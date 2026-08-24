@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Draft Arrival Cluster</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-primary-container": "#353789",
+                        "surface-dim": "#0e131e",
+                        "background": "#0e131e",
+                        "surface-bright": "#343945",
+                        "surface": "#0e131e",
+                        "on-tertiary": "#003915",
+                        "inverse-on-surface": "#2b303c",
+                        "secondary-container": "#571ac2",
+                        "surface-container-low": "#171c26",
+                        "on-secondary-container": "#c3abff",
+                        "surface-container": "#1b202a",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "secondary": "#d0bcff",
+                        "outline": "#918f9c",
+                        "surface-variant": "#303540",
+                        "tertiary-fixed-dim": "#4be176",
+                        "on-surface": "#dee2f1",
+                        "on-tertiary-fixed": "#002109",
+                        "outline-variant": "#464651",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "on-error": "#690005",
+                        "secondary-fixed": "#e9ddff",
+                        "tertiary": "#4ee478",
+                        "inverse-surface": "#dee2f1",
+                        "inverse-primary": "#5355a9",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-container-highest": "#303540",
+                        "on-secondary": "#3b0091",
+                        "primary-fixed": "#e1e0ff",
+                        "primary": "#c3c4ff",
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-tint": "#c1c1ff",
+                        "on-surface-variant": "#c7c5d3",
+                        "surface-container-high": "#252a35",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#090e18",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-tertiary-container": "#004c1e",
+                        "on-primary": "#242478",
+                        "on-background": "#dee2f1",
+                        "tertiary-container": "#26c760",
+                        "primary-container": "#a3a5ff",
+                        "error": "#ffb4ab",
+                        "on-error-container": "#ffdad6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0e131e; color: #dee2f1; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Manrope', sans-serif; }
+        .card-border { border: 1px solid #212631; }
+    </style>
+</head>
+<body class="min-h-screen p-8 md:p-16 antialiased selection:bg-primary-container selection:text-on-primary-container">
+<header class="mb-16">
+<h1 class="text-3xl font-headline font-bold text-on-surface tracking-tight">Draft Arrival Cluster</h1>
+<p class="text-on-surface-variant font-body mt-2 text-sm">Component Sheet — Deep Midnight Surface</p>
+</header>
+<div class="space-y-24 max-w-7xl mx-auto">
+<!-- SECTION: THE ARRIVAL CARD -->
+<section>
+<div class="flex items-center gap-4 mb-6">
+<h2 class="text-xs font-semibold text-on-surface-variant uppercase tracking-widest font-label">THE ARRIVAL CARD</h2>
+<div class="h-px bg-outline-variant flex-grow opacity-50"></div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+<!-- State A (Freshly Arrived) -->
+<div class="bg-surface-container-lowest card-border rounded-lg p-6 flex flex-col justify-between min-h-[280px]">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs text-primary font-medium px-2 py-1 bg-primary/10 rounded">Freshly Arrived</span>
+</div>
+<div class="group relative inline-block mb-4">
+<input class="bg-transparent border-b border-dashed border-outline-variant hover:border-primary focus:border-primary outline-none text-2xl font-headline font-semibold text-on-surface w-full max-w-md pb-1 transition-colors" type="text" value="Vendor Renewal Risk Sweep"/>
+<span class="material-symbols-outlined absolute -right-6 top-1 text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity text-sm">edit</span>
+</div>
+<div class="flex items-center gap-2 text-sm text-on-surface-variant mt-2">
+<span class="truncate max-w-[280px]">From "Every Monday, pull new vendor contracts..."</span>
+<button class="text-primary hover:text-primary-fixed underline decoration-primary/30 underline-offset-2 transition-colors">View full</button>
+</div>
+</div>
+<div class="flex items-center gap-3 mt-8">
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-medium hover:bg-primary-fixed transition-colors">Publish</button>
+<button class="bg-transparent border border-outline-variant text-on-surface px-4 py-2 rounded font-medium hover:bg-surface-variant transition-colors">Open in builder</button>
+</div>
+</div>
+<!-- State B (Returned-to) -->
+<div class="bg-surface-container-lowest card-border rounded-lg p-6 flex flex-col justify-between min-h-[280px]">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs text-on-surface-variant font-medium px-2 py-1 bg-surface-variant rounded">Returned-to</span>
+</div>
+<h3 class="text-2xl font-headline font-semibold text-on-surface mb-4">Vendor Renewal Risk Sweep</h3>
+<div class="flex items-center gap-2 text-sm text-on-surface-variant mt-2">
+<span class="truncate max-w-[280px]">From "Every Monday, pull new vendor contracts..."</span>
+<button class="text-primary hover:text-primary-fixed underline decoration-primary/30 underline-offset-2 transition-colors">View full</button>
+</div>
+</div>
+<div class="flex items-center gap-3 mt-8">
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-medium hover:bg-primary-fixed transition-colors">Publish</button>
+<button class="bg-transparent border border-outline-variant text-on-surface px-4 py-2 rounded font-medium hover:bg-surface-variant transition-colors">Open in builder</button>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION: THE DECISIONS LIST -->
+<section>
+<div class="flex items-center gap-4 mb-6">
+<h2 class="text-xs font-semibold text-on-surface-variant uppercase tracking-widest font-label">DECISIONS LIST</h2>
+<div class="h-px bg-outline-variant flex-grow opacity-50"></div>
+</div>
+<div class="bg-surface-container-lowest card-border rounded-lg overflow-hidden">
+<div class="flex flex-col">
+<!-- Row 1: Satisfied -->
+<div class="flex items-center justify-between px-4 py-3 border-b border-outline-variant/30 hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium text-on-surface">Data Source</span>
+</div>
+<div class="flex items-center gap-2 bg-tertiary/10 px-2 py-0.5 rounded">
+<span class="text-xs text-tertiary font-medium">Satisfied</span>
+</div>
+</div>
+<!-- Row 2: Needs You (Expanded with correction control) -->
+<div class="flex flex-col px-4 py-3 border-b border-outline-variant/30 bg-surface-variant/20">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#ffb4ab] text-lg" style="font-variation-settings: 'FILL' 1;">error</span>
+<span class="text-sm font-medium text-on-surface">Vendor Identification</span>
+</div>
+<div class="flex items-center gap-2 bg-[#93000a]/20 px-2 py-0.5 rounded">
+<span class="text-xs text-[#ffb4ab] font-medium">Needs You</span>
+</div>
+</div>
+<div class="pl-7 pr-2">
+<label class="block text-xs text-on-surface-variant mb-1">Correction control</label>
+<div class="flex gap-2">
+<input class="bg-surface-container border border-outline-variant rounded px-3 py-1.5 text-sm w-full focus:outline-none focus:border-primary text-on-surface" placeholder="Specify vendor logic..." type="text"/>
+<button class="bg-surface-variant hover:bg-outline-variant text-on-surface px-3 py-1.5 rounded text-sm transition-colors">Apply</button>
+</div>
+</div>
+</div>
+<!-- Row 3: Unknown -->
+<div class="flex items-center justify-between px-4 py-3 border-b border-outline-variant/30 hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant text-lg" style="font-variation-settings: 'FILL' 1;">help</span>
+<span class="text-sm font-medium text-on-surface">Contract Duration</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-variant/50 px-2 py-0.5 rounded">
+<span class="text-xs text-on-surface-variant font-medium">Unknown</span>
+<span class="text-xs text-on-surface-variant/70 ml-1 border-l border-outline-variant/50 pl-2">Not reported</span>
+</div>
+</div>
+<!-- Row 4: Knowledge-Grounding (Gate) -->
+<div class="flex items-center justify-between px-4 py-3 border-b border-outline-variant/30 hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-lg" style="font-variation-settings: 'FILL' 1;">database</span>
+<span class="text-sm font-medium text-on-surface">Knowledge-Grounding</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs text-on-surface-variant italic">Publishing requires grounding satisfaction</span>
+<div class="flex items-center gap-2 bg-[#93000a]/20 px-2 py-0.5 rounded">
+<span class="text-xs text-[#ffb4ab] font-medium">Needs You</span>
+</div>
+</div>
+</div>
+<!-- Row 5: Satisfied -->
+<div class="flex items-center justify-between px-4 py-3 hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium text-on-surface">Risk Assessment Logic</span>
+</div>
+<div class="flex items-center gap-2 bg-tertiary/10 px-2 py-0.5 rounded">
+<span class="text-xs text-tertiary font-medium">Satisfied</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION: THE SEED RECEIPT -->
+<section>
+<div class="flex items-center gap-4 mb-6">
+<h2 class="text-xs font-semibold text-on-surface-variant uppercase tracking-widest font-label">SEED RECEIPT</h2>
+<div class="h-px bg-outline-variant flex-grow opacity-50"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- State A (Active) -->
+<div class="bg-surface-container-lowest card-border rounded-lg p-5">
+<h3 class="text-sm font-semibold text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">receipt_long</span>
+                        Applied Decisions
+                    </h3>
+<ul class="space-y-2">
+<li class="flex items-center justify-between text-sm">
+<span class="text-on-surface-variant">Model</span>
+<span class="text-on-surface font-medium">GPT-4o</span>
+</li>
+<li class="flex items-center justify-between text-sm">
+<span class="text-on-surface-variant">Schedule</span>
+<span class="text-on-surface font-medium">Weekly</span>
+</li>
+</ul>
+</div>
+<!-- State B (Absent) -->
+<div class="bg-surface-container-lowest card-border rounded-lg p-5 border-dashed border-outline-variant flex items-center justify-center min-h-[120px] bg-surface-container-lowest/50">
+<span class="text-sm text-on-surface-variant italic">Absent when nothing to report</span>
+</div>
+</div>
+</section>
+</div>
+</body></html>

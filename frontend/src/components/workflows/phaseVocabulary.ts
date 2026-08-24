@@ -125,6 +125,65 @@ export function parseSkipTarget(onFailure: string | null | undefined): string | 
   return target.length > 0 ? target : null
 }
 
+// ── Phase 200-06 (BC-MR-03) — A BRANCH NODE'S OWN CONDITION ─────────────────────
+//
+// `200-CHECKLIST.md` §3 `BC-MR-03`, ledger row `BC-3` verbatim: *"`on_failure:
+// skip_to_phase:<slug>` IS in the definition. This half is frontend-only and was never
+// built."* The sketch draws the slot as `Over £2m?` — an author-written condition this
+// product does not have a field for — so what the node can honestly state is the condition
+// the definition really carries: *if the check on this step fails, the run goes there.*
+//
+// ⚠ THE SLUG IS AN IDENTIFIER, NOT A SENTENCE. `skip_to_phase:escalate` names a row; a
+// person reading a canvas needs the STEP'S NAME. The resolution is injected rather than
+// performed here, because only the caller holding the whole definition can do it — and
+// because a resolver that could not find the target must be able to say so by returning
+// null rather than by inventing a name.
+//
+// ⚠ AND IT IS SILENT ON A BROKEN BRANCH, WHICH IS 199-05's OWN RULE APPLIED AGAIN. An
+// unresolvable `skip_to_phase` already terminates in a stub node that prints the entire
+// sentence; a condition line on the source card saying the same thing three centimetres
+// away is the same fact twice. The resolver returning null is exactly that case.
+//
+// ⚠ WHY THIS IS NOT `WorkflowCanvas.BRANCH_CONNECTOR_WORD`, and why that is not drift.
+// That constant is the LINE's label: three words on an SVG label, naming what the
+// connector means. This is the CARD's line: a sentence naming where the run would go, in
+// the body of the step that owns the check. Two different elements on two different parts
+// of the plane, each with exactly ONE home for its own string. Neither is a second
+// spelling of the other, and neither module imports the other (the canvas imports this
+// file's TYPES only, and a value import back from here would close a live ESM cycle).
+
+/** The lead — the condition itself, stated as a condition. ONE home. */
+export const BRANCH_CONDITION_LEAD = "If the check fails"
+
+/** The join between the condition and its destination. ONE home. */
+export const BRANCH_CONDITION_ARROW = "→"
+
+/**
+ * The whole line, or `null` when this step declares no branch the canvas should state.
+ *
+ * `resolveName` is the caller's slug→name lookup over the definition it holds. Returning
+ * null from it (an unresolvable target) makes this return null too — see the docblock
+ * above for why silence is the right answer there rather than a slug.
+ *
+ * TOTAL over malformed input: an absent `validators`, a validator with no `on_failure`,
+ * and an `on_failure` that is not a skip directive all resolve to null rather than throw.
+ * These are author-supplied definition JSONB, so totality is a property of the function
+ * and not of its current callers.
+ */
+export function branchConditionOf(
+  phase: PhaseSpecJSON,
+  resolveName: (slug: string) => string | null,
+): string | null {
+  for (const validator of phase.validators ?? []) {
+    const target = parseSkipTarget(validator?.on_failure)
+    if (target === null) continue
+    const name = resolveName(target)
+    if (name === null || name.length === 0) return null
+    return `${BRANCH_CONDITION_LEAD} ${BRANCH_CONDITION_ARROW} ${name}`
+  }
+  return null
+}
+
 // ── The node face vocabulary ────────────────────────────────────────────────────
 
 /**
@@ -531,6 +590,42 @@ export const EXTERNAL_CAPABILITY_SENTENCES: Record<string, string> = {
 }
 
 /**
+ * Phase 200 (FE-WIRING) — THE JOINER BETWEEN THE VERB AND ITS DESTINATION.
+ *
+ * Sketch 200 draws the connector face WITH its destination on both graph views —
+ * `builder-canvas.html` (`Posts a message to Slack`) and `builder-spine.html:423`
+ * (`Saves the file to Google Drive`, `Creates an issue in Jira`) — while the map above is
+ * deliberately destination-FREE. Both were right at the time they were written: the map
+ * predates any connection mechanism, and until 189-13 there was genuinely nowhere for a
+ * destination to come from. `ExternalActionPhaseConfig.connection_id`
+ * (`backend/app/models/harness.py`) and `GET /connectors/connections`
+ * (`frontend/src/lib/api.ts` `listConnectorConnections`) both ship now, so the face can say
+ * where it goes without anyone guessing.
+ *
+ * ⚠ **A JOINER MAP AND NOT A SECOND SENTENCE MAP.** The VERB has exactly one home — the map
+ * above — and this adds only the word between it and the destination, so a re-worded
+ * capability changes in one place and the destination form follows. A parallel map of whole
+ * sentences would be a second spelling of all three verbs, free to drift, and drift here means
+ * the capability PICKER (`ExternalActionSection`, which reads the map above for its option
+ * labels under UI-SPEC §7b) and the node FACE disagreeing about what the same step does.
+ *
+ * ⚠ **THE PREPOSITIONS ARE THE SHEET'S OWN, NOT A GRAMMAR RULE.** `builder-spine.html` writes
+ * `to Google Drive` for a file and `in Jira` for a ticket — a ticket lives IN a tracker while a
+ * message goes TO a channel. `via` for email is the only one the sheet does not draw, and it is
+ * chosen because an email destination is the SENDER (the mailbox the connection authenticates
+ * as), not the recipient: `Sends an email to Acme SMTP` would name the wrong end of the
+ * transaction, which is exactly the class of quiet lie this vocabulary exists to avoid.
+ *
+ * CLOSED SET, MIRRORING THE MAP ABOVE. A capability with no entry here falls back to the
+ * destination-free sentence rather than to a default joiner — see `derivedFace` tier (4).
+ */
+export const EXTERNAL_CAPABILITY_DESTINATION_JOINERS: Record<string, string> = {
+  send_email: "via",
+  create_ticket: "in",
+  post_message: "to",
+}
+
+/**
  * The id→name lookups the derived face needs, injected by whoever holds them.
  *
  * Every member is optional and every miss is a fall-through, so the omitted /
@@ -548,6 +643,24 @@ export interface NameContext {
    *  resolved to its filename by the caller that holds the definition. Absent ⇒
    *  the template tier misses. */
   templateFilename?: string
+  /**
+   * Phase 200 (FE-WIRING) — connection id → the author's name for it. Source: the page's
+   * mount fetch of `GET /connectors/connections` (`listConnectorConnections`), joined on
+   * `ExternalActionPhaseConfig.connection_id`.
+   *
+   * ⚠ IT IS THE AUTHOR'S OWN LABEL, NEVER A HOST AND NEVER A CREDENTIAL. `ConnectorConnection`
+   * carries `name`, which is what the operator typed when they created the connection —
+   * `Slack — #reports`, `Jira (Delivery)`. No host, no port, no token and nothing from
+   * `config` reaches this map; CONN-03 SC#4's read-literally rule is unchanged, and what the
+   * node face gains is a NAME, not an endpoint.
+   *
+   * ⚠ ABSENT OR MISSING KEY ⇒ THE DESTINATION IS DROPPED AND THE DESTINATION-FREE SENTENCE
+   * RENDERS, byte-identically to how it always has. Every mount that does not supply this map
+   * — and every mount rendered before its fetch resolves — is in exactly the shipped state.
+   * A face that guessed a destination from a capability would be naming somewhere the step
+   * does not send to, on the one card whose whole job is to say where it sends.
+   */
+  connectionNames?: Readonly<Record<string, string>>
 }
 
 /** Module-scope so an omitted context hands the SAME reference on every call — the
@@ -580,6 +693,11 @@ export interface DerivedFaceInputs {
    *  through. IGNORED outside `external_action` for the same reason `folderName` is
    *  ignored outside the retrieval types. */
   capability?: string
+  /** Phase 200 (FE-WIRING) — the bound connection's display NAME, already resolved by the
+   *  caller out of `NameContext.connectionNames`. Like `skillName` / `folderName` and unlike
+   *  `capability`, this is a resolved name and never an id: a miss yields `undefined` and the
+   *  destination-free sentence renders. IGNORED outside `external_action`. */
+  connectionName?: string
 }
 
 /**
@@ -683,12 +801,41 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
   //     type sentence ("Reach outside"), which is the same floor tiers (2) and (3) obey:
   //     rendering a claim about a step whose executor cannot perform it states something
   //     false to the author, and a generic face is always better than a false one.
+  //
+  //     ⚠ PHASE 200 (FE-WIRING) — THE DESTINATION IS APPENDED WHEN, AND ONLY WHEN, THE CALLER
+  //     RESOLVED ONE. Sketch 200 draws this face WITH its destination on both graph views
+  //     (`Posts a message to Slack`, `Creates an issue in Jira`), and `connection_id` +
+  //     `GET /connectors/connections` now make that a READ rather than a guess. Three
+  //     independent conditions must all hold, and every failure falls back to the exact
+  //     destination-free sentence that shipped: the caller must have resolved a name, that name
+  //     must be non-blank after trimming, and the capability must own a joiner. So a mount with
+  //     no connection map, a step whose `connection_id` is unbound or dangling, a connection
+  //     the author named `"   "`, and a capability this client has a verb but no joiner for
+  //     ALL render today's string, byte for byte.
+  //
+  //     ⚠ BOTH LOOKUPS ARE WR-04 SINKS AND BOTH ARE OWN-PROPERTY GUARDED. `capability` reaches
+  //     here from author-supplied definition JSONB and both maps are plain object literals, so
+  //     a stored `"constructor"` returns the `Object` FUNCTION from either of them rather than
+  //     firing a fallback — the measured hard render crash of 188.1-04, and it would now have
+  //     two doors instead of one.
   if (
     inputs.phaseType === EXTERNAL_ACTION_PHASE_TYPE &&
     typeof inputs.capability === "string" &&
     Object.prototype.hasOwnProperty.call(EXTERNAL_CAPABILITY_SENTENCES, inputs.capability)
   ) {
-    return EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
+    const verb = EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
+    const destination =
+      typeof inputs.connectionName === "string" ? inputs.connectionName.trim() : ""
+    if (
+      destination.length > 0 &&
+      Object.prototype.hasOwnProperty.call(
+        EXTERNAL_CAPABILITY_DESTINATION_JOINERS,
+        inputs.capability,
+      )
+    ) {
+      return `${verb} ${EXTERNAL_CAPABILITY_DESTINATION_JOINERS[inputs.capability]} ${destination}`
+    }
+    return verb
   }
 
   // (5) HUMAN INPUT — nothing is bound, but the type alone says what happens.
@@ -740,6 +887,14 @@ export function derivedFaceOf(
   const rawCapability = config.capability
   const capability = typeof rawCapability === "string" ? rawCapability : undefined
 
+  // Phase 200 (FE-WIRING) — `connection_id` IS an id needing a lookup, so it reads like
+  // `skill_ref` above and NOT like `capability` beside it: a miss yields `undefined` and
+  // NEVER the raw id. An id-shaped destination on a node face is worse than no destination,
+  // which is the same floor D-187-05 sets for every other name-reading tier.
+  const rawConnectionId = config.connection_id
+  const connectionName =
+    typeof rawConnectionId === "string" ? ctx.connectionNames?.[rawConnectionId] : undefined
+
   return derivedFace({
     phaseType: typeof config.phase_type === "string" ? config.phase_type : "",
     skillName,
@@ -747,6 +902,7 @@ export function derivedFaceOf(
     templateFilename: ctx.templateFilename,
     folderName,
     capability,
+    connectionName,
   })
 }
 

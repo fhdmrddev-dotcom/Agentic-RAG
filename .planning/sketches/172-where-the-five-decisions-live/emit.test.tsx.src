@@ -1,0 +1,219 @@
+/**
+ * SKETCH 172 EMITTER — THROWAWAY. Deleted immediately after it runs.
+ *
+ * This is not a test. It renders the REAL `WorkflowBuilderPage` in its DRAFTED view with
+ * `visual_workflow_canvas` ON, and the REAL `SeedReceipt`, under jsdom, and writes their
+ * actual `innerHTML` to `dom.generated.json`.
+ *
+ * ── WHY THE PAGE ITSELF, AND NOT JUST THE LEAF ──
+ * 172's question is a COMPOSITION question: does the answerable surface own controls, or
+ * point at the ones that shipped? Three of the five D-07 rows ALREADY have controls on
+ * this screen — `project-folder-picker` and `business-requirement-input` live in the
+ * header identity strip, and the workflow name renders there as STATIC TEXT. A sketch
+ * that redrew that strip could quietly draw a strip that is easier to argue with than the
+ * real one. So the strip is RENDERED (SEED-155: if it depicts a surface consuming an
+ * existing component, it must RENDER it, not redraw it), and only the proposed decisions
+ * card is composed by hand — marked NEW in the contract.
+ *
+ * ── WHAT IS A PROPOSAL, SAID PLAINLY ──
+ * The decisions card exists in no component today. Every one of its nodes is NEW. Its
+ * COPY, however, is not invented: rows 1 and 3 render the shipped `UNBOUND_KB_INVITATION`
+ * and `REQUIREMENT_INVITATION` / `REQUIREMENT_AI_MARK_LABEL`, read out of the dump rather
+ * than re-typed, so the card cannot promise words the product does not say.
+ */
+import { describe, it, vi, beforeEach, expect } from "vitest"
+import { render, act, waitFor, screen } from "@testing-library/react"
+import fs from "node:fs"
+import path from "node:path"
+
+import { mockReactFlow } from "@/test-utils/mockReactFlow"
+
+const { mockGenerate, mockCreate, mockUpdate, mockListFolders, mockListSkills } = vi.hoisted(() => ({
+  mockGenerate: vi.fn(),
+  mockCreate: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockListFolders: vi.fn(),
+  mockListSkills: vi.fn(),
+}))
+const { mockValidate, mockBundle } = vi.hoisted(() => ({
+  mockValidate: vi.fn(),
+  mockBundle: vi.fn(),
+}))
+const { mockListDrafts } = vi.hoisted(() => ({ mockListDrafts: vi.fn() }))
+const { mockPublish } = vi.hoisted(() => ({ mockPublish: vi.fn() }))
+
+vi.mock("@/lib/api", () => ({
+  generateWorkflow: mockGenerate,
+  createWorkflowDraft: mockCreate,
+  updateWorkflowDraft: mockUpdate,
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
+  validateWorkflow: mockValidate,
+  getGroundingBundle: mockBundle,
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
+  publishWorkflow: mockPublish,
+  listDraftWorkflows: mockListDrafts,
+}))
+
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
+import { WorkflowBuilderPage, type BuilderDefinition } from "@/pages/WorkflowBuilderPage"
+import { SeedReceipt } from "@/components/workflows/SeedReceipt"
+import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+
+mockReactFlow()
+
+/**
+ * THE REAL FIVE KB TOOLS, read from `backend/app/services/harness/grounding.py:1029`
+ * (`KB_TOOLS`) and written here in `KB_TOOLS_SORTED` order. NOT invented — a sealed step
+ * in the receipt below names one of these, and the name has to be one the product uses.
+ */
+const KB_TOOLS = [
+  "analyze_document",
+  "get_related_documents",
+  "query_documents",
+  "read_document",
+  "search_documents",
+]
+
+const FOLDERS = [
+  { id: "f1", name: "Client deliverables", parent_id: null },
+  { id: "f2", name: "Vendor contracts", parent_id: null },
+  { id: "f3", name: "Weekly reporting", parent_id: null },
+]
+
+/**
+ * A five-step draft of this product's own shape. Two steps SEAL and they seal for the two
+ * DIFFERENT causes the receipt counts separately (`detected` vs `already-set`), because a
+ * fixture that produced only one cause would render only one of the card's two paragraphs
+ * and the stacking question would be judged against half the real card.
+ */
+const PHASES = [
+  {
+    slug: "gather",
+    phase_index: 0,
+    name: "Pull the vendor filings",
+    config: { phase_type: "llm_agent", available_tools: ["search_documents"] },
+  },
+  { slug: "assess", phase_index: 1, name: "Score the risk areas", config: { phase_type: "llm_single" } },
+  {
+    slug: "corroborate",
+    phase_index: 2,
+    name: "Check each claim against the contract",
+    config: { phase_type: "llm_agent", available_tools: ["read_document"] },
+  },
+  { slug: "draft", phase_index: 3, name: "Write the findings", config: { phase_type: "llm_single" } },
+  {
+    slug: "report",
+    phase_index: 4,
+    name: "Produce the vendor-risk brief",
+    config: { phase_type: "llm_emit", citation_policy: "strict" },
+  },
+] as unknown as PhaseSpecJSON[]
+
+/** The drafted definition the header renders. `business_requirement_seeded_by_ai` is what
+ *  makes the shipped `AI-proposed` mark appear — the one provenance mark this phase's
+ *  five rows would sit beside, so it must be in the dump rather than drawn. */
+const DEFINITION: BuilderDefinition = {
+  slug: "vendor-risk-review",
+  version: 1,
+  status: "draft",
+  name: "Vendor-risk review",
+  business_requirement:
+    "Produce a cited vendor-risk brief for each vendor under review this quarter.",
+  business_requirement_seeded_by_ai: true,
+  project_folder_id: "f2",
+  phases: PHASES as never,
+}
+
+/** The same draft with BOTH answers missing — the two shipped invitations render here
+ *  (`UNBOUND_KB_INVITATION`, `REQUIREMENT_INVITATION`) and nowhere else. */
+const DEFINITION_EMPTY: BuilderDefinition = {
+  ...DEFINITION,
+  business_requirement: "",
+  business_requirement_seeded_by_ai: false,
+  project_folder_id: null,
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockListFolders.mockResolvedValue(FOLDERS)
+  mockListSkills.mockResolvedValue([])
+  mockListDrafts.mockResolvedValue([])
+  mockCreate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-created" })
+  mockUpdate.mockResolvedValue({ id: "draft-1", version: 1, token: "tok-patched" })
+  mockBundle.mockResolvedValue({ tools: KB_TOOLS, folders: [], skills: [], degraded: [] })
+  mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
+  window.localStorage.clear()
+})
+
+const OUT = path.resolve(
+  __dirname,
+  // NOTE: this emitter is copied to `frontend/src/pages/`, which is THREE levels below
+  // the repo root — not four. 165's emitter lived one directory deeper
+  // (`components/workflows`), so its `../../../../` does not transfer.
+  "../../../.planning/sketches/172-where-the-five-decisions-live/dom.generated.json",
+)
+
+async function dumpBuilder(definition: BuilderDefinition): Promise<{
+  header: string
+  column: string
+}> {
+  const { container, unmount } = render(
+    <EffectiveFeaturesProvider
+      value={{ features: { visual_workflow_canvas: true }, loading: false, refetch: vi.fn() }}
+    >
+      <div style={{ width: 1200, height: 800 }}>
+        <WorkflowBuilderPage initial={{ definition, draftId: "draft-1" }} />
+      </div>
+    </EffectiveFeaturesProvider>,
+  )
+  // The folder fetch and the grounding bundle both settle on promises. Without the flush
+  // the KB picker renders with NO options and the strip would be dumped in a state no
+  // author ever sees.
+  await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  const header = container.querySelector("header")?.outerHTML ?? ""
+  const column = container.querySelector('[data-testid="builder-grid"]')?.outerHTML ?? ""
+  unmount()
+  return { header, column }
+}
+
+describe("sketch 172 emitter", () => {
+  it("dumps the real rendered DOM", async () => {
+    const dumps: Record<string, string> = {}
+
+    // ── THE DRAFTED HEADER, exactly as it ships. Rows 1, 3 and 4 of D-07 are all in
+    //    here already: a KB select, a requirement input with its AI-proposed mark, and
+    //    the workflow name as STATIC TEXT with no control at all.
+    const answered = await dumpBuilder(DEFINITION)
+    dumps.headerAnswered = answered.header
+    dumps.gridAnswered = answered.column
+
+    // ── THE SAME STRIP WITH THE ANSWERS MISSING — the two shipped invitations.
+    const empty = await dumpBuilder(DEFINITION_EMPTY)
+    dumps.headerEmpty = empty.header
+
+    // ── THE REAL RECEIPT, the card the proposed sibling would stack under (D-02).
+    {
+      const { container, unmount } = render(
+        <SeedReceipt phases={PHASES} kbTools={KB_TOOLS} open onDismiss={vi.fn()} />,
+      )
+      dumps.receipt = container.innerHTML
+      unmount()
+    }
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true })
+    fs.writeFileSync(OUT, JSON.stringify(dumps, null, 2), "utf8")
+    // eslint-disable-next-line no-console
+    console.log(
+      "EMITTED",
+      Object.entries(dumps)
+        .map(([k, v]) => `${k}=${v.length}B`)
+        .join(" "),
+    )
+  })
+})

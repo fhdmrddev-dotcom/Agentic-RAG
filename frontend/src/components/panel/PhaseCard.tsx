@@ -35,6 +35,19 @@ import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 // SAME words instead of printing the raw union member. See the marker below, where the
 // table used to stand, and that module's header for why the split was forced.
 import { statusMeta } from "./phaseStatusMeta"
+// ── Phase 200-07 (DES-02 / D-06 / D-07 · `200-CHECKLIST.md` RS-MR-01 / RS-MR-02 /
+//    RS-MR-04) — THE PANEL READS THE ONE RESOLVER AND DERIVES NOTHING NEW.
+//
+// A TYPE-ONLY import, and that is the shape rather than an accident: `200-05` built
+// `phaseDuration.ts` as the single home for D-06's nine arms and D-07's count arm, and
+// this card is a RENDERER. It receives an already-resolved `PhaseRunFacts` from
+// `PhaseTimeline` (which owns the fetch, the run status and the one hoisted `now`) and
+// prints it. No timestamp is subtracted here, no count is re-tested here, and the file
+// therefore cannot disagree with the run page about a duration.
+import type { PhaseRunFacts } from "@/components/workflows/phaseDuration"
+// The count's words. `countDeclared` is the ONE home for the `{n} {noun}` composition —
+// a template literal at this call site would be a second home for the same sentence.
+import { countDeclared } from "@/components/workflows/receiptVocabulary"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -135,6 +148,25 @@ const SUBSTEP_META: Record<EmitSubStep, SubStepMeta> = {
     textClass: "text-[hsl(var(--panel-status-active))]" },
   validated: { glyph: "✓", text: "Deliverable produced", node: "done",
     textClass: "text-[hsl(var(--panel-status-done))]" },
+  // Phase 196-03 (D-10) — an operator-DISABLED per-phase model was substituted for the
+  // run's model. `degraded` + the `recovering` amber: a substitution is degraded-but-honest,
+  // the same reading `recovering` already carries. It deliberately does NOT reuse the
+  // `recovering` STATUS — a narrated-emit recovery and a disabled-model substitution are
+  // different events, and collapsing them would put a lie on the run surface.
+  //
+  // ⚠ THE LABEL IS A FIXED PLAIN-TEXT CHILD (this file's XSS rule), so it CANNOT interpolate
+  // the two model ids — do not "improve" it into a template string. The specific ids live in
+  // the durable `policy_applied` audit receipt written by `_effective_model_checked` and in
+  // the backend log; the sentence below is true without them.
+  //
+  // ⚠ WHY THIS ENTRY EXISTS AT ALL (the A2 measurement, taken at planning time): `subStepMeta`
+  // below HAS a forward-compat default arm, and it renders `{ glyph: "•", text: "Working",
+  // node: "active" }`. Riding that default would have rendered a disabled-model substitution
+  // as the word "Working" — a SILENT notice, and therefore the very defect this phase exists
+  // to remove. The default arm stays (it is correct for a genuinely unknown future value);
+  // this member simply must not use it.
+  model_fallback: { glyph: "↯", text: "Switched to the run's model — this step's model is turned off",
+    node: "degraded", textClass: "text-accent-violet-text" },
 }
 
 function subStepMeta(s: EmitSubStep): SubStepMeta {
@@ -268,9 +300,26 @@ export interface PhaseCardProps {
   phase: Phase
   /** Native list position (for the visible "Phase i" ordinal). 0-based. */
   position: number
+  /**
+   * Phase 200-07 (DES-02 / D-06 / D-07) — the step's resolved run facts, or `undefined`.
+   *
+   * ⚠ **OPTIONAL, AND ITS ABSENCE IS A THIRD STATE rather than a default.** `undefined`
+   * means the CALLER holds no durable row for this slug — a live-only skeleton row, or a
+   * mount with no reconcile frame yet — and the honest render of that is NOTHING AT ALL.
+   * It is emphatically not `time not recorded`, which is a claim that a row exists and its
+   * timestamps are empty. Folding the two is the same defect `runFacts.ts` shipped once
+   * (CR-01) and `DecisionsList` shipped once (D-20).
+   *
+   * ⚠ **EVERY ARM ARRIVES ALREADY DECIDED.** The card never asks "is this running?" to
+   * pick a reading — `phaseDuration.ts` did, with the RUN's status in hand, which is the
+   * only place the difference between a live tick, `did not finish` and
+   * `paused, waiting on a person` is knowable. A local ternary here would be a second
+   * derivation and the panel and the run page would eventually disagree.
+   */
+  timing?: PhaseRunFacts
 }
 
-export function PhaseCard({ phase, position }: PhaseCardProps) {
+export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
   const status = statusMeta(phase.status)
   const isRunning = phase.status === "running"
@@ -338,9 +387,30 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
               ? "border-accent-violet/50 bg-accent-violet/5"
               : phase.status === "pending"
                 ? // QUIET idle — dim, still, no motion (SC#2 "quiet at rest").
-                  "border-border/40 bg-card/20 opacity-60"
-                : // done / skipped — folded calm.
-                  "border-border/50 bg-card/30",
+                  //
+                  // Phase 199-02 (DES-01, sheet `c3-phase-spine` Col 2) — THE BOX IS GONE
+                  // FROM THE SETTLED ROWS. See the note on the arm below; this arm keeps
+                  // its `opacity-60`, which is what carries "not yet".
+                  "border-transparent opacity-60"
+                : // done / skipped / stopped / not-sent / unknown — folded calm.
+                  //
+                  // Phase 199-02 (DES-01) — was `border-border/50 bg-card/30`. Sheet c3's
+                  // panel column draws a box on exactly TWO rows: the one that is live and
+                  // the one that is asking for a person. Every settled row sits on the bare
+                  // spine. The shipped panel boxed all of them, so a six-step run rendered
+                  // six competing frames and the eye had nothing to land on — which is the
+                  // same finding 127-03 already acted on when it made the active step bloom
+                  // and the idle step go quiet. This carries that decision into the FRAME
+                  // rather than only into the fill, and it is a SUBTRACTION: no atom is
+                  // added, no word changes, no status is repainted.
+                  //
+                  // ⚠ `border-transparent` RATHER THAN dropping the `border` utility. The
+                  // border box is what reserves the 1px on each edge; removing the utility
+                  // would move every row by 2px and turn a tone change into a geometry
+                  // change. The class is stock Tailwind and already ships in this tree
+                  // (`admin/ModelRegistryTab.tsx:589`), so it cannot compile to nothing —
+                  // the `bg-warning` failure mode `gutterTokens.fences.test.ts` exists for.
+                  "border-transparent",
         // The llm_batch_agents purple left-border accent (--accent-violet, Plan 01).
         // Kept for non-running states; the running BLOOM owns the left bar while live.
         phase.phaseType === "llm_batch_agents" &&
@@ -384,6 +454,56 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
               </span>
             )}
             <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{phase.slug}</span>
+
+            {/* ── Phase 200-07 · RS-MR-02 (the per-step reading) + RS-MR-01 (the declared
+                   count) ────────────────────────────────────────────────────────────────
+                SITED HERE, IN THE IDENTITY COLUMN, DELIBERATELY. The status atom below
+                carries `ml-auto` and its two children are pinned POSITIONALLY by
+                `PhaseCard.test.tsx`'s nine-row `[glyph, word]` inventory (it reads
+                `button span.ml-auto`'s children by index). Rendering into that atom would
+                make a characterization pin depend on this plan, and this repo's precedent
+                (199-03, and 200-06's icon-well decline) is to move the new thing rather
+                than re-baseline the pin. Measured: that inventory passes UNEDITED.
+
+                ⚠ ONE READING PER ROW — D-09's own shape, where `1.8s` and
+                `never ran (skipped)` occupy THE SAME SLOT. There is no "duration or
+                nothing" field here that a caller could fill beside a contradicting word,
+                which is what stops a step still marked active under a terminal run from
+                reading *still running* beside *did not finish*.
+
+                ⚠ `data-timing-kind` is a MACHINE HOOK, not text a person reads — it is how
+                the §4.2 fence asserts that a live tick appears on the `running` arm and on
+                no other. A ligature-style word rendered as visible text is what N-5 and
+                `RS-MNR-06` forbid; a `data-*` attribute is neither. */}
+            {timing !== undefined && (
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[11px] leading-tight text-panel-muted-foreground">
+                <span
+                  data-testid="phase-card-timing"
+                  data-timing-kind={timing.timing.kind}
+                  className="tabular-nums"
+                >
+                  {timing.timing.reading}
+                </span>
+                {/* ⚠ AN EXPLICIT NULL TEST — never a truthiness test, and never a
+                       zero-coalesce on the count. `declaredCount` already separated a
+                       declared `0` (a real measurement — the step searched and found
+                       nothing) from an absent one (this phase type declares no count at
+                       all, and four of the seven do); either of the two shapes just
+                       forbidden would fold them straight back together. The absent case
+                       renders NO ELEMENT: no digit, no dash, no empty span (`RS-MNR-03`),
+                       because an empty element is still a rendered slot.
+
+                       ⚠ NEITHER FORBIDDEN SHAPE IS SPELLED HERE, and that is the 187-24
+                       rule rather than coyness: this plan's acceptance greps this file for
+                       both, and a comment quoting either makes its own guard read `1`
+                       instead of `0`. It did, on the first draft of this very comment. */}
+                {timing.count !== null && (
+                  <span data-testid="phase-card-count">
+                    {countDeclared(timing.count.count, timing.count.noun)}
+                  </span>
+                )}
+              </span>
+            )}
           </span>
 
           {/* Status atom: aria-hidden glyph + REAL text + AA color (non-color-only). */}

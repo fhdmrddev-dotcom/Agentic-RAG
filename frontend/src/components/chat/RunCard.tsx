@@ -527,6 +527,64 @@ function formatElapsed(ms: number): string {
 }
 
 // File-local helpers — UI-SPEC §8.2 copy contract.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194 Plan 07 (RUN-01 / D-14) — THE CANCELLED PAIR WAS CONSIDERED AND
+// **KEPT**. This comment exists because a plan that silently leaves a file alone
+// and a plan that examined it and declined are two different facts, and only one
+// of them is auditable.
+//
+// D-14: `RunCard`'s shipped vocabulary is the STARTING POINT, not a rewrite —
+// planning may extend it; it may not replace it without stating why. Measured at
+// the phase base, the pair is the filled-square mark plus the word `"cancelled"`
+// (both below), read straight off the already-persisted `message.runStatus`.
+// ⚠ Neither mark is SPELLED anywhere in this comment, on purpose: this file's
+// glyph occurrences are load-bearing evidence (plan 194-04 chose the panel's
+// stopped mark by COUNTING them across `frontend/src`), and prose copies both
+// move an acceptance grep and make any future copy fence over this module
+// vacuous — the 187-24 / 193.2-F-3 lesson, and the same trap 194-04's own
+// `default:` grep fell into. It is kept, for three
+// reasons, the third of which is the one that actually settles it:
+//
+//  1. **The chat receipt is deliberately THIN.** The panel owns the meaningful
+//     phase spine and chat carries a thin run receipt — the Phase 094/103 split
+//     (`references/workflow-run-surface.md` D1). Phase 194 made the SPINE honest
+//     about a stop (plan 194-04 gave `Phase["status"]` a ninth member and the
+//     panel the word `Stopped`); duplicating that reasoning here would rebuild
+//     the spine in the receipt, which is precisely what D1 refuses.
+//  2. **Nothing here needs a new source of truth.** `runStatus` is already
+//     persisted and already drives both halves; no state, no fetch, no prop.
+//  3. **It does NOT read as though nothing survived** — the D-13 honesty worry
+//     that would have forced an extension. The rendered strip (`:383-389`) is
+//     `Run · {n} step{s} · <mark> cancelled · {elapsed}`, so the step count sits
+//     in the same sentence as the word. D-13 keeps a stopped run's completed phases
+//     and explicitly rejects "collapsing to a bare `cancelled` that hides partial
+//     work … it discards evidence the database still holds" — a bare `cancelled`
+//     is exactly what this receipt is NOT. Adding copy claiming work was kept (or
+//     discarded) would be a claim this component cannot check.
+//
+// ⚠ TWO MARKS ARE REFUSED HERE, and the line is drawn from both sides:
+//   - the shipped filled-square mark below is NOT replaced (D-14 forbids
+//     replacing without stating why, and no why exists). Plan 194-04 re-chose it
+//     BY MEASUREMENT for the panel's stopped state precisely because this file's
+//     occurrence is its only render in `frontend/src` and carries no second
+//     meaning.
+//   - the "stop-button" square the sketch drew — the one in
+//     `references/workflow-run-surface.md` D3's cancelled receipt, named there
+//     rather than re-typed here — is refused outright: net-new, absent from
+//     `references/icon-convention.md` §4's table, and §4 requires a net-new mark
+//     to be a FLAGGED proposal rather than something a plan quietly ships.
+//
+// ⚠ A CORRECTION RECORDED BESIDE `194-RESEARCH.md`'s THREE-MARK TABLE, WHICH
+// MISSED ONE. RESEARCH lists three: the filled square here, the lucide `Square`
+// (the Stop CONTROL), and the sketch's designed-never-built stop-button square.
+// There is a FOURTH and it ships: `pages/WorkflowRunPage.tsx:299` renders a
+// slashed-circle mark before the word `Cancelled` as the run band's cancelled
+// sentence. That is what disqualifies THAT mark from any new use — it would then
+// carry three concepts (that one, plus `admin/ModelDiscoveryPanel.tsx:504`'s "No
+// longer offered"). Plan 194-04 measured the same fourth mark independently, and
+// `194-07-SUMMARY.md` records it spelled out for a reader who needs the literal.
+// ─────────────────────────────────────────────────────────────────────────────
 function statusGlyph(s: Message["runStatus"]): string {
   if (s === "completed" || s === undefined) return "✓"
   if (s === "failed") return "✗"

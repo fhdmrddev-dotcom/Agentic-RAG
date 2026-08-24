@@ -254,3 +254,99 @@ number appearing on `.planning/ROADMAP.md` for SEED-013**. At that point each of
 either becomes an MCP client call behind the **unchanged** `ConnectorAdapter` protocol, or is
 retired. Until that phase number exists, this amendment stands and does not need re-argued — and the
 three re-open triggers of the verdict itself, dated 2026-08-07 above, are unaffected by it.
+
+## Recorded direction 2026-08-18 — breadth is now asked for, and re-open trigger #3 has FIRED
+
+**This is an addition, not an amendment** — the same fence the 2026-08-08 section above sets. The
+verdict stands in full and nothing in it is retracted here. What is recorded is that **one of this
+doc's own three re-open triggers has fired**, plus three findings measured the same day that would
+otherwise be inherited wrongly.
+
+### The direction (operator, 2026-08-18)
+
+> "expose our app as MCP and also to call other applications through MCP — I need to pull information
+> from Slack or Jira or Monday or ClickUp or whatever, email, OneDrive… similar to competitors like
+> Beam or Glean… where it fits should be in the chat, where it can call tools and inspect external
+> environments, as well as in the workflow."
+
+And, correcting an over-engineered reading of that ask:
+
+> "my point is not to over-complicate. We have the ability to connect simply — just authenticate and
+> connect at user level, similar to what we do in Claude AI… What I meant by hundreds is at least to
+> have a connection with the suitable applications that work side by side with our RAG."
+
+### Which trigger fired, precisely — #3, not #2
+
+**Trigger 3** — *"Open Platform slips past the point where breadth is commercially needed."* Its
+observable is *"connector breadth blocks a real deal or a real user while the Open Platform milestone
+(SEED-013 / SEED-014) still has no phase number on `.planning/ROADMAP.md`."* Measured 2026-08-18:
+
+```
+$ grep -niE "seed-013|open platform" .planning/ROADMAP.md
+   (0 hits)
+```
+
+⚠ It is **not** trigger 2 (*"a real connector need that no MCP server covers"*). Every application
+named has a maintained MCP server. The distinction is load-bearing: trigger 2 would re-open
+*first-party-thin*, while trigger 3 re-opens *breadth sequencing*, and they have different answers.
+
+**What this section does NOT do:** it does not re-open the verdict. Per the rule above, re-opening
+means amending this doc **and** adding a superseding `D-vX.Y-NN` entry — that happens when Open
+Platform gets a phase number, which is the same observable trigger 3 names. This records that the
+trigger fired so silence is not mistaken for a decision.
+
+### ⚠ Correction — MCP DOES standardize authorization; "OAuth per vendor" is WRONG
+
+Stated wrongly in conversation on 2026-08-18 and corrected the same session. It is recorded because
+the wrong version inflates every future connector estimate:
+
+> ✗ *"MCP standardizes how a tool is called; it standardizes nothing about how you got the token."*
+
+**False for remote MCP servers.** The MCP authorization spec requires OAuth 2.1 (Authorization Code +
+PKCE) and RFC 9728 Protected Resource Metadata for authorization-server discovery. Registration is by
+Client ID Metadata Documents (recommended), Dynamic Client Registration (RFC 7591, deprecated but
+supported), or manual pre-registration.
+
+**Consequence:** the OAuth client is built **once, generically**, and every compliant remote MCP
+server works — which is why Claude.ai's connector UX is "paste a URL, log in, done."
+⚠ **`SEED-144`'s per-vendor-OAuth premise should be re-read against this**; the work is materially
+smaller than that seed implies for any vendor shipping a compliant remote MCP server.
+
+### The structural finding — the tool registry is CLOSED BY DESIGN
+
+Measured in `backend/app/models/connector.py:155` and `backend/app/models/harness.py:196`: the
+`_TOOL_REGISTRY` / `PROGRAMMATIC_PHASE_REGISTRY` rule is that **an unknown key is a KeyError**,
+deliberately, as a safety property. User-level connections require **dynamic tool registration**
+scoped to enabled connections — a change to how tools are *resolved*, not a feature on top. This is
+the piece most likely to be discovered late and expensively.
+
+Tool-count explosion is **not** a blocker at the asked-for scale: a user connects 5–10 apps (~50
+tools), not hundreds.
+
+### n8n, measured live 2026-08-18 — BYO, never bundled
+
+The operator's local n8n MCP server was probed end-to-end (`n8n MCP Server v1.1.0`, stateless
+HTTP+SSE, 401 enforced on missing and bad tokens).
+
+- It is an **authoring** server, not an integration bus. Of 34 tools, the entire execution surface is
+  two — `execute_workflow` (async, returns an id) and `get_workflow_execution`. The unit of
+  integration is *a published n8n workflow*, not *a Slack node*. Per-workflow `availableInMCP`
+  requires the workflow to be **published** and to hold a webhook / form / schedule / chat trigger.
+- ⚠ **n8n is fair-code, NOT open source** (Sustainable Use License). A client running their own n8n is
+  fine, and building workflows for clients is expressly permitted — but **shipping n8n inside our
+  product, or hosting clients' workflows and credentials on an instance we operate, requires a paid
+  Embed License.**
+- Bundling also adds a second runtime (its own Postgres, queue and workers — against red line
+  **D-14**), a second identity and credential store **our RLS does not reach**, and its CVE patch
+  cadence.
+
+**Verdict: bring-your-own n8n, connected over MCP like any other server.** This keeps the
+`ConnectorAdapter` seam and the D-v3.6-02 reasoning intact — self-hosting moves egress control to the
+network layer, but the socket to Slack is still not ours, so an n8n-backed capability remains a
+distinct trust class rather than a CONN-03-covered one.
+
+### Where the full analysis lives
+
+[`SEED-177`](../.planning/seeds/SEED-177-mcp-connections-connect-and-be-connected.md) — the shape
+table, the ~15-application catalog, the suggested phase split (connections client → expose-us →
+reads-into-retrieval), the open-source leverage list and its deliberate skips.

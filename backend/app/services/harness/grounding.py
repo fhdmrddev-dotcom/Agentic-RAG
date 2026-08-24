@@ -242,28 +242,62 @@ def _render_folder_tree(folders: list[dict]) -> str:
     return "\n".join(lines) if lines else "(no folders)"
 
 
-async def _resolve_template_placeholders(
+async def resolve_template_placeholders(
     *,
     supabase,
     pool,
     user_id: str,
     template_asset_id: str | None,
     template_placeholders: list[str] | None,
-) -> list[str]:
+) -> tuple[list[str], str]:
     """OPTIONAL template grounding (D-103-3 / D-103-CONF-2). ``template_placeholders`` is
     used directly; ``template_asset_id`` resolves a LIBRARY asset
     (``resolve_template_source`` Branch 1, which keys on ``asset_id`` as the storage path
     and never touches ``thread_id``) then parses its docx placeholder vocabulary. A
     resolution miss degrades to no placeholders (template grounding is optional) — never
-    a hard failure of the whole generate."""
+    a hard failure of the whole generate.
+
+    RETURNS ``(names, read)`` where ``read`` is one of ``"ok" | "unreadable" |
+    "not_requested"`` (quick task 260814-q5r). **The list alone was ambiguous THREE ways
+    and the function collapsed all three into ``[]``**: an exception (storage miss,
+    deleted object, auth failure — swallowed below with only a log), no bytes, and a
+    genuinely field-less document. At HTTP 200 a caller could not tell *"we read it and
+    it has none"* from *"we never read it"* — so an author whose template failed to
+    resolve was told, in the same words, that their template has no fill-in fields. That
+    is a lie the author acts on, and the second element is the whole fix.
+
+    The mapping, arm by arm — **no control flow changed, only what each arm returns**:
+
+      * supplied ``template_placeholders``  -> ``"ok"`` (the caller already read it)
+      * no ``template_asset_id``            -> ``"not_requested"`` (we were not asked)
+      * ``except``                          -> ``"unreadable"``
+      * no bytes                            -> ``"unreadable"`` (no bytes IS never-read)
+      * parser returned nothing             -> ``"ok"`` with ``[]`` — **the arm that makes
+        the honest empty state possible: we DID open the document and it carries no tokens**
+      * parsed names                        -> ``"ok"``
+
+    ⚠ Renamed from ``_resolve_template_placeholders`` (it has a second caller now: the
+    owner-gated ``GET /workflows/{id}/template/placeholders`` read route). The
+    ``GroundingBundle`` dataclass, its ``degraded`` set and every existing consumer are
+    BYTE-UNAFFECTED — ``assemble_grounding_bundle`` unpacks and discards the status. A
+    template axis deliberately does NOT enter ``degraded``: that set is consumed by
+    ``/validate``'s ``grounding_unavailable_finding`` and by the publish gauntlet, so
+    putting an unreadable template into it would turn a document-read blip into a
+    validation finding and change publish behaviour far outside this concern.
+    """
     if template_placeholders:
-        return list(template_placeholders)
+        return list(template_placeholders), "ok"
     if not template_asset_id:
-        return []
+        return [], "not_requested"
     try:
         from app.models.harness import AssetRef  # function-local
         from app.services.template_asset_service import resolve_template_source
-        from app.services.template_render_service import parse_docx_template_variables
+        # Imported as a MODULE (Phase 193.1) so the shared name assembly and the parser
+        # arrive on one line: this function is no longer the only place that turns a
+        # parsed template into field names — the stateless author-time door
+        # (``POST /workflows/template/placeholders``) is the second caller, and the two
+        # may never disagree about the same document.
+        from app.services import template_render_service as _tmpl
 
         asset_ref = AssetRef(
             asset_id=str(template_asset_id),
@@ -280,17 +314,20 @@ async def _resolve_template_placeholders(
         )
         data = resolved.get("bytes")
         if not data:
-            return []
-        parsed = parse_docx_template_variables(data)
+            # No bytes is NEVER-READ, not read-and-empty. Reporting "ok" here would be
+            # the exact lie this three-state exists to prevent.
+            return [], "unreadable"
+        parsed = _tmpl.parse_docx_template_variables(data)
         if not parsed:
-            return []
-        names: list[str] = list(parsed.get("scalars") or [])
-        for col_keys in (parsed.get("columns") or {}).values():
-            names.extend(col_keys)
-        return sorted(set(names))
+            # We DID open the document and the parser found no tokens in it. This is the
+            # ONLY arm that may honestly answer "ok" with an empty list.
+            return [], "ok"
+        # LIFTED, not changed (193.1-02): scalars PLUS every loop column, EXCLUDING
+        # ``collections``, deduped and sorted — identical behaviour, one home.
+        return _tmpl.placeholder_names_from_parsed(parsed), "ok"
     except Exception:  # noqa: BLE001 — optional grounding: a miss is no placeholders, not a crash
         logger.warning("grounding: template placeholder resolution failed; skipping")
-        return []
+        return [], "unreadable"
 
 
 def _grounding_failed(detail: str) -> dict:
@@ -468,7 +505,10 @@ async def assemble_grounding_bundle(
         degraded.add("skills")
 
     skill_ids = {str(s["id"]) for s in skills}
-    placeholders = await _resolve_template_placeholders(
+    # The read status is DISCARDED here on purpose (quick task 260814-q5r): the bundle's
+    # shape, its consumers and its ``degraded`` set are unchanged by that task. The status
+    # is consumed only by the dedicated owner-gated placeholders route.
+    placeholders, _read = await resolve_template_placeholders(
         supabase=supabase,
         pool=pool,
         user_id=user_id,
@@ -516,6 +556,13 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
     ``bundle.tools``, the narrow half, so the NL grounding prose is the same string it was
     before 189. The capabilities are absent from it for the same reason they are absent
     from the rail: they are not names a model may be told to whitelist freely.
+
+    ⚠ **AMENDED at Phase 193.1 (D-26), 2026-08-14 — and the byte-identical claim above is
+    now TRUE OF EVERY SECTION EXCEPT THE TEMPLATE ONE.** That is stated here rather than
+    left for a reader to discover: the template placeholder section was deliberately
+    rewritten from one hedged heading into two ASSERTIVE arms (see the block comment above
+    ``template_section`` below). The tool / skill / folder / project sections are untouched
+    and remain byte-identical to the Phase 182 extraction.
     """
     folder_tree = _render_folder_tree(bundle.folders)
     skill_lines = (
@@ -528,6 +575,62 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
         if project_folder_id
         else "The workflow is NOT bound to a project folder (whole-KB).\n"
     )
+
+    # ── The template section — TWO ASSERTIVE ARMS, not one hedged heading (D-26) ──────
+    #
+    # ⚠ THE WORDING IS ASSERTIVE BY MEASUREMENT, NOT BY TASTE. Until 2026-08-14 this was a
+    # single conditional heading — ``### Template placeholder fields (if the workflow must
+    # fill a template)`` — followed by the names or ``(none)``. Plan ``193.1-04`` drove six
+    # real ``POST /workflows/generate`` calls on ``claude-opus-4-8`` / ``anthropic`` and
+    # measured what that phrasing actually buys (``193.1-UAT.md`` row U1):
+    #
+    #   | call                                   | render_template phase | keys in draft |
+    #   |----------------------------------------|-----------------------|---------------|
+    #   | A control — no placeholders sent       | 0                     | 1/8           |
+    #   | B ×3 — placeholders sent, hedged header | **0 / 0 / 0**        | 3–4/8         |
+    #   | C ×2 — the SAME payload, plus a describe|                       |               |
+    #   |        sentence saying a template IS    | **1 / 1**             | **8/8**       |
+    #   |        attached                         |                       |               |
+    #
+    # The wire was never broken: all eight names reached the prompt on every B run, proved
+    # without a provider call (``test_193_1_grounding_wire.py``). What failed was the
+    # INFERENCE. ``AUTHORING_SYSTEM_PROMPT``'s DELIVERABLE RULE
+    # (``workflow_authoring.py:82-91``) licenses ``render_template`` *"ONLY when the
+    # grounding explicitly lists template placeholders (i.e. the user provided a
+    # .docx/.pptx/.xlsx template to fill)"* and closes *"reach for a template only when one
+    # is actually provided"* — so its condition is PROVISION, and a list under an ``if``
+    # heading asserts no such thing. Three runs out of three, the model read the hedge and
+    # declined the branch.
+    #
+    # ⚠ THE RULE ITSELF IS DELIBERATELY NOT EDITED. One home per concern: the rule states
+    # the policy, the grounding states the FACTS the policy reads. Changing both at once
+    # would have left neither attributable when the fix was re-driven.
+    #
+    # ⚠ THE ABSENT ARM IS DELIBERATELY NO WEAKER — it is STRONGER, and that is a
+    # correctness requirement rather than symmetry. Call A proved the no-template path
+    # already behaves correctly, and SC#4 (*the fast door stays fast*) and D-08 both rest
+    # on it. A ``render_template`` phase with no template bound is TERMINAL at run
+    # (``no_template_bound``, ``phase_types.py:1271``) and can NEVER publish, so softening
+    # this arm would trade a slow deliverable for an impossible one.
+    #
+    # The two arms share no sentence: each states which of the two worlds this call is in,
+    # and the D-26 defect was precisely that ONE string served BOTH meanings.
+    if bundle.placeholders:
+        template_section = (
+            "### Template placeholder fields — the user HAS attached a template document "
+            "to this workflow; the final deliverable MUST therefore be an `llm_emit` phase "
+            "with `emitter: 'render_template'` that fills EXACTLY the fields named on the "
+            "next line\n"
+            f"{', '.join(bundle.placeholders)}\n"
+        )
+    else:
+        template_section = (
+            "### Template placeholder fields — NO template document was provided with this "
+            "workflow; the final deliverable MUST therefore be PLAIN TEXT / markdown, and a "
+            "`render_template` emit phase is FORBIDDEN because it would fail at run time\n"
+            "(none)\n"
+        )
+
     return (
         "## Grounding (use ONLY these ids / names)\n\n"
         f"{project_line}\n"
@@ -537,8 +640,7 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
         f"{', '.join(bundle.tools) or '(none)'}\n\n"
         "### Skill registry (enabled; owner + global) — ids eligible for `skill_ref`\n"
         f"{skill_lines}\n\n"
-        "### Template placeholder fields (if the workflow must fill a template)\n"
-        f"{', '.join(bundle.placeholders) if bundle.placeholders else '(none)'}\n"
+        f"{template_section}"
     )
 
 

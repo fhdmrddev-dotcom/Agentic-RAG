@@ -204,6 +204,13 @@ import {
   type XYPosition,
 } from "@xyflow/react"
 
+// 199 CR WR-03 — the ground table lives in its own leaf: a component file may not export a
+// shared OBJECT constant (`react-refresh/only-export-components`). The bare-string
+// `BRANCH_CONNECTOR_WORD` below is exempt under the same rule and deliberately stays here.
+import { BACKGROUND_GROUND } from "./canvasGround"
+// Phase 200 (FE-WIRING) — the zoom readout, in its own leaf so this G-5 hot file gains a JSX
+// child and no new hook. It subscribes to the viewport, which nothing in this body does.
+import { CanvasZoomReadout } from "@/components/workflows/CanvasZoomReadout"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import {
   CANVAS_EDGE_KINDS,
@@ -211,8 +218,18 @@ import {
   toCanvas,
   type CanvasEdge,
   type CanvasNode,
+  type EdgePayload,
 } from "@/components/workflows/canvasModel"
 import { CanvasToolbar, type ToolbarSaveState } from "@/components/workflows/CanvasToolbar"
+// 200-06 (BC-MR-02) — the four connection states have ONE home, and it is a leaf that
+// imports nothing but a React type. This shell owns the pointer and the selection, so it
+// resolves the state; it does not decide what the four ARE.
+import {
+  CONNECTION_STATE_DELTA,
+  CONNECTION_STATE_WORD,
+  CONNECTION_STATES,
+  connectionStateOf,
+} from "@/components/workflows/connectionState"
 import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
@@ -225,6 +242,10 @@ import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+// 200-06 (BUG-260813-01) — the NON-THROWING accessor, deliberately. The throwing
+// `useTheme` belongs to writers; this canvas only reads, and its four suites mount it with
+// no provider.
+import { useThemeOptional } from "@/providers/ThemeProvider"
 // Type-only: the check-state union has ONE owner and this file declares no second
 // spelling of it, so a rename there is a typecheck error here rather than a branch that
 // quietly stops matching. Erased at build — no runtime edge. 187-27 moved the owner from
@@ -342,6 +363,25 @@ const DEFAULT_EDGE_OPTIONS: DefaultEdgeOptions = {
   },
 }
 
+/**
+ * Phase 200 (canvas port) — how long the reorder-refusal acknowledgement stays on the node.
+ *
+ * 320ms against a 220ms animation: long enough that the nudge completes and the outline is
+ * seen to rest for a moment, short enough that it cannot read as a persistent STATE of the
+ * step. A refusal is an answer to one keypress, not a property of the first card.
+ *
+ * MODULE SCOPE, never a literal at the use site — the frozen-table rule this file already
+ * applies to `CANVAS_LAYOUT`, `EDGE_STYLE` and `BACKGROUND_GROUND`.
+ */
+const REFUSAL_NUDGE_MS = 320
+
+/**
+ * The class the refusing node's WRAPPER wears for `REFUSAL_NUDGE_MS`. Spelled once here and
+ * consumed by the `nodes` memo; its keyframe, its reduced-motion guard and the outline that
+ * carries the reading when motion is suppressed all live in `index.css` beside the ring's.
+ */
+const REFUSAL_NUDGE_CLASS = "canvas-reorder-refused"
+
 /** Solid for run order and for the terminal cap; dashed for a conditional branch. */
 const EDGE_STYLE: Record<string, CSSProperties> = {
   [CANVAS_EDGE_KINDS.flow]: { stroke: "hsl(var(--border))", strokeWidth: 2 },
@@ -352,6 +392,57 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
     strokeDasharray: "5 4",
   },
 }
+
+/**
+ * 199-05 — THE BRANCH CONNECTOR'S WORD, and the one row sheet `c1-canvas-plane` asked
+ * for that this surface could honestly answer.
+ *
+ * ⚠ THE MEASURED GAP. Until this constant the resolved on-fail branch was the ONLY
+ * connector on the plane that means something other than "then", and it said so in
+ * NOTHING but a dash and an amber stroke. The same concept carries its word on both
+ * sibling surfaces — `PhaseSpineGraph.tsx` prints `on fail → skip to <slug>`, and this
+ * canvas's own broken-target stub prints `on fail → goes to <slug> — no such step` — so
+ * a reader who cannot see the amber got the branch from the shipped canvas and from
+ * nowhere else. The acceptance bar is that every state the plane can express is
+ * distinguishable WITHOUT colour and carries its word where a word exists. The word
+ * existed; the connector did not carry it.
+ *
+ * WHY THE WORD AND NOT THE GLYPH. The `⤳` mark is the shipped on-fail glyph
+ * (`icon-convention.md` §4) and both sibling homes draw it — but both wrap it in
+ * `aria-hidden`, because it is decoration beside a sentence that already carries the
+ * meaning. An SVG edge label is ONE text node with no room for that split, so shipping
+ * the glyph here would put an unlabelled mark into an accessible name. The dash already
+ * carries the shape; this carries the meaning. The card's own rule, stated in
+ * `PhaseNodeCard`'s docblock: **the WORD carries the meaning; tone is decoration.**
+ *
+ * WHY IT IS NOT THE SHEET'S LABEL. Sheet c1's connectors carry `312 contracts` →
+ * `48 extracted` → `12 flagged`: a per-edge PAYLOAD COUNT. Nothing in this system emits
+ * one, and drawing an approximation would be a fabricated business figure on the surface
+ * a business reader trusts most. That is reported as CANNOT-EXPRESS, in full, in this
+ * plan's summary. What ships here is the branch's own authored CONDITION, which the
+ * definition already holds and two other surfaces already print.
+ *
+ * NOT ON THE BROKEN BRANCH. An unresolvable `skip_to_phase` already terminates in a stub
+ * node that prints the whole sentence; a second `on fail` on its connector would be the
+ * same fact twice, three centimetres apart.
+ */
+export const BRANCH_CONNECTOR_WORD = "on fail"
+
+/**
+ * The label's own presentation, in the SAME raw hsl the branch stroke above already
+ * spends — deliberately not a Tailwind token. 15 of sheet 178's 18 colour tokens compile
+ * to nothing against this repo's config, and an unpainted class is indistinguishable from
+ * a deliberately unpainted arm (the `bg-warning` silent no-op that shipped unguarded
+ * until 192.2). A raw literal beside an identical raw literal cannot acquire that failure.
+ */
+const BRANCH_CONNECTOR_LABEL = {
+  label: BRANCH_CONNECTOR_WORD,
+  labelShowBg: true,
+  labelBgPadding: [6, 2] as [number, number],
+  labelBgBorderRadius: 4,
+  labelStyle: { fill: "hsl(38 92% 60% / 0.95)", fontSize: 10, fontWeight: 500 },
+  labelBgStyle: { fill: "hsl(var(--card))", stroke: "hsl(38 92% 60% / 0.35)" },
+} as const
 
 /**
  * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
@@ -587,6 +678,12 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
+  // 200-06 (BUG-260813-01) — the app's ONE theme, read the same way the ⌥ reveal above is:
+  // a non-throwing context read, so this component still renders with no provider mounted.
+  // Because it is a CONTEXT and not a per-consumer hook, a toggle made anywhere — the chat
+  // shell owns the only one — re-renders this canvas. That is the property a second
+  // `useTheme()` call could not have had, and it is the reason this fix is a provider.
+  const themeCtx = useThemeOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
   const projection = useMemo(() => toCanvas(phases, { kbTools, nameContext }), [phases, kbTools, nameContext])
@@ -604,6 +701,40 @@ export function WorkflowCanvas({
    */
   const [dragOverlay, setDragOverlay] = useState<Record<string, XYPosition>>({})
 
+  // ⚠ DECLARED HERE, ABOVE THE `nodes` MEMO THAT READS IT, AND NOT BESIDE THE KEY
+  // HANDLER THAT WRITES IT. A `const` is in its temporal dead zone until its own line
+  // runs, so declaring it next to the handler further down threw
+  // `ReferenceError: Cannot access 'refusedSlug' before initialization` from inside the
+  // memo — 83 tests red on one hoisting mistake, which is what this note is here to
+  // stop the next reader repeating.
+  /**
+   * Phase 200 (canvas port) — WHICH STEP JUST REFUSED TO MOVE, if any.
+   *
+   * ⚠ IT EXISTS BECAUSE THE REFUSAL WAS SILENT. Operator finding, in their words: *"nodes
+   * cannot move to the left or to the right — the first node to the left cannot move beyond
+   * a certain boundary, same as to the right."* The REFUSAL is correct — order is derived
+   * from run order and there is no position −1 — but the handler's early `return` told
+   * nobody, so a person pressed a key, nothing happened, and nothing said why. That is the
+   * same defect class as a control that declines without saying so.
+   *
+   * A SLUG AND NOT A BOOLEAN, so the acknowledgement lands on the node the person actually
+   * selected rather than on the plane. It is transient by design and clears itself on a
+   * timer; nothing downstream persists it, and it never reaches the definition.
+   */
+  const [refusedSlug, setRefusedSlug] = useState<string | null>(null)
+  const refusalTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The timer is cleared on unmount so a refusal fired just before navigation cannot call
+  // `setState` on a dead component. `useEffect` with an empty dep list is the right shape:
+  // the ref survives every render, so there is nothing to re-subscribe.
+  useEffect(
+    () => () => {
+      if (refusalTimer.current !== null) clearTimeout(refusalTimer.current)
+    },
+    [],
+  )
+
+
   /**
    * The library's own measurement, echoed back so it survives our node rebuilds.
    * See `handleNodesChange` for why dropping it makes a dragged card blink.
@@ -615,6 +746,56 @@ export function WorkflowCanvas({
   /** Where the dragged card started. Captured on drag start; the axis split is read
    *  against it, never against the lane it happens to be nearest. */
   const dragOriginRef = useRef<XYPosition | null>(null)
+
+  // ── 200-06 (BC-MR-02) — the two VIEW facts a connection's state is read from ─────
+  //
+  // Both live here rather than on the projection: they are where the pointer is and what
+  // the person picked, neither of which belongs in a pure function of the definition.
+  // Neither participates in the node memos, so a hover cannot re-render a card.
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+
+  /**
+   * 200-06 (BC-MR-01 · D-08) — slug → THE STEP'S OWN DECLARED COUNT, ready to render.
+   *
+   * ⚠ **PLACED ABOVE `settledNodes` ON PURPOSE, AND THE PLACEMENT IS FENCED.** This
+   * file's own suite slices its source at the drag-overlay memo's declaration and asserts
+   * that the whole REMAINDER names the run lookup nowhere — the anti-blink split, which
+   * exists because a run lookup in the overlay memo rebuilt every node's `data` ~60×/s and
+   * visibly flickered the cards. The edges memo lives below that line, so it may not name
+   * the lookup either; this memo does the read once, up here, and the edges memo reads it.
+   *
+   * ⚠ AND THE SLICE ANCHOR IS A LITERAL STRING, SO THIS DOCBLOCK MAY NOT SPELL IT. Writing
+   * the anchor out here — even inside a comment, even to explain the rule — moves the
+   * suite's `indexOf` to this line and hands it an EMPTY slice, which then matches nothing.
+   * Measured RED exactly that way while this memo was being written, which is the whole
+   * reason the sentence above describes the anchor instead of quoting it.
+   *
+   * ⚠ **THE CANVAS STILL DERIVES NOTHING.** It calls the page-supplied function and keeps
+   * what came back. It computes no count, opens no fetch, reads no step ordinal and
+   * imports no vocabulary — the three properties its suite greps for. D-08's whole point
+   * is that the connection's label and the live per-step column are ONE mechanism; a
+   * second counting path here is what would let the two drift apart (BC-MNR-05).
+   *
+   * `typeof count === "number"` — never `count ?? …`, never `if (count)`. A step that
+   * searched and found nothing declared a real `0` and it must survive to the render;
+   * a type that declares no count at all must produce NO entry, so the edge can omit the
+   * label element rather than draw an empty one (BC-MNR-01).
+   */
+  const edgePayloads = useMemo<Record<string, EdgePayload>>(() => {
+    const out: Record<string, EdgePayload> = Object.create(null) as Record<string, EdgePayload>
+    if (runState === undefined) return out
+    for (const node of projection.nodes) {
+      if (node.type !== CANVAS_NODE_TYPES.phase) continue
+      const state = runState(node.id)
+      if (state === undefined) continue
+      const { count, noun } = state
+      if (typeof count !== "number" || Number.isNaN(count)) continue
+      if (typeof noun !== "string" || noun.length === 0) continue
+      out[node.id] = { count, noun }
+    }
+    return out
+  }, [projection.nodes, runState])
 
   // A COPY. Selection, the ⌥ boolean, the cosmetic `dy`, the per-node drag flag and the
   // server verdict mark are all view state; the model output and the definition behind
@@ -681,12 +862,27 @@ export function WorkflowCanvas({
       // node's `position` became a Function with no `.x`/`.y` — and the library then
       // wrote NO transform at all, painting the card at the origin on top of phase 1.
       const overlay = own(dragOverlay, node.id)
-      if (overlay === undefined) return node
+      // Phase 200 — the reorder-refusal acknowledgement rides HERE rather than in
+      // `settledNodes`, and the placement is load-bearing. This memo copies the node but
+      // hands `data` straight through BY REFERENCE, so `PhaseNode`'s memo still
+      // short-circuits and the card is not re-rendered to show a wrapper class. Adding it
+      // one memo up would have rebuilt every node's `data` object — the exact identity the
+      // drag-flicker fix depends on.
+      const refused = refusedSlug !== null && node.id === refusedSlug
+      if (overlay === undefined && !refused) return node
       touched = true
-      return { ...node, position: overlay }
+      return {
+        ...node,
+        ...(overlay === undefined ? {} : { position: overlay }),
+        // Composed, never replaced: the projection may already have given this node a
+        // class, and a refusal must not silently drop it.
+        ...(refused
+          ? { className: [node.className, REFUSAL_NUDGE_CLASS].filter(Boolean).join(" ") }
+          : {}),
+      }
     })
     return touched ? next : settledNodes
-  }, [settledNodes, dragOverlay])
+  }, [settledNodes, dragOverlay, refusedSlug])
 
   /**
    * The lane centres, in render order — the x-coordinate of every phase column, read
@@ -761,14 +957,55 @@ export function WorkflowCanvas({
     [nodes],
   )
 
-  const edges = useMemo<CanvasEdge[]>(
-    () =>
-      projection.edges.map((edge) => ({
+  const edges = useMemo<CanvasEdge[]>(() => {
+    // 199-05 — the stubs a BROKEN branch terminates in. Read off the node TYPE rather
+    // than off the reserved id prefix, so renaming the namespace cannot silently start
+    // labelling the broken branch twice.
+    const brokenTargets = new Set(
+      projection.nodes
+        .filter((node) => node.type === CANVAS_NODE_TYPES.unresolvedSkip)
+        .map((node) => node.id),
+    )
+    return projection.edges.map((edge) => {
+      const kind = edge.data?.kind ?? CANVAS_EDGE_KINDS.flow
+      // 200-06 (BC-MR-02) — the four states, resolved by the ONE leaf that defines them.
+      //
+      // `not taken` is the CONDITIONAL BRANCH and nothing else. It is a fact about the
+      // DEFINITION — this line is only followed when a check fails — never a claim that a
+      // run did not follow it, which would need rows this canvas does not read.
+      const connection = connectionStateOf({
+        selected: edge.id === selectedEdgeId,
+        hovered: edge.id === hoveredEdgeId,
+        conditional: kind === CANVAS_EDGE_KINDS.skip,
+      })
+      // ⚠ `own()`, not a bare index (WR-04 · BUG-260807-01 / BUG-260808-01). An edge's
+      // `source` IS a phase slug, `workflow_phases.slug` is unconstrained `text`, and a
+      // slug named `constructor` resolves an INHERITED FUNCTION through a bare index —
+      // never nullish, so every downstream guard passes and a function reaches the render.
+      // The map is null-prototype as well, so the write side cannot be poisoned either.
+      const payload = own(edgePayloads, edge.source)
+      return {
         ...edge,
-        style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
-      })),
-    [projection.edges],
-  )
+        // At rest and not-taken contribute an EMPTY delta, so the shipped run-order
+        // connector and the shipped dashed branch are byte-identical to before this plan.
+        style: { ...EDGE_STYLE[kind], ...CONNECTION_STATE_DELTA[connection] },
+        // The branch's word, on the RESOLVED branch only — see `BRANCH_CONNECTOR_WORD`.
+        // Spread CONDITIONALLY (the shipped D-14 idiom), so a run-order connector's object
+        // is byte-identical to what it was before this plan.
+        ...(kind === CANVAS_EDGE_KINDS.skip && !brokenTargets.has(edge.target)
+          ? BRANCH_CONNECTOR_LABEL
+          : {}),
+        data: {
+          ...(edge.data ?? { kind }),
+          connection,
+          // CONDITIONAL, for the same D-14 reason: an upstream step that declared nothing
+          // leaves the key absent, and `FlowEdge` then renders NO label element at all —
+          // never a `0`, never a dash, never an empty pill (BC-MNR-01).
+          ...(payload === undefined ? {} : { payload }),
+        },
+      }
+    })
+  }, [projection.edges, projection.nodes, edgePayloads, hoveredEdgeId, selectedEdgeId])
 
   /**
    * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
@@ -921,9 +1158,37 @@ export function WorkflowCanvas({
       if (from === -1) return
 
       const to = from + (event.key === "ArrowLeft" ? -1 : 1)
-      // At either end there is nowhere to go. Nothing is committed and nothing new is
-      // said — a live region that repeats itself on a no-op teaches the user to ignore it.
-      if (to < 0 || to >= phaseOrder.length) return
+      // At either end there is nowhere to go. Nothing is committed, and NOTHING NEW IS SAID
+      // — a live region that repeats itself on a no-op teaches the user to ignore it. That
+      // sentence is unchanged and still governs the ANNOUNCEMENT.
+      //
+      // ⚠ WHAT CHANGED IS THAT SILENCE IS NO LONGER THE WHOLE ANSWER (Phase 200 — operator
+      // finding). The reasoning above is correct about the screen reader and was being
+      // applied to the eye as well, so a sighted person pressed a key and got nothing at
+      // all. The visual acknowledgement below is the other half: it fires on the selected
+      // node, it is bounded, and it says "this direction is the end" without claiming
+      // anything moved.
+      //
+      // IT DOES NOT SPAM, and the mechanism is not a string comparison. `event.repeat` is
+      // already discarded above, so a HELD key nudges once. A repeatedly TAPPED key is a
+      // repeated deliberate act and gets a repeated answer — which is the honest behaviour;
+      // what the comment above forbids is re-announcing the same words into a live region,
+      // and the live region is untouched here. `setAnnouncement` is deliberately NOT called.
+      //
+      // The state is re-set before the timer so a second tap restarts the acknowledgement
+      // rather than being swallowed by the tail of the first.
+      if (to < 0 || to >= phaseOrder.length) {
+        event.preventDefault()
+        if (refusalTimer.current !== null) clearTimeout(refusalTimer.current)
+        setRefusedSlug(null)
+        // A frame's gap, so React really removes and re-adds the class and the animation
+        // restarts. Setting the same value twice in one tick would be a no-op render.
+        refusalTimer.current = setTimeout(() => {
+          setRefusedSlug(selectedSlug)
+          refusalTimer.current = setTimeout(() => setRefusedSlug(null), REFUSAL_NUDGE_MS)
+        }, 0)
+        return
+      }
 
       event.preventDefault()
       onCommitNodes?.(nodesWithMove(selectedSlug, to))
@@ -1247,7 +1512,25 @@ export function WorkflowCanvas({
           fitViewOptions={{ padding: 0.1, minZoom: 0.3 }}
           minZoom={0.3}
           maxZoom={2}
-          colorMode="dark"
+          // ── 200-06 (BUG-260813-01 · BC-MNR-03) — THE PLANE FOLLOWS THE APP ─────────
+          //
+          // This read `colorMode="dark"`, hardcoded, and it was the whole bug: the canvas
+          // was the only dark island in a light page. ⚠ AND IT DARKENED MORE THAN THE
+          // PLANE. React Flow puts this value on its wrapper as a CLASS — the literal
+          // string `"dark"` — and `tailwind.config.js` is `darkMode: ["class"]`, which
+          // Tailwind scopes by the NEAREST ANCESTOR. So one prop wrapped the whole subtree
+          // in a `.dark` ancestor and took the dot grid, the controls, the attribution and
+          // our own node cards with it — cards that hardcode nothing and use theme tokens
+          // throughout. That is why no per-card work was owed, and why the fence for this
+          // asserts the PLANE and a CARD rather than the prop: the completeness is a
+          // coincidence of two unrelated systems agreeing on one spelling, and if they ever
+          // diverge the canvas half-fixes and reads as a fresh bug.
+          //
+          // NON-THROWING, and required: this canvas's four suites mount it with no provider
+          // at all. `"dark"` is the fallback because it is what `getInitialTheme` returns
+          // with no window and no stored preference — so a provider-less render is
+          // byte-identical to the pre-fix rendering rather than newly light.
+          colorMode={themeCtx?.theme ?? "dark"}
           // D-183-05 — the EXISTING selection contract. The callback fires outside
           // the library's selectability guard, and `node.id === phase.slug` is what
           // carries the identity end to end. The cap and the broken-reference stub
@@ -1255,20 +1538,142 @@ export function WorkflowCanvas({
           onNodeClick={(_, node) => {
             if (node.type === CANVAS_NODE_TYPES.phase) onSelectNode(node.id)
           }}
+          // ── 200-06 (BC-MR-02) — the two states the plane could not express ────────
+          //
+          // FIRST-CLASS PROPS ON AN ALREADY-INTERACTIVE PLANE, exactly as `onPaneClick`
+          // below is, and for the same reason: the alternative was a handler bolted onto
+          // the edge component, and `FlowEdge`'s own suite forbids that outright — it
+          // greps that file for four attribute spellings and requires zero hits, because
+          // one tab stop per node is a canvas-level invariant and a pressable mark on a
+          // line would be a second. The pointer and the pick therefore live HERE, and the
+          // edge renders the state it is handed.
+          //
+          // Selection is tracked locally rather than through the library's own edge
+          // selection: `edges` is a CONTROLLED prop with no `onEdgesChange`, so a
+          // library-managed `selected` flag could never be applied back and the state
+          // would be unreachable. This mirrors the node contract two lines below, where
+          // `selectedSlug` is the page's and the click is the library's.
+          onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
+          onEdgeMouseEnter={(_, edge) => setHoveredEdgeId(edge.id)}
+          onEdgeMouseLeave={() => setHoveredEdgeId(null)}
           // …and the deselect half, read straight off the library's own pane element.
           // A first-class prop on an already-interactive plane — not a DOM handler
           // bolted onto a non-interactive element — so the a11y gate stays clean.
-          onPaneClick={onClearSelection}
+          //
+          // 200-06 — it clears the CONNECTION pick too. A click on empty plane means "I am
+          // done with what I had picked", and leaving a line lit while the node selection
+          // cleared would leave two selections disagreeing on one surface.
+          onPaneClick={() => {
+            setSelectedEdgeId(null)
+            onClearSelection()
+          }}
           // …and the same contract from the keyboard (CR-01). One rule, two devices.
           onKeyDown={activateFromKeyboard}
           // …and the announced affordance, which has to match the MODE (see the two
           // tables at module scope). The read-only table is byte-unchanged.
           ariaLabelConfig={editable ? ARIA_LABELS_EDITABLE : ARIA_LABELS}
         >
-          <Background />
+          {/* 199-05 — THE GROUND, COMMITTED. Sheet `c1-canvas-plane`'s one structural
+              claim about the plane is that it *commits* to a ground rather than leaving
+              one to happen: "a quiet dot grid, quiet enough that a step at rest is still
+              the loudest thing on the plane."
+
+              Until this line the ground was whatever `@xyflow/react` defaults to. The
+              three values below are the ones it was ALREADY producing — MEASURED off the
+              shipped rendering, not copied from the sheet — so this changes no pixel and
+              buys one thing: a library upgrade that moves a default can no longer move
+              this surface's ground without a diff. `BACKGROUND_GROUND` is the frozen
+              table (S5 — never a literal at a use site).
+
+              ⚠ THE COLOUR IS DELIBERATELY NOT COMMITTED. `color` would emit an inline
+              fill and take the dots OFF the theme's own variables, so the ground would
+              stop following light/dark. Geometry is ours to state; the palette belongs to
+              the theme. The sheet's own `#212631` on `#090e18` is declined for the same
+              reason 15 of its 18 colour tokens are: they are that sheet's palette, and
+              this repo's config does not carry them. */}
+          <Background
+            variant={BACKGROUND_GROUND.variant}
+            gap={BACKGROUND_GROUND.gap}
+            size={BACKGROUND_GROUND.size}
+          />
           {/* The prop below removes the interactivity padlock — see the docblock;
-              without it read-only is two clicks deep. */}
-          <Controls showInteractive={false} />
+              without it read-only is two clicks deep.
+
+              ── ⚠ Phase 200 (FE-WIRING) — SKETCH 200's `Lock canvas` IS DECLINED, AND THE
+                 NARROWING THAT WOULD HAVE ALLOWED IT WAS BUILT, MEASURED AND WITHDRAWN.
+
+              `builder-canvas.html:391` draws a `title="Lock canvas"` padlock in this cluster,
+              and the 200 audit correctly notes the library ships one — so this reads as a
+              one-word prop flip. It is not, and the reasoning is recorded because the
+              attractive version of it is wrong for a reason a reader cannot see from here.
+
+              THE NARROWING THAT WAS TRIED: `showInteractive={editable}`, so the read-only
+              canvas keeps `false` — every word of the argument above is stated about the
+              read-only surface and still holds — while the Builder's editable plane, which is
+              ALREADY draggable and connectable, gains a control whose only transition is
+              editable → LOCKED. That framing is sound as far as it goes: on an editable plane
+              the padlock cannot GRANT a capability, only withhold one.
+
+              ⚠ WHY IT WAS WITHDRAWN ANYWAY, and this is the fact the audit flagged as *"the
+              sheet's separate lock semantics would need a decision"*: xyflow's handler sets
+              `nodesDraggable`, `nodesConnectable` AND `elementsSelectable` — all three. The
+              third is not a layout concern. On THIS surface selecting a node is what opens the
+              step panel, so the library's "lock" would also remove the author's ability to
+              INSPECT a step. The sheet's padlock protects an arrangement; this one would
+              additionally make the workflow unreadable while engaged, which is a different
+              control wearing the same glyph. Choosing what a locked canvas should still permit
+              is a product decision, not a wiring one.
+
+              ⚠ RE-OPEN TRIGGER, dated rather than permanent: a phase that scopes canvas view
+              controls as a feature and decides what `Lock canvas` means here. The likely shape
+              is a lock that suppresses drag and connect while LEAVING selection alive — which
+              is not `showInteractive` at all, but the three underlying props set
+              independently. That is a build, and it is why this is not one. */}
+          <Controls showInteractive={false}>
+            {/* Phase 200 (FE-WIRING) — the sheet's `100%`. It renders INSIDE the shipped
+                cluster rather than as a second floating panel, so the plane still has exactly
+                one control affordance in its bottom-left corner.
+
+                ⚠ THE SHEET PUTS IT BETWEEN `−` AND `+` AND THIS APPENDS IT AFTER THE
+                BUTTONS, because `<Controls>` renders its children after its own and
+                interleaving them means rebuilding the cluster by hand — trading a real
+                dependency on the library's zoom handlers for a pixel match. The atom the sheet
+                is asking for is *"the plane says how far in it is"*, and it now does. */}
+            <CanvasZoomReadout />
+          </Controls>
+          {/* 200-06 (BC-MR-02) — THE LEGEND STRIP, the sketch's own bottom-right panel.
+              It is what makes the four states legible rather than merely distinct: a line
+              that changes weight under the pointer says nothing until the plane has said
+              what its line weights MEAN. The words are the leaf's, so the legend and the
+              lines can never end up naming the same state differently.
+
+              Decorative and inert: `aria-hidden`, no control, no tab stop — one tab stop
+              per node is a canvas-level invariant and a legend is not an exception to it.
+              The swatches carry SHAPE (weight and dash), never colour alone. */}
+          <div
+            aria-hidden="true"
+            data-testid="canvas-connection-legend"
+            className="pointer-events-none absolute bottom-2 right-2 z-10 flex items-center gap-3 rounded-md border border-border/60 bg-card/85 px-3 py-1.5 backdrop-blur-sm"
+          >
+            {CONNECTION_STATES.map((state) => (
+              <span key={state} className="flex items-center gap-1.5" data-legend-state={state}>
+                <svg width="16" height="4" viewBox="0 0 16 4" className="block">
+                  <line
+                    x1="0"
+                    y1="2"
+                    x2="16"
+                    y2="2"
+                    strokeWidth={CONNECTION_STATE_DELTA[state].strokeWidth ?? 2}
+                    stroke={CONNECTION_STATE_DELTA[state].stroke ?? "hsl(var(--border))"}
+                    strokeDasharray={state === "not-taken" ? "3 2" : undefined}
+                  />
+                </svg>
+                <span className="text-[11px] leading-none text-muted-foreground">
+                  {CONNECTION_STATE_WORD[state]}
+                </span>
+              </span>
+            ))}
+          </div>
           {/* 184-12 — the `＋` / `✕` layer. A CHILD of `<ReactFlow>` so it can read the
               viewport, and drawn through `<ViewportPortal>` so it lives on the plane
               beside the nodes rather than inside any of them. Editing-only. */}

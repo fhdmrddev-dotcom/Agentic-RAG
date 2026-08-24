@@ -55,6 +55,16 @@ PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
     "google":     180_000,  # Gemini Pro tiers at 200k — stay just below
     "openrouter": 100_000,  # Unknown underlying model — stay conservative
     "ollama":      80_000,  # Local hardware — stay conservative
+    "lmstudio":    32_768,  # Local hardware. Measured 2026-08-18: absent from this
+                            # table, `lmstudio` fell through to the 100_000
+                            # unknown-provider fallback — so the trimmer believed it
+                            # had 100k for a model whose real window was 32,768 and
+                            # never trimmed, and runs died with
+                            # `400: request (41206 tokens) exceeds the available
+                            # context size (32768)`. 32_768 is the common default
+                            # load size; a bigger box overrides it per-model via the
+                            # registry's `context_window_tokens` (which now CLAMPS
+                            # this chain — see resolve_context_budget).
     "deepseek":  100_000,  # DeepSeek-V4 actual 64K-1M depending on model — conservative
     "moonshot":  200_000,  # Kimi K2.6 actual 262k
     "minimax":   160_000,  # MiniMax M2.7 actual 204k
@@ -518,10 +528,26 @@ def _build_inferred_defaults(model_id: str, provider: str) -> ModelCapability:
     # meaningful operator triage signal.
     if model_id and model_id not in _WARNED_UNKNOWN_MODEL_IDS:
         _WARNED_UNKNOWN_MODEL_IDS.add(model_id)
+        # ⚠ The wording matters. This line used to end `safe_defaults_applied=True`,
+        # which READS AS BENIGN — and that is exactly how a total tool-calling
+        # failure stayed invisible for a day (2026-08-18). When the inferred
+        # provider is not in _NATIVE_TOOL_PROVIDERS the model is put into
+        # STRUCTURED mode, the `tools` param is never sent, and the model narrates
+        # its tool calls as PROSE (`<tool_call>...`) which the parser cannot read —
+        # the agent loop then breaks after one iteration with no error anywhere.
+        # So say the consequence and the remedy, not just that defaults were applied.
+        _native = provider in _NATIVE_TOOL_PROVIDERS
         logger.warning(
-            "model_capability_unknown model_id=%s inferred_provider=%s safe_defaults_applied=True",
+            "model_capability_unknown model_id=%s inferred_provider=%s native_tools=%s%s",
             model_id,
             provider,
+            _native,
+            "" if _native else (
+                " — TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED "
+                "mode, the tools param will NOT be sent, and any tool call it attempts "
+                "will arrive as unparseable prose. Add a row for this model in the Model "
+                "Registry (native_tools + the LOADED context_window_tokens) to fix it."
+            ),
         )
     return cap
 
@@ -713,9 +739,19 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
             base = dict(MODEL_CAPABILITIES.get(model_id, {}))
             if not base:
                 base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
-            # Overlay non-None DB fields
+            # Overlay non-None DB fields.
+            # Phase 196 (AUTH-04 / D-14): ``emit_tier`` joins the copy list, backed by the
+            # real column migration 120 adds. Before 120 the column did not exist, so adding
+            # the name here alone would have overlaid NULL for every row forever (RESEARCH
+            # Pitfall 1) — the list entry and the column ship together or not at all.
+            # ⚠ RESEARCH Pitfall 7, SURVIVES THIS CHANGE DELIBERATELY: the SYNC
+            # ``get_model_capability`` still never reads the DB, so
+            # ``get_model_capability("glm-4.7-flash")`` still returns
+            # ``capability_source="inferred"`` with NO emit_tier. Any surface that needs a
+            # DB-only model's tier must use THIS async path or the registry union payload.
             for field in ("llm_call_timeout_seconds", "context_window_tokens",
-                          "max_output_tokens", "native_tools", "deprecated"):
+                          "max_output_tokens", "native_tools", "deprecated",
+                          "emit_tier"):
                 db_val = db_row.get(field)
                 if db_val is not None:
                     base[field] = db_val

@@ -1,4 +1,23 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — THIS FILE WAS RE-SITED BY THE PHASE 200
+ * CANVAS PORT AND THE PORT IS REVERTED. The port replaced the node card's 137-B face (a
+ * 248px centre-aligned frosted block with a 62px 3D mark floating above its top edge) with
+ * sketch 200's compact 240x72 row carrying a 24px mark inside a left gutter, and every mark
+ * this module places had to move with it. **The operator has since seen both faces rendered
+ * and chosen the 137-B one**, naming the ring around the mark and the card silhouette, so
+ * the geometry here goes back with the card it is placed against.
+ *
+ * ⚠ THE PORT'S ARITHMETIC IS NOT LOST AND IS NOT REPEATED HERE. It was correct for the card
+ * it was solving — it re-derived every offset from a 240px card rather than guessing — and
+ * it reads in full at `901b25ff` and `c4463d92`. Reverting it is a judgement about which
+ * card ships, never a claim that the port measured wrong.
+ *
+ * ⚠ THE MARKS MOVE AS A SET OR THEY COLLIDE. This module, `NodeRunOverlay.tsx` and
+ * `PhaseNodeCard.tsx`'s own card div are one geometry, and criterion 23's zero-overlap
+ * check is what fails when only some of them move. Reverting any one alone is what the
+ * occupancy table exists to catch.
+ */
+/**
  * Phase 188.2-05 Task 2 (D-04) — NodeRunOverlay.
  *
  * PHASE 188'S RUN STATE, DRAWN AROUND THE CARD. The status ring that turns the 62px icon
@@ -145,6 +164,13 @@ const RING_STROKE: Record<CanvasReading, string> = {
   // already answered), primary (the run has moved on). Precedent, not laziness — the
   // SHAPE carries it, and this is the only ring drawn in four arcs.
   "recorded-not-sent": "hsl(var(--muted-foreground))",
+  // 194 / D-13 — the calm terminal token again, DUPLICATED from `skipped`, `unknown` and the
+  // recorded-not-sent reading on purpose. Every other token would claim something untrue:
+  // success (the confusion this reading exists to prevent), destructive (nothing failed — a
+  // person ended the run), warning (there is nothing for anyone to do), primary (the run is
+  // over). Precedent, not laziness — the SHAPE carries it, and this is the only ring cut
+  // exactly in half.
+  cancelled: "hsl(var(--muted-foreground))",
 }
 
 /** The track every reading shares — the path the arc has or has not travelled. */

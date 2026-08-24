@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agentic Platform - Workflows</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#93000a",
+                        "primary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-tertiary-container": "#4e4000",
+                        "secondary-fixed": "#dae3f6",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "inverse-primary": "#5355a9",
+                        "surface-container-lowest": "#0e0e13",
+                        "inverse-surface": "#e4e1e9",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "surface": "#131318",
+                        "secondary": "#bec7da",
+                        "surface-container": "#1f1f25",
+                        "primary-container": "#a3a5ff",
+                        "surface-dim": "#131318",
+                        "surface-tint": "#c1c1ff",
+                        "on-surface": "#e4e1e9",
+                        "primary": "#c3c4ff",
+                        "on-background": "#e4e1e9",
+                        "outline": "#918f9c",
+                        "background": "#131318",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "on-tertiary": "#3a3000",
+                        "tertiary": "#e5c74c",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#0b0664",
+                        "secondary-container": "#3e4757",
+                        "surface-container-high": "#2a292f",
+                        "surface-container-highest": "#35343a",
+                        "on-tertiary-fixed": "#221b00",
+                        "tertiary-fixed": "#ffe16c",
+                        "on-secondary": "#28313f",
+                        "on-primary": "#242478",
+                        "outline-variant": "#464651",
+                        "secondary-fixed-dim": "#bec7da",
+                        "inverse-on-surface": "#303036",
+                        "on-primary-container": "#353789",
+                        "on-secondary-fixed": "#131c2a",
+                        "surface-variant": "#35343a",
+                        "error": "#ffb4ab",
+                        "surface-container-low": "#1b1b21",
+                        "on-error": "#690005",
+                        "tertiary-container": "#c8ac33",
+                        "surface-bright": "#39383f",
+                        "on-secondary-container": "#acb5c8",
+                        
+                        // Custom exact overrides for this specific prompt
+                        "base-bg": "#060A0F",
+                        "rail-bg": "#080B11",
+                        "card-bg": "#0D1117",
+                        "raised-bg": "#0F141B",
+                        "muted-fill": "#151B24",
+                        "sys-border": "#212631",
+                        "sys-text": "#F4F6FE",
+                        "sys-secondary": "#9AA3B5",
+                        "sys-dim": "#6B7383",
+                        "sys-primary": "#A3A5FF",
+                        "sys-violet": "#895AF6",
+                        "sys-success": "#21C45D",
+                        "sys-warning": "#F5A524",
+                        "sys-danger": "#DC2626"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "rail_width": "64px",
+                        "lg": "24px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "margin": "24px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "xs": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "data-md": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "h2": ["Manrope"],
+                        "h1": ["Manrope"],
+                        "data-lg": ["JetBrains Mono"],
+                        "data-sm": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h3": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "data-md": ["14px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "h2": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "data-lg": ["16px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "data-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "body-sm": ["12px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "h3": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}]
+                    },
+                    "animation": {
+                        "fade-in": "fadeIn 200ms ease-out forwards",
+                        "slow-pulse": "slowPulse 2s ease-in-out infinite"
+                    },
+                    "keyframes": {
+                        "fadeIn": {
+                            "0%": { opacity: "0", transform: "translateY(4px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        },
+                        "slowPulse": {
+                            "0%, 100%": { opacity: "1" },
+                            "50%": { opacity: "0.7" }
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #F4F6FE;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Scrollbar for consistency */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #151B24; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #212631; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464651; 
+        }
+    </style>
+</head>
+<body class="flex h-screen w-full antialiased selection:bg-sys-primary selection:text-base-bg">
+<!-- Left Rail Shell -->
+<nav class="fixed left-0 top-0 h-full w-[56px] bg-rail-bg border-r border-sys-border flex flex-col items-center py-md z-50 transition-colors duration-200 ease-in-out">
+<!-- App Mark -->
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-primary hover:bg-muted-fill transition-colors mb-sm" title="Agentic Platform">
+<span class="font-h3 text-h3">A</span>
+</button>
+<!-- Expand -->
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors mb-lg" title="Expand">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="flex-1 flex flex-col items-center gap-sm w-full">
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="New Chat">
+<span class="material-symbols-outlined">add_comment</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Chat">
+<span class="material-symbols-outlined">chat</span>
+</button>
+<!-- Active Tab: Workflows -->
+<button class="w-full h-10 flex items-center justify-center text-sys-primary border-l-2 border-sys-primary bg-secondary-container transition-colors" title="Workflows">
+<span class="material-symbols-outlined ml-[-2px]">account_tree</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Documents">
+<span class="material-symbols-outlined">description</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Classification">
+<span class="material-symbols-outlined">category</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Library Health">
+<span class="material-symbols-outlined">health_and_safety</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Governance">
+<span class="material-symbols-outlined">policy</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors" title="Skills">
+<span class="material-symbols-outlined">bolt</span>
+</button>
+<button class="w-10 h-10 rounded-DEFAULT flex items-center justify-center text-sys-secondary hover:bg-muted-fill hover:text-sys-text transition-colors mt-auto" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<!-- Account Bottom -->
+<button class="w-10 h-10 rounded-full bg-muted-fill border border-sys-border flex items-center justify-center text-sys-secondary hover:text-sys-text transition-colors mt-sm overflow-hidden" title="Account">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-[56px] h-full overflow-y-auto bg-base-bg flex justify-center py-xl px-md">
+<!-- 720px Centered Column -->
+<div class="w-full max-w-[720px] flex flex-col gap-xl animate-fade-in">
+<!-- Header Section -->
+<header class="flex flex-col gap-xs">
+<h1 class="font-h1 text-h1 text-sys-text">Start a new workflow</h1>
+<p class="font-body-lg text-body-lg text-sys-secondary">Two ways in. You can change your mind later.</p>
+</header>
+<!-- The Two Doors -->
+<section class="grid grid-cols-2 gap-md">
+<!-- Door 1 (CHOSEN) -->
+<div class="bg-card-bg border-2 border-sys-primary p-md rounded-DEFAULT flex flex-col gap-sm relative hover:-translate-y-[2px] transition-transform duration-200 cursor-pointer overflow-hidden group">
+<div class="absolute inset-0 bg-sys-primary opacity-5 pointer-events-none"></div>
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-sys-primary">auto_awesome</span>
+<h2 class="font-h3 text-h3 text-sys-text">Describe it</h2>
+</div>
+<span class="bg-sys-primary/10 text-sys-primary font-data-sm text-data-sm px-2 py-1 rounded-sm border border-sys-primary/20">CHOSEN</span>
+</div>
+<p class="font-body-md text-body-md text-sys-secondary">Tell me what you want to achieve and I will draft the steps.</p>
+</div>
+<!-- Door 2 (AT REST) -->
+<div class="bg-card-bg border border-sys-border p-md rounded-DEFAULT flex flex-col gap-sm hover:-translate-y-[2px] hover:border-sys-secondary transition-all duration-200 cursor-pointer">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-sys-secondary">dashboard_customize</span>
+<h2 class="font-h3 text-h3 text-sys-text">Build it yourself</h2>
+</div>
+</div>
+<p class="font-body-md text-body-md text-sys-secondary">Start from an empty canvas and add each step by hand.</p>
+</div>
+</section>
+<!-- The Describe Box -->
+<section class="flex flex-col gap-sm">
+<label class="font-data-md text-data-md text-sys-text" for="workflow-description">What do you want this workflow to achieve?</label>
+<textarea class="w-full bg-card-bg border border-sys-border rounded-DEFAULT p-md font-body-md text-body-md text-sys-text focus:border-sys-primary focus:ring-0 resize-y" id="workflow-description" placeholder="Describe the steps..." rows="5"></textarea>
+<!-- Simulating a filled textarea for visual accuracy based on prompt -->
+<script>
+                    document.getElementById('workflow-description').value = "Scan the incoming support inbox for priority escalation flags. If a flag is detected and the sentiment is highly negative, draft a preliminary apology and route it to the Tier 3 resolving queue. Otherwise, auto-tag and archive.";
+                </script>
+</section>
+<!-- Divider -->
+<div class="h-px w-full bg-sys-border my-sm"></div>
+<!-- The Refusal State -->
+<section class="flex flex-col gap-sm">
+<label class="font-data-sm text-data-sm text-sys-dim" for="thin-description">If what you write is too thin</label>
+<textarea class="w-full bg-card-bg border border-sys-border rounded-DEFAULT p-sm px-md font-body-md text-body-md text-sys-text focus:border-sys-primary focus:ring-0 resize-none opacity-80" id="thin-description" readonly="" rows="1">Automate my emails.</textarea>
+<div class="bg-sys-danger/10 border border-sys-danger/30 border-l-4 border-l-sys-danger p-md rounded-r-DEFAULT flex items-start gap-sm mt-xs">
+<span class="material-symbols-outlined text-sys-danger mt-xs">error</span>
+<p class="font-body-md text-body-md text-sys-danger">That is not enough to work from yet. Tell me what it should produce, and where it should look.</p>
+</div>
+<div class="flex justify-end mt-sm">
+<button class="bg-muted-fill border border-sys-border text-sys-dim font-data-md text-data-md py-sm px-lg rounded-DEFAULT cursor-not-allowed flex items-center gap-xs" disabled="">
+<span class="material-symbols-outlined text-[16px]">block</span>
+                        Too thin to draft
+                    </button>
+</div>
+</section>
+<!-- Divider -->
+<div class="h-px w-full bg-sys-border my-sm"></div>
+<!-- The Knowledge Picker -->
+<section class="flex flex-col gap-sm">
+<label class="font-data-md text-data-md text-sys-text">What should it read?</label>
+<div class="flex flex-col gap-xs">
+<!-- State 1: Nothing chosen (Interactive Add) -->
+<button class="w-full bg-base-bg border border-dashed border-sys-border hover:border-sys-primary hover:bg-muted-fill text-sys-secondary font-body-md text-body-md p-sm rounded-DEFAULT flex items-center justify-center transition-colors">
+                        + Choose what it can read
+                    </button>
+<!-- State 2: One chosen -->
+<div class="w-full bg-card-bg border border-sys-border p-sm px-md rounded-DEFAULT flex items-center justify-between group">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-sys-secondary">folder</span>
+<span class="font-body-md text-body-md text-sys-text">Legal</span>
+<span class="font-data-sm text-data-sm text-sys-dim ml-sm">1,284 documents</span>
+</div>
+<button aria-label="Remove" class="text-sys-dim hover:text-sys-danger transition-colors opacity-0 group-hover:opacity-100 flex items-center">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- State 3: None available -->
+<div class="w-full bg-base-bg p-sm flex items-center justify-between opacity-70">
+<span class="font-body-md text-body-md text-sys-dim">You have no folders yet</span>
+<button class="text-sys-primary hover:text-primary-fixed font-data-sm text-data-sm transition-colors">
+                            + Upload documents
+                        </button>
+</div>
+</div>
+</section>
+<!-- Template Row -->
+<section class="flex flex-col gap-sm mt-md pb-xl">
+<label class="font-data-md text-data-md text-sys-text">Start from something that already works</label>
+<div class="w-full bg-card-bg border border-sys-border p-sm px-md rounded-DEFAULT flex items-center justify-between hover:bg-raised-bg transition-colors cursor-default">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-sys-secondary">draft</span>
+<span class="font-body-md text-body-md text-sys-text">Invoice audit</span>
+<span class="font-data-sm text-data-sm text-sys-dim ml-sm">4 steps</span>
+</div>
+<button class="bg-muted-fill border border-sys-border hover:border-sys-primary hover:text-sys-primary text-sys-text font-data-sm text-data-sm py-1 px-3 rounded-sm transition-colors">
+                        Use this
+                    </button>
+</div>
+</section>
+</div>
+</main>
+
+<script>
+(function(){
+  var HOPS = [["Describe it","draft-arrival"],["Build it yourself","builder-spine"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"doors", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

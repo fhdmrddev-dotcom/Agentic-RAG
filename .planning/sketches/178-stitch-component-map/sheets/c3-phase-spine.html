@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>COMPONENT SHEET — THE PHASE SPINE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "error": "#ffb4ab",
+              "on-error-container": "#ffdad6",
+              "secondary": "#d0bcff",
+              "primary-fixed": "#e1e0ff",
+              "on-secondary": "#3b0091",
+              "outline": "#918f9c",
+              "outline-variant": "#464651",
+              "on-tertiary-container": "#004c1e",
+              "on-primary-fixed-variant": "#3b3d8f",
+              "tertiary": "#4ee478",
+              "inverse-on-surface": "#2b303c",
+              "on-secondary-container": "#c3abff",
+              "secondary-container": "#571ac2",
+              "on-error": "#690005",
+              "primary": "#c3c4ff",
+              "on-primary": "#242478",
+              "surface-variant": "#303540",
+              "surface-container": "#1b202a",
+              "on-surface-variant": "#c7c5d3",
+              "on-secondary-fixed-variant": "#5415c0",
+              "surface-tint": "#c1c1ff",
+              "on-surface": "#dee2f1",
+              "error-container": "#93000a",
+              "tertiary-fixed-dim": "#4be176",
+              "secondary-fixed-dim": "#d0bcff",
+              "background": "#0e131e",
+              "surface": "#0e131e",
+              "on-tertiary-fixed-variant": "#005321",
+              "secondary-fixed": "#e9ddff",
+              "surface-bright": "#343945",
+              "on-secondary-fixed": "#23005c",
+              "surface-container-high": "#252a35",
+              "on-tertiary": "#003915",
+              "primary-container": "#a3a5ff",
+              "surface-container-lowest": "#090e18",
+              "inverse-surface": "#dee2f1",
+              "tertiary-container": "#26c760",
+              "on-primary-fixed": "#0b0664",
+              "on-background": "#dee2f1",
+              "surface-dim": "#0e131e",
+              "primary-fixed-dim": "#c1c1ff",
+              "on-primary-container": "#353789",
+              "surface-container-highest": "#303540",
+              "inverse-primary": "#5355a9",
+              "tertiary-fixed": "#6bfe8f",
+              "surface-container-low": "#171c26",
+              "on-tertiary-fixed": "#002109"
+            },
+            fontFamily: {
+              headline: ["Manrope", "sans-serif"],
+              display: ["Manrope", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+              label: ["Inter", "sans-serif"],
+              mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+      .icon-fill { font-variation-settings: 'FILL' 1; }
+      
+      .spine-line-solid { background-color: theme('colors.primary-container'); }
+      .spine-line-dashed { 
+        background-image: linear-gradient(to bottom, theme('colors.surface-variant') 50%, transparent 50%);
+        background-size: 2px 8px;
+      }
+      .spine-line-branch {
+         border-left: 1px solid theme('colors.primary-container');
+         border-bottom: 1px solid theme('colors.primary-container');
+      }
+      .spine-line-branch-dashed {
+         border-left: 1px dashed theme('colors.surface-variant');
+         border-bottom: 1px dashed theme('colors.surface-variant');
+      }
+      
+      .glow-pulse { animation: pulseGlow 3s infinite alternate ease-in-out; }
+      @keyframes pulseGlow {
+        0% { box-shadow: 0 0 0 0 rgba(163, 165, 255, 0.1); }
+        100% { box-shadow: 0 0 15px 5px rgba(163, 165, 255, 0.15); }
+      }
+      
+      .progress-ring { animation: rotate 2s linear infinite; }
+      @keyframes rotate { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen p-12 antialiased selection:bg-primary-container selection:text-on-primary-container">
+<header class="mb-24 flex items-baseline justify-between border-b border-surface-variant pb-8">
+<div>
+<h1 class="font-headline text-3xl font-bold tracking-tight text-on-background">COMPONENT SHEET — THE PHASE SPINE</h1>
+<p class="mt-2 text-on-surface-variant text-sm">ARCHITECTURAL SPECIMEN // AETHER INTELLIGENCE PLATFORM</p>
+</div>
+<div class="text-on-surface-variant font-mono text-xs uppercase tracking-widest">Scale 1:1 // Deep Midnight Theme</div>
+</header>
+<div class="grid grid-cols-1 xl:grid-cols-[1fr_380px_280px] gap-16 items-start">
+<!-- COLUMN 1: AUTHORING SPINE -->
+<section class="flex flex-col gap-6">
+<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">Col 1: The Authoring Spine</div>
+<div class="relative max-w-3xl">
+<!-- 1. Retrieve -->
+<div class="relative flex gap-6 pb-8">
+<div class="absolute left-[11px] top-6 bottom-0 w-[2px] spine-line-solid"></div>
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] icon-fill">search</span>
+</div>
+<div class="flex-1 rounded-lg border border-surface-variant bg-[#0D1117] p-4 flex items-start justify-between">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline font-semibold text-on-background">Retrieve Document Set</span>
+<span class="rounded bg-surface-variant px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">Vector</span>
+</div>
+<p class="text-sm text-on-surface-variant">Connecting to corporate knowledge base indexing recent filings.</p>
+</div>
+<span class="font-mono text-xs text-on-surface-variant">text-embedding-3-large</span>
+</div>
+</div>
+<!-- 2. Extract -->
+<div class="relative flex gap-6 pb-8">
+<div class="absolute left-[11px] top-6 bottom-0 w-[2px] spine-line-solid"></div>
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] icon-fill">data_object</span>
+</div>
+<div class="flex-1 rounded-lg border border-surface-variant bg-[#0D1117] p-4 flex items-start justify-between">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline font-semibold text-on-background">Extract Entities</span>
+<span class="rounded bg-surface-variant px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">Parser</span>
+</div>
+<p class="text-sm text-on-surface-variant">Identifying named parties, dates, and financial figures.</p>
+</div>
+<span class="font-mono text-xs text-on-surface-variant">GPT-4o</span>
+</div>
+</div>
+<!-- 3. Analyze (Selected) -->
+<div class="relative flex gap-6 pb-8">
+<div class="absolute left-[11px] top-6 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-primary-container bg-background ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] text-primary-container">psychology</span>
+</div>
+<div class="flex-1 rounded-lg border border-primary-container bg-primary-container/5 p-4 flex items-start justify-between glow-pulse">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="font-headline font-semibold text-primary-container">Analyze Clauses</span>
+<span class="rounded bg-primary-container/20 px-1.5 py-0.5 text-[10px] font-medium text-primary-container uppercase tracking-wider">Reasoning</span>
+</div>
+<p class="text-sm text-on-background">Evaluating extracted clauses against standard risk matrices.</p>
+<!-- Authoring internal config -->
+<div class="mt-4 border-t border-surface-variant/50 pt-3">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<span class="block text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">Prompt Template</span>
+<div class="text-xs font-mono text-on-surface bg-surface-container rounded p-1.5 line-clamp-1">sys_risk_eval_v2.md</div>
+</div>
+<div>
+<span class="block text-[10px] uppercase tracking-wider text-on-surface-variant mb-1">Temperature</span>
+<div class="text-xs font-mono text-on-surface bg-surface-container rounded p-1.5">0.1</div>
+</div>
+</div>
+</div>
+</div>
+<span class="font-mono text-xs text-primary-container">Claude-3.5-Sonnet</span>
+</div>
+</div>
+<!-- 4. Branching -->
+<div class="relative flex gap-6 pb-12">
+<!-- Main Spine continues down -->
+<div class="absolute left-[11px] top-6 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">call_split</span>
+</div>
+<div class="flex-1 w-full relative">
+<div class="flex items-center gap-2 mb-4 mt-0.5">
+<span class="font-headline font-medium text-on-surface-variant">Risk Assessment Split</span>
+<span class="rounded bg-surface-variant/50 px-1.5 py-0.5 text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">Router</span>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-4 relative">
+<!-- Traversed Path -->
+<div class="relative pt-6">
+<!-- Connector to branch -->
+<div class="absolute left-[50%] -top-4 w-[2px] h-10 spine-line-solid"></div>
+<div class="absolute -left-12 -top-4 w-[calc(50%+3rem)] h-[2px] bg-primary-container"></div>
+<div class="rounded-lg border border-primary-container/50 bg-[#0D1117] p-3 text-center">
+<div class="text-xs font-mono text-primary-container mb-2">High Risk Path</div>
+<div class="text-sm text-on-background">Escalate to Senior Council</div>
+<div class="mt-2 text-[10px] text-on-surface-variant uppercase">Traversed</div>
+</div>
+</div>
+<!-- Skipped Path -->
+<div class="relative pt-6 opacity-40">
+<!-- Connector to branch -->
+<div class="absolute left-[50%] -top-4 w-[2px] h-10 spine-line-dashed"></div>
+<div class="absolute right-[50%] -top-4 w-[calc(50%+0.5rem)] h-[2px] bg-surface-variant" style="background-image: linear-gradient(to right, theme('colors.surface-variant') 50%, transparent 50%); background-size: 8px 2px;"></div>
+<div class="rounded-lg border border-surface-variant bg-[#0D1117] p-3 text-center">
+<div class="text-xs font-mono text-on-surface-variant mb-2">Standard Path</div>
+<div class="text-sm text-on-surface-variant">Auto-Approve Queue</div>
+<div class="mt-2 text-[10px] text-on-surface-variant uppercase">Skipped</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. Judge -->
+<div class="relative flex gap-6 pb-8">
+<div class="absolute left-[11px] top-6 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">gavel</span>
+</div>
+<div class="flex-1 rounded-lg border border-surface-variant bg-[#0D1117] p-4 flex items-start justify-between opacity-60">
+<div>
+<span class="font-headline font-semibold text-on-surface-variant block mb-1">Human Review Gateway</span>
+<p class="text-sm text-on-surface-variant">Requires principal sign-off before drafting final response.</p>
+</div>
+<span class="font-mono text-xs text-on-surface-variant">Approval</span>
+</div>
+</div>
+<!-- 6. Draft -->
+<div class="relative flex gap-6">
+<div class="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">edit_document</span>
+</div>
+<div class="flex-1 rounded-lg border border-surface-variant bg-[#0D1117] p-4 flex items-start justify-between opacity-60">
+<div>
+<span class="font-headline font-semibold text-on-surface-variant block mb-1">Draft Response Memo</span>
+<p class="text-sm text-on-surface-variant">Synthesize findings into final client-facing document.</p>
+</div>
+<span class="font-mono text-xs text-on-surface-variant">GPT-4o</span>
+</div>
+</div>
+</div>
+</section>
+<!-- COLUMN 2: PANEL SPINE -->
+<section class="flex flex-col gap-6">
+<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">Col 2: The Panel Spine (Live Run)</div>
+<div class="relative">
+<!-- 1. Collapsed Done -->
+<div class="relative flex gap-4 pb-4">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-solid"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container ring-4 ring-background mt-1">
+<span class="material-symbols-outlined text-[12px] font-bold">check</span>
+</div>
+<div class="flex-1 py-1">
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-on-background">Retrieve</span>
+<span class="font-mono text-xs text-on-surface-variant">312 docs matched</span>
+</div>
+</div>
+</div>
+<!-- 2. Collapsed Done -->
+<div class="relative flex gap-4 pb-4">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-solid"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container ring-4 ring-background mt-1">
+<span class="material-symbols-outlined text-[12px] font-bold">check</span>
+</div>
+<div class="flex-1 py-1">
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-on-background">Extract</span>
+<span class="font-mono text-xs text-on-surface-variant">48 fields extracted</span>
+</div>
+</div>
+</div>
+<!-- 3. Active Running -->
+<div class="relative flex gap-4 pb-6">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-primary-container bg-background ring-4 ring-background mt-1">
+<svg class="progress-ring h-3 w-3 text-primary-container" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3" viewbox="0 0 24 24">
+<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+</svg>
+</div>
+<div class="flex-1 rounded border border-primary-container/30 bg-[#0D1117] p-3 shadow-[0_0_15px_rgba(163,165,255,0.05)]">
+<div class="flex items-center gap-2 mb-2">
+<span class="text-sm font-semibold text-primary-container">Analyze</span>
+<span class="font-mono text-[10px] text-primary-container/70 animate-pulse">Running...</span>
+</div>
+<div class="text-xs text-on-surface-variant font-mono truncate">Processing liability caps section (4/12)...</div>
+</div>
+</div>
+<!-- 4. Waiting Branch -->
+<div class="relative flex gap-4 pb-4">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background mt-1">
+<span class="h-1.5 w-1.5 rounded-full bg-surface-variant"></span>
+</div>
+<div class="flex-1 py-1 opacity-50">
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-on-surface-variant">Branch Evaluation</span>
+<span class="font-mono text-[10px] uppercase text-on-surface-variant">Waiting</span>
+</div>
+</div>
+</div>
+<!-- 5. Paused (Human Input Required) -->
+<div class="relative flex gap-4 pb-6 mt-4">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-dashed"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-tertiary-container bg-tertiary-container/10 ring-4 ring-background mt-1">
+<span class="material-symbols-outlined text-[12px] text-tertiary-container font-bold">pause</span>
+</div>
+<div class="flex-1 rounded border border-surface-variant bg-[#0D1117] p-3">
+<div class="flex items-center justify-between mb-3">
+<span class="text-sm font-semibold text-on-background">Human Gateway</span>
+<span class="font-mono text-[10px] bg-tertiary-container/15 text-tertiary-container px-1.5 py-0.5 rounded uppercase">Action Req</span>
+</div>
+<p class="text-xs text-on-surface-variant mb-4">Review required before continuing execution.</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-tertiary-container/15 hover:bg-tertiary-container/25 text-tertiary-container text-xs font-semibold py-1.5 rounded border border-tertiary-container/30 transition-colors">Approve</button>
+<button class="flex-1 bg-error/10 hover:bg-error/20 text-error text-xs font-semibold py-1.5 rounded border border-error/30 transition-colors">Reject</button>
+</div>
+</div>
+</div>
+<!-- 6. Draft Waiting -->
+<div class="relative flex gap-4">
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background mt-1">
+<span class="h-1.5 w-1.5 rounded-full bg-surface-variant"></span>
+</div>
+<div class="flex-1 py-1 opacity-50">
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-on-surface-variant">Draft</span>
+<span class="font-mono text-[10px] uppercase text-on-surface-variant">Blocked</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- COLUMN 3: RECEIPT SPINE -->
+<section class="flex flex-col gap-6">
+<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mb-4">Col 3: The Receipt Spine</div>
+<div class="rounded-lg border border-surface-variant bg-[#0D1117] p-4 max-w-[280px]">
+<div class="text-xs font-headline font-semibold text-on-background mb-4 uppercase tracking-wider border-b border-surface-variant/50 pb-2">Execution Trace</div>
+<div class="relative">
+<!-- Continuous Line -->
+<div class="absolute left-2 top-2 bottom-2 w-[1px] spine-line-solid"></div>
+<!-- Trace Items -->
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Retrieve</span>
+<span class="font-mono text-[10px] text-on-surface-variant">00:03</span>
+</div>
+</div>
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Extract</span>
+<span class="font-mono text-[10px] text-on-surface-variant">00:12</span>
+</div>
+</div>
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Analyze</span>
+<span class="font-mono text-[10px] text-on-surface-variant">00:45</span>
+</div>
+</div>
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Branch (High Risk)</span>
+<span class="font-mono text-[10px] text-on-surface-variant">00:01</span>
+</div>
+</div>
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Judge</span>
+<span class="font-mono text-[10px] text-on-surface-variant">14:22</span>
+</div>
+</div>
+<div class="relative flex items-center gap-3 py-1.5">
+<div class="w-4 flex justify-center z-10 bg-[#0D1117] py-1">
+<span class="h-2 w-2 rounded-full bg-primary-container"></span>
+</div>
+<div class="flex-1 flex justify-between items-baseline">
+<span class="text-xs text-on-background">Draft</span>
+<span class="font-mono text-[10px] text-on-surface-variant">00:18</span>
+</div>
+</div>
+</div>
+<div class="mt-4 pt-3 border-t border-surface-variant/50 flex justify-between items-center text-xs">
+<span class="text-on-surface-variant">Total Runtime</span>
+<span class="font-mono font-medium text-primary-container">15:41</span>
+</div>
+</div>
+<!-- FAILURE STATE VARIANT -->
+<div class="mt-8">
+<div class="font-mono text-[10px] uppercase tracking-[0.2em] text-error mb-4">Variant: Failure State</div>
+<div class="relative">
+<!-- Previous OK Step -->
+<div class="relative flex gap-4 pb-4">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] spine-line-solid"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container ring-4 ring-background mt-1">
+<span class="material-symbols-outlined text-[12px] font-bold">check</span>
+</div>
+<div class="flex-1 py-1">
+<span class="text-sm font-medium text-on-background">Branch Evaluate</span>
+</div>
+</div>
+<!-- Failed Step -->
+<div class="relative flex gap-4 pb-6">
+<div class="absolute left-[9px] top-5 bottom-0 w-[2px] bg-surface-variant/30"></div>
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-error bg-error/10 ring-4 ring-background mt-1 text-error">
+<span class="material-symbols-outlined text-[12px] font-bold">close</span>
+</div>
+<div class="flex-1 rounded border border-error/40 bg-error/5 p-3">
+<div class="flex justify-between items-center mb-1">
+<span class="text-sm font-semibold text-error">Judge Gateway</span>
+<span class="font-mono text-[10px] bg-error/20 text-error px-1.5 py-0.5 rounded uppercase">Failed</span>
+</div>
+<div class="font-mono text-xs text-error/80 break-all leading-tight">Error: Timeout waiting for human reviewer 'S. Jenkins' (Exceeded 48h limit).</div>
+</div>
+</div>
+<!-- Ghosted Step -->
+<div class="relative flex gap-4 opacity-40 grayscale">
+<div class="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-surface-variant bg-background ring-4 ring-background mt-1">
+<span class="material-symbols-outlined text-[12px] text-surface-variant">edit_document</span>
+</div>
+<div class="flex-1 py-1">
+<span class="text-sm text-on-surface-variant italic">Draft (Aborted)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

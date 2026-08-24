@@ -13,19 +13,12 @@ import {
   useStreamActions,
 } from "@/providers/StreamsProvider"
 import {
-  getProviders,
   getThreadWorkflow,
   ApiError,
 } from "@/lib/api"
+import { useComposerModel } from "@/hooks/useComposerModel"
 import type { Folder, Thread } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
-
-interface Provider {
-  id: string
-  name: string
-  models: string[]
-  is_active: boolean
-}
 
 interface Props {
   thread: Thread | null
@@ -52,19 +45,31 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     messages,
     loadMessages,
     sendMessage,
-    stopStreaming,
     clearMessages,
     setViewingThread,
     resumeFromFailed,
   } = useMessages()
-  const [providers, setProviders] = useState<Provider[]>([])
-  const [selectedProvider, setSelectedProvider] = useState<string>("")
-  const [models, setModels] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState<string>("")
-  // Phase 149 (IN-01 / D-149-05): the registry's deprecated-model ids, threaded from
-  // getProviders() into MessageInput so the chat picker renders the informational
-  // `deprecated` badge (deprecated ≠ disabled — the model stays selectable).
-  const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
+  // Phase 196 Plan 07 (D-18 / BUG-260718-04) — THE COMPOSER'S PROVIDER/MODEL MACHINE LIVES
+  // IN THE LEAF HOOK IMPORTED AT THE TOP OF THIS FILE. Five useState declarations
+  // (providers, selectedProvider, models, selectedModel, deprecatedModels), the
+  // getProviders load effect and the provider-change handler all moved there, taking this
+  // file's `useState` 7 → 2 and `useEffect` 4 → 3. That reduction is how G-5 is honoured on
+  // the ledger's strongest frontend extraction case: by arithmetic, not by argument. Do not
+  // move this state back, and do not add a per-thread effect here — the restore rung lives
+  // in the hook precisely so this file's counts stay where they landed.
+  //
+  // ⚠ The hook's name is spelled in exactly two places in this file — the import and the
+  // destructure immediately below — and deliberately NOT in this sentence, so a raw
+  // `grep -c` stays DISCRIMINATING and reads 2. Do not "tidy" this by naming it here.
+  const {
+    providers,
+    selectedProvider,
+    models,
+    selectedModel,
+    setSelectedModel,
+    deprecatedModels,
+    handleProviderChange,
+  } = useComposerModel(thread?.id ?? null, messages)
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
@@ -140,25 +145,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     setScopeFolderId(null)
   }, [thread?.id])
 
-  useEffect(() => {
-    getProviders()
-      .then(({ active, active_model, providers: list, deprecated_models }) => {
-        setProviders(list)
-        // Defensive: absent → empty set → no badge (older backend / read blip).
-        setDeprecatedModels(new Set(deprecated_models ?? []))
-        const activeProvider = list.find((p) => p.id === active) ?? list[0]
-        if (activeProvider) {
-          setSelectedProvider(activeProvider.id)
-          setModels(activeProvider.models)
-          const preferred = active_model && activeProvider.models.includes(active_model)
-            ? active_model
-            : (activeProvider.models[0] ?? "")
-          setSelectedModel(preferred)
-        }
-      })
-      .catch(console.error)
-  }, [])
-
   // Phase 092 (SC#5 / D-v2.5-03): mount-time reconcile of the workflow lock +
   // Continue state from GET /threads/{id}/workflow — the SOURCE OF TRUTH, never
   // a stale Realtime/SSE hint. Runs on every thread switch. A locked, non-stale
@@ -191,16 +177,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       })
     return () => controller.abort()
   }, [thread?.id, streamActions])
-
-  // Update model list when provider changes
-  const handleProviderChange = (providerId: string) => {
-    setSelectedProvider(providerId)
-    const p = providers.find((x) => x.id === providerId)
-    if (p) {
-      setModels(p.models)
-      setSelectedModel(p.models[0] ?? "")
-    }
-  }
 
   // D-067.2-02 / Phase 068 D-068-07/D-068-08: useLayoutEffect commits the
   // activeThreadIdRef write SYNCHRONOUSLY (inside <StreamsProvider>'s
@@ -358,7 +334,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const inputBar = (
     <MessageInput
       onSend={handleSend}
-      onStop={stopStreaming}
+      /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
+         from this element. The composer's Stop is `StopControl` (written WITHOUT its
+         JSX angle bracket on purpose — that token is a fence needle counting real
+         mounts, and this page must contain zero), which calls
+         `stopThread(threadId)` off the StreamsProvider store; this page no longer
+         threads a dispatcher down, and `stopStreaming` is no longer destructured
+         from `useMessages` above.
+
+         ⚠ The prop's name is spelled nowhere in this file, including in this
+         sentence explaining its absence — so a raw grep for it stays DISCRIMINATING
+         and any occurrence means it came back. Same discipline as `MessageInput`'s
+         `Props` docblock; do not "tidy" this by naming it.
+
+         ⚠ `stopStream` itself SURVIVES on `useMessages`' action surface — removing
+         it is a Deep-path change, deferred with the trigger *"a phase that touches
+         `useMessages`' action surface"*. */
       disabled={isStreaming}
       threadId={thread?.id ?? null}
       providers={providers}
@@ -549,6 +540,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           </span>
         </div>
       )}
+      {/* Phase 194.1 Plan 06 (RUN-01 / D-15) — `threadId` is the ONE prop this plan
+          threads, and it is the SAME expression this file already computes for the
+          composer one screen up and for every per-thread store selector at the top of
+          the component. Reused rather than re-derived, so the transcript and the
+          composer can never disagree about which thread they are looking at.
+
+          It is what lets `MessageList` mount the run-anchored line at LIST level. No
+          state is added here: the line owns its own read and its own clock, which is
+          why this file's `useState` / `useEffect` counts were unmoved by Phase 194.1.
+
+          ⚠ THE FIGURE THIS SENTENCE USED TO QUOTE — "unmoved at 7 / 4" — IS NO LONGER THE
+          READING, and it is corrected here rather than left to rot, because on this file the
+          measurement IS the guardrail: a stale count answers the next auditor with a number
+          that was true once and stops the audit. Phase 196-07 took the composer's
+          provider/model machine out to a leaf hook, so the counts are now `useState` 2 and
+          `useEffect` 3. Re-derive them, never copy them forward. */}
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
@@ -556,6 +563,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         onSendMessage={onSendMessage}
         showSuggestions={agentMode !== "explorer"}
         onResume={onResume}
+        threadId={thread?.id ?? null}
       />
       {inputBar}
     </div>

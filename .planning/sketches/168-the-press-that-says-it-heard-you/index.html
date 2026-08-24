@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 168 — The press that says it heard you (Phase 194.1)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding-top: 52px;
+    background: var(--color-bg); color: var(--color-text);
+    font-family: var(--font-sans); font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3 { font-family: var(--font-headline); margin: 0; }
+
+  /* ── variant nav ───────────────────────────────────────────── */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 8px 16px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brand {
+    font-family: var(--font-mono); font-size: var(--text-xs);
+    color: var(--color-text-dim); margin-right: 10px;
+  }
+  .variant-tab {
+    background: transparent; border: 1px solid var(--color-border);
+    color: var(--color-text-muted); font-family: var(--font-sans);
+    font-size: var(--text-xs); padding: 5px 11px; border-radius: var(--radius-full);
+    cursor: pointer; transition: all .15s ease;
+  }
+  .variant-tab:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .variant-tab.active {
+    background: var(--color-primary-dim); border-color: var(--color-primary-glow);
+    color: var(--color-primary);
+  }
+  .variant-tab.broken.active { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / .5); color: hsl(0 80% 78%); }
+
+  /* ── page frame ────────────────────────────────────────────── */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 26px 24px 90px; }
+  .lede { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.65; max-width: 78ch; }
+  .lede strong { color: var(--color-text); font-weight: 600; }
+  .kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--color-text-dim); margin-bottom: 7px;
+  }
+
+  /* ── the driver ────────────────────────────────────────────── */
+  .driver {
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: 14px 16px; margin: 20px 0 26px;
+  }
+  .driver .grp { display: flex; flex-direction: column; gap: 6px; }
+  .driver label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim);
+  }
+  .seg { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button {
+    background: transparent; border: 0; border-right: 1px solid var(--color-border);
+    color: var(--color-text-muted); font-family: var(--font-sans); font-size: var(--text-xs);
+    padding: 6px 11px; cursor: pointer; transition: all .15s ease;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: var(--color-muted); color: var(--color-text); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .driver .spacer { flex: 1; }
+  .reset {
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted);
+    font-size: var(--text-xs); padding: 7px 13px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: all .15s ease;
+  }
+  .reset:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+
+  /* ── mount cards ───────────────────────────────────────────── */
+  .mounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; }
+  .mount {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;
+  }
+  .mount-hd {
+    display: flex; align-items: baseline; gap: 8px; padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-soft); background: var(--color-bg-elev1);
+  }
+  .mount-hd .nm { font-size: var(--text-sm); font-weight: 600; }
+  .mount-hd .src { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); margin-left: auto; }
+  .mount-body { padding: 16px 14px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 116px; }
+  .mount-note {
+    padding: 9px 14px; border-top: 1px solid var(--color-border-soft);
+    font-size: 11px; color: var(--color-text-dim); line-height: 1.55;
+  }
+
+  /* ── SHIPPED atoms — class semantics copied from source ────── */
+  /* composer strip (MessageInput.tsx) */
+  .composer {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .composer .field { flex: 1; color: var(--color-text-dim); font-size: var(--text-sm); }
+  .composer .hint { font-size: 10px; color: var(--color-text-dim); }
+  .btn-icon {
+    height: 32px; width: 32px; flex-shrink: 0; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; cursor: pointer; transition: all .15s ease;
+    border: 1px solid hsl(0 72% 51% / .4); color: var(--color-danger);
+  }
+  .btn-icon:hover:not(:disabled) { background: var(--color-danger-dim); border-color: var(--color-danger); }
+  .btn-icon:disabled { cursor: default; }
+  .btn-icon .sq { width: 13px; height: 13px; background: currentColor; border-radius: 1.5px; display: block; }
+
+  /* panel row (WorkspacePanel.tsx) */
+  .panel-row {
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--color-border-soft); padding: 8px 12px;
+  }
+  .panel-row .lead {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--color-text-dim);
+  }
+  .btn-destructive {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    border-radius: var(--radius-sm); border: 1px solid hsl(0 72% 51% / .4);
+    background: var(--color-danger-dim); padding: 4px 9px; font-size: 11px;
+    color: var(--color-danger); cursor: pointer; transition: all .15s ease;
+  }
+  .btn-destructive:hover:not(:disabled) { background: hsl(0 72% 51% / .22); }
+  .btn-destructive:disabled { cursor: default; }
+  .btn-destructive .sq { width: 9px; height: 9px; background: currentColor; border-radius: 1px; }
+
+  /* tray row (ActiveRunsTray.tsx) */
+  .tray-row { display: flex; align-items: center; gap: 10px; border-radius: var(--radius-sm); padding: 6px 8px; }
+  .tray-row:hover { background: hsl(220 30% 11% / .6); }
+  .tray-dot { height: 6px; width: 6px; flex-shrink: 0; border-radius: 50%; background: var(--color-primary); }
+  .tray-dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  .tray-row .ttl { font-size: var(--text-sm); }
+  .tray-row .sub { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); }
+
+  /* ── PROPOSED atoms ───────────────────────────────────────── */
+  .spinner {
+    width: 13px; height: 13px; border-radius: 50%; display: inline-block;
+    border: 1.6px solid currentColor; border-top-color: transparent;
+    animation: spin .7s linear infinite;
+  }
+  .spinner.sm { width: 9px; height: 9px; border-width: 1.4px; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .is-stopping { opacity: .78; }
+
+  .yield-line {
+    display: inline-flex; align-items: center; gap: 7px; margin-left: auto;
+    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted);
+  }
+  .yield-line .gl { color: var(--color-text-dim); }
+  .term-read {
+    display: inline-flex; align-items: center; gap: 7px; margin-left: auto;
+    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim);
+  }
+  .term-read .mk { color: var(--color-text-muted); }
+  .surface-echo {
+    margin-top: 11px; display: flex; align-items: center; gap: 9px;
+    border-left: 2px solid var(--color-primary-glow); padding: 7px 11px;
+    background: hsl(239 100% 82% / .05); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 11.5px; color: var(--color-text-muted);
+  }
+  .surface-echo.term { border-left-color: var(--color-border); background: hsl(220 30% 11% / .4); }
+  .surface-echo .who {
+    font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .09em; color: var(--color-text-dim);
+  }
+
+  /* ── console / instruments ─────────────────────────────────── */
+  .instr { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .instr { grid-template-columns: 1fr } }
+  .instr-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden;
+  }
+  .instr-hd {
+    padding: 8px 13px; border-bottom: 1px solid var(--color-border-soft);
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim); background: var(--color-bg-elev1);
+  }
+  .log { font-family: var(--font-mono); font-size: 11px; padding: 11px 13px; min-height: 92px; line-height: 1.85; }
+  .log .t { color: var(--color-text-dim); }
+  .log .ev { color: var(--color-text-muted); }
+  .log .ev.warn { color: hsl(38 92% 72%); }
+  .log .ev.bad { color: hsl(0 80% 76%); }
+  .log .ev.ok { color: hsl(142 60% 62%); }
+  .log .empty { color: var(--color-text-dim); font-style: italic; }
+
+  /* ── notes / callouts ──────────────────────────────────────── */
+  .note {
+    border: 1px solid var(--color-border); border-left: 3px solid var(--color-warning);
+    background: var(--color-warning-dim); border-radius: var(--radius-sm);
+    padding: 12px 15px; margin: 20px 0; font-size: var(--text-sm);
+    color: var(--color-text-muted); line-height: 1.65;
+  }
+  .note.bad { border-left-color: var(--color-danger); background: var(--color-danger-dim); }
+  .note.good { border-left-color: var(--color-success); background: var(--color-success-dim); }
+  .note strong { color: var(--color-text); }
+  .note code, .lede code, td code, .mount-note code {
+    font-family: var(--font-mono); font-size: .92em;
+    background: hsl(220 30% 11% / .8); padding: 1px 5px; border-radius: 3px; color: var(--color-text-muted);
+  }
+
+  table.cost { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: var(--text-sm); }
+  table.cost th, table.cost td {
+    text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-border-soft);
+    vertical-align: top; line-height: 1.6;
+  }
+  table.cost th {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim); font-weight: 400;
+  }
+  table.cost td { color: var(--color-text-muted); }
+  table.cost td strong { color: var(--color-text); }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+  .vh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .vh h2 { font-size: var(--text-xl); }
+  .tag {
+    font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); color: var(--color-text-dim);
+  }
+  .tag.new { border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .tag.ship { border-color: hsl(142 71% 45% / .4); color: hsl(142 60% 62%); }
+  hr.sep { border: 0; border-top: 1px solid var(--color-border-soft); margin: 30px 0; }
+
+  /* ── sketch toolbar ────────────────────────────────────────── */
+  #sketch-tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 12px; background: rgba(0,0,0,.78); color: #fff; padding: 8px 12px;
+    border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center;
+  }
+  #sketch-tools select, #sketch-tools button {
+    background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px;
+    font-size: 11px; padding: 3px 7px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 168 · phase 194.1 · SC#1</span>
+  <button class="variant-tab broken active" data-v="today" onclick="showVariant('today')">Today (broken)</button>
+  <button class="variant-tab" data-v="a" onclick="showVariant('a')">A: In place</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: The control yields ★ Selected</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Surface-first</button>
+  <button class="variant-tab" data-v="contract" onclick="showVariant('contract')">The contract</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ══════════════════════════ SHARED DRIVER ══════════════════════════ -->
+  <div class="kicker">Drive it — every variant reads the same state machine</div>
+  <div class="driver">
+    <div class="grp">
+      <label>What is actually true right now</label>
+      <div class="seg" id="seg-scenario">
+        <button class="on" data-s="live">A run is streaming</button>
+        <button data-s="finished">The run already finished</button>
+        <button data-s="unresolvable">No run id resolvable</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>How long the cancel takes</label>
+      <div class="seg" id="seg-speed">
+        <button class="on" data-p="fast">0.4s</button>
+        <button data-p="slow">4s</button>
+        <button data-p="never">never resolves</button>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="reset" onclick="resetAll()">Reset</button>
+  </div>
+
+  <!-- ══════════════════════════ TODAY ══════════════════════════ -->
+  <div class="variant active" id="variant-today">
+    <div class="vh">
+      <h2>Today — the press is invisible</h2>
+      <span class="tag ship">shipped at 045a83dc</span>
+    </div>
+    <p class="lede">
+      All three controls are pure dispatchers — <code>onClick={onStop}</code> and
+      <code>onClick={() =&gt; void streamActions.stopThread(threadId)}</code>. Neither awaits the
+      promise nor holds local state, <strong>so there is nothing to render a pending style from.</strong>
+      Press any of them below and watch what changes on screen: nothing does, until the whole
+      stream teardown completes and the button swaps back to Send.
+    </p>
+    <p class="lede" style="margin-top:10px">
+      Then switch the driver to <strong>“The run already finished”</strong> and press the panel Stop.
+      That is <code>BUG-260709-01</code>, re-opened 2026-08-16 on its own trigger — and the console
+      line it produces states a cause that is <strong>false</strong>.
+    </p>
+    <div class="mounts" id="mounts-today"></div>
+  </div>
+
+  <!-- ══════════════════════════ A ══════════════════════════ -->
+  <div class="variant" id="variant-a">
+    <div class="vh">
+      <h2>A — In place</h2>
+      <span class="tag new">proposal</span>
+      <span class="tag">1 local state × 4 mounts</span>
+    </div>
+    <p class="lede">
+      The control keeps its slot and <strong>transforms</strong>: the filled square becomes a pending
+      ring, the word becomes <code>Stopping…</code>, the button disables so it cannot be pressed twice.
+      Nothing else on the surface moves. When the run reaches terminal the control
+      <strong>unmounts</strong> and a terminal reading takes its place — which is also the fix for the
+      dead control on a finished run.
+    </p>
+    <div class="mounts" id="mounts-a"></div>
+    <div class="note">
+      <strong>The judgement here is the “never resolves” arm.</strong> Set the driver to it and press.
+      A <code>Stopping…</code> that spins forever is a <em>new</em> lie, and it is worse than the
+      silence it replaced, because the user now believes something is happening. Every variant on this
+      page has to answer it; A answers it with a timeout that reverts and says so.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ B ══════════════════════════ -->
+  <div class="variant" id="variant-b">
+    <div class="vh">
+      <h2>B — The control yields</h2>
+      <span class="tag new">proposal</span>
+      <span class="tag">no disabled-control state to design</span>
+    </div>
+    <p class="lede">
+      On press the control is <strong>replaced in its own slot</strong> by a status line:
+      <code>⊘ Stopping this run…</code>. There is no disabled button, because there is no button —
+      which makes a double-press structurally impossible rather than defended against. When the run
+      goes terminal the same slot holds the terminal reading.
+    </p>
+    <p class="lede" style="margin-top:10px">
+      The cost is <strong>layout</strong>: a 32px icon button and a text line are different widths, so
+      the slot has to reserve space or the composer twitches on every stop. Watch the composer row
+      specifically — that is where it shows.
+    </p>
+    <div class="mounts" id="mounts-b"></div>
+    <div class="note good">
+      <strong>B is the only variant where the ⊘ mark is already shipped vocabulary.</strong>
+      Phase 174 D1/D2 use <code>⊘</code> for the quiet deliberate-stop tier
+      (<code>references/run-state-honesty.md</code>). A and C introduce a spinner, which is not in any
+      canvas or chat glyph table — see <em>The contract</em> tab.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ C ══════════════════════════ -->
+  <div class="variant" id="variant-c">
+    <div class="vh">
+      <h2>C — Surface-first</h2>
+      <span class="tag new">proposal</span>
+      <span class="tag">shared state, not per-mount</span>
+    </div>
+    <p class="lede">
+      The control does the least it honestly can: it disables. The <strong>surface</strong> carries the
+      acknowledgement — the phase spine's active step reads <em>stopping</em>, and the run's status
+      sentence changes. The claim being made is <em>“the run is stopping”</em>, not
+      <em>“the button was pressed”</em>, and only the surface is in a position to make it.
+    </p>
+    <p class="lede" style="margin-top:10px">
+      Because there is one shared reading rather than four independent button states, pressing Stop in
+      the tray also lights the panel and the composer. Open two mounts below and press either —
+      <strong>they agree</strong>. In A and B they cannot, because each control only knows about itself.
+    </p>
+    <div class="mounts" id="mounts-c"></div>
+    <div class="note bad">
+      <strong>The cost is where it is paid.</strong> A shared optimistic reading means writing into
+      shared streaming state before the server confirms — the exact place this project has a standing
+      rule about (<em>Realtime is a best-effort hint, not a source of truth — always reconcile via
+      fetch</em>, D-v2.5-03). C is the most honest reading and the most expensive one to make correct;
+      it is drawn so that trade can be judged rather than argued.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ CONTRACT ══════════════════════════ -->
+  <div class="variant" id="variant-contract">
+    <div class="vh"><h2>The contract</h2></div>
+
+    <p class="lede">
+      What a build must honour whichever variant wins, and what a build must
+      <strong>re-verify against the real component</strong> rather than trusting this page for.
+    </p>
+
+    <h3 style="margin-top:26px;font-size:var(--text-lg)">PROVENANCE — what is shipped and what is invented</h3>
+    <table class="cost">
+      <tr><th>Region</th><th>Status</th><th>Source</th></tr>
+      <tr>
+        <td><strong>Composer Stop button</strong></td>
+        <td><span class="tag ship">verbatim</span></td>
+        <td><code>MessageInput.tsx:410-420</code> — <code>data-testid="composer-stop"</code>, lucide
+          <code>Square</code> filled, <code>border-destructive/40 text-destructive</code>, <code>h-8 w-8 rounded-lg</code></td>
+      </tr>
+      <tr>
+        <td><strong>Panel Stop row</strong></td>
+        <td><span class="tag ship">verbatim</span></td>
+        <td><code>WorkspacePanel.tsx:453-469</code> — lead <code>"This run"</code>, label <code>"Stop"</code>,
+          aria <code>"Stop this workflow run"</code>, <code>data-testid="panel-stop-run"</code></td>
+      </tr>
+      <tr>
+        <td><strong>Tray row</strong></td>
+        <td><span class="tag ship">verbatim</span></td>
+        <td><code>ActiveRunsTray.tsx:115-135</code> — pulse dot, <code>⏱ {elapsed} · running</code>,
+          aria <code>Stop run on {title}</code></td>
+      </tr>
+      <tr>
+        <td><strong>“Stopping…” · the pending ring · the reserved slot</strong></td>
+        <td><span class="tag new">PROPOSAL</span></td>
+        <td>net-new. <code>grep -ri "stopping" frontend/src</code> → <strong>0 occurrences</strong> in
+          production source. This is new copy, not a re-use.</td>
+      </tr>
+      <tr>
+        <td><strong>The terminal reading that replaces the control</strong></td>
+        <td><span class="tag new">PROPOSAL</span></td>
+        <td>net-new on the panel row. The <em>words</em> borrow the shipped tier-1 vocabulary
+          (<code>⊘</code>, “stopped”) from Phase 174 D1.</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top:30px;font-size:var(--text-lg)">Four things that bind regardless of winner</h3>
+    <table class="cost">
+      <tr><th>#</th><th>Rule</th><th>Why</th></tr>
+      <tr><td>1</td><td><strong>A control that cannot stop anything must not be drawn.</strong>
+        The panel gate is <code>showTimeline = isHarness || phases.length > 0</code> and phase rows
+        <em>outlive the run</em> — so a finished run renders a live-looking Stop.</td>
+        <td>That is <code>BUG-260709-01</code> re-opened, and Phase 194's own <code>WR-03</code> /
+          Anti-Pattern <code>A-2</code>. Gate on <strong>run liveness</strong>, never on the presence of
+          phase rows.</td></tr>
+      <tr><td>2</td><td><strong>The warning text must not state a cause it has not established.</strong>
+        Today one console line explains three different failures, and is wrong for two of them.</td>
+        <td><code>StreamsProvider.tsx:2453-2459</code> says <em>“the run had not finished registering …
+          press Stop again in a moment”</em> — on a run that finished ten minutes ago, where pressing
+          again can never succeed.</td></tr>
+      <tr><td>3</td><td><strong>A pending state must have a losing arm.</strong> If the cancel does not
+        resolve, the surface says so and returns the control.</td>
+        <td>An indefinite <code>Stopping…</code> replaces a silent failure with a confident one.
+          Drive the <em>never resolves</em> setting on each tab.</td></tr>
+      <tr><td>4</td><td><strong>Whatever the press looks like, all four mounts do the same thing.</strong></td>
+        <td>Phase 194 D-08 already holds the runtime half — <em>four mounts, ONE mechanism</em>
+          (<code>stopThread(threadId)</code>, never <code>cancelRun</code> directly). This is its
+          display half.</td></tr>
+    </table>
+
+    <h3 style="margin-top:30px;font-size:var(--text-lg)">Cost, side by side</h3>
+    <table class="cost">
+      <tr><th></th><th>What it adds</th><th>What it risks</th></tr>
+      <tr><td><strong>A · In place</strong></td>
+        <td>One <code>isStopping</code> per mount + a timeout. No layout change. Smallest diff.</td>
+        <td>Four independent states that can disagree; a spinner is net-new vocabulary.</td></tr>
+      <tr><td><strong>B · Yields</strong></td>
+        <td>One slot per mount that swaps its child. Double-press impossible by construction.
+          Re-uses the shipped <code>⊘</code>.</td>
+        <td>Layout reservation in the composer; the control vanishing may read as the run vanishing.</td></tr>
+      <tr><td><strong>C · Surface-first</strong></td>
+        <td>One shared reading; all mounts agree for free; the claim is about the run, not the button.</td>
+        <td>Optimistic shared state before server confirmation — the reconcile rule (D-v2.5-03) makes
+          this the expensive one to get right.</td></tr>
+    </table>
+
+    <div class="note">
+      <strong>Not settled here, deliberately:</strong> where the Stop lives on the canvas run surface
+      (<em>sketch 169</em>), and what the thread shows about the stop afterwards
+      (<em>sketch 170</em>). This sketch is only the moment of the press.
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════ INSTRUMENTS ══════════════════════════ -->
+  <div class="instr">
+    <div class="instr-card">
+      <div class="instr-hd">What the user sees change</div>
+      <div class="log" id="log-screen"><span class="empty">press a Stop above…</span></div>
+    </div>
+    <div class="instr-card">
+      <div class="instr-hd">Console / network — the instruments Phase 194 UAT used</div>
+      <div class="log" id="log-wire"><span class="empty">press a Stop above…</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="sketch-tools"
+     onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.35'">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='420px'">375</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='800px'">768</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='1180px'">full</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   ONE state machine. Every variant renders the same states differently.
+   states: idle | stopping | stopped | noop | timedout
+   ═══════════════════════════════════════════════════════════════════ */
+
+var SPEED = { fast: 400, slow: 4000, never: Infinity };
+var TIMEOUT_MS = 6000;
+
+var driver = { scenario: 'live', speed: 'fast' };
+var sims = {};          /* variant -> { state, timers } */
+var VARIANTS = ['today', 'a', 'b', 'c'];
+
+var MOUNTS = [
+  { id: 'composer', name: 'Composer',      src: 'MessageInput.tsx:410' },
+  { id: 'panel',    name: 'Workspace panel', src: 'WorkspacePanel.tsx:453' },
+  { id: 'tray',     name: 'Active runs tray', src: 'ActiveRunsTray.tsx:126' },
+  { id: 'canvas',   name: 'Canvas run surface', src: 'WorkflowRunPage.tsx' }
+];
+
+function newSim() { return { state: 'idle', timers: [], elapsed: 138 }; }
+
+function clearSim(v) {
+  var s = sims[v]; if (!s) return;
+  s.timers.forEach(function (t) { clearTimeout(t); });
+  s.timers = [];
+}
+
+function resetAll() {
+  VARIANTS.forEach(function (v) { clearSim(v); sims[v] = newSim(); });
+  logScreen = []; logWire = [];
+  renderLogs(); renderAll();
+}
+
+/* ── logging ────────────────────────────────────────────────── */
+var logScreen = [], logWire = [], t0 = 0;
+
+function stamp() {
+  if (!t0) t0 = Date.now();
+  return '+' + ((Date.now() - t0) / 1000).toFixed(1) + 's';
+}
+function say(where, text, cls) {
+  var arr = where === 'screen' ? logScreen : logWire;
+  arr.push({ t: stamp(), text: text, cls: cls || '' });
+  renderLogs();
+}
+function renderLogs() {
+  [['log-screen', logScreen], ['log-wire', logWire]].forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    var arr = pair[1];
+    if (!arr.length) { el.innerHTML = '<span class="empty">press a Stop above…</span>'; return; }
+    el.innerHTML = arr.slice(-7).map(function (l) {
+      return '<div><span class="t">' + l.t + '</span> <span class="ev ' + l.cls + '">' + l.text + '</span></div>';
+    }).join('');
+  });
+}
+
+/* ── the press ──────────────────────────────────────────────── */
+function press(v) {
+  var s = sims[v];
+  if (s.state === 'stopping' || s.state === 'stopped') return;
+  if (!t0) t0 = Date.now();
+
+  /* scenario: the run already finished — the shipped no-op */
+  if (driver.scenario === 'finished' || driver.scenario === 'unresolvable') {
+    if (v === 'today') {
+      s.state = 'noop';
+      say('screen', 'nothing. document.body.innerText byte-identical (diffLen: 0)', 'bad');
+      say('wire', 'no request at all', 'bad');
+      say('wire', 'console: "Stop did nothing: no run id yet for thread ae2f654b-… — the run had not '
+        + 'finished registering (the pre-stamp window). … press Stop again in a moment."', 'warn');
+      say('screen', '⚠ that cause is FALSE — the run finished 11 min ago', 'bad');
+    } else {
+      s.state = 'noop';
+      say('screen', 'the control is not drawn at all — there is nothing to stop', 'ok');
+      say('wire', 'no request. no warning: the state was never reachable', 'ok');
+    }
+    renderAll();
+    return;
+  }
+
+  /* the live path */
+  s.state = 'stopping';
+  say('wire', 'DELETE /runs/9f69ddf1-…  →  in flight', '');
+
+  if (v === 'today') {
+    say('screen', 'nothing — the control has no pending state to render', 'bad');
+  } else if (v === 'a') {
+    say('screen', 'the control transforms in place: ■ → ◌  ·  "Stop" → "Stopping…"  ·  disabled', 'ok');
+  } else if (v === 'b') {
+    say('screen', 'the control leaves its slot; "⊘ Stopping this run…" takes it', 'ok');
+  } else if (v === 'c') {
+    say('screen', 'the SURFACE moves: spine step → "stopping", band → "Stopping this run…"; '
+      + 'all 4 controls disable together', 'ok');
+  }
+  renderAll();
+
+  var ms = SPEED[driver.speed];
+  if (ms === Infinity) {
+    s.timers.push(setTimeout(function () {
+      if (sims[v].state !== 'stopping') return;
+      if (v === 'today') {
+        say('screen', 'still nothing. the button will sit like this indefinitely', 'bad');
+        renderAll();
+        return;
+      }
+      sims[v].state = 'timedout';
+      say('screen', 'the losing arm: the pending state reverts and says so', 'warn');
+      say('wire', 'no terminal after ' + (TIMEOUT_MS / 1000) + 's — reconcile fetch fires', 'warn');
+      renderAll();
+    }, TIMEOUT_MS));
+    return;
+  }
+
+  s.timers.push(setTimeout(function () {
+    sims[v].state = 'stopped';
+    say('wire', '204 · workflow_runs.status = cancelled · thread anchor cleared', 'ok');
+    if (v === 'today') {
+      say('screen', 'the button swaps back to Send. nothing ever said "stopped".', 'bad');
+    } else {
+      say('screen', 'the control is gone; its slot reads the terminal state', 'ok');
+    }
+    renderAll();
+  }, ms));
+}
+
+/* ═══════════════════════ RENDERERS ═══════════════════════════ */
+
+function sqIcon(cls) { return '<span class="sq ' + (cls || '') + '"></span>'; }
+
+/* -- composer -------------------------------------------------- */
+function renderComposer(v, st) {
+  var right;
+  if (st === 'noop' && v !== 'today') {
+    right = '<span class="hint">Send ▲ — nothing is running</span>';
+  } else if (st === 'idle' || st === 'timedout' || v === 'today') {
+    right = '<button class="btn-icon" onclick="press(\'' + v + '\')" aria-label="Stop generation" '
+          + (st === 'stopping' && v === 'today' ? '' : '') + '>' + sqIcon() + '</button>';
+  }
+  if (v !== 'today') {
+    if (st === 'stopping') {
+      if (v === 'a') {
+        right = '<button class="btn-icon is-stopping" disabled aria-label="Stopping"><span class="spinner"></span></button>';
+      } else if (v === 'b') {
+        right = '<span class="yield-line" style="margin-left:0"><span class="gl">⊘</span> Stopping…</span>';
+      } else {
+        right = '<button class="btn-icon is-stopping" disabled aria-label="Stop generation">' + sqIcon() + '</button>';
+      }
+    } else if (st === 'stopped') {
+      right = '<span class="hint">Send ▲</span>';
+    } else if (st === 'timedout') {
+      right = '<button class="btn-icon" onclick="press(\'' + v + '\')" aria-label="Stop generation">' + sqIcon() + '</button>';
+    }
+  }
+
+  var body = '<div class="composer">'
+    + '<span class="field">Ask anything…</span>'
+    + (st === 'idle' || st === 'stopping' ? '' : '<span class="hint">Enter ↵</span>')
+    + right + '</div>';
+
+  if (v === 'c' && st === 'stopping') {
+    body += '<div class="surface-echo"><span class="who">run</span> Stopping this run…</div>';
+  }
+  if (v === 'c' && st === 'stopped') {
+    body += '<div class="surface-echo term"><span class="who">run</span> ⊘ Stopped · 2 of 3 steps · 2m 18s</div>';
+  }
+  if (v === 'b' && st === 'stopped') {
+    body += '<div class="surface-echo term"><span class="who">chat</span> ⊘ Stopped · 2m 18s</div>';
+  }
+  if (v === 'today' && st === 'stopping') {
+    body += '<div class="surface-echo term"><span class="who">note</span> identical to the frame before the press</div>';
+  }
+  return body;
+}
+
+/* -- panel ----------------------------------------------------- */
+function renderPanel(v, st) {
+  /* the gate: today it draws on phase rows; every proposal gates on run liveness */
+  if (v !== 'today' && (driver.scenario === 'finished' || driver.scenario === 'unresolvable')) {
+    return '<div class="panel-row"><span class="lead">This run</span>'
+      + '<span class="term-read"><span class="mk">⊘</span> Stopped · 2 of 3 steps · 2m 18s</span></div>'
+      + '<div class="surface-echo term"><span class="who">gate</span> run liveness, not phase rows — '
+      + 'so no control is drawn</div>';
+  }
+
+  var right;
+  if (st === 'stopping' && v === 'a') {
+    right = '<button class="btn-destructive is-stopping" disabled><span class="spinner sm"></span> Stopping…</button>';
+  } else if (st === 'stopping' && v === 'b') {
+    right = '<span class="yield-line"><span class="gl">⊘</span> Stopping this run…</span>';
+  } else if (st === 'stopping' && v === 'c') {
+    right = '<button class="btn-destructive is-stopping" disabled>' + sqIcon() + ' Stop</button>';
+  } else if (st === 'stopped' && v !== 'today') {
+    right = '<span class="term-read"><span class="mk">⊘</span> Stopped · 2 of 3 steps · 2m 18s</span>';
+  } else if (st === 'timedout') {
+    right = '<button class="btn-destructive" onclick="press(\'' + v + '\')">' + sqIcon() + ' Stop</button>';
+  } else {
+    right = '<button class="btn-destructive" onclick="press(\'' + v + '\')" '
+          + 'aria-label="Stop this workflow run">' + sqIcon() + ' Stop</button>';
+  }
+
+  var body = '<div class="panel-row"><span class="lead">This run</span>' + right + '</div>';
+
+  if (v === 'today' && (driver.scenario === 'finished' || driver.scenario === 'unresolvable')) {
+    body += '<div class="surface-echo term"><span class="who">gate</span> showTimeline = isHarness || '
+         + 'phases.length &gt; 0 — phase rows outlive the run, so the control is still here</div>';
+  }
+  if (v === 'today' && st === 'noop') {
+    body += '<div class="surface-echo term"><span class="who">after</span> diffLen: 0 — nothing on screen changed</div>';
+  }
+  if (v === 'c' && st === 'stopping') {
+    body += '<div class="surface-echo"><span class="who">spine</span> act ◌ stopping · Phase 2 of 3</div>';
+  }
+  if (v === 'c' && st === 'stopped') {
+    body += '<div class="surface-echo term"><span class="who">spine</span> act ■ Stopped · Phase 2 of 3</div>';
+  }
+  if (v === 'a' && st === 'timedout') {
+    body += '<div class="surface-echo term"><span class="who">losing arm</span> '
+         + 'Still running — the stop didn’t take. Try again.</div>';
+  }
+  if (v === 'b' && st === 'timedout') {
+    body += '<div class="surface-echo term"><span class="who">losing arm</span> '
+         + 'Still running — the stop didn’t take. Try again.</div>';
+  }
+  if (v === 'c' && st === 'timedout') {
+    body += '<div class="surface-echo term"><span class="who">losing arm</span> '
+         + 'the surface reverts to Running — the optimistic reading is withdrawn</div>';
+  }
+  return body;
+}
+
+/* -- tray ------------------------------------------------------ */
+function renderTray(v, st) {
+  if (v !== 'today' && (driver.scenario === 'finished' || driver.scenario === 'unresolvable')) {
+    return '<div style="font-size:11.5px;color:var(--color-text-dim);font-family:var(--font-mono)">'
+      + 'Active runs · 0 — the tray is not drawn</div>';
+  }
+  if (st === 'stopped' && v !== 'today') {
+    return '<div style="font-size:11.5px;color:var(--color-text-dim);font-family:var(--font-mono)">'
+      + 'Active runs · 0 — the tray is not drawn</div>';
+  }
+
+  var right;
+  if (st === 'stopping' && v === 'a') {
+    right = '<button class="btn-destructive is-stopping" disabled><span class="spinner sm"></span> Stopping…</button>';
+  } else if (st === 'stopping' && v === 'b') {
+    right = '<span class="yield-line"><span class="gl">⊘</span> Stopping…</span>';
+  } else if (st === 'stopping' && v === 'c') {
+    right = '<button class="btn-destructive is-stopping" disabled>' + sqIcon() + ' Stop</button>';
+  } else {
+    right = '<button class="btn-destructive" onclick="press(\'' + v + '\')">' + sqIcon() + ' Stop</button>';
+  }
+
+  var subtitle = (st === 'stopping' && v === 'c')
+    ? '⏱ 2m 18s · stopping'
+    : '⏱ 2m 18s · running';
+
+  return '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;'
+    + 'color:var(--color-text-dim);padding:0 8px 6px">Active runs · 1</div>'
+    + '<div class="tray-row"><span class="tray-dot ' + (st === 'stopping' && v === 'c' ? '' : 'pulse') + '"></span>'
+    + '<div style="min-width:0;flex:1"><div class="ttl">Weekly status report</div>'
+    + '<div class="sub">' + subtitle + '</div></div>' + right + '</div>';
+}
+
+/* -- canvas ---------------------------------------------------- */
+function renderCanvas(v, st) {
+  if (v === 'today') {
+    return '<div style="text-align:center;color:var(--color-text-dim);font-size:var(--text-sm);line-height:1.7">'
+      + '<div style="font-size:22px;opacity:.5">👁</div>'
+      + 'View only — <strong style="color:hsl(0 80% 76%)">no Stop control exists here</strong>'
+      + '<div style="font-family:var(--font-mono);font-size:10px;margin-top:8px">'
+      + 'grep -c "stopThread|cancelRun|Stop" WorkflowRunPage.tsx → 0</div></div>';
+  }
+  return '<div style="text-align:center;color:var(--color-text-dim);font-size:var(--text-sm);line-height:1.7">'
+    + 'The <strong style="color:var(--color-text-muted)">placement</strong> of this control is '
+    + '<strong style="color:var(--color-primary)">sketch 169</strong>.'
+    + '<div style="margin-top:8px">Whatever 169 picks, it wears <strong style="color:var(--color-text-muted)">'
+    + 'this variant’s pressed state</strong> — that is the point of deciding 168 first.</div></div>';
+}
+
+/* -- assemble -------------------------------------------------- */
+function renderMount(v, m) {
+  var st = sims[v].state;
+  var inner =
+      m.id === 'composer' ? renderComposer(v, st)
+    : m.id === 'panel'    ? renderPanel(v, st)
+    : m.id === 'tray'     ? renderTray(v, st)
+    :                       renderCanvas(v, st);
+
+  var note = '';
+  if (m.id === 'composer') note = 'Shipped: <code>data-testid="composer-stop"</code>, aria <code>Stop generation</code>.';
+  if (m.id === 'panel')    note = 'Shipped: lead <code>This run</code>, label <code>Stop</code>, <code>data-testid="panel-stop-run"</code>.';
+  if (m.id === 'tray')     note = 'Shipped: <code>Stop all</code> appears at 2+ runs — it inherits whatever this variant decides.';
+  if (m.id === 'canvas')   note = 'Does not exist at <code>045a83dc</code>.';
+
+  return '<div class="mount">'
+    + '<div class="mount-hd"><span class="nm">' + m.name + '</span>'
+    + '<span class="src">' + m.src + '</span></div>'
+    + '<div class="mount-body">' + inner + '</div>'
+    + '<div class="mount-note">' + note + '</div></div>';
+}
+
+function renderAll() {
+  VARIANTS.forEach(function (v) {
+    var host = document.getElementById('mounts-' + v);
+    if (!host) return;
+    host.innerHTML = MOUNTS.map(function (m) { return renderMount(v, m); }).join('');
+  });
+}
+
+/* ── nav + driver wiring ────────────────────────────────────── */
+function showVariant(id) {
+  var tabs = document.querySelectorAll('.variant-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var t = document.querySelector('.variant-tab[data-v="' + id + '"]');
+  if (t) t.classList.add('active');
+  var vs = document.querySelectorAll('.variant');
+  for (var j = 0; j < vs.length; j++) vs[j].classList.remove('active');
+  document.getElementById('variant-' + id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('seg-scenario').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  driver.scenario = b.dataset.s;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on');
+  VARIANTS.forEach(function (v) { clearSim(v); sims[v] = newSim(); });
+  renderAll();
+});
+
+document.getElementById('seg-speed').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  driver.speed = b.dataset.p;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on');
+});
+
+resetAll();
+</script>
+</body>
+</html>

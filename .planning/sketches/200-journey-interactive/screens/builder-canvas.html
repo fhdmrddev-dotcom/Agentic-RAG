@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Northwind QBR - Workflow Builder</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-container": "#a3a5ff",
+                      "surface-bright": "#39383f",
+                      "on-tertiary-fixed": "#221b00",
+                      "on-surface-variant": "#c7c5d3",
+                      "surface-container-highest": "#35343a",
+                      "secondary-container": "#3e4757",
+                      "outline": "#918f9c",
+                      "on-secondary-fixed-variant": "#3e4757",
+                      "inverse-primary": "#5355a9",
+                      "on-secondary-fixed": "#131c2a",
+                      "surface-dim": "#131318",
+                      "primary-fixed-dim": "#c1c1ff",
+                      "tertiary-fixed": "#ffe16c",
+                      "surface-container": "#1f1f25",
+                      "on-primary-container": "#353789",
+                      "on-error-container": "#ffdad6",
+                      "on-surface": "#e4e1e9",
+                      "on-tertiary-container": "#4e4000",
+                      "tertiary": "#e5c74c",
+                      "secondary-fixed": "#dae3f6",
+                      "inverse-surface": "#e4e1e9",
+                      "on-primary-fixed-variant": "#3b3d8f",
+                      "surface": "#131318",
+                      "outline-variant": "#464651",
+                      "on-tertiary": "#3a3000",
+                      "surface-container-lowest": "#0e0e13",
+                      "on-error": "#690005",
+                      "primary-fixed": "#e1e0ff",
+                      "error-container": "#93000a",
+                      "background": "#060A0F",
+                      "on-primary": "#242478",
+                      "surface-variant": "#35343a",
+                      "secondary-fixed-dim": "#bec7da",
+                      "on-primary-fixed": "#0b0664",
+                      "secondary": "#bec7da",
+                      "tertiary-container": "#c8ac33",
+                      "on-secondary": "#28313f",
+                      "error": "#ffb4ab",
+                      "on-tertiary-fixed-variant": "#544600",
+                      "on-background": "#e4e1e9",
+                      "primary": "#c3c4ff",
+                      "surface-container-low": "#1b1b21",
+                      "inverse-on-surface": "#303036",
+                      "surface-tint": "#c1c1ff",
+                      "tertiary-fixed-dim": "#e3c54a",
+                      "on-secondary-container": "#acb5c8",
+                      "surface-container-high": "#2a292f",
+                      
+                      // Custom Theme Overrides matching the prompt
+                      "rail": "#080B11",
+                      "card": "#0D1117",
+                      "raised": "#0F141B",
+                      "muted-fill": "#151B24",
+                      "border-color": "#212631",
+                      "text-primary": "#F4F6FE",
+                      "text-secondary": "#9AA3B5",
+                      "text-dim": "#6B7383",
+                      "brand-primary": "#A3A5FF",
+                      "brand-violet": "#895AF6",
+                      "status-success": "#21C45D",
+                      "status-warning": "#F5A524",
+                      "status-danger": "#DC2626"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "rail_width": "56px",
+                      "unit": "4px",
+                      "margin": "24px",
+                      "md": "16px",
+                      "gutter": "16px",
+                      "xs": "4px",
+                      "sm": "8px",
+                      "xl": "32px"
+              },
+              "fontFamily": {
+                      "data-md": ["JetBrains Mono"],
+                      "h1": ["Manrope"],
+                      "data-lg": ["JetBrains Mono"],
+                      "body-lg": ["Inter"],
+                      "h2": ["Manrope"],
+                      "h3": ["Manrope"],
+                      "body-sm": ["Inter"],
+                      "body-md": ["Inter"],
+                      "data-sm": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "data-md": ["14px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                      "h1": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                      "data-lg": ["16px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                      "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "h2": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                      "h3": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                      "body-sm": ["12px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "data-sm": ["12px", { "lineHeight": "1.4", "fontWeight": "500" }]
+              },
+              backgroundImage: {
+                  'dot-grid': 'radial-gradient(circle, #212631 1px, transparent 1px)'
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body { background-color: #060A0F; color: #F4F6FE; margin: 0; overflow: hidden; }
+        .canvas-bg { background-image: radial-gradient(circle, #212631 1px, transparent 1px); background-size: 24px 24px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+        }
+
+        @keyframes march {
+            to { stroke-dashoffset: -12; }
+        }
+        
+        @keyframes borderPulse {
+            0%, 100% { border-color: #212631; }
+            50% { border-color: #A3A5FF; }
+        }
+
+        .animate-march {
+            stroke-dasharray: 6 6;
+            animation: march 1s linear infinite;
+        }
+
+        .animate-border-pulse {
+            animation: borderPulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="flex h-screen w-full font-body-md text-body-md text-text-primary overflow-hidden">
+<!-- SideNavBar -->
+<nav class="w-rail_width h-screen bg-rail border-r border-border-color flex flex-col items-center py-md space-y-lg flex-shrink-0 z-20">
+<!-- Brand/App Mark -->
+<button class="w-10 h-10 rounded flex items-center justify-center text-brand-primary hover:bg-muted-fill transition-colors duration-200">
+<span class="material-symbols-outlined">widgets</span>
+</button>
+<!-- Top Actions -->
+<div class="flex flex-col space-y-sm w-full px-xs">
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Expand">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="New Chat">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+<!-- Main Nav -->
+<div class="flex flex-col space-y-sm w-full px-xs flex-grow">
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Chat">
+<span class="material-symbols-outlined">chat</span>
+</button>
+<!-- ACTIVE: Workflows -->
+<button class="w-full h-10 rounded flex items-center justify-center text-brand-primary border-l-2 border-brand-primary bg-muted-fill transition-colors duration-200" title="Workflows">
+<span class="material-symbols-outlined">account_tree</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Documents">
+<span class="material-symbols-outlined">description</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Classification">
+<span class="material-symbols-outlined">category</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Library Health">
+<span class="material-symbols-outlined">health_and_safety</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Governance">
+<span class="material-symbols-outlined">policy</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Skills">
+<span class="material-symbols-outlined">psychology</span>
+</button>
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<!-- Footer -->
+<div class="flex flex-col space-y-sm w-full px-xs pb-md">
+<button class="w-full h-10 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill transition-colors duration-200" title="Account">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-grow flex flex-col relative overflow-hidden">
+<!-- Builder Header (TopAppBar equivalent) -->
+<header class="h-[64px] bg-card border-b border-border-color flex items-center justify-between px-margin flex-shrink-0 z-20">
+<div class="flex items-center space-x-md">
+<button class="text-text-secondary hover:text-text-primary transition-colors flex items-center group">
+<span class="material-symbols-outlined mr-xs text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
+<span class="font-body-sm text-body-sm">Workflows</span>
+</button>
+<div class="h-4 w-px bg-border-color"></div>
+<div class="flex items-baseline space-x-sm">
+<h1 class="font-h3 text-h3 text-text-primary">Northwind QBR</h1>
+<span class="font-data-sm text-data-sm text-text-dim px-sm py-[2px] bg-muted-fill border border-border-color rounded">draft</span>
+</div>
+</div>
+<div class="flex items-center space-x-xl h-full">
+<!-- Sub-tabs -->
+<div class="flex h-full space-x-lg items-end">
+<button class="h-full pb-3 border-b-2 border-transparent text-text-secondary hover:text-text-primary transition-colors flex items-end">
+<span class="font-body-sm text-body-sm">Spine</span>
+</button>
+<!-- ACTIVE: Canvas -->
+<button class="h-full pb-3 border-b-2 border-brand-primary text-brand-primary flex items-end">
+<span class="font-body-sm text-body-sm">Canvas</span>
+</button>
+</div>
+<div class="h-4 w-px bg-border-color"></div>
+<!-- Actions -->
+<div class="flex items-center space-x-sm">
+<button class="px-md py-sm rounded border border-border-color text-text-primary hover:bg-raised transition-colors font-body-sm text-body-sm">
+                        Save draft
+                    </button>
+<button class="px-md py-sm rounded bg-brand-primary text-[#060A0F] font-body-sm text-body-sm font-medium hover:bg-opacity-90 transition-opacity">
+                        Publish...
+                    </button>
+</div>
+</div>
+</header>
+<!-- Canvas Plane -->
+<div class="flex-grow canvas-bg relative w-full h-full overflow-hidden flex items-center justify-center">
+<!-- Workflow Nodes & Connections Wrapper (Centered for Demo) -->
+<div class="relative w-[1000px] h-[500px]">
+<!-- SVG Connections (Underneath) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 0;">
+<!-- Line 1 to 2 -->
+<path d="M 240 100 C 300 100, 300 100, 340 100" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Line 2 to 3 -->
+<path class="animate-march" d="M 580 100 C 640 100, 640 250, 680 250" fill="none" id="active-path" stroke="#A3A5FF" stroke-width="2"></path>
+<text dy="-6" fill="#A3A5FF" font-family="Inter" font-size="11" font-weight="500">
+<textpath href="#active-path" startoffset="30%">running</textpath>
+</text>
+<!-- Line 3 to 4 (Output 1) -->
+<path d="M 800 230 C 840 230, 840 150, 880 150" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Line 3 to 5 (Output 2) -->
+<path d="M 800 270 C 840 270, 840 350, 880 350" fill="none" stroke="#6B7383" stroke-dasharray="4,4" stroke-width="2"></path>
+<!-- Line 4 to 6 -->
+<path d="M 1120 150 C 1160 150, 1160 250, 1200 250" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Line 5 to 6 -->
+<path d="M 1120 350 C 1160 350, 1160 250, 1200 250" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Connection: Escalate to Slack -->
+<path d="M 1120 150 C 1160 150, 1160 100, 1200 100" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Connection: File as routine to Google Drive -->
+<path d="M 1120 350 C 1160 350, 1160 400, 1200 400" fill="none" stroke="#6B7383" stroke-dasharray="4,4" stroke-width="2"></path>
+<!-- Connection: Summarize to Jira -->
+<path d="M 1440 250 C 1470 250, 1470 250, 1500 250" fill="none" stroke="#212631" stroke-width="2"></path>
+<!-- Connection: Jira Read to Node 1 -->
+<path d="M -60 100 C -30 100, -30 100, 0 100" fill="none" stroke="#212631" stroke-width="2"></path></svg>
+<!-- Nodes Layer -->
+<div class="absolute inset-0 pointer-events-auto" style="z-index: 10;">
+<!-- Node 1 -->
+<div class="absolute left-0 top-[64px] w-[240px] h-[72px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 text-text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">search</span>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Find this quarter's vendor contracts</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Initial retrieval step</div>
+</div>
+<div class="absolute top-xs right-xs text-brand-violet">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+</div>
+</div>
+<!-- Node 2 -->
+<div class="absolute left-[340px] top-[64px] w-[240px] h-[72px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 text-text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">save_as</span>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Pull out renewal dates and liability caps</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Entity extraction</div>
+</div>
+</div>
+<!-- Node 3: Branch (Hexagonal approximation using css shapes) -->
+<div class="absolute left-[680px] top-[214px] w-[120px] h-[72px] bg-card border-[2px] rounded flex flex-col items-center justify-center p-sm cursor-pointer z-20 animate-border-pulse" style="clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);">
+<div class="font-body-sm text-body-sm text-text-primary text-center leading-tight text-[11px]">Weigh against risk policy</div>
+<div class="font-data-sm text-data-sm text-text-secondary mt-xs text-[10px]">Over £2m?</div>
+</div>
+<!-- Node 4: Output 1 -->
+<div class="absolute left-[880px] top-[114px] w-[240px] h-[72px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 text-status-warning flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Escalate to the risk committee</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">High risk path</div>
+</div>
+</div>
+<!-- Node 5: Output 2 -->
+<div class="absolute left-[880px] top-[314px] w-[240px] h-[72px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer opacity-70">
+<div class="w-6 h-6 mr-sm flex-shrink-0 text-status-success flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">File as routine</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Standard path</div>
+</div>
+</div>
+<!-- Node 6: Final -->
+<div class="absolute left-[1200px] top-[214px] w-[240px] h-[72px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 text-text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">summarize</span>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Summarize findings</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Final compilation</div>
+</div>
+</div>
+<!-- Node 7: Slack -->
+<div class="absolute left-[1200px] top-[64px] w-[240px] h-[84px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 flex items-center justify-center">
+<svg class="w-5 h-5" viewbox="0 0 122.8 122.8"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.4 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#e01e5a"></path><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.4c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36c5f0"></path><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.4 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C77.6 5.8 83.4 0 90.5 0s12.9 5.8 12.9 12.9v32.3z" fill="#2eb67d"></path><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.4c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ecb22e"></path></svg>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Post the summary to the team channel</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Posts a message to Slack</div>
+<div class="text-status-warning text-[9px] font-bold mt-1 tracking-wider">CHANGES SOMETHING OUTSIDE</div>
+</div>
+</div>
+<!-- Node 8: Google Drive -->
+<div class="absolute left-[1200px] top-[364px] w-[240px] h-[84px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 flex items-center justify-center">
+<svg class="w-5 h-5" viewbox="0 0 87.3 78"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"></path><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44.05c-.8 1.45-1.2 3-1.2 4.55h27.5z" fill="#00ac47"></path><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l.05.1z" fill="#ea4335"></path><path d="m43.65 51.3 13.75 23.8c1.35-.8 2.5-1.9 3.3-3.3l25.4-44.05c.8-1.45 1.2-3 1.2-4.55h-27.5z" fill="#ffba00"></path><path d="m57.4 25h23.3c-1.35-2.35-3.3-4.3-5.65-5.65l-13.75-7.95c-2.35-1.35-5.05-2.1-7.75-2.1l-13.75 23.8z" fill="#00832d"></path><path d="m43.65 25 13.75 23.8h27.5c0-1.55-.4-3.1-1.2-4.5l-13.75-23.8c-.8-1.4-1.95-2.5-3.3-3.3z" fill="#2684fc"></path></svg>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">File the report in the shared drive</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Files the report in Google Drive</div>
+<div class="text-status-warning text-[9px] font-bold mt-1 tracking-wider">CHANGES SOMETHING OUTSIDE</div>
+</div>
+</div>
+<!-- Node 9: Jira (Write) -->
+<div class="absolute left-[1500px] top-[214px] w-[240px] h-[84px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 flex items-center justify-center">
+<svg class="w-5 h-5" viewbox="0 0 512 512"><path d="M490.5 235.3L276.7 21.5c-12-12-31.5-12-43.5 0L19.2 235.3c-12 12-12 31.5 0 43.5l213.8 213.8c12 12 31.5 12 43.5 0l213.8-213.8c12.2-12 12.2-31.5.2-43.5z" fill="#0052CC"></path><path d="M256 144v224l112-112-112-112z" fill="#fff"></path></svg>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Raise a ticket for anything unresolved</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Raises a ticket in Jira</div>
+<div class="text-status-warning text-[9px] font-bold mt-1 tracking-wider">CHANGES SOMETHING OUTSIDE</div>
+</div>
+</div>
+<!-- Node 10: Jira (Read) -->
+<div class="absolute left-[-300px] top-[64px] w-[240px] h-[84px] bg-card border border-border-color rounded flex items-center p-md hover:border-text-secondary transition-colors cursor-pointer">
+<div class="w-6 h-6 mr-sm flex-shrink-0 flex items-center justify-center">
+<svg class="w-5 h-5" viewbox="0 0 512 512"><path d="M490.5 235.3L276.7 21.5c-12-12-31.5-12-43.5 0L19.2 235.3c-12 12-12 31.5 0 43.5l213.8 213.8c12 12 31.5 12 43.5 0l213.8-213.8c12.2-12 12.2-31.5.2-43.5z" fill="#0052CC"></path><path d="M256 144v224l112-112-112-112z" fill="#fff"></path></svg>
+</div>
+<div class="flex-grow min-w-0">
+<div class="font-body-md text-body-md text-text-primary truncate font-medium text-[13px] leading-tight">Read this week's tickets</div>
+<div class="font-body-sm text-body-sm text-text-secondary text-[11px] mt-xs truncate">Reads tickets from Jira</div>
+<div class="text-text-dim text-[9px] font-bold mt-1 tracking-wider">ONLY READS</div>
+</div>
+</div></div>
+</div>
+<!-- Floating Controls -->
+<div class="absolute bottom-margin left-margin bg-raised border border-border-color rounded flex items-center space-x-sm p-xs z-30">
+<button class="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="font-data-sm text-data-sm text-text-primary px-xs">100%</span>
+<button class="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+<div class="w-px h-4 bg-border-color mx-xs"></div>
+<button class="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill rounded transition-colors" title="Fit to view">
+<span class="material-symbols-outlined text-[18px]">fit_screen</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-muted-fill rounded transition-colors" title="Lock canvas">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+</button>
+</div>
+<!-- Legend Strip -->
+<div class="absolute bottom-margin right-margin bg-raised border border-border-color rounded flex items-center px-md py-sm space-x-lg z-30">
+<div class="flex items-center space-x-xs">
+<div class="w-4 h-[2px] bg-border-color"></div>
+<span class="font-body-sm text-body-sm text-text-secondary text-[11px]">at rest</span>
+</div>
+<div class="flex items-center space-x-xs">
+<div class="w-4 h-[2px] bg-brand-primary"></div>
+<span class="font-body-sm text-body-sm text-text-secondary text-[11px]">selected</span>
+</div>
+<div class="flex items-center space-x-xs">
+<div class="w-4 h-[2px] bg-[#E4E1E9]"></div>
+<span class="font-body-sm text-body-sm text-text-secondary text-[11px]">hovered</span>
+</div>
+<div class="flex items-center space-x-xs">
+<div class="w-4 h-[2px] border-t-2 border-dashed border-text-dim"></div>
+<span class="font-body-sm text-body-sm text-text-secondary text-[11px]">not taken</span>
+</div>
+</div>
+</div>
+</main>
+
+<script>
+(function(){
+  var HOPS = [["Spine","builder-spine"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"builder-canvas", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

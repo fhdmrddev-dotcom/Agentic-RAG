@@ -146,7 +146,18 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
-import { generateWorkflow, listFolders, listSkills } from "@/lib/api"
+import { Play } from "lucide-react"
+import { listConnectorConnections, listFolders, listSkills } from "@/lib/api"
+// 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
+import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
+import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
+// 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
+// interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
+import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
+// 193.1-08 (D-24) — the pre-draft attach row, mounted on THIS screen and on the loose door's.
+// ONE component, two mounts: the marginal cost of the second is a mount and a prop, and the
+// alternative is two surfaces that drift. See the mount below for WHERE it lands and why.
+import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -165,14 +176,22 @@ import {
   createBuilderStore,
   selectDefinition,
   SAVED_STILL_A_DRAFT,
+  type TemplateAssetDescriptor,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+import { classifyTemplateNames } from "@/components/workflows/templateNameBuckets"
+import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
 // 186-07 (G-5): the header's save region — four sentences and three controls — has its own
 // file, so composing autosave into this page did not grow it.
 import { BuilderSaveRegion } from "@/components/workflows/BuilderSaveRegion"
 import { BuilderHeaderBar } from "@/components/workflows/BuilderHeaderBar"
-import { SeedReceipt } from "@/components/workflows/SeedReceipt"
+// 197-09 (AUTH-02 / D-02) — the arrival card that COMPOSES the receipt. `SeedReceipt` is
+// no longer imported here: this page mounts the parent, and the parent mounts the receipt
+// UNMODIFIED behind its first fold. That is the whole of D-02's composition rule at the
+// page level — one card in the UI, two components underneath.
+import { DraftArrivalCard } from "@/components/workflows/DraftArrivalCard"
+import type { DecisionsListProps } from "@/components/workflows/DecisionsList"
 import { StarterTemplatePicker } from "@/components/workflows/StarterTemplatePicker"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
@@ -187,6 +206,11 @@ import {
   type PersistState,
 } from "@/hooks/useDraftPersistence"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
+// 196-08 (AUTH-04): the ONE author-registry read on this surface. Sited here for the same
+// reason the two leaf hooks above are — the panel mounts the picker FOUR times, so a fetch
+// inside the component would be four requests per step click.
+import { useModelRegistry } from "@/hooks/useModelRegistry"
+import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
 import { isCheckOutstanding } from "@/components/workflows/verdictModel" // 187-27 (GAP B)
 import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
@@ -197,12 +221,37 @@ import {
   type PhaseGovernancePatch,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
+// Phase 193 fast-fix (AUTH-01, operator-approved 2026-08-13) — this page held a SECOND,
+// ungoverned copy of the describe screen's CTA and hint fragments. `193-05` moved the door
+// words into `doorVocabulary.ts` and `193-08` shipped variant D there, but this file was
+// outside both plans' `files_modified` and outside the D-24(a) sweep, so after variant D the
+// loose door read one CTA while this screen still read the pre-D one. Named ids, not literals.
+// ⚠ FOUR literals were expected here and FIVE were found: `DESCRIBE_H1` was duplicated too,
+// and is only in this list because the check was run rather than eyeballed.
+// ⚠ 199-09 adds `DESCRIBE_REFUSAL` to this list, and IMPORTING IT IS THE POINT. It is the
+// 23rd governed door id, created by `199-08` for the door's copy of this same box; this file
+// is already a SWEPT SOURCE of the D-24(a) copy fence, so spelling the sentence here instead
+// of importing it turns that fence red — which is the fence working. A second spelling of a
+// governed string is how a governed string stops being governed.
+import {
+  DESCRIBE_CTA,
+  DESCRIBE_H1,
+  DESCRIBE_REFUSAL,
+  HINT_FRAG1,
+  HINT_FRAG2,
+  HINT_FRAG3,
+} from "@/components/workflows/doorVocabulary"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
 // TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
 // never requested with the flag off, and a value import of anything from that module
 // here would pull it into the main bundle and undo D-183-03's whole point.
 import type { CanvasNotice, CanvasSession } from "@/components/workflows/WorkflowCanvas"
-import type { WorkflowDefinitionJSON } from "@/lib/api"
+import type { GenerateReadiness, WorkflowDefinitionJSON } from "@/lib/api"
+// 197-09 (D-18) — WHICH step produces the deliverable. Rows 2 and 5 of the arrival card
+// both jump to it, so the page reads the ONE derivation rather than scanning for an emit
+// step itself: `soulDeliverable` answers *whether* a file is produced and this answers
+// *which step*, and re-implementing either here is the drift `soulData.ts` forbids.
+import { terminalEmitSlug } from "@/components/workflows/soulData"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
  *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
@@ -356,6 +405,51 @@ export const UNBOUND_KB_INVITATION = "No knowledge base · searches everything"
 export const REQUIREMENT_INVITATION = "What must this workflow deliver? · required to publish"
 
 /**
+ * Phase 193.2-09 (D-06, `SEED-163`) — the VISIBLE half of the requirement's provenance.
+ *
+ * WHY A MARK AT ALL, AND WHY THIS IS NOT DECORATION. `193.2-05` made the generator PROPOSE
+ * a `business_requirement` and `193.2-07` made that proposal DURABLE
+ * (`WorkflowDefinition.business_requirement_seeded_by_ai`, stamped server-side after
+ * validation and never read off the emitted payload). Between those two and this one the
+ * field arrives pre-filled with nothing anywhere saying the AI wrote it — a decision the
+ * author is never shown, which is `SEED-163`'s own root failure repeated in miniature. D-06
+ * rejects that silent pre-fill explicitly, and rejects the other direction too (an empty
+ * field with a click-to-accept proposal is still one extra act before publish, which is the
+ * friction `SEED-163` exists to remove).
+ *
+ * IT IS ALSO WHAT MAKES D-09 HONEST. The publish gate is unchanged: stage 1's
+ * `business_requirement_missing` (`backend/app/services/harness/grounding.py`) only checks
+ * the field is non-empty, so an AI-seeded value passes it untouched. That is ACCEPTED —
+ * because the author can SEE the value is the AI's and overrule it, and pressing Publish is
+ * the consent (T-193.2-03). Without this mark, D-09 would be a silent weakening of the
+ * judge's own `answers_business_requirement` criterion rather than a stated trade.
+ *
+ * THE REGISTER: what is true, plainly (D-13). Not an endorsement — it does not say the
+ * proposal is good — and not a warning: the ordinary case is that the proposal is right and
+ * the author ships it. It reads *the AI proposed this; it is yours to change*, and the
+ * second clause is a fact about behaviour that ships in this same plan (the store clears the
+ * flag on any edit), never a promise about future work. **No `planned` / `coming` / `soon` /
+ * `deferred` / `future release`** — D-14, whose whole reason for existing is that `SEED-164`
+ * came from a docblock calling shipped work "deferred" and leaving it reading as a plan for
+ * a year.
+ *
+ * NO GLYPH, DELIBERATELY, AND THE RULE IS THE PROJECT'S OWN. The icon convention's §4 states
+ * it for the shipped `waitsForYou` badge: *the WORD carries the meaning; tone is decoration*,
+ * and an emoji there spends visual budget the design withholds. Two further reasons make it
+ * binding here rather than a preference: `✦` — the one glyph a sketch has ever proposed for
+ * "AI-drafted" — is REFUSED, because it is the shipped Working badge and sits on the verdict
+ * mark's coordinates on a canvas-adjacent surface; and inventing a NEW canvas mark when the
+ * vocabulary has none is the exact drift §4's "what to avoid" list names. The affordance's
+ * own `✎` already leads the row and is not repeated.
+ */
+export const REQUIREMENT_AI_MARK_LABEL = "AI-proposed"
+
+/** The fuller sentence, carried as `title` — the shipped idiom on this header, where
+ *  `net-new-flag` and `judge-locked` both explain themselves the same way. */
+export const REQUIREMENT_AI_MARK_EXPLANATION =
+  "The generator proposed this line when this workflow was created. Edit it and this mark clears."
+
+/**
  * What the picker calls a binding it cannot NAME — a folder that is not in the author's
  * own list, because it was deleted or because the draft was forked from a workflow that
  * bound someone else's.
@@ -458,6 +552,34 @@ function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): Phas
     : []
 }
 
+/**
+ * 197-09 (AUTH-02) — HAND THE AUTHOR TO A CONTROL THAT ALREADY EXISTS.
+ *
+ * ⚠ FOCUS FIRST, SCROLL SECOND, AND THE ORDER IS A CORRECTNESS REQUIREMENT — MEASURED,
+ * NOT REASONED. Written the other way round, both arrival-card seams did nothing at all:
+ * jsdom does not implement `scrollIntoView`, the call threw, and the `focus()` on the next
+ * line never ran, so `document.activeElement` stayed on `<body>`. Two cases caught it.
+ *
+ * The lesson generalises well past the test environment: the FOCUS is the seam's whole
+ * job and the scroll is an assist, so an assist that throws must never be able to eat the
+ * job. The `typeof` guard makes that structural rather than a property of statement order.
+ *
+ * `block: "nearest"` is deliberate — it moves the viewport the minimum needed rather than
+ * yanking the header to the top of the screen, which on a jump the author did not ask for
+ * is disorienting. And a focus that scrolls NOTHING is a jump the author cannot see, which
+ * is why the assist exists at all.
+ *
+ * Module scope, not a component body: it closes over nothing and a per-render copy inside
+ * a `useCallback([])` would be a stale closure waiting to be believed.
+ */
+function handOffTo(node: HTMLElement | null) {
+  if (node === null) return
+  node.focus()
+  if (typeof node.scrollIntoView === "function") {
+    node.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }
+}
+
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
 export interface BuilderDefinition {
@@ -542,13 +664,33 @@ export interface WorkflowBuilderPageProps {
    *  otherwise silently dropped). Only meaningful for a FRESH build (no `initial`) —
    *  the drafted editing view ignores it. */
   initialDescribe?: string
-  /** Phase 124 CR-01 fix: when true (the loose door's "Draft the workflow" CTA), run
+  /** Phase 124 CR-01 fix: when true (the loose door's `DESCRIBE_CTA` button), run
    *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
    *  so the fast path actually drafts instead of dead-ending on an empty screen. */
   autoDraft?: boolean
   /** Phase 187-26 (GAP A): the loose door's KB choice, made BEFORE the AI drafts.
    *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
   initialProjectFolderId?: string
+  /**
+   * 193.1-08 (D-24) — the document the author supplied on the LOOSE door, and its
+   * ALREADY-COMPLETED reading, carried across the hand-off.
+   *
+   * ⚠ THE PRECEDENT IS `initialProjectFolderId` DIRECTLY ABOVE, AND THAT IS THE WHOLE
+   * MECHANISM — no store, no context, no global. `187-26` added that prop for the identical
+   * problem: pre-draft state chosen on the door that only this page can spend. This pair is
+   * the same shape, one wave later, for a different pre-draft choice.
+   *
+   * ⚠ THEY TRAVEL AS A PAIR OR NOT AT ALL, and the door passes them from ONE spread for
+   * exactly that reason: a file arriving WITHOUT its answer is the only shape that could make
+   * this page re-read, and a re-read returns the reading to `loading` at the instant the
+   * one-shot auto-draft fires — the blind-draft race D-07 exists to make impossible. SEED,
+   * DO NOT RE-READ. The seed is installed only for the `File` it names, so a mismatched pair
+   * is ignored rather than trusted.
+   *
+   * BOTH ABSENT ⇒ this page behaves exactly as it does without them.
+   */
+  initialTemplateFile?: File | null
+  initialTemplateRead?: TemplateReadAnswer | null
   /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
    *
@@ -577,21 +719,25 @@ export interface WorkflowBuilderPageProps {
    * below does not reference them at all — so the shipped three-band surface is preserved
    * by construction rather than by remembering to pass nothing.
    */
+  /** Phase 200.3 (SEED-164 / D-03): Test Run action from builder header. */
+  onTestRun?: (def: WorkflowDefinitionJSON, draftId: string | null) => Promise<void> | void
   headerLead?: React.ReactNode
   headerTrail?: React.ReactNode
 }
 
 export function WorkflowBuilderPage({
   renderPublish,
+  onTestRun,
   initial,
   initialDescribe,
   autoDraft,
   initialProjectFolderId,
+  initialTemplateFile,
+  initialTemplateRead,
   registerCanLeave,
   headerLead,
   headerTrail,
 }: WorkflowBuilderPageProps) {
-  const [describe, setDescribe] = useState(initialDescribe ?? "")
   // Phase 184-04 (D-184-01): the definition's home. Created LAZILY so the factory
   // runs exactly once per mount, and never at module scope — a singleton would carry
   // one workflow's undo history into the next workflow opened in the same tab.
@@ -611,19 +757,17 @@ export function WorkflowBuilderPage({
   // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
   // cold-starts on "spine" on every mount and is persisted nowhere.
   const [graphView, setGraphView] = useState<"spine" | "canvas">("spine")
-  // Phase 103-ux: the project (knowledge base) the generated workflow binds to.
-  // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
-  // by name in the draft header afterwards. When opening an existing definition,
-  // seed it from that definition's own binding so the header shows the bound KB.
-  // Phase 187-26 (GAP A): the loose door may now have bound one before generate ran.
-  const [projectFolderId, setProjectFolderId] = useState<string>(
-    typeof initial?.definition.project_folder_id === "string" ? initial.definition.project_folder_id : (initialProjectFolderId ?? ""),
-  )
   // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
   // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
   const [folderNames, setFolderNames] = useState<IdNameMap>({})
   const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
   const [skillNames, setSkillNames] = useState<IdNameMap>({})
+  // Phase 200 (FE-WIRING): connection id→name, so an `external_action` step's face names its
+  // destination. Same lifecycle and same failure mode as the two maps above — fetched once on
+  // mount, best-effort, and an empty map is the SHIPPED state (the destination-free sentence),
+  // never a degraded one. ⚠ NAMES ONLY: nothing from `ConnectorConnection.config` is read here,
+  // so no host, port or credential can reach the canvas (CONN-03 SC#4).
+  const [connectionNames, setConnectionNames] = useState<IdNameMap>({})
   // The persisted draft id as a RENDERED value (null until the first save on a fresh build;
   // pre-seeded for Open/Tweak). The write loop keeps its own synchronous mirror — that is
   // what collapses the first save to exactly one create — and reports the id it minted here
@@ -641,6 +785,32 @@ export function WorkflowBuilderPage({
   // ONE generation and its copy is past-tense, so it must never read the live selector: see
   // `SeedReceipt`'s `phases` contract for why that made the card claim the author's own edits.
   const [receiptPhases, setReceiptPhases] = useState<readonly PhaseSpecJSON[]>([])
+  /**
+   * 197-09 (D-13 / T-197-03 / T-197-27) — THE SERVER'S READINESS VERDICT ABOUT **ONE**
+   * GENERATION, AND IT IS THE SAME CLASS OF VALUE AS `receiptPhases` ABOVE.
+   *
+   * ⚠ IT IS NOT STORE STATE AND MUST NEVER BECOME STORE STATE. Reading this verdict
+   * through a store SELECTOR would make the card narrate the AUTHOR's later edits in the
+   * server's voice — CR-01's shape for the fourth time, and the exact defect
+   * `receiptPhases` exists to have fixed (see its comment above and `SeedReceipt`'s
+   * `phases` contract). ⚠ The forbidden selector is named by ROLE here and never spelled
+   * out: a grep criterion sweeps this file's raw source for it, and `196-08` tripped that
+   * trap four times — once inside the comment written to explain the first three.
+   *
+   * ⚠ `undefined` IS A THIRD STATE, NOT A MISSING SECOND ONE. `197-06` shipped the wire
+   * type with three representable arms — present, missing-with-a-message, and the whole
+   * object being absent — with no empty-object default and no synthesised pass anywhere on
+   * the hop. That absence survives to here unchanged and is handed to the card unchanged.
+   * The two named ways to lose it are a nullish-coalesce onto an empty object, and a
+   * `=== "missing"` read whose `false` branch renders a green tick; BOTH TYPECHECK, which
+   * is why neither is written and why a case drives the distinction rather than a comment.
+   * ⚠ Neither is spelled out here — a source fence sweeps this file for the first of them,
+   * and a mention inside the comment explaining it is what `196-08` tripped on four times.
+   *
+   * REPLACED on every generation, never merged with a previous one — that is what makes a
+   * second generation replace the first one's card rather than blend with it.
+   */
+  const [readiness, setReadiness] = useState<GenerateReadiness | undefined>(undefined)
   // 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds, memoised
   // so the memoised `toCanvas` does not re-project every render. `assets` is DEFINITION-level
   // (a workflow's, never a phase's), which is why 187-04 gates the template tier on
@@ -648,13 +818,111 @@ export function WorkflowBuilderPage({
   // ACCEPTED: the maps land asynchronously, so derived faces SETTLE when the mount fetch
   // resolves, exactly as `PhaseFormPanel` already behaves. Rejected: holding the tier until
   // the maps are non-empty (a late canvas for a cosmetic reason). Never: a placeholder.
-  const nameContext = useMemo<NameContext>(() => {
+  // 260814-q5r — the descriptor has ONE home. This `.find()` used to live inside
+  // `nameContext` and produced only a filename; the authoring panel now also needs the
+  // `asset_id` to ask what the template asks for. Hoisted rather than duplicated: two
+  // `.find()` calls over the same array could drift, and a fields list shown under a
+  // filename resolved by a DIFFERENT lookup is exactly the lie this feature prevents.
+  // The defensive `typeof === "string"` coercion is kept for BOTH fields — `meta.assets`
+  // may be absent, null or not an array, and its entries are untyped JSONB.
+  const templateAsset = useMemo(() => {
     const assets = Array.isArray(meta.assets) ? (meta.assets as Array<Record<string, unknown>>) : []
-    const filename = assets.find((a) => a?.kind === "template")?.filename
-    return { folderNames, skillNames, templateFilename: typeof filename === "string" ? filename : undefined }
-  }, [folderNames, skillNames, meta])
+    const found = assets.find((a) => a?.kind === "template")
+    if (!found) return undefined
+    const filename = typeof found.filename === "string" ? found.filename : undefined
+    const assetId = typeof found.asset_id === "string" ? found.asset_id : undefined
+    return { filename, assetId }
+  }, [meta])
 
-  const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
+  const nameContext = useMemo<NameContext>(
+    () => ({
+      folderNames,
+      skillNames,
+      templateFilename: templateAsset?.filename,
+      // Phase 200 (FE-WIRING) — the connection id→name map, so an `external_action` step's face
+      // can name where it sends (`Posts a message to Slack`) instead of stopping at the verb.
+      // It rides the SAME memo as the other two because it is the same class of value and has
+      // the same failure mode: PITFALL 1 accepted — the map lands asynchronously, so those faces
+      // SETTLE when the mount fetch resolves, exactly as the folder and skill tiers already do.
+      // Rejected, for the third time and the same reason: holding the tier until the map is
+      // non-empty. Never: a placeholder destination.
+      connectionNames,
+    }),
+    [folderNames, skillNames, templateAsset, connectionNames],
+  )
+
+  /**
+   * Phase 193.1-05 (D-01 / D-25) — THE PRE-DRAFT DESCRIBE→GENERATE CONCERN, NO LONGER HERE.
+   *
+   * G-5 fired on this file (10 phases, 34 commits at the cut), and 193.1 adds a pre-draft
+   * TEMPLATE READ STATE MACHINE to the same screen — a genuinely second concern on the seam
+   * `CLAUDE.md`'s ledger row already named. So the extraction shipped FIRST, in its own wave,
+   * before the feature it makes room for (the 192.1 order). No waiver was taken.
+   *
+   * The describe text, the pre-draft KB choice, the CTA rule, the `/generate` call and the
+   * loose door's one-shot auto-draft all live in `useTemplateFirstDraft` now. What stays here
+   * is what was never that concern's: `draftId` (read across the drafted view), the seed
+   * receipt pair (a DRAFTED-view surface), and `selectedSlug` (the page's one selection
+   * contract, shared by both graph views). Each reaches the hook as a callback — see its
+   * header for why the two pre-flight resets are ONE call rather than two.
+   */
+  const {
+    describe,
+    setDescribe,
+    projectFolderId,
+    setProjectFolderId,
+    canDraft,
+    onDraft,
+    // 193.1-08 (D-24) — the four values the pre-draft row renders from. The page computes
+    // NOTHING about documents: it forwards the hook's own state and the hook's own writers,
+    // the panel-prop discipline (`PhaseFormPanel.tsx:155-169`) applied one screen up.
+    templateFile,
+    templateRead,
+    onPickTemplateFile,
+    onClearTemplateFile,
+    bindHeldTemplate,
+    bindFailed,
+  } = useTemplateFirstDraft({
+    store,
+    builderPhase,
+    initialDescribe,
+    autoDraft,
+    initialProjectFolderId,
+    // 193.1-08 (D-24) — straight through to the hook, which SEEDS its reading with them.
+    // Undefined on every mount that supplies nothing, which is every shipped call site but
+    // the loose door's.
+    initialTemplateFile,
+    initialTemplateRead,
+    initialDefinitionFolderId: initial?.definition.project_folder_id,
+    onDraftStarted: () => {
+      setSelectedSlug(null)
+      setDraftId(null)
+    },
+    // ⚠ 197-09 (D-13) — THE LAST HOP, AND THE ONE A GREEN TYPECHECK CANNOT PROVE. `197-06`
+    // widened this callback to a SECOND parameter carrying the server's readiness verdict,
+    // and recorded that the page was still ignoring it — because a ONE-ARGUMENT inline
+    // callback assigns to a two-parameter signature with NO TypeScript error at all. The
+    // page therefore compiled perfectly while silently dropping the verdict. Naming the
+    // parameter here is what spends it into page state; the behaviour is pinned by a case
+    // in `canvas.test.tsx` that reds when this parameter is deleted, never by `tsc`.
+    //
+    // All three writes are ONE snapshot of ONE generation, taken in the same batch as the
+    // store's single `setDrafted` transition — see `readiness`' own block above.
+    onDrafted: (def, verdict) => {
+      setShowReceipt(true)
+      setReceiptPhases(def.phases)
+      setReadiness(verdict)
+    },
+    // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
+    // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
+    // BELOW this call (it needs the write loop, which needs the callback this hook returns),
+    // so naming it directly here would read an uninitialised `const` during render. An arrow
+    // created here and invoked only from an async bind runs long after the whole body has
+    // evaluated. Passing THIS handler rather than a second copy of it is what keeps
+    // `setTemplateAsset` + `saveNow` the ONE writer on the definition JSONB.
+    onTemplateBound: (asset) => onTemplateAttached(asset),
+  })
+
   const panelOpen = selectedSlug !== null
 
   // Phase 183-07 (D-183-03) — the three-part fail-closed gate, now read through the ONE
@@ -793,6 +1061,41 @@ export function WorkflowBuilderPage({
     [builderPhase, meta, phases],
   )
 
+  /**
+   * Phase 193.1-09 (AUTH-03 / SC#3 — D-10 / D-20 / D-22) — WHICH OF THE ATTACHED TEMPLATE'S
+   * FIELDS THE DRAFT'S OWN STEPS NAME.
+   *
+   * Computed HERE and handed down finished, because the rail panel's standing rule is that a
+   * definition-level fact is caller-owned: this reads `definition.inputs[]` and the phase
+   * slugs, both siblings of `phases`, while that panel's only write seam patches `config`.
+   * The panel gains one optional prop and one gated line and computes nothing.
+   *
+   * The asset id comes from the ONE `templateAsset` memo — the same descriptor whose filename
+   * is already on screen — so the fields shown and the file named can never disagree. The
+   * definition comes from the ONE `selectDefinition` memo above, for the same reason.
+   *
+   * ⚠ THE COST, STATED HERE RATHER THAN LEFT TO BE FOUND: this is a SECOND call to the
+   * placeholders route for the same asset — the attach section makes its own. Two calls to one
+   * pure route with identical arguments cannot disagree about content, so this is a duplicate
+   * READ, not a second oracle, and the route persists nothing. The alternative — hoisting the
+   * read up and passing the fields down as props — was REJECTED: it changes the data contract
+   * of a component that shipped three weeks ago with a 43-case pinned suite, to save one GET.
+   * A future phase that wants a single read should hoist it DELIBERATELY, as its own change.
+   *
+   * ⚠ AND THE HONEST EXPECTATION IS THE DEGENERATE ONE. Measured across all 74 template-binding
+   * definitions, zero phase slugs match any known placeholder name, and the definition-level
+   * input list stayed empty on 6 of 6 post-fix generations — so the usual answer is *every
+   * field named nowhere*. That is not a defect and the surface does not render it as one.
+   */
+  const templateFields = useTemplatePlaceholders(draftId, templateAsset?.assetId)
+  const nameCheck = useMemo(() => {
+    // Only a resolved, NON-EMPTY field list produces a check. `fields` carries a non-empty
+    // list by that hook's own contract, so an unread, unreadable or field-less template
+    // renders nothing at all rather than an empty check that would read as an answer.
+    if (templateFields.kind !== "fields") return undefined
+    return { classification: classifyTemplateNames(templateFields.fields, definition) }
+  }, [templateFields, definition])
+
   const selectedPhase = useMemo<PhaseSpecJSON | null>(() => {
     if (builderPhase !== "drafted" || selectedSlug === null) return null
     return phases.find((p) => p.slug === selectedSlug) ?? null
@@ -888,9 +1191,64 @@ export function WorkflowBuilderPage({
     store,
     publishInFlight,
     validationCause,
-    onDraftCreated: setDraftId,
+    /**
+     * ── 193.1-07 (D-06 / D-25, threat T-193.1-07-01) — THE ROW EXISTS, SO BIND THE BYTES ──
+     *
+     * The held document is uploaded at the FIRST INSTANT a `definition_id` exists, which is
+     * exactly here: this callback is reached only from the write loop's create branch, and
+     * that branch is guarded against re-entry, so "first save" is distinguished by CONTROL
+     * FLOW and needs no flag.
+     *
+     * ⚠ **THE SHAPE OF THIS COMPOSITION IS THE GUARD, AND IT IS NOT NATURAL IN THE CODE THAT
+     * CALLS IT.** The write loop invokes this from INSIDE its own `try`, whose `catch` turns
+     * anything thrown into a save REFUSAL — and for a terminal-shaped refusal sets a halt flag
+     * that nothing in the session ever clears. So a bind that threw would report a failed save
+     * for a row that was successfully created, and could freeze autosave outright. Two things
+     * prevent it: the bind is an `async` function (which converts a synchronous throw into a
+     * rejection) that catches everything internally (so the rejection never escapes), and it
+     * is `void`-ed here so nothing is awaited inside the loop's turn. Its suite asserts the
+     * RETURNED PROMISE resolves — not merely that the state is right — because a `void`-ed
+     * rejection has nowhere to be caught. The persistence hook itself is UNCHANGED by this
+     * plan: `git diff --numstat` on it is empty, deliberately (D-25).
+     *
+     * ⚠ AND A STORAGE BLIP MAY NOT COST THE AUTHOR THEIR DRAFT. The save is the more
+     * consequential of the two acts and it has already succeeded by the time this runs; the
+     * upload is a follow-up that reports its own failure in its own place — the one
+     * `role="status"` line in the drafted view below, gated on the bind's own state — and
+     * never through the save's reading.
+     *
+     * ⚠ THAT LINE IS REFERRED TO BY ROLE RATHER THAN BY ITS TESTID, DELIBERATELY. The plan's
+     * own acceptance check is a raw `grep -c` for that id expecting exactly ONE, so a docblock
+     * spelling it would make the crude check read 2 and the constraint would stop being
+     * checkable by eye. Same property, same reason, as the extracted hook's header naming
+     * neither of its hosts. The suite asserts the `data-testid` occurs exactly once.
+     */
+    onDraftCreated: (id) => {
+      setDraftId(id)
+      void bindHeldTemplate(id)
+    },
   })
   const persistState: PersistState = persistence.state
+
+  const [testRunInFlight, setTestRunInFlight] = useState(false)
+  const handleTestRun = useCallback(async () => {
+    if (testRunInFlight) return
+    setTestRunInFlight(true)
+    try {
+      // ⚠ 200.3 CORRECTION — this was gated on `persistence.dirty`, which is NOT a member of
+      // `DraftPersistence` (the flag lives on the STORE: `store.getState().dirty`). The read was
+      // `undefined`, so the guard was permanently false and the flush NEVER RAN — a Test Run
+      // launched the last SAVED definition while the canvas showed newer work. `saveNow` is the
+      // user-initiated write and is safe unconditionally (`useDraftPersistence.ts` D-186-03), so
+      // the fix is to drop the guard rather than to reach for the store.
+      await persistence.saveNow()
+      if (onTestRun && definition) {
+        await onTestRun(definition as WorkflowDefinitionJSON, draftId)
+      }
+    } finally {
+      setTestRunInFlight(false)
+    }
+  }, [testRunInFlight, persistence, onTestRun, definition, draftId])
 
   const verdicts = useStore(store, (s) => s.verdicts)
   const verdictGroups = useMemo(() => groupVerdicts(verdicts), [verdicts])
@@ -911,6 +1269,23 @@ export function WorkflowBuilderPage({
    */
   const bundle = useGroundingBundle(canvasEnabled)
   const toolOptions: string[] | "degraded" = bundle.kind === "ready" ? bundle.tools : "degraded"
+
+  /**
+   * 196-08 (AUTH-04) — the live model registry, read ONCE for the whole panel.
+   *
+   * ⚠ IT IS NOT GATED ON `canvasEnabled`, unlike `bundle` directly above, and the difference
+   * is deliberate. The palette IS the canvas contract (D-14 promises a flag-off surface
+   * byte-identical to the shipped one). A model is not a canvas idea: the four `AI model`
+   * fields have been on the Spine form since Phase 103, and gating the picker on the flag
+   * would leave the surface most authors are actually on with the free-text box AUTH-04
+   * exists to remove. Same reasoning `template` already carries at the mount below.
+   *
+   * `showTechnical` is the app-wide ⌥ reveal, read through the NON-throwing accessor: this
+   * page renders in suites that mount no provider, and a leaf that still renders outside one
+   * is the shipped contract (`ProblemsTray`, `StepTypePicker`, `WorkflowCanvas` all do this).
+   */
+  const modelRegistry = useModelRegistry()
+  const showTechnical = useTechnicalNamesOptional()?.showTechnical ?? false
 
   /**
    * The server's KB-reading tool names (Phase 185 / D-185-09), read on BOTH honest
@@ -1188,6 +1563,26 @@ export function WorkflowBuilderPage({
       } catch {
         /* non-fatal */
       }
+      // Phase 200 (FE-WIRING) — the connection names, third and last of the mount's id→name
+      // reads. UNNARROWED (no `capability` argument): the map is joined on `connection_id`,
+      // and a step's capability can be edited without re-fetching, so narrowing the fetch would
+      // make the face go blank on exactly the edit that changed it.
+      //
+      // ⚠ ITS OWN `try`, deliberately, rather than joining the block above. This route is the
+      // NEWEST of the three and the only one that can refuse for a reason unrelated to the
+      // author (`no_encryption_key` — an operator-level configuration state, `ConnectorApiError`).
+      // A shared `catch` would let a connectors refusal swallow the skill map that had already
+      // resolved beside it, and every derived skill face would silently drop to its type
+      // sentence on an installation that simply has no connectors configured.
+      try {
+        const connections = await listConnectorConnections()
+        if (cancelled) return
+        const map: IdNameMap = {}
+        for (const c of connections) map[c.id] = c.name
+        setConnectionNames(map)
+      } catch {
+        /* non-fatal — every external face falls back to its destination-free sentence */
+      }
     })()
     return () => {
       cancelled = true
@@ -1223,65 +1618,12 @@ export function WorkflowBuilderPage({
     [boundFolderId, folderNames],
   )
 
-  const onDraft = useCallback(async () => {
-    const text = describe.trim()
-    if (text.length === 0) return
-    store.getState().setComposing()
-    setSelectedSlug(null)
-    // 186-07: only the RENDERED id resets. The loop's own mirror needs none — this callback
-    // is reachable only from the describe screen, which a session can be on only before any
-    // row exists (a save requires the drafted view, and the sole way back is a generate
-    // failure, which creates nothing).
-    setDraftId(null)
-    try {
-      const result = await generateWorkflow({
-        describe: text,
-        // Phase 103-ux: bind the generated workflow to the chosen project (KB). The
-        // backend GenerateRequest accepts project_folder_id; omit when none picked.
-        ...(projectFolderId ? { project_folder_id: projectFolderId } : {}),
-      })
-      if (result.ok) {
-        // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
-        // ONE store set. The graph renders whole, in one DOM batch (no timed reveal).
-        // Stamp the chosen project_folder_id onto the definition if the generator
-        // didn't already bind one (so the draft + later publish carry the binding).
-        const def = result.definition as unknown as BuilderDefinition
-        if (projectFolderId && !def.project_folder_id) def.project_folder_id = projectFolderId
-        store.getState().setDrafted(def)
-        // 187-15 — beside the SINGLE transition, so the receipt lands in the SAME DOM batch
-        // as the graph. `autoDraft` funnels through here too, deliberately (D-187-14).
-        setShowReceipt(true)
-        // 187-22 — REPLACED per generation, never frozen for the session, so a second draft
-        // gets a second receipt rather than the first one's numbers (D-187-09).
-        setReceiptPhases(def.phases)
-      } else {
-        // ok:false is an HONEST failure — never a renderable broken draft.
-        store.getState().setErrorState(result.error, result.detail)
-      }
-    } catch (e) {
-      store.getState().setErrorState(
-        "Couldn't generate the workflow.",
-        e instanceof Error ? e.message : undefined,
-      )
-    }
-  }, [describe, projectFolderId, store])
-
-  // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
-  // "Draft the workflow" CTA (autoDraft), run the EXISTING generate→draft flow ONCE
-  // with the seeded text — so the fast path actually drafts instead of dead-ending on
-  // an empty describe screen. Guarded to fire exactly once, fresh-build ("empty") only.
-  const autoDraftFiredRef = useRef(false)
-  useEffect(() => {
-    if (
-      autoDraft &&
-      !autoDraftFiredRef.current &&
-      (initialDescribe ?? "").trim().length > 0 &&
-      builderPhase === "empty"
-    ) {
-      autoDraftFiredRef.current = true
-      void onDraft()
-    }
-  }, [autoDraft, initialDescribe, builderPhase, onDraft])
+  // 193.1-05 (D-01) — `onDraft`, its `/generate` call, the `project_folder_id` stamp, the
+  // SINGLE STATE TRANSITION and the 124 CR-01 one-shot auto-draft effect all moved to
+  // `useTemplateFirstDraft` with their comments. `onDraft` above is the hook's, and the two
+  // page states the moved body used to write (`draftId`, the receipt pair) reach it as the
+  // `onDraftStarted` / `onDrafted` callbacks. Nothing about the flow changed — the six
+  // pre-draft captures `193.1-01` took on the unmoved tree hold with zero re-capture.
 
   // Merge a phase-form patch into the selected phase's config. The immutable merge
   // itself now lives in `definitionOps.patchPhaseConfig`, reached through the store's
@@ -1308,6 +1650,35 @@ export function WorkflowBuilderPage({
       store.getState().setGovernance(selectedSlug, patch)
     },
     [selectedSlug, store],
+  )
+
+  /**
+   * Phase 193 (AUTH-03, piece 2) — a template was attached to this workflow.
+   *
+   * IN `onGovernanceChange`'s EXACT SHAPE and for a related reason: the descriptor is a
+   * DEFINITION-level fact (a sibling of `phases` in `assets[]`), and `PhaseFormPanel`'s only
+   * write seam patches one step's `config`. So the panel forwards the descriptor and this
+   * page performs the write, through a store action, exactly as the two `meta`-writing
+   * siblings `setProjectFolder` and `setBusinessRequirement` are reached.
+   *
+   * ⚠ IT SAVES IMMEDIATELY, AND UNCONDITIONALLY. Every other write on this surface is a
+   * keystroke that can be re-typed; this one is not — the bytes are ALREADY in Storage under
+   * an id only this definition will ever reference, so a session that ends before the next
+   * autosave beat leaves an orphaned object and an author who was told the template was
+   * attached. `saveNow` bypasses the debounce and the dirty gate but never the hold or the
+   * single-flight rule, and it reads `store.getState()` at FIRE time (`performWrite`'s
+   * docblock), so the descriptor written one statement earlier is in the payload — this is
+   * NOT a closure over a stale rendered value.
+   *
+   * It is deliberately NOT `onFieldCommit`'s dirty-checked shape: `setTemplateAsset` arms
+   * `dirty` in the same `set()`, so the check would be answering a question it just asked.
+   */
+  const onTemplateAttached = useCallback(
+    (asset: TemplateAssetDescriptor) => {
+      store.getState().setTemplateAsset(asset)
+      void persistence.saveNow()
+    },
+    [store, persistence],
   )
 
   /**
@@ -1340,6 +1711,130 @@ export function WorkflowBuilderPage({
   /** A tray row was activated — anchor the panel on that step. Selection only; this is
    *  the D-183-05 contract's one callback, not a second way to open the panel. */
   const jumpToStep = useCallback((slug: string) => setSelectedSlug(slug), [])
+
+  /**
+   * ── 197-09 (AUTH-02 / D-14 / T-197-21) — THE TWO FOCUS SEAMS ────────────────────────
+   *
+   * THE ARRIVAL CARD'S ROWS DISPLAY THE CURRENT ANSWER AND HAND THE AUTHOR TO THE CONTROL
+   * THAT ALREADY EXISTS. They own no control and they write nothing. This page's own rule
+   * is the reason, and it is quoted rather than paraphrased because it is the whole
+   * argument (see `kbAffordance`'s docblock below): *"A second, different answer to one
+   * question is drift."* — and beside it, *"ONE CONTROL, TWO MOUNT POINTS."*
+   *
+   * Sketch 174 draws the same conclusion from the other end: *"Each decision hands you to
+   * the control already on the screen — nothing is duplicated."* It also recorded the
+   * failure a second control produces — its own header and card disagreed, because a
+   * `<select>`'s value is a DOM property lost on serialisation. In the real app both read
+   * `meta`, so that specific bug cannot recur; the CLASS (one screen, two answers to one
+   * question) is what these seams refuse.
+   *
+   * ⚠ `scrollIntoView` IS PART OF THE SEAM, NOT A FLOURISH. The header can be scrolled out
+   * of view on a narrow window, and a focus that scrolls nothing is a jump the author
+   * cannot see — the control takes the caret somewhere off-screen and the row appears to
+   * have done nothing. `block: "nearest"` is deliberate: it moves the viewport the minimum
+   * needed rather than yanking the header to the top of the screen.
+   *
+   * ⚠ BOTH REFS SIT ON NODES **INSIDE** THE EXISTING `canvasEnabled ? (…) : null`
+   * AFFORDANCES — the 193.2-09 placement, never a new node in `identityGroup`. A `ref`
+   * renders no DOM attribute, so the flag-off header byte pin cannot see one either way;
+   * the placement rule is what keeps that true if the element ever gains a visible
+   * attribute. Band 3 stays unmovable BY CONSTRUCTION rather than by care.
+   *
+   * ⚠ AND NEITHER SEAM WRITES. The two affordances keep their shipped store-writing calls
+   * exactly as they are — those two setter names are deliberately NOT spelled here,
+   * because a criterion counts their occurrences in this file to prove no third caller was
+   * added, and a mention inside the comment explaining that would defeat it (`196-08`).
+   * These callbacks move focus and do nothing else, which is what keeps ONE writer per
+   * question.
+   */
+  const kbPickerRef = useRef<HTMLSelectElement | null>(null)
+  const requirementInputRef = useRef<HTMLInputElement | null>(null)
+
+  const focusKbPicker = useCallback(() => handOffTo(kbPickerRef.current), [])
+
+  const focusRequirementInput = useCallback(() => handOffTo(requirementInputRef.current), [])
+
+  /** Row 4's writer — the store's own `setName`, reached through `getState()` inside a
+   *  callback (never as a rendered value, the shipped selector discipline). Row 4 is the
+   *  ONE row that owns a field rather than a jump, and that is not an exception to the
+   *  rule above: the name has NO existing control anywhere on this screen, so the row's
+   *  inline field is not a second answer — it is the first. D-17 declines `ForkNameDialog`
+   *  for the same reason (it exists for naming a copy that does not yet exist). */
+  const setWorkflowName = useCallback(
+    (nextName: string) => store.getState().setName(nextName),
+    [store],
+  )
+
+  /**
+   * ── 197-09 (AUTH-02 / SC#1) — THE ARRIVAL CARD'S **LIVE** HALF ──────────────────────
+   *
+   * TWO CLASSES OF VALUE REACH THIS CARD AND THEY MUST NOT BE CONFLATED. `receiptPhases`
+   * and `readiness` are SNAPSHOTS of one generation (see their blocks above). Everything
+   * in this object is the opposite: what the definition says **NOW**, recomputed from
+   * `meta` on every render with NO mirrored page copy anywhere — the shipped
+   * `requirementIsAiProposed` idiom, and the same reason it gives: in the drafted view the
+   * definition is the single source of truth and a second copy is the drift D-14 forbids.
+   *
+   * A card that passed the snapshot fence by freezing EVERYTHING would fail the live
+   * fence, and vice versa. Both are pinned by cases in `canvas.test.tsx`.
+   *
+   * ⚠ IT LIVES **HERE**, ABOVE THE DESCRIBE SCREEN'S EARLY RETURN, AND THAT PLACEMENT IS
+   * A CORRECTNESS REQUIREMENT RATHER THAN A TIDINESS ONE. This component returns the
+   * pre-draft describe screen from a branch a few hundred lines below, so EVERY hook in
+   * this file sits above that branch — measured, and it was true of all of them before
+   * this plan. Declaring this memo where it is *consumed* (beside `graphColumn`) put a
+   * hook after that return, so the empty → drafted transition rendered more hooks than
+   * the render before it and React threw `Rendered more hooks than during the previous
+   * render`, taking eleven cases and eight uncaught exceptions with it. The card's own
+   * suite could never have seen this: it mounts the component directly.
+   *
+   * Each field, and why it is READ rather than re-derived:
+   *
+   *  • `folderName` — `boundFolderName`, the shipped header read. Its own comment records
+   *    that `folderNames` and `folderOptions` are built from the SAME mount-fetch array,
+   *    so *"unnameable"* and *"not offered"* are one condition — which is exactly the
+   *    row's contract (`null` when unbound or unresolvable). A second `.find()` over
+   *    `folderOptions` would be a second lookup that can disagree with the header chip.
+   *    ⚠ The fetch function is named by ROLE, never spelled: a shipped source guard counts
+   *    its occurrences in this file to prove no second fetch was added, and a mention in a
+   *    comment is indistinguishable from a call site to it (`196-08`, four times).
+   *  • `templateFilename` — the ONE `templateAsset` memo (`260814-q5r` hoisted it precisely
+   *    so two `.find()` calls over `meta.assets` could not drift). No second scan.
+   *  • `businessRequirement` / `name` — the `typeof … === "string"` narrow the requirement
+   *    input already uses. ⚠ `BuilderDefinition` deliberately does NOT declare `name`
+   *    (197-05 decision 2): it lands under the index signature and types as `unknown`, so
+   *    this narrow is the one read site and it is the shipped idiom, not a new one.
+   *  • `deliverableStepSlug` — `terminalEmitSlug` over the LIVE definition, so adding or
+   *    removing an emit step moves the row. `null` is an honest absence and is never a
+   *    slug that selects nothing.
+   *  • `readiness` — passed straight through, `undefined` and all. NO `?? {}`.
+   */
+  const decisions = useMemo<DecisionsListProps>(
+    () => ({
+      folderName: boundFolderName,
+      templateFilename: templateAsset?.filename ?? null,
+      businessRequirement:
+        typeof meta.business_requirement === "string" ? meta.business_requirement : "",
+      name: typeof meta.name === "string" ? meta.name : "",
+      deliverableStepSlug: terminalEmitSlug(definition),
+      readiness,
+      onChangeKb: focusKbPicker,
+      onChangeRequirement: focusRequirementInput,
+      onOpenStep: jumpToStep,
+      onChangeName: setWorkflowName,
+    }),
+    [
+      boundFolderName,
+      templateAsset,
+      meta,
+      definition,
+      readiness,
+      focusKbPicker,
+      focusRequirementInput,
+      jumpToStep,
+      setWorkflowName,
+    ],
+  )
 
   /** "Tidy up" — the CURRENT workflow's nudge key only, never the whole namespace. The
    *  arrangement is browser-local (D-184-02), so this writes nothing to the server and
@@ -1469,6 +1964,31 @@ export function WorkflowBuilderPage({
   const preDraftHeaderHosted =
     canvasEnabled && (headerLead !== undefined || headerTrail !== undefined)
 
+  /**
+   * 199-09 (DES-01 · sheet `c9-doors-describe` §3, finished on `c10`'s screen) — THE SECOND
+   * DESCRIBE BOX SAYS OUT LOUD WHAT IT HAS SILENTLY REFUSED SINCE PHASE 124.
+   *
+   * ⚠ IT ADDS NO RULE AND CHANGES NO ENABLEMENT, and that was MEASURED before it was
+   * written rather than assumed — `199-08` explicitly left the question open. The CTA below
+   * is `disabled={!canDraft}`, and `useTemplateFirstDraft`'s `canDraft` opens on
+   * `describe.trim().length > 0` — the identical first term the door's own gate carries. So
+   * this expression reads a decision that was already made; it is never consulted by
+   * `canDraft`, and `canDraft` is untouched. Had the predicate NOT existed, inventing one
+   * would have been behaviour and this row would have been a report instead.
+   *
+   * ⚠ THE `length > 0` TERM IS LOAD-BEARING AND IS NOT A DUPLICATE OF THE TRIM. An untouched
+   * empty box is refused by the same rule, and captioning it would put a refusal on the first
+   * screen an author meets — the wrong reading, and a byte-for-byte change to a resting DOM
+   * that `WorkflowDoorSwitch.baseline.test.tsx`'s `GOVERN_INLINE` capture pins whole.
+   *
+   * ⚠ AND IT COVERS ONLY THE FIRST TERM, DELIBERATELY — the same fence `199-08` drew on the
+   * door. The second (`templateRead.kind !== "loading"`) already speaks for itself through
+   * `DescribeTemplateRow`'s own in-flight line, and the third (`builderPhase !== "composing"`)
+   * is spoken by the CTA's own "Composing…" label. A second sentence for either would be a
+   * second home for one fact.
+   */
+  const refusingDescribe = describe.length > 0 && describe.trim().length === 0
+
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
   if (builderPhase === "empty" || builderPhase === "composing" || builderPhase === "error") {
     const describeScreen = (
@@ -1479,7 +1999,7 @@ export function WorkflowBuilderPage({
               ✎
             </span>
             <h1 className="font-semibold text-foreground" style={{ fontSize: "1.5rem" }}>
-              What recurring work should this automate?
+              {DESCRIBE_H1}
             </h1>
           </div>
 
@@ -1490,8 +2010,36 @@ export function WorkflowBuilderPage({
             placeholder="Describe the goal in plain language…"
             rows={5}
             disabled={builderPhase === "composing"}
-            className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            // SPREAD-CONDITIONAL, the door's shipped idiom: with nothing refused the
+            // attribute is genuinely ABSENT rather than present-and-false, so the resting
+            // markup is the markup `GOVERN_INLINE` pins. `aria-invalid="false"` would not be.
+            {...(refusingDescribe ? { "aria-invalid": true } : {})}
+            // THE CONDITIONAL IS SPELLED AS A CONCATENATION so the unconditional arm is
+            // CHARACTER-IDENTICAL to what shipped — three slots move and the token count
+            // does not. Written as a whole-string ternary it would be a second literal that
+            // could drift from the first (the `ml-auto` idiom, `199-08` §3).
+            className={`w-full resize-none rounded-lg border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-1 ${refusingDescribe ? "focus:ring-destructive" : "focus:ring-primary"}`}
           />
+          {/* ⚠ THE REFUSAL, SAID OUT LOUD — the sheet's whole finding for this surface, and
+              the one thing a disabled button cannot do. `role="status"` rather than `alert`:
+              the author is mid-typing and this is a standing condition, not an interruption.
+              Rendered only while there is an input to refuse, so it never greets anyone and
+              the resting DOM is byte-identical.
+              ⚠ IT SITS ABOVE THE CTA GROUP, and the placement is load-bearing: two byte-exact
+              pins are scoped to that group alone by walking UP from `describe-hint`
+              (`FLAG_OFF_DESCRIBE_MARKUP` and the `/template|starter/i` word guard), so a
+              sibling above it is outside both — 193.1-08's measured reasoning, reused.
+              The sentence is IMPORTED (`DESCRIBE_REFUSAL`), never spelled: this file is a
+              swept source of the D-24(a) copy fence. */}
+          {refusingDescribe && (
+            <p
+              data-testid="describe-refusal"
+              role="status"
+              className="-mt-2 text-[12.5px] leading-snug text-destructive"
+            >
+              {DESCRIBE_REFUSAL}
+            </p>
+          )}
 
           {/* Phase 103-ux: ONE calm project picker — binds the generated workflow to
               a knowledge base. Only shown once folders have loaded (keeps the empty
@@ -1517,6 +2065,37 @@ export function WorkflowBuilderPage({
             </label>
           )}
 
+          {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE GOVERN DOOR ──────
+              ⚠ THIS IS `WorkflowBuilderPage.tsx`'s `describeScreen`, NOT `WorkflowDoorSwitch`'s
+              `door-describe`. The two screens are near-identical and the splice anchor below
+              (`flex flex-col items-center gap-3`) occurs in BOTH files, so the class string
+              cannot tell them apart — every assertion about this mount names this file
+              (`193.1-PATTERNS.md` §C-1). Both mounts exist because a fast-door author never
+              touches this screen (their CTA hands off and auto-fires the draft), while a
+              govern-door author never touches theirs and calls `/generate` directly.
+
+              ⚠ IT LANDS **BEFORE** THE CTA GROUP, AND THE PLACEMENT IS LOAD-BEARING RATHER
+              THAN aesthetic. Two independent byte-exact pins are scoped to that group alone —
+              they resolve it by walking UP from `describe-hint`, so a sibling above it is
+              outside both: `FLAG_OFF_DESCRIBE_MARKUP` (`describe.test.tsx:307`, captured in
+              Phase 187 wave 1) and the `/template|starter/i` word guard (`:324`). A mount
+              INSIDE the group would red TWO assertions, not one. It is also the sketch's own
+              splice — `165/build.cjs:269` inserts the block BEFORE the CTA group, never in it.
+
+              ⚠ RENDERED UNCONDITIONALLY — deliberately NOT behind `canvasEnabled`. Gating it
+              would inherit the flag-off escape hatch that let `StarterTemplatePicker` ship
+              inside the pinned region without reddening it, and AUTH-03 is not a canvas
+              feature: the flag-off Spine is the surface most authors are actually on. With no
+              document held the row's reading is `idle`, so it renders its control and NOTHING
+              else new, and the CTA is enabled exactly when it is today (D-08, by construction
+              — no document ⇒ nothing to wait for ⇒ no gate, and no second conditional). */}
+          <DescribeTemplateRow
+            state={templateRead}
+            filename={templateFile?.name}
+            onPickFile={onPickTemplateFile}
+            onClear={onClearTemplateFile}
+          />
+
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
@@ -1524,13 +2103,13 @@ export function WorkflowBuilderPage({
               onClick={onDraft}
               className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {builderPhase === "composing" ? "Composing…" : "Draft the workflow"}
+              {builderPhase === "composing" ? "Composing…" : DESCRIBE_CTA}
             </button>
 
             <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
-              You describe the goal — the AI <b className="font-medium text-foreground">drafts the phases</b>,{" "}
-              <b className="font-medium text-foreground">sets the strictness</b>, and{" "}
-              <b className="font-medium text-foreground">asks about anything it had to guess</b>.
+              You describe the goal — the AI <b className="font-medium text-foreground">{HINT_FRAG1}</b>,{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG2}</b>, and{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG3}</b>.
             </p>
             {/* 187-15 (Req 6 / 151-C) — ONE quiet line, gated HERE because `describeScreen` is
                 built on both branches and the picker holds no flag. Still one way in. */}
@@ -1679,13 +2258,35 @@ export function WorkflowBuilderPage({
       {/* 187-15 (Req 5 / 150-B) — above the graph, gated STRUCTURALLY by this branch: flag-off
           `kbTools` is `[]`, so an ungated receipt would report zero grounded steps on a workflow
           the run-time gate still binds. DISMISSED IT RENDERS NO NODE, which is why the graph is
-          pinned to the 1fr row by `*:last-child` rather than by auto-placement. */}
-      <SeedReceipt
+          pinned to the 1fr row by `*:last-child` rather than by auto-placement.
+
+          197-09 (AUTH-02 / D-01 / D-02 / D-06 / T-197-24) — THE CARD REPLACED THE RECEIPT
+          **IN PLACE**, and the two words are load-bearing. `graphColumn` still has exactly
+          THREE children: this strip, this card, `graphChild`. A FOURTH child auto-places
+          into row 3 while `[&>*:last-child]:row-start-3` forces the last one there too, so
+          the graph's `minmax(0,1fr)` row collapses to 0 px — sketch 172 measured it and the
+          class list above is what makes it structural. A case counts the children.
+
+          The receipt is not gone: `DraftArrivalCard` composes it UNMODIFIED behind its first
+          fold (D-02 — `SeedReceipt.tsx` is under a zero-insertion, zero-deletion criterion
+          for this whole phase and stays at `0 0`).
+
+          D-01 AND D-06 HOLD BY WHERE THIS SITS, not by a guard anyone has to write. D-01 —
+          guidance is on the draft, AFTER — because this branch exists only in the drafted
+          view, so nothing joins the generation's critical path and the fast door stays fast
+          (the D-05 red line). D-06 — FRESH GENERATIONS ONLY — because `open` is
+          `showReceipt`, which is set in the `onDrafted` handler and NOWHERE else: a
+          re-opened draft, a fork and a hand-built canvas workflow never see this card, which
+          is correct, because its claim (*an AI just made these decisions for you*) is true
+          at exactly one moment. ⚠ Do NOT add a second gate for D-06 and do NOT widen
+          `showReceipt`'s setters. */}
+      <DraftArrivalCard
         phases={receiptPhases}
         kbTools={kbTools}
         nameContext={nameContext}
         open={showReceipt}
         onDismiss={() => setShowReceipt(false)}
+        decisions={decisions}
       />
       {graphChild}
     </div>
@@ -1737,6 +2338,11 @@ export function WorkflowBuilderPage({
     >
       <span aria-hidden="true">📁</span>
       <select
+        // 197-09 — the arrival card's row 1 FOCUSES this control rather than mounting a
+        // second one. A `ref` renders no DOM attribute, so the flag-off header byte pin is
+        // blind to it — and this node already lives inside the `canvasEnabled` affordance,
+        // which is what makes that true by construction rather than by care.
+        ref={kbPickerRef}
         data-testid="project-folder-picker"
         aria-label="Knowledge base this workflow searches"
         value={boundFolderId}
@@ -1846,6 +2452,39 @@ export function WorkflowBuilderPage({
    * `✦`, which is the shipped Working badge and which the icon convention refuses for
    * canvas-adjacent surfaces because it sits on the verdict mark's coordinates.
    */
+  /**
+   * Phase 193.2-09 (D-06) — is the requirement on screen an AI PROPOSAL?
+   *
+   * READ OFF THE DEFINITION, with NO page-level `useState` mirror, for the same reason the
+   * input's own value is (see its comment below): in the drafted view the definition is the
+   * single source of truth and a second copy is drift. `meta` carries an index signature, so
+   * the flag needs no widening of `BuilderDefinition` and gets none — the `=== true` is the
+   * narrowing, and it is strict on purpose: an `unknown` off a JSONB row must not be truthy-
+   * tested into a provenance claim.
+   *
+   * IT NEVER TRUSTS A MODEL-SUPPLIED VALUE, and that is a property of where the bit comes
+   * from rather than of this line. `193.2-07` stamps the flag SERVER-SIDE after validation
+   * and ignores whatever the emission claimed — in BOTH directions, each pinned and each
+   * driven RED. That matters more than it reads: `WF_SCHEMA` is
+   * `WorkflowDefinition.model_json_schema()`, so the emit tool now ADVERTISES this field to
+   * the model, making laundering reachable rather than hypothetical. Nothing on the client
+   * may add a second opinion about provenance.
+   *
+   * THE NON-EMPTY CLAUSE IS D-08's FALLBACK, NOT A VALIDATION RULE. A mark on a value that
+   * does not exist would make the demote rule read a lie — the same sentence the server's
+   * stamp obeys, inherited verbatim from D-187-03's precedent. There is deliberately NO
+   * `.trim()`: trimming here would be a second copy of the server's emptiness predicate
+   * (`grounding.py` is literally `not (definition.business_requirement or "").strip()`),
+   * which D-182-06 forbids and which `setBusinessRequirement`'s own docblock forbids by
+   * name. The whitespace-with-flag state that `!== ""` therefore admits is UNREACHABLE from
+   * both ends: the server never stamps a value that trims empty, and editing a seeded value
+   * down to whitespace clears the flag in the same `set()` that writes it.
+   */
+  const requirementIsAiProposed =
+    meta.business_requirement_seeded_by_ai === true &&
+    typeof meta.business_requirement === "string" &&
+    meta.business_requirement !== ""
+
   const requirementAffordance = canvasEnabled ? (
     <span
       data-testid="builder-business-requirement"
@@ -1853,6 +2492,9 @@ export function WorkflowBuilderPage({
     >
       <span aria-hidden="true">✎</span>
       <input
+        // 197-09 — the arrival card's row 3 FOCUSES this control. Same placement rule as
+        // the KB picker's ref above: inside the affordance, never a node in `identityGroup`.
+        ref={requirementInputRef}
         type="text"
         data-testid="business-requirement-input"
         aria-label="Business requirement — the one line this workflow must satisfy"
@@ -1884,13 +2526,85 @@ export function WorkflowBuilderPage({
         onBlur={onFieldCommit}
         className="min-w-0 w-[240px] truncate bg-transparent text-[11px] text-muted-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary"
       />
+      {/* D-06's visible half — ONE gated sibling INSIDE this affordance, never a new node in
+          `identityGroup` and never a second ternary. That placement is not tidiness: band 3
+          of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting `identityGroup`, a literal
+          that stood unedited for NINE phases before Phase 193 re-captured it twice (words,
+          then structure) and whose own note says the phase expects NO third. Living inside
+          the same `canvasEnabled ? (…) : null` as the affordance means the flag-off header
+          cannot see this node at all, so band 3 is unmovable BY CONSTRUCTION rather than by
+          care — and the flag-off case next door in `canvas.test.tsx` is what proves it.
+          No colour, no accent and no glyph: the word carries it (see the constant's block). */}
+      {requirementIsAiProposed && (
+        <span
+          data-testid="business-requirement-ai-mark"
+          title={REQUIREMENT_AI_MARK_EXPLANATION}
+          className="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground"
+        >
+          {REQUIREMENT_AI_MARK_LABEL}
+        </span>
+      )}
     </span>
   ) : null
 
+  /**
+   * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
+   * the slug when it does not, the shipped fallback when it has neither.
+   *
+   * WHY IT MOVED. Before this, the header rendered the slug and `meta.name` appeared in no
+   * render position anywhere on this page — the workflow's name was displayed NOWHERE.
+   * D-15 accepted in words that "name and slug can disagree", but it was written before
+   * anyone had measured that absence, so what it accepted was a LATENT disagreement.
+   * Leaving the header on the slug ships a RENDERED one — `northwind-qbr-fa65a43c` in the
+   * header against `Northwind QBR` in the arrival card's row 4, on one screen. The card's
+   * row and this slot read the SAME live store value, so they agree by construction rather
+   * than by synchronisation.
+   *
+   * ⚠ THE SLUG IS NEVER WRITTEN. This expression only DISPLAYS. `slug` stays the key
+   * identity that forks and versioning use, minted once at generation; row 4's write path
+   * touches `meta.name` alone.
+   *
+   * ⚠ THE NON-EMPTY CHECK IS A DISPLAY FALLBACK, NOT A VALIDATION RULE — and it is a named
+   * deviation from D-19's literal `meta.name ?? meta.slug`, recorded rather than silent.
+   * Row 4's write neither trims nor rejects the empty string (the server owns emptiness),
+   * so an author who clears the field would otherwise be shown a blank identity slot. No
+   * store action, no request and no predicate learns anything from this check.
+   *
+   * The `typeof` narrowing is the idiom forty-five lines above: `name` is not declared on
+   * `BuilderDefinition` and lands under its index signature as `unknown`.
+   */
+  /**
+   * 199-09 (DES-01 · sheet `c10-builder-chrome` §1 case 4) — THE FALLBACK NOW READS AS A
+   * FALLBACK, and this is the one expression that decides both.
+   *
+   * ⚠ THE PREDICATE IS HOISTED, NOT DUPLICATED. `authoredName` is D-19's own non-empty
+   * check with its result carried instead of re-spelled: `identityLabel` is byte-for-byte
+   * the same three-arm chain it was (`name → slug → "Untitled workflow"`), and the tone
+   * below reads the SAME answer rather than asking the question a second time. Two
+   * spellings of one predicate is how a label and its styling come to disagree.
+   *
+   * ⚠ WHY IT IS A PRESENTATION CHANGE AND NOT A NEW RULE. Nothing reads `authoredName`
+   * except this label and its tone. No store action, no request and no predicate learns
+   * anything from it — D-19's "display fallback, not a validation rule" is preserved
+   * exactly, and is now the thing the surface is honest about: `vendor-brief` painted like
+   * an authored name asserts *"this workflow is called vendor-brief"* about a workflow
+   * nobody has named. Muting the stand-in says *"this is what we call it until you do"*.
+   */
+  const authoredName =
+    typeof meta.name === "string" && meta.name.length > 0 ? meta.name : null
+  const identityLabel = authoredName ?? meta.slug ?? "Untitled workflow"
+
   const identityGroup = (
     <>
-      <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
-        {meta.slug ?? "Untitled workflow"}
+      {/* THE CONDITIONAL IS A CONCATENATION so the AUTHORED arm is character-identical to
+          the class list that shipped — one slot moves and the token count does not. The
+          FALLBACK arm is the deliberate, stated change; it moves band 3 of
+          `FLAG_OFF_HEADER_MARKUP`, whose fixture binds no name, and that re-capture is
+          scoped, diffed and justified in this suite's own note. */}
+      <span
+        className={`min-w-0 truncate text-[14px] font-semibold ${authoredName === null ? "text-muted-foreground" : "text-foreground"}`}
+      >
+        {identityLabel}
       </span>
       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
         draft
@@ -1915,6 +2629,18 @@ export function WorkflowBuilderPage({
         onReload={() => void persistence.reload()}
         onOverwrite={() => void persistence.overwrite()}
       />
+      {canvasEnabled && draftId && onTestRun && (
+        <button
+          type="button"
+          data-testid="builder-test-run"
+          onClick={() => void handleTestRun()}
+          disabled={testRunInFlight || persistState.kind === "saving"}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Play className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+          <span>{testRunInFlight ? "Starting…" : "Test Run"}</span>
+        </button>
+      )}
       {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
           operator's correction). No net-new band: the reason travels through the
           shipped `renderPublish` seam as a third argument so the mount does not move.
@@ -1956,6 +2682,76 @@ export function WorkflowBuilderPage({
         </header>
       )}
 
+      {/* ── 193.1-07 (D-06 rule 2, threat T-193.1-07-02) — THE BIND FAILED, SAID OUT LOUD ──
+          The 192 `library-fork-failed` shape, transplanted whole: STATE IN THE HOOK, JSX ON
+          THE HOST, sentence from a `.ts` vocabulary module, `role="status"`, EXACTLY ONE
+          NODE. `role="status"` is what makes a line that appears after an act announced
+          rather than merely present. There is no toast library in this repo — zero `sonner`
+          imports, no `ui/toast` — and this is not the place to acquire one.
+
+          ⚠ WHY IT IS BUILT RATHER THAN ROUTED THROUGH SOMETHING THAT EXISTS. All three
+          candidates were measured and all three refused:
+            • the pre-draft generate-error block is gated on the `error` phase, and by bind
+              time the phase is `drafted`;
+            • the save's own refusal sentence in the toolbar is FORBIDDEN by D-06 rule 2 —
+              this is a silent write the person never pressed a button for, and folding it
+              into the save's reading is precisely the lie the rule exists to prevent;
+            • the canvas notice is retired on a history step, and a failure that vanishes on
+              an undo is a failure nobody saw.
+
+          ⚠ THE PLACEMENT IS OUTSIDE THE GRID, NOT INSIDE IT, and that is the reason it sits
+          here rather than one line lower: `FLAG_OFF_HEADER_MARKUP` pins the three drafted
+          header bands and this node is below them, while the grid's own first child is
+          asserted by the canvas suite. Rendering nothing when `bindFailed` is null keeps the
+          drafted DOM byte-identical for every session that did not hit this failure — which
+          is all of them but one.
+
+          ⚠ AND THE SENTENCE CARRIES THE CONSEQUENCE, NOT THE FACT. A deliverable step written
+          to fill a document that is not attached fails at RUN time and can never publish, so
+          "attaching failed" would leave the author with a workflow that dies at the worst
+          possible moment. The wording lives in `templateFirstVocabulary.ts` and names the one
+          place the fix lives; this page authors none of it. */}
+      {bindFailed && (
+        <p
+          data-testid="template-bind-failed"
+          role="status"
+          className="border-b border-warning/30 bg-warning/5 px-4 py-2 text-[12.5px] text-muted-foreground"
+        >
+          {templateBindFailedMessage(bindFailed.filename)}
+        </p>
+      )}
+
+      {/* ── Phase 200 (FE-WIRING) — THE GRAPH TRACK IS NOT DIMMED WHILE THE PANEL IS OPEN,
+             AND THE REFUSAL IS RECORDED HERE BECAUSE THIS IS WHERE IT WOULD LIVE.
+
+          `screens/step-panel.html:202` gives its `<main>` `opacity-60 pointer-events-none`
+          behind the open aside, and the 200 audit enumerates it as an FE-WIRING row (this
+          grid is the seam — nothing here dims or inerts the plane). It is DECLINED, on both
+          halves, and the halves fail for different reasons:
+
+            · `pointer-events-none` STRANDS THE AUTHOR. `panelOpen === selectedSlug !== null`,
+              so the panel is open exactly while a step is selected, and the graph is the ONLY
+              way to select a different one. Inerting it means every step-to-step move becomes
+              close-then-reopen, and the ONE remaining exit is `Escape` or the ✕. That is not
+              a focus effect; it is a dead end, and this tree's own word for a control that
+              leads nowhere is on `stepReadinessContext.ts`.
+            · `opacity-60` MUTES THE ONE THING THAT TIES THE TWO TRACKS TOGETHER. The selected
+              node's highlight lives in the dimmed track, so the sheet's own composition would
+              fade the anchor the panel is anchored TO — and it would do it for the whole
+              authoring session, since selecting a step is what opens the panel in the first
+              place.
+
+          ⚠ IT IS A MOCKUP FOCUS DEVICE, WHICH IS A REAL CLASS ON THIS SHEET RATHER THAN AN
+          EXCUSE. The sheet draws its plane as ten static illustrative nodes, and the audit's
+          own next row records a second divergence in the same layout: the sheet shows an open
+          400px panel AND the 44px collapsed strip simultaneously, which in the product is the
+          same grid track and therefore an unreachable state. A sheet may draw an arrangement
+          the live surface cannot hold; where it does, the live surface is the constraint.
+
+          ⚠ RE-OPEN TRIGGER, so this is dated rather than permanent: a step panel that becomes
+          MODAL — one the author cannot navigate past — would make the dim honest, because the
+          plane behind it really would be unreachable and saying so would be a statement rather
+          than a suggestion. The grid below is what makes that false today. */}
       <div
         data-testid="builder-grid"
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
@@ -1986,6 +2782,79 @@ export function WorkflowBuilderPage({
           // on `rails`, so a handler passed without it could never fire — and adding an
           // always-on governance prop would leak the canvas contract into the Spine view,
           // which is precisely what D-181-01's byte-identity promise forbids.
+          // Phase 193 (AUTH-03) — UNCONDITIONAL, unlike the two canvas-gated props above,
+          // and the difference is deliberate. `rails` / `onGovernanceChange` ride the flag
+          // because they ARE the canvas contract and D-181-01 promises a flag-off surface
+          // identical to the shipped one. A template binding is not a canvas idea: it is the
+          // only way any author can attach the file their deliverable fills in, on either
+          // view, and gating it would leave the shipped Spine — the surface most authors are
+          // actually on — with no door at all. The panel renders nothing for it on any step
+          // that is not `llm_emit`, so the cost elsewhere is zero.
+          template={{
+            definitionId: draftId,
+            // Both read off the ONE `templateAsset` memo, so the filename on screen and the
+            // asset the fields were read from are the same descriptor by construction.
+            filename: templateAsset?.filename,
+            assetId: templateAsset?.assetId,
+            onAttached: onTemplateAttached,
+          }}
+          // 193.1-09 (SC#3) — SPREAD-CONDITIONAL, the `rails` shape below rather than the
+          // `template` shape above, and the difference is deliberate: `template` is a control
+          // that must exist on every deliverable step, while this is an ANSWER that either
+          // exists or does not. Genuinely absent when there is nothing to say, so the panel's
+          // "ABSENT ⇒ NOTHING RENDERS" contract is honoured literally rather than by a falsy
+          // value that happens to render the same.
+          {...(nameCheck ? { nameCheck } : {})}
+          // 196-08 (AUTH-04) — SPREAD-CONDITIONAL on a COMPLETE read, the `nameCheck` shape
+          // above rather than the `template` shape, and the choice is the load-bearing one on
+          // this plan.
+          //
+          // ⚠ THE REJECTED ALTERNATIVE, NAMED: passing `models: []` on a `loading` or
+          // `unavailable` read. It renders a calm, correct-looking control that offers nothing
+          // but its inherit option — and worse, `ModelField` would then retain every stored
+          // model as `(current) — not in the registry`, telling an author that a perfectly
+          // registered model is unknown and inviting them to change it. That is precisely the
+          // substitution the registry hook's own docblock exists to make unconstructable, and
+          // this is the caller that would have re-created it. (⚠ The hook is named by role, not
+          // by token: this plan's acceptance grep counts its identifier over this file, so a
+          // mention in prose inflates the count — the 187-24 trap.)
+          //
+          // ⚠ THE COST OF THE CHOICE, STATED RATHER THAN LEFT TO BE FOUND: while the read is in
+          // flight, and for as long as it is failing, the `AI model` field is ABSENT from the
+          // step form. An absent field writes nothing and says nothing false; a lying one does
+          // both. `ModelField` cannot express "I could not read the registry" — it takes rows,
+          // not a reading — and widening it is 196-05's file, not this plan's.
+          //
+          // ⚠ CORRECTED at Phase 199-06 (DES-01, sheet `c4-phase-form-panel`), in the commit
+          // that closed it, and the paragraph above is kept rather than overwritten because
+          // it was an accurate statement of a real cost for one phase. THE WIDENING HAPPENED:
+          // the picker now takes the READING as well as the rows, so the field no longer
+          // disappears — it says which of the two things is true. `196-08` named the file
+          // that owed this and the hot-file ledger row carried the same line; this is it.
+          //
+          // ⚠ THE REJECTED ALTERNATIVE IS STILL REJECTED, and nothing here re-creates it. The
+          // two non-ready arms pass NO rows to consult: the picker returns above the first
+          // line that reads them, so `models: []` cannot be mistaken for an answer. What
+          // makes that safe is the EXPLICIT discriminator, never the emptiness of an array —
+          // and a registry that genuinely answers with nothing takes the third arm, inside
+          // the normal path, with its own sentence.
+          {...(modelRegistry.kind === "ready"
+            ? {
+                modelPicker: {
+                  models: modelRegistry.models,
+                  runDefaultModel: modelRegistry.runDefaultModel,
+                  showTechnical,
+                },
+              }
+            : {
+                modelPicker: {
+                  // Not consulted — see above. Present only because the shape requires them.
+                  models: [],
+                  runDefaultModel: null,
+                  showTechnical,
+                  noAnswer: modelRegistry.kind === "loading" ? ("loading" as const) : ("unavailable" as const),
+                },
+              })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>

@@ -413,6 +413,35 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     }
 
 
+def placeholder_names_from_parsed(parsed: dict | None) -> list[str]:
+    """The ONE assembly of *"which field names does this document ask a step to fill?"*.
+
+    WHY THIS EXISTS AS A FUNCTION (Phase 193.1 / D-05). Two doors read the same
+    document and sit one screen apart in the product: the bound-template door
+    (``grounding.resolve_template_placeholders`` -> ``GET /workflows/{id}/template/
+    placeholders``) and the stateless author-time door
+    (``POST /workflows/template/placeholders``). The assembly is NOT obvious — it takes
+    ``scalars`` PLUS every loop **column** and EXCLUDES ``collections`` — so a second
+    door that returned ``scalars`` alone would show a SHORTER field list for the same
+    file, with the loop columns silently missing, and the author would have no way to
+    tell which screen was lying. One home, one answer.
+
+    Takes ``parse_docx_template_variables``'s return value verbatim, including its
+    ``None``. A falsy input is ``[]`` — this function says nothing about WHY the parse
+    produced nothing; that three-state honesty (*read and empty* vs *never opened*) is
+    the caller's, and both callers keep it (``grounding.py:316-319`` and the route's
+    gate ORDER respectively).
+
+    De-duplicated and sorted, so the same document always answers in the same order.
+    """
+    if not parsed:
+        return []
+    names: list[str] = list(parsed.get("scalars") or [])
+    for col_keys in (parsed.get("columns") or {}).values():
+        names.extend(col_keys)
+    return sorted(set(names))
+
+
 def check_coverage(
     fm_dict: dict, retrieved_ids: set[str], placeholder_keys: list[str]
 ) -> dict:

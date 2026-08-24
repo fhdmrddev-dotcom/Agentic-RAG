@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 175 — What the eye lands on</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+.wrap { max-width:1320px; margin:0 auto; padding:var(--space-6) var(--space-5) 140px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-4); max-width:88ch; }
+.lede b { color:var(--color-text); }
+.lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+.shapebar { display:flex; gap:var(--space-5); flex-wrap:wrap; align-items:center; padding:10px var(--space-4);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  margin-bottom:var(--space-4); font-family:var(--font-mono); font-size:11px; }
+.shapebar .k { color:var(--color-text-dim); }
+.shapebar .v { color:var(--color-text); font-weight:600; }
+.shapebar .hot { color:var(--color-warning); }
+
+/* the density meter — the argument, measured on screen rather than asserted */
+.meter { display:flex; gap:var(--space-4); flex-wrap:wrap; align-items:center; padding:9px var(--space-4);
+  border:1px solid var(--color-primary-glow); border-radius:var(--radius-md); background:var(--color-primary-dim);
+  margin-bottom:var(--space-4); font-family:var(--font-mono); font-size:11px; }
+.meter .k { color:var(--color-text-muted); }
+.meter .v { color:var(--color-primary); font-weight:700; }
+
+.libbar { display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.searchbox { flex:1 1 260px; min-width:200px; display:flex; align-items:center; gap:7px; padding:7px 11px;
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+.searchbox input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-family:inherit; font-size:13px; }
+.searchbox input::placeholder { color:var(--color-text-dim); }
+.libbar select { background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:7px 9px; font-family:inherit; font-size:12.5px; cursor:pointer; }
+.countline { font-size:11.5px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); }
+
+.pane { display:none; }
+.pane.on { display:block; }
+
+/* ══ TODAY — the shipped card, every atom at one level ══════════════════════ */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:var(--space-3); }
+.t-card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); padding:14px; }
+.t-head { display:flex; align-items:flex-start; gap:8px; margin-bottom:9px; }
+.t-name { font-size:14px; font-weight:600; color:var(--color-text); }
+.t-ver { font-family:var(--font-mono); font-size:11px; color:var(--color-text-dim); background:var(--color-muted);
+  padding:1px 6px; border-radius:var(--radius-sm); }
+.t-prov { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em; color:var(--color-text-dim); }
+.t-atom { font-size:11.5px; color:var(--color-text-muted); line-height:1.55; margin:5px 0; }
+.t-atom .lbl { color:var(--color-text-dim); }
+.t-spine { display:flex; gap:4px; margin:7px 0; }
+.t-dot { width:7px; height:7px; border-radius:50%; background:var(--color-primary-glow); }
+.t-note { font-size:11px; color:var(--color-text-dim); line-height:1.5; margin-top:8px;
+  border-top:1px solid var(--color-border-soft); padding-top:8px; }
+
+/* ══ A — THE SCAN LINE ══════════════════════════════════════════════════════ */
+.rows { border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; background:var(--color-surface); }
+.r { border-bottom:1px solid var(--color-border-soft); }
+.r:last-child { border-bottom:none; }
+.r-line { display:flex; align-items:center; gap:10px; padding:9px 13px; cursor:pointer; transition:background var(--dur-fast); }
+.r-line:hover { background:var(--color-surface-hi); }
+.r-caret { color:var(--color-text-dim); font-size:10px; width:9px; transition:transform var(--dur-fast); }
+.r.open .r-caret { transform:rotate(90deg); }
+/* THE DIFFERENTIATOR STACK leads; the name is context, because the name repeats */
+.r-diff { display:flex; align-items:baseline; gap:9px; min-width:0; flex:1; }
+.r-proj { font-size:13px; font-weight:600; color:var(--color-text); white-space:nowrap; }
+.r-name { font-size:12px; color:var(--color-text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.r-meta { display:flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex-shrink:0; }
+.r-v { color:var(--color-text-muted); }
+.r-body { display:none; padding:2px 13px 14px 32px; }
+.r.open .r-body { display:block; }
+.r-atomrow { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-bottom:8px; }
+.r-atom { font-size:11.5px; color:var(--color-text-muted); }
+.r-atom .lbl { color:var(--color-text-dim); display:block; font-size:10px; font-family:var(--font-mono); letter-spacing:.05em; }
+
+/* ══ B — COLOUR CARRIES THE STATE ═══════════════════════════════════════════ */
+.b-card { position:relative; border:1px solid var(--color-border); border-left:3px solid var(--color-border);
+  border-radius:var(--radius-md); background:var(--color-surface); padding:12px 14px; cursor:pointer;
+  transition:border-color var(--dur-fast), background var(--dur-fast); }
+.b-card:hover { background:var(--color-surface-hi); }
+.b-card.tier-strict { border-left-color:var(--color-primary); }
+.b-card.tier-middle { border-left-color:var(--color-accent-violet); }
+.b-card.tier-loose  { border-left-color:var(--color-text-dim); }
+.b-top { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.b-proj { font-size:13.5px; font-weight:600; }
+.b-when { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); }
+.b-name { font-size:11.5px; color:var(--color-text-dim); margin-top:2px; }
+.b-tags { display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
+.b-tag { font-size:10px; font-family:var(--font-mono); letter-spacing:.04em; padding:2px 7px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-muted); }
+.b-tag.file { border-color:var(--color-success-dim); color:var(--color-success); }
+.b-tag.chat { border-color:var(--color-border); color:var(--color-text-dim); }
+.b-tag.strict { border-color:var(--color-primary-glow); color:var(--color-primary); }
+.b-more { display:none; margin-top:10px; padding-top:9px; border-top:1px solid var(--color-border-soft);
+  font-size:11.5px; color:var(--color-text-muted); line-height:1.6; }
+.b-card.open .b-more { display:block; }
+
+/* ══ C — ICON-LED COMPRESSION ═══════════════════════════════════════════════ */
+.c-card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:11px 13px; cursor:pointer; }
+.c-card:hover { background:var(--color-surface-hi); }
+.c-top { display:flex; align-items:center; gap:9px; }
+.c-glyphs { display:flex; gap:5px; flex-shrink:0; }
+.c-g { width:22px; height:22px; border-radius:var(--radius-sm); display:grid; place-items:center; font-size:11px;
+  background:var(--color-muted); color:var(--color-text-muted); position:relative; }
+.c-g.on { background:var(--color-primary-dim); color:var(--color-primary); }
+.c-g[data-tip]:hover::after { content:attr(data-tip); position:absolute; bottom:126%; left:50%; transform:translateX(-50%);
+  background:var(--color-bg-elev1); border:1px solid var(--color-border); color:var(--color-text); font-size:10.5px;
+  font-family:var(--font-sans); padding:3px 7px; border-radius:var(--radius-sm); white-space:nowrap; z-index:5; }
+.c-title { min-width:0; flex:1; }
+.c-proj { font-size:13px; font-weight:600; }
+.c-sub { font-size:11px; color:var(--color-text-dim); }
+.c-more { display:none; margin-top:9px; padding-top:9px; border-top:1px solid var(--color-border-soft);
+  font-size:11.5px; color:var(--color-text-muted); line-height:1.6; }
+.c-card.open .c-more { display:block; }
+
+.note { font-size:11.5px; color:var(--color-text-dim); line-height:1.6; margin-top:var(--space-4);
+  border-left:2px solid var(--color-border); padding-left:11px; max-width:80ch; }
+.note b { color:var(--color-text-muted); }
+
+/* a measured refutation, shown rather than patched away */
+.refuted { border:1px solid var(--color-warning-dim); border-left:3px solid var(--color-warning);
+  background:color-mix(in srgb, var(--color-warning) 7%, transparent); border-radius:var(--radius-md);
+  padding:11px 14px; margin-bottom:var(--space-3); font-size:12px; line-height:1.62; color:var(--color-text-muted); }
+.refuted b { color:var(--color-text); }
+.refuted code { font-family:var(--font-mono); font-size:11px; color:var(--color-warning); }
+</style>
+</head>
+<body>
+
+<nav id="variant-nav">
+  <span class="brand">SKETCH 175 · WHAT THE EYE LANDS ON</span>
+  <button class="variant-tab today active" data-p="today">Today (shipped)</button>
+  <button class="variant-tab" data-p="a">A · The scan line</button>
+  <button class="variant-tab" data-p="b">B · Colour carries it</button>
+  <button class="variant-tab" data-p="c">C · Icon-led</button>
+</nav>
+
+<div class="wrap">
+
+  <p class="lede">
+    <b>The operator's words:</b> “the information is too much… it should be expandable, not only text; it should be
+    coloured according to the theme… if the user wants information he can click and see, instead of just reflecting
+    everything as a long text.”
+    <br><br>
+    <b>The measurement that reframes it.</b> Read from the live database on 2026-08-18:
+    <code>285 rows · 39 distinct names · 93% of rows carry a repeated name</code>. So the field the eye naturally lands
+    on — the name — is the <b>least</b> distinguishing thing in the dataset. Compressing text alone will not make this
+    library scannable; the card has to <b>lead with what actually tells two rows apart</b>. Every variant below is
+    judged on that, not on looking tidier.
+  </p>
+
+  <div class="shapebar">
+    <span><span class="k">fixture rows</span> <span class="v" id="s-rows">–</span></span>
+    <span><span class="k">distinct names</span> <span class="v" id="s-names">–</span></span>
+    <span><span class="k">largest family</span> <span class="v hot" id="s-fam">–</span></span>
+    <span><span class="k">live DB</span> <span class="v hot">285 rows · 39 names · 93% repeated</span></span>
+  </div>
+
+  <div class="meter">
+    <span class="k">at rest, per row:</span>
+    <span><span class="k">height</span> <span class="v" id="m-h">–</span></span>
+    <span><span class="k">words</span> <span class="v" id="m-w">–</span></span>
+    <span><span class="k">rows visible in 800px</span> <span class="v" id="m-n">–</span></span>
+    <span class="k" id="m-note"></span>
+  </div>
+
+  <div class="libbar">
+    <div class="searchbox"><span style="color:var(--color-text-dim)">⌕</span><input placeholder="Matches the letters you type, in the name or the purpose."></div>
+    <select><option>All projects</option></select>
+    <select><option>Recently updated</option><option>Name</option></select>
+  </div>
+  <div class="countline" id="countline">–</div>
+
+  <!-- ══ TODAY ══ -->
+  <div class="pane on" id="p-today">
+    <div class="grid" id="g-today"></div>
+    <p class="note"><b>What is wrong here is not the amount of information — it is that all of it has the same
+    weight.</b> Nine atoms render at one visual level, so nothing is scannable and everything must be read. With 93% of
+    rows sharing a name, the eye lands first on the one field that cannot tell them apart.</p>
+  </div>
+
+  <!-- ══ A ══ -->
+  <div class="pane" id="p-a">
+    <div class="refuted">
+      <b>⚠ THIS VARIANT'S PREMISE WAS MEASURED AND IT ONLY HALF HOLDS — left standing rather than quietly patched.</b>
+      A leads with <code>project</code> as the differentiator. Measured across the 24 rows on screen:
+      <b id="r-stat">–</b>. So for most rows the headline reads “Unbound”, and the line differentiates no better than the
+      name it replaced. <b>Densest is not the same as most scannable.</b>
+      <br><br>
+      What the data says actually separates two rows inside one family, in order of strength:
+      <b>updated · version · owner · lineage (forked from …)</b> — project only earns the lead once a library is
+      genuinely spread across projects, which this one is not. A build of this direction should lead with
+      <b>when + version</b> and treat project as a chip, or the 39px row is a tidier way of telling you nothing.
+    </div>
+    <div class="rows" id="g-a"></div>
+    <p class="note"><b>The bet:</b> rank beats compression. One line per row, leading with the differentiator stack and
+    demoting the repeated name to context. Everything else is one click away.
+    <br><b>The risk, now measured rather than guessed:</b> a list reads as an inventory rather than a library, and the
+    differentiator has to be chosen from what the data actually varies on.</p>
+  </div>
+
+  <!-- ══ B ══ -->
+  <div class="pane" id="p-b">
+    <div class="grid" id="g-b"></div>
+    <p class="note"><b>The bet:</b> colour does the first pass so reading is the second. The left edge encodes the
+    governance tier, tags encode deliverable and provenance, and the theme's own tokens carry it — no new hue.
+    <br><b>The risk:</b> colour that encodes something a person has not learned yet is decoration. This has to be
+    teachable in one glance, and it must survive a colour-blind reader — which is why the tag still says the word.</p>
+  </div>
+
+  <!-- ══ C ══ -->
+  <div class="pane" id="p-c">
+    <div class="grid" id="g-c"></div>
+    <p class="note"><b>The bet:</b> the atoms become glyphs — deliverable, tier, grounding, step count — and text
+    appears only where a word is irreplaceable. Hover names each glyph; click opens the words.
+    <br><b>The risk:</b> this is the densest and the most learnable-in-theory, and the easiest to get wrong: an icon
+    nobody decodes is worse than the sentence it replaced. It leans hardest on the shared PHASE_GLYPHS vocabulary
+    already established in the icon convention.</p>
+  </div>
+
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+  var ROWS = L.rows.slice(0, 24);
+
+  var a = L.audit();
+  document.getElementById("s-rows").textContent  = L.rows.length;
+  document.getElementById("s-names").textContent = a.distinctNames;
+  document.getElementById("s-fam").textContent   = a.largestFamilySize + " x " + a.largestFamily;
+  document.getElementById("countline").textContent =
+    ROWS.length + " of " + L.rows.length + " shown · fixture generated by the real fork rules";
+
+  /* The refutation is COMPUTED from the rows on screen, never typed — so it cannot
+     go stale against the fixture the way a written number would. */
+  (function statRow() {
+    var projs = {}, names = {};
+    ROWS.forEach(function (r) {
+      var p = r.projectName || "Unbound";
+      projs[p] = (projs[p] || 0) + 1;
+      names[r.name] = (names[r.name] || 0) + 1;
+    });
+    var pk = Object.keys(projs), nk = Object.keys(names);
+    var unbound = projs["Unbound"] || 0;
+    var el = document.getElementById("r-stat");
+    if (el) {
+      el.textContent = nk.length + " distinct name" + (nk.length === 1 ? "" : "s") +
+        " · " + pk.length + " distinct projects · " + unbound + " of " + ROWS.length + " unbound";
+    }
+  })();
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function when(r) { return L.relTime ? L.relTime(r.updatedAt) : "recently"; }
+  function tierOf(r) { return (r.tierId || "loose").toLowerCase(); }
+  function isFile(r) { return /file|doc|deck|sheet|pack|brief/i.test(r.deliverable || ""); }
+
+  /* ── TODAY: every atom, one weight ─────────────────────────────────────── */
+  document.getElementById("g-today").innerHTML = ROWS.map(function (r) {
+    var dots = (r.chain || []).slice(0, 6).map(function () { return '<span class="t-dot"></span>'; }).join("");
+    return '<div class="t-card">' +
+      '<div class="t-head"><span class="t-name">' + esc(r.name) + '</span>' +
+      '<span class="t-ver">v' + r.version + '</span></div>' +
+      '<div class="t-prov">' + esc((r.provenance || "draft").toUpperCase()) + ' · ' + esc(r.ownerLabel || "you") + '</div>' +
+      '<div class="t-atom"><span class="lbl">Purpose </span>' + esc(r.purpose) + '</div>' +
+      '<div class="t-atom"><span class="lbl">Needs </span>' + esc(r.projectName || "no knowledge base") + '</div>' +
+      '<div class="t-spine">' + dots + '</div>' +
+      '<div class="t-atom"><span class="lbl">Governance </span>' + esc(r.tierId || "loose") + '</div>' +
+      '<div class="t-atom"><span class="lbl">Produces </span>' + esc(r.deliverable || "an answer in chat") + '</div>' +
+      '<div class="t-atom"><span class="lbl">Updated </span>' + esc(when(r)) + '</div>' +
+      '<div class="t-note">' + esc(r.parentName
+          ? "Forked from " + r.parentName + ". The original stays live and unchanged."
+          : "Opens your own copy. Nothing is published until it passes the gauntlet.") + '</div>' +
+      '</div>';
+  }).join("");
+
+  /* ── A: the scan line ──────────────────────────────────────────────────── */
+  document.getElementById("g-a").innerHTML = ROWS.map(function (r, i) {
+    return '<div class="r" data-i="' + i + '">' +
+      '<div class="r-line js-t">' +
+        '<span class="r-caret">▶</span>' +
+        '<span class="r-diff">' +
+          '<span class="r-proj">' + esc(r.projectName || "Unbound") + '</span>' +
+          '<span class="r-name">' + esc(r.name) + '</span>' +
+        '</span>' +
+        '<span class="r-meta">' +
+          '<span>' + esc(when(r)) + '</span>' +
+          '<span class="r-v">v' + r.version + '</span>' +
+          '<span>' + (isFile(r) ? "file" : "chat") + '</span>' +
+        '</span>' +
+      '</div>' +
+      '<div class="r-body">' +
+        '<div class="r-atomrow">' +
+          '<span class="r-atom"><span class="lbl">PURPOSE</span>' + esc(r.purpose) + '</span>' +
+        '</div>' +
+        '<div class="r-atomrow">' +
+          '<span class="r-atom"><span class="lbl">GOVERNANCE</span>' + esc(r.tierId || "loose") + '</span>' +
+          '<span class="r-atom"><span class="lbl">PRODUCES</span>' + esc(r.deliverable || "an answer in chat") + '</span>' +
+          '<span class="r-atom"><span class="lbl">STEPS</span>' + ((r.chain || []).length || 3) + '</span>' +
+          '<span class="r-atom"><span class="lbl">OWNER</span>' + esc(r.ownerLabel || "you") + '</span>' +
+        '</div>' +
+        (r.parentName ? '<div class="r-atom" style="color:var(--color-text-dim)">Forked from ' + esc(r.parentName) + '</div>' : '') +
+      '</div>' +
+      '</div>';
+  }).join("");
+
+  /* ── B: colour carries the state ───────────────────────────────────────── */
+  document.getElementById("g-b").innerHTML = ROWS.map(function (r) {
+    var t = tierOf(r);
+    return '<div class="b-card tier-' + t + ' js-t">' +
+      '<div class="b-top"><span class="b-proj">' + esc(r.projectName || "Unbound") + '</span>' +
+        '<span class="b-when">' + esc(when(r)) + ' · v' + r.version + '</span></div>' +
+      '<div class="b-name">' + esc(r.name) + '</div>' +
+      '<div class="b-tags">' +
+        '<span class="b-tag ' + (isFile(r) ? "file" : "chat") + '">' + (isFile(r) ? "makes a file" : "answers in chat") + '</span>' +
+        '<span class="b-tag ' + (t === "strict" ? "strict" : "") + '">' + esc(t) + '</span>' +
+        '<span class="b-tag">' + ((r.chain || []).length || 3) + ' steps</span>' +
+      '</div>' +
+      '<div class="b-more">' + esc(r.purpose) +
+        (r.parentName ? '<br><span style="color:var(--color-text-dim)">Forked from ' + esc(r.parentName) + '</span>' : '') +
+      '</div></div>';
+  }).join("");
+
+  /* ── C: icon-led ───────────────────────────────────────────────────────── */
+  document.getElementById("g-c").innerHTML = ROWS.map(function (r) {
+    var t = tierOf(r), file = isFile(r), steps = (r.chain || []).length || 3;
+    return '<div class="c-card js-t">' +
+      '<div class="c-top">' +
+        '<span class="c-glyphs">' +
+          '<span class="c-g ' + (file ? "on" : "") + '" data-tip="' + (file ? "Produces a file" : "Answers in chat") + '">' + (file ? "▤" : "◇") + '</span>' +
+          '<span class="c-g ' + (t === "strict" ? "on" : "") + '" data-tip="Governance: ' + esc(t) + '">' + (t === "strict" ? "🔒" : "◎") + '</span>' +
+          '<span class="c-g" data-tip="' + steps + ' steps">' + steps + '</span>' +
+        '</span>' +
+        '<span class="c-title">' +
+          '<div class="c-proj">' + esc(r.projectName || "Unbound") + '</div>' +
+          '<div class="c-sub">' + esc(r.name) + ' · ' + esc(when(r)) + ' · v' + r.version + '</div>' +
+        '</span>' +
+      '</div>' +
+      '<div class="c-more">' + esc(r.purpose) + '</div>' +
+      '</div>';
+  }).join("");
+
+  /* ── interactions: everything expands, per the operator's ask ──────────── */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest(".js-t");
+    if (!t) return;
+    var host = t.classList.contains("r-line") ? t.parentElement : t;
+    host.classList.toggle("open");
+  });
+
+  /* ── the density meter: measured from the DOM, not asserted ────────────── */
+  var METER = {
+    today: { sel: "#g-today .t-card", note: "every atom rendered, nothing deferred" },
+    a:     { sel: "#g-a .r",          note: "one line at rest; 7 atoms one click away" },
+    b:     { sel: "#g-b .b-card",     note: "two lines + tags; purpose one click away" },
+    c:     { sel: "#g-c .c-card",     note: "glyph row + two lines; purpose one click away" }
+  };
+  function measure(p) {
+    var cfg = METER[p], el = document.querySelector(cfg.sel);
+    if (!el) return;
+    var h = Math.round(el.getBoundingClientRect().height);
+    var words = (el.innerText || "").trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById("m-h").textContent = h + "px";
+    document.getElementById("m-w").textContent = words;
+    document.getElementById("m-n").textContent = Math.max(1, Math.floor(800 / (h + 12)));
+    document.getElementById("m-note").textContent = "— " + cfg.note;
+  }
+
+  var tabs = [].slice.call(document.querySelectorAll(".variant-tab"));
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      var p = tab.dataset.p;
+      [].slice.call(document.querySelectorAll(".pane")).forEach(function (pane) {
+        pane.classList.toggle("on", pane.id === "p-" + p);
+      });
+      measure(p);
+    });
+  });
+  measure("today");
+})();
+</script>
+</body>
+</html>

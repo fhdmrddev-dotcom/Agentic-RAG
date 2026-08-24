@@ -1,0 +1,104 @@
+/**
+ * SKETCH 167 EMITTER — THROWAWAY. Deleted immediately after it runs.
+ *
+ * Renders the REAL `TemplateAttachSection` (the shipped rail surface a template is
+ * attached through on an ALREADY-DRAFTED workflow) and writes its actual `innerHTML`
+ * to `.planning/sketches/167-the-template-arrives-late/dom.generated.json`.
+ *
+ * ── THE LIMIT, DECLARED UP FRONT ─────────────────────────────────────────────────────
+ * The enclosing `PhaseFormPanel` is NOT rendered. It is a 1095-line component with a
+ * large prop surface, and drawing it here would put a second full app surface on a page
+ * whose question is about one section inside it. So this sketch makes **NO LAYOUT CLAIM
+ * about the panel** — only about the section, which IS real, and about the reconcile
+ * block, which is a proposal. That is the same limit sketch 164 declared for its govern
+ * dump, stated for the same reason: a limit that lives only in someone's head is a limit
+ * the next reader will not know about.
+ *
+ * The stage renders the section at the panel's real 320 px rail width, which is the one
+ * property of the enclosing panel this sketch does depend on.
+ */
+import { describe, it, vi, beforeEach } from "vitest"
+import { render } from "@testing-library/react"
+import fs from "node:fs"
+import path from "node:path"
+
+const { mockUseTemplatePlaceholders } = vi.hoisted(() => ({
+  mockUseTemplatePlaceholders: vi.fn(),
+}))
+
+vi.mock("@/lib/api", () => ({
+  uploadWorkflowTemplate: vi.fn(),
+  WorkflowTemplateUploadError: class extends Error {},
+}))
+
+vi.mock("@/hooks/useTemplatePlaceholders", () => ({
+  useTemplatePlaceholders: (...args: unknown[]) => mockUseTemplatePlaceholders(...args),
+}))
+
+import { TemplateAttachSection } from "./TemplateAttachSection"
+
+/** The real eight, parsed from `pm-weekly-status-report.docx` during quick task 260814-q5r. */
+const PM_WEEKLY_FIELDS = [
+  "accomplishments",
+  "milestones",
+  "overall_rag_status",
+  "planned_next",
+  "project_name",
+  "reporting_period",
+  "risks_blockers",
+  "summary",
+]
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+const OUT = path.resolve(
+  __dirname,
+  "../../../../.planning/sketches/167-the-template-arrives-late/dom.generated.json",
+)
+
+describe("sketch 167 emitter", () => {
+  it("dumps the real attach section as the late-attach surface", () => {
+    const dumps: Record<string, string> = {}
+
+    /* Nothing attached yet — the drafted workflow before the template arrives. */
+    mockUseTemplatePlaceholders.mockReturnValue({ kind: "idle" })
+    {
+      const { container, unmount } = render(
+        <TemplateAttachSection
+          definitionId="b7c1f2a4-0000-4000-8000-000000000001"
+          onAttached={vi.fn()}
+        />,
+      )
+      dumps.beforeAttach = container.innerHTML
+      unmount()
+    }
+
+    /* Attached, read succeeded, eight fields — the exact moment SC#3 is about. The
+       draft already exists; these eight arrived after it was written. */
+    mockUseTemplatePlaceholders.mockReturnValue({ kind: "fields", fields: PM_WEEKLY_FIELDS })
+    {
+      const { container, unmount } = render(
+        <TemplateAttachSection
+          definitionId="b7c1f2a4-0000-4000-8000-000000000001"
+          filename="pm-weekly-status-report.docx"
+          assetId="u1/_library/d1/abc12345-pm-weekly-status-report.docx"
+          onAttached={vi.fn()}
+        />,
+      )
+      dumps.afterAttach = container.innerHTML
+      unmount()
+    }
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true })
+    fs.writeFileSync(OUT, JSON.stringify(dumps, null, 2), "utf8")
+    // eslint-disable-next-line no-console
+    console.log(
+      "EMITTED",
+      Object.entries(dumps)
+        .map(([k, v]) => `${k}=${v.length}B`)
+        .join(" "),
+    )
+  })
+})

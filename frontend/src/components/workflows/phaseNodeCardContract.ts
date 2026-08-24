@@ -163,10 +163,49 @@ export interface PhaseNodeCardProps {
   title: string
   /** The one supporting line. An empty string renders nothing. */
   subtitle?: string
+  /**
+   * Phase 200 (canvas port) — does `subtitle` carry a MACHINE IDENTIFIER rather than a
+   * sentence? It changes exactly one thing: whether that line may be truncated.
+   *
+   * ⚠ IT EXISTS BECAUSE TWO CORRECT RULES COLLIDED, and neither could simply win.
+   * `screens/builder-canvas.html` truncates its supporting line on all ten of its nodes,
+   * and the sketch is the absolute reference for LAYOUT. But 187-09 moved the ⌥
+   * Technical-names reveal OUT of the title slot and INTO this one for the measured reason
+   * that the title truncates: the reveal rendered as `AI agent step · find-renewal-t…`
+   * with the SLUG clipped — the one token the reveal exists to show. Porting the sheet's
+   * `truncate` unconditionally would have silently re-broken that fix.
+   *
+   * A shipped fix that prevents a real defect is a CONSTRAINT the layout must satisfy, not
+   * a competitor to it. So the sheet's truncation is kept for the sentence case — which is
+   * every card on a default Builder canvas, at the sheet's exact 72px — and suspended for
+   * the identifier case, where the line wraps and the whole slug reaches the reader. No
+   * hover or ⓘ affordance is needed, because nothing has to be hidden to satisfy both.
+   *
+   * DATA, NOT LAYOUT — extensibility seam #1's own rule. The card gains a slot; no caller
+   * of any other slot changes; absent ⇒ the sheet's behaviour, so a caller that never sets
+   * it gets the reference composition. The ADAPTER owns the answer, because the adapter is
+   * already the one place that knows whether the reveal is on (D-183-08: exactly ONE
+   * technical-names state in the app), and this card still renders provider-less.
+   */
+  subtitleIsIdentifier?: boolean
   /** An extra ⌥-reveal line. **Not passed by the 184 adapter** — the reveal is a
    *  title swap today; this slot exists so a later phase adds a line without
    *  re-cutting the card. Absent ⇒ renders nothing. */
   technicalLine?: string
+  /** Phase 200-06 (`BC-MR-03`) — this step's own BRANCH CONDITION, already resolved to
+   *  the target step's NAME by `canvasModel`'s projection. Absent ⇒ the card renders no
+   *  condition element at all, which is the state every step without an `on_failure`
+   *  branch is in, and also the state a step whose branch target does not resolve is in
+   *  (the broken-reference stub already prints that whole sentence — 199-05's rule).
+   *
+   *  ⚠ IT IS A BODY LINE, NOT A BADGE, AND THAT IS FORCED RATHER THAN CHOSEN. `BadgeSlots`
+   *  is a max-2 tuple union and both slots are SPENT ("Not connected", "Waits for you"), so
+   *  a third badge is a TYPECHECK ERROR. The condition therefore lands in the body, which
+   *  is also where it belongs: it is a SENTENCE, and a word-badge carries one word.
+   *
+   *  ⚠ NO SLUG EVER REACHES THIS SLOT. The value is business words about a named step; a
+   *  slug here would put an identifier on the one surface a non-technical person reads. */
+  condition?: string
   /** The icon-well tint, already resolved (with `DEFAULT_TINT` as the fallback) by
    *  the caller. The card performs no lookup and so cannot crash on an unknown type. */
   tint: string
@@ -190,6 +229,40 @@ export interface PhaseNodeCardProps {
    *  only ever selects between three fixed sentences. The detailed reason stays in the
    *  developer timeline, one click away through "Open the chat thread". */
   emitFailure?: EmitFailure | null
+  /**
+   * Phase 200 (FE-WIRING) — THE STEP'S OWN ELAPSED, ALREADY WORDED BY THE CALLER.
+   *
+   * `screens/node-identity.html:265` draws `00:15` in the bottom-right corner of its RUNNING
+   * node, and it was the one atom on that sheet whose every part already shipped one surface
+   * over: `started_at` / `completed_at` are on the wire (`backend/app/api/workflow_runs.py`,
+   * migration `121_workflow_phases_timings.sql`, applied), `phaseDuration.ts` formats them
+   * through `fmtElapsed`, and the SPINE consumes them as `node-run-time`. Only this card had
+   * no slot — `grep -n "elapsed\|duration" PhaseNodeCard.tsx phaseNodeCardContract.ts` → 0.
+   *
+   * ⚠ **A STRING, NOT A TIMESTAMP AND NOT A NUMBER.** The card formats no duration and
+   * decides nothing about what an unrecorded one reads as — the identical discipline as
+   * `label` and `noun` on `NodeRunState`, and as `runTense.total` on the spine. A card doing
+   * its own wall-clock arithmetic would be a SECOND clock beside the page's, free to disagree
+   * with the run band directly above it about the same run.
+   *
+   * ⚠ AND THE CLOCK CALL IS NOT NAMED HERE, DELIBERATELY. This file is inside
+   * `CARD_SUBTREE_PATHS`, whose scope fence (`PhaseNodeCard.test.tsx` — *"the card reads no
+   * DOM, no clock and no randomness"*) is a `?raw` SOURCE regex and cannot tell a mention in a
+   * comment from a live call. Spelling the API in the sentence explaining why the card must
+   * not call it turns that fence RED — which is exactly the trap `196-08` fell into four
+   * times, once inside the comment written to explain the first three.
+   *
+   * ⚠ **ABSENT ⇒ NO ELEMENT AT ALL — never `00:00`, never `—`, never a spinner.** A step the
+   * page holds no timing for is not a step that has run for zero seconds. This is the same
+   * three-state discipline `count` carries on `NodeRunState` and the same floor
+   * `runFacts.ts`'s four-arm correction records the cost of folding.
+   *
+   * ⚠ **RUN TENSE, SO IT IS UNREACHABLE FROM THE BUILDER BY CONSTRUCTION.** It rides
+   * `NodeRunState`, which only a surface holding a real run supplies. An authoring canvas
+   * passes no `runState` at all, so a draft cannot render an elapsed — which is exactly what
+   * `199-02` refused, and the refusal now holds by shape rather than by care.
+   */
+  elapsed?: string | null
   /** The server's verdict mark (VALID-03), rendered by 184-08 and relocated to the
    *  card's LEFT edge by 185-01 (D-185-17 — top-right is CLAIMED for the governance
    *  seal). **Every value here is SERVER-DERIVED** — the caller reads it off

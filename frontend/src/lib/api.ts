@@ -1321,6 +1321,46 @@ export interface ThreadWorkflowState {
    *  `latest_producer_run_id` directly above, which is the OTHER table. Both are bare uuids,
    *  so a swap typechecks and then resolves nothing. */
   last_workflow_run_id?: string | null
+  /** Phase 194.1 (D-09 AMENDED) — the LAST run's status and its two timestamps, keyed to the
+   *  same anchor-then-latest run as `last_workflow_run_id` directly above. The server reads
+   *  them off SELECTs it already issued: no new route, no extra round trip.
+   *
+   *  ⚠ `last_run_status` is the LAST run's status. It is NOT `run_status` above, which is the
+   *  LIVE anchor's and is `null` after a stop — that gap is why these exist. Both are
+   *  `string | null` and a swap TYPECHECKS, exactly like the two id types warned about above.
+   *
+   *  ⚠ ELAPSED IS `last_run_created_at` -> `last_run_updated_at`, i.e. from QUEUED to LAST
+   *  UPDATE — NOT a wall-clock run duration, because queue time is inside it. `claimed_at` is
+   *  deliberately not offered (0 of 149 completed rows carry it — the in-process producer
+   *  never takes `claim_run`'s CAS lease). Any surface printing the interval owes that
+   *  disclosure. Timestamps are ISO strings on the wire.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
+   */
+  last_run_status?: string | null
+  last_run_created_at?: string | null
+  last_run_updated_at?: string | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
@@ -1337,6 +1377,34 @@ export interface WorkflowPhaseState {
   phase_index: number
   status: string
   phase_type?: string
+  /**
+   * ── Phase 200-07 (DES-02 / D-05 / D-07) — THE CLIENT MIRROR OF TRANSPORT 3, CAUGHT
+   *    MISSING AND ADDED HERE ────────────────────────────────────────────────────────
+   *
+   * ⚠ `200-02` widened the BACKEND `WorkflowPhaseState` (`models/thread.py:122-125`) with
+   * these four fields and did NOT widen this client mirror, so `GET /threads/{id}/workflow`
+   * has been sending them and the panel has been unable to declare them. `200-02`'s own
+   * SUMMARY states the reason the two models must move together, verbatim: *"widening only
+   * the other model would ship a run page with durations and a chat panel without them."*
+   * That is exactly the state this restores — measured against the Python model rather than
+   * inferred from the plan's prose, which asserts both transports already carried them.
+   *
+   * ⚠ **A TYPE, NOT A RUNTIME EXPORT.** These four lines are fully erased at build, so
+   * `197`'s decline on this file still holds and `196-08`'s mock-factory failure mode
+   * (a `vi.mock("@/lib/api")` factory missing a newly-added export) measurably cannot fire.
+   * Proved by grep over this plan's real diff (D-15), never by quoting this paragraph.
+   *
+   * Semantics are stated ONCE, on `WorkflowRunPhase` — the run page's mirror of the same
+   * `workflow_phases` rows. The two that bind hardest, repeated because getting either
+   * wrong is a rendered lie rather than a crash: a NULL timestamp means **the time was not
+   * recorded** (there is no backfill), and `step_count` distinguishes `0` (a real
+   * measurement of nothing) from `null` (this phase type declares no count) — so the arm is
+   * `typeof === "number"` and never `?? 0`.
+   */
+  started_at?: string | null
+  completed_at?: string | null
+  step_count?: number | null
+  step_noun?: string | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py
@@ -1345,12 +1413,147 @@ export interface WorkflowPhaseState {
  *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
  *  JSONB the Workflows page card uses to derive the client-side strictness tier
  *  (deriveTier) + the phase-type chain. Optional — the composer Harness picker only
- *  reads id/slug/name and ignores it (backward compatible). */
+ *  reads id/slug/name and ignores it (backward compatible).
+ *
+ *  Phase 192 (LIB-01 / D-04): `is_mine` + `is_system_global` are the ADDITIVE ownership
+ *  bits that let the library's *Yours* and *Starters* chips filter client-side with honest
+ *  SIMULTANEOUS counts, instead of the `?scope=mine` server round-trip a re-query chip
+ *  would need. Both are computed server-side against the authenticated caller; the backend
+ *  deliberately never sends a raw `created_by` UUID (see the binding rule on the Python
+ *  model — that pool bypasses RLS, so whatever it emits, the caller receives).
+ *
+ *  DECLARED OPTIONAL ON PURPOSE, AND THIS IS A CONTRACT, NOT LAZINESS. A frontend deployed
+ *  AHEAD of the backend receives rows without these keys. The honest client behaviour is to
+ *  read `undefined` as "unknown" and fall back to feed-derived provenance
+ *  (`provenance !== "starter"`), which is CORRECT rather than merely non-fatal — a row is
+ *  still genuinely the user's own even when the field is absent. Consumers (notably
+ *  `library/libraryFilter.ts`) inherit that rule from here: never treat `undefined` as
+ *  `false`, because that silently renders an empty *Yours* chip on a stale deploy. */
 export interface PublishedWorkflow {
   id: string
   slug: string
   name: string
   definition?: WorkflowDefinitionJSON | null
+  is_mine?: boolean
+  is_system_global?: boolean
+  /**
+   * Phase 192.1 (LIB-05 / D-15) — when this row last changed, ISO-8601 as the server
+   * rendered it. The recency half of the library identity line ("changed 2 months ago").
+   *
+   * OPTIONAL AND NULLABLE for the reason spelled out in the block above this interface: a
+   * frontend deployed AHEAD of the backend receives rows without the key. `undefined` means
+   * "the wire did not say", and the honest rendering of that is NO `changed` segment — never
+   * a fabricated time, and never `new Date()`.
+   *
+   * ⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST RATHER THAN A
+   * BUG. `workflow_definitions_block_published` makes a published row immutable, so its
+   * `updated_at` is frozen at the publish flip — which IS the last time it changed. Do not
+   * add a second field to "fix" it.
+   */
+  updated_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-07 / D-08) — WHEN THIS ROW LAST RAN, ISO-8601 as the server
+   * rendered it. Joined from `workflow_runs` by a `LEFT JOIN LATERAL … LIMIT 1` that is
+   * OWNER-SCOPED (`r.user_id = $1`), so it answers *"did MY last run of this work?"* and
+   * never reports another caller's activity on a world-readable global row.
+   *
+   * ⚠ THIS IS NOT `updated_at`, AND THE TWO VISIBLY DISAGREE ON REAL DATA. `updated_at` on a
+   * published row is the PUBLISH time (see the ⚠ D-17 paragraph directly above); this is the
+   * last time anybody pressed Run. Measured on the live feed 2026-08-19, the first populated
+   * published row's run is two days LATER than its publish. Do not read one for the other.
+   *
+   * ⚠ THREE STATES, NOT TWO — the whole point of D-08. `undefined` means THE WIRE DID NOT SAY
+   * (a frontend deployed ahead of its backend: the key is simply absent from the payload).
+   * `null` means the backend looked and there is NO RUN. They are different facts and the
+   * client must not collapse them: the honest rendering of `null` is an explicit *never run*,
+   * and the honest rendering of `undefined` is an explicit *unknown* — never a fabricated
+   * time, never `new Date()`, never a blank, and never a green tick. This is the same rule
+   * `updated_at` states one field up, with one extra arm because absence here has two causes.
+   *
+   * ⚠ CORRECTED BY 192.2-10 (CR-01) — THE PARAGRAPH ABOVE IS PRESERVED VERBATIM AND IS
+   * SUPERSEDED, NEVER OVERWRITTEN. Its sentence *"`null` means the backend looked and there is
+   * NO RUN"* is FALSE AS A ROW-LEVEL CLAIM. The lateral behind this field is OWNER-SCOPED
+   * (`r.user_id = $1`, `backend/app/db/workflows.py`), which is the correct security posture and
+   * stands — but it makes the fact CALLER-SCOPED. So `null` means *the backend looked and **YOU**
+   * have no run of this row*. It says nothing whatever about whether anybody else has.
+   *
+   * Measured on the live feeds 2026-08-19 as a caller who is not the runner: **5 of 92**
+   * `/workflows/published` rows and **1 of 3** `/workflows/starters` rows come back with
+   * `last_run_at: null` on a definition that HAS been run. Rendering that as an affirmative
+   * *"Never run"* is precisely the false claim CR-01 names.
+   *
+   * ⚠ THE ROW-LEVEL ANSWER LIVES ONE FIELD DOWN — `has_any_run`, added by `192.2-08`. When the
+   * question is *"has this ever run?"* read THE PAIR, never this field alone.
+   */
+  last_run_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-08) — the RAW status of the run `last_run_at` describes, exactly
+   * as `workflow_runs.status` spells it. The backend deliberately ships no business word: the
+   * library card owns the vocabulary (`library/runFacts.ts`), and a status word chosen here
+   * would be a second copy of it living on the wire.
+   *
+   * ⚠ THE COLUMN'S DOMAIN IS SIX VALUES AND IT CAN GROW WITHOUT THIS TYPE CHANGING —
+   * `active` · `paused` · `cap_paused` · `completed` · `failed` · `cancelled`
+   * (`supabase/migrations/057_workflow_runs.sql:19`, widened by `063_dual_mode_continue.sql`).
+   * It is therefore typed `string`, not a union: a union would make a new terminal state a
+   * COMPILE error in a client that is merely reading, while the real requirement is that the
+   * client keep working and say so. Any consumer mapping this to words needs a TOTAL default
+   * arm, and that arm must never be success.
+   *
+   * `undefined` / `null` carry the same two meanings as on `last_run_at` above.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
+   */
+  last_run_status?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / CR-01) — WHETHER ANY RUN OF THIS DEFINITION EXISTS, BY ANYBODY.
+   * A ROW-LEVEL fact, and the only deliberately UNSCOPED field on this model. Landed by
+   * `192.2-08` as one projection-only SQL `EXISTS` at four sites.
+   *
+   * ⚠ IT ANSWERS A DIFFERENT QUESTION FROM ITS TWO NEIGHBOURS DIRECTLY ABOVE, AND THE TWO ARE
+   * MEANT TO DISAGREE. `last_run_at` / `last_run_status` come off an OWNER-SCOPED lateral
+   * (`r.user_id = $1`) and answer *did MY last run of this work?*. This one answers *has
+   * ANYBODY run it?*. **`has_any_run: true` WITH `last_run_at: null` is the meaningful pair —
+   * somebody ran it, and it was not you.** That shape is real on 5 `/published` rows and 1
+   * `/starters` row today for any caller who is not the runner (measured 2026-08-19).
+   *
+   * ⚠ THREE STATES, AND A CONSUMER MAY NOT COLLAPSE THEM (192.2-10 DEC-10-A):
+   *   · `true`           — somebody has run it.
+   *   · `false`          — the backend looked and NOBODY has. **The only state that honestly
+   *                        earns the words "Never run".**
+   *   · absent or `null` — THE WIRE DID NOT SAY: a frontend deployed ahead of its backend, or a
+   *                        read path that omits the column. NOT a synonym for `false`.
+   * A `?? false` anywhere downstream manufactures the affirmative claim *nobody has run this*
+   * out of an absence — CR-01's exact shape, one layer down.
+   *
+   * ⚠ THE DISCLOSURE BUDGET IS EXISTENCE-ONLY, AND IT IS A DECISION RATHER THAN AN OMISSION
+   * (`192.2-08` DEC-08-A). A bare SQL `EXISTS`: never WHO, never WHEN, never HOW MANY, never
+   * WITH WHAT OUTCOME. Widening this key toward any of those is a cross-tenant disclosure, not
+   * a richer field. Re-open trigger: the first workflow row visible to a caller who is not
+   * entitled to know it has been exercised at all.
+   */
+  has_any_run?: boolean | null
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
@@ -2530,7 +2733,18 @@ export async function kickReembed(): Promise<ReembedProgress> {
   return res.json() as Promise<ReembedProgress>
 }
 
-export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[] }> {
+/**
+ * Phase 196 Plan 07 (D-18 / BUG-260718-04): `disabled_models` joins `deprecated_models` on this
+ * payload — the operator-DISABLED id set, so the composer's per-thread model restore can apply
+ * D-07's disabled rule BY NAME instead of inferring it from a provider's offered list.
+ *
+ * Both sets are OPTIONAL on the wire type and both are read with a `?? []` default at the call
+ * site. That is not defensive noise: an older backend answers without the key, and a degraded
+ * read must resolve to "no badge / no disabled ids" rather than to a crash in the chat composer.
+ * The two sets are INDEPENDENT — a deprecated model stays selectable (D-149-05); a disabled one
+ * is the thing the restore must refuse.
+ */
+export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[]; disabled_models?: string[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get providers")
@@ -3324,8 +3538,84 @@ export interface WorkflowDraftRow {
    * truncated and matches ZERO rows: every save would then refuse as stale (probed
    * against the live database, 2026-08-01). The server renders it and the server
    * compares it; this client only carries it.
+   *
+   * ⚠ IF YOU CAME HERE WANTING A TIMESTAMP, THE FIELD YOU WANT IS `updated_at` DIRECTLY
+   * BELOW. Phase 192.1 (D-16) added it as a SEPARATE field precisely because this one must
+   * never be parsed as a date, even though both are rendered from the same
+   * `workflow_definitions.updated_at` column server-side. Two fields off one column is the
+   * intended shape, not duplication.
    */
   token: string
+  /**
+   * Phase 192.1 (LIB-05 / D-15) — when this draft last changed, ISO-8601 as the server
+   * rendered it. Feeds the library identity line's "changed <rel>" segment.
+   *
+   * PLACED HERE, ADJACENT TO `token`, ON PURPOSE: this is where a reader wondering why there
+   * are two near-identical timestamps will look. See the ⚠ paragraph on `token` above — the
+   * token is opaque and comparison-only; this field is formattable and display-only. They
+   * are never interchangeable, and collapsing them makes every save after the first refuse
+   * as stale.
+   *
+   * Optional and nullable on the same stale-deploy contract as `PublishedWorkflow`:
+   * `undefined` is "the wire did not say", rendered as no `changed` segment.
+   */
+  updated_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-07 / D-08) — when this DRAFT last ran, and what that run did.
+   * The mirror of the two fields on `PublishedWorkflow`; read their docblocks for the
+   * three-state rule, which is identical here and is the load-bearing part.
+   *
+   * ⚠ A DRAFT'S RUN IS ITS GOLDEN RUN, AND COUNTING IT IS DELIBERATE. A draft cannot be Run
+   * from the library — publish IS the test — so the only runs a draft has are the ones the
+   * publish gauntlet made. *"Your test run failed"* is exactly the answer LIB-06 asks for on
+   * a shelf that is 69% drafts, so the join does not exclude them.
+   *
+   * ⚠ AND NEITHER OF THESE IS `token`. See the ⚠ paragraph on that field above: it is opaque
+   * by contract and parsing it as a date breaks every later save. These two are display
+   * fields off a different table entirely.
+   */
+  last_run_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-08) — the RAW `workflow_runs.status` of the run `last_run_at`
+   * describes. The mirror of `PublishedWorkflow.last_run_status`; read that docblock for the
+   * three-state rule and for why it is `string` rather than a union.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
+   */
+  last_run_status?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / CR-01) — the mirror of `PublishedWorkflow.has_any_run`; read THAT
+   * docblock for the three states and the disclosure budget, which are identical here and are
+   * the load-bearing part.
+   *
+   * ⚠ MIRRORED FOR CONSISTENCY, AND SAYING SO IS THE POINT. `/workflows/drafts` is already
+   * scoped to `created_by = $1`, so on this feed the caller is normally the only person with
+   * runs and the row-level bit AGREES with the two owner-scoped fields above. That agreement is
+   * a property of THIS FEED, not an invariant of the pair — leaving the field off here would
+   * have made *"the two facts agree"* an unstated assumption that the next feed quietly breaks.
+   */
+  has_any_run?: boolean | null
 }
 
 /**
@@ -3348,10 +3638,30 @@ export interface WorkflowDraftWriteResult {
   token: string
 }
 
+/** Phase 197 (D-13) — the server's publish-readiness verdict for ONE generated draft.
+ *  THREE representable states, and the THIRD IS THE ABSENCE OF THIS WHOLE OBJECT:
+ *  `{status:"present"}` · `{status:"missing", message}` · the field not there at all.
+ *  ⚠ ABSENT MEANS THE SERVER SAID NOTHING — never that everything is fine. A
+ *  `readiness ?? {}` default, or a `=== "missing"` read whose false branch renders a
+ *  green tick, collapses that third state into the first. Both are the shipped floor
+ *  in one shape: `useModelRegistry`'s (a failed read is `status:"failed"`, never an
+ *  empty success) and `model_registry`'s (an ABSENT override row means ENABLED).
+ *  ⚠ ONE ENTRY, DELIBERATELY. Measured across the whole publish gauntlet, stage 1's
+ *  `business_requirement` is the ONLY definition-level predicate — nothing anywhere
+ *  refuses a publish for a missing knowledge-base binding, a missing document, the
+ *  AI-chosen name or the deliverable. A second key here would be a claim no gate makes.
+ *  ⚠ IT RIDES THE `ok:true` ARM ALONE. A failed generation carries no verdict
+ *  server-side, so reading one off the failure arm is a typecheck error here too. */
+export type GenerateReadiness = {
+  business_requirement:
+    | { status: "present" }
+    | { status: "missing"; message: string }
+}
+
 /** The structured result of POST /workflows/generate. The route returns HTTP 200
  *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
 export type GenerateResult =
-  | { ok: true; definition: WorkflowDefinitionJSON }
+  | { ok: true; definition: WorkflowDefinitionJSON; readiness?: GenerateReadiness }
   | { ok: false; error: string; detail?: string }
 
 /** The body of POST /workflows/generate (D-103-CONF-2 / D-103-3 template supply). */
@@ -3431,6 +3741,198 @@ export class WorkflowDraftUnreadableError extends Error {
     // Logged, never shown. One line, at the boundary that received it.
     console.warn("PATCH /workflows/{id} → 422 (shape rejected before the handler):", rawBody)
   }
+}
+
+/**
+ * Phase 193 (AUTH-03, piece 2) — the descriptor `POST /workflows/{id}/template` returns.
+ *
+ * FIELD-FOR-FIELD the backend's `TemplateAssetRef` (`workflows.py:1617`), which is itself
+ * field-for-field `app.models.harness.AssetRef`. That identity is the whole contract: the
+ * object goes STRAIGHT into `definition.assets[]` and the `extra='forbid'` WorkflowDefinition
+ * accepts it unchanged, so no client-side re-shaping exists to drift.
+ *
+ * `kind` is the single-value literal, not `string` — this door mints templates and never
+ * `reference` assets, and typing it wide would let a caller write an asset the run engine's
+ * `resolve_template_source` Branch 1 would silently skip.
+ */
+export interface WorkflowTemplateAsset {
+  kind: "template"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
+/**
+ * Phase 193 (AUTH-03) — `POST /workflows/{id}/template` refused, or never arrived.
+ *
+ * It carries the STATUS and the server's `detail` sentence SEPARATELY rather than one
+ * pre-worded message, because the three refusals mean three different things to the person
+ * looking at the panel and only the caller knows which surface is asking:
+ *   • `404` — the workflow is gone or is not theirs (deliberately indistinguishable
+ *     server-side, so the client must not invent a distinction either).
+ *   • `422` — the FILE was refused. The backend's detail is a plain, actionable sentence by
+ *     contract ("A workflow template must be a .docx, .pptx or .xlsx document (got .png).",
+ *     "File too large. Maximum size is 10 MB.") and is safe to show verbatim.
+ *   • `502` — Storage write failed. Also a clean sentence, never a traceback.
+ * `"network"` is the request that never got an answer at all.
+ *
+ * `detail` is `null` whenever the body was missing or unreadable — a caller must therefore
+ * always have a fallback sentence and can never render `null` at a person.
+ */
+export class WorkflowTemplateUploadError extends Error {
+  readonly status: number | "network"
+  readonly detail: string | null
+  constructor(status: number | "network", detail: string | null) {
+    super(detail ?? `workflow template upload failed (${status})`)
+    this.name = "WorkflowTemplateUploadError"
+    this.status = status
+    this.detail = detail
+  }
+}
+
+/**
+ * Phase 193 (AUTH-03, piece 2) — attach a template to a workflow AT AUTHORING TIME.
+ *
+ * Mirrors `uploadWorkspaceTemplate`'s FormData + Bearer shape (see its comment): the
+ * NO-`Content-Type` detail is load-bearing so the browser writes the multipart boundary
+ * itself, and the single part is named `file` because that is the part name the route
+ * declares.
+ *
+ * ⚠ THIS DOES NOT WRITE THE DEFINITION, and that is the backend's deliberate contract
+ * (`AUTH-03-BACKEND-SUMMARY.md`): it returns the descriptor and stops. The caller appends it
+ * to `definition.assets[]` and saves through the EXISTING draft-save path, which keeps
+ * exactly ONE writer on the `definition` JSONB and off Phase 186's `If-Match` token.
+ */
+export async function uploadWorkflowTemplate(
+  definitionId: string,
+  file: File,
+): Promise<WorkflowTemplateAsset> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/${definitionId}/template`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as WorkflowTemplateAsset
+}
+
+/**
+ * What a bound template asks the step to fill in, and whether we could read it.
+ *
+ * `read` is not decoration. An empty `placeholders` list is ambiguous on its own —
+ * it could mean *we opened the document and it carries no fill-in fields*, or *we
+ * never opened it at all*. Rendering those two as the same sentence lets an author
+ * conclude their template is field-less when the read simply failed, and they then
+ * ship a workflow that fills nothing. The server therefore carries them separately.
+ */
+export interface WorkflowTemplatePlaceholders {
+  read: "ok" | "unreadable"
+  placeholders: string[]
+}
+
+/**
+ * GET /workflows/{id}/template/placeholders — the fields a bound template expects.
+ *
+ * Sited HERE, beside `uploadWorkflowTemplate`, rather than beside `getGroundingBundle`:
+ * it shares that function's concern (the template a workflow binds) and its gate
+ * (`require_visible("workflow_authoring")`), not the palette's `require_canvas()`.
+ *
+ * ⚠ WHY THIS IS NOT `getGroundingBundle(assetId)`, recorded here because the older seam
+ * next door looks like it should already do this job. `getGroundingBundle`'s
+ * `templateAssetId` parameter feeds a backend query param typed `UUID | None`, while
+ * every asset id this app mints is a Storage PATH (`{user_id}/_library/{definition_id}/…`)
+ * — so passing a real one is a **measured 422** (`uuid_parsing`, before the handler
+ * runs). That parameter, and the `GroundingBundle.template_placeholders` field it
+ * populates, therefore remain **unused by the app**. They are left in place rather than
+ * deleted: removing a shipped typed seam is a separate decision from adding this one.
+ */
+export async function getWorkflowTemplatePlaceholders(
+  definitionId: string,
+  assetId: string,
+  signal?: AbortSignal,
+): Promise<WorkflowTemplatePlaceholders> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/workflows/${definitionId}/template/placeholders?asset_id=${encodeURIComponent(assetId)}`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error(`Failed to read the template's fields (status ${res.status})`)
+  return (await res.json()) as WorkflowTemplatePlaceholders
+}
+
+/**
+ * Phase 193.1 (AUTH-03, D-05) — POST /workflows/template/placeholders: WHAT A DOCUMENT ASKS
+ * FOR, READ FROM BYTES ALONE, BEFORE ANY WORKFLOW EXISTS.
+ *
+ * ── WHAT THIS IS FOR, AND WHAT IT DELIBERATELY IS NOT ────────────────────────────────────
+ * It takes bytes and returns names. **It persists NOTHING** — no definition row, no Storage
+ * object, no draft, not even a temporary one. That is the whole reason it needs no
+ * `definitionId`: there is no row to key on because nothing is being written, which is what
+ * makes it usable on the pre-draft describe screen where neither an id nor a saved asset
+ * exists yet.
+ *
+ * ── ITS BOUND-TEMPLATE SIBLING, NAMED SO NOBODY HAS TO GUESS WHY THERE ARE TWO ───────────
+ * `getWorkflowTemplatePlaceholders` above answers the same question about a document ALREADY
+ * BOUND to a saved workflow, and is keyed on `(definitionId, assetId)` for exactly that
+ * reason. Both return `WorkflowTemplatePlaceholders`, and the shared return type is a decision
+ * rather than a convenience: ONE wire shape for both doors means a caller derives the SAME
+ * reading arms from either, so the pre-draft screen and the deliverable step's rail can never
+ * disagree about what an answer means.
+ *
+ * ── THE SHAPE, AND THE ONE DETAIL THAT IS LOAD-BEARING ───────────────────────────────────
+ * `uploadWorkflowTemplate`'s body — FormData, a single part named `file` because that is the
+ * part name the route declares, `Authorization: Bearer`, and **NO `Content-Type`** so the
+ * browser writes the multipart boundary itself. Setting that header by hand produces a request
+ * with no boundary and the server rejects it. Plus the abortable tail its sibling has and the
+ * upload lacks: a pre-draft read is racing an author who may replace the file, so the caller
+ * needs to cancel a read that has been overtaken.
+ *
+ * ⚠ NOTHING ABOUT THE CALLER IS SENT BEYOND THE TOKEN — no id, no path, no filename. The route
+ * accepts no path and owns no row, so the cross-tenant class that required an owner-prefix
+ * check on the bound-template door has nothing here to attach to. That is elimination by
+ * construction, not a guard that could be removed.
+ *
+ * ── REFUSALS ARE RELAYED, NOT RE-WORDED ──────────────────────────────────────────────────
+ * Throws `WorkflowTemplateUploadError` carrying `status: number | "network"` and the server's
+ * own `detail` when the body has one, so a caller can show a 422's own actionable sentence
+ * rather than inventing a second copy of a rule the server owns and can drift from.
+ */
+export async function readTemplatePlaceholdersFromFile(
+  file: File,
+  signal?: AbortSignal,
+): Promise<WorkflowTemplatePlaceholders> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/template/placeholders`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+      signal,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as WorkflowTemplatePlaceholders
 }
 
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
@@ -3706,6 +4208,66 @@ export interface WorkflowRunPhase {
   phase_index: number
   status: string
   phase_type: string | null
+  /** Phase 200 (DES-02 / D-05) — when this step flipped to active.
+   *
+   *  ⚠ `null` means **the time was not recorded**, not "zero". Either the step never ran
+   *  (a `skipped` phase is routed around, so it has no start instant at all) or it ran
+   *  before migration 121 existed. **There is NO BACKFILL** — a value derived from
+   *  `updated_at` would be right for some rows and silently wrong for others, with nothing
+   *  on the row to say which. Render nothing for `null`; never render `0s`. */
+  started_at?: string | null
+  /** Phase 200 (DES-02 / D-05) — when this step reached a terminal status.
+   *
+   *  With `started_at`, this is the first per-step duration the wire has ever carried:
+   *  `completed_at − started_at`. `null` while the step is still running, on a `skipped`
+   *  step, and on every pre-migration-121 row. ⚠ A run SPAN is
+   *  `min(started_at) → max(completed_at)` across the phases — see `WorkflowRunRead`. */
+  completed_at?: string | null
+  /** Phase 200 (DES-02 / D-07) — the count this step's phase type DECLARED, read from the
+   *  step's own output server-side.
+   *
+   *  ⚠ **`0` AND `null` ARE DIFFERENT ANSWERS AND MUST BE BRANCHED, NEVER COALESCED.**
+   *  `0` is a real measurement — the step searched and found nothing. `null` means **this
+   *  phase type declares no count at all**, and four of the seven do: `programmatic`,
+   *  `llm_single`, `llm_human_input`, `external_action`. Writing `step_count ?? 0` prints
+   *  "0 sources" under a step that never claimed to measure anything. Test for `null`
+   *  explicitly (or `typeof === "number"`) and render nothing when absent — never a `0`,
+   *  never a dash. */
+  step_count?: number | null
+  /** Phase 200 (DES-02 / D-07) — the noun for `step_count`: `sources` | `agents` |
+   *  `fields`. Non-null iff `step_count` is non-null.
+   *
+   *  ⚠ AUTHORED COPY owned by the executor that declares it, and deliberately
+   *  domain-neutral. Render the pair verbatim (`312 sources`). **Never substitute a domain
+   *  word of your own** — "312 docs matched" is a claim about the customer's domain that
+   *  nothing measured. */
+  step_noun?: string | null
+  /** Phase 200.1 (RUN-04) — this step's own `output["text"]`: the answer it produced,
+   *  verbatim and unclamped.
+   *
+   *  ⚠ **`null` MEANS THIS STEP WROTE NO TEXT, AND AN EMPTY STRING IS NEVER SENT.** The
+   *  server collapses "no `text` key", "output was not an object" and `text === ""` into
+   *  one `null`, deliberately: an empty answer and no answer are not two facts worth
+   *  distinguishing on a surface whose job is to say what was produced. So `=== null` and
+   *  a truthiness test agree here, which is the point.
+   *
+   *  ⚠ **IT IS NOT SAFE TO CALL THE LAST ROW'S TEXT "THE RUN'S ANSWER".** A `confirm`
+   *  step carries `text` too, and it is a QUESTION — measured on real data:
+   *  *"Does this draft answer your question? Add any corrections."* The run's answer is
+   *  **the LAST server-ordered row carrying a non-empty `deliverable_text`**, which is a
+   *  different rule and the one `WorkflowRunPage` applies.
+   *
+   *  ⚠ **UNCLAMPED, ON EVERY ROW THAT HAS ONE** (`D-200.1-02-B`). Measured max 38,935
+   *  characters on one row, mean 3,871, p95 15,431 — a five-step run typically ~19 KB.
+   *  A clamp without a second signalling field would be a silent truncation, and a
+   *  populate-only-the-final-row rule would be invisible on the wire. Re-open trigger: the
+   *  first surface reading this for a LIST of runs rather than for one run.
+   *
+   *  ⚠ **MODEL-AUTHORED CONTENT — render it as a text node**, never through React's raw-HTML
+   *  escape hatch. ⚠ That prop is not SPELLED here on purpose: `WorkflowRunPage.tsx` carries a
+   *  fence sweeping its own RAW source for it at zero occurrences, and this tree has recorded
+   *  six times that a comment naming a forbidden token satisfies the grep meant to forbid it. */
+  deliverable_text?: string | null
 }
 
 /**
@@ -3728,10 +4290,21 @@ export interface WorkflowRunPhase {
  * executed — a spine whose steps the run never had. Carrying it inline also means a
  * terminal run renders with no stream and no second fetch.
  *
- * **`claimed_at` is the ONLY honest elapsed anchor.** `workflow_runs` has no
- * `started_at` and no `completed_at` (measured — `supabase/full-schema.sql`), so a
- * duration is `updated_at − claimed_at` and a null `claimed_at` means the run has not
- * started processing at all. See `WorkflowRunPage`'s elapsed contract (D-188-18).
+ * **`claimed_at` is the ONLY honest elapsed anchor** *(⚠ SUPERSEDED FOR A RUN SPAN —
+ * Phase 200. The original sentence is kept rather than deleted, because erasing a
+ * superseded invariant hides that a promise changed.)*
+ *
+ * It stays TRUE OF THIS TABLE: `workflow_runs` still has no `started_at` and no
+ * `completed_at`, so a run-row duration is `updated_at − claimed_at` and a null
+ * `claimed_at` means the run has not started processing at all (D-188-18).
+ *
+ * ⚠ **But it is no longer the best anchor for a run SPAN, and the reason is measured
+ * rather than stylistic: `claimed_at` is null on 100% of completed runs** — 149 rows, 0
+ * with `claimed_at` (`WorkflowRunPage.tsx:849-851`). So the anchor this sentence
+ * recommends is, in practice, absent exactly when a span is wanted. Since Phase 200 the
+ * PHASE rows carry their own timestamps, so the honest span is
+ * `min(phases.started_at) → max(phases.completed_at)` — derived from steps that really
+ * ran, and null-safe because a phase that never ran contributes neither end.
  *
  * The degrade path Plan 03 recorded: if the definition row cannot be read, the server
  * returns `workflow_name: ""` / `workflow_slug: ""` / `workflow_version: 0` /
@@ -3803,6 +4376,130 @@ export async function getWorkflowRun(
   })
   if (!res.ok) throw new ApiError(`Failed to load the run (status ${res.status})`, res.status)
   return (await res.json()) as WorkflowRunRead
+}
+
+/** One citation passage retrieved for a specific step in a workflow run. */
+export interface RunStepCitation {
+  document_id: string
+  filename: string
+  chunk_index: number | null
+  passage: string | null
+}
+
+/**
+ * GET /workflow-runs/{run_id}/phases/{phase_slug}/citations — lazy citation passages (Phase 200.2).
+ *
+ * Owner-scoped and run+step-scoped on the backend (D-09). Returns allow-listed citation objects
+ * stripped of similarity scores and internal metadata (D-10 / A-05).
+ */
+export async function getWorkflowRunPhaseCitations(
+  runId: string,
+  phaseSlug: string,
+  signal?: AbortSignal,
+): Promise<RunStepCitation[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/workflow-runs/${encodeURIComponent(runId)}/phases/${encodeURIComponent(phaseSlug)}/citations`,
+    {
+      headers,
+      signal,
+    },
+  )
+  if (!res.ok) {
+    throw new ApiError(`Failed to load step citations (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as RunStepCitation[]
+}
+
+// ── SEED-190 — THE RUN LOG ──────────────────────────────────────────────────────────
+//
+// ⚠ THIS FIRES THE 197 DECLINE'S OWN RE-OPEN TRIGGER AND THE TRIGGER IS BEING HONOURED
+// RATHER THAN STEPPED AROUND. `docs/HOT-FILE-LEDGER.md` records this file as the hottest in
+// the repository (176 commits / 100 phases / 6430 lines) with a standing DECLINE to extract,
+// whose trigger reads: *"the next phase adding a RUNTIME export or a second concern here"*.
+// `listWorkflowRuns` below IS a runtime export. It is added here anyway, and the reason is
+// that it is not a second CONCERN: it sits directly beneath `getWorkflowRun`, hits the same
+// router, shares its `ApiError` convention and its encode discipline, and an extraction that
+// moved one without the other would split a two-function surface across two files. **The
+// trigger is not thereby discharged** — it is recorded as fired, with the next phase touching
+// this file owing the extraction rather than another paragraph explaining why not.
+
+/**
+ * One row of the run log (backend `WorkflowRunListItem`).
+ *
+ * ⚠ IT IS A PROJECTION OF `WorkflowRunRead`, NOT A SECOND VOCABULARY. Every field is the
+ * same field under the same name; what is ABSENT is `definition` (a log draws no spine) and
+ * the per-phase rows (the span is pre-reduced server-side). A client that starts deriving
+ * something here that `WorkflowRunRead` derives differently is the defect this note exists
+ * to name in advance.
+ */
+export interface WorkflowRunListItem {
+  /** ⚠ A `workflow_runs.id` — the SAME id space `getWorkflowRun` takes, and NOT a `runs.id`.
+   *  The id trap is documented in full on `WorkflowRunRead` above. */
+  id: string
+  thread_id: string
+  definition_id: string
+  /** ⚠ EMPTY STRING when the definition row is gone. Deleting a workflow does not delete its
+   *  runs, so an orphaned run reaches the log with no name and the surface says so in words.
+   *  It is never `null` — the backend normalises, so the client has one case, not two. */
+  workflow_name: string
+  workflow_slug: string
+  workflow_version: number
+  /** The DB-native status. The sentence a person reads comes from `runFacts` (D-17). */
+  status: string
+  created_at: string | null
+  /** Phase rows this run created — a fact about the RUN, not about the definition today. */
+  step_total: number
+  /** `min(started_at)` across the run's phases. ⚠ NULL on every pre-migration-121 run, and
+   *  that is "not recorded", never zero. */
+  started_at: string | null
+  /** `max(completed_at)` across the run's phases. NULL while a run is still going. */
+  completed_at: string | null
+}
+
+/** One page of the run log (backend `WorkflowRunListRead`). `total` is the count UNDER THE
+ *  SAME FILTER — the number the surface says "showing N of" against. */
+export interface WorkflowRunListPage {
+  runs: WorkflowRunListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * GET /workflow-runs — this caller's runs, newest first.
+ *
+ * Owner-scoped in the query server-side; there is no "everyone" mode to ask for. An empty
+ * page is a 200 with no rows, never a 404 — "you have no runs" is an answer.
+ *
+ * @param slug restrict to ONE workflow, across every version sharing the slug. ⚠ NOT a
+ *   `definition_id`: a workflow's runs span its published versions, so a definition filter
+ *   would show a VERSION's history under the workflow's name. Measured on the dev database:
+ *   `pm-weekly-status-report` has 21 runs across 3 definition rows.
+ *
+ * Throws the status-carrying `ApiError`, matching `getWorkflowRun` directly above, because
+ * the log has to word a canvas-off 404 differently from a 5xx.
+ */
+export async function listWorkflowRuns(
+  options: { slug?: string; limit?: number; offset?: number; signal?: AbortSignal } = {},
+): Promise<WorkflowRunListPage> {
+  const headers = await getAuthHeaders()
+  // `URLSearchParams` rather than template interpolation — a slug is server-supplied today
+  // but reaches here as a plain string, and `&` / `#` are STRUCTURAL in a query string. Same
+  // defensive-construction rule as `getWorkflowRun`'s path encode (WR-07), one component over.
+  const params = new URLSearchParams()
+  if (options.slug !== undefined) params.set("slug", options.slug)
+  if (options.limit !== undefined) params.set("limit", String(options.limit))
+  if (options.offset !== undefined) params.set("offset", String(options.offset))
+  const query = params.toString()
+  const res = await fetch(`${API_BASE}/workflow-runs${query ? `?${query}` : ""}`, {
+    headers,
+    signal: options.signal,
+  })
+  if (!res.ok) {
+    throw new ApiError(`Failed to load the run log (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as WorkflowRunListPage
 }
 
 // ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
@@ -4768,6 +5465,14 @@ export interface ModelRegistryRow {
   llm_call_timeout_seconds: number | null
   is_default: boolean
   is_locked: boolean
+  /** AUTH-04 / D-14: the forced-emission tier an OPERATOR asserts for this model. The SAME
+   *  WR-04 honesty rule as the numerics applies, with one addition the numerics do not need:
+   *  a model with no tracked tier reads `null`, and the tab renders that `null` as the
+   *  read-time `coerce` default rather than as blank. Blank would be a lie — the backend
+   *  ladder (`forced_emit.py`) does NOT treat an absent tier as "unknown", it treats it as
+   *  `coerce`, so a model showing "—" here would already be behaving as best-effort. All 37
+   *  rows shipping before migration 120 read `null`. */
+  emit_tier: "force_strict" | "force" | "coerce" | null
   /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
    *  built-in registry (DEF). The tab renders per-field OVR/DEF and shows a Reset only on
    *  overridden fields; a Reset sends an explicit `null` for that field (clears to DEF, Plan
@@ -4787,6 +5492,9 @@ export interface ModelCapabilityPatch {
   max_output_tokens?: number
   native_tools?: boolean
   llm_call_timeout_seconds?: number
+  /** AUTH-04: an explicit `null` is a Reset (clears the override to DEF) — the same
+   *  explicit-null semantics every other column here carries. */
+  emit_tier?: "force_strict" | "force" | "coerce" | null
 }
 
 /** The request body for `POST /admin/models` (Plan 02 — the D-159-02 add-by-ID write).
@@ -4880,6 +5588,73 @@ export async function getModelRegistry(): Promise<ModelRegistryRow[]> {
   if (!res.ok) throw new ApiError("Failed to load the model registry.", res.status)
   const body = (await res.json()) as { models?: ModelRegistryRow[] }
   return body.models ?? []
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 196 (AUTH-04 / D-01) — the NON-OPERATOR author view of the same registry.
+//
+// `getModelRegistry` above is operator-only: `GET /admin/models` 404s a normal
+// author, by design and with no RLS backstop behind it. But a workflow author must
+// still see what models exist in order to pick one, and neither shipped list is the
+// live registry (`verified_models` misses every DB-only id; `allowed_models` misses
+// 35 code-registry ids). `GET /models/registry` is the second, NARROWER door: same
+// union, six allowlisted fields, authenticated but not operator-gated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One model as a workflow AUTHOR may see it — the six-field allowlist projection
+ *  served by `GET /models/registry`.
+ *
+ *  ⚠ This is deliberately a STANDALONE interface. It does not `extends` the operator
+ *  row and is not derived from it by a `Pick<…>` or any other mapped type — a grep
+ *  for either against this file must come back empty. The operator row carries
+ *  `deprecated_reason`, whose own doc-comment above declares it "operator context,
+ *  never shown to end users". A structural allowlist is what stops a field added to
+ *  the operator row later from travelling to every author by inheritance — the
+ *  Phase 190 CR-01 shape, where migration 116's RLS copy leaked a secret column
+ *  precisely by inheriting rather than allowlisting. The duplication is the point.
+ *
+ *  `emit_tier` is `null` when untracked, and `null` is NOT "unknown": the backend
+ *  ladder reads an absent tier as `coerce`, so a surface rendering this must say
+ *  `coerce` rather than blank (the same rule the operator row's field carries). */
+export interface AuthorModelRow {
+  model_id: string
+  provider: string
+  capability_source: string
+  enabled: boolean
+  deprecated: boolean
+  emit_tier: "force_strict" | "force" | "coerce" | null
+}
+
+/** Read the LIVE model registry as a non-operator author (`GET /models/registry`).
+ *
+ *  How this differs from `getModelRegistry` above, in three ways that all matter:
+ *  (1) it is NOT operator-gated — a plain authenticated author gets 200 where
+ *  `/admin/models` gives them a byte-identical 404; (2) every row is the six-field
+ *  author projection, never the operator row; (3) `run_default_model` is the model a
+ *  run would ACTUALLY inherit, resolved server-side through the run's own chain — it
+ *  is neither `app_settings.llm_model` (a different function, which is why the
+ *  registry's `is_default` is not exposed here) nor a hardcoded id, and it is `null`
+ *  rather than a guess when the chain cannot resolve.
+ *
+ *  The backend returns the same `{"models": [...]}` ENVELOPE as `/admin/models`, so
+ *  the same rule applies: unwrap `.models` HERE, never in the component — casting the
+ *  raw object would ship a `{models}` object into list state and crash the next
+ *  `.map` (CR-01 precedent). */
+export async function getAuthorModelRegistry(): Promise<{
+  models: AuthorModelRow[]
+  run_default_model: string | null
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/models/registry`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the model registry.", res.status)
+  const body = (await res.json()) as {
+    models?: AuthorModelRow[]
+    run_default_model?: string | null
+  }
+  return {
+    models: body.models ?? [],
+    run_default_model: body.run_default_model ?? null,
+  }
 }
 
 /** Edit one model's capabilities (`PATCH /admin/models/{id}`, Plan 06). Sends only

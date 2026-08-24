@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Journey — End to End</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "surface-container": "#1b202a",
+                        "surface-bright": "#343945",
+                        "surface": "#0e131e",
+                        "primary": "#c3c4ff",
+                        "background": "#0e131e",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-tint": "#c1c1ff",
+                        "on-background": "#dee2f1",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-container-lowest": "#090e18",
+                        "on-secondary-container": "#c3abff",
+                        "surface-container-high": "#252a35",
+                        "tertiary": "#4ee478",
+                        "inverse-on-surface": "#2b303c",
+                        "surface-container-highest": "#303540",
+                        "tertiary-container": "#26c760",
+                        "secondary": "#d0bcff",
+                        "on-secondary": "#3b0091",
+                        "primary-fixed": "#e1e0ff",
+                        "outline": "#918f9c",
+                        "error": "#ffb4ab",
+                        "on-surface": "#dee2f1",
+                        "surface-variant": "#303540",
+                        "surface-container-low": "#171c26",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "outline-variant": "#464651",
+                        "primary-container": "#a3a5ff",
+                        "on-tertiary": "#003915",
+                        "inverse-surface": "#dee2f1",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "secondary-fixed": "#e9ddff",
+                        "on-error": "#690005",
+                        "on-primary": "#242478",
+                        "on-primary-container": "#353789",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#002109",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "on-secondary-fixed": "#23005c",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-tertiary-container": "#004c1e",
+                        "secondary-container": "#571ac2",
+                        "inverse-primary": "#5355a9",
+                        "surface-dim": "#0e131e",
+                        "error-container": "#93000a"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    },
+                    fontFamily: {
+                        headline: ["Manrope", "sans-serif"],
+                        display: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                        label: ["Inter", "sans-serif"],
+                        mono: ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #060A0F; }
+        .border-base { border-color: #212631; }
+        .bg-card-dark { background-color: #0D1117; }
+        .text-micro { font-size: 0.65rem; line-height: 1rem; }
+    </style>
+</head>
+<body class="text-on-background font-body min-h-screen antialiased selection:bg-primary-container selection:text-on-primary-container pb-24">
+<!-- TopNav from JSON (Suppressed navigation shell per contextual rule - Focus Canvas) -->
+<!-- But keeping header structural brand -->
+<header class="fixed top-0 w-full z-50 flex flex-col px-6 py-4 bg-[#060A0F]/90 backdrop-blur-md border-b border-[#212631]">
+<div class="flex justify-between items-center w-full max-w-screen-2xl mx-auto">
+<h1 class="font-headline text-xl font-bold tracking-tight text-on-surface">Aether Intelligence</h1>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant">settings</span>
+</div>
+</div>
+</header>
+<main class="pt-24 px-8 max-w-[1600px] mx-auto flex flex-col gap-16">
+<!-- Header -->
+<div>
+<h2 class="font-headline text-3xl font-extrabold text-on-surface mb-2 tracking-tight">The Journey — End to End</h2>
+<p class="text-on-surface-variant max-w-2xl font-body">Component Sheet • Internal Agentic Workflow Platform</p>
+</div>
+<!-- 1. THE JOURNEY SPINE -->
+<section class="flex flex-col gap-8">
+<h3 class="font-headline text-sm font-bold uppercase tracking-wider text-primary border-b border-base pb-2">1. The Journey Spine</h3>
+<!-- Horizontal Scroll Container for Spine -->
+<div class="w-full overflow-x-auto pb-8 hide-scrollbar">
+<div class="flex items-start min-w-max gap-4 px-2">
+<!-- Moment 1 -->
+<div class="flex flex-col gap-4 w-72">
+<div class="bg-card-dark border border-base rounded-lg p-5 flex flex-col gap-3 h-40 transition-transform duration-200 hover:-translate-y-1">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-on-surface-variant" style="font-variation-settings: 'FILL' 1;">edit_note</span>
+<span class="text-micro font-mono text-on-surface-variant px-2 py-1 bg-surface-container rounded">01</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-on-surface text-base">Say what you want</h4>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">Describe your objective in plain English.</p>
+</div>
+</div>
+<div class="px-4 border-l 2 border-base">
+<p class="text-micro font-mono text-tertiary-container uppercase tracking-wider mb-1">Carries</p>
+<p class="text-xs text-on-surface-variant">The request &amp; knowledge sources.</p>
+</div>
+</div>
+<!-- Connection -->
+<div class="flex flex-col items-center justify-center h-40 pt-10">
+<div class="w-24 border-t border-dashed border-base relative">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#060A0F] px-2 text-micro font-mono text-on-surface-variant whitespace-nowrap">
+                                Handing off: 1,284 contracts
+                            </div>
+<span class="material-symbols-outlined text-[10px] text-base absolute -right-1 -top-[5px]">arrow_forward_ios</span>
+</div>
+</div>
+<!-- Moment 2 -->
+<div class="flex flex-col gap-4 w-72">
+<div class="bg-card-dark border border-base rounded-lg p-5 flex flex-col gap-3 h-40 transition-transform duration-200 hover:-translate-y-1">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="text-micro font-mono text-on-surface-variant px-2 py-1 bg-surface-container rounded">02</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-on-surface text-base">The agent proposes</h4>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">Agent drafts a plan based on your contracts.</p>
+</div>
+</div>
+<div class="px-4 border-l border-base">
+<p class="text-micro font-mono text-tertiary-container uppercase tracking-wider mb-1">Carries</p>
+<p class="text-xs text-on-surface-variant">Draft workflow &amp; decisions.</p>
+</div>
+</div>
+<!-- Connection -->
+<div class="flex flex-col items-center justify-center h-40 pt-10">
+<div class="w-24 border-t border-dashed border-base relative">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#060A0F] px-2 text-micro font-mono text-on-surface-variant whitespace-nowrap">
+                                Handing off: Draft Plan
+                            </div>
+<span class="material-symbols-outlined text-[10px] text-base absolute -right-1 -top-[5px]">arrow_forward_ios</span>
+</div>
+</div>
+<!-- Moment 3 -->
+<div class="flex flex-col gap-4 w-72">
+<div class="bg-surface-container border border-primary/30 rounded-lg p-5 flex flex-col gap-3 h-40 transition-transform duration-200 hover:-translate-y-1 relative overflow-hidden">
+<div class="absolute top-0 right-0 bg-primary/10 px-2 py-1 rounded-bl-lg border-b border-l border-primary/20">
+<span class="text-[10px] font-bold text-primary tracking-widest uppercase">Trust Gate</span>
+</div>
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-on-surface" style="font-variation-settings: 'FILL' 1;">fact_check</span>
+<span class="text-micro font-mono text-on-surface-variant px-2 py-1 bg-surface-container-high rounded">03</span>
+</div>
+<div class="mt-2">
+<h4 class="font-headline font-bold text-on-surface text-base">Review &amp; correct</h4>
+<p class="text-sm text-on-surface-variant mt-1 leading-relaxed">Validate the agent's logic and trust the plan.</p>
+</div>
+</div>
+<div class="px-4 border-l border-base">
+<p class="text-micro font-mono text-tertiary-container uppercase tracking-wider mb-1">Carries</p>
+<p class="text-xs text-on-surface-variant">Validated workflow.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

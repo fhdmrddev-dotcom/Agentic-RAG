@@ -17,6 +17,7 @@ scoreboard — NOT these mocked tests.
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
@@ -429,11 +430,10 @@ def _interactive_definition_row(*, kind: str) -> dict:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["llm_human_input", "ask_user_validator"])
+@pytest.mark.parametrize("kind", ["ask_user_validator"])
 async def test_interactive_phase_blocks_publish_before_golden_run(kind):
-    """WR-04: a definition with an interactive phase (llm_human_input OR an ask_user
-    validator disposition) is blocked at ``interactive_phase`` PRE-RUN — the golden run
-    is NEVER driven (an unsubscribed ask_user prompt cannot wedge the publish)."""
+    """WR-04: a definition with an ask_user validator disposition is blocked at
+    ``interactive_phase`` PRE-RUN — the golden run is NEVER driven."""
     row = _interactive_definition_row(kind=kind)
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
@@ -449,6 +449,114 @@ async def test_interactive_phase_blocks_publish_before_golden_run(kind):
     assert result["golden_run_id"] is None
     drive.assert_not_awaited()  # the golden run was NEVER driven
     flip.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_seed164_human_input_proceeds_to_golden_run():
+    """SEED-164: an llm_human_input definition is NOT blocked pre-run and proceeds to golden run."""
+    row = _interactive_definition_row(kind="llm_human_input")
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 90, "summary": "good", "criteria": []}
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "approved output"}, "completed")),
+        ) as drive,
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+    ):
+        result = await _call()
+
+    assert result["published"] is True
+    drive.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["ask_user_validator"])
+async def test_the_interactive_block_writes_a_publish_blocked_receipt(kind):
+    """G-1 (``/gsd:validate-phase 193.2``) — the stage-2.5 block DOES leave a receipt.
+
+    ⚠ THIS SETTLES A CONTRADICTION, and both sides are recorded rather than one quietly
+    corrected. ``193.2-UAT.md`` row **U2** stated the expectation verbatim as *"**no**
+    ``publish_blocked`` row is written"*, while ``_block``'s own docstring says it writes
+    one and stage 2.5 (``publish_service.py:223``) returns ``await _block(...)``. **U2 was
+    never driven** — no interactive step ever appeared across the 20 measured generations
+    (``193.2-FREQUENCY.md`` figure 2, 0/20), so the surface never rendered and no manual
+    observation settled it either. The property therefore had verification of NEITHER kind
+    while the row above it read as covered.
+
+    **Measured, and this test is what makes it re-derivable:** a publish POST that reaches
+    stage 2.5 writes a ``publish_blocked`` receipt at ``blocked_stage="interactive_phase"``.
+    U2's sentence is true ONLY of the path where the client greys ``publish-trigger`` off
+    ``/validate``'s ``blockedReason`` and the POST is never sent — a DIFFERENT path, on a
+    different tier. The two were conflated; they are separated here.
+
+    The sibling case above already patches ``write_audit`` and asserts nothing on it, which
+    is exactly how a receipt can go unobserved while looking watched.
+    """
+    row = _interactive_definition_row(kind=kind)
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()) as audit,
+        patch.object(publish_service, "_drive_golden_run", AsyncMock()),
+        patch("app.db.workflows.publish_definition", AsyncMock()),
+    ):
+        result = await _call()
+
+    assert result["blocked_stage"] == "interactive_phase"  # non-vacuity: we hit stage 2.5
+
+    # THE RECEIPT — asserted on the call the sibling case leaves unexamined.
+    blocked = [c for c in audit.await_args_list if c.kwargs.get("event_type") == "publish_blocked"]
+    assert len(blocked) == 1, (
+        f"expected exactly one publish_blocked receipt, got {len(blocked)}: "
+        f"{[c.kwargs.get('event_type') for c in audit.await_args_list]}"
+    )
+
+    metadata = blocked[0].kwargs["metadata"]
+    assert metadata["blocked_stage"] == "interactive_phase"
+    assert metadata["definition_id"] == str(_DEF_ID)  # attributable with a NULL run_id
+    assert metadata["golden_run_id"] is None  # blocked PRE-RUN, so there is no run to name
+    assert metadata["named_failures"], "the receipt carries the named phase + message"
+
+    # The receipt is written against a NULL run_id — the stage-0/1/2 shape `_block`
+    # documents (``harness_audit.run_id`` is nullable; Phase 107 receipt VIEW).
+    assert blocked[0].args[1] is None
+
+
+@pytest.mark.asyncio
+async def test_a_clean_definition_writes_no_interactive_publish_blocked_receipt():
+    """G-1's positive control — the receipt above is EARNED, not an artifact of the mock.
+
+    Without it, a ``write_audit`` mock that recorded a ``publish_blocked`` call on every
+    publish would satisfy the case above and nobody would know. A definition with no
+    interactive phase must produce NO ``interactive_phase`` receipt.
+    """
+    row = _definition_row(business_requirement="Deliver a cited answer.")
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 90, "summary": "good", "criteria": []}
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()) as audit,
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
+        ),
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+    ):
+        result = await _call()
+
+    assert result["published"] is True  # non-vacuity: this definition really did publish
+    interactive = [
+        c for c in audit.await_args_list
+        if c.kwargs.get("event_type") == "publish_blocked"
+        and c.kwargs.get("metadata", {}).get("blocked_stage") == "interactive_phase"
+    ]
+    assert interactive == []
 
 
 @pytest.mark.asyncio
@@ -476,8 +584,8 @@ async def test_non_interactive_definition_proceeds_past_interactive_check():
 
 
 def test_interactive_phase_failures_helper_detects_both_forms():
-    """WR-04 unit: ``_interactive_phase_failures`` flags both an ``llm_human_input``
-    phase AND an ``ask_user`` validator disposition; a clean definition returns []."""
+    """WR-04 unit + SEED-164: ``_interactive_phase_failures`` flags an ``ask_user`` validator disposition;
+    ``llm_human_input`` is unblocked (SEED-164); a clean definition returns []."""
     from app.models.harness import WorkflowDefinition
 
     human = WorkflowDefinition.model_validate(
@@ -490,9 +598,594 @@ def test_interactive_phase_failures_helper_detects_both_forms():
         _definition_row(business_requirement="x")["definition"]
     )
 
-    assert publish_service._interactive_phase_failures(human)  # llm_human_input flagged
+    assert publish_service._interactive_phase_failures(human) == []  # SEED-164: unblocked
     assert publish_service._interactive_phase_failures(asker)  # ask_user validator flagged
     assert publish_service._interactive_phase_failures(clean) == []  # nothing flagged
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# PHASE 193.2 (BUG-260815-01 / D-12 / D-13 / D-14 / T-193.2-01) — THE REFUSAL'S WORDS
+# ══════════════════════════════════════════════════════════════════════════════════════
+#
+# The pre-193.2 message read *"interactive phases (llm_human_input / ask_user dispositions)
+# cannot be validated in a synchronous publish"* — two engine identifiers aimed at a person
+# who chose neither and can see neither word anywhere on the canvas. This block makes the
+# rewritten copy's honesty properties MECHANICAL rather than reviewed.
+#
+# ⚠ THE F-3 SCOPING INVERSION, stated because getting it backwards produces a fence that is
+# RED on a clean tree: every assertion here scopes over the COMPOSED MESSAGE VALUE, never
+# over ``inspect.getsource`` of the module. ``publish_service``'s own docblocks legitimately
+# QUOTE both forbidden identifiers — they must, to record what was fixed and why the gate
+# matches exactly two shapes — so a source-scoped F-3 would fail on the shipping tree.
+#
+# ⚠ THE SHIPPED WR-04 CASES ABOVE ARE NOT EDITED. In particular
+# ``test_interactive_phase_blocks_publish_before_golden_run``'s ``drive.assert_not_awaited()``
+# IS the proof that the gate stays and the golden run is never driven for these definitions.
+#
+# ⚠ THE OTHER HALF OF F-5 LIVES IN ``tests/unit/test_187_route_assigned_reach.py``, whose
+# header states the two-halves discipline this block imitates rather than duplicates: that
+# file owns the CLIENT-REACH half (an ``interactive_phase`` verdict is route-assigned and
+# incomplete, so it reaches ``blockedReason``); this file owns the VALUE half (the string
+# ``/validate`` emits and the string the publish refusal emits are the same bytes).
+
+#: The D-14 register: nothing shipped may promise unscheduled work.
+_UNSCHEDULED_RE = re.compile(r"plann?ed|coming|soon|deferred|future release", re.I)
+
+#: The identifiers and the slug that may never reach copy (F-3).
+_FORBIDDEN_IN_COPY = ("llm_human_input", "ask_user", "zz-plant-slug")
+
+
+def _interactive_definition(*, kind: str, name=..., slug: str | None = None):
+    """A ``WorkflowDefinition`` whose single phase is INTERACTIVE, with a settable ``name``.
+
+    A SIBLING of ``_interactive_definition_row`` rather than a change to it: that fixture is
+    consumed by the shipped WR-04 cases, and neither shipped fixture phase carries a ``name``
+    at all — which is exactly why the empty-name degradation case can use it as it stands and
+    every LABEL case must add one here.
+
+    ``name=...`` (the sentinel) omits the key entirely, which is the pre-103 JSONB shape;
+    ``name=None`` writes an explicit null.
+    """
+    from app.models.harness import WorkflowDefinition
+
+    if kind == "llm_human_input":
+        phase = {
+            "slug": slug or "approve",
+            "phase_index": 0,
+            "config": {"phase_type": "llm_human_input", "prompt": "Approve this?"},
+            "validators": [],
+        }
+    else:
+        phase = {
+            "slug": slug or "answer",
+            "phase_index": 0,
+            "config": {"phase_type": "llm_single", "prompt": "Answer the question."},
+            "validators": [
+                {"kind": "regex_match", "config": {"pattern": "x"}, "on_failure": "ask_user"}
+            ],
+        }
+    if name is not ...:
+        phase["name"] = name
+    return WorkflowDefinition.model_validate(
+        {
+            "slug": "qual-test",
+            "version": 1,
+            "name": "Quality Test Workflow",
+            "status": "draft",
+            "phases": [phase],
+            "business_requirement": "Deliver a cited answer.",
+        }
+    )
+
+
+_BOTH_KINDS = ("ask_user_validator",)
+
+
+def test_seed164_human_input_passes_publish_gauntlet():
+    """SEED-164: llm_human_input definitions are not refused by _interactive_phase_failures."""
+    definition = _interactive_definition(kind="llm_human_input", name="Approve step")
+    findings = publish_service._interactive_phase_failures(definition)
+    assert findings == [], f"Expected 0 findings for llm_human_input, got: {findings!r}"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_f3_no_internal_identifier_and_no_slug_reaches_the_copy(kind):
+    """F-3 — ``BUG-260815-01``: no engine identifier and no slug may reach the message.
+
+    Scoped over the COMPOSED MESSAGE VALUE (see the block header for why a source-scoped
+    form would be RED on a clean tree). The phase carries the distinctive slug
+    ``zz-plant-slug`` so a slug leak is unmistakable rather than merely plausible.
+    """
+    definition = _interactive_definition(kind=kind, name=None, slug="zz-plant-slug")
+    findings = publish_service._interactive_phase_failures(definition)
+
+    # NON-VACUITY — an absence assertion over zero findings is the commonest way a fence
+    # stops seeing. The slug must still be carried as MACHINE-READABLE metadata.
+    assert findings, f"{kind}: no finding produced — the absence assertions below prove nothing"
+    assert findings[0]["phase"] == "zz-plant-slug", (
+        "the finding's `phase` key must still carry the slug — it is metadata the canvas "
+        "keys off, and only the `message` is copy"
+    )
+
+    for finding in findings:
+        message = finding["message"]
+        for token in _FORBIDDEN_IN_COPY:
+            assert token not in message, (
+                f"{kind}: {token!r} reached user-visible copy — that is BUG-260815-01 "
+                f"(and BUG-260809-02 before it). Message was: {message!r}"
+            )
+
+    # INLINE PLANT — a literal that DOES carry the slug must match the same predicate the
+    # fence applies, so the loop above cannot be passing because it inspects nothing.
+    planted = 'the step "zz-plant-slug" cannot be validated'
+    assert any(token in planted for token in _FORBIDDEN_IN_COPY), (
+        "control: the containment predicate stopped detecting a planted slug"
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+@pytest.mark.parametrize("name", ["Approve the quarterly draft", None], ids=["named", "degraded"])
+def test_f4_no_message_promises_anything_unscheduled(kind, name):
+    """F-4 (D-14) — across BOTH arms and BOTH the named and degraded forms (4 shapes).
+
+    ``SEED-164`` exists because *"the DEFERRED Phase-103 rework"* read like a plan for a
+    year while being scheduled nowhere. No shipped string may do that again.
+    """
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=name)
+    )
+    assert findings, f"{kind}/{name!r}: no finding produced — nothing was actually checked"
+
+    for finding in findings:
+        assert not _UNSCHEDULED_RE.search(finding["message"]), (
+            f"{kind}/{name!r}: the refusal promises unscheduled work: {finding['message']!r}"
+        )
+
+    # POSITIVE CONTROL — the regex still fires on a string that does promise something.
+    assert _UNSCHEDULED_RE.search("this is planned for a future release"), (
+        "control: _UNSCHEDULED_RE stopped matching — the assertions above are inert"
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_d13_the_refusal_names_the_step_by_its_visible_label(kind):
+    """D-13 — the message names the offending step by the label a non-coder reads."""
+    label = "Approve the quarterly draft"
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=label)
+    )
+    assert findings
+    assert label in findings[0]["message"], (
+        f"{kind}: the step's visible name is absent from the refusal — the author cannot "
+        f"tell WHICH step to act on. Message was: {findings[0]['message']!r}"
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+@pytest.mark.parametrize(
+    "name", [..., None, "", "   ", "\n\t "], ids=["absent", "null", "empty", "spaces", "control"]
+)
+def test_d13_an_empty_name_degrades_to_a_true_name_free_sentence(kind, name):
+    """D-13 — the degradation is name-free and TRUE: never a slug, never a step number.
+
+    ``PhaseNodeCard`` puts no ``phase_index`` on the node face, so *"Step 3"* would name
+    something the author cannot read on the canvas — which is why a digit-based reference is
+    asserted absent alongside the slug.
+    """
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=name, slug="zz-plant-slug")
+    )
+    assert findings, f"{kind}/{name!r}: no finding produced"
+    message = findings[0]["message"]
+
+    expected = (
+        publish_service._INTERACTIVE_STEP_UNNAMED
+        if kind == "llm_human_input"
+        else publish_service._INTERACTIVE_FALLBACK_UNNAMED
+    )
+    assert message == expected, f"{kind}/{name!r}: not the degraded literal: {message!r}"
+    assert "zz-plant-slug" not in message, "the degradation fell back to the slug"
+    assert not any(ch.isdigit() for ch in message), (
+        f"the degradation carries a digit — a step NUMBER names something invisible on the "
+        f"canvas. Message was: {message!r}"
+    )
+    assert '""' not in message, "the degradation left an empty quoted label behind"
+
+
+def test_d13_the_two_arms_share_no_message():
+    """D-13 / the 193.1 D-26 shape — the two arms must not collapse onto one literal.
+
+    Arm 1 is about the STEP (remove it); arm 2 is about a step's FAILURE ROUTE (change it).
+    ONE string serving both meanings is precisely the defect 193.1 fixed in ``grounding.py``,
+    and this is the only assertion that can catch a later "simplification" that undoes it.
+    """
+    label = "Approve the quarterly draft"
+    human = publish_service._INTERACTIVE_STEP_NAMED.format(label=label)
+    asker = publish_service._interactive_phase_failures(
+        _interactive_definition(kind="ask_user_validator", name=label)
+    )[0]["message"]
+
+    def _differ(a: str, b: str) -> bool:
+        """Distinct, and sharing no complete sentence — not merely unequal strings."""
+        if a == b:
+            return False
+        sentences = lambda s: {p.strip() for p in s.split(". ") if p.strip()}  # noqa: E731
+        return not (sentences(a) & sentences(b))
+
+    assert _differ(human, asker), (
+        "the two arms collapsed onto one message (or share a sentence). They describe "
+        f"different things and one literal cannot honestly serve both.\n  arm1: {human!r}\n"
+        f"  arm2: {asker!r}"
+    )
+    # POSITIVE CONTROL — the predicate detects the collapse it exists to catch.
+    assert not _differ(human, human), "control: _differ stopped detecting a collapsed pair"
+    assert not _differ(
+        "Publishing cannot pause. Remove that step to publish.",
+        "Something else entirely. Remove that step to publish.",
+    ), "control: _differ stopped detecting a SHARED SENTENCE between two unequal messages"
+
+    # The degraded pair must not collapse either.
+    assert _differ(
+        publish_service._INTERACTIVE_STEP_UNNAMED,
+        publish_service._INTERACTIVE_FALLBACK_UNNAMED,
+    ), "the degraded arms collapsed onto one message"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_t193201_a_huge_name_yields_a_bounded_message(kind):
+    """T-193.2-01 — the clamp. ``PhaseSpec.name`` is an UNBOUNDED ``str | None``.
+
+    Unclamped, a 10 KB step name becomes a 10 KB refusal inside a ``text-[12px]``
+    ``shrink-0`` header span AND a 10 KB PERSISTED ``harness_audit.metadata`` row.
+    """
+    huge = "A" * 10_000
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=huge)
+    )
+    assert findings
+    message = findings[0]["message"]
+
+
+    assert len(message) < 400, (
+        f"{kind}: a 10,000-character step name produced a {len(message)}-character refusal "
+        f"— the clamp is not applied"
+    )
+    assert huge not in message, "the RAW name landed in the message, not the sanitised label"
+    assert "…" in message, "the clamped label carries no ellipsis, so the truncation is silent"
+    assert publish_service._LABEL_MAX_CHARS <= 80, (
+        "the clamp drifted above the 60-80 band this threat model specifies"
+    )
+    assert publish_service._LABEL_MAX_CHARS >= 60
+
+
+#: ⚠ THE HOSTILE TABLE IS A FIXED LITERAL LIST AND IT IS **NOT** DERIVED FROM THE
+#: IMPLEMENTATION'S PREDICATE — that independence is the entire point of it (code review
+#: ``WR-02``, 2026-08-15).
+#:
+#: WHAT THIS REPLACES, RECORDED RATHER THAN ERASED. Until this date the single-line case below
+#: asserted ``not any(ord(ch) < 32 or ord(ch) == 127 for ch in message)`` — the **identical
+#: predicate** to the code under test (``publish_service.py``'s pre-``WR-02``
+#: ``ch.isspace() or ord(ch) < 32 or ord(ch) == 127``). A test that restates the
+#: implementation's own condition can never discover a class that condition misses, and this
+#: one did not: driven against the pre-``WR-02`` scrubber, **22 of the 31 codepoints below
+#: survived it, and every single survivor was Unicode category ``Cf``** (the table's other
+#: nine are 7 × ``Cc`` + ``Zl`` + ``Zp``, which the old rule did catch) — while the case sat
+#: green the whole time. The fix widened the guard to
+#: general categories; re-deriving the *test* from those categories would rebuild the same
+#: circularity one level up. So the codepoints are spelled out here, individually, and a
+#: future NARROWING of the guard reds one named row rather than nothing.
+#:
+#: ⚠ WRITTEN AS ``\\uXXXX`` ESCAPES, NEVER AS RAW CHARACTERS, AND THAT IS A HARD RULE.
+#: ``U+202E`` and its neighbours reverse the DISPLAYED order of a source file for any human or
+#: agent reading it; a raw bidi override committed into a repository that becomes model context
+#: is the very hazard this table exists to fence. The names are carried beside each codepoint
+#: so a failure is legible without a Unicode chart.
+_HOSTILE_CODEPOINTS = (
+    ("\u0000", "NULL"),
+    ("\u0009", "CHARACTER TABULATION"),
+    ("\u000a", "LINE FEED"),
+    ("\u000d", "CARRIAGE RETURN"),
+    ("\u001b", "ESCAPE"),
+    ("\u007f", "DELETE"),
+    ("\u0085", "NEXT LINE"),
+    ("\u00ad", "SOFT HYPHEN"),
+    ("\u061c", "ARABIC LETTER MARK"),
+    ("\u180e", "MONGOLIAN VOWEL SEPARATOR"),
+    ("\u200b", "ZERO WIDTH SPACE"),
+    ("\u200c", "ZERO WIDTH NON-JOINER"),
+    ("\u200d", "ZERO WIDTH JOINER"),
+    ("\u200e", "LEFT-TO-RIGHT MARK"),
+    ("\u200f", "RIGHT-TO-LEFT MARK"),
+    ("\u2028", "LINE SEPARATOR"),
+    ("\u2029", "PARAGRAPH SEPARATOR"),
+    ("\u202a", "LEFT-TO-RIGHT EMBEDDING"),
+    ("\u202b", "RIGHT-TO-LEFT EMBEDDING"),
+    ("\u202c", "POP DIRECTIONAL FORMATTING"),
+    ("\u202d", "LEFT-TO-RIGHT OVERRIDE"),
+    ("\u202e", "RIGHT-TO-LEFT OVERRIDE"),
+    ("\u2060", "WORD JOINER"),
+    ("\u2066", "LEFT-TO-RIGHT ISOLATE"),
+    ("\u2067", "RIGHT-TO-LEFT ISOLATE"),
+    ("\u2068", "FIRST STRONG ISOLATE"),
+    ("\u2069", "POP DIRECTIONAL ISOLATE"),
+    ("\ufeff", "ZERO WIDTH NO-BREAK SPACE (BOM)"),
+    ("\ufff9", "INTERLINEAR ANNOTATION ANCHOR"),
+    ("\ufffa", "INTERLINEAR ANNOTATION SEPARATOR"),
+    ("\ufffb", "INTERLINEAR ANNOTATION TERMINATOR"),
+)
+
+#: The four the code reviewer drove against the shipped function by hand. Asserted to be a
+#: SUBSET of the table above, so nobody can "fix" this finding down to the four examples that
+#: happened to be tried — which is the blindness, not the bug.
+_WR02_REVIEWER_CODEPOINTS = ("\u200b", "\u202e", "\u2066", "\u00ad")
+
+
+def test_wr02_the_hostile_table_is_well_formed_and_covers_the_reported_four():
+    """NON-VACUITY + SCOPE for the table above — a fence's own inputs must be checked.
+
+    Three ways this table could quietly stop meaning anything, each pinned:
+      1. it shrinks to the four codepoints a reviewer named (the blindness being fixed);
+      2. a duplicate row makes the parametrized case count lie about its coverage;
+      3. a row is written as a RAW character, defeating the escape rule in the docblock.
+    """
+    chars = [ch for ch, _ in _HOSTILE_CODEPOINTS]
+    assert len(chars) >= 30, "the hostile table shrank"
+    assert len(set(chars)) == len(chars), "the hostile table has a duplicate row"
+    assert all(len(ch) == 1 for ch in chars), "a row is not a single codepoint"
+    for ch in _WR02_REVIEWER_CODEPOINTS:
+        assert ch in chars, f"U+{ord(ch):04X} — the review's own repro case is not in the table"
+    # The table is NOT allowed to be re-derived from the implementation's category set, but it
+    # SHOULD be a subset of what that set covers; a row outside it would be a silent xfail.
+    import unicodedata
+
+    for ch, name in _HOSTILE_CODEPOINTS:
+        assert (
+            unicodedata.category(ch) in publish_service._NON_PRINTING_CATEGORIES
+            or ch.isspace()
+        ), f"{name} (U+{ord(ch):04X}) is in the table but outside the guard's stated classes"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+@pytest.mark.parametrize(
+    "hostile,name",
+    _HOSTILE_CODEPOINTS,
+    ids=[f"U+{ord(ch):04X}" for ch, _ in _HOSTILE_CODEPOINTS],
+)
+def test_wr02_no_non_printing_codepoint_survives_into_the_refusal(hostile, name, kind):
+    """``WR-02`` — each hostile codepoint asserted INDIVIDUALLY against the composed refusal.
+
+    Individually, not as a set comprehension: a future narrowing of the guard must red a row
+    that NAMES the codepoint it stopped catching. The concrete harm being fenced is display
+    spoofing and hidden content — ``U+202E`` reverses the displayed order of everything after
+    it, including *"Remove that step to publish."*, so a crafted step label can make a refusal
+    read as something other than what it says; ``U+200B`` hides content inside a label the
+    operator is being asked to act on, and makes an operator ``grep`` disagree with the screen.
+    **It is NOT an XSS or injection surface** — the message reaches React as a text child and
+    there is no ``dangerouslySetInnerHTML`` on the path (verified in the ``193.2`` review).
+    """
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=f"Approve{hostile}the draft")
+    )
+    assert findings
+    message = findings[0]["message"]
+
+    assert hostile not in message, (
+        f"{kind}: {name} (U+{ord(hostile):04X}) survived into copy. The scrub is not covering "
+        f"its Unicode class. Message was: {message!r}"
+    )
+    # …and the READABLE label still lands: scrubbing may not degrade the step name into
+    # something the operator cannot match against the canvas (the D-13 constraint).
+    assert "Approve" in message and "the draft" in message, (
+        f"{kind}: scrubbing {name} destroyed the readable label: {message!r}"
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_wr02_a_name_made_only_of_invisibles_degrades_rather_than_quoting_nothing(kind):
+    """``WR-02`` boundary — a label that scrubs to NOTHING must take the name-free arm.
+
+    The failure this forbids is a refusal reading ``the step "" stops to wait for a person``:
+    an empty quoted label is worse than the honest degraded sentence, because it looks like a
+    step whose name the author simply cannot see.
+    """
+    invisible = "".join(ch for ch, _ in _HOSTILE_CODEPOINTS if not ch.isspace())
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=invisible, slug="zz-plant-slug")
+    )
+    assert findings
+    message = findings[0]["message"]
+
+    expected = (
+        publish_service._INTERACTIVE_STEP_UNNAMED
+        if kind == "llm_human_input"
+        else publish_service._INTERACTIVE_FALLBACK_UNNAMED
+    )
+    assert message == expected, f"{kind}: an all-invisible name did not degrade: {message!r}"
+    assert '""' not in message, "an empty quoted label reached copy"
+    assert "zz-plant-slug" not in message, "the degradation fell back to the slug"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_wr02_scrubbing_keeps_the_refusal_inside_its_measured_length_ceiling(kind):
+    """``WR-02`` re-measurement — the clamp interacts with the scrub, so both are re-driven.
+
+    ⚠ RE-MEASURED 2026-08-15 AFTER THE CATEGORY WIDENING, because the two are coupled: every
+    scrubbed character becomes a space and runs are then collapsed, so a hostile-stuffed name
+    SHORTENS rather than lengthens. Driven over the degraded arm, a realistic 27-character
+    label, a 10,000-``A`` name, a 200-character wide-glyph name and a 10,000-character name
+    stuffed with ``U+202E``/``U+200B``: the worst case is **196** characters on arm 1 and
+    **195** on arm 2 — IDENTICAL to the pre-fix figures recorded in ``193.2-06-SUMMARY.md``,
+    against the 250 ceiling that summary set. Nothing grew.
+    """
+    stuffed = ("A\u202e\u200b" * 4_000)[:10_000]
+    for name in (None, "Approve the quarterly draft", "A" * 10_000, "—" * 200, stuffed):
+        findings = publish_service._interactive_phase_failures(
+            _interactive_definition(kind=kind, name=name)
+        )
+        assert findings
+        message = findings[0]["message"]
+        assert len(message) <= 250, (
+            f"{kind}: a {len(message)}-character refusal breached the 250 ceiling "
+            f"({'degraded' if name is None else repr(name[:20]) + '…'})"
+        )
+        assert len(message) <= 196, (
+            f"{kind}: the refusal grew past the measured 196-character worst case to "
+            f"{len(message)} — the clamp and the scrub have drifted apart"
+        )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_t193201_a_newline_bearing_name_yields_a_single_line_message(kind):
+    """T-193.2-01 — a newline in a model-authored name breaks the one-line shape on BOTH
+    surfaces this one string feeds, so whitespace and non-printing characters are collapsed.
+
+    ⚠ AMENDED 2026-08-15 (code review ``WR-02``). WHAT THIS CASE ASSERTED UNTIL THEN IS
+    RECORDED HERE VERBATIM RATHER THAN DELETED, because the shape it had is the finding:
+
+        assert not any(ord(ch) < 32 or ord(ch) == 127 for ch in message)
+
+    That is the **identical predicate** to the code it was testing, so it could only ever
+    confirm the implementation agreed with itself. The class-wide guarantee now lives in
+    ``test_wr02_no_non_printing_codepoint_survives_into_the_refusal``, asserted against the
+    INDEPENDENT ``_HOSTILE_CODEPOINTS`` table above; what stays here is the concrete
+    one-line/one-space shape a newline-bearing name must produce.
+    """
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name="Approve\nthe\r\nquarterly\tdraft\x07")
+    )
+    assert findings
+    message = findings[0]["message"]
+
+    assert "\n" not in message and "\r" not in message and "\t" not in message, (
+        f"{kind}: the refusal is not a single line: {message!r}"
+    )
+    assert "\x07" not in message, (
+        f"{kind}: a control character survived into copy: {message!r}"
+    )
+    # The SANITISED label lands, not the raw one.
+    assert "Approve the quarterly draft" in message, (
+        f"{kind}: the collapsed label is not what reached the message: {message!r}"
+    )
+
+
+async def _validate_via_the_real_route(definition, monkeypatch):
+    """Drive ``POST /workflows/validate``'s OWN handler and return its ``ValidateResponse``.
+
+    The handler is called DIRECTLY — the posture three shipped suites already use
+    (``test_182_validate.py:117-126``, ``test_182_grounding_degradation.py:244``,
+    ``test_182_publish_grounding_stage.py:374``) — rather than through TestClient, so no
+    live DB, no auth round-trip and no event loop of our own.
+
+    ``assemble_grounding_bundle`` is swapped for a clean empty bundle, following
+    ``test_182_validate.py``'s ``_patch_bundle``. That is deliberate rather than incidental:
+    left unpatched, ``supabase=object()`` makes the grounding read raise, the route's
+    documented ``except Exception`` catches it and appends a ``grounding_unavailable``
+    verdict — so the handler would run its DEGRADED path, and a fence should measure the
+    path users actually get. The fixtures below bind no folder, name no tool and reference
+    no skill, so with the bundle stubbed the grounding step is a genuine no-op and the only
+    thing left to observe is step (4)'s projection.
+    """
+    from app.api import workflows as wf
+    from app.services.harness import grounding as g
+
+    async def _fake_assemble(**_kwargs):
+        return g.GroundingBundle(
+            tools=[], tool_names=set(), folders=[], skills=[], skill_ids=set(), placeholders=[]
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
+
+    return await wf.validate_workflow(
+        body=definition,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"},
+        supabase=object(),
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+@pytest.mark.parametrize("name", ["Approve the quarterly draft", None], ids=["named", "degraded"])
+async def test_f5_validate_and_the_publish_refusal_emit_the_same_bytes(kind, name, monkeypatch):
+    """F-5 (D-12), the publish half — ONE message string feeds BOTH surfaces.
+
+    ⚠ **REWRITTEN 2026-08-15 (code review ``WR-01``). WHAT THIS CASE ASSERTED UNTIL THEN IS
+    RECORDED HERE VERBATIM RATHER THAN DELETED, because a fence whose history is erased
+    cannot be audited — and because the shape it had is the single most valuable thing about
+    it: it is what a tautology looks like when it is wearing a correct docstring.** In full:
+
+        publish_failures = publish_service._interactive_phase_failures(definition)
+        validate_findings = [
+            {"code": "interactive_phase", "phase": f.get("phase"), "message": f.get("message")}
+            for f in publish_service._interactive_phase_failures(definition)   # ← same call
+        ]
+        assert [f["message"] for f in publish_failures] == [
+            f["message"] for f in validate_findings
+        ]
+
+    …under the claim *"Computed rather than hard-coded: a hard-coded expectation would pass
+    while the two callers drifted apart, which is the whole property under test."* The claim
+    was right about the danger and the code did not implement it. ``_interactive_phase_failures``
+    is a pure function of ``definition``, so **both sides of that comparison were the same
+    call and the assertion was ``x == x``.** It could not go red for any edit to any file.
+    Worse, it **never imported ``app.api.workflows`` at all** — it hand-copied the route's
+    projection into the test, so the one artefact under test was a replica of the thing that
+    could drift. D-12's server-side property had ZERO coverage while reading ✅.
+
+    **What it asserts NOW:** the REAL ``/validate`` handler is executed, and the ``message``
+    on every ``interactive_phase`` verdict it returns is compared against what the PUBLISH
+    path composes. Two different call paths, one expected value. An edit to the route's
+    step-(4) projection — clamping the message for the canvas, prefixing a code, mapping it
+    through a lookup table, swapping the composer — now fails here, which is the whole point:
+    the client renders ``verdict.message`` verbatim, so a drift is directly user-visible.
+
+    ⚠ **DRIVEN RED, not reasoned about.** Planting ``f.get("message")[:20]`` in the route's
+    step-(4) projection (``app/api/workflows.py``) fails all four parametrized shapes; the
+    plant was then reverted to an EMPTY ``git diff --numstat`` and all four went green. The
+    pre-rewrite version of this case stayed GREEN under that same plant — measured, which is
+    how a fence is shown to see something rather than assumed to.
+
+    ⚠ **The ``phase`` key is asserted too, and separately from the message.** It carries the
+    SLUG as machine-readable metadata (the canvas keys nodes off it) while only ``message``
+    is copy — ``test_f3_no_internal_identifier_and_no_slug_reaches_the_copy`` depends on that
+    split, so a route that leaked the slug into the message and dropped it from ``phase``
+    must not read as a pass here.
+
+    The other half of F-5 — that an ``interactive_phase`` verdict actually reaches
+    ``blockedReason`` on the client — is owned by ``PublishGauntlet.test.tsx``'s ``?raw``
+    one-home fence (``193.2-06`` task 3), NOT by ``test_187_route_assigned_reach.py``, which
+    ``193.2-VALIDATION.md`` credited in error and which received zero changes this phase.
+    """
+    from app.api import workflows as wf
+
+    definition = _interactive_definition(kind=kind, name=name)
+
+    # The way the PUBLISH path calls it (publish_service.py stage 2.5).
+    publish_failures = publish_service._interactive_phase_failures(definition)
+
+    # The way ``/validate`` calls it — through the ROUTE, not through a copy of the route.
+    response = await _validate_via_the_real_route(definition, monkeypatch)
+    validate_verdicts = [v for v in response.verdicts if v.code == "interactive_phase"]
+
+    # NON-VACUITY, on BOTH sides. An equality between two empty lists is the commonest way a
+    # fence like this stops seeing — and it is exactly what a route that dropped step (4)
+    # entirely would produce.
+    assert publish_failures, f"{kind}/{name!r}: the publish path composed no refusal"
+    assert validate_verdicts, (
+        f"{kind}/{name!r}: /validate emitted no interactive_phase verdict — the route no "
+        f"longer runs the WR-04 check, so the equality below would prove nothing"
+    )
+    assert len(publish_failures) == len(validate_verdicts), (
+        f"{kind}/{name!r}: the two surfaces disagree on HOW MANY steps are at fault"
+    )
+
+    # PROOF THAT THE ROUTE WAS REALLY EXECUTED — not a helper that happens to share a name.
+    assert wf.validate_workflow.__module__ == "app.api.workflows"
+
+    assert [f["message"] for f in publish_failures] == [
+        v.message for v in validate_verdicts
+    ], "the publish refusal and the /validate verdict no longer carry the same bytes"
+
+    # The slug stays METADATA on both surfaces (see the docstring's `phase` note).
+    assert [f["phase"] for f in publish_failures] == [v.phase for v in validate_verdicts]
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
@@ -924,16 +1617,15 @@ def test_the_armed_checkpoint_is_not_a_validator():
         "contradicts D-06. The fix belongs in the engine (189-05), not here."
     )
 
-    # POSITIVE CONTROL — the helper still flags the two shapes it DOES own, so the
+    # POSITIVE CONTROL — the helper still flags the shape it DOES own, so the
     # emptiness above is a measurement rather than a broken helper.
-    for kind in ("llm_human_input", "ask_user_validator"):
-        other = WorkflowDefinition.model_validate(
-            _interactive_definition_row(kind=kind)["definition"]
-        )
-        assert publish_service._interactive_phase_failures(other), (
-            f"control: _interactive_phase_failures stopped flagging {kind!r} — the "
-            f"assertion above proves nothing while this helper is inert"
-        )
+    other = WorkflowDefinition.model_validate(
+        _interactive_definition_row(kind="ask_user_validator")["definition"]
+    )
+    assert publish_service._interactive_phase_failures(other), (
+        "control: _interactive_phase_failures stopped flagging ask_user_validator — the "
+        "assertion above proves nothing while this helper is inert"
+    )
 
 
 @pytest.mark.asyncio
@@ -1305,9 +1997,22 @@ def test_v20_an_external_action_workflow_publishes(mock_asyncpg_pool):
         f"workflow_phases writes: "
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'UPDATE workflow_phases' in s]!r}"
     )
-    import json as _json
+    # ⚠ 200.1 / D-200.1-01(b) — THIS ASSERTION USED TO `json.loads` THE BOUND PARAMETER, AND
+    # THAT ONLY WORKED BECAUSE THE WRITER PRE-ENCODED IT. The pre-encode was the defect: the
+    # pool already installs a jsonb codec with `encoder=json.dumps`, so every value landed as
+    # a jsonb STRING SCALAR (484 of 484 `completed` rows). `record_phase_not_sent` now hands
+    # the codec a plain dict, so the parameter IS the payload and `json.loads` raises on it.
+    # ⚠ Read it through the SHIPPED read-side unwrap rather than re-typing a shape check here:
+    # `phase_output_object` accepts BOTH shapes, so this stays an assertion about the CONTENT
+    # and cannot be broken again by the transport. A test that re-states the encoding is a
+    # test that pins the encoding — which is how this one came to defend the defect.
+    from app.models.thread import phase_output_object
 
-    persisted = _json.loads(recorded[0][1][1])
+    persisted = phase_output_object(recorded[0][1][1])
+    assert persisted is not None, (
+        f"the recorded_not_sent payload was neither a dict nor JSON text: "
+        f"{recorded[0][1][1]!r}"
+    )
     assert persisted["recorded_intent"]["capability"] == "send_email"
     assert "NOT SENT" in persisted["text"], (
         f"the recorded body must read as NOT SENT, never as a receipt: {persisted['text']!r}"

@@ -4,12 +4,18 @@ title: Chat run-state / stop button desyncs from backend reality (both direction
 reported: 2026-07-09
 surface: Agentic-RAG
 severity: major
-status: folded
+status: folded   # ⚠ RE-OPENED 2026-08-16 (was `folded` / folded_into 145 — this report's OWN
+                 # re_open_trigger reads "Re-open if either direction still reproduces after 145
+                 # ships"; DIRECTION A REPRODUCES, driven at 045a83dc in Phase 194 UAT-03), then
+                 # FOLDED into Phase 194.1 the same day at discuss-phase.
+                 # ⚠ PARTIAL FOLD — DIRECTION A ONLY (a dead Stop offered on a finished run),
+                 # claimed by R7's WorkspacePanel.tsx:354 showTimeline gate fix. Direction B is
+                 # NOT claimed. See re_open_trigger.
 affected_areas: [frontend/streaming, backend/run-lifecycle, StreamsProvider, redis/runs-active]
-folded_into: "145"
+folded_into: "194.1"   # was "145"; superseded, not overwritten — the 145 fold is recorded in the body
 verified_closed_by: null
 related_seeds: [SEED-094]
-re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09). Fix model: Postgres runs.status authoritative (D-145-01); runs:active demoted to derived mirror written atomically by the extracted owner (D-145-02); Direction A = client inactivity watchdog + silent finalize (D-145-03/04); Direction B = periodic+boot stream-age staleness sweep (D-145-06). Re-open if either direction still reproduces after 145 ships."
+re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09). Fix model: Postgres runs.status authoritative (D-145-01); runs:active demoted to derived mirror written atomically by the extracted owner (D-145-02); Direction A = client inactivity watchdog + silent finalize (D-145-03/04); Direction B = periodic+boot stream-age staleness sweep (D-145-06). Re-open if either direction still reproduces after 145 ships. | Folded at /gsd:discuss-phase 194.1 (2026-08-16) — PARTIAL, DIRECTION A ONLY: R7 makes the WorkspacePanel Stop render only while the run is non-terminal (the gate is defined at WorkspacePanel.tsx:354, NOT at :453 where the row renders). DIRECTION B (a live run the client believes is finished) is NOT claimed by 194.1 and this record does not assert it is fixed. Re-open the WHOLE report if Direction A reproduces after 194.1 ships; carry Direction B forward if it is still observed once 194.1 has landed."
 reproduces_on:
   branch: develop
   commit: 6ce1be0a
@@ -123,3 +129,58 @@ that deepseek-only code path) shows the same `runs:active`-empty behavior.
 - DeepSeek `ef317508…` run `2075b364` (xlen 4391), MiniMax `e086075e…` run `3bd13487` — both
   streaming while `runs:active` empty.
 - Redis key conventions: `runs:active`, `runs_by_thread:{thread_id}`, `run:{run_id}` (CLAUDE.md).
+
+---
+
+## Update — DIRECTION A REPRODUCES at `045a83dc` (2026-08-16, Phase 194 UAT) → RE-OPENED
+
+This report's `re_open_trigger` reads, verbatim:
+
+> *"Re-open if either direction still reproduces after 145 ships."*
+
+**Direction A reproduces.** Re-opened on that trigger — honoured mechanically, not overridden.
+
+### Driven evidence (Phase 194 UAT row UAT-03)
+
+Pressed the workspace-panel Stop on a workflow run that had **already finished**:
+
+| Instrument | Reading |
+|---|---|
+| Network (in-page `fetch` interceptor) | **no request at all** |
+| Screen | `document.body.innerText` **byte-identical** before and after (`diffLen: 0`) |
+| Console | `Stop did nothing: no run id yet for thread ae2f654b-… — the run had not finished registering (the pre-stamp window). Nothing was cancelled; press Stop again in a moment.` |
+| DB | run terminal — nothing to cancel |
+
+This is Direction A as originally described — *"UI stuck showing a Stop, clicking Stop did nothing,
+the backend finished long ago"* — with the same workaround still being the only remedy: **a browser
+refresh reconciles it.**
+
+### ⚠ What is DIFFERENT from the 2026-07-09 report, and it matters for routing
+
+The original Direction A was a **reconcile/staleness** problem: `runs:active` and the live SSE path
+disagreed with Postgres, and Phase 145's fix model (Postgres authoritative, `runs:active` demoted to
+a derived mirror, watchdog + staleness sweep) targeted exactly that.
+
+**The 2026-08-16 sighting is NOT a staleness problem.** The panel Stop renders because its gate is
+`showTimeline = isHarness || phases.length > 0` (`WorkspacePanel.tsx:453`) — **phase rows outlive the
+run**, so the control is drawn from durable data that is *correctly* still there. Nothing is stale;
+the gate simply is not asking about run liveness at all.
+
+⇒ **Phase 145's fix was not wrong and this is not a regression of it — this is a second, independent
+cause of the same user-visible symptom.** Filing it under the original report because the symptom and
+the user's loss of trust are identical, but a fix aimed at reconcile will not touch it.
+
+### Related current records
+
+- `BUG-260816-01` (2026-08-16) — the Stop controls give no feedback, and the canvas run surface has
+  no Stop at all. Section (b) part 2 is this same finished-run control.
+- Phase 194 review finding **WR-03** and verification **Anti-Pattern A-2** — both open, both this.
+- `194-UAT.md` **UAT-01** — a *different* silent-Stop path (the cross-thread tray no-op), which is
+  worth reading alongside: together they mean a Stop press can do nothing for **three** distinct
+  reasons, all reported through one console warning whose text is wrong for two of them.
+
+### Suggested routing
+
+Same phase as `BUG-260816-01` / `BUG-260816-02` — the "Stop is reachable, acknowledges you, and tells
+the truth" cluster. The specific fix here is small and separable: **gate the control on run liveness
+rather than on the presence of phase rows**, so a finished run shows no Stop at all.

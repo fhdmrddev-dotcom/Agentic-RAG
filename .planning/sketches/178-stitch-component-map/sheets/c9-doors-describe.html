@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Component Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#002109",
+                        "on-background": "#dee2f1",
+                        "tertiary-fixed": "#6bfe8f",
+                        "outline-variant": "#464651",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-variant": "#303540",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#090e18",
+                        "primary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "error-container": "#93000a",
+                        "outline": "#918f9c",
+                        "on-secondary-container": "#c3abff",
+                        "secondary-fixed": "#e9ddff",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-container-low": "#171c26",
+                        "on-surface": "#dee2f1",
+                        "on-primary": "#242478",
+                        "inverse-on-surface": "#2b303c",
+                        "surface-tint": "#c1c1ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "inverse-primary": "#5355a9",
+                        "surface": "#0e131e",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "primary": "#c3c4ff",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-primary-fixed": "#0b0664",
+                        "on-primary-container": "#353789",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-error": "#690005",
+                        "on-secondary": "#3b0091",
+                        "surface-bright": "#343945",
+                        "on-error-container": "#ffdad6",
+                        "tertiary": "#4ee478",
+                        "surface-container-highest": "#303540",
+                        "surface-container-high": "#252a35",
+                        "surface-container": "#1b202a",
+                        "inverse-surface": "#dee2f1",
+                        "on-tertiary-container": "#004c1e",
+                        "background": "#0e131e",
+                        "secondary-container": "#571ac2",
+                        "surface-dim": "#0e131e",
+                        "secondary": "#d0bcff",
+                        "tertiary-container": "#26c760",
+                        "primary-container": "#a3a5ff",
+                        "on-tertiary": "#003915"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen p-12 antialiased selection:bg-primary-container/30 selection:text-primary">
+<div class="max-w-4xl mx-auto space-y-24 pb-24">
+<!-- 1. THE DOOR SWITCH -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">1. The Door Switch</div>
+<div class="space-y-8">
+<!-- State: At rest -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: At rest</div>
+<div class="flex gap-4">
+<!-- Describe Door -->
+<div class="flex-1 p-5 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer group flex flex-col gap-3">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">auto_awesome</span>
+<div>
+<div class="font-medium text-on-surface mb-1">Describe it</div>
+<div class="text-sm text-on-surface-variant">What do you want to achieve?</div>
+</div>
+</div>
+<!-- Build Door -->
+<div class="flex-1 p-5 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer group flex flex-col gap-3">
+<span class="material-symbols-outlined text-outline group-hover:text-on-surface transition-colors">account_tree</span>
+<div>
+<div class="font-medium text-on-surface mb-1">Build it</div>
+<div class="text-sm text-on-surface-variant">Architect from zero</div>
+</div>
+</div>
+</div>
+</div>
+<!-- State: Left chosen (Describe) -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Left chosen (Describe)</div>
+<div class="flex gap-4">
+<!-- Describe Door (Active) -->
+<div class="flex-1 p-5 rounded-lg border border-primary bg-primary-container/10 flex flex-col gap-3">
+<span class="material-symbols-outlined fill text-primary">auto_awesome</span>
+<div>
+<div class="font-medium text-primary mb-1">Describe it</div>
+<div class="text-sm text-primary/80">What do you want to achieve?</div>
+</div>
+</div>
+<!-- Build Door (Inactive/Dimmed) -->
+<div class="flex-1 p-5 rounded-lg border border-transparent bg-surface-container-lowest opacity-60 flex flex-col gap-3 cursor-not-allowed">
+<span class="material-symbols-outlined text-outline-variant">account_tree</span>
+<div>
+<div class="font-medium text-on-surface-variant mb-1">Build it</div>
+<div class="text-sm text-outline-variant">Architect from zero</div>
+</div>
+</div>
+</div>
+</div>
+<!-- State: Right chosen (Build) -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Right chosen (Build)</div>
+<div class="flex gap-4">
+<!-- Describe Door (Inactive/Dimmed) -->
+<div class="flex-1 p-5 rounded-lg border border-transparent bg-surface-container-lowest opacity-60 flex flex-col gap-3 cursor-not-allowed">
+<span class="material-symbols-outlined text-outline-variant">auto_awesome</span>
+<div>
+<div class="font-medium text-on-surface-variant mb-1">Describe it</div>
+<div class="text-sm text-outline-variant">What do you want to achieve?</div>
+</div>
+</div>
+<!-- Build Door (Active) -->
+<div class="flex-1 p-5 rounded-lg border border-outline bg-surface-container-high flex flex-col gap-3">
+<span class="material-symbols-outlined fill text-on-surface">account_tree</span>
+<div>
+<div class="font-medium text-on-surface mb-1">Build it</div>
+<div class="text-sm text-on-surface-variant">Architect from zero</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. THE DOOR HEADER STRIP -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">2. The Door Header Strip</div>
+<div class="space-y-6">
+<!-- Describe Method -->
+<div class="flex items-center gap-3 py-3 border-b border-surface-variant">
+<button class="flex items-center justify-center w-6 h-6 rounded hover:bg-surface-container-high transition-colors text-outline hover:text-on-surface" title="Switch method">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">auto_awesome</span>
+<span class="text-sm font-medium text-on-surface">Describing workflow...</span>
+</div>
+</div>
+<!-- Manual Method -->
+<div class="flex items-center gap-3 py-3 border-b border-surface-variant">
+<button class="flex items-center justify-center w-6 h-6 rounded hover:bg-surface-container-high transition-colors text-outline hover:text-on-surface" title="Switch method">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">account_tree</span>
+<span class="text-sm font-medium text-on-surface">Manual composition...</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. THE DESCRIBE BOX -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">3. The Describe Box</div>
+<div class="space-y-8">
+<!-- State: Empty -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Empty</div>
+<div class="rounded-lg border border-surface-variant bg-surface overflow-hidden group focus-within:border-primary transition-colors">
+<textarea class="w-full h-32 p-4 bg-transparent resize-none border-none focus:ring-0 text-on-surface placeholder:text-outline-variant text-sm font-body" placeholder="Every Monday, pull new vendor contracts..."></textarea>
+</div>
+</div>
+<!-- State: Filled -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Filled</div>
+<div class="rounded-lg border border-surface-variant bg-surface overflow-hidden">
+<textarea class="w-full h-32 p-4 bg-transparent resize-none border-none focus:ring-0 text-on-surface text-sm font-body" readonly="">Scan the incoming support inbox for priority escalation flags. If a flag is detected and the sentiment is highly negative, draft a preliminary apology and route it to the Tier 3 resolving queue. Otherwise, auto-tag and archive.</textarea>
+</div>
+</div>
+<!-- State: Refusal -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Refusal</div>
+<div class="rounded-lg border border-error/50 bg-error-container/5 overflow-hidden flex flex-col">
+<textarea class="w-full h-24 p-4 bg-transparent resize-none border-none focus:ring-0 text-on-surface text-sm font-body" readonly="">Automate my emails.</textarea>
+<div class="px-4 py-3 bg-error-container/10 border-t border-error/20 flex items-start gap-2">
+<span class="material-symbols-outlined text-error text-[18px] mt-[1px]">error</span>
+<span class="text-sm text-error font-medium">Request too vague - Needs a goal and a source.</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. THE KNOWLEDGE PICKER -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">4. The Knowledge Picker</div>
+<div class="flex gap-8 items-center">
+<!-- State: None chosen -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">None chosen</div>
+<button class="inline-flex items-center gap-2 px-3 py-1.5 rounded border border-surface-variant border-dashed text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors text-sm">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                        Attach knowledge
+                    </button>
+</div>
+<!-- State: One chosen -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">One chosen</div>
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded border border-surface-variant bg-surface-container-low text-sm group cursor-pointer hover:border-outline transition-colors">
+<span class="material-symbols-outlined text-primary text-[16px]">folder</span>
+<span class="font-medium text-on-surface">Legal</span>
+<span class="text-outline-variant mx-1">·</span>
+<span class="font-mono text-xs text-outline">1,284 docs</span>
+<button class="ml-1 flex items-center justify-center w-4 h-4 rounded-sm text-outline-variant hover:text-on-surface hover:bg-surface-variant transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+</div>
+<!-- State: Zero KBs (Empty) -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">Zero knowledge bases</div>
+<div class="inline-flex items-center gap-3 px-3 py-1.5 rounded border border-surface-variant bg-surface-container-lowest text-sm">
+<span class="text-outline-variant">No knowledge bases</span>
+<button class="text-primary hover:text-primary-fixed font-medium transition-colors">Upload Knowledge</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. THE TEMPLATE ROW -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">5. The Template Row</div>
+<div class="flex items-center gap-3 overflow-x-auto pb-2">
+<!-- Template Pill 1 -->
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low hover:border-outline-variant transition-all text-sm group shrink-0">
+<span class="font-medium text-on-surface">Invoice Audit</span>
+<span class="text-outline-variant">·</span>
+<span class="text-outline">4 phases</span>
+<span class="material-symbols-outlined text-[16px] text-outline opacity-0 group-hover:opacity-100 -mr-1 transition-opacity">arrow_outward</span>
+</button>
+<!-- Template Pill 2 -->
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low hover:border-outline-variant transition-all text-sm group shrink-0">
+<span class="font-medium text-on-surface">Vendor Onboarding</span>
+<span class="text-outline-variant">·</span>
+<span class="text-outline">6 phases</span>
+<span class="material-symbols-outlined text-[16px] text-outline opacity-0 group-hover:opacity-100 -mr-1 transition-opacity">arrow_outward</span>
+</button>
+<!-- Template Pill 3 -->
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-surface-variant bg-surface hover:bg-surface-container-low hover:border-outline-variant transition-all text-sm group shrink-0">
+<span class="font-medium text-on-surface">Compliance Sweep</span>
+<span class="text-outline-variant">·</span>
+<span class="text-outline">2 phases</span>
+<span class="material-symbols-outlined text-[16px] text-outline opacity-0 group-hover:opacity-100 -mr-1 transition-opacity">arrow_outward</span>
+</button>
+</div>
+</section>
+<!-- 6. THE NAME CHECK -->
+<section class="space-y-6">
+<div class="text-xs font-semibold tracking-[0.1em] text-outline uppercase">6. The Name Check</div>
+<div class="space-y-8 max-w-sm">
+<!-- State: Available -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Available</div>
+<div class="relative flex items-center border-b border-surface-variant pb-2 focus-within:border-on-surface transition-colors">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-on-surface font-mono text-sm placeholder:text-outline-variant" type="text" value="q3-revenue-reconciliation"/>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-[18px] absolute right-0">check_circle</span>
+</div>
+</div>
+<!-- State: Already taken -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Already taken</div>
+<div class="relative flex items-center border-b border-error/50 pb-2">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-error font-mono text-sm" type="text" value="daily-standup-digest"/>
+<span class="material-symbols-outlined text-error text-[18px] absolute right-0">cancel</span>
+</div>
+</div>
+<!-- State: Still checking -->
+<div class="space-y-2">
+<div class="text-xs text-outline-variant">State: Still checking</div>
+<div class="relative flex items-center border-b border-surface-variant pb-2">
+<input class="w-full bg-transparent border-none p-0 focus:ring-0 text-outline font-mono text-sm" disabled="" type="text" value="marketing-assets-pull"/>
+<div class="absolute right-0 flex items-center justify-center">
+<!-- Custom minimal spinner inline -->
+<svg class="animate-spin h-[18px] w-[18px] text-outline" fill="none" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+<path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

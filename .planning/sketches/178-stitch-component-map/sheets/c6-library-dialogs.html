@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - The Library Row</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-surface-variant": "#c7c5d3",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#303540",
+                        "surface-container": "#1b202a",
+                        "on-secondary-container": "#c3abff",
+                        "on-primary": "#242478",
+                        "inverse-surface": "#dee2f1",
+                        "secondary-fixed": "#e9ddff",
+                        "on-tertiary": "#003915",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "surface-bright": "#343945",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-surface": "#dee2f1",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "on-primary-container": "#353789",
+                        "surface-tint": "#c1c1ff",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#4be176",
+                        "tertiary": "#4ee478",
+                        "surface-container-high": "#252a35",
+                        "secondary": "#d0bcff",
+                        "primary": "#c3c4ff",
+                        "inverse-on-surface": "#2b303c",
+                        "surface-container-highest": "#303540",
+                        "surface-container-lowest": "#090e18",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "inverse-primary": "#5355a9",
+                        "on-secondary": "#3b0091",
+                        "surface-container-low": "#171c26",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-dim": "#0e131e",
+                        "primary-fixed": "#e1e0ff",
+                        "on-background": "#dee2f1",
+                        "on-tertiary-fixed": "#002109",
+                        "tertiary-container": "#26c760",
+                        "outline": "#918f9c",
+                        "on-secondary-fixed": "#23005c",
+                        "surface": "#0e131e",
+                        "secondary-container": "#571ac2",
+                        "on-error-container": "#ffdad6",
+                        "on-error": "#690005",
+                        "background": "#0e131e",
+                        "primary-container": "#a3a5ff",
+                        "on-tertiary-container": "#004c1e",
+                        "tertiary-fixed": "#6bfe8f",
+                        "outline-variant": "#464651"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style type="text/tailwindcss">
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        /* Component specific styles to enforce flatness */
+        .aether-card { @apply bg-[#0D1117] border border-[#212631] rounded flex flex-col p-4 transition-all duration-200 relative; }
+        .aether-card:hover { @apply border-outline-variant bg-surface-container-low; }
+        .aether-input { @apply bg-[#0D1117] border border-[#212631] rounded px-3 py-1.5 text-sm font-body text-on-surface focus:outline-none focus:border-primary transition-colors; }
+        .aether-btn-primary { @apply bg-primary text-on-primary font-headline font-semibold px-4 py-1.5 rounded hover:bg-primary-fixed transition-colors inline-flex items-center gap-2 text-sm; }
+        .aether-btn-secondary { @apply bg-[#0D1117] border border-[#212631] text-on-surface font-headline font-semibold px-4 py-1.5 rounded hover:bg-surface-container-low transition-colors inline-flex items-center gap-2 text-sm; }
+        .aether-btn-destructive { @apply bg-error-container text-on-error-container font-headline font-semibold px-4 py-1.5 rounded hover:bg-error/20 transition-colors inline-flex items-center gap-2 text-sm; }
+        
+        /* State Indicators */
+        .state-success { @apply text-tertiary bg-tertiary/15; }
+        .state-warning { @apply text-[#fbbf24] bg-[#fbbf24]/15; } /* using arbitrary amber for warning as per prompt */
+        .state-template { @apply text-primary bg-primary/15; }
+        .state-error { @apply text-error bg-error/15; }
+        .state-neutral { @apply text-on-surface-variant bg-surface-variant/30; }
+
+        .pulse-active { animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse-border {
+            0%, 100% { border-color: theme('colors.primary'); box-shadow: inset 0 0 0 1px theme('colors.primary'); }
+            50% { border-color: transparent; box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen p-8 md:p-16 flex flex-col gap-24">
+<!-- 2. THE TOOLBAR -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label text-[11px] text-outline uppercase tracking-wider">The Toolbar</h2>
+<div class="flex items-center gap-4 border-b border-[#212631] pb-4">
+<div class="relative flex-1 max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+<input class="aether-input w-full pl-10 h-9" placeholder="Search workflows..." type="text"/>
+</div>
+<div class="relative">
+<select class="aether-input h-9 appearance-none pr-8">
+<option>All Projects</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[18px] pointer-events-none">expand_more</span>
+</div>
+<div class="relative">
+<select class="aether-input h-9 appearance-none pr-8">
+<option>Any Status</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-outline text-[18px] pointer-events-none">expand_more</span>
+</div>
+<div class="ml-auto flex items-center gap-6">
+<span class="font-body text-[12px] text-outline font-mono">285 ITEMS</span>
+<button class="aether-btn-primary h-9">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Build workflow
+                </button>
+</div>
+</div>
+</section>
+<!-- 1. THE WORKFLOW CARD SYSTEM -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label text-[11px] text-outline uppercase tracking-wider">The Workflow Card System</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+<!-- Ready to run -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-success flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Ready
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Daily Summary Extraction</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>4 phases</span>
+<span>Ran 2h ago</span>
+</div>
+</div>
+</div>
+<!-- Still building -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-warning flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">construction</span> Building
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Vendor Onboarding Pipeline</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>8 phases</span>
+<span>Never run</span>
+</div>
+</div>
+</div>
+<!-- Starter -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-template flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">library_add</span> Starter
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Basic Web Scraper Template</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>2 phases</span>
+<span>Template</span>
+</div>
+</div>
+</div>
+<!-- Failure case -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-error flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">error</span> Failed
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Lead Enrichment Sync</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>5 phases</span>
+<span class="text-error">Ran 10m ago</span>
+</div>
+</div>
+</div>
+<!-- Unbound (No Project) -->
+<div class="aether-card group border-dashed">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-neutral flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">link_off</span> Unbound
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Ad-hoc Data Parser</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>1 phase</span>
+<span>No project</span>
+</div>
+</div>
+</div>
+<!-- Hovered State -->
+<div class="aether-card border-outline-variant bg-surface-container-low">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-success flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Ready
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Invoice OCR Processing</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3 relative">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3 opacity-0">
+<span>3 phases</span>
+<span>Ran 1d ago</span>
+</div>
+<div class="absolute inset-0 flex items-center pt-3 bg-surface-container-low">
+<button class="aether-btn-primary w-full justify-center h-8 text-[12px]">
+<span class="material-symbols-outlined text-[16px]">play_arrow</span> Run Workflow
+                        </button>
+</div>
+</div>
+</div>
+<!-- Currently running -->
+<div class="aether-card pulse-active bg-surface-container-lowest">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider text-primary bg-primary/20 flex items-center gap-1 animate-pulse">
+<span class="material-symbols-outlined text-[12px]">autorenew</span> Running
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Nightly Database Backup</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>12 phases</span>
+<span class="text-primary">Started 2m ago...</span>
+</div>
+</div>
+</div>
+<!-- Empty name case -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-warning flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">construction</span> Building
+                    </div>
+</div>
+<div class="font-headline font-medium text-[15px] text-outline-variant italic mb-auto">Untitled Workflow</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>0 phases</span>
+<span>Never run</span>
+</div>
+</div>
+</div>
+<!-- Identical Name Test 1 -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-success flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Ready
+                    </div>
+<span class="font-mono text-[10px] text-outline ml-auto">v3.2</span>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Quarterly Risk Review</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>15 phases</span>
+<span>Ran Q3</span>
+</div>
+</div>
+</div>
+<!-- Identical Name Test 2 -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-error flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">error</span> Failed
+                    </div>
+<span class="font-mono text-[10px] text-outline ml-auto">v4.0-beta</span>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Quarterly Risk Review</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>18 phases</span>
+<span class="text-error">Ran 1h ago</span>
+</div>
+</div>
+</div>
+<!-- Identical Name Test 3 -->
+<div class="aether-card group">
+<div class="flex items-center gap-2 mb-3">
+<div class="px-2 py-0.5 rounded text-[10px] font-headline font-bold uppercase tracking-wider state-warning flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">construction</span> Building
+                    </div>
+<span class="font-mono text-[10px] text-outline ml-auto">Draft</span>
+</div>
+<div class="font-headline font-medium text-[15px] text-on-surface mb-auto">Quarterly Risk Review</div>
+<div class="flex items-center justify-between mt-6 border-t border-[#212631] pt-3">
+<div class="font-body text-[12px] text-on-surface-variant flex gap-3">
+<span>2 phases</span>
+<span>Never run</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. THE RUN DIALOG -->
+<section class="flex flex-col gap-4 items-start">
+<h2 class="font-label text-[11px] text-outline uppercase tracking-wider">The Run Dialog</h2>
+<div class="bg-[#0D1117] border border-[#212631] rounded w-full max-w-md p-6">
+<h3 class="font-headline font-semibold text-lg text-on-surface mb-4">Execute Invoice OCR Processing</h3>
+<div class="bg-surface-container-low rounded p-3 mb-6 font-mono text-[12px] text-on-surface-variant flex flex-col gap-2">
+<div class="flex justify-between"><span>Sequence length:</span> <span class="text-on-surface">3 phases</span></div>
+<div class="flex justify-between"><span>Target nodes:</span> <span class="text-on-surface">production-cluster</span></div>
+<div class="flex justify-between"><span>Estimated time:</span> <span class="text-on-surface">~45s</span></div>
+</div>
+<div class="flex justify-end gap-3">
+<button class="aether-btn-secondary">Cancel</button>
+<button class="aether-btn-primary">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span> Execute Run
+                </button>
+</div>
+</div>
+</section>
+<!-- 4. THE FORK DIALOG -->
+<section class="flex flex-col gap-4 items-start">
+<h2 class="font-label text-[11px] text-outline uppercase tracking-wider">The Fork Dialog</h2>
+<div class="bg-[#0D1117] border border-[#212631] rounded w-full max-w-md p-6">
+<h3 class="font-headline font-semibold text-lg text-on-surface mb-4">Fork Workflow</h3>
+<div class="mb-6">
+<label class="block font-body text-[13px] text-on-surface-variant mb-2">New Name</label>
+<input class="aether-input w-full border-tertiary/50 focus:border-tertiary" type="text" value="Invoice OCR Processing (Copy)"/>
+<div class="mt-2 text-[11px] text-tertiary flex items-center gap-1 font-body">
+<span class="material-symbols-outlined text-[14px]">check</span> Name available
+                </div>
+</div>
+<div class="flex justify-end gap-3">
+<button class="aether-btn-secondary">Cancel</button>
+<button class="aether-btn-primary">Fork Workflow</button>
+</div>
+</div>
+</section>
+<!-- 5. THE DELETE SHEET -->
+<section class="flex flex-col gap-4 items-start">
+<h2 class="font-label text-[11px] text-outline uppercase tracking-wider">The Delete Sheet</h2>
+<div class="bg-[#0D1117] border border-error-container/50 rounded w-full max-w-md p-6 relative overflow-hidden">
+<!-- Subtle error wash background -->
+<div class="absolute inset-0 bg-error/5 pointer-events-none"></div>
+<h3 class="font-headline font-semibold text-lg text-error mb-2 relative z-10">Delete Daily Summary Extraction?</h3>
+<p class="font-body text-[13px] text-on-surface-variant mb-6 relative z-10 leading-relaxed">
+                This will permanently remove <span class="text-on-surface font-medium">12 historical runs</span> and <span class="text-on-surface font-medium">5 configured phases</span>.
+            </p>
+<div class="flex justify-end gap-3 relative z-10">
+<button class="aether-btn-secondary border-transparent bg-transparent hover:bg-surface-container-high">Cancel</button>
+<button class="aether-btn-destructive">
+<span class="material-symbols-outlined text-[18px]">delete</span> Delete Workflow
+                </button>
+</div>
+</div>
+</section>
+</body></html>

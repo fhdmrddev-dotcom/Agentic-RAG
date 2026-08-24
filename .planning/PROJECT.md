@@ -8,7 +8,17 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Last Shipped: v3.0 Document Management
+## Active Milestone: v3.8 Document Intelligence, Automations & Connectors
+
+**Opened:** 2026-08-24 (Phases 201–206)
+**Goal:** Elevate document ingestion to first-class structured table and email parsing, deliver unattended recurring workflow execution with strict spend caps, provide stateful multi-run memory, and wire governed outbound action connectors.
+
+## Last Shipped: v3.7 Workflow Product Completion
+
+**Shipped:** 2026-08-24 (17 phases [192, 192.1, 192.2, 193, 193.1, 193.2, 194, 194.1, 195, 196, 197, 198, 199, 200, 200.1, 200.2, 200.3], 147 plans, 20/20 requirements satisfied).
+**Goal:** Made the workflow product built across v2.8→v3.6 usable end to end — find it, understand the door, build it with the right vocabulary, stop it, test run it, and see what it produced.
+
+## Previously Shipped: v3.0 Document Management
 
 **Shipped:** 2026-06-21 (7 days, 11 phases [110, 111, 111.1, 112–119], 46 plans, 410 commits, +99,800 / −627 LOC; git tag v3.0).
 
@@ -144,11 +154,48 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 </details>
 
+## Current Milestone: v3.7 Workflow Product Completion
+
+**Goal:** Make the workflow product built across v2.8→v3.6 actually usable end to end — so an author
+can find a workflow, understand the door they are walking through, build it with the right
+vocabulary, stop it, and see what it produced.
+
+**Why now (the honest reason).** v3.6 shipped 13 phases and 151 plans of *capability*. The operator's
+own product review on 2026-08-10 — driving the app rather than reading a gate — found that the
+flagship surface is not usable end to end: the library cannot be searched, a run cannot be stopped,
+the deliverable is never shown, and the two authoring doors are indistinguishable. **Ten of the
+fourteen findings were already planted as seeds by the same operator during earlier UAT and had never
+been scheduled.** This milestone schedules them.
+
+**Target features:**
+- Workflows page information architecture — search, filter, card legibility, the Tweak-opens-edit confusion ([[SEED-136]])
+- Stop a running workflow ([[SEED-140]])
+- Show the deliverable — output files on the run surface ([[SEED-148]])
+- Make the two authoring doors legible ([[SEED-147]])
+- Non-AI utility nodes + a user-input/form node ([[SEED-141]])
+- Guided authoring instead of one-shot describe ([[SEED-051]])
+- Model picker sourced from the registry inside canvas nodes — the workflow half only ([[SEED-135]], [[SEED-040]], [[SEED-088]])
+- Template-upload placement — the capability shipped in Phase 152 and the operator could not find it ([[SEED-110]], closed-as-shipped)
+
+**Explicitly OUT of scope, with the sequencing reason:**
+- **Ingestion / retrieval** ([[SEED-149]], [[SEED-150]], [[SEED-060]], [[SEED-087]]) → next milestone. Real, but a different subsystem.
+- **Connections / integrations** ([[SEED-146]] umbrella, CONN-02) → after. **Deliberate ordering:** safe outbound writes need a stop control and a human-approval step, and both land here. Building the approval model against an unfinished authoring surface is how it gets built twice.
+- **Phase 105 scheduling + budget caps** → next milestone's likely headline. Its hard prerequisite (SEED-140) lands in this milestone's CORE; its brake (spend-cap enforcement) does not exist yet. See `.planning/v2.9-STRETCH-CARRYFORWARD.md`.
+
+**Key context:**
+- Phase numbering continues from 190, but **191 is reserved** for the deferred canvas-scale phase (`.planning/v3.6-STRETCH-CARRYFORWARD.md`). This milestone starts at **192**.
+- **G-2 fires on most of this milestone** — page IA, node vocabulary, doors, output display are all visual/"feels like" surfaces. Expect `/gsd:sketch` before spec/discuss on those phases, and the `sketch-findings-agentic-rag` skill auto-loads.
+- **G-5 hot files:** `WorkflowCanvas.tsx` (1292 L), `PhaseNodeCard.tsx` (274 L after the 188.2 cut), `WorkflowBuilderPage.tsx`, `phase_types.py` (**fires — 35 commits / 14 phases**). Audit at discuss-phase before adding a second concern to any of them.
+- **D-14 still binds:** seven harness executors, the canvas is a projection and never a second runtime. SEED-141's utility nodes must answer to this before anything is built.
+- Standing cloud-parity debt: run `bash scripts/pending-cloud-migrations.sh` rather than quoting a number.
+
 ## Current State
 
 **Shipped:** **v3.6 Visual / No-Code Workflow Studio** — 2026-08-09 (13 phases [181-190 + inserts 184.1/188.1/188.2], **151 plans**, 1,064 commits; git tag `v3.6`). Drag-and-drop visual authoring + non-technical live-run observability over the existing governed harness engine, with **graded per-node governance** as the category differentiator. 20/24 requirements satisfied; CORE 19/21 with **zero unsatisfied**. STRETCH 191 deferred (`.planning/v3.6-STRETCH-CARRYFORWARD.md`). Migrations 114-118. Prior: v3.5 — 2026-07-23 (14/14 CORE); v3.4 Multi-Tenancy — 2026-07-22 (22/22 CORE); v3.3 Operator UX — 2026-07-18 (20/20).
 
-**Current:** **No milestone active — v3.6 closed 2026-08-09.** Scope the next one via `/gsd:new-milestone`.
+**Current:** **v3.7 Workflow Product Completion — opened 2026-08-10** (see the Current Milestone section above).
+
+⚠ **The paragraph below is SUPERSEDED as the immediate next slot, and kept because its content is still correct.** At v3.6 close the sequenced next slot was recorded as connections. On 2026-08-10 the operator's product review re-ordered it: connections moves to *after* v3.7, because the stop control and human-approval step that make outbound writes safe are built in v3.7. Everything the paragraph says about connections remains true — only its position in the queue changed.
 
 **The sequenced next slot is the connections / integrations milestone** — and it is not a fresh idea but a debt with four converging records. **`SEED-146` is the umbrella; read it first.** Its inputs: `SEED-144` (connections should be **provider-shaped**, not action-shaped) · `SEED-145` (connections are **platform assets usable in CHAT**, not workflow-only assets) · `SEED-142` (two-way connectors — read/pull/auto-ingest, which would amend CLAUDE.md's manual-upload-only rule) · and **`D-190-DEF-17`, the concrete unfinished edge**: only 1 of 3 shipped capabilities is drivable from a workflow. ⚠ Two standing warnings recorded with those seeds: **every capability shipped so far is a WRITE — no read/search/list exists at all**, and **no outbound capability may be added to `_TOOL_REGISTRY` before the approval model exists.** Sequence it with SEED-142 or Google gets connected twice.
 

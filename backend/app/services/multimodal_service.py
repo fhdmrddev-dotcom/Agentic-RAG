@@ -25,6 +25,11 @@ log = logging.getLogger(__name__)
 
 PDF_MIME = "application/pdf"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+CSV_MIMES: frozenset[str] = frozenset({"text/csv", "application/csv"})
+EXCEL_MIMES: frozenset[str] = frozenset({
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+})
 
 # Max edge length (px) for PIL.thumbnail() before vision-LLM call (D-072-02).
 # OpenAI detail=low downsamples to 512px internally → no quality gain above 1024px.
@@ -178,6 +183,281 @@ def extract_docx_tables(raw: bytes) -> list[dict]:
     return results
 
 
+def _mime_to_extractor(mime: str) -> str:
+    """Return a short extractor tag for the given MIME type (document_tables.extractor)."""
+    if mime == PDF_MIME:
+        return "pdfplumber"
+    if mime == DOCX_MIME:
+        return "python-docx"
+    if mime in CSV_MIMES:
+        return "csv-reader"
+    if mime in EXCEL_MIMES:
+        return "openpyxl"
+    return "unknown"
+
+
+def extract_csv_tables(raw: bytes) -> list[dict]:
+    """Return a list of table dicts extracted from CSV bytes.
+
+    Performs delimiter auto-detection via csv.Sniffer (comma/semicolon/tab/pipe).
+    Normalises blank or purely-numeric header cells to 'Column N'.
+    Filters trailing blank rows.
+    Returns [] when the file has fewer than 2 non-empty rows (no usable header+data).
+    """
+    import csv as _csv  # noqa: PLC0415
+
+    try:
+        decoded = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        decoded = raw.decode("latin-1")
+
+    try:
+        dialect = _csv.Sniffer().sniff(decoded[:2048], delimiters=",;\t|")
+    except _csv.Error:
+        dialect = None
+
+    reader_kwargs: dict = {"dialect": dialect} if dialect else {}
+    all_rows = [
+        r for r in _csv.reader(io.StringIO(decoded), **reader_kwargs)
+        if any(cell.strip() for cell in r)
+    ]
+    if len(all_rows) < 2:
+        return []
+
+    raw_headers = all_rows[0]
+    headers = [
+        cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+        else f"Column {i + 1}"
+        for i, cell in enumerate(raw_headers)
+    ]
+    data_rows = [[str(cell) for cell in row] for row in all_rows[1:]]
+    return [{"page": 1, "table_index": 0, "headers": headers, "rows": data_rows}]
+
+
+def extract_excel_tables(raw: bytes) -> list[dict]:
+    """Return a list of table dicts extracted from Excel (.xlsx/.xls) bytes.
+
+    Each sheet becomes one table dict with page = sheet number (1-based).
+    Sheets with fewer than 2 non-empty rows are skipped.
+    Header cells that are None/empty or purely numeric are normalised to 'Column N'.
+    """
+    import openpyxl  # noqa: PLC0415
+
+    wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    results: list[dict] = []
+    for sheet_num, ws in enumerate(wb.worksheets, start=1):
+        all_rows = [
+            [str(c.value) if c.value is not None else "" for c in row]
+            for row in ws.iter_rows()
+        ]
+        non_empty = [r for r in all_rows if any(cell.strip() for cell in r)]
+        if len(non_empty) < 2:
+            continue
+        raw_headers = non_empty[0]
+        headers = [
+            cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+            else f"Column {i + 1}"
+            for i, cell in enumerate(raw_headers)
+        ]
+        data_rows = non_empty[1:]
+        results.append({
+            "page": sheet_num,
+            "table_index": 0,
+            "headers": headers,
+            "rows": data_rows,
+        })
+    return results
+
+
+TABLE_CHUNK_MAX_ROWS = 25
+
+
+def _sanitize_markdown_cell(val: object) -> str:
+    """Sanitize cell value for clean Markdown table rendering."""
+    s = str(val if val is not None else "").replace("\r\n", " ").replace("\n", " ").strip()
+    return s.replace("|", "\\|")
+
+
+def format_table_markdown_chunks(
+    table: dict,
+    max_rows: int = TABLE_CHUNK_MAX_ROWS,
+) -> list[str]:
+    """Format an extracted table into one or more Markdown chunks with schema header.
+
+    Each chunk begins with a schema header:
+      `[Table {table_index + 1} | Page {page} | Columns: {headers}]`
+    followed by standard Markdown table syntax. Large tables are partitioned
+    into batches of `max_rows`, repeating the column headers on every chunk split.
+    """
+    headers = [str(h) for h in table.get("headers") or []]
+    rows = table.get("rows") or []
+    if not headers:
+        return []
+
+    page_val = table.get("page")
+    page_str = f"Page {page_val}" if page_val is not None else "Page N/A"
+    table_idx = (table.get("table_index") or 0) + 1
+    col_str = ", ".join(headers)
+    prefix = f"[Table {table_idx} | {page_str} | Columns: {col_str}]"
+
+    header_line = "| " + " | ".join(_sanitize_markdown_cell(h) for h in headers) + " |"
+    delim_line = "| " + " | ".join(["---"] * len(headers)) + " |"
+
+    if not rows:
+        return [f"{prefix}\n{header_line}\n{delim_line}"]
+
+    chunks: list[str] = []
+    for i in range(0, len(rows), max_rows):
+        batch = rows[i : i + max_rows]
+        row_lines = [
+            "| " + " | ".join(_sanitize_markdown_cell(cell) for cell in row) + " |"
+            for row in batch
+        ]
+        chunk_body = "\n".join(row_lines)
+        chunks.append(f"{prefix}\n{header_line}\n{delim_line}\n{chunk_body}")
+
+    return chunks
+
+
+def embed_and_store_table_chunks(
+    document_id: str,
+    user_id: str,
+    table_dicts: list[dict],
+    supabase: Client,
+    app_settings: "UserEffectiveSettings | None" = None,
+) -> list[dict]:
+    """Format and embed extracted tables as document_chunks for semantic search (TAB-02).
+
+    Offsets chunk_index from max(chunk_index) to prevent collisions with text chunks.
+    Tags chunks with embedding_model, embedding_dimensions, and org_id.
+    """
+    if not table_dicts:
+        return []
+
+    if app_settings is None:
+        try:
+            from app.models.user_settings import load_app_settings  # noqa: PLC0415
+            app_settings = load_app_settings()
+        except Exception:
+            app_settings = None
+
+    all_table_chunks: list[str] = []
+    for tbl in table_dicts:
+        chunks = format_table_markdown_chunks(tbl, max_rows=TABLE_CHUNK_MAX_ROWS)
+        all_table_chunks.extend(chunks)
+
+    if not all_table_chunks:
+        return []
+
+    # Get current max chunk_index for this document
+    max_idx_result = (
+        supabase.table("document_chunks")
+        .select("chunk_index")
+        .eq("document_id", document_id)
+        .order("chunk_index", desc=True)
+        .limit(1)
+        .execute()
+    )
+    base_idx = (
+        (max_idx_result.data[0]["chunk_index"] + 1)
+        if max_idx_result.data
+        else 0
+    )
+
+    # Resolve org_id from documents table for multi-tenant isolation
+    org_id = None
+    try:
+        doc_res = (
+            supabase.table("documents")
+            .select("org_id")
+            .eq("id", document_id)
+            .maybe_single()
+            .execute()
+        )
+        if doc_res and doc_res.data:
+            org_id = doc_res.data.get("org_id")
+    except Exception:
+        pass
+
+    embeddings = embed_texts(all_table_chunks, user_settings=app_settings)
+    _tbl_embedding_model = (
+        getattr(app_settings, "embedding_model", None) or "text-embedding-3-small"
+    )
+    _tbl_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
+
+    chunk_rows = [
+        {
+            "document_id": document_id,
+            "user_id": user_id,
+            "content": chunk_text,
+            "chunk_index": base_idx + i,
+            "embedding": embedding,
+            "embedding_model": _tbl_embedding_model,
+            "embedding_dimensions": _tbl_embedding_dimensions,
+            **({"org_id": org_id} if org_id else {}),
+        }
+        for i, (chunk_text, embedding) in enumerate(zip(all_table_chunks, embeddings))
+    ]
+
+    supabase.table("document_chunks").insert(chunk_rows).execute()
+    log.info("Stored %d table chunk(s) for document %s", len(chunk_rows), document_id)
+    return chunk_rows
+
+
+def backfill_document_table_chunks(
+    document_id: str,
+    supabase: Client,
+    user_id: str | None = None,
+    app_settings: "UserEffectiveSettings | None" = None,
+) -> int:
+    """Backfill table chunks in document_chunks for a document with existing document_tables.
+
+    Returns the number of generated table chunks.
+    """
+    if not user_id:
+        doc_res = (
+            supabase.table("documents")
+            .select("user_id")
+            .eq("id", document_id)
+            .maybe_single()
+            .execute()
+        )
+        if not doc_res or not doc_res.data:
+            return 0
+        user_id = str(doc_res.data["user_id"])
+
+    tables_res = (
+        supabase.table("document_tables")
+        .select("page, table_index, headers, rows")
+        .eq("document_id", document_id)
+        .order("table_index")
+        .execute()
+    )
+    if not tables_res.data:
+        return 0
+
+    # Skip if table chunks already present
+    existing = (
+        supabase.table("document_chunks")
+        .select("id")
+        .eq("document_id", document_id)
+        .ilike("content", "[Table %")
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return 0
+
+    chunk_rows = embed_and_store_table_chunks(
+        document_id=document_id,
+        user_id=user_id,
+        table_dicts=tables_res.data,
+        supabase=supabase,
+        app_settings=app_settings,
+    )
+    return len(chunk_rows)
+
+
 def extract_and_store_tables(
     raw: bytes,
     mime_type: str,
@@ -210,13 +490,27 @@ def extract_and_store_tables(
             ]
         elif mime_type == PDF_MIME:
             table_dicts = extract_pdf_tables(raw)
+            extractor_tag = "pdfplumber"
         elif mime_type == DOCX_MIME:
             table_dicts = extract_docx_tables(raw)
+            extractor_tag = "python-docx"
+        elif mime_type in CSV_MIMES:
+            table_dicts = extract_csv_tables(raw)
+            extractor_tag = "csv-reader"
+        elif mime_type in EXCEL_MIMES:
+            table_dicts = extract_excel_tables(raw)
+            extractor_tag = "openpyxl"
         else:
             return  # Unsupported mime type — nothing to extract
 
         if not table_dicts:
             return
+
+        # When extracted_doc provides the tag, prefer it (Docling has its own name).
+        if extracted_doc is not None and extracted_doc.tables:
+            extractor_tag = getattr(extracted_doc, "extractor_name", None) or "docling"
+        elif "extractor_tag" not in dir():  # fallback safety — should never trigger
+            extractor_tag = _mime_to_extractor(mime_type)
 
         rows = [
             {
@@ -226,6 +520,7 @@ def extract_and_store_tables(
                 "table_index": t["table_index"],
                 "headers": t["headers"],
                 "rows": t["rows"],
+                "extractor": extractor_tag,
                 # Phase 071.2 D-071.2-08: conditional bbox spread — populate the
                 # migration 042 column only when the upstream extractor produced one.
                 # Skipping the key (rather than writing None) keeps the DB write clean
@@ -236,6 +531,20 @@ def extract_and_store_tables(
         ]
         supabase.table("document_tables").insert(rows).execute()
         log.info("Stored %d table(s) for document %s", len(rows), document_id)
+
+        # TAB-02 / Phase 202: generate and embed table chunks into document_chunks
+        try:
+            from app.models.user_settings import load_app_settings  # noqa: PLC0415
+            app_settings = load_app_settings()
+            embed_and_store_table_chunks(
+                document_id=document_id,
+                user_id=user_id,
+                table_dicts=table_dicts,
+                supabase=supabase,
+                app_settings=app_settings,
+            )
+        except Exception as chunk_exc:
+            log.warning("Table chunk embedding failed for document %s: %s", document_id, chunk_exc)
 
     except Exception as exc:
         log.warning("Table extraction failed for document %s: %s", document_id, exc)

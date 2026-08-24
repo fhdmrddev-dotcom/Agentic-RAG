@@ -1,0 +1,845 @@
+/**
+ * Phase 200 — `RunTranscript.tsx`'s guard, pinned in the commit that created it (the
+ * 196-05 / 196-07 rule: *"an unpinned file is not a lightly-guarded one, it is an UNGUARDED
+ * one"*).
+ *
+ * WHAT WOULD BE UNGUARDED WITHOUT THIS FILE:
+ *  • **the tense rule** — that a state word never sits beside a duration the other source's
+ *    view of liveness contradicts. Both directions are driven, and both were the reason the
+ *    rule was rewritten mid-build;
+ *  • that a row's instant is its `completed_at` when it has one, so a finished step sorts by
+ *    its ENDING and the running step by its beginning;
+ *  • that EVERY row renders — including one with no readable instant, which keeps its gutter
+ *    column and holds nothing rather than a fabricated zero or a dash;
+ *  • that a declared `0` renders and an ABSENT count renders NO ELEMENT (D-07 / `SEED-159`),
+ *    with a positive control proving the two are distinguishable in this render;
+ *  • that the two absence headlines are picked apart correctly — no steps versus no times;
+ *  • that this file spells NO user-visible string of its own (rule 3: one literal left in
+ *    JSX is a second home, and a second home cannot be re-worded by a one-line diff).
+ */
+import { describe, it, expect } from "vitest"
+import { render, screen, within, cleanup } from "@testing-library/react"
+import { afterEach } from "vitest"
+import RunTranscriptSource from "./RunTranscript?raw"
+import { RunTranscript, type TranscriptLiveReading } from "./RunTranscript"
+import { type PhaseTimingRow } from "./phaseDuration"
+import {
+  TRANSCRIPT_LANDMARK_LABEL,
+  TRANSCRIPT_NO_STEPS,
+  TRANSCRIPT_TIMES_NOT_RECORDED,
+} from "./transcriptVocabulary"
+import { OUTCOME_FINISHED, OUTCOME_NEVER_RAN, OUTCOME_NOT_REACHED } from "./receiptVocabulary"
+
+afterEach(cleanup)
+
+const T0 = Date.parse("2026-08-20T10:00:00Z")
+const s = (offsetSeconds: number) => new Date(T0 + offsetSeconds * 1000).toISOString()
+
+/** The three-step run these cases share. Step 1 finished, step 2 finished later, step 3
+ *  was never reached — the ordinary mid-life shape. */
+const ROWS: PhaseTimingRow[] = [
+  {
+    slug: "gather",
+    status: "completed",
+    started_at: s(0),
+    completed_at: s(12),
+    step_count: 312,
+    step_noun: "sources",
+  },
+  { slug: "draft", status: "completed", started_at: s(14), completed_at: s(70) },
+  { slug: "check", status: "pending" },
+]
+
+const titleOf = (slug: string) => `Step ${slug}`
+
+function liveMap(entries: Record<string, TranscriptLiveReading>) {
+  return (slug: string) => entries[slug]
+}
+
+function rowsInOrder(): string[] {
+  return Array.from(document.querySelectorAll('[data-testid^="transcript-row-"]')).map(
+    (el) => el.getAttribute("data-testid") ?? "",
+  )
+}
+
+function clockOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-clock").textContent ?? ""
+}
+
+function stateOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-state").textContent ?? ""
+}
+
+// ── 1. The region and its two absences ──────────────────────────────────────────────
+
+describe("RunTranscript — the region", () => {
+  it("names itself from the vocabulary, never from a literal", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(screen.getByTestId("run-transcript").getAttribute("aria-label")).toBe(
+      TRANSCRIPT_LANDMARK_LABEL,
+    )
+  })
+
+  it("a run with NO rows says so — and says the no-STEPS sentence, not the no-TIMES one", () => {
+    render(<RunTranscript phases={[]} titleOf={titleOf} now={T0} />)
+    expect(screen.getByTestId("run-transcript-empty").textContent).toBe(TRANSCRIPT_NO_STEPS)
+    expect(screen.queryByTestId("run-transcript-untimed")).toBeNull()
+  })
+
+  it("a run whose rows carry NO readable start says the no-TIMES sentence — and still renders every row", () => {
+    // ⚠ THE ROWS ARE STILL TRUE; only their placement in time is unknown. A region that
+    // vanished here would read as "the run did nothing", which is a worse claim than "we do
+    // not hold a time for it".
+    const historic: PhaseTimingRow[] = [
+      { slug: "gather", status: "completed" },
+      { slug: "draft", status: "failed" },
+    ]
+    render(<RunTranscript phases={historic} titleOf={titleOf} now={T0} />)
+    expect(screen.getByTestId("run-transcript-untimed").textContent).toBe(
+      TRANSCRIPT_TIMES_NOT_RECORDED,
+    )
+    expect(screen.queryByTestId("run-transcript-empty")).toBeNull()
+    expect(rowsInOrder()).toEqual(["transcript-row-gather", "transcript-row-draft"])
+    // The gutter column survives and holds NOTHING — never a zero, never a dash.
+    expect(clockOf("gather")).toBe("")
+  })
+
+  it("does not print the no-times headline merely because ONE row is untimed", () => {
+    // ⚠ IT IS A STATEMENT ABOUT THE RUN. `ROWS` has an untimed `check` step and a perfectly
+    // good clock, and a headline above that list would be false.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(screen.queryByTestId("run-transcript-untimed")).toBeNull()
+    expect(clockOf("check")).toBe("")
+  })
+})
+
+// ── 2. Placement and order ──────────────────────────────────────────────────────────
+
+describe("RunTranscript — where a step sits on the clock", () => {
+  it("stamps every step at its START, so the gutter reads as a timeline", () => {
+    // ⚠ REVERSED FROM A COMPLETION STAMP on 2026-08-20 — see `transcriptEntries`' docblock. The
+    // first step starts AT the anchor, so a completion stamp printed the same string as its own
+    // duration (`11s · … · 11s`), which is what the browser showed.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(clockOf("gather")).toBe("00:00")
+    expect(clockOf("draft")).toBe("00:14")
+  })
+
+  it("the stamp and the duration are DIFFERENT facts on the same line", () => {
+    // The non-vacuity of the reversal: on the first row they must not be the same string.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const row = screen.getByTestId("transcript-row-gather")
+    const stamp = within(row).getByTestId("transcript-clock").textContent
+    const duration = within(row).queryByTestId("transcript-time")?.textContent
+    // ⚠ THE GUTTER IS A CLOCK POSITION (`mm:ss`), NOT A DURATION PHRASE. Two formatters for
+    // two contracts — see `runClock`'s docblock. The duration moved to the spine when the log
+    // line was reduced to the sheet's gutter-and-sentence, so what this pins now is the gutter's
+    // SHAPE, which is what made the two numbers confusable in the first place.
+    expect(stamp).toBe("00:00")
+    expect(stamp).toMatch(/^\d{2}:\d{2}$/)
+    expect(duration).toBeUndefined()
+  })
+
+  it("orders by the clock, and appends the untimed rows after every timed one", () => {
+    // The server order here is deliberately the REVERSE of the time order, so a render that
+    // ignored the instants would pass by accident.
+    const scrambled: PhaseTimingRow[] = [
+      { slug: "check", status: "pending" },
+      { slug: "draft", status: "completed", started_at: s(14), completed_at: s(70) },
+      { slug: "gather", status: "completed", started_at: s(0), completed_at: s(12) },
+    ]
+    render(<RunTranscript phases={scrambled} titleOf={titleOf} now={T0} />)
+    expect(rowsInOrder()).toEqual([
+      "transcript-row-gather",
+      "transcript-row-draft",
+      "transcript-row-check",
+    ])
+  })
+
+  it("breaks a tie on the SERVER's row order, never on the slug", () => {
+    // Two steps completing in the same millisecond is a real outcome on a fast run; the
+    // server's own ordering is the only tiebreak this component is allowed.
+    const tied: PhaseTimingRow[] = [
+      { slug: "zebra", status: "completed", started_at: s(0), completed_at: s(5) },
+      { slug: "alpha", status: "completed", started_at: s(1), completed_at: s(5) },
+    ]
+    render(<RunTranscript phases={tied} titleOf={titleOf} now={T0} />)
+    expect(rowsInOrder()).toEqual(["transcript-row-zebra", "transcript-row-alpha"])
+  })
+})
+
+// ── 3. The tense rule — both contradictions, driven ─────────────────────────────────
+
+describe("RunTranscript — the state word and the duration cannot contradict each other", () => {
+  it("a live step shows the page's label and NO duration", () => {
+    const live: PhaseTimingRow[] = [{ slug: "draft", status: "active", started_at: s(14) }]
+    // (the row and the reading agree: `active` ⇒ `running`)
+    render(
+      <RunTranscript
+        phases={live}
+        titleOf={titleOf}
+        runStatus="active"
+        liveOf={liveMap({ draft: { reading: "running", label: "Running" } })}
+        now={T0 + 60_000}
+      />,
+    )
+    expect(stateOf("draft")).toBe("Running")
+    expect(within(screen.getByTestId("transcript-row-draft")).queryByTestId("transcript-time"))
+      .toBeNull()
+  })
+
+  it("drops the page's words when they contradict the row's own status — the MEASURED crossing", () => {
+    /**
+     * ⚠ THIS IS THE CASE THAT WAS FOUND ON THE OPERATOR'S DATABASE, NOT INVENTED. The page
+     * joins the definition's steps onto the run's rows by `phase_index` (D-188-01); on 2 of
+     * 228 local runs the run's own `phase_index` values disagree with the definition's
+     * ordering, and the join then reports each step's state as its NEIGHBOUR's. The first run
+     * opened in a browser was one of them, and it printed *"Produce the deliverable · Not
+     * started"* about a step that had FAILED.
+     *
+     * The row's own fields cannot be crossed that way — slug, status, timestamps and count all
+     * come from one record — so a disagreement drops the page's words entirely.
+     */
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        // The row says `completed`; the page's reading says this step never started.
+        liveOf={liveMap({ gather: { reading: "not-started", label: "Not started" } })}
+        now={T0}
+      />,
+    )
+    expect(stateOf("gather")).toBe(OUTCOME_FINISHED)
+    expect(stateOf("gather")).not.toBe("Not started")
+    // ⚠ THE HELD READING IS STILL READABLE, and the conflict is announced. Dropping the words
+    // silently would leave a crossed run looking exactly like a correct one.
+    const row = screen.getByTestId("transcript-row-gather")
+    expect(row.getAttribute("data-reading")).toBe("not-started")
+    expect(row.getAttribute("data-source-conflict")).toBe("true")
+    // NON-VACUITY: an AGREEING row in the same render keeps the page's words and is not
+    // flagged, so the two attributes above are the rule firing rather than a constant.
+    expect(screen.getByTestId("transcript-row-draft").getAttribute("data-source-conflict"))
+      .toBeNull()
+  })
+
+  it("a stale slice still calling a finished step live is a disagreement, so the wire's word shows", () => {
+    // ⚠ CONTRADICTION ONE, and the reason the rule is an agreement test rather than a
+    // preference: a present-tense word beside a finished duration. The wire says this step
+    // completed in 12s. The line shows what the row itself records.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        liveOf={liveMap({ gather: { reading: "running", label: "Running" } })}
+        now={T0}
+      />,
+    )
+    expect(stateOf("gather")).toBe(OUTCOME_FINISHED)
+  })
+
+  it("a slice ahead of the wire is a disagreement too — the mirror case", () => {
+    // ⚠ CONTRADICTION TWO: a settled word beside a still-ticking duration. The slice says this
+    // step is done; the row is still `active`. The row's own pairing is internally consistent
+    // and is what renders.
+    const inFlight: PhaseTimingRow[] = [{ slug: "draft", status: "active", started_at: s(14) }]
+    render(
+      <RunTranscript
+        phases={inFlight}
+        titleOf={titleOf}
+        runStatus="active"
+        liveOf={liveMap({ draft: { reading: "done", label: "Complete" } })}
+        now={T0 + 600_000}
+      />,
+    )
+    expect(stateOf("draft")).not.toBe("Complete")
+    expect(screen.getByTestId("transcript-row-draft").getAttribute("data-source-conflict"))
+      .toBe("true")
+  })
+
+  it("`waiting-for-you` AGREES with a `running` row — the state this surface most needs to name", () => {
+    // ⚠ THE ONE COMPARISON AN `===` WOULD GET WRONG. The wire has no `waiting-for-you`
+    // status: it is DERIVED on top of a running row when an ask is pending. An identity test
+    // would call it a disagreement and drop the very label that says a person is being
+    // waited on.
+    const waiting: PhaseTimingRow[] = [{ slug: "check", status: "active", started_at: s(20) }]
+    render(
+      <RunTranscript
+        phases={waiting}
+        titleOf={titleOf}
+        runStatus="active"
+        liveOf={liveMap({
+          check: { reading: "waiting-for-you", label: "Paused for your answer" },
+        })}
+        now={T0 + 60_000}
+      />,
+    )
+    expect(stateOf("check")).toBe("Paused for your answer")
+    expect(screen.getByTestId("transcript-row-check").getAttribute("data-source-conflict"))
+      .toBeNull()
+    expect(within(screen.getByTestId("transcript-row-check")).queryByTestId("transcript-time"))
+      .toBeNull()
+  })
+
+  it("a reading this build does not know FAILS CLOSED to the wire, never to a prototype member", () => {
+    // ⚠ WR-04. The reading arrives as a plain string on a read shape, and the agreement table
+    // is a plain object literal — so a `constructor`-shaped reading reaches the lookup. An
+    // own-property read resolves it to nothing, which is a DISAGREEMENT and therefore the
+    // wire's word; a bare index would hand back a function and take the agreeing branch.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        liveOf={liveMap({ gather: { reading: "constructor", label: "NOT A STATE" } })}
+        now={T0}
+      />,
+    )
+    expect(stateOf("gather")).toBe(OUTCOME_FINISHED)
+    expect(screen.getByTestId("transcript-row-gather").getAttribute("data-source-conflict"))
+      .toBe("true")
+  })
+
+  it("an ORDINARY COMPLETION says nothing — the bright line is the statement", () => {
+    /**
+     * ⚠ THE RULE THE BROWSER FORCED. The first port printed `Complete` on all five rows of a
+     * five-step run: `SEED-184`'s *"information is dumped as text, not presented"* complaint,
+     * arriving in the surface built to answer it. The sheet prints no status word anywhere.
+     *
+     * ⚠ IT IS NOT COLOUR-ALONE, and that is why the removal is safe: the state is still stated
+     * in words once per step, on the SPINE beside this column, which carries a glyph and a
+     * `data-reading` for every step including the finished ones.
+     */
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        liveOf={liveMap({ gather: { reading: "done", label: "Complete" } })}
+        now={T0}
+      />,
+    )
+    const row = screen.getByTestId("transcript-row-gather")
+    expect(within(row).queryByTestId("transcript-state")).toBeNull()
+    // ...and the facts it DOES carry are all still there.
+    // ⚠ THE DURATION AND THE COUNT ARE NOT ON THIS LINE ANY MORE — they moved to the spine
+    // when the log was reduced to the sheet's gutter-and-sentence. What this case still pins is
+    // the SILENCE, which is the rule the browser forced.
+    expect(within(row).queryByTestId("transcript-time")).toBeNull()
+    expect(within(row).queryByTestId("transcript-count")).toBeNull()
+    // NON-VACUITY: a step that is NOT an ordinary completion still speaks, in the same render.
+    expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
+  })
+
+  it("every reading other than `done` still carries its word", () => {
+    // The exceptional cases are exactly the ones a person needs told rather than left to infer.
+    const mixed: PhaseTimingRow[] = [
+      { slug: "gather", status: "failed", started_at: s(0), completed_at: s(4) },
+      { slug: "draft", status: "active", started_at: s(6) },
+      { slug: "check", status: "skipped" },
+    ]
+    render(
+      <RunTranscript
+        phases={mixed}
+        titleOf={titleOf}
+        runStatus="active"
+        liveOf={liveMap({
+          gather: { reading: "failed", label: "Failed — its answer did not pass the checks" },
+          draft: { reading: "running", label: "Running" },
+          check: { reading: "skipped", label: "Skipped" },
+        })}
+        now={T0 + 10_000}
+      />,
+    )
+    expect(stateOf("gather")).toBe("Failed — its answer did not pass the checks")
+    expect(stateOf("draft")).toBe("Running")
+    expect(stateOf("check")).toBe("Skipped")
+  })
+
+  it("falls back to the RECEIPT's outcome for a slug the page holds no reading for", () => {
+    // ⚠ THE FLOOR, and it must be a real word rather than a blank: the page can legitimately
+    // hold no reading for a step (a definition it could not resolve), and a line with no
+    // state at all reads as a step that did nothing.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(stateOf("gather")).toBe(OUTCOME_FINISHED)
+    expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
+  })
+
+  it("a skipped step reads NEVER RAN, which is not the same as a time we do not hold", () => {
+    // The D-06 split, met at this surface: `never ran` is an affirmative fact.
+    const skipped: PhaseTimingRow[] = [{ slug: "check", status: "skipped" }]
+    render(<RunTranscript phases={skipped} titleOf={titleOf} now={T0} />)
+    expect(stateOf("check")).toBe(OUTCOME_NEVER_RAN)
+  })
+})
+
+// ── 4. The count: `0` is a fact, absence is not ─────────────────────────────────────
+
+/* ⚠ THE COUNT CASES MOVED TO `RunSpine.test.tsx`. The declared count is the SPINE's sub-line
+   since the log line was reduced to the sheet's gutter-and-sentence; D-07's rule (a declared
+   `0` renders, an ABSENT count renders no element) is unchanged and is asserted there, against
+   the surface that now shows it. Recorded rather than deleted so the rule's home is findable. */
+
+// ── 5. The source sweep ─────────────────────────────────────────────────────────────
+
+describe("RunTranscript — it spells nothing", () => {
+  /**
+   * ⚠ RULE 3, ASSERTED RATHER THAN TRUSTED. One sentence literal left in JSX is a second
+   * home for governed copy, and a second home cannot be re-worded by a one-line diff.
+   *
+   * The probe is a sweep for a JSX text child that is a bare quoted sentence — a run of
+   * letters containing a space — inside the component body, comments stripped. Comments are
+   * stripped because this file's docblock quotes the sheet's own narration on purpose, and a
+   * sweep that could not tell prose from code would count that (the 187-24 trap, which has
+   * fired repeatedly in this tree).
+   */
+  const code = RunTranscriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+
+  it("carries no multi-word string literal outside the imports", () => {
+    const body = code.slice(code.lastIndexOf('from "@/components/workflows/transcriptVocabulary"'))
+    const sentences = body.match(/"[A-Za-z][A-Za-z' ]*\s[A-Za-z' ]+"/g) ?? []
+    expect(sentences).toEqual([])
+    // POSITIVE CONTROL — the sweep really does catch one.
+    expect('<span>{"Step started"}</span>'.match(/"[A-Za-z][A-Za-z' ]*\s[A-Za-z' ]+"/g)).toHaveLength(
+      1,
+    )
+  })
+
+  it("imports every word it renders from a vocabulary module", () => {
+    expect(code).toMatch(/from "@\/components\/workflows\/transcriptVocabulary"/)
+    // ⚠ `receiptVocabulary` is reached INDIRECTLY now, through `phaseRunFacts` — the log line
+    // renders a state word and a gutter and imports no phrase of its own beyond its own module.
+    expect(code).toMatch(/from "@\/components\/workflows\/phaseDuration"/)
+  })
+})
+
+// ── THE BRIGHT / DIM CONTRAST, AND EXACTLY WHERE IT IS HONEST ───────────────────────────
+//
+// The operator asked for "the sheet's bright-completed / dim-in-flight contrast". The sheet
+// alternates because its bright lines are RESULTS and its dim lines are in-flight NARRATION
+// between them ("Connecting to Northwind CRM instance…"). This product holds no narration and
+// renders ONE LINE PER STEP, so there is no alternation to copy. What is real — and what the
+// eye actually reads as rhythm on that drawing — is that work which has not happened yet is
+// quieter than work that has.
+//
+// ⚠ THE RUNNING LINE STAYS BRIGHT, and that refusal is asserted here rather than left in a
+// comment: it is the single most important row on a page somebody is watching, and the sheet's
+// own current line is bright with a spinner, not dim.
+function titleClassOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-title").className
+}
+
+describe("RunTranscript — a step that has not run is QUIETER than one that has", () => {
+  it("a step the run never reached is dimmed", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(titleClassOf("check")).toContain("text-muted-foreground")
+    expect(titleClassOf("check")).not.toContain("text-foreground")
+  })
+
+  it("a COMPLETED step is full strength — the other half of the contrast", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft"]) {
+      expect(titleClassOf(slug)).toContain("text-foreground")
+      expect(titleClassOf(slug)).not.toContain("text-muted-foreground")
+    }
+  })
+
+  it("the RUNNING step is full strength — the muting refusal, asserted", () => {
+    // ⚠ THE ONE THING A NAIVE READING OF "dim-in-flight" WOULD HAVE DONE. `check` is `active`
+    // here and the page says it is running, so it is the row being watched.
+    const live: PhaseTimingRow[] = [
+      ROWS[0],
+      ROWS[1],
+      { slug: "check", status: "active", started_at: s(72), completed_at: null },
+    ]
+    render(
+      <RunTranscript
+        phases={live}
+        titleOf={titleOf}
+        now={T0 + 80_000}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "running", label: "Running" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-foreground")
+    expect(titleClassOf("check")).not.toContain("text-muted-foreground")
+  })
+
+  it("a SKIPPED step is full strength — it is a settled outcome, not a not-yet", () => {
+    // ⚠ THE ARM MOST LIKELY TO BE GOT WRONG. A skipped step never ran, so it is tempting to
+    // file it with "has not happened". The run REACHED it and routed around it, which is a
+    // decision; dimming it would file a decision under "not yet".
+    render(
+      <RunTranscript
+        phases={[ROWS[0], { slug: "escalate", status: "skipped" }]}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="completed"
+      />,
+    )
+    expect(titleClassOf("escalate")).toContain("text-foreground")
+  })
+
+  it("a HISTORIC row is full strength — its step ran, only its clock is missing", () => {
+    render(
+      <RunTranscript
+        phases={[{ slug: "write", status: "completed", started_at: null, completed_at: null }]}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="completed"
+      />,
+    )
+    expect(titleClassOf("write")).toContain("text-foreground")
+  })
+
+  it("ATTENTION outranks the dim arm, and the precedence is not incidental", () => {
+    // ⚠ THE WIRE ROW IS `active`, AND THE FIRST DRAFT OF THIS CASE GOT THAT WRONG. It seeded
+    // the row as `pending` while telling the page it was `waiting-for-you`, and the title came
+    // out DIM — correctly. That is this file's own tense rule doing its job: the two sources
+    // disagreed, so the page's words were dropped entirely and the row rendered from the wire,
+    // which said the step had not started.
+    //
+    // The corrected fixture is what the product really produces, measured on a live run of a
+    // human-input workflow on 2026-08-20: the engine flips the phase row to `active` when it
+    // asks, so the row and the slice AGREE and the violet arm fires. Kept as a note because a
+    // fixture that cannot occur proves nothing about a precedence that never runs.
+    const asking: PhaseTimingRow[] = [
+      ROWS[0],
+      ROWS[1],
+      { slug: "check", status: "active", started_at: s(72), completed_at: null },
+    ]
+    render(
+      <RunTranscript
+        phases={asking}
+        titleOf={titleOf}
+        now={T0 + 80_000}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "waiting-for-you", label: "Paused for your answer" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-accent-violet-text")
+    expect(titleClassOf("check")).not.toContain("text-muted-foreground")
+  })
+
+  it("a step the two sources DISAGREE about renders from the WIRE — dim, and silent", () => {
+    // The case the draft above stumbled into, kept as coverage in its own right. The page
+    // claims a step is waiting; the row says it never started. The tense rule drops the page's
+    // words, and the tone follows the row rather than the claim.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "waiting-for-you", label: "Paused for your answer" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-muted-foreground")
+    expect(titleClassOf("check")).not.toContain("text-accent-violet-text")
+    // …and the disagreement is machine-readable, which is what a person diagnosing a crossed
+    // run needs.
+    expect(
+      screen.getByTestId("transcript-row-check").getAttribute("data-source-conflict"),
+    ).toBe("true")
+  })
+
+  it("a run where EVERY step finished has no alternation, and that is correct", () => {
+    // ⚠ ASSERTED SO THE ABSENCE IS NOT LATER READ AS THE CHANGE HAVING FAILED. Five completed
+    // steps are five equal facts. The sheet's alternation is a property of copy this product
+    // does not have — the same reason its two-line-per-step rhythm was built and withdrawn.
+    render(
+      <RunTranscript phases={[ROWS[0], ROWS[1]]} titleOf={titleOf} now={T0} runStatus="completed" />,
+    )
+    const tones = ["gather", "draft"].map(titleClassOf)
+    expect(new Set(tones).size).toBe(1)
+    expect(tones[0]).toContain("text-foreground")
+  })
+})
+
+// ── 6. THE GUTTER, PORTED FROM THE SHEET'S OWN MARKUP ───────────────────────────────────
+//
+// `run-surface.html` draws every settled gutter as
+//
+//     w-16 font-data-sm text-data-sm flex-shrink-0 text-[#464651]
+//
+// and its inline config defines `data-sm` as 12px / line-height 1.4 / weight 500. The width
+// and the type scale are adopted; the COLOUR is not, and that single deviation is
+// `D-200.1-03-A` — recorded in the component's own docblock with both measured contrast
+// ratios, and asserted below as a KEPT value rather than left as a silent omission.
+
+function clockClassOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-clock").className
+}
+
+function rowClassOf(slug: string): string {
+  return screen.getByTestId(`transcript-row-${slug}`).className
+}
+
+/** The shipped settled-row flow, re-typed here ON PURPOSE so a future edit to the component
+ *  cannot quietly re-flow the settled rows while claiming to have touched only the gutter. */
+const SETTLED_ROW_CLASS = "flex min-w-0 items-baseline gap-4 text-sm leading-relaxed"
+
+describe("RunTranscript — the settled gutter carries the sheet's width and type scale", () => {
+  it("is the sheet's `w-16` at the sheet's 12px/500 data scale", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const cls = screen.getAllByTestId("transcript-clock")[0].className
+    expect(cls).toContain("w-16")
+    expect(cls).toContain("text-[12px]")
+    expect(cls).toContain("font-medium")
+    expect(cls).toContain("leading-[1.4]")
+    // ⚠ THE OLD VALUES ARE ASSERTED ABSENT, not merely the new ones present. A class list is
+    // additive, so `toContain("w-16")` passes perfectly well beside a surviving `w-14`, and
+    // tailwind's last-wins emission would then make the rendered width a coin flip.
+    expect(cls).not.toContain("w-14")
+    expect(cls).not.toContain("text-[11px]")
+  })
+
+  it("KEEPS the three values the port did not change — the deviation is asserted, not omitted", () => {
+    // ⚠ `text-muted-foreground/60` IS THE DELIBERATE DEVIATION (`D-200.1-03-A`). The sheet's
+    // `#464651` measures ~2.1:1 on the ground both drawings share, below even the 3:1 graphical
+    // floor; the shipped value composites to ~3.4:1. Pinning it here means a later "finish the
+    // port" edit has to argue with a test rather than quietly adopt the darker literal.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const cls = screen.getAllByTestId("transcript-clock")[0].className
+    expect(cls).toContain("font-mono")
+    expect(cls).toContain("tabular-nums")
+    expect(cls).toContain("text-muted-foreground/60")
+  })
+
+  it("the DECLINED literal reaches the render nowhere", () => {
+    // The other half of the decision: the sheet's colour is quoted in a comment (so the
+    // declined value stays findable) and is rendered by nothing. Comments are stripped first —
+    // otherwise this sweep would count the very docblock that records the refusal (the 187-24
+    // trap, which has fired repeatedly in this tree).
+    const stripped = RunTranscriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    expect(stripped).not.toContain("#464651")
+    // POSITIVE CONTROL — the literal really is present in the file, inside the comment that
+    // declines it, so the assertion above is a scope test rather than a vacuous one.
+    expect(RunTranscriptSource).toContain("#464651")
+  })
+
+  it("the settled row's own flow is BYTE-IDENTICAL to the shipped string", () => {
+    // ⚠ THE FENCE THAT MAKES THE GUTTER CHANGE SAFE. `items-baseline` and `gap-4` are already
+    // the sheet's rhythm (`space-x-4`), so this port had no business touching them — and an
+    // equality test, not a `toContain`, is what stops a class being added or dropped here while
+    // the diff reads as "the gutter".
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft", "check"]) {
+      expect(rowClassOf(slug)).toBe(SETTLED_ROW_CLASS)
+    }
+  })
+
+  it("every row's gutter is ported, not just the first", () => {
+    // Including the UNTIMED one, whose column survives holding nothing — a narrower port that
+    // only styled rows with a clock would leave that column a different width.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft", "check"]) {
+      expect(clockClassOf(slug)).toContain("w-16")
+      expect(clockClassOf(slug)).toContain("text-[12px]")
+    }
+  })
+})
+
+// ── 7. THE LIVE ROW — INDIGO, PULSING, AND SPINNING ────────────────────────────────────
+//
+// `run-surface.html`'s Active Log block is four lines of markup and it is the whole
+// specification:
+//
+//     <div class="flex space-x-4 items-center">
+//       <div class="w-16 font-data-sm text-data-sm flex-shrink-0 text-indigo animate-pulse">…
+//       <div class="flex-1 text-[#F4F6FE] flex items-center space-x-2">
+//         <span class="material-symbols-outlined text-[16px] text-indigo animate-spin">sync</span>
+//
+// `.text-indigo` is `#A3A5FF`; this tree's dark `--primary` (239 100% 82%) converts to
+// `#A3A5FF` exactly, so `text-primary` is a TOKEN MATCH rather than an approximation. The
+// glyph is NOT ported — a CSS ring is the shipped precedent and keeps this file's zero-glyph
+// property true.
+
+/** A three-step run whose LAST step is genuinely in flight: the row is `active`, the page
+ *  reads `running`, and the two therefore AGREE — which is what the tense rule requires
+ *  before any live treatment may fire at all. */
+const LIVE_ROWS: PhaseTimingRow[] = [
+  ROWS[0],
+  ROWS[1],
+  { slug: "check", status: "active", started_at: s(72), completed_at: null },
+]
+
+function renderLive() {
+  return render(
+    <RunTranscript
+      phases={LIVE_ROWS}
+      titleOf={titleOf}
+      now={T0 + 80_000}
+      runStatus="active"
+      liveOf={liveMap({ check: { reading: "running", label: "Running" } })}
+    />,
+  )
+}
+
+describe("RunTranscript — the live row is unmistakably live", () => {
+  it("the live clock is the sheet's indigo, and it pulses", () => {
+    renderLive()
+    const cls = clockClassOf("check")
+    expect(cls).toContain("text-primary")
+    expect(cls).toContain("animate-pulse")
+    // ⚠ THE SETTLED TONE MUST BE GONE, NOT MERELY OUTVOTED. Two colour utilities in one class
+    // list is a coin flip on emission order, so the treatment composes rather than appends.
+    expect(cls).not.toContain("text-muted-foreground/60")
+  })
+
+  it("the treatment is scoped to the ONE live row, in the same render", () => {
+    // ⚠ NON-VACUITY. Without this, a change that pulsed EVERY clock would pass the case above.
+    renderLive()
+    for (const slug of ["gather", "draft"]) {
+      expect(clockClassOf(slug)).toContain("text-muted-foreground/60")
+      expect(clockClassOf(slug)).not.toContain("text-primary")
+      expect(clockClassOf(slug)).not.toContain("animate-pulse")
+    }
+  })
+
+  it("a textless ring spins beside the live line", () => {
+    renderLive()
+    const spinner = within(screen.getByTestId("transcript-row-check")).getByTestId(
+      "transcript-spinner",
+    )
+    expect(spinner.getAttribute("aria-hidden")).toBe("true")
+    expect(spinner.className).toContain("animate-spin")
+    expect(spinner.className).toContain("border-primary")
+    // ⚠ IT SAYS NOTHING, AND THAT IS THE REFUSAL BEING KEPT. See the row-text case below.
+    expect(spinner.textContent).toBe("")
+  })
+
+  it("no glyph library was imported to draw it", () => {
+    // The sheet's mark is `material-symbols-outlined sync`. A CSS ring costs no dependency and
+    // keeps this component's zero-glyph property, which its own docblock states.
+    expect(RunTranscriptSource).not.toMatch(/from "lucide-react"/)
+    expect(RunTranscriptSource).not.toContain("material-symbols")
+  })
+
+  it("a run with NO live row has NO spinner — a terminal run, and an unreached step", () => {
+    // ⚠ T-200.1-05, ASSERTED RATHER THAN ASSUMED. A spinner on a finished run is a false claim
+    // that work is in progress, which is the one lie this treatment could tell.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} runStatus="completed" />)
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+    cleanup()
+    // …and the `not-started` step of a still-active run does not get one either.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} runStatus="active" />)
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+  })
+
+  it("a STALE slice calling a finished step live earns no spinner — the tense rule holds the gate", () => {
+    // ⚠ THE TREATMENT DERIVES NOTHING OF ITS OWN. It hangs off `isLive`, which
+    // `pageAgreesWithWire` has already refused for this fixture, so the spinner is unreachable
+    // through a disagreement rather than merely absent from one.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        liveOf={liveMap({ gather: { reading: "running", label: "Running" } })}
+        now={T0}
+      />,
+    )
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+    expect(screen.getByTestId("transcript-row-gather").getAttribute("data-source-conflict")).toBe(
+      "true",
+    )
+  })
+
+  it("the live row is cross-axis CENTRED; a settled row is not", () => {
+    // A 16px ring on a baseline-aligned row sits visibly low. The sheet draws `items-center` on
+    // its Active Log row and on none of the others.
+    renderLive()
+    expect(rowClassOf("check")).toContain("items-center")
+    expect(rowClassOf("check")).not.toContain("items-baseline")
+    for (const slug of ["gather", "draft"]) {
+      expect(rowClassOf(slug)).toBe(SETTLED_ROW_CLASS)
+    }
+  })
+})
+
+// ── 8. BOTH SHIPPED REFUSALS, ASSERTED AS STILL HOLDING ────────────────────────────────
+//
+// ⚠ THE POINT OF THIS SECTION IS THAT THE PORT DID NOT QUIETLY OVERTURN EITHER OF THEM. The
+// three cases that carry refusal (i) already exist above and pass with their bodies UNEDITED —
+// a pin that still holds against a test nobody re-typed is evidence; a re-baselined pin is only
+// a record of what the code now does. What is ADDED here is the pairing each refusal was
+// missing.
+
+describe("RunTranscript — the live line is STILL full strength (refusal i)", () => {
+  it("the live title is bright AND the spinner is present, in one case", () => {
+    // ⚠ ASSERTED TOGETHER ON PURPOSE. Split across two cases, a later change could dim the row
+    // and point at the spinner as the compensation, and both cases would still pass. The
+    // sheet's own current line is bright WITH a spinner — it is not one or the other.
+    renderLive()
+    const cls = titleClassOf("check")
+    expect(cls).toContain("text-foreground")
+    expect(cls).not.toContain("text-muted-foreground")
+    // …and no opacity modifier snuck the dimming back in by another route.
+    expect(cls).not.toMatch(/text-foreground\/\d/)
+    expect(
+      within(screen.getByTestId("transcript-row-check")).getByTestId("transcript-spinner"),
+    ).toBeTruthy()
+  })
+})
+
+describe("RunTranscript — no per-line narration was invented (refusal ii)", () => {
+  /**
+   * ⚠ A SPINNER IS NOT NARRATION, AND THIS IS WHERE THAT CLAIM IS MADE CHECKABLE. It states
+   * *this is happening now* — a fact this product HAS, and already carries on `data-live` and
+   * on the spine's pulsing mark. What the sheet's dim lines add is a claim about WHAT is
+   * happening ("Connecting to Northwind CRM instance…"), which this product cannot source.
+   *
+   * So the live row's rendered text is pinned to an EXACT accounting: its gutter, its title,
+   * and the one state word the component already computes. Nothing else.
+   */
+  const NARRATION = "Connecting to Northwind CRM instance..."
+
+  it("the live LINE reads exactly the step's name and its one state word", () => {
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock")
+    // The LINE is the row minus its gutter — the half of the sheet's structure that would
+    // carry a narration sentence if one had been invented.
+    const line = Array.from(row.childNodes)
+      .filter((n) => n !== clock)
+      .map((n) => n.textContent ?? "")
+      .join("")
+    expect(line).toBe(`${titleOf("check")}Running`)
+  })
+
+  it("the live ROW's TOTAL text is its clock plus that line, and nothing else", () => {
+    // The complete accounting, gutter included — strictly stronger than the line assertion
+    // above, and the reason no character on that row can be unaccounted for.
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock").textContent ?? ""
+    expect(row.textContent).toBe(`${clock}${titleOf("check")}Running`)
+    // NON-VACUITY: the clock really is carrying text here, so the concatenation is doing work
+    // rather than agreeing with an empty string.
+    expect(clock).toMatch(/^\d{2}:\d{2}$/)
+  })
+
+  it("POSITIVE CONTROL — the same assertion FAILS when a narration sentence is present", () => {
+    /**
+     * ⚠ DRIVEN, NOT REASONED. A row-text assertion that has never been shown to fail is not
+     * evidence that narration would be caught. This builds the very row the sheet draws — the
+     * live line WITH its narration appended — and proves the check above goes red on it.
+     */
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock").textContent ?? ""
+    const expected = `${clock}${titleOf("check")}Running`
+
+    // Sanity: the untouched row passes.
+    expect(row.textContent).toBe(expected)
+
+    const narrating = row.cloneNode(true) as HTMLElement
+    const invented = document.createElement("span")
+    invented.textContent = NARRATION
+    narrating.appendChild(invented)
+
+    expect(narrating.textContent).not.toBe(expected)
+    expect(narrating.textContent).toContain(NARRATION)
+  })
+})

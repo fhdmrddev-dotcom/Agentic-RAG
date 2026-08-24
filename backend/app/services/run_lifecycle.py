@@ -155,6 +155,101 @@ async def finalize_run_terminal(
     await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
 
 
+async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
+    """The ONE workflow-side cancel composition — status + the interrupted phase (194).
+
+    ``db.workflows.finish_run`` with the status ``'cancelled'`` (the
+    ``workflow_runs.status`` write and the thread-anchor clear, in ONE transaction,
+    idempotent) THEN ``db.workflows.cancel_active_phases`` (the RUN-KEYED set-predicate
+    phase terminalize).
+
+    ⚠ THE TWO CALLS BELOW ARE THE ONLY ONES IN THIS MODULE, and every mention of the
+    two writers in this docstring is deliberately written WITHOUT its opening
+    parenthesis so that grepping the writer's name followed by one counts CALLS rather
+    than mentions. A grep needle that also matches its own docblock is not a needle —
+    this project has tripped that trap four times in this phase alone.
+
+    ⚠ ONE COMPOSITION, TWO CALLERS, AND THAT IS THE POINT. Step 3b's zombie arm below
+    calls it, and so does the ``DELETE /runs/{id}`` no-producer arm (plan 194-10) —
+    which is D-08/D-10's "one mechanism" applied to the server side. ⚠ Do NOT fork a
+    second cancel writer or a second ``workflow_runs`` status writer; if a third caller
+    appears it calls THIS, it does not re-compose the two writes.
+    ⚠ CORRECTED BESIDE, NOT OVER (194 code review WR-01). This paragraph shipped
+    claiming, verbatim: "The shape is not new: ``delete_workflow_cascade``
+    (``api/workflows.py:1494-1518``) has composed exactly this since Phase 152, in the
+    wrong file — 194 MOVES that composition here rather than copying it." **Measured,
+    that is FALSE IN BOTH HALVES.** ``git diff`` on ``api/workflows.py`` across the whole
+    of Phase 194 is EMPTY: nothing was moved, a SECOND composition was created, and the
+    cascade still inline-composes its own run-status write at ``api/workflows.py:1518``.
+    It is wrong a second way too — the cascade has never called the phase writer (which
+    did not exist before this phase), so it never composed "exactly this" at all.
+    ⇒ The rule above still binds and is now the ONLY thing keeping the two in step:
+    re-pointing ``delete_workflow_cascade``'s steps (2)+(3) at this helper is OWED, and
+    is the trigger for the next phase that touches that route. A docstring crediting
+    itself with a de-duplication it did not perform is how the fork stays invisible.
+
+    ⚠ BEST-EFFORT BY CONTRACT — IT NEVER RAISES (D-062-13, T-062-03) — BUT IT REPORTS.
+    Returns ``True`` iff BOTH writes landed, ``False`` if either raised. This is the
+    whole of the 194 CR-03 fix and the reason it is a return value rather than an
+    exception: the try/except must stay HERE (a second caller inherits the discipline
+    instead of having to remember it), yet a caller must still be able to tell success
+    from silence.
+    ⚠ THE JUSTIFICATION THIS DOCSTRING USED TO GIVE IS QUOTED RATHER THAN DELETED,
+    BECAUSE IT IS TRUE OF ONE CALLER AND FALSE OF THE OTHER: "the chat-side cancel has
+    already landed by the time this runs, and a workflow-side failure must never turn a
+    successful Stop into an error." That holds for Step 3b below — ``runs.status`` is
+    already written there, so it IGNORES this return by design, and a fence pins that.
+    It does NOT hold for the ``DELETE /runs/{id}`` no-producer arm, where this
+    composition is the ONLY durable write in the entire request; that arm answered 204
+    over a write that may never have happened.
+    ⇒ THE RULE FOR A THIRD CALLER: a caller with NO other durable write MUST NOT report
+    success on ``False``.
+
+    ⚠ THE APP-SHUTDOWN GATE IS ABSENT FROM THIS MODULE ON PURPOSE, AND ITS ABSENCE IS
+    A MEASURED DECISION RATHER THAN AN OVERSIGHT. 194-CONTEXT warns that "any new
+    terminalize must carry the same gate or it will break restart-resumability." That
+    is TRUE of ``run_producer.py``'s F2 block (096-09 / Phase 096 UAT Test 2, which
+    MUST keep its gate) and FALSE here, for three independent measured reasons — all
+    three written out in full in the fence's own docstring, at
+    ``backend/tests/test_run_lifecycle.py::test_step_3b_carries_no_app_shutdown_gate``,
+    so the next reader finds the argument rather than re-deriving it.
+    ⇒ Do not "fix" this by adding the gate. Two fences bind: one asserts its ABSENCE
+    here and one asserts its PRESENCE in ``run_producer.py``, each driven RED against
+    its own separate plant.
+    ⚠ THE GATE'S IDENTIFIER IS DELIBERATELY NOT SPELLED ANYWHERE IN THIS MODULE, INCLUDING IN THIS DOCSTRING — a raw grep for it over this file must count ZERO, so that any occurrence at all means the gate was ADDED. A needle that also matches the prose explaining why the thing is absent cannot tell absence from presence; this project has tripped that trap four times in this phase alone.
+
+    ⚠ THE CROSS-WORKER INTERLEAVE, named rather than guarded: a Stop on worker A (this composition) while worker B's producer is mid-F2 can interleave two identical ``UPDATE workflow_runs SET status='cancelled'`` writes; both write the SAME value, row-level locking serialises them, and the anchor clear is idempotent — BENIGN BY VALUE-IDENTITY, NOT BY EXCLUSION.
+    THE ONE THING A CALLER MUST NEVER DO IS MAKE THE TWO WRITES DISAGREE — e.g. one passing 'failed' while the other passes 'cancelled'. That prohibition IS the whole guard.
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE (T-194-09-01), matching
+    ``_cancel_run_internals`` below and both writers in ``db/workflows.py``. The
+    workflow cluster writes through a service-role pool that BYPASSES RLS, so the WHERE
+    clause is the access boundary — but this takes no user-supplied filter, only a key.
+    Ownership is the CALLER's (T-147-06): plan 194-10 adds the owner-scoped,
+    anchor-confirmed gate for the new id shape.
+    """
+    try:
+        # Late import (S3 / the module's shipped discipline) — this file already
+        # late-imports from app.api.threads, app.dependencies, app.utils.db and
+        # app.services.ask_user_service. Keeps the db layer off the load path.
+        from app.db.workflows import (  # noqa: PLC0415
+            cancel_active_phases,
+            finish_run,
+        )
+
+        # The anchor comes back from supabase as a STRING; asyncpg binds a uuid column
+        # from a UUID. Same coercion the shipped Step 3b already applies to thread_id.
+        _wf = UUID(workflow_run_id) if isinstance(workflow_run_id, str) else workflow_run_id
+        await finish_run(pool, _wf, "cancelled")
+        await cancel_active_phases(pool, _wf)
+        return True
+    except Exception:
+        logger.exception(
+            "Workflow cancel co-write failed for workflow run %s", workflow_run_id
+        )
+        return False
+
+
 async def _cancel_run_internals(
     *,
     run_id,
@@ -243,6 +338,68 @@ async def _cancel_run_internals(
     except Exception:
         logger.exception("Zombie heal finalize (cancel) failed for run %s", run_id)
 
+    # 1b. Phase 194 (194-09 / RUN-01 / SC#2) — the WORKFLOW half of the heal.
+    #
+    # ⚠ WHY THIS EXISTS AT ALL, AND WHY IT IS NOT AN EDGE CASE. ``RUN_TASKS`` is a
+    # PER-PROCESS dict and ``WORKER_COUNT=2`` is the default, so a Stop landing on the
+    # worker that does not hold the producer task takes THIS arm — roughly HALF of all
+    # missed Stops. Before 194-09 the arm healed only the ``runs`` row.
+    #
+    # ⚠ CORRECTED BESIDE, NOT OVER (194-CONTEXT D-09). D-09 stated the consequence as
+    # "the thread anchor is never cleared ⇒ the thread is permanently wedged." That is
+    # measurably FALSE: the anchor IS cleared, by the shipped 092-03 block immediately
+    # below, unconditionally. The GAP is real and only the CONSEQUENCE was wrong, and
+    # the true one is worse in a different way: ``workflow_runs.status='active'``
+    # forever with NO anchor pointing at it — invisible to ``find_resumable_runs``
+    # (which requires ``t.active_workflow_run_id = wr.id``), so no sweep will ever
+    # touch it, while it still renders as a live run to anything reading run status
+    # without joining the anchor. AN ORPHANED LIE, NOT A LOCK.
+    #
+    # ⚠ THE ORDER IS LOAD-BEARING: this READ must happen BEFORE the shipped 092-03
+    # clear below. ``finish_run`` keys its own anchor clear on
+    # ``WHERE active_workflow_run_id = $1``, so if the standalone clear ran first the
+    # id is already NULL and the ``workflow_runs`` row is unreachable forever.
+    #
+    # ⚠ NO APP-SHUTDOWN GATE HERE, DELIBERATELY — see
+    # ``cancel_workflow_run_internals``'s docstring for the three measured reasons and
+    # for why the gate's identifier is not spelled anywhere in this module.
+    #
+    # Own try/except + logger.exception per D-062-13 — "Postgres ``runs.status`` is the
+    # durable cancel record"; a workflow-side failure must never fail the cancel.
+    wf_id = None
+    try:
+        from app.utils.db import aexec  # noqa: PLC0415
+        _anchor_resp = await aexec(
+            supabase.table("threads")
+            .select("active_workflow_run_id")
+            .eq("id", thread_id)
+            .maybe_single()
+        )
+        _anchor = _anchor_resp.data if _anchor_resp is not None else None
+        wf_id = (_anchor or {}).get("active_workflow_run_id")
+    except Exception:
+        logger.exception(
+            "Zombie heal workflow-anchor read failed for thread %s (run %s)",
+            thread_id,
+            run_id,
+        )
+
+    # The ``if wf_id`` guard IS the Deep-path scope: a Deep run / continuation has
+    # ``threads.active_workflow_run_id IS NULL``, so this branch is not entered and the
+    # Deep cancel path stays byte-identical (the same shape ``run_producer.py``'s F2
+    # block states at :246-247).
+    if wf_id:
+        try:
+            from app.dependencies import get_pg_pool  # noqa: PLC0415
+            await cancel_workflow_run_internals(
+                pool=await get_pg_pool(), workflow_run_id=wf_id
+            )
+        except Exception:
+            logger.exception(
+                "Zombie heal workflow co-write could not acquire a pool for run %s",
+                run_id,
+            )
+
     # Phase 092 (092-03 / SC#2, MODE-02) — clear the per-thread workflow lock anchor on
     # cancel so a cancelled Harness/cap_paused run never strands the thread
     # Harness-locked. Best-effort, symmetric with the zombie-heal Redis ops (D-062-13).
@@ -295,5 +452,8 @@ async def _cancel_run_internals(
 __all__ = [
     "register_run_start",
     "finalize_run_terminal",
+    # Exported ON PURPOSE (194-09): plan 194-10's no-producer arm calls the SAME
+    # composition rather than re-composing finish_run + cancel_active_phases itself.
+    "cancel_workflow_run_internals",
     "_cancel_run_internals",
 ]

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 158 — Finding and narrowing</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+
+.app { height:calc(100vh - 46px); display:grid; grid-template-columns:58px 1fr; overflow:hidden; }
+.rail { background:var(--color-bg-elev1); border-right:1px solid var(--color-border); display:flex; flex-direction:column;
+  align-items:center; padding:var(--space-3) 0; gap:var(--space-2); }
+.rail .ri { width:36px; height:36px; display:grid; place-items:center; border-radius:var(--radius-md); font-size:15px;
+  color:var(--color-text-dim); cursor:pointer; }
+.rail .ri.on { background:var(--color-primary-dim); color:var(--color-primary); }
+.page { display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.phead { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--space-6);
+  border-bottom:1px solid var(--color-border); flex:none; }
+.phead h1 { font-size:var(--text-xl); font-weight:650; }
+.phead .sub { font-size:12.5px; color:var(--color-text-muted); }
+.spacer { flex:1; }
+.body { flex:1; min-height:0; overflow-y:auto; padding:var(--space-5) var(--space-6); }
+
+.btn-primary { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;
+  border-radius:var(--radius-md); background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-primary:hover { filter:brightness(1.08); }
+.btn-ghost { font-size:12.5px; padding:7px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; transition:all var(--dur-fast); }
+.btn-ghost:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+
+.searchbox { display:flex; align-items:center; gap:8px; background:var(--color-surface); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:8px var(--space-3); transition:all var(--dur-fast); }
+.searchbox:focus-within { border-color:var(--color-primary-glow); box-shadow:0 0 0 3px var(--color-primary-dim); }
+.searchbox input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-size:13px; }
+.searchbox input::placeholder { color:var(--color-text-dim); }
+.kbd { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); border:1px solid var(--color-border);
+  border-radius:4px; padding:1px 5px; }
+
+.chip { font-size:11.5px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); white-space:nowrap; }
+.chip:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.chip .c { font-family:var(--font-mono); font-size:9.5px; opacity:.7; margin-left:4px; }
+.chiprow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.countline { font-size:12px; color:var(--color-text-muted); font-family:var(--font-mono); }
+.countline b { color:var(--color-text); }
+
+mark { background:hsl(38 92% 60% / .3); color:var(--color-text); border-radius:3px; padding:0 1px; }
+
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:var(--space-3); }
+.card { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2); transition:all var(--dur-fast); }
+.card:hover { border-color:var(--color-primary-glow); box-shadow:var(--shadow-md); }
+.card-name { font-size:13.5px; font-weight:600; line-height:1.3; }
+.purpose { font-size:12.5px; color:var(--color-text-muted); line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.meta { font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono); }
+.chain { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.chain .ph { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); font-size:11px; }
+.chain .arrow { color:var(--color-text-dim); font-size:10px; }
+.state-pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; padding:2px 7px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.state-pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.state-pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.state-pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+
+.empty { padding:var(--space-8); text-align:center; color:var(--color-text-muted); font-size:13px; }
+.empty .big { font-size:26px; margin-bottom:var(--space-2); opacity:.5; }
+.note { font-size:11.5px; color:var(--color-text-dim); background:var(--color-muted);
+  border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary);
+  padding:8px var(--space-3); border-radius:var(--radius-sm); line-height:1.55; margin-bottom:var(--space-4); }
+.note.warn { border-left-color:var(--color-warning); }
+
+/* ── ⌘K palette (variant B) ── */
+.pal-backdrop { position:fixed; inset:0; z-index:9000; background:rgba(3,5,12,.7); backdrop-filter:blur(3px);
+  display:none; align-items:flex-start; justify-content:center; padding-top:12vh; }
+.pal-backdrop.open { display:flex; }
+.palette { width:min(620px,92%); background:var(--color-surface-hi); border:1px solid var(--color-border);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+.pal-input { display:flex; align-items:center; gap:10px; padding:var(--space-4); border-bottom:1px solid var(--color-border); }
+.pal-input input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-size:15px; }
+.pal-list { max-height:46vh; overflow-y:auto; padding:var(--space-2); }
+.pal-group { font-size:9.5px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); padding:8px var(--space-3) 4px; }
+.pal-opt { display:flex; align-items:center; gap:10px; padding:8px var(--space-3); border-radius:var(--radius-md);
+  cursor:pointer; font-size:13px; }
+.pal-opt.active { background:var(--color-primary-dim); }
+.pal-opt .po-sub { margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.pal-foot { display:flex; align-items:center; gap:var(--space-4); padding:8px var(--space-4);
+  border-top:1px solid var(--color-border); font-size:11px; color:var(--color-text-dim); }
+
+.rest-shot { border:1px dashed var(--color-border); border-radius:var(--radius-md); padding:var(--space-4);
+  background:var(--color-bg-elev1); }
+
+#sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-family:system-ui; font-size:11px;
+  background:rgba(0,0,0,.8); color:#fff; padding:8px 10px; border-radius:8px; opacity:.42;
+  transition:opacity var(--dur-base); display:flex; gap:8px; align-items:center; }
+#sketch-tools:hover { opacity:1; }
+#sketch-tools select, #sketch-tools button { font-size:11px; background:#1b1b22; color:#fff; border:1px solid #3a3a44;
+  border-radius:5px; padding:3px 6px; cursor:pointer; }
+#sketch-tools .lbl { color:#8a8a96; font-size:10px; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">158 · FINDING &amp; NARROWING</span>
+  <button class="variant-tab active" data-v="a">A: Always-on page search ★ Selected</button>
+  <button class="variant-tab" data-v="b">B: ⌘K finds workflows</button>
+  <button class="variant-tab" data-v="c">C: Calm collapsed toolbar</button>
+</div>
+
+<!-- ══════════ A — always-on page search ══════════ -->
+<div id="variant-a" class="variant">
+  <div class="app">
+    <div class="rail"><div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div></div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1><span class="sub">Search is always there.</span>
+        <div class="spacer"></div>
+        <button class="btn-primary">＋ New workflow</button>
+      </div>
+      <div style="padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-border);display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
+        <div class="searchbox" style="flex:1;max-width:400px">
+          <span>🔎</span><input id="qa" placeholder="Search by name or what it does…" oninput="renderA()">
+          <button class="kbd" style="cursor:pointer;background:transparent" onclick="document.getElementById('qa').value='';renderA()">clear</button>
+        </div>
+        <div class="chiprow" id="chips-a"></div>
+        <div class="spacer"></div>
+        <span class="countline" id="count-a"></span>
+      </div>
+      <div class="body">
+        <div class="note">Search matches the <b>name</b> and the <b>purpose sentence</b> (the soul's
+          <span style="font-family:var(--font-mono)">business_requirement</span>), highlighting the hit — so
+          <span style="font-family:var(--font-mono)">clause</span>, <span style="font-family:var(--font-mono)">assessments</span>
+          and <span style="font-family:var(--font-mono)">sign-off</span> all find workflows whose <i>titles</i> don't contain them.
+          <b>Stated honestly: this is substring matching, not meaning.</b> A paraphrase you'd expect to work —
+          “the thing that checks vendors” — returns <b>0 results</b>, because those words appear in that order nowhere.
+          Try it. Whether SC#1 (“typing part of its name”) is the real bar, or whether the purpose sentence should be
+          searched at all, is a decision for this sketch — not something to discover after shipping.</div>
+        <div id="list-a"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ B — ⌘K ══════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail"><div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div></div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1><span class="sub">Finding lives in one place, app-wide.</span>
+        <div class="spacer"></div>
+        <button class="btn-ghost" onclick="openPal()">🔎 Search <span class="kbd">⌘K</span></button>
+        <button class="btn-primary">＋ New workflow</button>
+      </div>
+      <div style="padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-border);display:flex;gap:var(--space-3);align-items:center">
+        <div class="chiprow" id="chips-b"></div>
+        <div class="spacer"></div>
+        <span class="countline" id="count-b"></span>
+      </div>
+      <div class="body">
+        <div class="note warn"><b>The honest cost, measured.</b> The shipped ⌘K
+          (<span style="font-family:var(--font-mono)">ThreadCommandPalette.tsx</span>, Phase 156) indexes
+          <b>threads only</b> — it takes <span style="font-family:var(--font-mono)">threads: Thread[]</span> and matches with
+          <span style="font-family:var(--font-mono)">matchesTitle</span>. It is hand-rolled on Radix Dialog, <b>not cmdk</b>.
+          Teaching it workflows means changing a <b>global</b> component and its one shared engine — a bigger blast radius than
+          a page-local input, and it is <i>not</i> free reuse.</div>
+        <div id="list-b"></div>
+      </div>
+    </div>
+  </div>
+  <div class="pal-backdrop" id="pal" onclick="if(event.target===this)closePal()">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Search">
+      <div class="pal-input"><span>🔎</span><input id="qpal" placeholder="Search workflows and chats…" oninput="renderPal()"></div>
+      <div class="pal-list" id="pal-list" role="listbox"></div>
+      <div class="pal-foot"><span><span class="kbd">↑↓</span> move</span><span><span class="kbd">↵</span> open</span>
+        <span><span class="kbd">esc</span> close</span>
+        <span style="margin-left:auto">Workflows <b style="color:var(--color-text-muted)">and</b> chats, one box</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ C — calm collapsed ══════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail"><div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div></div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1><span class="sub">Calm at rest, depth one tap away.</span>
+        <div class="spacer"></div>
+        <button class="btn-primary">＋ New workflow</button>
+      </div>
+      <div style="padding:var(--space-3) var(--space-6);border-bottom:1px solid var(--color-border)">
+        <button class="btn-ghost" id="expand-c" onclick="toggleC()">🔎 Search &amp; filter</button>
+        <div id="tools-c" style="display:none;margin-top:var(--space-3);gap:var(--space-3);align-items:center;flex-wrap:wrap">
+          <div class="searchbox" style="flex:1;max-width:400px">
+            <span>🔎</span><input id="qc" placeholder="Search workflows…" oninput="renderC()">
+          </div>
+          <div class="chiprow" id="chips-c"></div>
+          <div class="spacer"></div>
+          <span class="countline" id="count-c"></span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="note warn"><b>This is 021-D8's shipped intent, held to the org-scale bar.</b> It reads clean at rest —
+          but the create button and the whole library are already visible, so the tap buys nothing until you need it,
+          and at 200 workflows you need it <i>every single visit</i>. A control you always open is a control that
+          should always be open.</div>
+        <div id="list-c"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="sketch-tools">
+  <span class="lbl">theme</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option><option value="canvas-184">Canvas 184</option>
+  </select>
+  <span class="lbl">scale</span>
+  <select id="scale" onchange="setScale(this.value)">
+    <option value="12">12</option><option value="54" selected>54</option><option value="200">200</option>
+  </select>
+  <button onclick="demoType()">▶ demo typing</button>
+</div>
+
+<script src="../157-the-library-at-scale/data.js"></script>
+<script>
+var SCALE=54, WF=buildWorkflows(SCALE);
+var fA="all", fB="all", fC="all";
+var palIdx=0, palRows=[];
+
+function setScale(v){ SCALE=parseInt(v,10); WF=buildWorkflows(SCALE); renderAll(); }
+function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function hl(text,q){
+  if(!q) return esc(text);
+  var i=text.toLowerCase().indexOf(q.toLowerCase());
+  if(i<0) return esc(text);
+  return esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length));
+}
+function matches(w,q){
+  if(!q) return true; q=q.toLowerCase();
+  return w.name.toLowerCase().indexOf(q)>=0 || w.purpose.toLowerCase().indexOf(q)>=0;
+}
+var FILTERS=[["all","All"],["published","Ready to run"],["draft","Still building"],["starter","Starters"]];
+function apply(q,f){
+  return WF.filter(function(w){ return matches(w,q) && (f==="all"||w.state===f); });
+}
+function chipsHtml(q,cur,fn){
+  return FILTERS.map(function(p){
+    var n=WF.filter(function(w){return matches(w,q)&&(p[0]==="all"||w.state===p[0]);}).length;
+    return '<button class="chip '+(cur===p[0]?"on":"")+'" onclick="'+fn+'(\''+p[0]+'\')">'+p[1]+'<span class="c">'+n+'</span></button>';
+  }).join("");
+}
+function cardHtml(w,q){
+  return '<div class="card">'+
+    '<div style="display:flex;align-items:flex-start;gap:8px">'+
+      '<div style="flex:1;min-width:0"><div class="card-name">'+hl(w.name,q)+'</div></div>'+
+      '<span class="state-pill '+w.state+'">'+w.state+'</span></div>'+
+    '<div class="purpose">'+hl(w.purpose,q)+'</div>'+
+    '<div class="chain">'+chainHtml(w.phases,true)+'</div>'+
+    '<div class="meta">'+TIER_GLYPH[w.tier]+' '+w.tier+' · '+w.project+' · '+w.owner+'</div>'+
+  '</div>';
+}
+function listHtml(pool,q,clearFn){
+  if(pool.length===0){
+    return '<div class="empty"><div class="big">🔎</div>Nothing matches'+(q?' “'+esc(q)+'”':'')+'.<br>'+
+      '<button class="btn-ghost" style="margin-top:12px" onclick="'+clearFn+'()">Clear search &amp; filters</button></div>';
+  }
+  return '<div class="grid">'+pool.map(function(w){return cardHtml(w,q);}).join("")+'</div>';
+}
+
+/* ── A ── */
+function setA(f){ fA=f; renderA(); }
+function clearA(){ document.getElementById("qa").value=""; fA="all"; renderA(); }
+function renderA(){
+  var q=document.getElementById("qa").value;
+  var pool=apply(q,fA);
+  document.getElementById("chips-a").innerHTML=chipsHtml(q,fA,"setA");
+  document.getElementById("count-a").innerHTML="<b>"+pool.length+"</b> of "+WF.length;
+  document.getElementById("list-a").innerHTML=listHtml(pool,q,"clearA");
+}
+
+/* ── B ── */
+function setB(f){ fB=f; renderB(); }
+function clearB(){ fB="all"; renderB(); }
+function renderB(){
+  var pool=apply("",fB);
+  document.getElementById("chips-b").innerHTML=chipsHtml("",fB,"setB");
+  document.getElementById("count-b").innerHTML="<b>"+pool.length+"</b> of "+WF.length;
+  document.getElementById("list-b").innerHTML=listHtml(pool,"","clearB");
+}
+function openPal(){ document.getElementById("pal").classList.add("open"); palIdx=0;
+  var i=document.getElementById("qpal"); i.value=""; renderPal(); i.focus(); }
+function closePal(){ document.getElementById("pal").classList.remove("open"); }
+function renderPal(){
+  var q=document.getElementById("qpal").value;
+  var wfs=WF.filter(function(w){return matches(w,q);}).slice(0,6);
+  var threads=[ "Vendor risk — Q3 notes", "Contract review with Legal", "Budget variance chat" ]
+    .filter(function(t){ return !q || t.toLowerCase().indexOf(q.toLowerCase())>=0; }).slice(0,3);
+  palRows=wfs.map(function(w){return {k:"wf",label:w.name,sub:w.state};})
+    .concat(threads.map(function(t){return {k:"th",label:t,sub:"chat"};}));
+  if(palIdx>=palRows.length) palIdx=Math.max(0,palRows.length-1);
+  var h="";
+  if(wfs.length){ h+='<div class="pal-group">Workflows</div>'+
+    wfs.map(function(w,i){ return '<div class="pal-opt '+(palIdx===i?"active":"")+'" role="option" onclick="palGo('+i+')">'+
+      '<span>▤</span><span>'+hl(w.name,q)+'</span><span class="po-sub">'+w.state+'</span></div>'; }).join(""); }
+  if(threads.length){ h+='<div class="pal-group">Chats</div>'+
+    threads.map(function(t,i){ var gi=wfs.length+i; return '<div class="pal-opt '+(palIdx===gi?"active":"")+'" role="option" onclick="palGo('+gi+')">'+
+      '<span>💬</span><span>'+hl(t,q)+'</span><span class="po-sub">chat</span></div>'; }).join(""); }
+  if(!h) h='<div class="empty" style="padding:var(--space-6)">Nothing matches “'+esc(q)+'”.</div>';
+  document.getElementById("pal-list").innerHTML=h;
+}
+function palGo(i){ var r=palRows[i]; if(r){ closePal(); } }
+document.addEventListener("keydown",function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){ e.preventDefault();
+    var b=document.getElementById("variant-b"); if(b&&b.style.display!=="none") openPal(); return; }
+  var pal=document.getElementById("pal");
+  if(!pal||!pal.classList.contains("open")) return;
+  if(e.key==="Escape"){ closePal(); }
+  else if(e.key==="ArrowDown"){ e.preventDefault(); palIdx=Math.min(palRows.length-1,palIdx+1); renderPal(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); palIdx=Math.max(0,palIdx-1); renderPal(); }
+  else if(e.key==="Enter"){ e.preventDefault(); palGo(palIdx); }
+});
+
+/* ── C ── */
+var openC=false;
+function toggleC(){
+  openC=!openC;
+  document.getElementById("tools-c").style.display=openC?"flex":"none";
+  document.getElementById("expand-c").textContent=openC?"🔎 Hide search & filter":"🔎 Search & filter";
+  if(openC) document.getElementById("qc").focus();
+}
+function setC(f){ fC=f; renderC(); }
+function clearC(){ document.getElementById("qc").value=""; fC="all"; renderC(); }
+function renderC(){
+  var q=document.getElementById("qc").value;
+  var pool=apply(q,fC);
+  document.getElementById("chips-c").innerHTML=chipsHtml(q,fC,"setC");
+  document.getElementById("count-c").innerHTML="<b>"+pool.length+"</b> of "+WF.length;
+  document.getElementById("list-c").innerHTML=listHtml(pool,q,"clearC");
+}
+
+/* ── demo ── */
+function demoType(){
+  var active=document.querySelector(".variant-tab.active").dataset.v;
+  var id=active==="a"?"qa":active==="b"?null:"qc";
+  if(active==="b"){ openPal(); id="qpal"; }
+  if(active==="c"&&!openC) toggleC();
+  var el=document.getElementById(id); if(!el) return;
+  var word="vendor risk", i=0; el.value="";
+  var t=setInterval(function(){
+    el.value=word.slice(0,++i);
+    el.dispatchEvent(new Event("input"));
+    if(i>=word.length) clearInterval(t);
+  },90);
+}
+
+function renderAll(){ renderA(); renderB(); renderC(); }
+document.querySelectorAll(".variant-tab").forEach(function(btn){
+  btn.addEventListener("click",function(){
+    document.querySelectorAll(".variant").forEach(function(v){v.style.display="none";});
+    document.querySelectorAll(".variant-tab").forEach(function(t){t.classList.remove("active");});
+    document.getElementById("variant-"+btn.dataset.v).style.display="block";
+    btn.classList.add("active");
+  });
+});
+renderAll();
+</script>
+</body>
+</html>

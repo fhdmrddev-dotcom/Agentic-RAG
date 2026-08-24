@@ -23,8 +23,8 @@
  * pre-rendered), CsvTablePreview / <pre> / <img> (plain React children).
  * FilePreview itself never injects raw file content as HTML.
  */
-import { useEffect, useRef, useState } from "react"
-import { ChevronLeft, Download, Loader2 } from "lucide-react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { ChevronLeft, Copy, Download, Loader2 } from "lucide-react"
 import { downloadWorkspaceFile, getWorkspaceFileContent, DownloadError } from "@/lib/api"
 import { useResolvedFileId } from "@/hooks/useResolvedFileId"
 import type { WorkspaceFile, WorkspaceFileContent } from "@/types"
@@ -292,28 +292,39 @@ function FilePreviewContent({
   }
 
   const kind = classifyInline(content.mime_type, file.path)
+
+  // The four INLINE arms. Assigned rather than returned so the copy control below can
+  // wrap them all once, instead of the same button being pasted into four branches.
+  let body: ReactNode = null
   switch (kind) {
     case "markdown":
-      return (
+      body = (
         <div className="p-3">
           <MarkdownRenderer content={content.content} />
         </div>
       )
+      break
     case "code":
-      return (
+      body = (
         <div className="p-1">
           <ShikiCode code={content.content} language={langFromPath(file.path)} />
         </div>
       )
+      break
     case "csv":
-      return <CsvTablePreview content={content.content} />
+      body = <CsvTablePreview content={content.content} />
+      break
     case "text":
-      return (
+      body = (
         <pre className="m-0 whitespace-pre-wrap break-words px-3 py-2 font-mono text-[13px] text-foreground">
           {content.content}
         </pre>
       )
+      break
     default:
+      // ⚠ NO COPY CONTROL ON THIS ARM, AND THAT IS THE POINT OF THE EARLY RETURN. The
+      // fallback is what renders when there is nothing to show inline — an offer to copy
+      // "the content" there would either copy nothing or copy bytes a person cannot read.
       return (
         <Fallback
           message="No preview available · Download"
@@ -322,4 +333,75 @@ function FilePreviewContent({
         />
       )
   }
+
+  return (
+    <div className="relative">
+      {/* ── Phase 200 (sketch `run-panel-parts.html`) — THE COPY CONTROL, top-right ─────
+             The sheet draws a `content_copy` affordance in the preview's top-right corner.
+             The content was already in hand — the inline read returns the whole string —
+             and the clipboard idiom already ships twice elsewhere in the app. A grep for
+             `clipboard` across the panel and chat trees returned ZERO: no preview and no
+             code block had any way to get text out except selecting it by hand.
+
+             ⚠ IT RENDERS ONLY OVER THE FOUR INLINE ARMS. See the `default` early return
+             above — an offer to copy on the no-preview arm would copy nothing. */}
+      <CopyContentButton text={content.content} />
+      {body}
+    </div>
+  )
+}
+
+/**
+ * Copy the previewed text to the clipboard, and SAY whether it worked.
+ *
+ * ⚠ **THE FAILURE ARM IS NOT OPTIONAL.** `navigator.clipboard` is undefined outside a
+ * secure context and its write REJECTS when the document is not focused or permission is
+ * refused. A control that silently no-ops in those cases is worse than no control: the
+ * person walks away believing they hold the text. So the guard is explicit, the promise is
+ * caught, and the button reports `Copy failed` rather than flashing the success word.
+ *
+ * ⚠ **THE CONFIRMATION IS A `role="status"` LIVE REGION, not a title.** A sighted user
+ * gets the word on the button; without the region a screen-reader user pressing it would
+ * hear nothing at all and have no way to know the copy happened.
+ */
+function CopyContentButton({ text }: { text: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle")
+
+  // The confirmation is transient. Cleared on unmount too, so a state update never lands
+  // on a preview the user has already navigated away from.
+  useEffect(() => {
+    if (state === "idle") return
+    const t = window.setTimeout(() => setState("idle"), 2000)
+    return () => window.clearTimeout(t)
+  }, [state])
+
+  const onCopy = () => {
+    const clip = typeof navigator === "undefined" ? undefined : navigator.clipboard
+    if (!clip?.writeText) {
+      setState("failed")
+      return
+    }
+    clip.writeText(text).then(
+      () => setState("copied"),
+      () => setState("failed"),
+    )
+  }
+
+  return (
+    <div className="absolute right-2 top-2 z-10">
+      <button
+        type="button"
+        onClick={onCopy}
+        data-testid="preview-copy"
+        aria-label="Copy file contents"
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-surface/90 px-2 py-1 text-[11px] text-panel-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <Copy className="h-3 w-3" aria-hidden="true" />
+        {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
+      </button>
+      <span role="status" className="sr-only">
+        {state === "copied" ? "Copied to clipboard" : state === "failed" ? "Copy failed" : ""}
+      </span>
+    </div>
+  )
 }

@@ -85,6 +85,29 @@ export const RUN_READING_WORD: Record<CanvasReading, string> = {
   "waiting-for-you": "Paused for your answer",
   unknown: "State unknown",
   "recorded-not-sent": "Not sent — recorded",
+  // THE NINTH (Phase 194 Plan 04 / RUN-01 / D-04 / D-13) is the terminal a step reaches when
+  // a person stops the run underneath it. Outcome first, agent second: the sentence opens on
+  // what happened and then says who did it, so it can never be skimmed as a fault the system
+  // raised. D-04 is what makes that a requirement rather than a preference — this reading
+  // must read as neither success, nor failure, nor a step that was passed over, and the suite
+  // asserts all three as inequalities against the shipped words rather than trusting it.
+  //
+  // ⚠ IT IS NOT THE PANEL'S WORD, AND THAT IS THE RULE RATHER THAN AN OVERSIGHT. The panel
+  // spine says one thing about this step in its harness vocabulary and the canvas says
+  // another in business words; only the DERIVATION is shared (`lib/phaseState.ts`'s RULE,
+  // D-188-02). Req 8's acceptance is a grep proving zero local re-derivations — NOT that the
+  // two views print identical strings. The panel's word is deliberately not repeated in this
+  // file, and the suite asserts mechanically that the two strings DIFFER.
+  //
+  // ⚠ AND IT MUST NOT CLAIM WORK WAS THROWN AWAY. The validated sketch
+  // (`sketch-findings-agentic-rag/references/workflow-run-surface.md:25`) words the run band
+  // "… · partial work discarded", and that clause is exactly what D-13 forbids: a stopped run
+  // KEEPS its completed phases, their outputs are already durable, and collapsing to a claim
+  // that hides partial work discards evidence the database still holds. The sketch's copy is
+  // amended in plan 194-05 with the amendment recorded BESIDE the operator-approved original
+  // (this project's standing habit); this word is written so it cannot be read as that claim.
+  // It says what happened to THIS step and asserts nothing about any other.
+  cancelled: "Stopped by you",
 }
 
 /**
@@ -122,6 +145,17 @@ const CLAUSE_SKIPPED = "— the run took a different path"
 const CLAUSE_WAITING = "— it needs your reply before it can continue"
 /** Unknown: admits the gap. Never phrased as a warning the run has not raised. */
 const CLAUSE_UNKNOWN = "— we can't tell what happened to this step"
+/**
+ * Stopped (194-04 / D-13): states what a person cannot get from the word alone — whether
+ * this step FINISHED. It did not; it was interrupted mid-work.
+ *
+ * ⚠ EVERY WORD OF IT IS SCOPED TO THIS STEP. It says nothing about the run's other phases,
+ * because a stopped run KEEPS its completed ones and a clause that implied otherwise would be
+ * the "partial work discarded" claim D-13 forbids, one layer down. It also does not say the
+ * work here was thrown away — nobody measured that, the row's outputs are whatever the
+ * database holds, and a vocabulary table is not the place to guess.
+ */
+const CLAUSE_STOPPED = "— you ended the run while this step was still working"
 
 /**
  * The failure clause is a CLOSED SET OF THREE, keyed off the typed `EmitFailure` enum
@@ -205,6 +239,16 @@ const STATIC_CLAUSE: Record<CanvasReading, string | null> = {
   // TYPECHECK ERROR here until it was, precisely as intended. A `default:` arm would have
   // absorbed it silently as "no clause" and this decision would never have been taken.
   "recorded-not-sent": null,
+  // 194-04 / D-13 — a clause, and it is a DECISION taken against this table's own rule rather
+  // than a default. The rule is that a clause is carried by the readings a person cannot act
+  // on from the word alone; here the word says what happened and WHO did it, and leaves open
+  // the one thing that actually matters for honesty — did this step finish? It did not. That
+  // is precisely D-13's requirement, and the word alone cannot carry it.
+  //
+  // ⚠ This is the ninth reading the docblock above was written for — added later, and a
+  // TYPECHECK ERROR here until it was, precisely as intended. A fall-through arm would have
+  // absorbed it silently as "no clause" and this decision would never have been taken.
+  cancelled: CLAUSE_STOPPED,
 }
 
 /**
@@ -249,6 +293,97 @@ export interface NodeRunState {
   /** The step's terminal emit failure, when its run row carries one. Selects which of the
    *  three fixed clauses follows the failure word; ignored at every other reading. */
   emitFailure?: EmitFailure | null
+  /**
+   * Phase 200-06 (D-08 · `200-CHECKLIST.md` `BC-MR-01`) — THE STEP'S OWN DECLARED COUNT,
+   * as the executor declared it, carried straight off the wire (`step_count`).
+   *
+   * ⚠ **A REAL INTEGER, INCLUDING `0`.** A search step that ran and found nothing declared
+   * a real `0` and it must render. **`undefined` / `null` is the DIFFERENT fact** — the
+   * phase type declares no count at all (four of the seven do not: `programmatic`,
+   * `llm_single`, `llm_human_input`, `external_action`), and the UI then renders NOTHING:
+   * never `0`, never a dash, never an empty pill (`BC-MNR-01`). The two must never be
+   * folded together, which is why the arm is `typeof count === "number"` everywhere and
+   * never `count ?? …` and never `if (count)`.
+   *
+   * ⚠ **THE CANVAS COUNTS NOTHING** (`BC-MNR-05` / D-08). This field rides the seam that
+   * already exists; there is no second counting path and no second fetch. `200-02` put it
+   * on the wire at all four transports, and the PAGE joins it to the slug exactly as it
+   * already joins the reading and the words.
+   */
+  count?: number | null
+  /**
+   * The NOUN for that count — `sources` · `agents` · `fields` — authored at exactly one
+   * executor site per phase type and carried on the wire beside the number (`step_noun`).
+   *
+   * ⚠ **THE STEP'S OWN NOUN, NEVER THE CONTRACT'S AND NEVER THE DOMAIN'S** (D-07 /
+   * `SEED-168`). Sheet c1 draws `312 contracts → 48 extracted → 12 flagged`; reproducing
+   * that phrasing by letting a model author the word is the fabricated business figure
+   * `199-05` called *"the highest-consequence lie this phase could ship"*. The client
+   * spells no noun of its own — it renders the one the server declared, or nothing.
+   */
+  noun?: string | null
+  /**
+   * Phase 200 (`PORT-canvas.md` — *"the marching running connector, NOT LANDED, and this is
+   * the one real gap"*) — IS THIS STEP EXECUTING RIGHT NOW, resolved by the PAGE.
+   *
+   * ⚠ **A BOOLEAN, AND THAT IS THE WHOLE POINT.** `WorkflowCanvas.tsx` is forbidden by its
+   * own suite from spelling ANY of the seven reading words or importing this module as a
+   * value (D-188-01/D-188-02 — the page decides the reading, the canvas paints it), so a
+   * canvas that wanted to animate its one live connector had to write `reading === "running"`
+   * and tripped the fence. The canvas author built the marching line, measured the trip, and
+   * backed the whole thing out rather than loosen the fence. This field is the seam that was
+   * missing: the page — which already owns the vocabulary — resolves the fact, and the canvas
+   * merges a stroke delta and a CSS class with **no derivation and no lookup**.
+   *
+   * ⚠ **`true` MEANS EXECUTING, NOT "NOT FINISHED".** A step `waiting-for-you` is stopped
+   * dead awaiting a human and nothing is flowing into it; a step `not-started` has not been
+   * reached. Animating either would be motion asserting progress that is not happening — the
+   * same class of claim as a fabricated count. Absent ⇒ paint the resting connector, which
+   * is why the field is optional and why no consumer may read it as `!live ⇒ finished`.
+   */
+  live?: boolean
+  /**
+   * Phase 200 (FE-WIRING) — THE STEP'S OWN ELAPSED, ALREADY WORDED BY THE PAGE.
+   *
+   * `screens/node-identity.html:265` draws `00:15` on its running node. Every piece of it
+   * shipped one surface over before this field existed: `started_at` / `completed_at` are on
+   * the wire (`backend/app/api/workflow_runs.py`, migration `121_workflow_phases_timings.sql`),
+   * `phaseDuration.ts` formats them via `fmtElapsed`, and the SPINE renders the result as
+   * `node-run-time`. The canvas card had no slot and no supply line; this is the supply line.
+   *
+   * ⚠ **A STRING, LIKE `label` AND `noun` BESIDE IT, AND FOR THEIR REASON.** The page owns the
+   * clock. A card that formatted its own elapsed would be a second clock beside the run band's
+   * on the same screen, free to disagree with it about the same run by a tick.
+   *
+   * ⚠ **ABSENT ⇒ THE CARD RENDERS NO ELEMENT.** `undefined` / `null` is "we hold no timing for
+   * this step", which is emphatically not "this step has run for zero seconds". Never `00:00`,
+   * never a dash, never an empty slot — the `count` field above carries the same three-state
+   * discipline for the same reason.
+   *
+   * ⚠ **THE CANVAS TIMES NOTHING.** This rides the seam that already exists; there is no second
+   * clock, no interval and no fetch anywhere in the card subtree.
+   */
+  elapsed?: string | null
+}
+
+/**
+ * THE PAYLOAD LABEL — the whole string a connection carries, or `null` for "say nothing".
+ *
+ * ONE function, so the composition has one home and the absence rule has one arm. The
+ * canvas cannot call it (its own suite forbids a value import of this module, which is
+ * what keeps the vocabulary out of a G-5 hot file), so the caller is `FlowEdge`.
+ *
+ * ⚠ **BOTH HALVES ARE REQUIRED, AND THE NUMBER'S TEST IS `typeof`.** A declared `0` with
+ * a noun renders `0 sources` — the fact that a step searched and found nothing. A missing
+ * number, or a number with no noun, renders NOTHING AT ALL: the caller must be able to
+ * omit the label ELEMENT, so this returns `null` rather than an empty string (an empty
+ * string still renders an element, and `BC-MNR-01` forbids an empty pill exactly as
+ * firmly as it forbids a `0`).
+ */
+export function payloadLabel(count?: number | null, noun?: string | null): string | null {
+  if (typeof count !== "number" || Number.isNaN(count)) return null
+  if (typeof noun !== "string" || noun.length === 0) return null
+  return `${count} ${noun}`
 }
 
 // ── The card border ─────────────────────────────────────────────────────────────
@@ -263,6 +398,16 @@ export interface NodeRunState {
  * burning the whole 10% accent budget on the least urgent news on the screen. The
  * quiet states stay quiet so the two loud ones (something needs you / something broke)
  * are the only things that pull the eye.
+ *
+ * THE SIXTH ABSENCE IS 194's, and it is a STATED DECISION rather than an omission — an
+ * unrecorded absence from a `Partial<>` table is invisible to the compiler and therefore
+ * indistinguishable from a bug, which is why 189 wrote its own down and why this one is here.
+ * The stopped reading claims NO border, for two reasons that point the same way. It is a
+ * QUIET terminal: nothing broke and nothing is owed, so it belongs with *Complete* and the
+ * recorded-not-sent reading rather than with the two loud ones. And it is the ONE state on
+ * this surface the person already knows about before the canvas tells them — they pressed
+ * Stop. Spending the accent to announce a fact the user just caused would dim the only two
+ * readings that genuinely need to pull the eye. Its ring shape already carries it.
  *
  * The FIFTH absence is 189's, and it is recorded here rather than left to be discovered:
  * an unrecorded omission from a `Partial<>` table is indistinguishable from a bug, and
@@ -347,6 +492,32 @@ export type RingSpec =
  *                     the eighth reading so this list stays a complete enumeration
  *                     rather than becoming seven-of-eight: the criterion above is only
  *                     a criterion while every row it covers is named in it.
+ *   • `cancelled`   — the only ring CUT EXACTLY IN HALF: dash equals gap, one pair, so
+ *                     half the circle is drawn and half is simply not there (194 / D-13).
+ *                     Added with the ninth reading, for the same enumeration reason.
+ *
+ * THE NINTH SHAPE, AND WHY EACH CLAUSE OF IT IS LOAD-BEARING:
+ *
+ *   • `dash === gap` is its assertable unique property, and it is a property of the ROW
+ *     rather than of a number a test re-types: no other spec has its dash fraction equal to
+ *     its gap fraction (`.26/.74`, `.42/.08`, `.74/.26`, `.15/.10`), and the two `length`
+ *     rows are textures with no fractions at all. A test compares the two fields.
+ *   • It reads as INTERRUPTED rather than as any kind of quantity. The arc sets out at 12
+ *     o'clock, travels the right-hand half, and stops at 6 — it does not fade, it does not
+ *     wrap, and it never comes back round. That is the whole meaning of the state, drawn.
+ *   • It does NOT spin. The run is over for this phase; a moving terminal would claim work
+ *     still in flight. Movement stays `running`'s own uniqueness property, which survives
+ *     `prefers-reduced-motion` only because no other row leans on it.
+ *   • `repeats: 1` and `0.5 + 0.5 = 1.00` exactly, so the pattern tiles the circle with no
+ *     seam where it wraps at the path start — the rule every fraction row in this table has
+ *     held since 188.
+ *   • `gapCentre: 0.5` because it is unclaimed (`null`, 0.375, 0.75 and 0.125 are taken), it
+ *     is NOT 12 o'clock — the waiting reading's signature and the pause chip's home — and it
+ *     keeps the computed dashoffset POSITIVE like every shipped row.
+ *   • A near-closed ring with one small notch was REJECTED for the same reason 189 rejected
+ *     it: it maximises confusability with `done`, and `done` is the reading this must be
+ *     most distinct from. A step a person interrupted reading as one that succeeded is the
+ *     confusion this phase exists to prevent.
  *
  * THE EIGHTH SHAPE, AND WHY EACH CLAUSE OF IT IS LOAD-BEARING (UI-SPEC §4b):
  *
@@ -409,6 +580,13 @@ export const RING_GEOMETRY: Record<CanvasReading, RingSpec> = {
   "recorded-not-sent": {
     kind: "fraction",
     arc: { dash: 0.15, gap: 0.1, repeats: 4, gapCentre: 0.125 },
+    spinning: false,
+  },
+  // 194-04 / D-13 — the ring cut exactly in half. See the ninth-shape block above for why
+  // each of the four numbers is what it is; none of them is a taste call.
+  cancelled: {
+    kind: "fraction",
+    arc: { dash: 0.5, gap: 0.5, repeats: 1, gapCentre: 0.5 },
     spinning: false,
   },
 }

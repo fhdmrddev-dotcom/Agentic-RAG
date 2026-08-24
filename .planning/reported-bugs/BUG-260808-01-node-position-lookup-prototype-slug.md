@@ -4,12 +4,13 @@ title: A phase slugged with an Object.prototype member name gets NO node transfo
 reported: 2026-08-08
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflow-canvas, frontend/canvas-model, security/WR-04]
-folded_into: null
+folded_into: 200
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: >
+  Folded at /gsd:discuss-phase 200 (2026-08-19), together with BUG-260807-01 (same shape, both tagged security/WR-04). Correctness under the canvas plan 200-05 rebuilds. WARNING: this is NOT a checklist row under D-01 -- it widens 200-05 beyond the element inventory deliberately.
 reproduces_on:
   branch: develop
   commit: HEAD at the 189-16 owed-rows UAT session (post 690ead48)

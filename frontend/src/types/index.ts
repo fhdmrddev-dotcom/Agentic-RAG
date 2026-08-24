@@ -988,7 +988,12 @@ export interface TaskRunIndexItem {
  *  streams via `phase_substep` (status field). A sealed forced emit is ATOMIC (it
  *  cannot stream tokens), so the emit moment surfaces as these honest sub-steps on the
  *  EXISTING status-node rail instead of a static "Step 0 · working…" box. Optional —
- *  only a `llm_emit` fill phase ever carries one; every other phase leaves it undefined. */
+ *  most phases leave it undefined.
+ *
+ *  ⚠ THIS DOCBLOCK USED TO SAY *"only a `llm_emit` fill phase ever carries one"* AND
+ *  PHASE 196 MAKES THAT FALSE — corrected here rather than left as a stale claim.
+ *  `model_fallback` (196-03 / D-10) is streamed by EVERY llm phase type, not just the
+ *  fill one, and the render site was never gated on phase type anyway. */
 export type EmitSubStep =
   | "forcing"
   | "emitting"
@@ -996,6 +1001,9 @@ export type EmitSubStep =
   | "validating"
   | "rendering"
   | "validated"
+  /** Phase 196-03 (D-10) — an operator-DISABLED per-phase model was substituted for the
+   *  run's model. The ONE member a non-`llm_emit` phase can carry. */
+  | "model_fallback"
 
 /** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
  *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail
@@ -1031,7 +1039,26 @@ export interface Phase {
    *  snake_case SLUG (migration 115 widened `workflow_phases_status_check`); this union
    *  carries the kebab-case client member, exactly as `active`/`completed` already map to
    *  `running`/`done`. The rendered sentence a person reads is a third spelling again and
-   *  lives in the vocabulary layers, never here. */
+   *  lives in the vocabulary layers, never here.
+   *
+   *  Phase 194 Plan 04 (RUN-01 / D-04 / D-07 / D-13 / D-17) — `"cancelled"` is ADDITIVE by
+   *  the same mechanism, for the third time. It is the phase that was RUNNING when a person
+   *  stopped the run, and it reaches a terminal the eight members above cannot state: it is
+   *  not `done` (nothing finished), not `failed` (nothing went wrong — a person ended the
+   *  run), not `skipped` (the step DID run; it was never routed around), not
+   *  `recorded-not-sent` (189's governed external-action outcome, unrelated to a stop) and
+   *  NOT `unknown` — we know exactly what happened to it. That last one is the interesting
+   *  refusal, and it is why this member exists rather than a collapse: `unknown` means "a row
+   *  that EXISTS and carries a status this client does not recognise", so resolving a stop to
+   *  it would be a fallback that claims LESS than its input supports — the mirror image of
+   *  the fail-open the union's first widening was added to refuse.
+   *
+   *  ⚠ D-17 STILL APPLIES, AND THE COINCIDENCE HERE IS NOT A RELAXATION OF IT. Migration 119
+   *  spells the database slug `cancelled` and this client member is spelled `cancelled` too —
+   *  identically, this once. That is a property of THIS WORD (it needs no case change and no
+   *  kebab hyphen), exactly as `failed` and `skipped` have always coincided, and NOT a rule
+   *  that the two layers share a spelling. The panel's word and the canvas's sentence are
+   *  still a third and a fourth spelling and still live in the vocabulary layers, never here. */
   status:
     | "pending"
     | "running"
@@ -1041,6 +1068,7 @@ export interface Phase {
     | "skipped"
     | "recorded-not-sent"
     | "unknown"
+    | "cancelled"
   attempt?: number
   error?: string
   subAgents: TaskRunIndexItem[]

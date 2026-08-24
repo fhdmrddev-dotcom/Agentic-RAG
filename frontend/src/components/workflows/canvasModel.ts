@@ -37,8 +37,14 @@
  */
 import type { Edge, Node } from "@xyflow/react"
 
+// Type-only, and that is required rather than stylistic: this module is the PURE
+// projection (D-183-12) and must stay free of any runtime dependency that could make the
+// committed snapshot depend on view state. `connectionState.ts` is a true leaf anyway,
+// but the type-only form is what makes the independence structural.
+import type { ConnectionState } from "@/components/workflows/connectionState"
 import {
   actionRiskArmed,
+  branchConditionOf,
   groundingCauseOf,
   nodeTitle,
   notConnectedOf,
@@ -64,10 +70,22 @@ import {
 export const CANVAS_LAYOUT = {
   /** Uniform node width — every card is the same width; content wraps, never widens. */
   NODE_WIDTH: 260,
-  /** The floor a card may not shrink below; it grows DOWNWARD from here. Raised
-   *  96 → 104 by D-185-17: 104 is the 137-B floor, the height at which the mark
-   *  floating above the card's top edge clears the title line by 11px rather than
-   *  the 3px the sketch theme's own `padding-top: 34` left. */
+  /** The floor a card may not shrink below; it grows DOWNWARD from here.
+   *
+   *  104 is D-185-17's 137-B floor: the height at which the mark floating above the card's
+   *  top edge clears the title line by 11px rather than the 3px the sketch theme's own
+   *  `padding-top: 34` left.
+   *
+   *  ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT AND BACK TO 104 HERE, and the port's reason is
+   *  kept rather than erased because it was correct FOR ITS CARD: "That mark no longer
+   *  floats above the card; sketch 200 puts it INSIDE, on the left, so the clearance the
+   *  104 bought is not a constraint any more. 72 is `screens/builder-canvas.html`'s own
+   *  node height." The operator has since chosen the 137-B face, the mark floats above the
+   *  top edge again, and the clearance IS a constraint again — so the number goes back with
+   *  the card that needs it. ⚠ IT MOVES WITH `EDGE_ANCHOR_Y` OR THE CONNECTORS DETACH: both
+   *  constants and `PhaseNodeCard`'s own `RUN_MODE_NODE_MIN_HEIGHT` are one decision in
+   *  three places, and reverting any two of the three leaves the lines entering the cards
+   *  at the wrong height. */
   NODE_MIN_HEIGHT: 104,
   /** Horizontal distance between two adjacent phase columns. */
   PITCH_X: 320,
@@ -75,7 +93,16 @@ export const CANVAS_LAYOUT = {
   LANE_Y: 0,
   /** The lane below the spine where an unresolved-skip stub is parked. */
   SKIP_LANE_Y: 200,
-  /** Handle offset from the node TOP (never 50%) — a taller card keeps its baseline. */
+  /** Handle offset from the node TOP (never 50%) — a taller card keeps its baseline.
+   *
+   *  ⚠ 28 → 36 AT THE PHASE 200 CANVAS PORT AND BACK TO 28 HERE. The port's measurement is
+   *  kept because it was real and it is the record of what 36 meant: "its nodes sit at
+   *  `top: 64px` with a height of 72, and every connector into and out of them is drawn at
+   *  `y = 100`. `100 − 64 = 36`, i.e. the vertical centre of the sheet's 72px card." That
+   *  is the right anchor for a 72px card and the wrong one for a 104px card whose first
+   *  42px are padding under a floating mark — at 36 the lines would enter the restored card
+   *  above its title. D-183-12 is untouched either way: this is a FIXED offset from the top,
+   *  never 50%, so a taller card keeps its baseline. */
   EDGE_ANCHOR_Y: 28,
   /** The ○ end cap's square size. */
   END_CAP_SIZE: 40,
@@ -173,6 +200,21 @@ export interface PhaseNodeData {
    * neither this file nor `PhaseNode.tsx` nor the card is touched.
    */
   notConnected: boolean
+  /**
+   * Phase 200-06 (`BC-MR-03`) — this step's own branch condition, already resolved to the
+   * TARGET STEP'S NAME, or ABSENT when there is nothing honest to say.
+   *
+   * Absent in three distinct cases, and the third is a decision rather than a gap: the
+   * step declares no `on_failure` at all; the directive is not a skip; or the target slug
+   * resolves to no phase in this definition — in which case the broken-reference STUB
+   * already prints the whole sentence and a second copy on the source card would be the
+   * same fact twice, three centimetres apart (199-05's own rule).
+   *
+   * ⚠ THE SLUG NEVER REACHES THE FACE. `workflow_phases.slug` is an identifier; the card
+   * carries business words. The resolution happens once, in the projection, against the
+   * definition the projection already holds.
+   */
+  condition?: string
   [k: string]: unknown
 }
 
@@ -240,6 +282,43 @@ export interface CanvasEdgeData extends Record<string, unknown> {
    * `FlowEdge.tsx` is empty, deliberately.
    */
   armed?: boolean
+  /**
+   * Phase 200-06 (`BC-MR-01` / D-08) — the UPSTREAM step's own declared count, ready to
+   * render, or ABSENT when that step declared nothing.
+   *
+   * ⚠ **`toCanvas` NEVER SETS THIS, AND THAT IS STRUCTURAL RATHER THAN AN OVERSIGHT.**
+   * This projection is a PURE function of the definition alone (D-183-12) — same phases
+   * in, byte-identical nodes and edges out — and a run's declared count is not in the
+   * definition. The key is declared HERE because this is where the edge's data shape has
+   * its one home; it is FILLED by `WorkflowCanvas`, from the `runState` seam the PAGE
+   * supplies, in the same memo that resolves the stroke. So the projection's committed
+   * snapshot stays byte-identical to what it was before this plan, and there is still
+   * exactly one place a reader looks to learn what an edge can carry.
+   */
+  payload?: EdgePayload
+  /**
+   * Phase 200-06 (`BC-MR-02`) — which of the four connection states this line is in.
+   *
+   * Resolved by `connectionState.connectionStateOf` in `WorkflowCanvas` (which owns the
+   * pointer and the selection), never here: it is a VIEW state, not a projection fact,
+   * and putting it in the pure projection would make the committed snapshot depend on
+   * where the mouse is. Absent ⇒ `FlowEdge` renders exactly as it did before this plan.
+   */
+  connection?: ConnectionState
+}
+
+/**
+ * ONE connection's payload — the fact it carries, kept in the two halves the wire carries
+ * them in so that neither can be synthesised from the other.
+ *
+ * ⚠ `count` is a REAL integer INCLUDING `0`; ABSENCE is the DIFFERENT fact and is
+ * expressed by omitting the whole object, never by a `0` and never by a dash
+ * (`BC-MNR-01`). `noun` is the STEP'S OWN word, authored at one executor site per phase
+ * type and carried on the wire — the client spells none of its own (`BC-MNR-02`).
+ */
+export interface EdgePayload {
+  count: number
+  noun: string
 }
 
 /**
@@ -331,8 +410,26 @@ function buildPhaseData(
   phase: PhaseSpecJSON,
   kbTools: readonly string[],
   nameContext: NameContext,
+  /**
+   * 200-06 (BC-MR-03) — slug → the step's own NAME, over the definition being projected.
+   *
+   * INJECTED rather than looked up here, for the reason the `nameContext` parameter beside
+   * it exists: this helper sees ONE phase, and resolving a branch target needs all of
+   * them. The caller is `toCanvas`, which already holds `bySlug`.
+   *
+   * OPTIONAL, and omitting it means "no condition on any face" rather than "a condition
+   * with a slug in it". Every shipped caller of `toCanvas` supplies it (it is not a public
+   * parameter — the resolver is built inside the projection), so the default exists only
+   * so this helper stays total on its own.
+   */
+  resolveName: (slug: string) => string | null = () => null,
 ): PhaseNodeData {
   const phaseType = phase.config.phase_type
+  // The whole line, or null when this step declares no branch worth stating. Spread
+  // CONDITIONALLY below (the shipped D-14 idiom), so a step with no branch produces a
+  // `data` object byte-identical to what it produced before this plan — which is what
+  // keeps the committed projection snapshot unmoved for every fixture but the branching one.
+  const condition = branchConditionOf(phase, resolveName)
   return {
     slug: phase.slug,
     phaseIndex: phase.phase_index,
@@ -357,6 +454,7 @@ function buildPhaseData(
     armed: isArmed(phase),
     waitsForYou: waitsForYou(phase),
     notConnected: isNotConnected(phase),
+    ...(condition === null ? {} : { condition }),
   }
 }
 
@@ -434,8 +532,17 @@ export function toCanvas(
   // (0) PHASE NODES — one per phase, id === slug (SC#3). `llm_batch_agents` gets ONE
   // node: the ×N fan-out is a RUNTIME behaviour, not topology, and drawing N lanes
   // would disagree with the server's adjacency.
+  // 200-06 (BC-MR-03) — slug → this definition's own step NAME. A `Map`, so a slug named
+  // `constructor` cannot resolve an inherited member: `Map.get` reads no prototype chain.
+  // `nodeTitle` is the SAME function the face's own title comes from, so the condition
+  // names a step exactly as that step names itself.
+  const nameOfSlug = (slug: string): string | null => {
+    const target = bySlug.get(slug)
+    return target === undefined ? null : nodeTitle(target, nameContext)
+  }
+
   for (const [col, phase] of ordered.entries()) {
-    const data = buildPhaseData(phase, kbTools, nameContext)
+    const data = buildPhaseData(phase, kbTools, nameContext, nameOfSlug)
     nodes.push({
       id: phase.slug,
       type: CANVAS_NODE_TYPES.phase,

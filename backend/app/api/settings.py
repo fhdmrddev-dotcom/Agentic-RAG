@@ -593,9 +593,24 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
     from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
     _overrides = await load_all_model_overrides()
     deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
+    # Phase 196 Plan 07 (D-18 / BUG-260718-04): the operator-DISABLED model-id set, so the
+    # composer's per-thread model restore can apply D-07's disabled rule by name instead of
+    # inferring it. Same already-fetched `_overrides` dict as the line above — no new read,
+    # no new import, no new cache.
+    #
+    # ⚠ SEMANTICS ARE `_registry_row`'s, NOT `enabled_model_allowed_set`'s: only a row that
+    # is PRESENT with `enabled` explicitly False is disabled. An ABSENT override row is
+    # enabled (that is the overwhelming majority of ids, which have no row at all), so a
+    # truthiness test here would report every unregistered model as disabled. This is the
+    # identical predicate `_build_providers` uses to assemble `disabled_ids`
+    # (user_settings.py — D-149-08), which is what makes the two agree by construction.
+    disabled_models = sorted(
+        mid for mid, cap in _overrides.items() if cap.get("enabled") is False
+    )
     return {
         "active": s.active_provider,
         "active_model": s.llm_model,
         "providers": configured,
         "deprecated_models": deprecated_models,
+        "disabled_models": disabled_models,
     }

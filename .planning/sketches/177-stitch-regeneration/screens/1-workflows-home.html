@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Workflows</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        'page-bg': '#060A0F',
+                        'sidebar-bg': '#080B11',
+                        'card-bg': '#0D1117',
+                        'raised-bg': '#0F141B',
+                        'muted-fill': '#151B24',
+                        'border-color': '#212631',
+                        'primary-text': '#F4F6FE',
+                        'secondary-text': '#9AA3B5',
+                        'dim-text': '#6B7383',
+                        'primary-accent': '#A3A5FF',
+                        'primary-strong': '#635BFF',
+                        'violet': '#895AF6',
+                        'success': '#21C45D',
+                        'warning': '#F5A524',
+                        'danger': '#DC2626',
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px",
+                        "6px": "6px",
+                        "10px": "10px",
+                        "14px": "14px",
+                        "20px": "20px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #F4F6FE;
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 20px;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+    </style>
+</head>
+<body class="bg-page-bg text-primary-text min-h-screen flex antialiased">
+<!-- SideNavBar (from JSON) -->
+<nav class="bg-[#080B11] font-body text-[14px] leading-relaxed font-label text-[11px] uppercase tracking-wider font-headline font-semibold h-screen w-64 fixed left-0 top-0 flex flex-col border-r border-[#212631]/50 z-20">
+<div class="flex flex-col h-full py-6">
+<!-- Header -->
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-strong to-violet flex items-center justify-center overflow-hidden shrink-0">
+<img alt="User Profile" class="w-full h-full object-cover opacity-80 mix-blend-screen" data-alt="Abstract deep midnight cosmic core glowing with soft indigo light in a dark void. Highly detailed, ethereal, modern dark mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDy7ceD2hhb6BATzS8C4j-2e1iFSFhlIoU1Kzr88EoqvJpTWy_cQ86vJcnsVlye_3qIV6DZojXr92FlAC9tgRGhaff2sphYCL1-d6gMX9ZwgsrQIGzEzEDFpbSQGVfLo4dMJtbZLdYbHpdTWjRbzpiMHY3FbVz0XOGI0uopyGzSWDBHlsNrUCU_bc045Fmkft-z9iaZ8_pGAxiW5MD7NgmRfiAi-M9UW4vFonnUoaDO3_r4yUpPMthBeEYBtsQvZptg69-f3uMyAETj"/>
+</div>
+<div>
+<h1 class="font-headline text-lg font-bold text-[#F4F6FE] leading-tight">Aether Intelligence</h1>
+<span class="text-dim-text text-[11px] uppercase tracking-widest font-mono">Deep Midnight</span>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-4 mb-6">
+<button class="w-full bg-muted-fill hover:bg-[#212631] text-primary-text border border-[#212631]/50 rounded-10px py-2.5 px-4 flex items-center justify-center gap-2 transition-colors duration-200 group">
+<span class="material-symbols-outlined text-[18px] text-primary-accent group-hover:text-[#F4F6FE]">add</span>
+<span class="font-medium text-sm">New Workflow</span>
+</button>
+</div>
+<!-- Tabs -->
+<div class="flex-1 flex flex-col gap-1 px-2">
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] hover:bg-[#151B24] rounded-6px" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-medium">Chat</span>
+</a>
+<a class="text-[#A3A5FF] bg-[#A3A5FF]/15 border-r-2 border-[#635BFF] flex items-center px-4 py-3 gap-3 transition-colors rounded-l-6px translate-x-1" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="account_tree">account_tree</span>
+<span class="font-medium">Workflows</span>
+</a>
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] hover:bg-[#151B24] rounded-6px" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="database">database</span>
+<span class="font-medium">Knowledge</span>
+</a>
+</div>
+<!-- Footer Tabs -->
+<div class="mt-auto px-2 flex flex-col gap-1 pt-4 border-t border-[#212631]/50">
+<a class="text-[#9AA3B5] flex items-center px-4 py-2.5 gap-3 transition-colors hover:text-[#F4F6FE] hover:bg-[#151B24] rounded-6px" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="settings">settings</span>
+<span class="font-medium text-[13px]">Settings</span>
+</a>
+<a class="text-[#9AA3B5] flex items-center px-4 py-2.5 gap-3 transition-colors hover:text-[#F4F6FE] hover:bg-[#151B24] rounded-6px" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="menu_book">menu_book</span>
+<span class="font-medium text-[13px]">Documentation</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- TopAppBar (from JSON) -->
+<header class="bg-[#060A0F] font-headline font-medium text-[15px] h-16 fixed top-0 right-0 left-64 z-10 border-b border-[#212631]/50">
+<div class="flex items-center justify-between px-8 w-full h-full">
+<div class="flex items-center gap-6">
+<h2 class="font-headline font-bold text-[#F4F6FE] tracking-tight text-lg">Workflows</h2>
+<div class="relative focus-within:ring-1 focus-within:ring-[#635BFF]/50 rounded-6px flex items-center h-9 w-64 bg-muted-fill border border-border-color/50 px-3 transition-colors group">
+<span class="material-symbols-outlined text-dim-text text-[18px] mr-2 group-focus-within:text-primary-accent" data-icon="search">search</span>
+<input class="bg-transparent border-none text-[13px] text-primary-text placeholder-dim-text focus:ring-0 w-full p-0 h-full font-body outline-none" placeholder="Search workflows..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors p-2 rounded-6px hover:bg-muted-fill">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+</button>
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors p-2 rounded-6px hover:bg-muted-fill">
+<span class="material-symbols-outlined text-[20px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+<button class="h-9 px-4 bg-primary-strong hover:bg-[#5249E5] text-[#F4F6FE] font-semibold text-[13px] rounded-6px transition-colors duration-200 flex items-center justify-center border border-transparent">
+                    Execute Run
+                </button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-64 mt-16 p-8 min-h-screen">
+<!-- Header Row (Page Level) -->
+<div class="mb-8 flex flex-col gap-6">
+<div class="flex items-end justify-between">
+<div>
+<div class="flex items-baseline gap-4 mb-2">
+<h2 class="text-2xl font-headline font-bold text-primary-text">Workflows</h2>
+<span class="font-mono text-dim-text text-sm">285 items</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<!-- Filters & Search that match height perfectly -->
+<div class="h-10 px-3 bg-muted-fill border border-border-color/50 rounded-6px flex items-center min-w-[200px] focus-within:border-primary-accent transition-colors">
+<span class="material-symbols-outlined text-dim-text text-[18px] mr-2">search</span>
+<input class="bg-transparent border-none text-sm text-primary-text placeholder-dim-text focus:ring-0 w-full p-0 outline-none" placeholder="Filter by name..." type="text"/>
+</div>
+<div class="h-10 relative">
+<select class="h-full bg-muted-fill border border-border-color/50 text-sm text-primary-text rounded-6px pl-3 pr-8 appearance-none focus:outline-none focus:border-primary-accent cursor-pointer min-w-[140px]">
+<option>All Projects</option>
+<option>Unbound</option>
+<option>Finance Ops</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-dim-text pointer-events-none text-[18px]">expand_more</span>
+</div>
+<div class="h-10 relative">
+<select class="h-full bg-muted-fill border border-border-color/50 text-sm text-primary-text rounded-6px pl-3 pr-8 appearance-none focus:outline-none focus:border-primary-accent cursor-pointer min-w-[120px]">
+<option>Recent</option>
+<option>Oldest</option>
+<option>A-Z</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-dim-text pointer-events-none text-[18px]">expand_more</span>
+</div>
+<button class="h-10 px-5 bg-primary-strong hover:bg-[#5249E5] text-[#F4F6FE] font-semibold text-sm rounded-6px transition-colors duration-200 flex items-center justify-center ml-2 border border-transparent shadow-sm">
+                        Build workflow
+                    </button>
+</div>
+</div>
+<!-- Filter Chips -->
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-success/30 bg-success/5 hover:bg-success/15 transition-colors text-xs font-medium text-secondary-text">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+                    Ready to run
+                </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-warning/30 bg-warning/5 hover:bg-warning/15 transition-colors text-xs font-medium text-secondary-text">
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+                    Still building
+                </button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet/30 bg-violet/5 hover:bg-violet/15 transition-colors text-xs font-medium text-secondary-text">
+<span class="w-2 h-2 rounded-full bg-violet"></span>
+                    Starter
+                </button>
+</div>
+</div>
+<!-- Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+<!-- Card 1 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Ready to run</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Quarterly Vendor Risk Review</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Unbound</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">5 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Ran 2 hours ago
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 2 (Repeated Name) -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Still building</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Quarterly Vendor Risk Review</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Finance Ops</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">3 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Never run
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 3 (Repeated Name) -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Ready to run</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Quarterly Vendor Risk Review</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Legal</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">8 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Ran yesterday
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-violet"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Starter</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Contract Clause Extraction</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Unbound</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">2 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Never run
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Ready to run</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Contract Clause Extraction</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Legal Ops</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">4 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Ran 10 mins ago
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Ready to run</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Daily Standup Summary</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Engineering</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">1 PHASE</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Ran 4 hours ago
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 7 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Still building</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Competitor Feature Matrix</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>Product</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">6 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Never run
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+<!-- Card 8 -->
+<div class="bg-card-bg border border-border-color rounded-10px p-4 flex flex-col gap-4 group hover:border-border-color/80 transition-colors relative h-[180px]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-[11px] font-label uppercase tracking-wider text-secondary-text">Ready to run</span>
+</div>
+<button class="text-dim-text hover:text-primary-text opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-primary-text text-[15px] mb-1 leading-tight line-clamp-2">Weekly Incident Report Gen</h3>
+<div class="flex items-center gap-2 text-xs text-dim-text mt-2">
+<span>SRE</span>
+<span class="w-1 h-1 rounded-full bg-dim-text/50"></span>
+<span class="font-mono text-[10px]">3 PHASES</span>
+</div>
+</div>
+<div class="mt-auto flex items-end justify-between">
+<div class="text-xs text-secondary-text">
+                        Ran 2 days ago
+                    </div>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity bg-muted-fill hover:bg-primary-strong hover:text-white text-primary-accent text-xs font-medium px-3 py-1.5 rounded-6px border border-border-color/50">
+                        Run
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

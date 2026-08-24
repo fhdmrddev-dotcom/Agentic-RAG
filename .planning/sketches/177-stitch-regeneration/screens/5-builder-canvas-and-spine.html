@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Workflow Builder</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#060A0F',
+                        elevated: '#080B11',
+                        surface: '#0D1117',
+                        raised: '#0F141B',
+                        muted: '#151B24',
+                        border: '#212631',
+                        primaryText: '#F4F6FE',
+                        secondaryText: '#9AA3B5',
+                        dimText: '#6B7383',
+                        primary: '#A3A5FF',
+                        violet: '#895AF6',
+                        success: '#21C45D',
+                        warning: '#F5A524',
+                        danger: '#DC2626'
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #060A0F; color: #F4F6FE; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+        .spine-line { width: 2px; background-color: rgba(33, 38, 49, 0.5); position: absolute; left: 50%; transform: translateX(-50%); z-index: 0; }
+    </style>
+</head>
+<body class="h-screen w-full flex overflow-hidden bg-page text-primaryText antialiased">
+<!-- Top Navigation (Shell) -->
+<div class="fixed top-0 left-0 right-0 h-14 bg-page border-b border-border/50 flex justify-between items-center px-6 z-50">
+<div class="flex items-center space-x-6">
+<span class="font-headline text-xl font-bold text-primaryText tracking-tight">Aether Intelligence</span>
+<div class="flex space-x-4">
+<a class="text-secondaryText font-body text-[14px] hover:text-primaryText transition-colors" href="#">Editor</a>
+<a class="text-primaryText border-b-2 border-primary pb-1 font-body text-[14px]" href="#">Canvas</a>
+<a class="text-secondaryText font-body text-[14px] hover:text-primaryText transition-colors" href="#">Logs</a>
+</div>
+</div>
+<div class="flex items-center space-x-4">
+<div class="flex space-x-3 text-secondaryText">
+<span class="material-symbols-outlined cursor-pointer hover:text-primaryText">history</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primaryText">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primaryText">more_vert</span>
+</div>
+<button class="px-4 py-1.5 text-[14px] text-secondaryText hover:text-primaryText transition-colors">Save Draft</button>
+<button class="px-4 py-1.5 bg-primary/10 text-primary font-medium text-[14px] rounded hover:bg-primary/20 transition-colors">Publish</button>
+<div class="w-8 h-8 rounded-full bg-muted border border-border/50 overflow-hidden ml-2">
+<img class="w-full h-full object-cover" data-alt="A striking digital installation art piece featuring glowing, generative geometric shapes suspended in a vast, minimalist gallery space. The room is illuminated by high-key, soft white lighting that creates a bright, modern light-mode aesthetic. The artwork relies on a sophisticated palette of deep blacks and pristine whites, punctuated by intense accents of vibrant red. The mood is serene yet technologically advanced." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAey8uFDa3cwovPoW2zZcaWOaeakYgvrOU3CmYm3EYHSH1bvJe9T8tfv5vMbD6OgpnQm0RM3CBm5M2K83wottrnTLuEf10Aew1VF1mrkWs53-tENjRPZqG1axSPsl6ls43Xe9CKXPXUcr1quJ2GQOlgOkaNaiBDy2lh6DIHFh0q32-lKZKtgZq1ome2w9QFPcrqmY5oyN6V1Azcs6UaRzrvPZ-lOq20jTMJBGdcWLmMBFs9vEQC_ZtqA1gEDKI9zqlV1YKUH1WXkSWa"/>
+</div>
+</div>
+</div>
+<!-- Main Content Area -->
+<div class="flex-1 flex pt-14 h-full w-full">
+<!-- LEFT RAIL (Narrow) -->
+<aside class="w-[280px] bg-elevated border-r border-border/50 flex-shrink-0 flex flex-col p-5 overflow-y-auto">
+<a class="flex items-center text-dimText text-[12px] uppercase tracking-wider hover:text-primaryText transition-colors mb-8 group" href="#">
+<span class="material-symbols-outlined text-[16px] mr-2 group-hover:-translate-x-1 transition-transform">arrow_back</span>
+                Back to Library
+            </a>
+<div class="space-y-6">
+<div>
+<label class="text-[11px] uppercase tracking-wider text-dimText block mb-1">Workflow Name</label>
+<input class="w-full bg-transparent border-b border-border/50 text-[15px] text-primaryText py-1 focus:outline-none focus:border-primary transition-colors font-headline" type="text" value="Vendor Renewal Risk Sweep"/>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface border border-border rounded-DEFAULT">
+<span class="text-[12px] text-secondaryText">Lifecycle</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-mono bg-warning/15 text-warning">DRAFT</span>
+</div>
+<div class="pt-6 border-t border-border/50">
+<button class="w-full py-2 bg-muted text-dimText border border-border/50 rounded-DEFAULT text-[13px] font-medium cursor-not-allowed flex items-center justify-center" disabled="">
+<span class="material-symbols-outlined text-[16px] mr-2">lock</span>
+                        Publish
+                    </button>
+<p class="text-[11px] text-dimText mt-2 text-center">Requires 2 more grounded phases</p>
+</div>
+</div>
+</aside>
+<!-- CENTER (Phase Spine) -->
+<main class="flex-1 bg-page overflow-y-auto relative p-10 flex flex-col items-center">
+<div class="w-full max-w-2xl relative py-8">
+<!-- Spine Line -->
+<div class="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-border/50 z-0"></div>
+<!-- Node 1 -->
+<div class="relative z-10 w-[420px] mx-auto mb-8 bg-surface border border-border rounded-lg p-4 flex items-center hover:bg-raised transition-colors group cursor-pointer">
+<div class="w-10 h-10 rounded-DEFAULT bg-muted flex items-center justify-center border border-border/50 mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-secondaryText">database</span>
+</div>
+<div class="flex-1">
+<div class="text-[14px] font-medium text-primaryText">Retrieve Contracts</div>
+<div class="text-[12px] text-dimText mt-1">Author name</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="material-symbols-outlined text-[14px] text-success/70 mb-1">lock</span>
+<span class="text-[10px] font-mono text-secondaryText px-1.5 py-0.5 bg-muted rounded">GPT-4o</span>
+</div>
+</div>
+<!-- Connect Line -->
+<div class="h-8"></div>
+<!-- Node 2 -->
+<div class="relative z-10 w-[420px] mx-auto mb-8 bg-surface border border-border rounded-lg p-4 flex items-center hover:bg-raised transition-colors group cursor-pointer">
+<div class="w-10 h-10 rounded-DEFAULT bg-muted flex items-center justify-center border border-border/50 mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-secondaryText">description</span>
+</div>
+<div class="flex-1">
+<div class="text-[14px] font-medium text-primaryText">Extract Dates</div>
+<div class="text-[12px] text-dimText mt-1">Derived name</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="material-symbols-outlined text-[14px] text-success/70 mb-1">lock</span>
+<span class="text-[10px] font-mono text-secondaryText px-1.5 py-0.5 bg-muted rounded">GPT-4o</span>
+</div>
+</div>
+<!-- Connect Line -->
+<div class="h-8"></div>
+<!-- Node 3 -->
+<div class="relative z-10 w-[420px] mx-auto mb-12 bg-surface border border-border rounded-lg p-4 flex items-center hover:bg-raised transition-colors group cursor-pointer">
+<div class="w-10 h-10 rounded-DEFAULT bg-muted flex items-center justify-center border border-border/50 mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-secondaryText">psychology</span>
+</div>
+<div class="flex-1">
+<div class="text-[14px] font-medium text-primaryText">Analyze liability caps</div>
+<div class="text-[12px] text-dimText mt-1">Type description</div>
+</div>
+<div class="flex flex-col items-end justify-center">
+<span class="text-[10px] font-mono text-secondaryText px-1.5 py-0.5 bg-muted rounded">GPT-4o</span>
+</div>
+</div>
+<!-- Node 4: BRANCH -->
+<div class="relative z-10 w-full mb-12 flex justify-center">
+<!-- Branch horizontal lines -->
+<div class="absolute top-[32px] left-[25%] right-[25%] h-px bg-border/50 z-0"></div>
+<div class="absolute top-0 bottom-[32px] left-1/2 w-px bg-border/50 z-0"></div>
+<div class="flex space-x-12 relative z-10">
+<!-- Path A -->
+<div class="w-[240px] flex flex-col items-center">
+<div class="w-px h-8 bg-border/50"></div>
+<div class="bg-surface border border-border rounded-lg p-3 w-full text-center hover:bg-raised transition-colors cursor-pointer">
+<span class="text-[10px] uppercase tracking-wider text-danger mb-1 block">Path</span>
+<div class="text-[13px] font-medium text-primaryText">High Risk</div>
+</div>
+<div class="w-px h-8 bg-border/50"></div>
+</div>
+<!-- Path B -->
+<div class="w-[240px] flex flex-col items-center">
+<div class="w-px h-8 bg-border/50"></div>
+<div class="bg-surface border border-border rounded-lg p-3 w-full text-center hover:bg-raised transition-colors cursor-pointer">
+<span class="text-[10px] uppercase tracking-wider text-secondaryText mb-1 block">Path</span>
+<div class="text-[13px] font-medium text-primaryText">Standard</div>
+</div>
+<div class="w-px h-8 bg-border/50"></div>
+</div>
+</div>
+</div>
+<!-- Connect Line Rejoin -->
+<div class="absolute bottom-[320px] left-1/2 -translate-x-1/2 w-px bg-border/50 h-8 z-0"></div>
+<!-- Node 5 (Selected State) -->
+<div class="relative z-10 w-[420px] mx-auto mb-8 bg-raised border border-primary rounded-lg p-4 flex items-center shadow-[0_0_15px_rgba(163,165,255,0.1)] cursor-pointer">
+<div class="absolute -left-px top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r"></div>
+<div class="w-10 h-10 rounded-DEFAULT bg-primary/10 flex items-center justify-center border border-primary/20 mr-4 flex-shrink-0 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">gavel</span>
+</div>
+<div class="flex-1">
+<div class="text-[14px] font-medium text-primaryText">Judge</div>
+<div class="text-[12px] text-primary/70 mt-1">Evaluator node</div>
+</div>
+<div class="flex flex-col items-end justify-center">
+<span class="text-[10px] font-mono text-primary px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded">GPT-4o</span>
+</div>
+</div>
+<!-- Connect Line -->
+<div class="h-8"></div>
+<!-- Node 6 -->
+<div class="relative z-10 w-[420px] mx-auto bg-surface border border-border rounded-lg p-4 flex items-center hover:bg-raised transition-colors group cursor-pointer">
+<div class="w-10 h-10 rounded-DEFAULT bg-muted flex items-center justify-center border border-border/50 mr-4 flex-shrink-0">
+<span class="material-symbols-outlined text-secondaryText">edit_note</span>
+</div>
+<div class="flex-1">
+<div class="text-[14px] font-medium text-primaryText">Draft Memo</div>
+<div class="text-[12px] text-dimText mt-1">Output generator</div>
+</div>
+<div class="flex flex-col items-end justify-center">
+<span class="text-[10px] font-mono text-secondaryText px-1.5 py-0.5 bg-muted rounded">GPT-4o</span>
+</div>
+</div>
+<!-- End Dot -->
+<div class="w-3 h-3 rounded-full bg-border mx-auto mt-8 relative z-10"></div>
+</div>
+</main>
+<!-- RIGHT PANEL (Configuration) -->
+<aside class="w-[320px] bg-elevated border-l border-border/50 flex-shrink-0 flex flex-col p-6 overflow-y-auto">
+<h2 class="font-headline text-[16px] font-semibold text-primaryText mb-8 flex items-center">
+<span class="material-symbols-outlined text-[18px] mr-2 text-secondaryText">settings</span>
+                Configure: Judge
+            </h2>
+<div class="space-y-8">
+<!-- Field 1 -->
+<div>
+<label class="text-[11px] uppercase tracking-wider text-dimText block mb-2">Phase Name</label>
+<input class="w-full bg-surface border border-border rounded-DEFAULT px-3 py-2 text-[13px] text-primaryText focus:outline-none focus:border-primary transition-colors" type="text" value="Judge"/>
+</div>
+<!-- Field 2 -->
+<div>
+<label class="text-[11px] uppercase tracking-wider text-dimText block mb-2">Model</label>
+<div class="relative">
+<select class="w-full bg-surface border border-border rounded-DEFAULT pl-3 pr-8 py-2 text-[13px] text-primaryText appearance-none focus:outline-none focus:border-primary transition-colors font-mono">
+<option>GPT-4o</option>
+<option>Claude 3.5 Sonnet</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-dimText pointer-events-none text-[18px]">expand_more</span>
+</div>
+</div>
+<div class="w-full h-px bg-border/50 my-6"></div>
+<!-- Grounding Control -->
+<div class="bg-surface border border-border rounded-lg p-4">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center text-[13px] font-medium text-primaryText">
+<span class="material-symbols-outlined text-[16px] mr-2 text-warning" style="font-variation-settings: 'FILL' 1;">lock</span>
+                            Knowledge Lock
+                        </div>
+<div class="w-8 h-4 bg-primary/20 rounded-full relative cursor-not-allowed opacity-70">
+<div class="absolute right-0.5 top-0.5 w-3 h-3 bg-primary rounded-full"></div>
+</div>
+</div>
+<div class="p-3 bg-muted rounded-DEFAULT border border-border/50">
+<div class="text-[12px] font-medium text-secondaryText mb-1 flex items-center">
+                            Locked by Alex M.
+                        </div>
+<p class="text-[11px] text-dimText leading-relaxed">
+                            This lock is permanent. Only Alex M. can release it.
+                        </p>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</body></html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Two Dialogs, Deliberately Unequal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary": "#242478",
+                        "secondary-container": "#3e4757",
+                        "error-container": "#93000a",
+                        "tertiary-fixed": "#ffe16c",
+                        "surface": "#131318",
+                        "primary-container": "#a3a5ff",
+                        "on-error-container": "#ffdad6",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#131c2a",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-tint": "#c1c1ff",
+                        "on-tertiary-container": "#4e4000",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "outline-variant": "#464651",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "inverse-surface": "#e4e1e9",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "outline": "#918f9c",
+                        "surface-variant": "#35343a",
+                        "on-tertiary": "#3a3000",
+                        "surface-bright": "#39383f",
+                        "secondary": "#bec7da",
+                        "surface-container-highest": "#35343a",
+                        "surface-container-high": "#2a292f",
+                        "secondary-fixed-dim": "#bec7da",
+                        "background": "#131318",
+                        "on-background": "#e4e1e9",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "on-secondary-container": "#acb5c8",
+                        "primary-fixed": "#e1e0ff",
+                        "inverse-primary": "#5355a9",
+                        "surface-container-lowest": "#0e0e13",
+                        "on-tertiary-fixed": "#221b00",
+                        "on-surface-variant": "#c7c5d3",
+                        "tertiary": "#e5c74c",
+                        "tertiary-container": "#c8ac33",
+                        "on-secondary": "#28313f",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "on-surface": "#e4e1e9",
+                        "on-primary-container": "#353789",
+                        "inverse-on-surface": "#303036",
+                        "surface-dim": "#131318",
+                        "error": "#ffb4ab",
+                        "primary": "#c3c4ff",
+                        "surface-container-low": "#1b1b21",
+                        "secondary-fixed": "#dae3f6",
+                        "surface-container": "#1f1f25"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.125rem",
+                        lg: "0.25rem",
+                        xl: "0.5rem",
+                        full: "0.75rem"
+                    },
+                    spacing: {
+                        lg: "24px",
+                        gutter: "16px",
+                        rail_width: "64px",
+                        md: "16px",
+                        xl: "32px",
+                        margin: "24px",
+                        sm: "8px",
+                        xs: "4px",
+                        unit: "4px"
+                    },
+                    fontFamily: {
+                        "body-md": ["Inter"],
+                        "h1": ["Manrope"],
+                        "data-md": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h2": ["Manrope"],
+                        "h3": ["Manrope"],
+                        "data-sm": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"]
+                    },
+                    fontSize: {
+                        "body-md": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "h1": ["32px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "data-md": ["14px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "body-sm": ["12px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "h2": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "h3": ["18px", { lineHeight: "1.4", fontWeight: "600" }],
+                        "data-sm": ["12px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "data-lg": ["16px", { lineHeight: "1.4", fontWeight: "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #e4e1e9;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .card-bg { background-color: #0D1117; border: 1px solid #212631; }
+        .raised-bg { background-color: #0F141B; border: 1px solid #212631; }
+        .input-bg { background-color: #0D1117; border: 1px solid #212631; color: #e4e1e9; }
+        .input-bg:focus { border-color: #A3A5FF; outline: none; }
+        .input-bg::placeholder { color: #6B7383; }
+        .btn-primary { background-color: #A3A5FF; color: #060A0F; }
+        .btn-secondary { background-color: transparent; border: 1px solid #212631; color: #F4F6FE; }
+        .btn-danger { background-color: #DC2626; color: white; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-xl px-margin">
+<!-- Header -->
+<header class="w-full max-w-[1440px] mb-xl border-b border-[#212631] pb-lg">
+<h1 class="font-h1 text-h1 text-on-surface mb-xs">Two dialogs, deliberately unequal</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">A harmless action asks lightly. A permanent one asks heavily. The difference is the design.</p>
+</header>
+<main class="w-full max-w-[1440px] grid grid-cols-12 gap-gutter">
+<!-- SECTION 1 -->
+<section class="col-span-12 lg:col-span-6 flex flex-col gap-lg">
+<div class="mb-sm">
+<h2 class="font-h2 text-h2 text-on-surface mb-xs uppercase tracking-widest text-[12px] text-outline">Section 1</h2>
+<h3 class="font-h2 text-h2 text-on-surface">MAKING A COPY <span class="text-on-surface-variant font-normal text-body-lg">(a harmless action, asked lightly)</span></h3>
+</div>
+<!-- Dialog Specimen -->
+<div class="card-bg w-[480px] p-lg flex flex-col gap-md">
+<div>
+<h4 class="font-h3 text-h3 text-on-surface mb-xs">Name your copy</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">You are copying Quarterly Business Review. Give your copy a name you will recognise later.</p>
+</div>
+<div class="flex flex-col gap-xs">
+<input class="input-bg w-full h-10 px-md rounded-DEFAULT font-body-md text-body-md" placeholder="" type="text"/>
+</div>
+<div class="p-md bg-[#0F141B] border border-[#212631] rounded-DEFAULT">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Opens a new private copy you can edit. The published version stays live and unchanged.</p>
+</div>
+<div class="flex justify-end gap-sm mt-sm">
+<button class="btn-secondary h-10 px-md rounded-DEFAULT font-body-md text-body-md font-medium">Cancel</button>
+<button class="btn-primary h-10 px-md rounded-DEFAULT font-body-md text-body-md font-medium">Create my copy</button>
+</div>
+</div>
+<!-- Field States -->
+<div class="flex flex-col gap-md w-[480px]">
+<h5 class="font-data-md text-data-md text-outline uppercase">Field States</h5>
+<!-- State 1: EMPTY -->
+<div class="flex flex-col gap-xs">
+<label class="font-data-sm text-data-sm text-on-surface-variant">1. EMPTY</label>
+<input class="input-bg w-full h-10 px-md rounded-DEFAULT font-body-md text-body-md" placeholder="" type="text"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Give it a name.</span>
+</div>
+<!-- State 2: CLASHING -->
+<div class="flex flex-col gap-xs">
+<label class="font-data-sm text-data-sm text-on-surface-variant">2. CLASHING</label>
+<input class="input-bg w-full h-10 px-md rounded-DEFAULT font-body-md text-body-md border-[#F5A524]" type="text" value="Quarterly Business Review"/>
+<span class="font-body-sm text-body-sm text-[#F5A524]">You already have one called this. Allowed, but you will not be able to tell them apart.</span>
+</div>
+<!-- State 3: FREE -->
+<div class="flex flex-col gap-xs">
+<label class="font-data-sm text-data-sm text-on-surface-variant">3. FREE</label>
+<input class="input-bg w-full h-10 px-md rounded-DEFAULT font-body-md text-body-md" type="text" value="QBR Q3 2024 - Draft"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Name available.</span>
+</div>
+</div>
+</section>
+<!-- SECTION 2 -->
+<section class="col-span-12 lg:col-span-6 flex flex-col gap-lg">
+<div class="mb-sm">
+<h2 class="font-h2 text-h2 text-on-surface mb-xs uppercase tracking-widest text-[12px] text-outline">Section 2</h2>
+<h3 class="font-h2 text-h2 text-on-surface">DELETING <span class="text-on-surface-variant font-normal text-body-lg">(permanent, so asked heavily)</span></h3>
+</div>
+<div class="flex flex-col xl:flex-row gap-lg">
+<!-- Loading State -->
+<div class="card-bg w-full max-w-[520px] p-lg flex flex-col gap-md opacity-70">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-outline animate-spin">progress_activity</span>
+<h4 class="font-h3 text-h3 text-on-surface">Delete this workflow?</h4>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Checking what this will remove…</p>
+</div>
+<!-- Loaded State -->
+<div class="card-bg w-full max-w-[520px] p-lg flex flex-col gap-md">
+<h4 class="font-h3 text-h3 text-on-surface">Delete this workflow?</h4>
+<div class="flex flex-col gap-sm">
+<h5 class="font-data-md text-data-md text-outline uppercase text-[12px]">Permanently removed</h5>
+<div class="p-md raised-bg rounded-DEFAULT flex flex-col gap-xs">
+<span class="font-body-md text-body-md text-on-surface font-medium">Quarterly Business Review</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1 version • 17 run records</span>
+</div>
+</div>
+<div class="flex flex-col gap-sm">
+<h5 class="font-data-md text-data-md text-outline uppercase text-[12px]">Kept — not touched</h5>
+<div class="p-md bg-transparent border border-[#212631] rounded-DEFAULT">
+<p class="font-body-sm text-body-sm text-on-surface-variant">17 chat threads become normal chats. Transcripts and files stay. Your knowledge base is untouched.</p>
+</div>
+</div>
+<div class="flex justify-end gap-sm mt-sm">
+<button class="btn-secondary h-10 px-md rounded-DEFAULT font-body-md text-body-md font-medium">Keep it</button>
+<button class="btn-danger h-10 px-md rounded-DEFAULT font-body-md text-body-md font-medium">Delete forever</button>
+</div>
+<p class="font-body-sm text-body-sm text-outline text-right italic">Recorded with your name in the audit log.</p>
+</div>
+</div>
+</section>
+<!-- SECTION 3 -->
+<section class="col-span-12 mt-xl flex flex-col gap-md">
+<div class="mb-sm">
+<h2 class="font-h2 text-h2 text-on-surface mb-xs uppercase tracking-widest text-[12px] text-outline">Section 3</h2>
+<h3 class="font-h2 text-h2 text-on-surface">WHY THEY LOOK DIFFERENT</h3>
+</div>
+<div class="card-bg rounded-DEFAULT overflow-hidden">
+<div class="grid grid-cols-3 border-b border-[#212631] p-md bg-[#0F141B]">
+<div class="font-data-sm text-data-sm text-outline uppercase">Rule</div>
+<div class="font-data-sm text-data-sm text-outline uppercase">Making a copy</div>
+<div class="font-data-sm text-data-sm text-outline uppercase">Deleting</div>
+</div>
+<div class="grid grid-cols-3 border-b border-[#212631] p-md items-center hover:bg-[#0F141B] transition-colors">
+<div class="font-body-md text-body-md text-on-surface">Names what it affects</div>
+<div class="font-body-md text-body-md text-on-surface-variant">no</div>
+<div class="font-body-md text-body-md text-on-surface">yes</div>
+</div>
+<div class="grid grid-cols-3 border-b border-[#212631] p-md items-center hover:bg-[#0F141B] transition-colors">
+<div class="font-body-md text-body-md text-on-surface">States exact numbers first</div>
+<div class="font-body-md text-body-md text-on-surface-variant">no</div>
+<div class="font-body-md text-body-md text-on-surface">yes</div>
+</div>
+<div class="grid grid-cols-3 border-b border-[#212631] p-md items-center hover:bg-[#0F141B] transition-colors">
+<div class="font-body-md text-body-md text-on-surface">Spends danger colour</div>
+<div class="font-body-md text-body-md text-on-surface-variant">no</div>
+<div class="font-body-md text-body-md text-on-surface">yes, on the button only</div>
+</div>
+<div class="grid grid-cols-3 p-md items-center hover:bg-[#0F141B] transition-colors">
+<div class="font-body-md text-body-md text-on-surface">Leaves a receipt</div>
+<div class="font-body-md text-body-md text-on-surface-variant">no</div>
+<div class="font-body-md text-body-md text-on-surface">yes</div>
+</div>
+</div>
+</section>
+</main>
+
+<script>
+(function(){
+  var HOPS = [];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"fork-delete", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

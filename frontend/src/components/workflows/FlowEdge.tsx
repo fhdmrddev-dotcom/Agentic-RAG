@@ -73,6 +73,27 @@
  * because layering it under the arc would double the ink and, when armed, would draw
  * the very bypass the shape exists to deny.
  *
+ * ── 200-06: THE PAYLOAD LABEL, AND THE STATE THIS FILE DOES NOT DECIDE ──────────
+ *
+ * `200-CHECKLIST.md` §3 `BC-MR-01` — a connection carries the UPSTREAM step's own
+ * DECLARED count. D-08's rule is that the label and the live per-step column are ONE
+ * mechanism: the number rides the `runState` seam the PAGE already owns, this component
+ * counts nothing, opens no request, joins nothing to nothing and words no noun. It is
+ * handed `data.payload` and it draws what `payloadLabel` composes, or it draws nothing.
+ *
+ * ⚠ NOTHING AND `0` ARE DIFFERENT FACTS, AND THE DIFFERENCE IS THE WHOLE ATOM
+ * (`BC-MNR-01`). A step whose type declares no count at all renders NO ELEMENT — not a
+ * `0`, not a dash, not an empty pill. A step that searched and found nothing declared a
+ * real `0` and MUST render it. That is why the absence arrives as an ABSENT `data.payload`
+ * rather than as a zero, and why `payloadLabel` returns `null` rather than `""`.
+ *
+ * THE FOUR CONNECTION STATES (`BC-MR-02`) are resolved by `connectionState.ts` and chosen
+ * by the SHELL, which owns the pointer and the pick. This file renders the state it is
+ * handed onto the drawn path, and nothing more: the shell's suite drives all four, and the
+ * criterion-24 fence below is why the pointer state could not live here even if it wanted
+ * to — this file may name none of the four attribute spellings that could create a second
+ * tab stop, and a state tracked locally would have needed one of them.
+ *
  * ── READ-ONLY, WITHOUT EXCEPTION (T-185-10-01, sketch 147 §4) ────────────────────
  *
  * Every mark carries `pointer-events: none` and declares no ARIA role, no tab index and
@@ -136,6 +157,7 @@ import { memo } from "react"
 import { BaseEdge, getBezierPath, Position, type EdgeProps } from "@xyflow/react"
 
 import { CANVAS_LAYOUT, type CanvasEdge } from "@/components/workflows/canvasModel"
+import { payloadLabel } from "@/components/workflows/runVocabulary"
 
 // ── The geometry table (S5 — one frozen table, never a literal at a use site) ────
 
@@ -186,6 +208,17 @@ export const LINE = `M0,${DETOUR.INSERT_Y} L${DETOUR.GAP},${DETOUR.INSERT_Y}`
 
 /** The x of the person-point and of the label: the gap's centre, where the ＋ also is. */
 const POINT_X = DETOUR.GAP / 2
+
+/**
+ * Phase 200-06 (`BC-MR-01`) — how far ABOVE the line's own midpoint the payload label
+ * sits, in plane pixels.
+ *
+ * ABOVE, and that is a clearance fact rather than a taste. The detour's own word already
+ * owns the space BELOW the line (`DETOUR.LABEL_DROP` = 44), so putting the payload there
+ * would stack two strings on an armed connector. Above the line the gap is empty in every
+ * one of the three shipped edge states.
+ */
+const PAYLOAD_LIFT = 10
 
 // ── The two labels (ONE home each, asserted character-identical by the suite) ────
 
@@ -287,6 +320,25 @@ function FlowEdgeImpl({
 }: EdgeProps<CanvasEdge>) {
   const armed = data?.armed
 
+  // ── THE PAYLOAD LABEL (200-06 · BC-MR-01 · D-08) ──────────────────────────────
+  //
+  // The UPSTREAM step's own DECLARED count, handed down on `data.payload` by the shell,
+  // which read it off the `runState` seam the PAGE owns. This component counts nothing,
+  // joins nothing and words no noun: it renders the string the vocabulary composes from
+  // the two halves the wire carried, or it renders NOTHING.
+  //
+  // ⚠ `null` MEANS "NO ELEMENT", NOT "AN EMPTY ONE" (BC-MNR-01). A step whose type
+  // declares no count is a different fact from a step that declared `0`, and the second
+  // one MUST render — a search that found nothing is a real answer. `payloadLabel` is the
+  // one place that distinction is made, and it returns `null` rather than "" precisely so
+  // this file can omit the element rather than draw an empty pill.
+  const payload = data?.payload
+  const payloadText = payload === undefined ? null : payloadLabel(payload.count, payload.noun)
+
+  // The state's own machine-readable handle. Rendered on the drawn path in every branch,
+  // so the four states are distinguishable to a test without reading a stroke colour.
+  const connection = data?.connection
+
   // The library's own default path, byte-for-byte. Computed unconditionally so the
   // label anchors stay exactly where the built-in renderer put them.
   const [path, labelX, labelY] = getBezierPath({
@@ -299,25 +351,53 @@ function FlowEdgeImpl({
     curvature: pathOptions?.curvature,
   })
 
+  // Placed in PLANE coordinates, so it sits identically on an ordinary connector and on a
+  // detour — the detour's box is translated and this deliberately is not. Inert to the
+  // pointer, like every other mark this file draws.
+  const payloadMark =
+    payloadText === null ? null : (
+      <text
+        data-testid="canvas-edge-payload"
+        x={labelX}
+        y={labelY - PAYLOAD_LIFT}
+        textAnchor="middle"
+        fontSize={10}
+        fill="hsl(var(--muted-foreground))"
+        pointerEvents="none"
+      >
+        {payloadText}
+      </text>
+    )
+
   // THE ORDINARY CONNECTOR — no checkpoint declared, so nothing about this edge changed
   // when `edge.type` did. This is the branch every shipped canvas renders.
+  //
+  // ⚠ THE FRAGMENT ADDS NO DOM. `payloadMark` is `null` on every canvas that supplies no
+  // run state — which is every Builder canvas shipped today — and a fragment wrapping one
+  // child and a `null` produces exactly the child. So `185-VALIDATION.md`'s manual row
+  // ("an ordinary unarmed flow edge renders identically to today") still passes, and it
+  // passes for the same reason it did before: nothing was added to the no-payload path.
   if (armed === undefined) {
     return (
-      <BaseEdge
-        path={path}
-        labelX={labelX}
-        labelY={labelY}
-        label={label}
-        labelStyle={labelStyle}
-        labelShowBg={labelShowBg}
-        labelBgStyle={labelBgStyle}
-        labelBgPadding={labelBgPadding}
-        labelBgBorderRadius={labelBgBorderRadius}
-        style={style}
-        markerEnd={markerEnd}
-        markerStart={markerStart}
-        interactionWidth={interactionWidth}
-      />
+      <>
+        <BaseEdge
+          path={path}
+          labelX={labelX}
+          labelY={labelY}
+          label={label}
+          labelStyle={labelStyle}
+          labelShowBg={labelShowBg}
+          labelBgStyle={labelBgStyle}
+          labelBgPadding={labelBgPadding}
+          labelBgBorderRadius={labelBgBorderRadius}
+          style={style}
+          markerEnd={markerEnd}
+          markerStart={markerStart}
+          interactionWidth={interactionWidth}
+          {...(connection === undefined ? {} : { "data-connection-state": connection })}
+        />
+        {payloadMark}
+      </>
     )
   }
 
@@ -334,6 +414,7 @@ function FlowEdgeImpl({
   const owned = armed ? ARC : LINE
 
   return (
+    <>
     <g
       data-testid="canvas-detour"
       data-armed={armed ? "true" : "false"}
@@ -351,6 +432,7 @@ function FlowEdgeImpl({
         markerEnd={markerEnd}
         markerStart={markerStart}
         interactionWidth={interactionWidth}
+        {...(connection === undefined ? {} : { "data-connection-state": connection })}
       />
       {/* A signal, never a control — see the read-only section of the docblock. */}
       <text
@@ -365,6 +447,8 @@ function FlowEdgeImpl({
         {armed ? DETOUR_ARMED_LABEL : DETOUR_OPEN_LABEL}
       </text>
     </g>
+    {payloadMark}
+    </>
   )
 }
 

@@ -569,8 +569,39 @@ def _is_transient_provider_error(e: APIError) -> bool:
 
     Checks status code, structured body (OpenRouter puts real code in e.body),
     and message text. Never retries auth, billing, or parameter errors.
+
+    BUG-260815-09 — ``status_code`` MUST be read with ``getattr``, never as an
+    attribute. ``openai.APIError`` is the SDK's BASE class and does NOT define
+    ``status_code``; only the ``APIStatusError`` subclasses (BadRequestError,
+    RateLimitError, ...) do. Verified against the pinned SDK:
+        openai.APIError('x', request=None, body=None).status_code
+        -> AttributeError: 'APIError' object has no attribute 'status_code'
+
+    A bare ``APIError`` is exactly what an OpenAI-COMPATIBLE server raises when
+    it fails MID-STREAM, because the failure arrives inside the SSE body rather
+    than as an HTTP status. Measured 2026-08-15 against LM Studio on :1234 —
+    a context overflow ("n_keep: 120081 >= n_ctx: 33280") surfaced as a plain
+    ``openai.APIError``, with no status code anywhere.
+
+    The consequence was not a crash but a LIE. This helper is called from the
+    ``except (APIError, AnthropicAPIError)`` handler; raising AttributeError
+    INSIDE that handler escapes it, unwinds past every per-provider
+    classification branch, and lands in the generic ``except Exception``, which
+    renders "An unexpected error occurred (AttributeError). Please try again."
+    The provider's real, actionable message -- telling the user their context
+    window was too small -- was discarded on the way. Every local
+    OpenAI-compatible backend (LM Studio, llama.cpp, vLLM, Ollama's compat
+    endpoint) is affected, and so is any hosted provider that reports a
+    mid-stream failure this way.
+
+    Note the two CALL SITES already read this attribute defensively
+    (``getattr(provider_err, "status_code", None)`` at the request-too-large
+    check and in the retry log), and the ``e.body`` access just below is inside
+    an ``except (AttributeError, TypeError)``. This one line was the only
+    unguarded read on the path -- which is why it survived: the pattern was
+    understood, it just was not applied here.
     """
-    if e.status_code in (502, 503, 529):
+    if getattr(e, "status_code", None) in (502, 503, 529):
         return True
     try:
         code = e.body.get("error", {}).get("code")
@@ -1441,10 +1472,33 @@ async def run_agent_loop(
         )
     )
 
+    # The model the request will ACTUALLY be served by — identical expression to the
+    # one the stream itself uses at :1663. Both trim sites previously passed
+    # ``user_settings.llm_model``, which is the org/user DEFAULT, not the per-request
+    # pick: a composer-selected `body.model` never reached the context budget at all.
+    # Measured 2026-08-18 — `user_settings` had zero rows, so the budget for a run
+    # served by `qwen3.6-35b-a3b-mtp` (32,768-token window) was resolved against
+    # `deepseek-v4-flash`, yielding an 80,000-token budget the trimmer never hit. The
+    # run then died at `finish_reason=length` mid-tool-call with all its data gathered.
+    _budget_model = body.model or user_settings.llm_model or settings.llm_model
+
+    # Warm the 30s-TTL override cache BEFORE the first trim. resolve_context_budget's
+    # registry clamp reads that cache synchronously (it has no await), so on a cold
+    # process the very first trim of a run would otherwise miss the model's declared
+    # context window and fall through to the provider default. The call is already
+    # TTL-cached and made again at :1663, so this is a no-op on a warm cache.
+    try:
+        await get_model_capability_async(_budget_model)
+    except Exception:
+        logger.warning(
+            "context budget: could not warm model overrides for %s; "
+            "falling back to the static context chain", _budget_model, exc_info=True
+        )
+
     # Trim conversation history to fit context window before the first LLM call
     messages = trim_messages_to_fit(
         messages,
-        max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+        max_tokens=resolve_context_budget(user_settings.active_provider, _budget_model),
         reserve_recent=settings.context_window_reserve_recent,
     )
     logger.debug(
@@ -1782,7 +1836,7 @@ async def run_agent_loop(
             # Re-trim after tool results have been appended (context grows each iteration)
             messages = trim_messages_to_fit(
                 messages,
-                max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+                max_tokens=resolve_context_budget(user_settings.active_provider, _budget_model),
                 reserve_recent=settings.context_window_reserve_recent,
             )
             if len(messages) < _pre_trim_len:

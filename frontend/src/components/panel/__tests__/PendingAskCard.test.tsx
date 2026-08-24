@@ -6,7 +6,7 @@
  * the GET-reconciled prompt (run_id present) and the pure-SSE prompt (run_id
  * ABSENT — A2 / Pitfall 1: submit must be gated + reconcile triggered).
  */
-import { describe, it, expect, vi, afterEach } from "vitest"
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest"
 import { act, render, screen, waitFor, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
@@ -45,6 +45,28 @@ const hookState: { asks: PendingAsk[]; reconcile: ReturnType<typeof vi.fn> } = {
   asks: [],
   reconcile: vi.fn().mockResolvedValue(undefined),
 }
+/**
+ * Phase 194.1 Plan 05 Task 3 — the THIRD and FOURTH keys, and needing them is the
+ * measurement rather than plumbing.
+ *
+ * `PendingAskStack` now DERIVES `runIsOver` from the workflow lock and the phase
+ * list — two hooks `WorkspacePanel` already calls for its timeline gate. Left out
+ * of this explicit object literal they resolve to `undefined` and every case that
+ * renders the STACK throws; the cases that render a bare `PendingAskCard` are
+ * unaffected, which is itself the proof that the derivation lives in the stack and
+ * not in the card.
+ *
+ * They default to the LIVE-RUN arm (`lock` present, `phases` empty) so every
+ * pre-existing case still measures exactly what it measured before this prop
+ * existed. `stackState` lets a case move them.
+ */
+const stackState: {
+  lock: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
+  phases: unknown[]
+} = {
+  lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+  phases: [],
+}
 vi.mock("@/providers/StreamsProvider", () => ({
   useViewingThread: () => "thread-1",
   useAskUserPrompt: () => ({
@@ -53,19 +75,35 @@ vi.mock("@/providers/StreamsProvider", () => ({
     error: null,
     reconcile: hookState.reconcile,
   }),
+  useWorkflowLockForThread: () => stackState.lock,
+  usePhases: () => ({
+    data: stackState.phases,
+    isLoading: false,
+    error: null,
+    reconcile: vi.fn(),
+  }),
 }))
 
 import {
   NO_DEADLINE_WAITING_LINE,
+  RUN_STOPPED_RETIREMENT_LINE,
   PendingAskCard,
   PendingAskStack,
 } from "../PendingAskCard"
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import cardSource from "../PendingAskCard.tsx?raw"
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   hookState.asks = []
   hookState.reconcile = vi.fn().mockResolvedValue(undefined)
+  // Phase 194.1 Plan 05 — back to the LIVE-RUN arm, for the same reason the two
+  // lines above exist: state a previous case left behind is indistinguishable from
+  // state this case caused.
+  stackState.lock = { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 }
+  stackState.phases = []
 })
 
 const noopReconcile = () => Promise.resolve()
@@ -152,6 +190,66 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
     expect(await screen.findByText(/answered · agent resumed/i)).toBeInTheDocument()
     expect(screen.getByText(/you answered/i)).toBeInTheDocument()
     expect(screen.getByText(mockPendingAskWithRunId.options[0])).toBeInTheDocument()
+  })
+
+  /**
+   * ─────────────────────────────────────────────────────────────────────────
+   * PHASE 199 PLAN 07 (sheet `c8-run-panel`) — THE RESOLVED CARD IS A RECEIPT,
+   * NOT A FORM THAT STAYED ON SCREEN. Verdict: **ALREADY-SHIPPED, now FENCED.**
+   *
+   * The sheet draws its ANSWERED card as a receipt — the question demoted, the
+   * decision, and the moment it was taken — and the shipped card already reads
+   * that way. So this plan builds nothing here and pins the property instead,
+   * because it was TRUE AND UNGUARDED: the shipped answered case above asserts
+   * the three texts that ARE there and nothing about what must NOT be.
+   *
+   * ⚠ THIS IS ALSO THE PLAN'S REGISTERED THREAT `T-199-07-01` (Spoofing). A
+   *   resolved ask that kept a live control could be re-answered, or read as
+   *   still open, after the loop had already moved on. The disposition asks for
+   *   controls to be **GONE, not merely disabled** — so the fence counts
+   *   ELEMENTS, never `disabled` attributes.
+   *
+   * ⚠ THE NEEDLE IS DRIVEN AGAINST A REAL CONTRAST RATHER THAN A PLANT. The
+   *   PENDING arm of the SAME card, with the SAME fixture, is swept by the SAME
+   *   selector in the positive control below and must return a non-zero count —
+   *   which is what proves this selector can fire at all. A count-zero fence
+   *   with an unproven needle is exactly the guard that passes while defending
+   *   nothing.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  const INTERACTIVE = 'button, input, textarea, select, [role="radio"], [contenteditable="true"]'
+
+  it("RESOLVED — the answered card holds ZERO interactive controls (T-199-07-01)", async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+
+    // Non-vacuity FIRST: it really is the answered arm, and it really still
+    // carries its two facts. A zero-control count against an unmounted card
+    // would be a green test about an empty container.
+    await screen.findByText(/answered · agent resumed/i)
+    expect(screen.getByText(/you answered/i)).toBeInTheDocument()
+    expect(screen.getByText(mockPendingAskWithRunId.prompt)).toBeInTheDocument()
+
+    // GONE, not disabled. `disabled` is a browser courtesy; absence is the fact.
+    expect(container.querySelectorAll(INTERACTIVE)).toHaveLength(0)
+    // Said the other way round, so a future arm that re-introduced a dead control
+    // could not satisfy this case by marking it disabled.
+    expect(container.querySelectorAll("[disabled], [aria-disabled]")).toHaveLength(0)
+  })
+
+  it("POSITIVE CONTROL — the SAME selector finds the pending card's controls", () => {
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    // The pending arm has two radios, a textarea and a submit — so the needle above
+    // is live, and the zero it reports on the answered arm is a measurement.
+    expect(container.querySelectorAll(INTERACTIVE).length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[role="radio"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll("textarea")).toHaveLength(1)
   })
 
   it("renders the calm '.expired' state on timeout, never an opaque crash (D5)", () => {
@@ -439,5 +537,268 @@ describe("PendingAskCard (185-05) — a null deadline is a wait, never an expiry
       <PendingAskCard ask={mockPendingAskNoDeadline()} reconcile={noopReconcile} />,
     )
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 3 (R7(b)) — A STOPPED RUN RETIRES ITS APPROVAL WITH A
+// SENTENCE, AND NEVER BY REMOVING IT.
+//
+// THE DEFECT, stated as a measurement: after a Stop, Postgres already reads
+// `cancelled` while this card is still fully actionable — a user can pick an
+// option and press Send Answer into a run that is over. The server's 404 catches
+// it and that authority is UNCHANGED here; what this adds is the client declining
+// to OFFER the action first. Defence in depth, not a replacement.
+//
+// ⚠ RETIRED, NOT REMOVED — a rule across every sketch-170 variant, not a
+// preference. A card that vanishes mid-read is its own small dishonesty: the user
+// who was halfway through the question cannot tell "the run stopped" from "the app
+// lost my question". So the card STAYS, says why, and stops being dispatchable.
+//
+// ⚠ NO NEW `useState`. The card already carries NINE; a tenth for a fact derivable
+// from two hooks the panel already calls would be the second-concern failure D-03
+// forbids. The arm is DERIVED and short-circuits ABOVE `canSubmit`, which is why
+// `canSubmit`'s own `state === "pending"` conjunct is byte-untouched.
+describe("PendingAskCard (194.1-05 / R7(b)) — retired by a stopped run, never removed", () => {
+  const ASK = mockPendingAskWithRunId
+
+  function renderRetired() {
+    return render(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver />)
+  }
+
+  it("the card is STILL IN THE DOM after the run is over — it is retired, not removed", () => {
+    renderRetired()
+    // The question the user was reading is still readable. This is the assertion
+    // P3 (remove-the-card) reds against.
+    expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
+  })
+
+  it("says the RUN WAS STOPPED, in the exported constant's own words", () => {
+    renderRetired()
+    expect(screen.getByText(RUN_STOPPED_RETIREMENT_LINE)).toBeInTheDocument()
+    // The sentence must actually name the event. A retirement that does not say
+    // WHY is just the calm expired state the card already had.
+    expect(RUN_STOPPED_RETIREMENT_LINE.toLowerCase()).toContain("stopped")
+  })
+
+  /**
+   * ⚠ THE NAIVE FORM OF THIS CASE PASSES VACUOUSLY, AND IT WAS CAUGHT BY RUNNING
+   * THE RED GATE RATHER THAN BY READING IT. Rendering a retired card cold and
+   * asserting `disabled === true` proves NOTHING: `canSubmit` requires
+   * `hasAnswer`, so a plain `pending` card with no option chosen is ALREADY
+   * disabled on both axes. That version of the assertion was green against a
+   * component with no retirement arm at all — it would have shipped a fence P4
+   * could not red.
+   *
+   * The honest form drives the LIVED sequence on ONE instance: the user picks an
+   * answer (proving the button is genuinely enabled first), and only THEN does the
+   * run end. The enabled→disabled transition on the same node is the measurement;
+   * either half alone is not.
+   */
+  it("a chosen answer becomes UNDISPATCHABLE when the run ends — BOTH disabled and aria-disabled", async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver={false} />,
+    )
+    await user.click(screen.getByText("prod_sales_2026"))
+
+    // PRECONDITION, asserted rather than assumed: it really is dispatchable now.
+    const before = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(before.disabled).toBe(false)
+    expect(before.getAttribute("aria-disabled")).toBe("false")
+
+    // …the run is stopped.
+    rerender(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver />)
+
+    // ⚠ BOTH axes, never one. `disabled` is what the BROWSER honours and
+    // `aria-disabled` is what a SCREEN READER announces; the shipped card drives
+    // both from one `canSubmit`, and a retirement touching only one would make the
+    // two audiences disagree. This is the assertion P4 reds against.
+    const after = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(after.disabled).toBe(true)
+    expect(after.getAttribute("aria-disabled")).toBe("true")
+
+    // …and pressing it dispatches nothing. A `disabled` attribute that some later
+    // refactor routed around would still satisfy the two clauses above.
+    await user.click(after).catch(() => {})
+    expect(vi.mocked(answerAskUser)).not.toHaveBeenCalled()
+  })
+
+  it("announces itself as a live region, like the expired arm whose shape it borrows", () => {
+    renderRetired()
+    expect(screen.getByRole("status")).toBeInTheDocument()
+  })
+
+  /**
+   * The negative half. Without it, "retired when runIsOver" is equally consistent
+   * with a card that is ALWAYS retired — and a fence that cannot tell those apart
+   * has measured nothing.
+   */
+  it("a LIVE run's card is untouched — dispatchable, and carrying none of the retirement copy", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver={false} />)
+    await user.click(screen.getByText("prod_sales_2026"))
+    const btn = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    expect(btn.getAttribute("aria-disabled")).toBe("false")
+    expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+  })
+
+  it("the prop is OPTIONAL and defaults to live — every existing caller is unchanged", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={ASK} reconcile={noopReconcile} />)
+    await user.click(screen.getByText("prod_sales_2026"))
+    const btn = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+  })
+
+  it("has no axe violations in the retired arm", async () => {
+    const { container } = renderRetired()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  /**
+   * ⚠ THE DERIVATION'S TWO CONJUNCTS, EACH SHOWN TO MATTER SEPARATELY. This is the
+   * lesson `api/runs.py`'s ledger row states in the backend and it applies here
+   * unchanged: *a clause whose only test is a world where a sibling clause also
+   * holds has never actually been tested.* `runIsOver = lock == null && phases > 0`
+   * has exactly two ways to be wrong, and they point in OPPOSITE directions, so a
+   * single "retired when the run is over" case cannot see either.
+   */
+  describe("the runIsOver derivation, driven through PendingAskStack", () => {
+    beforeEach(() => {
+      hookState.asks = [ASK]
+    })
+
+    it("retires when the lock is cleared AND phases exist (the run ended)", () => {
+      stackState.lock = null
+      stackState.phases = [{ slug: "p0" }]
+      render(<PendingAskStack />)
+      expect(screen.getByText(RUN_STOPPED_RETIREMENT_LINE)).toBeInTheDocument()
+    })
+
+    it("does NOT retire on a DEEP thread — no lock, but no phases either", () => {
+      // ⚠ `lock == null` ALONE is true here. Retiring on it would kill every Deep
+      // `ask_user` prompt the instant it appeared — a thread with no run to stop
+      // must keep its approvals answerable.
+      stackState.lock = null
+      stackState.phases = []
+      render(<PendingAskStack />)
+      expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+      expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
+    })
+
+    it("does NOT retire MID-RUN — phases exist, but the lock is still held", () => {
+      // ⚠ `phases.length > 0` ALONE is true here. Retiring on it would kill a LIVE
+      // prompt the moment its first phase row landed — the same defect Task 1 just
+      // removed from the panel's Stop row, in a new place.
+      stackState.lock = { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 }
+      stackState.phases = [{ slug: "p0" }]
+      render(<PendingAskStack />)
+      expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 3 — FOUR retirements must wear FOUR coats.
+//
+// ⚠ THE THREE SHIPPED SENTENCES ARE **READ FROM SOURCE**, NEVER RE-TYPED. A fence
+// built on a re-typed literal tests the typing. The extraction recipes are the ones
+// `194.1-BASELINE.md` §9 recorded, including its two measured traps:
+//   · Trap 1 — they are NOT three parallel strings. (b) is a TEMPLATE literal and
+//     the other two are constants, so a fence that harvests double-quoted literals
+//     finds two and silently thinks it found three.
+//   · Trap 2 — a RAW sweep for (b) reds on the PROSE DOCUMENTING it: the sentence
+//     appears in double quotes inside the NaN/0 guard's comment. Comments are
+//     stripped FIRST, and the comment mention is separately asserted PRESENT so the
+//     strip can never cover for a real absence.
+// ⚠ §9's standing instruction holds: a later plan must NOT "fix" a red here by
+// deleting that comment. It documents a real guard; the FENCE would be what is
+// mis-scoped, never the documentation.
+describe("PendingAskCard (194.1-05) — the four retirement sentences are pairwise distinct", () => {
+  const src = cardSource as string
+  const codeOnly = src
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+    .join("\n")
+
+  it("the swept source is real and is the right file (an absence fence cannot detect its own blindness)", () => {
+    expect(typeof src).toBe("string")
+    expect(src.length).toBeGreaterThan(10000)
+    expect(src).toContain("export function PendingAskCard")
+    expect(codeOnly.length).toBeGreaterThan(3000)
+  })
+
+  it("all four are pairwise distinct AND share no complete sentence", () => {
+    // (a) the 404-expiry constant, (b) the countdown template, (c) the no-deadline
+    // fallback — all three READ out of the module's own source.
+    const a = codeOnly.match(/setExpiredMessage\(\s*"([^"]+)"\s*\)/)![1]
+    const b = codeOnly.match(/`(No response within \$\{[^}]+\} — agent stopped)`/)![1]
+    const c = codeOnly.match(/"(This prompt is no longer active)"/)![1]
+    // (d) is THIS plan's, imported from the module rather than typed here.
+    const d = RUN_STOPPED_RETIREMENT_LINE
+
+    // Every extraction actually found something — otherwise the distinctness below
+    // is a set of comparisons over `undefined`.
+    for (const s of [a, b, c, d]) {
+      expect(typeof s).toBe("string")
+      expect(s.length).toBeGreaterThan(20)
+    }
+
+    const all = [a, b, c, d]
+    expect(new Set(all).size).toBe(4)
+
+    // ⚠ THE STRONGER CLAUSE, AND THE ONE THAT ACTUALLY FIRES. 193.2 measured a
+    // fence asserting only `a !== b` passing a real plant that swapped one arm's
+    // SECOND sentence for another arm's while leaving the strings unequal. So split
+    // on the em-dash and the sentence terminators and require NO overlap.
+    //
+    // ⚠ ALL SIX PAIRS, not three. A fence over a subset is passed by a plant that
+    // reuses the pair it does not check.
+    const sentences = (s: string) =>
+      s
+        .split(/[—.!?]/)
+        .map((x) => x.trim().toLowerCase())
+        .filter((x) => x.length > 8)
+    const parts = all.map(sentences)
+    const pairs: Array<[number, number]> = [
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ]
+    expect(pairs).toHaveLength(6)
+    for (const [i, j] of pairs) {
+      expect(
+        parts[i].filter((s) => parts[j].includes(s)),
+        `sentences ${i} and ${j} share a complete sentence`,
+      ).toHaveLength(0)
+    }
+
+    // ⚠ (a) and (c) BOTH open with "This prompt" and that is NOT a violation — the
+    // clause is about complete sentences, not shared prefixes (§9 Trap 3). Asserted
+    // positively so a later plan does not "fix" a non-problem by rewording shipped
+    // copy nobody asked it to touch.
+    expect(a.startsWith("This prompt")).toBe(true)
+    expect(c.startsWith("This prompt")).toBe(true)
+  })
+
+  it("§9 Trap 2 is still real — (b) IS quoted in a comment, which is why the strip is what makes the fence honest", () => {
+    // The comment mention is asserted PRESENT so nobody later reads the strip as
+    // covering for an absence — and so nobody "fixes" a future red by deleting it.
+    expect(src).toContain('"No response within 0:00 — agent stopped"')
+    expect(codeOnly).not.toContain('"No response within')
+  })
+
+  it("the shared-complete-sentence clause DOES fire when two arms are collapsed (positive control)", () => {
+    const collapsed = ["one thing here — same tail sentence", "two things — same tail sentence"]
+    const sentences = (s: string) =>
+      s.split(/[—.!?]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 8)
+    const [x, y] = collapsed.map(sentences)
+    expect(x.filter((s) => y.includes(s))).not.toHaveLength(0)
   })
 })

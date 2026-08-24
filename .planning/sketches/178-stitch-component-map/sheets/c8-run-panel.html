@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Live Run Panel - Components</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container": "#1b202a",
+                        "on-secondary": "#3b0091",
+                        "outline-variant": "#464651",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-surface": "#dee2f1",
+                        "on-error": "#690005",
+                        "inverse-surface": "#dee2f1",
+                        "surface-variant": "#303540",
+                        "outline": "#918f9c",
+                        "on-secondary-container": "#c3abff",
+                        "tertiary-container": "#26c760",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "tertiary-fixed": "#6bfe8f",
+                        "inverse-on-surface": "#2b303c",
+                        "error-container": "#93000a",
+                        "error": "#ffb4ab",
+                        "surface-bright": "#343945",
+                        "tertiary-fixed-dim": "#4be176",
+                        "on-tertiary": "#003915",
+                        "surface": "#0e131e",
+                        "surface-container-low": "#171c26",
+                        "on-tertiary-fixed": "#002109",
+                        "on-background": "#dee2f1",
+                        "on-primary-container": "#353789",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-container-lowest": "#090e18",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "tertiary": "#4ee478",
+                        "primary-fixed": "#e1e0ff",
+                        "primary": "#c3c4ff",
+                        "secondary-container": "#571ac2",
+                        "surface-container-highest": "#303540",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-secondary-fixed": "#23005c",
+                        "on-error-container": "#ffdad6",
+                        "background": "#0e131e",
+                        "secondary-fixed": "#e9ddff",
+                        "on-tertiary-container": "#004c1e",
+                        "on-primary": "#242478",
+                        "surface-container-high": "#252a35",
+                        "primary-container": "#a3a5ff",
+                        "inverse-primary": "#5355a9",
+                        "surface-dim": "#0e131e",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-tint": "#c1c1ff",
+                        "secondary": "#d0bcff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .pulse-amber { animation: pulseAmber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulseAmber { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        
+        .card-base {
+            background-color: theme('colors.surface-container-lowest');
+            border: 1px solid theme('colors.outline-variant');
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body antialiased min-h-screen py-16 flex flex-col items-center">
+<!-- Container constraint: single column, exactly 380px wide -->
+<div class="w-[380px] flex flex-col gap-6">
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center">The Ask Card</div>
+<!-- 1. THE ASK CARD -->
+<div class="flex flex-col gap-4">
+<!-- YES/NO -->
+<div class="card-base p-3 flex flex-col gap-3">
+<div class="font-medium text-sm text-on-surface">Approve vendor risk score?</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant py-1.5 px-3 rounded text-sm font-medium transition-colors">Reject</button>
+<button class="flex-1 bg-primary text-on-primary hover:bg-primary-fixed-dim py-1.5 px-3 rounded text-sm font-medium transition-colors">Approve</button>
+</div>
+</div>
+<!-- MULTI-CHOICE -->
+<div class="card-base p-3 flex flex-col gap-3">
+<div class="font-medium text-sm text-on-surface">Select risk category:</div>
+<div class="flex flex-col gap-1.5">
+<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container cursor-pointer rounded">
+<input class="text-primary bg-surface border-outline-variant focus:ring-primary focus:ring-offset-background" name="risk" type="radio"/>
+<span class="text-sm font-mono">Low</span>
+</label>
+<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container cursor-pointer rounded">
+<input class="text-primary bg-surface border-outline-variant focus:ring-primary focus:ring-offset-background" name="risk" type="radio"/>
+<span class="text-sm font-mono">Medium</span>
+</label>
+<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container cursor-pointer rounded">
+<input class="text-primary bg-surface border-outline-variant focus:ring-primary focus:ring-offset-background" name="risk" type="radio"/>
+<span class="text-sm font-mono">High</span>
+</label>
+</div>
+</div>
+<!-- FREE-TEXT -->
+<div class="card-base p-3 flex flex-col gap-3">
+<div class="font-medium text-sm text-on-surface">Reason for override:</div>
+<div class="flex gap-2">
+<input class="flex-1 bg-surface border-outline-variant rounded text-sm px-2 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary" placeholder="..." type="text"/>
+<button class="bg-surface-container-highest hover:bg-surface-bright text-on-surface border border-outline-variant px-3 rounded text-sm font-medium transition-colors">Submit</button>
+</div>
+</div>
+<!-- ANSWERED -->
+<div class="card-base p-3 flex flex-col gap-2 bg-surface-container-low border-l-2 border-l-primary border-t-outline-variant border-r-outline-variant border-b-outline-variant">
+<div class="text-xs text-on-surface-variant">Approve vendor risk score?</div>
+<div class="flex items-center gap-2 text-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
+<span class="text-on-surface font-medium">Approved</span>
+<span class="text-on-surface-variant font-mono text-xs ml-auto">14:20</span>
+</div>
+</div>
+</div>
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center mt-6">The Paused Cue</div>
+<!-- 2. THE PAUSED CUE -->
+<div class="card-base px-3 py-2 flex items-center justify-between bg-[#1f1a10] border-[#4a3619]">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-[#fbbf24] pulse-amber"></div>
+<span class="text-sm font-medium text-[#fbbf24]">Awaiting Human</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-[#fbbf24]">front_hand</span>
+</div>
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center mt-6">The Files Section</div>
+<!-- 3. THE FILES SECTION -->
+<div class="card-base flex flex-col divide-y divide-outline-variant">
+<!-- Unknown sorts first -->
+<div class="flex items-center gap-3 p-3 hover:bg-surface-container cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-outline">unknown_document</span>
+<div class="flex-1 truncate">
+<div class="text-sm font-mono text-on-surface">raw_dump</div>
+</div>
+<div class="text-right">
+<div class="text-xs font-mono text-on-surface-variant">2.4MB</div>
+<div class="text-[10px] font-mono text-outline">--:--</div>
+</div>
+</div>
+<div class="flex items-center gap-3 p-3 hover:bg-surface-container cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-error">picture_as_pdf</span>
+<div class="flex-1 truncate">
+<div class="text-sm font-mono text-on-surface">report.pdf</div>
+</div>
+<div class="text-right">
+<div class="text-xs font-mono text-on-surface-variant">1.2MB</div>
+<div class="text-[10px] font-mono text-outline">2m ago</div>
+</div>
+</div>
+<div class="flex items-center gap-3 p-3 hover:bg-surface-container cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-tertiary">table</span>
+<div class="flex-1 truncate">
+<div class="text-sm font-mono text-on-surface">data.csv</div>
+</div>
+<div class="text-right">
+<div class="text-xs font-mono text-on-surface-variant">450KB</div>
+<div class="text-[10px] font-mono text-outline">5m ago</div>
+</div>
+</div>
+<div class="flex items-center gap-3 p-3 hover:bg-surface-container cursor-pointer transition-colors">
+<span class="material-symbols-outlined text-primary">code</span>
+<div class="flex-1 truncate">
+<div class="text-sm font-mono text-on-surface">schema.json</div>
+</div>
+<div class="text-right">
+<div class="text-xs font-mono text-on-surface-variant">12KB</div>
+<div class="text-[10px] font-mono text-outline">10m ago</div>
+</div>
+</div>
+</div>
+<!-- Empty state files -->
+<div class="card-base p-6 flex flex-col items-center justify-center text-center border-dashed">
+<span class="text-sm text-outline">No outputs generated yet</span>
+</div>
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center mt-6">The File Preview</div>
+<!-- 4. THE FILE PREVIEW -->
+<div class="flex flex-col gap-4">
+<!-- Table Preview -->
+<div class="card-base overflow-hidden flex flex-col">
+<div class="bg-surface-container-low px-3 py-1.5 border-b border-outline-variant flex justify-between items-center">
+<span class="text-xs font-mono text-on-surface-variant">data.csv</span>
+<span class="material-symbols-outlined text-[14px] text-outline">fullscreen</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant text-[10px] uppercase text-outline bg-surface-container-lowest">
+<th class="px-2 py-1 font-mono font-normal">id</th>
+<th class="px-2 py-1 font-mono font-normal">status</th>
+<th class="px-2 py-1 font-mono font-normal">score</th>
+</tr>
+</thead>
+<tbody class="text-xs font-mono text-on-surface">
+<tr class="border-b border-outline-variant/50">
+<td class="px-2 py-1 text-on-surface-variant">901</td>
+<td class="px-2 py-1">active</td>
+<td class="px-2 py-1">0.89</td>
+</tr>
+<tr class="border-b border-outline-variant/50">
+<td class="px-2 py-1 text-on-surface-variant">902</td>
+<td class="px-2 py-1">pending</td>
+<td class="px-2 py-1">0.45</td>
+</tr>
+<tr>
+<td class="px-2 py-1 text-on-surface-variant">903</td>
+<td class="px-2 py-1">error</td>
+<td class="px-2 py-1 text-error">0.12</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="bg-surface-container-low px-3 py-1.5 border-t border-outline-variant text-center">
+<span class="text-[10px] font-mono text-outline">Showing first 50 rows</span>
+</div>
+</div>
+<!-- Text Preview -->
+<div class="card-base overflow-hidden flex flex-col">
+<div class="bg-surface-container-low px-3 py-1.5 border-b border-outline-variant flex justify-between items-center">
+<span class="text-xs font-mono text-on-surface-variant">schema.json</span>
+<span class="material-symbols-outlined text-[14px] text-outline">content_copy</span>
+</div>
+<div class="p-3 bg-surface-container-lowest overflow-x-auto">
+<pre class="text-[11px] font-mono leading-relaxed text-on-surface">{
+  "vendor_id": "V-88291",
+  "assessment": {
+    "risk_level": "high",
+    "flags": [
+      "compliance_gap",
+      "missing_auth"
+    ]
+  }
+}
+</pre>
+</div>
+<div class="bg-surface-container-low px-3 py-1.5 border-t border-outline-variant text-center">
+<span class="text-[10px] font-mono text-outline">End of preview</span>
+</div>
+</div>
+</div>
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center mt-6">The Version Diff</div>
+<!-- 5. THE VERSION DIFF -->
+<div class="card-base overflow-hidden font-mono text-xs">
+<div class="bg-surface-container-low px-3 py-1.5 border-b border-outline-variant flex justify-between items-center">
+<span class="text-xs text-on-surface-variant">config_diff</span>
+</div>
+<div class="flex flex-col">
+<div class="flex px-2 py-1 text-on-surface-variant">
+<span class="w-6 text-right select-none text-outline mr-2 opacity-50">12</span>
+<span class="w-4 select-none mr-2"> </span>
+<span class="whitespace-pre">"timeout_ms": 5000,</span>
+</div>
+<div class="flex px-2 py-1 bg-[#4a1015]/30 text-error border-l-2 border-error">
+<span class="w-6 text-right select-none opacity-50 mr-2">13</span>
+<span class="w-4 select-none mr-2">-</span>
+<span class="whitespace-pre">"retry_count": 3</span>
+</div>
+<div class="flex px-2 py-1 bg-[#0a3f20]/30 text-tertiary border-l-2 border-tertiary">
+<span class="w-6 text-right select-none opacity-50 mr-2">13</span>
+<span class="w-4 select-none mr-2">+</span>
+<span class="whitespace-pre">"retry_count": 5</span>
+</div>
+<div class="flex px-2 py-1 text-on-surface-variant">
+<span class="w-6 text-right select-none text-outline mr-2 opacity-50">14</span>
+<span class="w-4 select-none mr-2"> </span>
+<span class="whitespace-pre">}</span>
+</div>
+</div>
+</div>
+<div class="text-[10px] uppercase tracking-[0.1em] text-outline text-center mt-6">The Empty Panel</div>
+<!-- 6. THE EMPTY PANEL -->
+<div class="card-base h-32 flex items-center justify-center border-dashed">
+<span class="text-sm text-outline">Workflow results will appear here during execution.</span>
+</div>
+</div>
+</body></html>

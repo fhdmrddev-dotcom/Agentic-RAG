@@ -114,6 +114,9 @@ from app.services.template_render_service import (
 )
 from app.services.tool_dispatcher import ToolContext
 
+# ── llm_human_input — MOVED to app.services.harness.human_input (G-5 / D-13, 2026-08-19) ──
+from app.services.harness.human_input import _exec_llm_human_input, _latest_phase_text  # noqa: F401
+
 # Imported lazily-at-call (NOT at module top) to avoid a harness import cycle
 # (harness_engine imports the harness package which imports phase_types): the
 # honest-fail surface lives in harness_engine and is fetched inside the executor.
@@ -395,7 +398,35 @@ def _effective_model(phase, ctx) -> str:
     return getattr(phase.config, "model", None) or getattr(ctx, "model", "") or ""
 
 
-def _build_phase_tool_context(phase, ctx) -> ToolContext:
+async def _effective_model_checked(phase, ctx) -> str:
+    """Phase 196 Plan 03 (D-10) — ``_effective_model`` routed through the SHIPPED
+    disabled-model resolver before a per-phase id ever reaches a provider.
+
+    INVARIANT: an ENABLED model is a STRICT no-op — same value, no notice, no receipt. A
+    DISABLED one is substituted and never silently: ONE ``model_fallback`` sub-step on the
+    producer stream the frontend already tails, plus ONE durable ``policy_applied`` receipt
+    naming both ids (no 25th audit kind — that kind already means exactly this).
+    FAIL-OPEN, a DECISION rather than an inherited default: a registry-read blip returns the
+    model unchanged, so a disabled model runs rather than the phase sinking — the shipped
+    chat posture. Failing closed would make an infrastructure hiccup look like an authoring
+    error. The import is FUNCTION-LOCAL (the resolver reaches ``app.api.threads`` late); A1
+    (no harness import cycle) is proven by a real fresh import in the 196-03 unit file.
+    """
+    from app.services.run_model_resolution import _resolve_enabled_model  # noqa: PLC0415 — late (A1)
+    org_default = getattr(getattr(ctx, "user_settings", None), "llm_model", "") or ""
+    resolved, notice = await _resolve_enabled_model(_effective_model(phase, ctx), org_default)
+    if not notice:
+        return resolved
+    await _emit_phase_substep(ctx, phase, status="model_fallback")
+    await _emit_audit(ctx, event_type="policy_applied", metadata={
+        "policy": "model_disabled_fallback", "phase": getattr(phase, "slug", None),
+        "disabled_model": notice.get("disabled_model"),
+        "fallback_model": notice.get("fallback_model"), "message": notice.get("message"),
+    })
+    return resolved
+
+
+def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolContext:
     """Build the ToolContext the sub-agent runs under for an LLM-agent phase.
 
     Carries the run substrate (redis / pool / supabase / user / thread) off the
@@ -452,7 +483,10 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         scoped_folder_path=getattr(ctx, "scoped_folder_path", None),
         emit=getattr(ctx, "emit", None),
         spawn=getattr(ctx, "spawn", None),
-        model=_effective_model(phase, ctx),
+        # 196-03 (D-10): the CHECKED model when an async caller resolved one — THIS is what
+        # the sub-agent runs on (run_task_sub_agent reads parent_ctx.model, not the caller's
+        # local). Omitted => the shipped sync fallback, byte-identical.
+        model=model if model is not None else _effective_model(phase, ctx),
         previous_files_in_run={},
         parent_run_id=None,
         per_run_task_semaphore=getattr(ctx, "per_run_task_semaphore", None),
@@ -470,6 +504,52 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         # => Plan 03 read is a no-op => Deep/non-skill phases byte-identical.
         skill_snapshot=getattr(phase.config, "skill_snapshot", None),
     )
+
+
+# ── 200 (DES-02 / D-07): the DECLARED per-step measure ────────────────────────
+# Key carried inside the executor's own returned dict. ``harness_engine._persist_output``
+# stores each executor dict FULL AND INLINE in ``workflow_phases.output`` (CR-02), so this
+# rides an existing jsonb column: no new column, no migration, no second write.
+MEASURE_KEY = "_measure"
+
+
+def _measure(count: int, noun: str) -> dict:
+    """Build the ``{"_measure": {"count", "noun"}}`` fragment for a DECLARING phase type.
+
+    ⚠ **A PHASE TYPE DECLARES A COUNT ONLY WHERE A COUNT IS ALREADY A FACT IN ITS OWN
+    OUTPUT.** The number is read off something the executor genuinely produced
+    (``len(source_refs)`` / ``len(sub_run_ids)`` / ``len(field_map)``) — it is never
+    authored by a model and never derived structurally by counting whichever key happens
+    to be a list. That structural derivation was OFFERED AND REJECTED (D-07): outputs
+    differ in shape per phase type and **no key marks "the thing produced"**, so a generic
+    count would silently mean something different on every type.
+
+    ⚠ **A TYPE WITH NO REAL NUMBER EMITS NO KEY AT ALL** — not ``0``, not ``null``, not a
+    dash. FOUR of the seven do exactly that (``programmatic``, ``llm_single``,
+    ``llm_human_input``, ``external_action``). The absence has to be an ABSENT KEY so the
+    client's arm can be ``hasOwnProperty``-shaped rather than ``?? 0``-shaped; a ``None``
+    with a noun beside it would render as a real measurement of zero.
+
+    ⚠ **BUT ``count: 0`` IS A REAL FACT AND IS EMITTED** (IDIOM-3 / SEED-159). A step that
+    searched and found nothing genuinely measured zero, and that is a DIFFERENT statement
+    from "this type does not count things". ``source_refs: []`` therefore yields
+    ``{"count": 0, "noun": "sources"}`` and must never be collapsed into silence — folding
+    the two together is the defect, in both directions.
+
+    ⚠ **THE NOUN IS THE STEP'S OWN, NEVER THE CONTRACT'S AND NEVER THE DOMAIN'S** (D-07 /
+    SEED-168, and it is AUTHORED COPY recorded in ``200-CHECKLIST.md`` §5.1). The three
+    words are ``sources`` / ``agents`` / ``fields`` — domain-neutral by construction. The
+    sketch's ``312 docs matched`` / ``48 fields extracted`` phrasing is a DOMAIN sentence,
+    and letting a model author that number would ship the fabricated business figure
+    ``199-05`` named "the highest-consequence lie this phase could ship". Each noun is
+    spelled at exactly ONE executor site so a later wording change is a one-line edit.
+
+    ⚠ ``programmatic`` DELIBERATELY DECLARES NOTHING even though several of its registry
+    members return lists. Its ``fn``s are pluggable and their shapes differ per ``fn``, so
+    ``len(whatever_list_is_there)`` is exactly the structural derivation D-07 rejected —
+    and a per-``fn`` declaration would be a FOURTH concern in this module, which G-5 fires on.
+    """
+    return {MEASURE_KEY: {"count": count, "noun": noun}}
 
 
 # ── executors ──────────────────────────────────────────────────────────────
@@ -526,7 +606,7 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
             {"role": "user", "content": _first_phase_user_turn(accumulated_outputs, ctx)},
         ],
         tools=[],
-        model=_effective_model(phase, ctx),
+        model=await _effective_model_checked(phase, ctx),
         user_settings=getattr(ctx, "user_settings", None),
     )
     return {"text": content or ""}
@@ -545,7 +625,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 D-04 — layer-1 whitelist over the EFFECTIVE list so the budget-capped tools
     # the MODEL sees include read_skill_file when the phase carries a skill_snapshot.
     whitelist = frozenset(_effective_tools(phase))
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
 
     # D-05 layer 1 — the model only SEES the whitelisted, budget-capped tools.
     # WR-04 (091-08): this list is now PASSED to run_task_sub_agent as
@@ -561,7 +641,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         whitelist, model, getattr(ctx, "user_settings", None)
     )
 
-    phase_ctx = _build_phase_tool_context(phase, ctx)
+    phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
 
     # D-12 — align with the Explorer=8 cap when the config is the model default.
     max_steps = phase.config.max_steps
@@ -612,12 +692,20 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # it across ALL phases and attaches the accumulated set to the final answer —
     # so a Research→Summarize workflow shows the RESEARCH phase's sources on the
     # SUMMARIZE phase's prose (the final phase has none of its own).
+    agent_source_refs = result.get("source_refs") or []
     return {
         "text": result["summary"],
         "sub_run_id": str(result["sub_run_id"]),
-        "source_refs": result.get("source_refs") or [],
+        "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
         "similarity_scores": result.get("similarity_scores") or [],
+        # 200 (D-07) — DECLARED measure, site 1 of 3. The number is a fact this executor
+        # already produced: how many grounding sources the sub-agent actually gathered.
+        # ⚠ ZERO IS EMITTED, NOT SUPPRESSED: a sub-agent that searched and found nothing
+        # measured 0 sources, which is a REAL fact and is not the same statement as "this
+        # phase type does not count things" (IDIOM-3 / SEED-159). The noun is AUTHORED COPY
+        # (200-CHECKLIST.md §5.1) and this is its ONE home in the tree.
+        **_measure(len(agent_source_refs), "sources"),
     }
 
 
@@ -639,7 +727,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 D-04 — layer-1 whitelist over the EFFECTIVE list (read_skill_file ∪ tools
     # when a snapshot is present), so each branch's budget-capped schemas include it.
     whitelist = frozenset(_effective_tools(phase))
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
     # WR-04 (091-08): pass the budget-capped list to each sub-agent (was discarded).
     # 101-06 WR-01: same render_template schema augmentation as _exec_llm_agent — the
     # shared _phase_tools_override helper guarantees the two paths cannot drift.
@@ -675,7 +763,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
 
     async def _one(question: str) -> dict:
         async with sem:  # composes with the shipped per-run + Redis-Lua caps
-            phase_ctx = _build_phase_tool_context(phase, ctx)
+            phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
             # The sub-agent's USER turn (task_service.py:351) = the sub-question, the
             # actual substance to research — not the truncated slug label it was before.
             # Prefix the overall topic so the branch keeps the user's intent in view.
@@ -723,138 +811,15 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         "source_refs": batch_source_refs,
         "citations": batch_citations,
         "similarity_scores": batch_similarity_scores,
+        # 200 (D-07) — DECLARED measure, site 2 of 3. How many parallel sub-agents this
+        # phase actually fanned out to — one ``sub_run_id`` per branch that really ran, so
+        # the number is the executor's own fact and not a re-derivation of the config's
+        # ``max_parallel_agents`` cap (which is a LIMIT, not a count of what happened).
+        # ⚠ Counting ``sub_run_ids`` rather than ``source_refs`` on purpose: the grounding
+        # lists are UNIONED across branches here, so their length answers a different
+        # question. The noun is AUTHORED COPY (§5.1) and this is its ONE home.
+        **_measure(len(sub_run_ids), "agents"),
     }
-
-
-async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
-    """Pause for human input via the ask_user pub/sub flow, block on the answer.
-
-    Reuses the ask_user substrate ordering (SUBSCRIBE → advertise → durable prompt
-    row → emit → block) so Plan 04's resume can re-subscribe against the same
-    ``tool_call_id``. The per-call timeout is clamped to the 1800s hard cap
-    (``settings.ask_user_max_timeout_seconds``). The durable prompt row + tool_call_id
-    are stored in the output so resume can find the pending prompt.
-    """
-    run_id: UUID = getattr(ctx, "run_id", None)
-    redis = getattr(ctx, "redis", None)
-    tool_call_id = uuid4().hex
-    prompt = phase.config.prompt
-    options = list(phase.config.options)
-    timeout_seconds = min(
-        phase.config.timeout_seconds, settings.ask_user_max_timeout_seconds
-    )
-    # D-12: the prior phase's text is the DRAFT the user is being asked to confirm
-    # (the doc_qa_human flow's `draft` phase produces {"text": <answer>}). Carry it
-    # through the durable prompt row + the SSE event + the /pending replay so the
-    # Phase 094 frame can render "here's what I'd answer — confirm?" without
-    # re-deriving it. Empty string when there is no upstream text (harmless).
-    draft = _latest_phase_text(accumulated_outputs)
-
-    # Durable prompt row (D-085-05) — Plan 04 resume re-subscribes against this
-    # tool_call_id. Best-effort: a failed insert only affects the /pending replay
-    # surface, not the live block-on-answer flow.
-    supabase = getattr(ctx, "supabase", None)
-    current_user = getattr(ctx, "current_user", None) or {}
-    thread_id = getattr(ctx, "thread_id", None)
-    if supabase is not None and thread_id:
-        try:
-            from app.utils.db import aexec
-
-            await aexec(
-                supabase.table("messages").insert(
-                    {
-                        "thread_id": thread_id,
-                        "user_id": current_user.get("id"),
-                        "role": "system",
-                        "content": prompt,
-                        # CTX-01 (T-120-04): llm_human_input ask_user prompt — workflow row.
-                        "origin": "harness",
-                        "tool_calls": [
-                            {
-                                "kind": "ask_user_prompt",
-                                "tool_call_id": tool_call_id,
-                                "prompt": prompt,
-                                "options": options,
-                                "timeout_seconds": timeout_seconds,
-                                "run_id": str(run_id),
-                                # D-12: the prior phase's draft (the thing being
-                                # confirmed) — additive; older rows have no draft.
-                                "draft": draft,
-                            }
-                        ],
-                    }
-                )
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception(
-                "llm_human_input: prompt row insert failed run=%s tcid=%s",
-                run_id, tool_call_id,
-            )
-
-    # Emit the ask_user prompt so the frontend renders the question.
-    # Facet B / edit #4 (092-07): this is a DIRECT executor emit (NOT an engine
-    # _emit site reached by run_workflow's stream_run_id threading), so route it on
-    # the PRODUCER stream transport (run:{producer}) the frontend watches — while
-    # the durable prompt-row run_id VALUE (above), the subscribe_for_response
-    # channel (below), and the get_pending_ask_user resume matcher all stay on
-    # ctx.run_id (the workflow_run id) for live↔resume answer-channel consistency.
-    _stream_id = getattr(ctx, "producer_run_id", None) or run_id
-    emit = getattr(ctx, "emit", None)
-    if emit is not None and redis is not None:
-        try:
-            await emit(
-                redis, _stream_id, "ask_user_prompt",
-                tool_call_id=tool_call_id,
-                prompt=prompt,
-                options=options,
-                timeout_seconds=timeout_seconds,
-                # D-12: carry the prior-phase draft on the live SSE event too, so the
-                # frontend PendingAsk shape gets it without a /pending round-trip.
-                draft=draft,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("llm_human_input: ask_user_prompt emit failed")
-
-    # Block on the answer via the shipped subscribe helper (SUBSCRIBE → SADD →
-    # block; cleanup in finally). Returns the parsed payload or None on timeout.
-    payload = await subscribe_for_response(
-        redis, run_id, tool_call_id, float(timeout_seconds)
-    )
-
-    # 096-09 (UAT Test 2 restart-resumability fix): a {"kind":"shutdown"} payload
-    # comes ONLY from main.py's broadcast_shutdown_sentinel_to_all (graceful app
-    # shutdown). For a HARNESS llm_human_input phase we must NOT complete with an
-    # empty answer — that would advance/finish the workflow and lose the pending
-    # question. Instead escape via CancelledError so this phase stays 'active' and
-    # the durable prompt row stays pending; the boot-time resume sweep then
-    # re-subscribes + re-emits the SAME prompt and blocks on the answer
-    # (BUG-260605-01). The engine's cancel/escape handler skips prompt-expiry on
-    # shutdown (is_app_shutting_down gate), so the prompt survives the restart.
-    # Deep-mode ask_user (the dispatcher tool) is unaffected — it keeps returning
-    # a normal "interrupted by server shutdown" ToolResult and finalizes.
-    if payload and payload.get("kind") == "shutdown":
-        raise asyncio.CancelledError(
-            "llm_human_input interrupted by server shutdown — phase left active "
-            "for the boot-time resume sweep (096-09)"
-        )
-
-    answer = ""
-    if payload and payload.get("kind") == "response":
-        # BUG-260607-01 (same defense as the Deep dispatcher ask_user handler):
-        # a choice-click answer arrives as {response_text: "", choice_index: N}
-        # — resolve the chosen option text so the workflow never advances on a
-        # silently-empty answer when the user actually chose.
-        answer = (payload.get("response_text") or "").strip()
-        if not answer and options:
-            _ci = payload.get("choice_index")
-            try:
-                _ci = int(_ci)
-                if 0 <= _ci < len(options):
-                    answer = str(options[_ci])
-            except (TypeError, ValueError):
-                pass
-
-    return {"text": prompt, "answer": answer, "tool_call_id": tool_call_id}
 
 
 # ── 101.1 (D-01/D-04/D-08/D-10/D-12) — the 6th executor: a SEALED FORCED EMIT ──
@@ -1231,7 +1196,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     """
     definition = getattr(ctx, "definition", None)
     emitter = getattr(phase.config, "emitter", "render_template")
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
     run_id = getattr(ctx, "run_id", None)
     pool = getattr(ctx, "pool", None)
     # D-01 (SEED-082): the citation policy decides ONLY the post-verdict disposition
@@ -1597,6 +1562,17 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 "placeholder_keys": placeholder_keys,
                 "source_refs": [],
                 "citations": [],
+                # 200 (D-07) — DECLARED measure, site 3 of 3, and the ONLY success return
+                # in this executor (every other exit routes through _emit_failure_output /
+                # _emit_unexpected_failure, which declare nothing — a failed emit produced
+                # no deliverable and has no honest count to report).
+                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``len(field_map)`` is the count of
+                # TOP-LEVEL entries in the legacy field-map — each scalar key, plus each
+                # collection as ONE entry. It is deliberately NOT a leaf-cell count: the
+                # map is the emitted deliverable's field structure, and that is the thing
+                # a person means by "how many fields did it fill". The noun is AUTHORED
+                # COPY (§5.1) and this is its ONE home.
+                **_measure(len(legacy_map), "fields"),
             }
 
         # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
@@ -1679,19 +1655,6 @@ def _collect_sub_questions(accumulated_outputs: dict) -> list[str]:
         if isinstance(out, dict) and isinstance(out.get("sub_questions"), list):
             return list(out["sub_questions"])
     return []
-
-
-def _latest_phase_text(accumulated_outputs: dict) -> str:
-    """The most-recent upstream phase's answer text — the draft an llm_human_input
-    phase asks the user to confirm (D-12). Mirrors ``_collect_sub_questions``'
-    reverse scan: every phase executor returns ``{"text": <answer>}``, so the
-    latest non-empty ``text`` is the prior phase's output (the doc_qa_human flow's
-    ``draft`` phase produces ``{"text": <answer>}`` — that is the thing being
-    confirmed). Returns ``""`` when there is no upstream text (harmless)."""
-    for out in reversed(list(accumulated_outputs.values())):
-        if isinstance(out, dict) and isinstance(out.get("text"), str) and out["text"].strip():
-            return out["text"]
-    return ""
 
 
 # ── Phase 189 (CONN-01) — the 7th executor: the governed EXTERNAL ACTION ─────

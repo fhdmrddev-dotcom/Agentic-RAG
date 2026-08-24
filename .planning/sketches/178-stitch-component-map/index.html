@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>178 — Stitch component map of the workflow product</title>
+<link rel="stylesheet" href="../themes/default.css"/>
+<style>
+  .wrap { max-width: 1180px; margin: 0 auto; padding: var(--space-12) var(--space-8) var(--space-16); }
+  h1 { font-family: var(--font-headline); font-size: var(--text-3xl); margin: 0 0 var(--space-3); letter-spacing: -0.02em; }
+  .lede { color: var(--color-text-muted); max-width: 70ch; margin: 0 0 var(--space-8); font-size: var(--text-md); }
+  .banner { border: 1px solid hsl(239 100% 82% / 0.3); background: var(--color-primary-dim);
+            border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); margin: 0 0 var(--space-6); }
+  .banner b { color: var(--color-primary); }
+  .banner p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.65; }
+  .banner p + p { margin-top: var(--space-2); }
+  .warn-banner { border-color: hsl(38 92% 60% / 0.35); background: var(--color-warning-dim); }
+  .warn-banner b { color: var(--color-warning); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-6); margin-top: var(--space-10); }
+  .card { border: 1px solid var(--color-border); background: var(--color-surface);
+          border-radius: var(--radius-lg); overflow: hidden; text-decoration: none; color: inherit;
+          display: flex; flex-direction: column;
+          transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+  .card:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+  .shot { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: top center;
+          background: var(--color-bg); border-bottom: 1px solid var(--color-border); }
+  .meta { padding: var(--space-4) var(--space-5) var(--space-5); }
+  .n { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim);
+       letter-spacing: 0.08em; text-transform: uppercase; }
+  .t { font-family: var(--font-headline); font-size: var(--text-lg); margin: var(--space-1) 0 var(--space-2); }
+  .d { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 var(--space-3); line-height: 1.55; }
+  .src { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); line-height: 1.7; }
+  .verdict { margin-top: var(--space-3); font-size: var(--text-sm); display: flex; gap: var(--space-2); align-items: baseline; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; flex: none; transform: translateY(-1px); }
+  .ok   .dot { background: var(--color-success); } .ok   { color: var(--color-success); }
+  .warn .dot { background: var(--color-warning); } .warn { color: var(--color-warning); }
+  .verdict span:last-child { color: var(--color-text-muted); }
+  .missing { border-style: dashed; opacity: 0.72; }
+  footer { margin-top: var(--space-16); padding-top: var(--space-6); border-top: 1px solid var(--color-border);
+           color: var(--color-text-dim); font-size: var(--text-sm); line-height: 1.7; }
+  code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-text-muted); }
+</style></head>
+<body><div class="wrap">
+<div class="n">Sketch 178 · Google Stitch (Gemini 3.1 Pro) · 2026-08-19</div>
+<h1>The component map</h1>
+<p class="lede">Not pages — <b>components</b>. Every atom of the workflow product drawn as a specimen
+sheet showing all of its states at once, including the canvas itself. Pages re-derive layout;
+component sheets are where the language actually gets decided.</p>
+
+<div class="banner">
+  <p><b>⭐ The adopted mindset is now baked into the tool.</b> Two rules, held together:
+  <b>text is noise — cut it</b>, and <b>the purpose must survive the cut</b>. The user must never lose
+  what a workflow is FOR and what it is doing for them right now; everything else is a value, a state
+  word, or gone.</p>
+  <p>Also added, and it worked: <em>draw the component, not the app</em> — and <em>never name the
+  mechanism to the user</em>. Zero app-shell leaks and zero stock photography across all nine sheets,
+  against three shell duplications and three stock portraits in the page pass.</p>
+</div>
+
+<div class="banner warn-banner">
+  <p><b>⚠ Still direction, not an acceptance bar.</b> These render zero shipped components. The next
+  step is a normal sketch that <em>renders</em> the real ones in this language — that sketch is the bar,
+  never this.</p>
+</div>
+
+<div class="grid">
+  <a class="card" href="sheets/c1-canvas-plane.html">
+    <img class="shot" src="thumbs/c1-canvas-plane.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 1</div><div class="t">The canvas plane &amp; connections</div>
+    <p class="d">The authoring surface, and — the point of the re-run — <b>connections that say what flows along them</b> in five distinguishable states. Steps named as business work, never machinery.</p>
+    <div class="src">WorkflowCanvas · CanvasToolbar<br/>PlaneEditingLayer · FlowEdge</div>
+    <div class="verdict ok"><span class="dot"></span><span><b>Re-run 2026-08-19.</b> Connections now carry their payload — 312 contracts &rarr; 48 extracted &rarr; 12 flagged. Committed dot grid, no ids.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c2-phase-node.html">
+    <img class="shot" src="thumbs/c2-phase-node.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 2</div><div class="t">The phase node</div>
+    <p class="d">Six types, six interaction states, six run states, the fork-shaped router node, and three zoom sizes — the product's single most repeated atom.</p>
+    <div class="src">PhaseNode · PhaseNodeCard<br/>NodeCornerMarks · NodeIconWell · NodeRunOverlay</div>
+    <div class="verdict ok"><span class="dot"></span><span>The best artifact of either pass. Fixes the over-literal name ladder.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c3-phase-spine.html">
+    <img class="shot" src="thumbs/c3-phase-spine.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 3</div><div class="t">The phase spine, three widths</div>
+    <p class="d">One spine language at authoring width, panel width and chat-receipt width — plus a branch that skips, a failed run, and a paused one.</p>
+    <div class="src">PhaseSpine · PhaseSpineGraph<br/>PhaseTimeline · PhaseCard</div>
+    <div class="verdict warn"><span class="dot"></span><span>Unification works; but it prints "(4/12)" — a determinate count — and over-writes the authoring column.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c4-phase-form-panel.html">
+    <img class="shot" src="thumbs/c4-phase-form-panel.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 4</div><div class="t">The phase configuration panel</div>
+    <p class="d">The densest form in the product, drawn twice — collapsed to essentials, and fully open — with the grounding switch that visibly refuses.</p>
+    <div class="src">PhaseFormPanel · ModelField · GovernanceSection<br/>ExternalActionSection · TemplateAttachSection · ConnectionPicker</div>
+    <div class="verdict ok"><span class="dot"></span><span>Holds the density ceiling without a wall of helper text.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c5-draft-arrival.html">
+    <img class="shot" src="thumbs/c5-draft-arrival.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 5</div><div class="t">The draft arrival cluster</div>
+    <p class="d">The receipt for what the agent decided: the arrival card that must survive navigation, five decision rows in three states, and the seed receipt.</p>
+    <div class="src">DraftArrivalCard · DecisionsList<br/>decisionsVocabulary · SeedReceipt</div>
+    <div class="verdict ok"><span class="dot"></span><span>Three arms per row, unknown never reads as satisfied.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c6-library-dialogs.html">
+    <img class="shot" src="thumbs/c6-library-dialogs.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 6</div><div class="t">The library row and its dialogs</div>
+    <p class="d">The workflow card in every state it must survive — including an empty name, a failed run, and three identical titles adjacent — plus run, fork and delete.</p>
+    <div class="src">WorkflowCard · LibraryToolbar<br/>RunModal · ForkNameDialog · WorkflowDeleteSheet</div>
+    <div class="verdict ok"><span class="dot"></span><span>The 93%-repeated-name case drawn honestly, with the toolbar on one baseline.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c7-gauntlet-soul.html">
+    <img class="shot" src="thumbs/c7-gauntlet-soul.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 7</div><div class="t">The publish gauntlet + the soul</div>
+    <p class="d">Eight checks as one compact strip, the judge's hard wall with no override anywhere, the verdict in plain words, and governance in three states.</p>
+    <div class="src">PublishGauntlet · verdictModel<br/>WorkflowSoul · soulData · governanceVocabulary</div>
+    <div class="verdict ok"><span class="dot"></span><span>Indeterminate throughout; the wall has no escape hatch drawn.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c8-run-panel.html">
+    <img class="shot" src="thumbs/c8-run-panel.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 8</div><div class="t">The live run panel</div>
+    <p class="d">At its real 380px: the ask card in three question shapes plus answered, the paused cue, accumulating files, previews, the diff, and the resting empty state.</p>
+    <div class="src">PendingAskCard · PausedRunCue · FilesSection<br/>FilePreview · CsvTablePreview · VersionDiff · PanelEmpty</div>
+    <div class="verdict ok"><span class="dot"></span><span>Narrow-width discipline; unknown file times say so rather than blanking.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c9-doors-describe.html">
+    <img class="shot" src="thumbs/c9-doors-describe.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 9</div><div class="t">The two doors + describe cluster</div>
+    <p class="d">The fork, the persistent header strip that stops the describe box appearing twice, the box refusing an input too short to act on, and templates that seed rather than branch.</p>
+    <div class="src">WorkflowDoorSwitch · DoorHeaderStrip · doorVocabulary<br/>DescribeKbPicker · DescribeTemplateRow · StarterTemplatePicker · TemplateNameCheck</div>
+    <div class="verdict ok"><span class="dot"></span><span>The doors read as different kinds of act; the duplicate box is designed out.</span></div></div>
+  </a>
+  <a class="card" href="sheets/c10-builder-chrome.html">
+    <img class="shot" src="thumbs/c10-builder-chrome.png" alt=""/>
+    <div class="meta"><div class="n">Sheet 10</div><div class="t">The builder chrome</div>
+    <p class="d">The header bar in five cases — including an empty name and a name too long — the four-state save region, the gated publish button, the problems tray, and the step picker as a colleague's verbs.</p>
+    <div class="src">BuilderHeaderBar &middot; BuilderSaveRegion<br/>ProblemsTray &middot; StepTypePicker</div>
+    <div class="verdict ok"><span class="dot"></span><span>The name is the headline, never a slug — the reported defect, designed out.</span></div></div>
+  </a>
+  <div class="card missing">
+    <div class="meta" style="padding-top:var(--space-6)"><div class="n">Sheet 11 — RE-RUNNING</div>
+    <div class="t">The journey, end to end</div>
+    <p class="d">The six moments a risk manager travels: say what you want &rarr; the agent proposes &rarr; review and correct &rarr; put it to work &rarr; it runs and asks &rarr; the outcome. Plus where-am-I, the hand-offs, and the three points where a human is required.</p>
+    <div class="src">cross-surface &middot; no single component owns this</div>
+    <div class="verdict warn"><span class="dot"></span><span>First attempt truncated at three moments — its horizontal row overflowed. Re-running vertically.</span></div></div>
+  </div>
+</div>
+
+<footer>Stitch project <code>10710316306258284608</code> · design system <code>assets/12493500246735489470</code>,
+now carrying the adopted mindset so every future generation inherits it.<br/>
+Page-level pass: <a href="../177-stitch-regeneration/index.html" style="color:var(--color-primary)">sketch 177</a>.
+Full read in <code>README.md</code>.</footer>
+</div></body></html>

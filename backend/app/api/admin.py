@@ -33,7 +33,13 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 import app.dependencies as deps
-from app.config import MODEL_CAPABILITIES, _infer_provider_for, settings
+from app.config import (
+    _LLM_CALL_TIMEOUT_MAX_S,
+    _LLM_CALL_TIMEOUT_MIN_S,
+    MODEL_CAPABILITIES,
+    _infer_provider_for,
+    settings,
+)
 from app.dependencies import (
     get_redis,
     get_supabase,
@@ -134,6 +140,12 @@ _MODEL_CAP_COLUMNS = {
     "enabled",
     "deprecated",
     "deprecated_reason",
+    # Phase 196 (AUTH-04 / D-14): the operator-correctable forced-emission tier (7 -> 8).
+    # ⚠ SCOPE LINE, stated rather than left implicit: _ADD_MODEL_CAP_COLUMNS (the
+    # add-model-by-id path below) is deliberately NOT extended with emit_tier. The PATCH
+    # path is the correction knob D-14 asks for, and a newly added row can be PATCHed
+    # immediately — so nothing is unreachable, and the add path keeps its narrower surface.
+    "emit_tier",
 }
 
 # Phase 149 (WR-01): the per-column value-type contract for the PATCH write. A wrong-typed
@@ -148,6 +160,39 @@ _MODEL_CAP_INT_COLUMNS = {
     "max_output_tokens",
 }
 _MODEL_CAP_BOOL_COLUMNS = {"native_tools", "enabled", "deprecated"}
+
+# Phase 196 (AUTH-04 / T-196-IV2): the per-column CLOSED VOCABULARY for enum columns —
+# LAYER 3 of the A7 three-layer pin. The other two layers are the SQL CHECK
+# ``model_capabilities_overrides_emit_tier_check`` (migration 120) and
+# ``app.services.forced_emit._RUNGS_BY_TIER``; all three are asserted EQUAL in both
+# directions by backend/tests/unit/test_196_emit_tier_two_layer_pin.py.
+#
+# ⚠ WHY AN EQUALITY AND NOT JUST A GUARD: a tier the CHECK accepts and the ladder does not
+# recognise is rewritten to "coerce" by the boundary guard at forced_emit.py:377 — with no
+# exception, no audit row and no log line. The operator sets "guaranteed format", the write
+# succeeds, and the run silently degrades to best-effort. Drift here is not loud.
+_MODEL_CAP_ENUM_COLUMNS = {
+    "emit_tier": {"force_strict", "force", "coerce"},
+}
+
+# Phase 196 (T-196-IV2b — SEED-172 finding 3, folded by operator ratification): per-column
+# INCLUSIVE (min, max) bounds for the int columns. SEED-172 measured 0, negatives and
+# fat-fingered absurdities being accepted end-to-end today; a 0 context window or a 0
+# timeout is not a smaller configuration, it is a broken one.
+#
+# The timeout pair is IMPORTED from app.config rather than retyped, so the PATCH path and
+# the LLM_CALL_TIMEOUT_OVERRIDES env parser can never drift apart (they are the same
+# T-066-05 mitigation, reached by two different doors).
+#
+# ⚠ The other two pairs have NO shipped clamp to mirror — they are sanity caps chosen here,
+# and their only job is to reject 0, negatives and absurdities. They are deliberately far
+# above any real model (today's largest context window is ~2M tokens) so they can never
+# refuse a legitimate future model; do not tighten them into a curation policy.
+_MODEL_CAP_INT_BOUNDS: dict[str, tuple[int, int]] = {
+    "llm_call_timeout_seconds": (_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S),
+    "context_window_tokens": (1, 10_000_000),
+    "max_output_tokens": (1, 1_000_000),
+}
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -1051,56 +1096,13 @@ async def set_visibility(
 # non-operators by the router-level require_operator (no RLS backstop — SC#4 / D-149-09).
 
 
-def _registry_row(model_id, cap, ovr, default_model, model_locked):
-    """Build one union registry row: OVR (DB-stored) values win over DEF (built-in) values,
-    with BOTH discernible via ``overridden_fields`` so the editor can render Reset (D-149-03).
-
-    ``cap`` is the built-in MODEL_CAPABILITIES entry (or None for a DB-only model); ``ovr``
-    is the model_capabilities_overrides row (or None for a pure DEF row). An OVR column is
-    applied only when NON-None (null-clears-to-DEF — the same overlay rule as
-    get_model_capability_async), so an operator's cleared field falls back to the built-in.
-    """
-    cap = cap or {}
-    ovr = ovr or {}
-
-    def _eff(col, default=None):
-        v = ovr.get(col)
-        if v is not None:
-            return v
-        return cap.get(col, default)
-
-    provider = ovr.get("provider") or cap.get("provider") or _infer_provider_for(model_id)
-    # DB-only OR any model carrying a stored override row → db_override; else the built-in.
-    source = "db_override" if ovr else "registry"
-    # Which editable columns are actually STORED (non-None) in the DB — the editor renders
-    # Reset only for fields that are overridden vs inherited from the built-in DEF.
-    overridden_fields = sorted(c for c in _MODEL_CAP_COLUMNS if ovr.get(c) is not None)
-
-    _enabled = ovr.get("enabled")
-    _deprecated = ovr.get("deprecated")
-    return {
-        "model_id": model_id,  # verbatim casing (Pitfall 6)
-        "provider": provider,
-        "capability_source": source,
-        "enabled": bool(_enabled) if _enabled is not None else True,
-        "deprecated": bool(_deprecated) if _deprecated is not None else False,
-        # IN-02: surface the stored deprecation reason so re-editing a deprecated model seeds
-        # the input from the current note (not blank) — a blur/enter no longer clobbers it.
-        "deprecated_reason": ovr.get("deprecated_reason"),
-        # WR-04: distinguish "not tracked in the registry" from a real 0. No built-in
-        # MODEL_CAPABILITIES entry carries context_window_tokens, so coalescing absent→0 made
-        # the tab read "Context 0 · DEF" for essentially every registry row (false — the value
-        # is simply not tracked, not zero). Return the RAW effective value or None; the tab
-        # renders None as "—" (not a concrete 0). Same for the sibling numeric fields.
-        "context_window_tokens": _eff("context_window_tokens"),
-        "max_output_tokens": _eff("max_output_tokens"),
-        "native_tools": bool(_eff("native_tools", False)),
-        "llm_call_timeout_seconds": _eff("llm_call_timeout_seconds"),
-        "is_default": model_id == default_model,
-        "is_locked": bool(model_locked) and model_id == default_model,
-        # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.
-        "overridden_fields": overridden_fields,
-    }
+# Phase 196 Plan 04 (D-02): ``_registry_row`` and the union loop that used to live HERE now
+# live in ``app.services.model_registry`` — ONE function, two callers, because the new
+# non-operator author route (``GET /models/registry``) must compute the SAME union without
+# widening this router's default-deny gate. Moved verbatim; imported function-locally below
+# (Pitfall 4). Nothing is re-imported at module scope here because no test imports
+# ``_registry_row`` / ``get_model_registry`` from this module — see that module's
+# PATCH SURFACE section.
 
 
 @router.get("/models")
@@ -1116,31 +1118,19 @@ async def get_model_registry(request: Request):
     ``llm_model_locked``). Floor-EXEMPT (the tab re-fetches — the /admin/runs + /admin/users
     poll precedent, D-07); ``audit_is_write=False`` marks it a read. The router gate is the
     sole authority — a non-operator gets a byte-identical 404 (SC#4 / D-149-09).
+
+    Phase 196 Plan 04 (D-02): the composition now lives in
+    ``app.services.model_registry.build_model_registry_rows`` so the non-operator author route
+    (``GET /models/registry``) computes the SAME union without widening this router's gate.
+    The response is byte-identical to before apart from the new ``emit_tier`` field (D-13).
     """
     request.state.audit_is_write = False
 
-    # Function-local imports (Pitfall 4 — keep the settings module off admin's load path).
-    from app.models.user_settings import _load_settings_from_db, load_all_model_overrides
+    # Function-local import (Pitfall 4 — keep the settings module off admin's load path; the
+    # leaf itself does the user_settings reads function-locally for the same reason).
+    from app.services.model_registry import build_model_registry_rows
 
-    settings_row = await _load_settings_from_db()
-    default_model = settings_row.get("llm_model") or ""
-    model_locked = bool(settings_row.get("llm_model_locked"))
-
-    overrides = await load_all_model_overrides()
-
-    rows = []
-    seen = set()
-    # DEF rows (built-in registry) overlaid with any OVR.
-    for model_id, cap in MODEL_CAPABILITIES.items():
-        rows.append(_registry_row(model_id, cap, overrides.get(model_id), default_model, model_locked))
-        seen.add(model_id)
-    # DB-only rows (in overrides, not in the built-in registry) — discovery-confirmed models.
-    for model_id, ovr in overrides.items():
-        if model_id in seen:
-            continue
-        rows.append(_registry_row(model_id, None, ovr, default_model, model_locked))
-
-    return {"models": rows}
+    return {"models": await build_model_registry_rows()}
 
 
 class AddModelRequest(BaseModel):
@@ -1379,6 +1369,31 @@ async def set_model_capability(
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"'{col}' must be an integer or null.",
+                )
+            # T-196-IV2b (SEED-172 finding 3): RANGE, not just type. A well-typed 0 or -1
+            # passed every check before Phase 196 and was written end-to-end; a 0 timeout
+            # fires the per-call timer instantly (every run `timed_out` — the T-066-05 DoS)
+            # and a 0 context window is not a smaller model, it is a broken row.
+            _lo, _hi = _MODEL_CAP_INT_BOUNDS[col]
+            if not (_lo <= val <= _hi):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{col}' must be between {_lo} and {_hi} (inclusive), or null.",
+                )
+        elif col in _MODEL_CAP_ENUM_COLUMNS:
+            # T-196-IV2: the closed vocabulary, refused BEFORE any DB touch. Without this
+            # branch an off-vocabulary tier would reach Postgres and die on a raw 23514
+            # (a 500 to the operator, not a 422) — and, worse, a tier the CHECK happened to
+            # accept would be written unvalidated against forced_emit._RUNGS_BY_TIER and
+            # degrade runs SILENTLY. See _MODEL_CAP_ENUM_COLUMNS for the three-layer pin.
+            _allowed = _MODEL_CAP_ENUM_COLUMNS[col]
+            if not isinstance(val, str) or val not in _allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"'{col}' must be one of "
+                        f"{', '.join(sorted(_allowed))}, or null."
+                    ),
                 )
         elif col in _MODEL_CAP_BOOL_COLUMNS:
             if not isinstance(val, bool):

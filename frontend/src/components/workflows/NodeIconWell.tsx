@@ -1,4 +1,27 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20, VERBATIM APART FROM ONE ATTRIBUTE. The Phase
+ * 200 canvas port DELETED this module: sketch 200 draws the step's mark INSIDE the card in
+ * a 24px left gutter, so a module whose whole subject is a 62px disc floating above the
+ * card's top edge had no consumer left, and the card grew an inline well instead. **The
+ * operator has since seen both faces rendered and chosen this one**, naming the ring around
+ * the mark and the card silhouette, so the module comes back and the card renders it again
+ * at its original JSX position.
+ *
+ * ⚠ NO TEST ID, AND THAT WAS A DECISION RATHER THAN AN OMISSION. The port's inline well
+ * carried `data-testid="canvas-icon-well"` and the card's suite came to depend on it. This
+ * file is restored WITHOUT it, because dropping it makes the rendered DOM byte-identical to
+ * the pre-port tree — which lets `PhaseNodeCard.test.tsx`'s three `CARD_HTML_BASELINE`
+ * captures and its whole geometry matrix be restored VERBATIM and PASS, rather than
+ * re-baselined. A pin that still holds against a capture nobody re-typed is evidence; a
+ * re-captured pin is only a record of what the code now does. Nothing outside that suite
+ * ever referenced the name (measured: `grep -rn "canvas-icon-well" frontend/src`).
+ *
+ * ⚠ THE PARAGRAPHS BELOW ARE THE 188.2-05 ORIGINAL AND SOME OF THEM WERE ALREADY STALE
+ * WHEN THIS FILE WAS DELETED — deliberately so; see the `:NNN` note near the foot. They are
+ * restored unedited rather than tidied, because a restoration that rewrote its subject
+ * would stop being one.
+ */
+/**
  * Phase 188.2-05 Task 1 (D-04) — NodeIconWell.
  *
  * THE 3D MARK THAT FLOATS ABOVE THE CARD'S TOP EDGE. Four nested `<span>`s — a soft light
