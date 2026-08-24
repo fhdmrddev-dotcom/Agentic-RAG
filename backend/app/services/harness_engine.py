@@ -1671,10 +1671,21 @@ async def run_workflow(
         # publishes the signal without also running it. So this brake reads state and
         # stops; the durable writes belong to the worker that decided the cancel.
         #
-        # ⚠ ``break``, NOT ``raise``, for the same reason. The run has already been
-        # terminalized on the cancelling worker, so raising would only route a second,
-        # redundant terminalize through the escape handler. Breaking leaves the loop by
-        # its normal door with the durable state already correct.
+        # ⚠ ``return``, AND **NOT** ``break`` — THE PLAN SAYS "break immediately" AND
+        # THAT WORD WOULD HAVE SHIPPED A LIE. This ``while`` loop does not fall through
+        # to nothing: the statements after it are ``finish_run(pool, run_id,
+        # "completed")``, a ``run_completed`` audit row, ``_surface_final_answer`` and a
+        # ``run_completed`` SSE frame. Breaking out of a CANCELLED run therefore
+        # overwrites the cancelling worker's ``cancelled`` with ``completed``, persists
+        # a partial answer as the deliverable and tells the browser the run finished.
+        # Written first as ``break`` and caught by driving the engine — the pinning case
+        # is ``test_the_boundary_brake_never_lets_the_run_report_completed``, which reads
+        # `completed` out of the recorded writes when the statement is reverted.
+        #
+        # ⚠ AND NOT ``raise`` EITHER. The run has already been terminalized on the
+        # cancelling worker, so raising would only route a second, redundant terminalize
+        # through the escape handler. Returning leaves the engine with the durable state
+        # already correct and nothing further claimed.
         if await is_run_cancelled(redis, run_id):
             logger.info(
                 "run %s: cancel signal observed at the phase boundary before %s — "
@@ -1682,7 +1693,7 @@ async def run_workflow(
                 run_id,
                 phase.slug,
             )
-            break
+            return
 
         # 1. DURABLE active BEFORE any work (Pitfall 1).
         # 200 (DES-02 / D-05): the write RETURNS the timestamp it stored, so the frame
