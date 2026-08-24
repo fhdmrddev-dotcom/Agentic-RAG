@@ -340,3 +340,66 @@ def test_the_reply_trail_is_still_stripped():
     """POSITIVE CONTROL — the fix above must not have turned the de-poisoning off."""
     assert strip_quoted_replies("Body here\n-----Original Message-----\nold stuff") == "Body here"
     assert strip_quoted_replies("Mine\n> old line one\n> old line two") == "Mine"
+
+
+# -------------------------------------------------------------------------------------
+# A REAL .msg FAILED INGESTION IN THE APP. Not a hypothetical.
+#   Postgres refused the document at the embedding step with SQLSTATE 22P05,
+#   "unsupported Unicode escape sequence -- NUL cannot be converted to text".
+#   Measured on the offending file: the NUL was in the SUBJECT (1 occurrence), NOT in the
+#   body and NOT in any of its 19 headers. extract-msg reads NUL-terminated MAPI properties
+#   out of an OLE compound file and the terminator rides along into the decoded string.
+#   Postgres refuses NUL in `text` at any depth -- no cast or encoding stores it -- so it
+#   has to be removed where the value is produced.
+#
+# NOTE ON THIS FILE: an earlier draft of these tests wrote LITERAL NUL bytes into the
+# source and pytest refused to collect it ("source code string cannot contain null
+# bytes"). Every NUL below is an ESCAPE SEQUENCE, never a raw byte.
+# -------------------------------------------------------------------------------------
+from app.services.email_extraction_service import scrub_text
+
+
+def test_scrub_text_removes_nul_the_character_that_broke_ingestion():
+    assert scrub_text("An update\x00") == "An update"
+    assert scrub_text("a\x00b\x00c") == "abc"
+    assert "\x00" not in scrub_text("a\x00b")
+
+
+def test_scrub_text_keeps_the_whitespace_that_carries_meaning():
+    """A blanket control-character strip would flatten every email body into one line."""
+    body = "Dear Sara,\n\n\tRegards,\r\nAhmed"
+    assert scrub_text(body) == body
+
+
+def test_scrub_text_removes_other_control_characters_but_not_ordinary_text():
+    assert scrub_text("bell\x07 del\x7f vt\x0b") == "bell del vt"
+    assert scrub_text("Rapport trimestriel — Q3 · 2026") == "Rapport trimestriel — Q3 · 2026"
+    assert scrub_text("ورقة1") == "ورقة1"
+
+
+def test_scrub_text_never_returns_none():
+    assert scrub_text(None) == ""
+    assert scrub_text("") == ""
+
+
+def test_a_parsed_subject_carrying_nul_cannot_reach_the_database():
+    """END-TO-END on the shape that failed: the NUL must be gone from the retrieval text,
+    which is what is handed to chunking and then to Postgres."""
+    from app.services.email_extraction_service import (
+        format_email_text_for_retrieval,
+        parse_eml_bytes,
+    )
+
+    src = (
+        b"From: a@x.com\r\nTo: b@x.com\r\n"
+        b"Subject: An update\x00 on your application\r\n"
+        b"\r\nBody line one.\r\nBody line two.\r\n"
+    )
+    parsed = parse_eml_bytes(src)
+    text = format_email_text_for_retrieval(parsed)
+
+    assert "\x00" not in parsed.subject
+    assert "\x00" not in text
+    # POSITIVE CONTROL -- the subject survived; only the NUL left.
+    assert "An update on your application" in parsed.subject
+    assert "Body line one." in text
