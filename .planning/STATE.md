@@ -2,30 +2,49 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: ready_to_execute
+status: phase_built_not_verified
 last_updated: 2026-08-24
 last_activity: 2026-08-24
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 5
-  percent: 71
+  total_plans: 8
+  completed_plans: 6
+  percent: 75
 stopped_at: >
-  Phase 204 wave 2: 204-03 (SCHED-01, the workflow scheduler) DONE — 4742ac00,
-  97d934b7, 90431308, 657b66e2, f84b4a7a, fa80b5a7, docs 3378353f. 35 new cases
-  green; ZERO new backend failures vs base 9af9706e (67 before AND after,
-  identical sets); count gate OK 110/110 total 5438 failed 0; tsc -p
-  tsconfig.app.json 0 errors in any touched file; check-deploy-drift RESULT PASS.
-  All three threat mitigations driven, 4 counterfactuals RED.
-  ⚠ OWED, IN ORDER: (1) paste supabase/migrations/124_workflow_schedules.sql into
-  the LOCAL Supabase SQL editor — it is AUTHORED and UNAPPLIED, so the table does
-  not exist on any database; (2) bash scripts/regenerate-full-schema.sh (no
-  --reset) — without it every greenfield deploy comes up WITHOUT the table;
-  (3) three UAT rows named in 204-03-SUMMARY.md. Keep SCHEDULER_PROCESS_ENABLED
-  false until (1). SCHED-01 is BUILT, not verified.
-  ⚠ 204-02 (SCHED-02) was running in a worktree in parallel and is NOT covered by
-  this entry. Next: reconcile wave 2, then verify Phase 204.
+  Phase 204 COMPLETE AS BUILD, NOT AS VERIFICATION. All 3 plans executed; the
+  204-02 worktree branch is MERGED into develop (--no-ff, clean, zero
+  files_modified overlap with 204-03, confirmed by diff before merging).
+  MERGED-TREE EVIDENCE (the first time the two wave-2 halves ever ran together):
+  the three phase suites give 100 passed (28 cross-worker + 37 circuit-breaker +
+  35 scheduler). Per-plan gates: zero new backend failures vs base 9af9706e
+  (failing-id sets diffed with comm, not asserted); count gate OK 110/110,
+  total 5438, failed 0; tsc -p tsconfig.app.json 34 pre-existing errors, NONE in
+  any touched file; check-deploy-drift RESULT PASS; CLAUDE.md size 116960 chars
+  (78 percent, headroom 33040).
+  X X X  BLOCKING OPERATOR ACTION - NOTHING IN THIS PHASE WORKS UNTIL IT IS DONE:
+  TWO migrations are AUTHORED and UNAPPLIED - 124_workflow_schedules.sql and
+  125_circuit_breaker_trip.sql. Paste each into the LOCAL Supabase SQL editor
+  (never db push / db reset - that wipes dev data), then run
+  bash scripts/regenerate-full-schema.sh with NO --reset.
+  The two failure modes are DIFFERENT and the second is the dangerous one:
+  without 124 the workflow_schedules table exists on no database, so the
+  scheduler cannot run at all (loud). Without 125, workflow_runs.metadata does
+  not exist, load_run_budget FAILS OPEN - the read raises, the budget resolves
+  empty, and EVERY RUN PROCEEDS UNCAPPED (silent). A spend cap that is off is
+  worse than one that is absent, because the UI says it is set.
+  Keep SCHEDULER_PROCESS_ENABLED=false until both are applied.
+  REQUIREMENTS: all three rows deliberately UNCHECKED. SCHED-01 built not
+  verified (migration + 3 UAT rows owed). SCHED-02 built not verified (migration
+  owed; token coverage is 3 of 4 phase types - llm_emit cannot measure its own
+  spend, forced_emit.py has zero usage occurrences). L-01 PARTIAL - the
+  "or by SCHED-02's circuit breaker" clause is now CLEARED (the breaker composes
+  cancel_workflow_run_internals, the same path manual Stop uses), but the
+  WORKER_COUNT=2 clause is still verified only as an in-process isolation
+  property, with no live two-uvicorn-worker row.
+  Phase 206 was REWRITTEN (not dropped) as MCP Connector Client - workflow-scoped;
+  the rest of the connector story is .planning/CONNECTIONS-MILESTONE-CANDIDATE.md.
+  NEXT: apply 124 + 125, regenerate full-schema, then /gsd:verify-work 204.
 ---
 
 # Project State

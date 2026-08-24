@@ -34,7 +34,7 @@
 | 201 | CSV & Structured Tabular Ingestion | CSV and spreadsheet files automatically extract structured tables into `document_tables`, enabling `query_table` on CSV documents | TAB-01 | ✅ Complete (2026-08-24) |
 | 202 | Table Chunks Retrieval Injection & Semantic Search | Extracted tables are injected as structured markdown representations and summaries into `document_chunks` so semantic search finds cell facts | TAB-02 | ✅ Complete (2026-08-24) |
 | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Parse `.msg` and `.eml` files with header metadata extracted, thread deduplication, and attachment relationship links | EML-01, EML-02 | ✅ Complete (2026-08-24) |
-| 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | Planned |
+| 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | ⚠ **Built, not verified** (2026-08-24) — migrations 124 + 125 UNAPPLIED |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | Planned |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | Planned — ⚠ **REWRITTEN 2026-08-24**, see detail |
 
@@ -43,7 +43,7 @@
 - [x] **Phase 201: CSV & Structured Tabular Ingestion** — `555432c4` — 39 tests passing
 - [x] **Phase 202: Table Chunks Retrieval Injection & Semantic Search** — `bbe73a91` — 46 tests passing
 - [x] **Phase 203: Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline** — `725a2b5c` — 56 tests passing
-- [ ] **Phase 204: Scheduled & Recurring Unattended Runs** — ⚠ carries **L-01**, folded in from Phase 194 (see the detail section below)
+- [~] **Phase 204: Scheduled & Recurring Unattended Runs** — **BUILT 2026-08-24, NOT VERIFIED** — 3 plans, `d2e4eb3d`…`06dfaf01` + merge. **100 passed** across the three phase suites on the merged tree (28 + 37 + 35); zero new backend failures vs `9af9706e` (failing-id sets diffed, not asserted); count gate `total 5438 · failed 0 · 110/110`; `tsc -p tsconfig.app.json` 34 pre-existing, none in touched files; deploy-drift PASS. ⚠ **DELIBERATELY NOT ✅ — migrations 124 and 125 are authored and UNAPPLIED, so the scheduler table exists on no database and `load_run_budget` FAILS OPEN (every run uncapped).** Three UAT rows owed. See `204-0{1,2,3}-SUMMARY.md`.
 - [ ] **Phase 205: Stateful & Incremental Workflows**
 - [ ] **Phase 206: MCP Connector Client — workflow-scoped** — ⚠ **REWRITTEN 2026-08-24** (was *Outbound Action Connectors*). The rest of the connector story moved to the **Connections & Open Platform** milestone: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
 
