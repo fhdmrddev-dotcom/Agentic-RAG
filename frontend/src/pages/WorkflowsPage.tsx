@@ -897,6 +897,24 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
             // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
             // predicate here; the breadcrumb above consults it.
             registerCanLeave={registerCanLeave}
+            // Phase 200.3 (SEED-164 / D-03): Test Run from builder header
+            onTestRun={async (_def, draftId) => {
+              if (onLaunch && _def) {
+                await onLaunch(
+                  {
+                    id: draftId ?? "",
+                    slug: (typeof _def.slug === "string" ? _def.slug : "") || "workflow",
+                    version: typeof _def.version === "number" ? _def.version : 1,
+                    name: (typeof _def.name === "string" ? _def.name : "") || "Draft Workflow",
+                    status: "draft",
+                    definition: _def as DefShape,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                  } as PublishedWorkflow,
+                  "",
+                )
+              }
+            }}
             renderPublish={(_def, draftId, blockedReason, onPublishRunning) =>
               draftId ? (
                 <PublishGauntlet

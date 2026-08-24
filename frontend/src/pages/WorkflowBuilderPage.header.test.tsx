@@ -1319,6 +1319,7 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
       "🔒",
       "judge always-on",
       "Save draft",
+      "Test Run",
       "◆ Publish…",
     ])
   })
@@ -1719,3 +1720,65 @@ describe("199-09 — the Builder's pre-draft CTA predicate, MEASURED not assumed
     expect(cta).toBeDisabled()
   })
 })
+
+describe("Phase 200.3 (SEED-164 / D-03) — Builder header Test Run action", () => {
+  it("flag ON: renders Test Run button and clicking it launches the draft", async () => {
+    const onLaunch = vi.fn().mockResolvedValue(undefined)
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowsPage folders={[]} onLaunch={onLaunch} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    fireEvent.click(await screen.findByTestId("draft-open"))
+    await screen.findByTestId("door-govern")
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+
+    const testRunBtn = await screen.findByTestId("builder-test-run")
+    expect(testRunBtn).toBeInTheDocument()
+    expect(testRunBtn.textContent).toContain("Test Run")
+
+    fireEvent.click(testRunBtn)
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
+    expect(onLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "draft-1",
+        slug: "vendor-brief",
+        status: "draft",
+      }),
+      "",
+    )
+  })
+
+  it("flag OFF: Test Run button is absent to preserve byte-identical flag-off surface", async () => {
+    await openDraftBuilder(OFF_VARIANTS[0].value)
+    expect(screen.queryByTestId("builder-test-run")).toBeNull()
+  })
+
+  /**
+   * ⚠ THE REGRESSION THIS PINS SHIPPED ONCE AND NO TEST SAW IT.
+   *
+   * `handleTestRun` originally flushed behind `if (persistence.dirty)`. That member does not
+   * exist on `DraftPersistence` — the flag lives on the STORE (`store.getState().dirty`) — so
+   * the read was `undefined`, the guard was permanently false, and the flush NEVER RAN. A
+   * Test Run launched the last SAVED definition while the canvas showed newer work. Only
+   * `tsc -p tsconfig.app.json` caught it; the two behavioural tests above passed throughout,
+   * because neither asserts the flush.
+   *
+   * ⚠ THE SWEEP IS OVER STRIPPED CODE, NOT RAW SOURCE (187-24, and it would have fired here):
+   * the shipped fix carries a docblock that SPELLS the forbidden member by name so the next
+   * reader knows why the guard is gone. A raw-source grep expecting zero reds on that prose.
+   * NON-VACUITY is asserted first — a `?raw` import that resolved to "" passes every
+   * absence clause silently.
+   */
+  it("the flush is UNCONDITIONAL — no `persistence.dirty` read survives in the builder", () => {
+    const code = stripComments(builderSource)
+    expect(code.length).toBeGreaterThan(20000) // non-vacuity: the ?raw import really resolved
+    expect(code).toContain("await persistence.saveNow()")
+    expect(code).not.toContain("persistence.dirty")
+    // POSITIVE CONTROL — the needle really matches the shape it claims to forbid.
+    expect("if (persistence.dirty) {").toContain("persistence.dirty")
+  })
+})
+

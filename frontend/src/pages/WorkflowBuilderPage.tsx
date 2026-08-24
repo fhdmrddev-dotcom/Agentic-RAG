@@ -146,6 +146,7 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
+import { Play } from "lucide-react"
 import { listConnectorConnections, listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
@@ -718,12 +719,15 @@ export interface WorkflowBuilderPageProps {
    * below does not reference them at all — so the shipped three-band surface is preserved
    * by construction rather than by remembering to pass nothing.
    */
+  /** Phase 200.3 (SEED-164 / D-03): Test Run action from builder header. */
+  onTestRun?: (def: WorkflowDefinitionJSON, draftId: string | null) => Promise<void> | void
   headerLead?: React.ReactNode
   headerTrail?: React.ReactNode
 }
 
 export function WorkflowBuilderPage({
   renderPublish,
+  onTestRun,
   initial,
   initialDescribe,
   autoDraft,
@@ -1225,6 +1229,26 @@ export function WorkflowBuilderPage({
     },
   })
   const persistState: PersistState = persistence.state
+
+  const [testRunInFlight, setTestRunInFlight] = useState(false)
+  const handleTestRun = useCallback(async () => {
+    if (testRunInFlight) return
+    setTestRunInFlight(true)
+    try {
+      // ⚠ 200.3 CORRECTION — this was gated on `persistence.dirty`, which is NOT a member of
+      // `DraftPersistence` (the flag lives on the STORE: `store.getState().dirty`). The read was
+      // `undefined`, so the guard was permanently false and the flush NEVER RAN — a Test Run
+      // launched the last SAVED definition while the canvas showed newer work. `saveNow` is the
+      // user-initiated write and is safe unconditionally (`useDraftPersistence.ts` D-186-03), so
+      // the fix is to drop the guard rather than to reach for the store.
+      await persistence.saveNow()
+      if (onTestRun && definition) {
+        await onTestRun(definition as WorkflowDefinitionJSON, draftId)
+      }
+    } finally {
+      setTestRunInFlight(false)
+    }
+  }, [testRunInFlight, persistence, onTestRun, definition, draftId])
 
   const verdicts = useStore(store, (s) => s.verdicts)
   const verdictGroups = useMemo(() => groupVerdicts(verdicts), [verdicts])
@@ -2605,6 +2629,18 @@ export function WorkflowBuilderPage({
         onReload={() => void persistence.reload()}
         onOverwrite={() => void persistence.overwrite()}
       />
+      {canvasEnabled && draftId && onTestRun && (
+        <button
+          type="button"
+          data-testid="builder-test-run"
+          onClick={() => void handleTestRun()}
+          disabled={testRunInFlight || persistState.kind === "saving"}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Play className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+          <span>{testRunInFlight ? "Starting…" : "Test Run"}</span>
+        </button>
+      )}
       {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
           operator's correction). No net-new band: the reason travels through the
           shipped `renderPublish` seam as a third argument so the mount does not move.

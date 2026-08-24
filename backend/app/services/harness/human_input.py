@@ -128,6 +128,23 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     timeout_seconds = min(
         phase.config.timeout_seconds, settings.ask_user_max_timeout_seconds
     )
+    # ── 200.3 (SEED-164 / D-01) — GOLDEN RUN AUTO-CONTINUES WITHOUT BLOCKING ──────
+    # A publish validation golden run has no interactive user watching the screen to
+    # click or answer. Mock the response with the first choice (or "Approved") so the
+    # workflow can validate end-to-end and pass the publish gauntlet.
+    if getattr(ctx, "is_golden_run", False):
+        default_answer = options[0] if options else "Approved"
+        logger.info(
+            "llm_human_input: golden run auto-continued with answer %r (tool_call_id=%s)",
+            default_answer,
+            tool_call_id,
+        )
+        return {
+            "text": prompt,
+            "answer": default_answer,
+            "tool_call_id": tool_call_id,
+            "_golden_run_mock": True,
+        }
 
     # ── 200 (D-10) — A RE-DRIVE CONSUMES THE DURABLE ANSWER; IT DOES NOT RE-ASK ──
     #

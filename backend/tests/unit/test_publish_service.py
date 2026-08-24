@@ -430,11 +430,10 @@ def _interactive_definition_row(*, kind: str) -> dict:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["llm_human_input", "ask_user_validator"])
+@pytest.mark.parametrize("kind", ["ask_user_validator"])
 async def test_interactive_phase_blocks_publish_before_golden_run(kind):
-    """WR-04: a definition with an interactive phase (llm_human_input OR an ask_user
-    validator disposition) is blocked at ``interactive_phase`` PRE-RUN — the golden run
-    is NEVER driven (an unsubscribed ask_user prompt cannot wedge the publish)."""
+    """WR-04: a definition with an ask_user validator disposition is blocked at
+    ``interactive_phase`` PRE-RUN — the golden run is NEVER driven."""
     row = _interactive_definition_row(kind=kind)
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
@@ -453,7 +452,30 @@ async def test_interactive_phase_blocks_publish_before_golden_run(kind):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["llm_human_input", "ask_user_validator"])
+async def test_seed164_human_input_proceeds_to_golden_run():
+    """SEED-164: an llm_human_input definition is NOT blocked pre-run and proceeds to golden run."""
+    row = _interactive_definition_row(kind="llm_human_input")
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 90, "summary": "good", "criteria": []}
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "approved output"}, "completed")),
+        ) as drive,
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+    ):
+        result = await _call()
+
+    assert result["published"] is True
+    drive.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["ask_user_validator"])
 async def test_the_interactive_block_writes_a_publish_blocked_receipt(kind):
     """G-1 (``/gsd:validate-phase 193.2``) — the stage-2.5 block DOES leave a receipt.
 
@@ -562,8 +584,8 @@ async def test_non_interactive_definition_proceeds_past_interactive_check():
 
 
 def test_interactive_phase_failures_helper_detects_both_forms():
-    """WR-04 unit: ``_interactive_phase_failures`` flags both an ``llm_human_input``
-    phase AND an ``ask_user`` validator disposition; a clean definition returns []."""
+    """WR-04 unit + SEED-164: ``_interactive_phase_failures`` flags an ``ask_user`` validator disposition;
+    ``llm_human_input`` is unblocked (SEED-164); a clean definition returns []."""
     from app.models.harness import WorkflowDefinition
 
     human = WorkflowDefinition.model_validate(
@@ -576,7 +598,7 @@ def test_interactive_phase_failures_helper_detects_both_forms():
         _definition_row(business_requirement="x")["definition"]
     )
 
-    assert publish_service._interactive_phase_failures(human)  # llm_human_input flagged
+    assert publish_service._interactive_phase_failures(human) == []  # SEED-164: unblocked
     assert publish_service._interactive_phase_failures(asker)  # ask_user validator flagged
     assert publish_service._interactive_phase_failures(clean) == []  # nothing flagged
 
@@ -656,7 +678,14 @@ def _interactive_definition(*, kind: str, name=..., slug: str | None = None):
     )
 
 
-_BOTH_KINDS = ("llm_human_input", "ask_user_validator")
+_BOTH_KINDS = ("ask_user_validator",)
+
+
+def test_seed164_human_input_passes_publish_gauntlet():
+    """SEED-164: llm_human_input definitions are not refused by _interactive_phase_failures."""
+    definition = _interactive_definition(kind="llm_human_input", name="Approve step")
+    findings = publish_service._interactive_phase_failures(definition)
+    assert findings == [], f"Expected 0 findings for llm_human_input, got: {findings!r}"
 
 
 @pytest.mark.parametrize("kind", _BOTH_KINDS)
@@ -771,9 +800,7 @@ def test_d13_the_two_arms_share_no_message():
     and this is the only assertion that can catch a later "simplification" that undoes it.
     """
     label = "Approve the quarterly draft"
-    human = publish_service._interactive_phase_failures(
-        _interactive_definition(kind="llm_human_input", name=label)
-    )[0]["message"]
+    human = publish_service._INTERACTIVE_STEP_NAMED.format(label=label)
     asker = publish_service._interactive_phase_failures(
         _interactive_definition(kind="ask_user_validator", name=label)
     )[0]["message"]
@@ -817,6 +844,7 @@ def test_t193201_a_huge_name_yields_a_bounded_message(kind):
     )
     assert findings
     message = findings[0]["message"]
+
 
     assert len(message) < 400, (
         f"{kind}: a 10,000-character step name produced a {len(message)}-character refusal "
@@ -1589,16 +1617,15 @@ def test_the_armed_checkpoint_is_not_a_validator():
         "contradicts D-06. The fix belongs in the engine (189-05), not here."
     )
 
-    # POSITIVE CONTROL — the helper still flags the two shapes it DOES own, so the
+    # POSITIVE CONTROL — the helper still flags the shape it DOES own, so the
     # emptiness above is a measurement rather than a broken helper.
-    for kind in ("llm_human_input", "ask_user_validator"):
-        other = WorkflowDefinition.model_validate(
-            _interactive_definition_row(kind=kind)["definition"]
-        )
-        assert publish_service._interactive_phase_failures(other), (
-            f"control: _interactive_phase_failures stopped flagging {kind!r} — the "
-            f"assertion above proves nothing while this helper is inert"
-        )
+    other = WorkflowDefinition.model_validate(
+        _interactive_definition_row(kind="ask_user_validator")["definition"]
+    )
+    assert publish_service._interactive_phase_failures(other), (
+        "control: _interactive_phase_failures stopped flagging ask_user_validator — the "
+        "assertion above proves nothing while this helper is inert"
+    )
 
 
 @pytest.mark.asyncio

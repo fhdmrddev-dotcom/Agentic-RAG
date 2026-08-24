@@ -671,57 +671,25 @@ def _clean_label(raw) -> str | None:
 
 
 def _interactive_phase_failures(definition) -> list:
-    """Named failures for any INTERACTIVE phase blocking the synchronous publish (WR-04).
+    """Named failures for any INTERACTIVE validator blocking synchronous publish (WR-04).
 
     Returns one ``{"phase": <slug>, "message": ...}`` entry per phase that would
     dead-end the synchronous publish golden run by blocking on a human:
 
-      - an ``llm_human_input`` phase (``config.phase_type == "llm_human_input"``), or
       - any validator whose ``on_failure == "ask_user"`` (the D-11 interactive
         disposition — it pauses the run waiting for a human to choose).
 
-    Empty list == no interactive phases (the publish proceeds to the golden run). This
-    is a PRE-RUN lint-class check (no provider call) — it short-circuits BEFORE any
-    golden run so an unsubscribed ``ask_user`` prompt can never wedge the publish.
+    Empty list == no blocking interactive phases (the publish proceeds to the golden run).
 
-    ⚠ ``phase`` CARRIES THE SLUG AND THAT IS DELIBERATE — it is machine-readable metadata for
-    the caller (``/validate`` keys a canvas finding off it), NOT copy. ``message`` is the copy,
-    and no branch of it interpolates the slug.
-
-    ⚠ THIS GATE IS NOT EXHAUSTIVE OVER "STEPS THAT ASK A PERSON", AND THE COPY ABOVE IS
-    WORDED SO IT NEVER IMPLIES OTHERWISE. It matches exactly the two shapes named above. An
-    ``external_action`` phase also involves a human approval in a LIVE run and is NOT refused
-    here — deliberately: ``test_the_armed_checkpoint_is_not_a_validator`` pins that emptiness
-    as a FENCE, because naming armed phases here is CONFLICT-1 Option B, which makes an
-    ``external_action`` workflow unpublishable and contradicts D-06 outright (REJECTED at
-    D-19). It does not need refusing either: on a golden run the armed checkpoint is
-    AUTO-CONTINUED (``harness_engine.py:837``) and the send is skipped while the record is
-    kept (``phase_types.py`` GATE 1 / D-16), so it cannot wedge a publish the way an
-    unsubscribed ``ask_user`` can. Widening this gate is a scope decision, never a drive-by.
-
-    THE GATE ITSELF IS DELIBERATE AND STAYS. An unsubscribed ``ask_user`` prompt has no human
-    watching it during a publish and would burn ``harness_publish_max_seconds`` waiting for
-    someone nobody asked. A workflow that legitimately pauses for a person — published, and
-    skipped or stubbed during the validation run — is a real and named capability need
-    (``SEED-164``), and it is a seed rather than a schedule: nothing here promises it.
+    ⚠ 200.3 (SEED-164): ``llm_human_input`` is permitted and no longer refused here.
+    During the golden run, ``_exec_llm_human_input`` auto-continues with the first configured
+    choice (or "Approved") when ``ctx.is_golden_run`` is True, enabling publishing while
+    preserving interactive pausing for real live runs.
     """
     failures: list = []
     for phase in getattr(definition, "phases", []) or []:
         slug = getattr(phase, "slug", None)
-        config = getattr(phase, "config", None)
         label = _clean_label(getattr(phase, "name", None))
-        if getattr(config, "phase_type", None) == "llm_human_input":
-            failures.append(
-                {
-                    "phase": slug,
-                    "message": (
-                        _INTERACTIVE_STEP_NAMED.format(label=label)
-                        if label
-                        else _INTERACTIVE_STEP_UNNAMED
-                    ),
-                }
-            )
-            continue  # one finding per phase is enough
         for v in getattr(phase, "validators", []) or []:
             if getattr(v, "on_failure", None) == "ask_user":
                 failures.append(

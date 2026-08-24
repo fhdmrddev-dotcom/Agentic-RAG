@@ -130,6 +130,8 @@ export interface WorkflowDoorSwitchProps {
      *  calls it nor observes it. */
     onPublishRunning?: (running: boolean) => void,
   ) => React.ReactNode
+  /** Phase 200.3 (SEED-164 / D-03): Test Run action passed straight through to Builder */
+  onTestRun?: (def: import("@/pages/WorkflowBuilderPage").BuilderDefinition, draftId: string | null) => Promise<void> | void
   /** The describe-CTA handler — the loose door forwards the describe text to the
    *  EXISTING draft/generate path (the shell adds no new sink; D-01/T-124-08). */
   onDescribeDraft?: (describe: string) => void
@@ -170,6 +172,7 @@ export function WorkflowDoorSwitch({
   def,
   initial,
   renderPublish,
+  onTestRun,
   onDescribeDraft,
   initialDoor = "both",
   registerCanLeave,
@@ -282,6 +285,7 @@ export function WorkflowDoorSwitch({
           <WorkflowBuilderPage
             initial={initial}
             renderPublish={renderPublish}
+            onTestRun={onTestRun}
             initialDescribe={describe}
             autoDraft={handoffDraft}
             // Phase 187-26 (GAP A): the door's KB choice, carried into the EXISTING
