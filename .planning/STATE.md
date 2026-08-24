@@ -9,19 +9,23 @@ progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 stopped_at: >
-  Phase 204 wave 1 DONE — 204-01 (L-01 cross-worker cancellation brake) shipped:
-  d2e4eb3d, 6ef6fb93, 6ecb125c, docs fe2d4cb1. 28 new cases green, ZERO new
-  failures vs base cd6af1c5 (65 pre-existing before AND after, identical sets).
-  6 counterfactuals driven RED. Two plan corrections: the prescribed `break`
-  would have written `completed` over a cancelled run (run_workflow's loop falls
-  through to finish_run("completed")), and a shipped 194 AST fence forbids a
-  second `cancel_phase` call site in harness_engine.py.
-  OWED: a live WORKER_COUNT=2 UAT row (D-204-04 verified in-process only), and a
-  pre-provider-call check in task_service.py (out of 204-01 files_modified).
-  Next: wave 2 — /gsd:execute-phase 204 (204-02 + 204-03 in parallel)
+  Phase 204 wave 2: 204-03 (SCHED-01, the workflow scheduler) DONE — 4742ac00,
+  97d934b7, 90431308, 657b66e2, f84b4a7a, fa80b5a7, docs 3378353f. 35 new cases
+  green; ZERO new backend failures vs base 9af9706e (67 before AND after,
+  identical sets); count gate OK 110/110 total 5438 failed 0; tsc -p
+  tsconfig.app.json 0 errors in any touched file; check-deploy-drift RESULT PASS.
+  All three threat mitigations driven, 4 counterfactuals RED.
+  ⚠ OWED, IN ORDER: (1) paste supabase/migrations/124_workflow_schedules.sql into
+  the LOCAL Supabase SQL editor — it is AUTHORED and UNAPPLIED, so the table does
+  not exist on any database; (2) bash scripts/regenerate-full-schema.sh (no
+  --reset) — without it every greenfield deploy comes up WITHOUT the table;
+  (3) three UAT rows named in 204-03-SUMMARY.md. Keep SCHEDULER_PROCESS_ENABLED
+  false until (1). SCHED-01 is BUILT, not verified.
+  ⚠ 204-02 (SCHED-02) was running in a worktree in parallel and is NOT covered by
+  this entry. Next: reconcile wave 2, then verify Phase 204.
 ---
 
 # Project State
@@ -45,6 +49,35 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Current focus:** Phase 198 — node vocabulary
 
 ## Current Position
+
+### 2026-08-24 — Phase 204 plan 03 EXECUTED (SCHED-01, the workflow scheduler)
+
+Published workflows can be scheduled on a cron or interval and run unattended. Seven commits;
+full record in `.planning/phases/204-scheduled-and-recurring-unattended-runs/204-03-SUMMARY.md`.
+
+⚠ **SCHED-01 IS BUILT, NOT VERIFIED, and the difference is one operator action.** Migration 124
+is authored and **UNAPPLIED** — CLAUDE.md requires the SQL-editor paste and an agent cannot open
+a browser. The DDL was DRY-RUN against `:54322` inside a rolled-back transaction (`17 cols ·
+rls=True · 4 policies · 4 indexes · a both-cadence INSERT raises CheckViolation`), so it parses
+and every referenced object exists — but **the table does not exist on any database yet.**
+`SCHEDULER_PROCESS_ENABLED` is `false` by default and must stay so until it does.
+
+**Three decisions worth carrying forward:**
+- **No leader election.** Exactly-once belongs to the claiming transaction (`FOR UPDATE SKIP
+  LOCKED` **plus the `next_run_at` advance inside it** — the second half is the load-bearing
+  one). So the loop runs in every worker, and there is no leader whose death silently stops
+  every schedule.
+- **Only a PUBLISHED workflow can be scheduled.** A draft is mutable; an unattended run of a
+  mutable workflow is one nobody agreed to.
+- **The per-run caps ride on `workflow_runs.inputs`** under a `_schedule_` namespace — `204-02`'s
+  breaker reads them from the run it is already policing.
+
+⚠ **`frontend/src/lib/api.ts`'s 197 G-5 decline — which fired at 200.2 and was never answered —
+is ANSWERED: RE-DECLINED in writing, with a trigger that has only two outcomes.** *The next phase
+adding a runtime export there TAKES the split or escalates it as a phase; it may NOT re-decline.*
+
+⚠ **`WorkflowCard.tsx`'s ⋯-menu seam is now named for the THIRD time and is overdue.**
+
 
 ### ⚠ 2026-08-23 — Phase 200.2 CONTEXT GATHERED (`/gsd:discuss-phase 200.2`). The block below is preserved verbatim; it is the record of the 200.1 pass and is still accurate about that work.
 

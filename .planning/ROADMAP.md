@@ -97,6 +97,7 @@ would give the milestone a control that reports the property it does not have �
 - **Wave 2** *(blocked on Wave 1)*
   - `204-02-PLAN.md` — Hard Spend-Cap & Token/Duration Circuit Breaker (`SCHED-02`)
   - `204-03-PLAN.md` — Background Workflow Scheduler Service, Database Schema & API/UI Controls (`SCHED-01`)
+    ✅ **EXECUTED 2026-08-24** — `204-03-SUMMARY.md`; 7 commits, 35 new tests, all three threat mitigations driven with counterfactuals. ⚠ **OWED before SCHED-01 can be called done:** paste migration 124 into the Supabase SQL editor, then `scripts/regenerate-full-schema.sh` (no `--reset`), then the 3 UAT rows the summary names.
 
 ⚠ **WR-04 IS EXPLICITLY *NOT* FOLDED IN, and that is a decision rather than an oversight.** 194's other
 residual — three non-owner callers drive `_cancel_run_internals`, so the UI says *"Stopped by you"* about
