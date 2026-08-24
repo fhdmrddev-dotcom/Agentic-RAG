@@ -1095,32 +1095,6 @@ export function WorkflowCard({
     ...identity.segs.filter((seg) => seg !== face.state),
     ...(identity.ofN === null ? [] : [identity.ofN]),
     ...(identity.when === null ? [] : [identity.when]),
-    // ⚠ Phase 204.1 (SCHED-01 follow-up) — THE AUTOMATION FACT, and it goes LAST on purpose.
-    // 204 shipped scheduling and this card said nothing about it: a workflow firing every
-    // Monday at 08:00 read identically to one never automated, and the only way to find out
-    // was to open the ⋯ menu on every card in turn. For a feature whose whole point is
-    // running while nobody watches, invisible is the wrong default.
-    //
-    // ⚠ IT JOINS THIS ARRAY RATHER THAN BECOMING A BADGE, and that is FORCED, not chosen:
-    // the badge budget is a max-2 tuple enforced as a TYPECHECK ERROR (189 spent the second
-    // slot), so a third badge does not compile. The identity line is the card's one home for
-    // a muted fact about the row, which is exactly what this is.
-    //
-    // ⚠ IT SPREADS EMPTY WHEN SILENT, so a row with no active schedule composes
-    // BYTE-IDENTICALLY to before — the property `templateMark` documents above, and the
-    // reason 192.1's by-child-order DOM assertions keep passing untouched:
-    // `1 + 2 × identityParts.length` is unchanged on those rows.
-    //
-    // ⚠ LAST, AFTER `when`. The earlier segments DISCRIMINATE between namesakes
-    // (`rowIdentity.ts` ranks them); automation discriminates nothing — it is a fact about
-    // one row, like `changed 2 days ago`. Ahead of the ranked segments it would push the
-    // thing that tells two cards apart further from the eye.
-    //
-    // ⚠ THE DECISION IS NOT HERE. `automationFacts.ts` owns it, for the reason `cardFace.ts`
-    // exists: this file's G-5 was DISCHARGED by extracting exactly this shape once, and a
-    // second wire-reading ternary inline would undo that discharge one commit later.
-    ...(automation.phrase === null ? [] : [automation.phrase]),
-    ...(automation.more === null ? [] : [automation.more]),
   ]
 
   /** Every row state has something behind `⋯` — the fork and the two delete grades. */
@@ -1255,6 +1229,47 @@ export function WorkflowCard({
                 spells NO lifecycle word anywhere; `row.provenance` reaches `cardFace` as an
                 input key and nothing else. */}
             <span className={STATE_TONE[face.mark]}>{face.state}</span>
+            {/* ⚠ Phase 204.1 (SCHED-01 follow-up) — THE AUTOMATION FACT, MOVED HERE FROM THE
+                IDENTITY LINE ON OPERATOR FEEDBACK, and the move is the finding. It first
+                shipped as a segment on the 11px uppercase meta line, which honoured that
+                line's no-colour/no-glyph rule perfectly and WAS NOT SEEN — the operator
+                scanned the card and asked where it was. A fact that survives the style guide
+                and fails the glance has not indicated anything.
+
+                ⚠ THIS LINE IS WHERE A READER ALREADY LOOKS. It answers *does this one work*
+                — `Worked 4 days ago | Ready to run` — and "it also runs itself on Mondays" is
+                the same KIND of fact at the same 12px weight, which is why it belongs beside
+                them rather than one register down among the discriminators.
+
+                ⚠ IT SPENDS A GLYPH AND THE ACCENT TONE, WHICH THE META LINE COULD NOT. This
+                line already carries a coloured dot and a `Wrench`, so a `CalendarClock` here
+                introduces no new vocabulary — and it is the SAME glyph the ⋯ menu's
+                `Schedules…` item uses, so the mark that says "automated" is one mark in two
+                places rather than two spellings of one idea.
+
+                ⚠ IT STAYS SILENT ON EVERY UNSCHEDULED ROW. `automation.phrase === null`
+                renders nothing at all — no separator, no glyph — so 110 of 111 cards compose
+                byte-identically and this column's by-child-order pins keep passing. */}
+            {automation.phrase !== null && (
+              <>
+                <span aria-hidden="true" className="text-border">
+                  {ANSWER_SEPARATOR}
+                </span>
+                <CalendarClock
+                  data-testid="row-automation-glyph"
+                  className="h-3.5 w-3.5 flex-none text-primary"
+                  aria-hidden="true"
+                />
+                <span data-testid="row-automation" className="text-primary">
+                  {automation.phrase}
+                </span>
+                {automation.more !== null && (
+                  <span data-testid="row-automation-more" className="text-muted-foreground">
+                    {automation.more}
+                  </span>
+                )}
+              </>
+            )}
           </div>
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────

@@ -77,3 +77,42 @@ describe("automationFacts", () => {
     }
   })
 })
+
+describe("where the automation fact renders (204.1 — the operator move)", () => {
+  /**
+   * ⚠ THIS SUITE PINS A PLACEMENT, WHICH IS UNUSUAL AND IS THE POINT. The fact first shipped
+   * as a segment on the 11px uppercase identity line. That honoured the line's no-colour,
+   * no-glyph rule exactly — and the operator scanned the card and asked where it was. A fact
+   * that satisfies the style guide and fails the glance has not indicated anything.
+   *
+   * So the pin is not "a string exists somewhere on the card"; it is that the string is on the
+   * STATUS line (`Worked 4 days ago | Ready to run | …`), which is the line a reader already
+   * uses to answer *does this one work*. A future tidy-up that moves it back down to the meta
+   * line would pass every existing assertion and silently re-create the invisible version.
+   */
+  it("is pinned to the status line by test id, not merely present on the card", async () => {
+    const src = await import("./WorkflowCard?raw").then((m) => m.default as string)
+
+    const statusIdx = src.indexOf('data-testid="row-answer-dot"')
+    const identityIdx = src.indexOf('data-testid="row-identity"')
+    const automationIdx = src.indexOf('data-testid="row-automation"')
+
+    expect(statusIdx).toBeGreaterThan(-1)
+    expect(identityIdx).toBeGreaterThan(-1)
+    expect(automationIdx).toBeGreaterThan(-1)
+
+    // The automation atom sits between the status-line dot and the identity line — i.e. it is
+    // a child of the status row, not of the meta row beneath it.
+    expect(automationIdx).toBeGreaterThan(statusIdx)
+    expect(automationIdx).toBeLessThan(identityIdx)
+  })
+
+  it("does not put the automation words back into identityParts", async () => {
+    const src = await import("./WorkflowCard?raw").then((m) => m.default as string)
+    const arrStart = src.indexOf("const identityParts: string[] = [")
+    const arrEnd = src.indexOf("\n  ]", arrStart)
+    const arr = src.slice(arrStart, arrEnd)
+    expect(arr).not.toContain("automation.phrase")
+    expect(arr).not.toContain("automation.more")
+  })
+})
