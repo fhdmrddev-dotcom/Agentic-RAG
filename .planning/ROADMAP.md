@@ -356,10 +356,22 @@ MCP **server** · the Popular-catalog IA.
 
 ##### Two constraints that must not be discovered late
 
-⚠ **1. `backend/tests/test_189_no_egress.py` FAILS ON ANY MCP IDENTIFIER IN `backend/app`.** That
-fence is doing its job — it was written when no MCP client was meant to exist. It must be
-**consciously retired in the same commit that adds the client**, with the reason recorded, and never
-worked around or narrowed until it passes.
+⚠ **1. THE MCP FENCE FAILS ON ANY MCP IDENTIFIER IN `backend/app`, AND RETIRING IT TOUCHES TWO
+FILES, NOT ONE.** Verified 2026-08-25:
+
+- **`backend/tests/unit/test_189_no_egress.py::test_no_mcp_identifiers_in_backend_app`** is the
+  fence itself — a case-insensitive `mcp` sweep over `backend/app`, measured at plan time as
+  `0` occurrences. ⚠ Note the path is under **`tests/unit/`**; an earlier draft of this section
+  named `backend/tests/` and that file does not exist.
+- ⚠ **`backend/tests/unit/test_190_ssti_fence.py:475` ASSERTS THAT TEST STILL EXISTS BY NAME** —
+  `assert "def test_no_mcp_identifiers_in_backend_app(" in delegated_text`. So deleting or renaming
+  the 189 test turns a **190 SSTI fence** red for a reason that looks entirely unrelated to MCP, in
+  a file the phase had no reason to open.
+
+**Retire it consciously, in the same commit that adds the client, with the reason recorded — and
+update the 190 delegation in that same commit.** Never narrow the matcher until it passes.
+`test_190_connector_source_fence.py` and `test_190_egress.py` also mention `mcp`, but only in prose
+about 189's matcher being falsified by its own positive control; neither needs changing.
 
 ⚠ **2. THE PER-TOOL GRAIN IS A SCHEMA DECISION, AND THIS PHASE COMMITS IT.** Evidence, from the
 competitor's own connector screen (screenshots, 2026-08-24): Atlassian Rovo lists its **7 tools
