@@ -2,49 +2,19 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: phase_built_not_verified
+status: ready_to_execute
 last_updated: 2026-08-24
 last_activity: 2026-08-24
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_phases: 4
+  total_plans: 9
+  completed_plans: 8
+  percent: 88
 stopped_at: >
-  Phase 204 COMPLETE AS BUILD, NOT AS VERIFICATION. All 3 plans executed; the
-  204-02 worktree branch is MERGED into develop (--no-ff, clean, zero
-  files_modified overlap with 204-03, confirmed by diff before merging).
-  MERGED-TREE EVIDENCE (the first time the two wave-2 halves ever ran together):
-  the three phase suites give 100 passed (28 cross-worker + 37 circuit-breaker +
-  35 scheduler). Per-plan gates: zero new backend failures vs base 9af9706e
-  (failing-id sets diffed with comm, not asserted); count gate OK 110/110,
-  total 5438, failed 0; tsc -p tsconfig.app.json 34 pre-existing errors, NONE in
-  any touched file; check-deploy-drift RESULT PASS; CLAUDE.md size 116960 chars
-  (78 percent, headroom 33040).
-  X X X  BLOCKING OPERATOR ACTION - NOTHING IN THIS PHASE WORKS UNTIL IT IS DONE:
-  TWO migrations are AUTHORED and UNAPPLIED - 124_workflow_schedules.sql and
-  125_circuit_breaker_trip.sql. Paste each into the LOCAL Supabase SQL editor
-  (never db push / db reset - that wipes dev data), then run
-  bash scripts/regenerate-full-schema.sh with NO --reset.
-  The two failure modes are DIFFERENT and the second is the dangerous one:
-  without 124 the workflow_schedules table exists on no database, so the
-  scheduler cannot run at all (loud). Without 125, workflow_runs.metadata does
-  not exist, load_run_budget FAILS OPEN - the read raises, the budget resolves
-  empty, and EVERY RUN PROCEEDS UNCAPPED (silent). A spend cap that is off is
-  worse than one that is absent, because the UI says it is set.
-  Keep SCHEDULER_PROCESS_ENABLED=false until both are applied.
-  REQUIREMENTS: all three rows deliberately UNCHECKED. SCHED-01 built not
-  verified (migration + 3 UAT rows owed). SCHED-02 built not verified (migration
-  owed; token coverage is 3 of 4 phase types - llm_emit cannot measure its own
-  spend, forced_emit.py has zero usage occurrences). L-01 PARTIAL - the
-  "or by SCHED-02's circuit breaker" clause is now CLEARED (the breaker composes
-  cancel_workflow_run_internals, the same path manual Stop uses), but the
-  WORKER_COUNT=2 clause is still verified only as an in-process isolation
-  property, with no live two-uvicorn-worker row.
-  Phase 206 was REWRITTEN (not dropped) as MCP Connector Client - workflow-scoped;
-  the rest of the connector story is .planning/CONNECTIONS-MILESTONE-CANDIDATE.md.
-  NEXT: apply 124 + 125, regenerate full-schema, then /gsd:verify-work 204.
+  Phase 205 (Stateful & Incremental Workflows) PLANNED. 1 plan authored:
+  205-01-PLAN.md (Stateful & Incremental Workflow Execution & Living Registers).
+  Ready for /gsd:execute-phase 205.
 ---
 
 # Project State
@@ -65,9 +35,16 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 198 — node vocabulary
+**Current focus:** Phase 205 — Stateful & Incremental Workflows
 
 ## Current Position
+
+### 2026-08-24 — Phase 205 PLANNED (STATE-01, STATE-02)
+
+Phase 205 planning complete. 1 plan authored: `205-01-PLAN.md` covering database resolution of the
+most recent completed run, owner isolation, JSONB string-scalar defensive hydration, template variable
+interpolation (`{{prior_run.output}}`), living-register delta markdown badges + structured payload, and
+Workflow Studio settings. Ready to execute.
 
 ### 2026-08-24 — Phase 204 plan 03 EXECUTED (SCHED-01, the workflow scheduler)
 

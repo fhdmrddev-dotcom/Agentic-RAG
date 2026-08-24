@@ -181,6 +181,11 @@ between them, because each wave mocked the other's side:
 is ever split, it owes an integration test that **mocks neither side**. See
 `backend/tests/unit/test_scheduler_breaker_seam.py` for the shape.
 
+##### Plans
+
+- **Wave 1**
+  - `205-01-PLAN.md` — Stateful & Incremental Workflow Execution & Living Registers (`STATE-01`, `STATE-02`)
+
 ---
 
 #### Phase 206: MCP Connector Client — workflow-scoped
