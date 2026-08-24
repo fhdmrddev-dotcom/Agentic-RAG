@@ -118,3 +118,61 @@ def test_extract_text_excel_vnd_ms_excel_mime():
     result = extract_text(xlsx, "application/vnd.ms-excel")
     assert "## Sheet:" in result
     assert "Columns:" in result
+
+
+# -------------------------------------------------------------------------------------
+# The "no text" message must describe the FILE's state, not the extractor's experience.
+#
+# An operator uploaded an .xlsx, got "No text content could be extracted from the file",
+# and reasonably read it as a broken importer. It was not: the workbook was genuinely
+# empty (<sheetData/> self-closed, no sharedStrings.xml). Proving the app was RIGHT cost
+# more than the message would have.
+# -------------------------------------------------------------------------------------
+import pytest
+
+from app.api.documents import (
+    _EMPTY_TEXT_DEFAULT,
+    empty_text_message,
+)
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+@pytest.mark.parametrize(
+    "mime,needle",
+    [
+        (XLSX, "spreadsheet is empty"),
+        ("application/vnd.ms-excel", "spreadsheet is empty"),
+        ("text/csv", "no rows"),
+        ("application/pdf", "scan"),
+        ("message/rfc822", "no readable message body"),
+        ("application/vnd.ms-outlook", "no readable message body"),
+        ("application/x-msg", "no readable message body"),
+    ],
+)
+def test_named_formats_say_what_is_true_of_the_file(mime, needle):
+    msg = empty_text_message(mime)
+    assert needle in msg
+    assert msg != _EMPTY_TEXT_DEFAULT
+
+
+@pytest.mark.parametrize("mime", [DOCX, "text/markdown", "application/zip", "", None])
+def test_everything_else_keeps_the_generic_sentence_word_for_word(mime):
+    """A DOCX extracting to nothing could be a dozen things. A wrong SPECIFIC message is
+    worse than a right VAGUE one, so the fallback is deliberate and byte-unchanged."""
+    assert empty_text_message(mime) == _EMPTY_TEXT_DEFAULT
+
+
+def test_the_generic_sentence_itself_has_not_been_reworded():
+    assert _EMPTY_TEXT_DEFAULT == "No text content could be extracted from the file."
+
+
+def test_every_message_is_actionable_or_explanatory_never_bare():
+    """Each specific message must either tell the reader what to DO or explain WHY.
+    A sentence that only restates the failure is what this change exists to remove."""
+    from app.api.documents import _EMPTY_TEXT_MESSAGES
+
+    for mime, msg in _EMPTY_TEXT_MESSAGES.items():
+        assert len(msg) > 30, mime
+        assert any(w in msg for w in ("again", "OCR", "body")), (mime, msg)
