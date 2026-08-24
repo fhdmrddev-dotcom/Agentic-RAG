@@ -59,7 +59,31 @@
   ⚠ **PLANNED BY GEMINI, PRE-FLIGHTED HERE — and the pre-flight caught two blockers BEFORE a line was written** (`205-PREFLIGHT.md`): (1) scoping the prior run on `definition_id` would have **reset the living register on every republish** — measured, `pm-weekly-status-report` carries 4 definition ids for one slug; scoping moved to the stable slug. (2) "the last phase of the prior run" is the rule **Phase 200.2 rejected by name** — a `confirm` step's `text` is a QUESTION, so that version would have fed the machine's own question into next week's run as its baseline.
   ⚠ **THE JSONB UNWRAP IS THE FEATURE, NOT A PRECAUTION.** Measured live: string-scalar `workflow_phases.output` rows decode to `text` on **367/400**, object-typed rows on **14**. Without it the read finds nothing and renders `"[Initial Run - No Prior State]"` forever — a silent failure that looks like a correct cold start. Migration 123 repaired `definition_snapshot` only and never touched this column.
   ⚠ **An authoring fence fired and was answered as a DECISION, not re-baselined:** adding `is_stateful` put it in the schema the authoring model sees while the prompt never asks for it. It is now an allowlisted *advertised-but-not-asked* field, because the flag is **half of a pair** — it does nothing unless the prompts also reference `{{prior_run.output}}`, and a model flipping it true without writing those prompts yields a workflow that resolves last week's deliverable and ignores it. Re-open trigger recorded.
-  ⚠ **OWED:** no live two-run stateful UAT — every gate here is static or unit-level, and both 204 defects were invisible to 106 passing tests until a real run was driven.
+  ✅ **LIVE TWO-RUN UAT DRIVEN 2026-08-25 — PASS, and it proves what no unit test could.** A stateful
+  workflow (`uat-205-living-register`, one `llm_agent` phase whose prompt echoes `{{prior_run.output}}`)
+  was fired TWICE through the real unattended path — the scheduler claimed and launched both, nobody
+  watching, both `completed`:
+
+  ```
+  run 1  →  1. ALPHA
+  run 2  →  1. ALPHA
+            2. BRAVO
+  ```
+
+  Run 2 reproduced run 1's line VERBATIM and appended the next item, which is only possible if the
+  prior deliverable was resolved from the database, **unwrapped from its jsonb string scalar**, and
+  interpolated into a prompt that reached a live model. Both arms exercised: cold start took the
+  `[Initial Run - No Prior State]` path and correctly began at ALPHA rather than erroring; the
+  incremental arm grew the register instead of resetting it.
+
+  ⚠ **THIS RETROACTIVELY CONFIRMS THE PRE-FLIGHT'S G-1 BLOCKER WAS REAL.** The resolution is
+  slug-scoped, so the register survives a republish. Had it shipped scoping on `definition_id`, run 2
+  would have restarted at `1. ALPHA` — **indistinguishable from correct cold-start behaviour**, which
+  is precisely why it had to be caught before execution rather than in review.
+
+  ⚠ Incidental finding: **published definitions are immutable at the DATABASE level** — reassigning
+  one raises `workflow_definitions row … is published and immutable; create a new version instead`
+  from a PL/pgSQL guard. A real protection, met while setting the UAT up.
 - [ ] **Phase 206: MCP Connector Client — workflow-scoped** — ⚠ **REWRITTEN 2026-08-24** (was *Outbound Action Connectors*). The rest of the connector story moved to the **Connections & Open Platform** milestone: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
 
 ---
