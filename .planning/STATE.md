@@ -3,18 +3,19 @@ gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
 status: ready_to_execute
-last_updated: 2026-08-24
-last_activity: 2026-08-24
+last_updated: 2026-08-25
+last_activity: 2026-08-25
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 8
-  percent: 88
+  total_phases: 8
+  completed_phases: 6
+  total_plans: 14
+  completed_plans: 10
+  percent: 71
 stopped_at: >
-  Phase 205 (Stateful & Incremental Workflows) PLANNED. 1 plan authored:
-  205-01-PLAN.md (Stateful & Incremental Workflow Execution & Living Registers).
-  Ready for /gsd:execute-phase 205.
+  Phase 206.1 (Settings -> Connections finishes the MCP story) PLANNED - 3 plans, 3 serial waves,
+  worktrees FORBIDDEN (all three edit ConnectionsTab.tsx, and a worktree's node_modules is a
+  junction to the operator's real tree so the one npm install must happen on the main tree).
+  Plan-checker PASSED at revision round 1. Ready to execute.
 ---
 
 # Project State
@@ -35,16 +36,29 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 205 — Stateful & Incremental Workflows
+**Current focus:** Phase 206.1 planned and ready to execute; then Phase 207 (`api.ts` split)
 
 ## Current Position
 
-### 2026-08-24 — Phase 205 PLANNED (STATE-01, STATE-02)
+### 2026-08-25 — Phase 206 EXECUTED (CONN-02, CONN-03)
 
-Phase 205 planning complete. 1 plan authored: `205-01-PLAN.md` covering database resolution of the
-most recent completed run, owner isolation, JSONB string-scalar defensive hydration, template variable
-interpolation (`{{prior_run.output}}`), living-register delta markdown badges + structured payload, and
-Workflow Studio settings. Ready to execute.
+Phase 206 execution complete. Delivered:
+1. Migration 126 (`126_mcp_connector_connections.sql`): Provider-shaped connector schema (`mcp_server_url`, `tool_grants`, `discovered_tools`, `capability` nullable).
+2. Pydantic models in `backend/app/models/connector.py` & `backend/app/models/harness.py`.
+3. SSRF egress defense `validate_mcp_destination` in `backend/app/security/egress.py` (blocking loopback, RFC1918, cloud metadata 169.254.169.254, IPv6 site-local).
+4. Async JSON-RPC 2.0 `McpClient` in `backend/app/services/mcp_client.py` with Bearer/Basic auth handling.
+5. Tool discovery (`POST /connectors/connections/{id}/discover`) and permission grant management (`PATCH /connectors/connections/{id}/grants`) in `connector_service.py` and `api/connectors.py`.
+6. Workflow engine MCP tool dispatch in `backend/app/services/harness/phase_types.py` with per-tool grant enforcement (`tool_grants.get(tool_name) is True`) and `tool_refused` audit event logging (`write_audit`).
+7. Frontend client methods in `frontend/src/lib/api.ts` with mock budget spent across all 7 suites.
+8. Leaf component `McpToolPicker.tsx` maintaining zero-hook pin in `PhaseFormPanel.tsx` (F-7).
+9. All 59 backend tests and 651 frontend tests green.
+
+### 2026-08-24 — Phase 205 EXECUTED (STATE-01, STATE-02)
+
+Phase 205 execution complete. Delivered `get_latest_completed_workflow_run` (scoped on stable `slug` and owner,
+Phase 200.2 deliverable resolution, JSONB string-scalar defensive hydration), `{{prior_run.output}}`/`{{prior_run.id}}`/`{{prior_run.created_at}}`
+template variable interpolation, Living Register delta badges, `is_stateful` toggle in builder header bar,
+and isolated `PromptVariableChips.tsx` preserving the zero-hook pin in `PhaseFormPanel.tsx`. 9/9 pytest and 249/249 vitest tests green.
 
 ### 2026-08-24 — Phase 204 plan 03 EXECUTED (SCHED-01, the workflow scheduler)
 

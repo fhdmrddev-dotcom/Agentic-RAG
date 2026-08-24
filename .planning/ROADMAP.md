@@ -48,15 +48,18 @@
 - [x] **Phase 203: Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline** — `725a2b5c` — 56 tests passing
 - [x] **Phase 204: Scheduled & Recurring Unattended Runs** — ✅ **COMPLETE + VERIFIED LIVE 2026-08-24.** 3 plans + 2 defect fixes. Migrations 124 + 125 applied (dev data intact), `full-schema.sql` regenerated. **159 backend tests pass.** Driven end to end against a real run: schedule claimed in ~20s → real unattended run launched → 60s cap **tripped at 61.06s** (`max_duration_exceeded`, `cancelled`, audit row written). Exactly-once: **10 trials × 3 concurrent claimers → 1 claim every time**.
   ⚠ **UAT FOUND TWO DEFECTS THAT 106 PASSING TESTS COULD NOT SEE, BOTH AT THE SEAM BETWEEN THE TWO PARALLEL WAVES:**
+
   1. `57024280` — **the spend cap never armed.** 204-03 wrote caps to `workflow_runs.inputs`, 204-02 read `workflow_runs.metadata`, and `scheduler_service.py` had **zero** occurrences of `metadata`. `load_run_budget` fails open, so the breaker disarmed **silently**: run `27e00e7e` measured **3m20s against a 120s cap**. The "built, gated, green, structurally unreachable" shape (Phase 200 SC#3, Phase 118).
   2. `c62f745e` — **a scheduled run was invisible to the Control Room.** `register_run_start` (the only writer of Redis `runs:active`) is called from exactly one place: `threads.py`, the CHAT path. The worst case to miss — a chat run has a person watching; an unattended run is the one an operator most needs to see and kill. Fixed with `mirror_run_active` + `finalize_run_terminal` (bare `finalize_run` would have left a permanent ghost with a live Kill button).
   ⚠ **THE LESSON FOR PARALLEL WAVES:** both executors correctly reported zero new failures. Neither suite crossed the seam because each mocked the other's side. **A phase whose waves run in parallel owes an integration test that mocks neither** — `test_scheduler_breaker_seam.py` is that test, and its own first draft had the 187-24 trap (a source scan reading an import as a use), caught only by driving the counterfactual.
   ⚠ **Owed:** the schedule **dialog** has had no live UAT; the concurrency proof is 3 pooled connections in one process, not 2 uvicorn workers.
+
 - [x] **Phase 204.1 (INSERT): The Library Says What Runs Itself** — `7c3377ed` + `d04fe2a4` — ✅ **COMPLETE, AND CONFIRMED BY EYE 2026-08-25.** 204 shipped scheduling and the library said nothing about it: a workflow firing every Monday read identically to one never automated, and the only way to find out was to open the ⋯ menu on 122 cards in turn. `204-03` had recorded it as **deviation 4** rather than building it, because the projection lives in `db/workflows.py` — its parallel sibling's file during that wave, and reaching across was the seam that produced 204's two defects.
   Card now reads `● Worked 4 days ago │ Ready to run │ 🗓 runs every Monday  +1 more`.
   ⚠ **THE FIRST VERSION WAS INVISIBLE, AND THAT IS THE FINDING.** It shipped on the 11px uppercase identity line, honouring that line's no-colour/no-glyph rule exactly — and the operator scanned the card and asked where it was. **A fact that satisfies the style guide and fails the glance has not indicated anything.** Moved to the 12px status line, which is where a reader already looks to answer *does this one work*; that line already spends a coloured dot and a `Wrench`, so no new vocabulary was introduced. The **placement is now PINNED** and the counterfactual drives it — moving it back reds two tests.
   ⚠ **Three-place lockstep in one commit** (projection · `response_model` · serializer) because an undeclared key is dropped **silently**. Owner-scoped lateral (this feed bypasses RLS), projection-only so the `$2` filter is not renumbered, and an `is_active` predicate so a **PAUSED** schedule stays silent rather than contradicting the Pause button.
   ⚠ **A badge was impossible, not merely undesirable:** the card's badge budget is a max-2 tuple enforced as a **typecheck error** (189 spent the second slot). The decision lives in `automationFacts.ts`, not the card — `WorkflowCard.tsx`'s G-5 was discharged by extracting exactly this shape once (`cardFace.ts`), and a second wire-reading ternary inline would undo that. `WorkflowCard.test.tsx` passes **UNEDITED**: silent rows compose byte-identically. 697 library tests · tsc 34 = baseline · 1 of 111 cards speaks.
+
 - [x] **Phase 205: Stateful & Incremental Workflows** — `1370943e` + `cf16539e` — ✅ **COMPLETE 2026-08-25.** ONE plan (204's lesson applied). A stateful workflow resolves its own previous completed run and interpolates `{{prior_run.output}}` / `.id` / `.created_at` into phase prompts; living-register framing emits `[NEW]` / `[UPDATED]` / `[RESOLVED]`. **9 new cases; 68 = 68 failing-set diff, zero new; tsc 34 = baseline; count gate `5444 · failed 0 · 110/110`.**
   ⚠ **PLANNED BY GEMINI, PRE-FLIGHTED HERE — and the pre-flight caught two blockers BEFORE a line was written** (`205-PREFLIGHT.md`): (1) scoping the prior run on `definition_id` would have **reset the living register on every republish** — measured, `pm-weekly-status-report` carries 4 definition ids for one slug; scoping moved to the stable slug. (2) "the last phase of the prior run" is the rule **Phase 200.2 rejected by name** — a `confirm` step's `text` is a QUESTION, so that version would have fed the machine's own question into next week's run as its baseline.
   ⚠ **THE JSONB UNWRAP IS THE FEATURE, NOT A PRECAUTION.** Measured live: string-scalar `workflow_phases.output` rows decode to `text` on **367/400**, object-typed rows on **14**. Without it the read finds nothing and renders `"[Initial Run - No Prior State]"` forever — a silent failure that looks like a correct cold start. Migration 123 repaired `definition_snapshot` only and never touched this column.
@@ -69,6 +72,7 @@
   ```
   run 1  →  1. ALPHA
   run 2  →  1. ALPHA
+
             2. BRAVO
   ```
 
@@ -86,6 +90,7 @@
   ⚠ Incidental finding: **published definitions are immutable at the DATABASE level** — reassigning
   one raises `workflow_definitions row … is published and immutable; create a new version instead`
   from a PL/pgSQL guard. A real protection, met while setting the UAT up.
+
 - [x] **Phase 206: MCP Connector Client — workflow-scoped** — ✅ **COMPLETE 2026-08-25.** Migration 126 (`126_mcp_connector_connections.sql`). Delivered provider-shaped MCP connector model (`mcp_server_url`, `tool_grants`, `discovered_tools`), Async JSON-RPC 2.0 client with SSRF egress defense (`validate_mcp_destination`), `/discover` and `/grants` endpoints, external-action MCP tool dispatch with per-tool grant enforcement (`tool_grants.get(tool_name) is True`) and `tool_refused` audit event logging (`write_audit`), frontend API methods, 7 mock budgets spent in same commit, `McpToolPicker.tsx` leaf component maintaining zero-hook pin in `PhaseFormPanel.tsx`, and full unit/integration test suite (`test_mcp_connector_client.py`). All 59 backend tests and 651 frontend tests pass green.
 - [ ] **Phase 206.1 (INSERT): Settings → Connections finishes the MCP story** — ⚠ **206 SHIPPED A FEATURE WITH NO DOOR, AND THE UAT THAT FOUND IT ALSO FOUND TWO DEFECTS ON THE SAME SURFACE.** All three live in `ConnectionsTab.tsx` / `ConnectionFormPanel.tsx`, and they are ONE phase rather than three inserts on one hot file (G-1).
   1. **The creation door (capability).** `Add a connection` offers `send_email` / `create_ticket` / `post_message` and nothing else — no MCP option, no `mcp_server_url` field. Measured in the browser: `mentionsMcp: false`. Every part of 206 downstream of the row WORKS (discover → grant → executor, all driven live against `mcp.deepwiki.com`), so the only thing standing between the operator and the feature is a form. 206's plan never listed either Settings file, so this is scope, not a slip — but it is the Phase-118 *built-and-unreachable* shape and it must not stay that way.
@@ -131,8 +136,10 @@ would give the milestone a control that reports the property it does not have �
 1. **Cancellation must reach the producer**, not just the row. Whichever mechanism is chosen, the
    acceptance is behavioural: *a scheduled run that trips its cap issues no further provider calls*,
    measured against real request counts, never inferred from the status column.
+
 2. **It must work at `WORKER_COUNT=2`.** L-01 exists precisely because the producer can be on a
    different worker from the request that cancels it — the single-worker case was never the broken one.
+
 3. **The existing Stop path is the same path.** A scheduler-only cancel channel would leave the manual
    Stop still lying, and put the two on separate mechanisms that drift.
 
@@ -183,8 +190,10 @@ It moved to the **12px status line**, after `Ready to run`, with the accent tone
 
 1. It is where a reader already looks — it answers *does this one work?*, and *"it also runs itself
    on Mondays"* is the same **kind** of fact at the same weight.
+
 2. It **already spends colour and glyphs** (the status dot, the `Wrench` for drafts), so the accent
    tone and the calendar mark introduce no new vocabulary. The identity line structurally could not.
+
 3. `CalendarClock` is the **same glyph the ⋯ menu's `Schedules…` item uses**, so "automated" is one
    mark in two places rather than two spellings of one idea.
 
@@ -197,21 +206,27 @@ meta line would otherwise pass every other assertion and silently recreate the i
 
 - ⚠ **A BADGE WAS IMPOSSIBLE, NOT MERELY UNDESIRABLE.** The card's badge budget is a **max-2 tuple
   enforced as a TYPECHECK ERROR**; 189 spent the second slot, so a third badge does not compile.
+
 - ⚠ **THREE-PLACE LOCKSTEP IN ONE COMMIT** — `.select()` projection · `response_model` · serializer.
   An undeclared key is dropped **silently**, which is a green db test beside an unchanged UI
   (T-192.2-11, measured on this very model).
+
 - ⚠ **OWNER-SCOPED ON `s.user_id = $1`, AND THAT IS SECURITY-BEARING.** This feed runs on a
   service-role pool that BYPASSES RLS, so the predicate is the only boundary — the same distinction
   `_LAST_RUN_LATERAL_SQL` and `_HAS_ANY_RUN_SQL` already encode, and CR-01 is what happens when it
   is got wrong.
+
 - ⚠ **PROJECTION-ONLY**: binds no placeholder, touches no `WHERE`/`ORDER BY`, so the `$2`
   project-folder filter appended after it is **not renumbered**.
+
 - ⚠ **`is_active` IS THE PREDICATE.** A **PAUSED** schedule renders nothing — the modal's Pause
   exists to stop a schedule without deleting it, and a card still claiming "runs every Monday" would
   contradict the button its author just pressed.
+
 - ⚠ **THE DECISION LIVES IN `automationFacts.ts`, NOT THE CARD.** `WorkflowCard.tsx`'s G-5 was
   DISCHARGED by extracting exactly this shape once (`cardFace.ts`); a second wire-reading ternary
   inline would undo that discharge one commit later.
+
 - ⚠ **PUBLISHED FEED ONLY.** Starters and drafts are deliberately not widened — the schedules API
   refuses a draft, so the field would be structurally always null. *(This cost two false alarms
   during UAT: the first two seeds landed on a starter and on an unrendered row, and both looked
@@ -249,9 +264,11 @@ and a human has to diff it by eye. STATE-01 is what turns a repeating run into a
 
 1. **A run can read its own workflow's prior run.** Not any run — the same `workflow_id`, owner-scoped,
    most recent terminal one. The read must be explicit and bounded, never "load all history".
+
 2. **What it reads is the prior run's OUTPUT**, not its internal phase rows. `workflow_runs.output`
    / the deliverable is the contract; reaching into `workflow_phases` would couple a workflow to the
    engine's internals.
+
 3. **STATE-02: the deliverable can render a DELTA** — added / updated / closed, relative to that
    prior run.
 
@@ -264,15 +281,19 @@ and a human has to diff it by eye. STATE-01 is what turns a repeating run into a
   live rows *today* (measured 2026-08-24 — `jsonb_typeof` returns `string`, so `->'phases'` returns
   NULL). **A phase whose whole premise is reading a prior run's jsonb output must defend the read at
   the point of read**, exactly as `load_run_budget` does, and must never pre-encode on the write side.
+
 - ⚠ **`declared_phase_measure`'s `isinstance(raw, dict)` guard already kills a Phase-200 feature
   silently** because of that same trap — and the absent-arm renders honestly, so no test and no eye
   caught it. Assume the prior run's output may not be the shape it claims.
+
 - ⚠ **Owner scoping is security-bearing.** `db/workflows.py` writes through a service-role pool that
   BYPASSES RLS, so the `WHERE` predicate is the only access boundary. A "read my previous run" query
   that forgets `user_id`/`org_id` reads another tenant's deliverable.
+
 - ⚠ **`backend/app/db/workflows.py` fires G-5** (43 commits / 21 phases / 2194 lines) and is tied
   with `api/workflows.py` as the hottest backend module by phase count. Read its section in
   `docs/HOT-FILE-LEDGER.md` before editing; honour by construction.
+
 - ⚠ **`backend/app/services/task_service.py` fires G-5 at NINE phases and has NO ledger row** —
   invisible to its own guardrail for its entire life. It is the sole home of `_stream_one_iteration`
   and `run_task_sub_agent`, so a change there lands in **chat** as well as workflows. If this phase
@@ -344,8 +365,10 @@ defect this phase shipped, not a limitation the milestone inherits.
 
 1. **Workflow-scoped, so the approval model is not a blocker.** Phase 189/190's outbound governance
    already lives on the canvas. **Chat** is what needs an approval model, and chat stays in the milestone.
+
 2. **No OAuth needed.** MCP servers carry their own auth. The OAuth work is for Google/Microsoft
    first-party APIs — also in the milestone.
+
 3. **Atlassian and GitHub already ship official MCP servers** (`https://mcp.atlassian.com/v1/mcp`),
    so the proof costs no adapter.
 
@@ -370,6 +393,7 @@ FILES, NOT ONE.** Verified 2026-08-25:
   fence itself — a case-insensitive `mcp` sweep over `backend/app`, measured at plan time as
   `0` occurrences. ⚠ Note the path is under **`tests/unit/`**; an earlier draft of this section
   named `backend/tests/` and that file does not exist.
+
 - ⚠ **`backend/tests/unit/test_190_ssti_fence.py:475` ASSERTS THAT TEST STILL EXISTS BY NAME** —
   `assert "def test_no_mcp_identifiers_in_backend_app(" in delegated_text`. So deleting or renaming
   the 189 test turns a **190 SSTI fence** red for a reason that looks entirely unrelated to MCP, in
@@ -397,6 +421,7 @@ would be the migration that seed warns about.
 
 - **CONN-02** — satisfied for Atlassian + GitHub **via MCP**, not by hand-written Jira/SMTP adapters.
   The Email/SMTP half moves to the Connections milestone (generic SMTP/IMAP).
+
 - **CONN-03** — the credential-as-platform-asset half is satisfied here (org-level, encrypted,
   cross-tenant isolated). **OAuth is NOT** — MCP server auth is not OAuth, and Google/Microsoft OAuth
   is milestone work.
@@ -425,6 +450,7 @@ not be the reason the two defects go unreviewed.
 - The form accepts an MCP connection but the row it creates is one the picker cannot bind.
 - The dense row is achieved by DELETING a column rather than reflowing it — the destination is
   the one column a person reads to approve a send, and hiding it is worse than truncating it.
+
 - A logo is approximated, per-surface, or resolves EMPTY in production (§3's measured trap).
 - The MCP row borrows another service's mark because it has no capability — the exact defect
   `destinationFactsOf` shipped, where a positional fallback made every MCP connection claim it
@@ -435,12 +461,15 @@ not be the reason the two defects go unreviewed.
 1. An MCP connection is creatable from `Add a connection` — server URL, optional credential — and
    the round trip is driven: create → discover → grant → a workflow step calls a granted tool.
    **No direct database insert anywhere in the evidence.**
+
 2. With the panel open at 1280px and 1536px, no cell in a connection row truncates a value a
    person needs to read: asserted as `scrollWidth <= clientWidth` on the destination cell, not by
    eye. Both the wide and dense shapes are pinned.
+
 3. Every capability renders its own service's logo from ONE shared map, and an MCP connection
    renders a mark that is neither Slack's nor Jira's. Every slug is verified to resolve (or the
    SVG is bundled), with a fallback that is not blank.
+
 4. `connectionsCopy.ts`'s destination arms stay explicit — no new positional fallback.
 5. Backend baseline unchanged, tsc baseline unchanged, count gate green with no per-file decrease.
 
@@ -455,16 +484,22 @@ others** — the separability *"Why one phase and not three"* above requires.
 Plans:
 
 - [ ] 206.1-01-PLAN.md — **item 3, the per-service mark map.** FIRST because it is the only item
+
+**Cross-cutting constraints:**
+
+- D-206.1-02: `frontend/src/lib/api.ts` is NOT edited by this plan.
   fully provable in vitest, the only one needing the npm install, and both other items render a mark.
   `connectionMark.tsx` (total own-property lookup, named neutral, MCP resolved by its OWN
   `mcp_server_url` condition) + the three-ink contract that stops the MCP mark shipping BLACK ON
   BLACK while every test stays green + two corrections-beside-their-originals
   (D-206.1-08/09/10/11/23).
+
 - [ ] 206.1-02-PLAN.md — **item 2, the dense row shape.** The wide render pinned byte-for-byte BEFORE
   the branch exists, a `dense` prop threaded from the one `panel && !isMobile` condition, a
   destination that WRAPS (`scrollWidth <= clientWidth` is unsatisfiable by widening alone), and a
   real-browser geometry tier at 1280 and 1536 — because jsdom reports every box metric as `0` and
   passes SC#2 vacuously (D-206.1-12/13/14/20/21).
+
 - [ ] 206.1-03-PLAN.md — **item 1, the MCP creation door**, plus the live edit-mode defect it was
   found beside. The fourth chooser option and its three fields, a create body with NO `capability`
   key, a disabled Save with its OWN `aria-describedby` id, four positional ladders given named arms
@@ -503,10 +538,13 @@ surface, and the count gate + a full `vi.mock` census as the acceptance evidence
 1. `frontend/src/lib/api.ts` is under 500 lines and contains only re-exports.
 2. Every symbol exported by `api.ts` at Phase 206's tip is still exported from `api.ts` — asserted by
    diffing the export list before and after, not by reading.
+
 3. **No call site outside `frontend/src/lib/` changes.** A `git diff --numstat` over the phase shows
    zero lines changed in any file that imports from `@/lib/api`.
+
 4. Count gate green with **no per-file decrease**, and the `vi.mock("@/lib/api")` census unchanged in
    both count and path.
+
 5. The ledger row for `api.ts` records the split as **TAKEN**, retiring the trigger rather than
    re-declining it.
 
@@ -565,7 +603,6 @@ the right vocabulary, stop it, and see what it produced.
 - [x] **Phase 200.1 (INSERT): The Run Says What It Produced** ✅ **CLOSED 2026-08-21** — 3/3 plans, verification **passed 5/5** (re-run independently, not read off SUMMARYs), code review **2 Criticals found and BOTH fixed the same session**: a `RecursionError` escaping `phase_output_object`'s "never raises" contract on a model-influenced parser, and `runAnswer` selecting a confirm step's own QUESTION as the run's answer — the shipped FIXTURE was itself the defect shape, which is why 163 tests were green over it. All four deliverable arms driven in a browser; the `file only` arm proved to have **zero instances** across the 120 most recent terminal runs by the UI's own thread-scoped predicate. ⚠ `/gsd:secure-phase 200.1` **NOT RUN** and is owed. ⚠ `phase.complete` wrote `status: milestone_complete` here and it was FALSE (it sorts by phase NUMBER); hand-corrected, see commit `d9c35fe1`. — the run surface names its deliverable BY TYPE, and the log's live line looks live (RUN-04). ⚠ **INSERTED 2026-08-20 by the v3.7 close audit, from two operator observations and one defect the audit measured.** ⚠ **NOT a Phase 195 gap and not a gap-closure round** — 195's goal is verbatim *"a workflow that produces a FILE shows it"* and all three of its criteria are about files; a TEXT deliverable is new capability, which G-7 forbids inside a closure round. **Three plans.** ⚠ **The backend half is ONE narrow field on an existing route — but it is BLOCKED behind a read-side defect this audit found**, which is why the defect is plan 1 rather than a footnote. Full derivation in the phase detail below.
 - [x] **Phase 200.2 (INSERT): The Run Column Stops Repeating Itself** — the centre column leads with the deliverable, chosen by what the run produced, and shows what each step yielded instead of restating the panel's list (RUN-05) ✅ **CLOSED 2026-08-23** — 6/6 plans executed, all four success criteria verified (`200.2-UAT.md`), `RunHero` & `RunStepList` composed, lazy citation endpoint wired, 5435 tests passing with 0 failures across 110 pinned files.
 - [ ] **Phase 200.3 (INSERT): Publish & Run Human-in-the-Loop Workflows** — enable publishing workflows with human approval steps by auto-continuing the human step during the background golden run, and add Test Run to the Builder (SEED-164).
-
 
 ### Phase Details
 
@@ -1522,6 +1559,7 @@ shapes, and they are not equivalent:
 
   * **(a) repair the READ** — one shared unwrap helper beside `declared_phase_measure`, so both wire
     models handle both shapes. Reaches all 588 historical rows. Leaves the writer wrong.
+
   * **(b) repair the WRITER** — drop `json.dumps` at the three `$N::jsonb` bind sites and let the
     pool codec encode once. Correct going forward; leaves 527 rows unreadable unless a migration
     repairs them, and **migration 123's precedent is that repairing in place is doable and cheap**.
@@ -1588,16 +1626,20 @@ not show.
   1. A finished run whose deliverable was a TEXT answer says so and shows it; a run that produced a
      file still shows the file; a run that produced both shows both; and a run that produced neither
      says that — **four distinct renders, none folded into another**.
+
   2. The declared answer reaches the client through **one narrow declared field** on the existing
      route. `citations`, `source_refs`, `field_map`, `tool_call_id`, `sub_run_id` and prompts do NOT
      reach the wire — provable by an assertion over the response body, not by reading the serializer.
+
   3. A per-step count declared by an executor **actually renders**, on a real row, in the browser —
      Phase 200's SC#3 discharged against data rather than against a wire model. The chosen repair
      (read-side, writer-side, or both) is recorded with its reason, and the sibling `inputs` /
      `definition` decision is honoured or overturned **in writing**.
+
   4. The run log's live line is visibly live: the sheet's clock treatment and its spinner, ported
      from the sheet's own markup. **Both shipped refusals survive** — the live line is not dimmed,
      and no authored narration is invented.
+
   5. Gates hold: count gate `failed 0` with no per-file decrease (baseline at `e0c57ef4`:
      **total 5365 · pinned 5004 · 110/110**), `tsc -p tsconfig.app.json --noEmit` at its 33-error /
      19-file pre-existing baseline, `backend/tests/unit` at **62 failed / 2350 passed**, and no
@@ -1625,6 +1667,7 @@ hot-file ledger triples cannot be derived until every source edit has landed.**
       checkpoint: the count on screen for run `f4c8d111-…`, beside the DB reading of the same rows.
       ⚠ It also gives `backend/app/models/thread.py` its FIRST ledger row and section — measured
       `12 / 8 / 217`, so G-5 has been firing on it, invisibly, for its entire life.
+
 - [ ] `200.1-02-PLAN.md` — **the deliverable by type** (wave 2). One narrow declared field,
       `deliverable_text`, on `WorkflowRunPhaseRead`; the four arms on the run surface, each pinned as
       its own case and proved DISTINCT by a set-size assertion. ⚠ The exposure bound is an
@@ -1633,6 +1676,7 @@ hot-file ledger triples cannot be derived until every source edit has landed.**
       **set-equality assertion over the real `TestClient` response body** with a planted-key positive
       control. Also carries the phase-wide hot-file ledger sync. ⚠ All four arms exist on real local
       runs — both 63 · text-only 120 · file-only 3 · nothing 46 — so the whole check is fixture-free.
+
 - [ ] `200.1-03-PLAN.md` — **the log's live line** (wave 1). Ported from
       `screens/run-surface.html`'s own markup: the settled gutter at `w-16` / 12px / weight 500, and
       the live row's indigo pulsing clock plus a textless 16px CSS spinner. ⚠ The sheet's `text-indigo`
@@ -1640,7 +1684,6 @@ hot-file ledger triples cannot be derived until every source edit has landed.**
       than an approximation. One deviation taken in writing: the sheet's `#464651` measures **2.16:1**
       against the ground both drawings share, so it is declined. Both shipped refusals asserted as
       still holding — one against a test that must pass UNEDITED.
-
 
 #### Phase 200.2: The Run Column Stops Repeating Itself (INSERT)
 
@@ -1682,11 +1725,14 @@ name. Whether that earns the repetition is the question the rendered sketch must
 success criterion, not an assumption.
 
 ⚠ **THREE BINDING REFUSALS** — full derivation in `SEED-191`:
+
 1. **No stored thinking process.** No substep/event table exists; `reasoning_content` is `0` on every
    workflow-run message; the live substep stream is an ephemeral Redis buffer. A reasoning view is a
    **backend persistence phase**, not this one.
+
 2. **No fabricated relevance score.** `similarity_scores` held 7 entries against 38 `citations` on the
    same row — they do not correspond. The Stitch reference drew one anyway.
+
 3. **No invented per-step narration.** `RunTranscript` ships this refusal with a driven positive
    control; a restyle must not quietly overturn it.
 
@@ -1695,10 +1741,13 @@ already spent the budget (*"governance spends no colour and no third badge"*). P
 weight, size, spacing and the card.
 
 **Success criteria**
+
 1. The centre column's top region renders the deliverable by TYPE, and all four arms are driven in a
    browser on real runs — including `neither`, which today reads as a loading failure.
+
 2. Each step shows what it yielded, sourced from a stored field; a step that yielded nothing shows
    nothing (no `0`, no dash) — D-07's absent arm survives.
+
 3. The real citation passages are reachable from the step that read them.
 4. The column and the right panel no longer read as the same list — judged by a human, on screen, not
    by a DOM assertion.
@@ -1711,29 +1760,33 @@ weight, size, spacing and the card.
       equality over the real response body + planted never-before-seen key + non-vacuity + driven
       counterfactual + an AST no-widening walk. The EXISTING serializer stays byte-unchanged. No
       migration. Registers the path in `CANVAS_GATED_PATHS` in the same commit.
+
 - [ ] `200.2-02-PLAN.md` — **the step-card list** (wave 2). The variant-C process trace consuming
       the FULL `WorkflowRunPhase` wire model (never `PhaseTimingRow`); yield = declared count, or
       `wrote an answer` from `deliverable_text` keyed on `phase_type` from the wire (A-03), else
       nothing; the yield replaces ONLY `finished` (D-07); fetch-on-expand with empty-degrade
       (operator decision 1); the new `runColumnVocabulary.ts` leaf (operator decision 3).
+
 - [ ] `200.2-03-PLAN.md` — **the hero region** (wave 2). The four 200.1-02 arms re-presented at
       the top of the centre column (D-01/D-02/D-04); the D-13/D-16 split terminal sentences with
       type-level totality; the A-07 typed heading; D-15 newest-file hero; D-03 live renders
       nothing; reuses the shipped `runAnswer` memo UNCHANGED and FILES D-17 as
       `BUG-260823-04` (operator decision 2 — the rule stays).
+
 - [ ] `200.2-04-PLAN.md` — **the page integration** (wave 3). Hero above the `[Log|Shape]` switch
       in both views; `RunStepList` replaces the `RunTranscript` mount; `RunSpine`'s count sub-line
       REMOVED (D-05/A-02 — load-bearing, shipped in the SAME plan as the centre yield); the foot
       deliverable region retired with every superseded string quoted, not deleted.
+
 - [ ] `200.2-05-PLAN.md` — **the A-10 teardown + the phase's ledger sync** (wave 3).
       `frontend/sketch/` + `tsconfig.sketch.json` deleted in one commit; `RunTranscript.tsx`'s
       OWED ledger section; every touched hot file re-derived in BOTH documents in one commit; the
       CLAUDE.md size gate measured (the margin was 3,613 below the warn band at 200.1's close).
+
 - [ ] `200.2-06-PLAN.md` — **the G-4 lived-experience UAT** (wave 4, `autonomous: false`). SC#4's
       human judgement, the four hero arms on real runs, the disclosure affordance, the spine's
       ring faces, the narrow viewport, the long-answer row. Cross-provider / multi-tool /
       parallel-thread axes DO NOT APPLY (UI-state-only) — stated in the UAT doc, not omitted.
-
 
 #### Phase 198: Node Vocabulary (research-first)
 
