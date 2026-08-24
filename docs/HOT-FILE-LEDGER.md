@@ -3638,3 +3638,176 @@ write and is safe unconditionally (D-186-03). The regression pin sweeps **stripp
 source: the fix's own docblock spells `persistence.dirty` by name so the next reader knows why the
 guard is gone, and a raw-source grep expecting zero would red on that prose (187-24). **The
 counterfactual was DRIVEN** — replanting the guard turns the pin RED, restoring it passes.
+
+---
+
+### `frontend/src/lib/api.ts` — ⚠ 2026-08-24 (Phase 204, plan `204-03`): the seam is **RE-DECLINED IN WRITING**, and the old trigger is retired
+
+**Measured after this plan's commit: `180 commits / 103 phases / 6728 L`** (it read `179 / 102 /
+6580`, which was correct at its own commit). **Still the hottest file in the repository.**
+
+**The obligation this row was carrying.** The section immediately above records that the 197
+decline's trigger — *"the next phase adding a RUNTIME export or a second concern here"* —
+**FIRED at 200.2** (`getWorkflowRunPhaseCitations`) and **was never answered**, and it states in
+terms that *"the decline is OWED AN ANSWER at the next phase that touches this file — either take
+the extraction, or re-decline in writing with a fresh trigger. Carrying the old 'it did not fire'
+sentence forward is no longer available."* Phase 204 is that next phase. This is the answer.
+
+**204-03 adds SIX runtime exports** — `listSchedules`, `listWorkflowSchedules`,
+`createWorkflowSchedule`, `updateSchedule`, `deleteSchedule`, `triggerSchedule` — plus one
+NON-exported helper (`readScheduleFailure`) and a four-name `import type` from
+`@/types/schedule`. Measured, not assumed: a `git diff -U0` over this file's real diff, grepped
+for added lines matching an exported binding, reads **6**. So this is the SECOND firing, and it
+is unambiguous.
+
+**THE VERDICT: RE-DECLINED. The seam is not taken by 204-03.** The reason is sized rather than
+convenient: this plan's whole frontend share is six additive functions plus a dialog, and the
+named seam (a per-domain split under `frontend/src/lib/api/` behind a re-exporting barrel) is a
+6,700-line restructure of the single hottest file in the tree. Landing that in the same commit
+as a net-new feature destroys the one property a bisect needs — *which change broke this* — and
+the barrel requirement means it cannot be landed incrementally either (repointing import sites
+and splitting the module in one commit erases the byte-identity evidence the cut depends on). It
+is a phase, and pretending otherwise inside a feature task is how it stays undone for a third
+time.
+
+**FRESH TRIGGER — deliberately stronger than the one it replaces, because that one fired twice
+without consequence:**
+
+> **The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or
+> escalates it to the operator as a phase of its own. It may NOT re-decline.**
+
+⚠ The strengthening is the point. A trigger whose only sanction is *"write another paragraph"*
+is a trigger that can be paid off indefinitely, and this row has now paid it off twice. The new
+one has exactly two outcomes and neither of them is another entry in this file.
+
+**⚠ THE MEASURED MOCK BUDGET WAS SPENT IN THE SAME COMMIT, and this is the FIRST time it was
+spent in advance rather than after a red run.** Property 1 of this file (above) is that a new
+runtime export **throws at MOUNT** in every suite that stubs `@/lib/api` with an explicit
+whole-module factory — `196-08` cost **249 red tests** that way, and 200.2 escaped it *by luck*
+(no whole-module-mocking suite happened to mount the new symbol). 204-03 could not rely on that
+luck: `WorkflowsPage` now mounts `WorkflowScheduleModal`, which imports all six. **Eleven
+factories were widened in the same commit** — nine matched the `vi.mock("@/lib/api", () => ({`
+literal form and two the `() => { … return { … } }` form.
+
+⚠ **A FACTORY-SHAPE CENSUS IS PART OF THE BUDGET, NOT JUST A FILE COUNT.** A twelfth suite named
+in this plan's brief, `src/pages/SettingsPage.test.tsx`, was **measured NOT to need widening**:
+it spreads `await vi.importActual("@/lib/api")`, so it carries every real export by construction.
+Three of the twelve did not match the idiom the brief assumed, and a plan that had patched twelve
+files by name would have edited one for no reason and missed the two whose shape differed.
+
+**Result, measured rather than predicted:** `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`
+→ `count gate OK — 110/110 pinned files present, no per-file decrease, 0 failing` ·
+`total 5438 · failed 0 · pinned total 5004`. (The grand total continues to grow; that is the gate
+working. Its contract is no per-file DECREASE and zero failing, never a fixed total.)
+
+---
+
+### `frontend/src/pages/WorkflowsPage.tsx` — 204-03, honoured by construction
+
+**Measured 2026-08-24: `41 commits / 16 phases / 1383 L`.** ⚠ The row read `39 / 14 / 1340` —
+its **SIXTH consecutive staling**, and it was already stale *before this plan started*. Re-derive
+with the recipe; do not increment the cell by hand.
+
+**204-03's share is `+15 / −0`:** one `useState`, one prop passed to `WorkflowCard`, one modal
+mount, one import. No existing handler was retyped, renamed or repointed — the composition
+contract this page carries (*it owns fetching, merge and filter state, and declares no card, no
+filter item and no modal*) is unchanged: `WorkflowScheduleModal` is declared elsewhere and only
+MOUNTED here, exactly as `RunModal` is.
+
+⚠ **THE STATE HOLDS `{id, name}` AND NOT A `PublishedWorkflow`, deliberately.** The dialog needs
+a definition id to write against and a name to say, and nothing else. A whole row in that slot is
+an invitation for a later edit to reach for a field the dialog has no business reading.
+
+⚠ **A CHANGE HERE STILL LANDS IN CHAT FIRST.** This page is reachable through `ChatLayout.tsx`,
+whose sole mount of `WorkspacePanel` lives in the same file; UAT on the Workflows surface alone
+will miss the blast radius. 204-03 does not touch `ChatLayout.tsx`, and that is why the schedule
+dialog is mounted from the page rather than from the layout.
+
+---
+
+### `frontend/src/components/workflows/library/WorkflowCard.tsx` — 204-03, and the ⋯ seam is now named for the THIRD time
+
+**Measured 2026-08-24: `19 commits / 6 phases / 1616 L`** (the row read `18 / 5 / 1570`).
+
+**204-03's share is one optional prop (`onSchedule`) and one `DropdownMenuItem`,** placed second
+in the ⋯ menu directly under the SEED-190 run-log item — the menu's only two non-destructive
+items, kept together above the forks and the deletes. It is a `DropdownMenuItem`, which is what
+keeps the WR-03 five-role sweep over `role="menu"`'s element children green.
+
+⚠ **THE PROP HANDS UP THE ROW'S `id`, NOT ITS SLUG — THE OPPOSITE OF `onRunLog`, AND THAT
+ASYMMETRY IS LOAD-BEARING.** A run LOG spans a workflow's published versions, so it is
+slug-scoped and its docblock says so at length. A SCHEDULE is a foreign key to ONE
+`workflow_definitions` row — the exact version that executes unattended at 03:00 — so it is
+id-scoped. Copying the neighbour's shape here would leave the server to choose a version, and
+*which version does the 3am run use* is not a question a caller may answer by omission. Both
+docblocks now state the contrast, so the next reader does not "fix" one to match the other.
+
+⚠ **THE ITEM IS OFFERED ON PUBLISHED ROWS ONLY**, unlike the run-log door beside it, which is
+deliberately offered on every row state including drafts. The API refuses to schedule a draft
+with a 400 (a draft is mutable, and an unattended run of a mutable workflow is one nobody agreed
+to), so a draft-side affordance would exist only to be refused.
+
+⚠ **`SCHEDULE_LABEL` IS A CARD-LOCAL CONSTANT, NOT A `libraryVocabulary.ts` ENTRY, AND THAT
+FOLLOWS THE SHIPPED PRECEDENT RATHER THAN BREAKING THE RULE.** `RUN_LOG_LABEL` — the label of the
+item immediately above it — is declared in THIS file, not in the vocabulary module. The library's
+one-string-home rule is about the words the LIBRARY LIST speaks; this card already keeps its own
+menu words locally, and siting the new one elsewhere would put two adjacent menu labels in two
+different modules.
+
+⚠ **THE ⋯ OVERFLOW MENU + ITS ARMED-DELETE STATE MACHINE IS NOW NAMED AS THE SEAM FOR THE THIRD
+TIME.** `192.2-02` discharged this file's G-5 by extracting `cardFace.ts` and named the menu as
+the next seam; SEED-190 then edited exactly that seam on 2026-08-20 and did not take it; 204-03
+has now edited it again and also not taken it. Three plans have touched the one part of this card
+that holds local state. **It is overdue, and a fourth "honoured by construction" here should not
+be accepted without a reason stronger than the last three.**
+
+---
+
+### `backend/app/main.py` — 204-03, honoured by construction
+
+**Measured 2026-08-24: `74 commits / 54 phases / 835 L`** (the row read `72 / 53 / 783`).
+
+**Purely additive:** two router registrations and one lifespan block (start + stop) behind
+`settings.scheduler_process_enabled`, which is `False` by default — so a box that has never asked
+for schedules boots byte-identically to before this phase. No existing sweep, registration or
+shutdown step was restructured. The named seam for this file (*a registration module doing one
+thing 40×* — no seam proposed) is unchanged.
+
+⚠ **THE SCHEDULER IS STOPPED FIRST AMONG THE RUN-TOUCHING SHUTDOWN STEPS, and the ordering is a
+decision.** It is the only component in the lifespan that STARTS work; every other background
+task reconciles or sweeps. Leaving it ticking while the producer-cancel loop below tears down
+live runs races a fresh launch against a closing pool.
+
+⚠ **IT RUNS IN EVERY WORKER WITH NO LEADER ELECTION**, and that is not an oversight to be
+"fixed" later: exactly-once belongs to `db/schedules.claim_due_schedules` (`FOR UPDATE SKIP
+LOCKED` plus the `next_run_at` advance inside the claiming transaction), which is a property of
+the database rather than of whichever worker won an election. A leader scheme's failure mode is
+that the leader dies and **nothing fires, silently** — the worst available failure for unattended
+automation.
+
+---
+
+### `backend/app/config.py` — 204-03, honoured by construction
+
+**Measured 2026-08-24: `73 commits / 43 phases / 1331 L`** (the row read `71 / 42 / 1285`).
+Still the second-hottest file measured anywhere in this project.
+
+**204-03 appends three fields** — `scheduler_process_enabled` (default `False`),
+`scheduler_poll_interval_seconds` (`60`), `scheduler_max_claims_per_tick` (`10`) — beside the
+existing `run_stale_sweep_*` knobs. Nothing else in the module is touched: `MODEL_CAPABILITIES`,
+both `get_model_capability` doors and `apply_setup_overlay` are byte-unchanged, so this file's
+three red lines (the sync path never reads the DB; `_build_inferred_defaults` never learns the
+two deprecated flags; the timeout bounds stay the single source for the PATCH door) are all
+intact by non-contact.
+
+⚠ **THE FILE WAS NOT IN `204-03`'s `files_modified`** and was edited anyway — recorded as a
+deviation in `204-03-SUMMARY.md` rather than left for a diff to discover. The alternative was
+reading `os.environ` directly inside `scheduler_service.py`, which would have added a fourth
+configuration mechanism to the tree AND made the new var invisible to
+`scripts/check-deploy-drift.sh`, whose check 1 censuses `backend/.env.example` against the
+one-box preset.
+
+**THE NAMED SEAM IS UNCHANGED AND UNTAKEN:** `MODEL_CAPABILITIES` + its two readers want
+`services/model_registry.py`, with a same-commit re-export in `config.py` because
+`from app.config import settings` is everywhere. Per G-5 the next phase touching this file owes a
+refactor recommendation FIRST.
