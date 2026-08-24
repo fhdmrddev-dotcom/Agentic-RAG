@@ -38,7 +38,7 @@
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
-| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | Planned — **3 items, all found by live UAT + the operator's eye 2026-08-25** |
+| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | Planned — **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -443,6 +443,34 @@ not be the reason the two defects go unreviewed.
    SVG is bundled), with a fallback that is not blank.
 4. `connectionsCopy.ts`'s destination arms stay explicit — no new positional fallback.
 5. Backend baseline unchanged, tsc baseline unchanged, count gate green with no per-file decrease.
+
+##### Plans
+
+**Plans**: 3 plans in 3 waves — **SERIAL, and worktrees are FORBIDDEN for this phase.** All three
+edit `ConnectionsTab.tsx` and/or its suite, and a worktree's `frontend/node_modules` is a JUNCTION
+to the operator's real 541 MB tree, so the single `@iconify-json/logos` install must happen ONCE, on
+the main working tree (plan 01). One plan per ROADMAP item, so **one can be reverted without the
+others** — the separability *"Why one phase and not three"* above requires.
+
+Plans:
+
+- [ ] 206.1-01-PLAN.md — **item 3, the per-service mark map.** FIRST because it is the only item
+  fully provable in vitest, the only one needing the npm install, and both other items render a mark.
+  `connectionMark.tsx` (total own-property lookup, named neutral, MCP resolved by its OWN
+  `mcp_server_url` condition) + the three-ink contract that stops the MCP mark shipping BLACK ON
+  BLACK while every test stays green + two corrections-beside-their-originals
+  (D-206.1-08/09/10/11/23).
+- [ ] 206.1-02-PLAN.md — **item 2, the dense row shape.** The wide render pinned byte-for-byte BEFORE
+  the branch exists, a `dense` prop threaded from the one `panel && !isMobile` condition, a
+  destination that WRAPS (`scrollWidth <= clientWidth` is unsatisfiable by widening alone), and a
+  real-browser geometry tier at 1280 and 1536 — because jsdom reports every box metric as `0` and
+  passes SC#2 vacuously (D-206.1-12/13/14/20/21).
+- [ ] 206.1-03-PLAN.md — **item 1, the MCP creation door**, plus the live edit-mode defect it was
+  found beside. The fourth chooser option and its three fields, a create body with NO `capability`
+  key, a disabled Save with its OWN `aria-describedby` id, four positional ladders given named arms
+  against a synthetic FIFTH shape, the driven round trip with no direct DB insert, and the phase's
+  five-row/five-section hot-file ledger debt in its own commit
+  (D-206.1-03/04/05/06/07/18/19/22/24).
 
 ---
 
