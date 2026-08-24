@@ -8,13 +8,20 @@ last_activity: 2026-08-24
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 3
-  percent: 50
+  total_plans: 7
+  completed_plans: 4
+  percent: 57
 stopped_at: >
-  Phase 204 PLANNED (3 plans: 204-01, 204-02, 204-03).
-  L-01, SCHED-01, SCHED-02 scoped across 2 waves.
-  Next: /gsd:execute-phase 204
+  Phase 204 wave 1 DONE — 204-01 (L-01 cross-worker cancellation brake) shipped:
+  d2e4eb3d, 6ef6fb93, 6ecb125c, docs fe2d4cb1. 28 new cases green, ZERO new
+  failures vs base cd6af1c5 (65 pre-existing before AND after, identical sets).
+  6 counterfactuals driven RED. Two plan corrections: the prescribed `break`
+  would have written `completed` over a cancelled run (run_workflow's loop falls
+  through to finish_run("completed")), and a shipped 194 AST fence forbids a
+  second `cancel_phase` call site in harness_engine.py.
+  OWED: a live WORKER_COUNT=2 UAT row (D-204-04 verified in-process only), and a
+  pre-provider-call check in task_service.py (out of 204-01 files_modified).
+  Next: wave 2 — /gsd:execute-phase 204 (204-02 + 204-03 in parallel)
 ---
 
 # Project State

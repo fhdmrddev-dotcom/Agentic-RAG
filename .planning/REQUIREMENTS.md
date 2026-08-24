@@ -48,7 +48,7 @@
 | **EML-02** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Complete (2026-08-24) |
 | **SCHED-01** | 204 | Scheduled & Recurring Unattended Runs | Planned |
 | **SCHED-02** | 204 | Scheduled & Recurring Unattended Runs | Planned |
-| **L-01** | 204 | Scheduled & Recurring Unattended Runs — cancellation reaches the PRODUCER | Planned (folded from Phase 194, 2026-08-24) |
+| **L-01** | 204 | Scheduled & Recurring Unattended Runs — cancellation reaches the PRODUCER | **Partial (204-01, 2026-08-24)** — the manual-Stop half is implemented and behaviourally tested (mock provider call counter frozen after cancel; 28 cases, 6 counterfactuals driven RED). ⚠ NOT ticked: the requirement also says *"or by SCHED-02's circuit breaker"*, which 204-02 has not built, and the `WORKER_COUNT=2` clause is verified **in-process** (worker A shares only Redis + Postgres with worker B) rather than by a live two-uvicorn-worker row. Both are owed before this may be checked. |
 | **STATE-01** | 205 | Stateful & Incremental Workflows | Planned |
 | **STATE-02** | 205 | Stateful & Incremental Workflows | Planned |
 | **CONN-02** | 206 | Outbound Action Connectors (Jira, Email, Slack) | Planned |
