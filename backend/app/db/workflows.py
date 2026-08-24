@@ -260,6 +260,15 @@ _AUDIT_EVENT_TYPES = frozenset(
         # not an intention. Phase 189's D-09 deferred this kind to 190 deliberately,
         # "where it would describe a real consequence"; 190 is the phase that creates one.
         "external_action_sent",
+        # 125 (Phase 204 SCHED-02 / D-204-07) — the spend-cap / wall-clock trip. This is
+        # the ONLY thing that distinguishes, in the ledger, a run the SYSTEM stopped from
+        # a run a PERSON stopped: both terminalize `cancelled` through the identical
+        # composition (D-204-03), so without this kind an unattended run killed by its own
+        # budget is indistinguishable from a user pressing Stop.
+        # ⚠ REGISTERED HERE **AND** IN MIGRATION 125 IN THE SAME COMMIT. Either alone only
+        # moves the failure (ValueError <-> Postgres 23514); G2 in
+        # tests/unit/test_audit_event_registration.py pins the two sets equal.
+        "circuit_breaker_tripped",
     }
 )
 
@@ -2192,3 +2201,138 @@ async def write_audit(
         event_type,
         json.dumps(metadata),
     )
+
+
+# ── Phase 204 (SCHED-02 / D-204-07) — the circuit-breaker trip record ────────
+async def record_circuit_breaker_trip(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    record: dict,
+    *,
+    user_id=None,
+) -> None:
+    """The DURABLE evidence that a policy — not a person — stopped this run.
+
+    TWO writes, in this order, and the order is the point: the ``harness_audit`` receipt
+    first, the ``workflow_runs.metadata`` detail second, and BOTH before the caller
+    terminalizes anything (``CircuitBreaker.trip_breaker``'s step 2). The threat this
+    answers is *audit evasion* — a run killed for spending too much must leave a record
+    saying so, with the exact numbers, or the ledger cannot tell it apart from a user
+    pressing Stop. Both paths end ``cancelled``.
+
+    ⚠ IT RAISES. Unlike ``cancel_workflow_run_internals``, this is NOT best-effort at this
+    layer — the caller owns that decision and wraps it, so a failure is visible in the log
+    with a real traceback instead of being swallowed one level too early. The rule the
+    caller enforces is "the bookkeeping is best-effort and the halt is not"; the rule HERE
+    is simply "say what went wrong".
+
+    ⚠ THE ``metadata`` PARAMETER IS THE PLAIN DICT — NEVER A PRE-DUMPED STRING (200.1 /
+    D-200.1-01(b)). The pool installs a jsonb codec whose encoder IS ``json.dumps``
+    (``dependencies._init_pg_connection``, D-073-06), so a pre-encoded string is encoded a
+    SECOND time and lands as a jsonb STRING SCALAR — measured at 484 of 484 ``completed``
+    rows on ``workflow_phases.output`` before it was fixed, and the root cause of migration
+    122 one column over. ⚠ **THE FIX IS TO STOP PRE-ENCODING, NEVER TO ADD A CAST**:
+    ``$2::jsonb`` is fine and stays. ``write_audit`` above is the deliberate exception and
+    is NOT a counter-example — it binds a ``text`` parameter that the cast then PARSES, a
+    different (and equally correct) shape that predates the codec.
+
+    ⚠ ``||`` MERGES, IT DOES NOT REPLACE, AND ``COALESCE`` IS WHAT MAKES THAT WORK ON A
+    NULL. ``metadata`` is nullable with no default (migration 125 — ``ADD COLUMN`` with no
+    default is catalog-only and rewrites no rows), and ``NULL || anything`` is ``NULL`` in
+    Postgres. Without the coalesce every trip on every pre-125 row would write nothing at
+    all and report success.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY. This module writes through a
+    service-role pool that BYPASSES RLS, so — exactly as the terminal phase writers above
+    record — the predicate is the only thing scoping the write. It takes a key and no
+    user-supplied filter; ownership is the CALLER's (T-147-06).
+    """
+    await write_audit(
+        pool,
+        run_id,
+        user_id=user_id,
+        event_type="circuit_breaker_tripped",
+        metadata=record,
+    )
+    await pool.execute(
+        "UPDATE workflow_runs "
+        "SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, updated_at = now() "
+        "WHERE id = $1",
+        run_id,
+        # THE PLAIN DICT — see the codec paragraph above.
+        {"circuit_breaker": record},
+    )
+
+
+async def load_run_budget(pool: asyncpg.Pool, run_id: UUID) -> dict:
+    """Read a run's circuit-breaker limits + its wall-clock anchor (SCHED-02).
+
+    Returns ``{"max_tokens_per_run", "max_duration_seconds", "started_at"}`` — any of
+    which may be ``None``. 204-03's scheduler writes the two limits into
+    ``workflow_runs.metadata`` when it mints an unattended run; an interactive run has
+    none and gets a disarmed breaker.
+
+    ⚠ IT FAILS **OPEN**, AND THAT DIRECTION IS A DECISION WITH A COST WORTH STATING. If
+    migration 125 has not been applied, or the column read raises for any other reason,
+    this returns empty limits — so the breaker is DISARMED and the run behaves exactly as
+    it did before Phase 204. Failing closed would mean a transient database blip killed
+    every in-flight run across every worker at once, turning a hiccup into a fleet-wide
+    outage; that is the same argument ``is_run_cancelled`` makes for its own fail-open
+    (204-01). ⚠ THE COST IS REAL AND IS NOT HIDDEN: an unapplied migration silently
+    disarms the spend cap. That is why the failure is logged at exception level with the
+    run id, and why migration 125 is owed an apply before any scheduled run exists.
+
+    ⚠ THE ANCHOR IS A SERVER TIMESTAMP, NEVER ``now()``. ``claimed_at ?? created_at`` are
+    the same two columns the run page's elapsed reads (Phase 200 F3/F6). A resumed run
+    that re-anchored on the current time would hand itself a fresh full wall-clock budget
+    on every restart, which is precisely how a duration cap stops capping anything.
+    """
+    empty = {
+        "max_tokens_per_run": None,
+        "max_duration_seconds": None,
+        "started_at": None,
+    }
+    try:
+        row = await pool.fetchrow(
+            "SELECT metadata, claimed_at, created_at FROM workflow_runs WHERE id = $1",
+            run_id,
+        )
+    except Exception:
+        logger.exception(
+            "circuit-breaker budget read failed for run %s — the run proceeds with NO "
+            "limits (fail-open). If migration 125 is unapplied, the spend cap is off.",
+            run_id,
+        )
+        return empty
+    if row is None:
+        return empty
+
+    meta = row.get("metadata")
+    # The string-scalar defence, applied at the point of read rather than assumed away:
+    # a row written by any path that pre-encoded would decode to a `str` here, and
+    # `.get` on a string raises. 527 of 588 `workflow_phases.output` values were in
+    # exactly that state (200.1), so this is a measured shape, not a hypothetical one.
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except (TypeError, ValueError):
+            meta = None
+    if not isinstance(meta, dict):
+        meta = {}
+
+    def _positive_int(value) -> int | None:
+        # `bool` is excluded because it subclasses `int` — True would read as a 1-token
+        # budget, which is the shape `declared_phase_measure` records being bitten by.
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed > 0 else None
+
+    return {
+        "max_tokens_per_run": _positive_int(meta.get("max_tokens_per_run")),
+        "max_duration_seconds": _positive_int(meta.get("max_duration_seconds")),
+        "started_at": row.get("claimed_at") or row.get("created_at"),
+    }
