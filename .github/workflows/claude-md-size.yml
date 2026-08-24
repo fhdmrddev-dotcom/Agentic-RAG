@@ -1,0 +1,36 @@
+# CI backstop for the CLAUDE.md context budget.
+#
+# Claude Code loads CLAUDE.md verbatim into the system prompt of every session
+# AND every subagent, and refuses to load a file over 150,000 chars. On
+# 2026-08-16 this repo's CLAUDE.md hit 194,908 chars and tripped that limit.
+#
+# This is the BACKSTOP, not the primary guard. `develop` ran 30 commits without
+# a push while CLAUDE.md grew 43k -> 195k, so an `on: push` gate could not have
+# fired once in that window. The primary guard is the local PostToolUse hook
+# .claude/hooks/claude-md-size-guard.js, which fires in the turn that authors
+# the content. CI catches whatever reaches a shared branch anyway.
+#
+# No secrets, no actions beyond checkout — node is preinstalled on ubuntu-latest.
+name: claude-md-size
+
+on:
+  push:
+    branches: [master, main, develop, production, "release/**"]
+    paths:
+      - "**/CLAUDE.md"
+      - "scripts/check-claude-md-size.cjs"
+      - ".github/workflows/claude-md-size.yml"
+  pull_request:
+    paths:
+      - "**/CLAUDE.md"
+      - "scripts/check-claude-md-size.cjs"
+      - ".github/workflows/claude-md-size.yml"
+
+jobs:
+  claude-md-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the CLAUDE.md context budget
+        run: node scripts/check-claude-md-size.cjs

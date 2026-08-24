@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Deep Midnight - Workflows</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary": "#242478",
+                        "surface-container-high": "#2a292f",
+                        "on-surface-variant": "#c7c5d3",
+                        "tertiary": "#e5c74c",
+                        "on-secondary": "#28313f",
+                        "primary-fixed": "#e1e0ff",
+                        "tertiary-fixed": "#ffe16c",
+                        "surface-container": "#1f1f25",
+                        "surface-container-low": "#1b1b21",
+                        "outline": "#918f9c",
+                        "tertiary-container": "#c8ac33",
+                        "secondary-fixed": "#dae3f6",
+                        "on-tertiary-fixed": "#221b00",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "surface-bright": "#39383f",
+                        "surface-dim": "#131318",
+                        "inverse-primary": "#5355a9",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "inverse-on-surface": "#303036",
+                        "surface-container-highest": "#35343a",
+                        "background": "#131318",
+                        "surface": "#131318",
+                        "on-primary-fixed": "#0b0664",
+                        "on-tertiary-container": "#4e4000",
+                        "secondary-fixed-dim": "#bec7da",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "primary": "#c3c4ff",
+                        "outline-variant": "#464651",
+                        "on-error": "#690005",
+                        "on-primary-container": "#353789",
+                        "surface-container-lowest": "#0e0e13",
+                        "inverse-surface": "#e4e1e9",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "surface-variant": "#35343a",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-fixed": "#131c2a",
+                        "secondary": "#bec7da",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "on-tertiary": "#3a3000",
+                        "on-surface": "#e4e1e9",
+                        "error": "#ffb4ab",
+                        "surface-tint": "#c1c1ff",
+                        "on-secondary-container": "#acb5c8",
+                        "on-background": "#e4e1e9",
+                        "secondary-container": "#3e4757",
+                        "primary-container": "#a3a5ff",
+                        // Custom Deep Midnight overrides to match prompt spec precisely
+                        "dm-bg": "#060A0F",
+                        "dm-rail": "#080B11",
+                        "dm-card": "#0D1117",
+                        "dm-raised": "#0F141B",
+                        "dm-muted": "#151B24",
+                        "dm-border": "#212631",
+                        "dm-text": "#F4F6FE",
+                        "dm-secondary": "#9AA3B5",
+                        "dm-dim": "#6B7383",
+                        "dm-primary": "#A3A5FF",
+                        "dm-violet": "#895AF6",
+                        "dm-success": "#21C45D",
+                        "dm-warning": "#F5A524",
+                        "dm-danger": "#DC2626"
+                    },
+                    fontFamily: {
+                        "data-sm": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"],
+                        "h3": ["Manrope"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h2": ["Manrope"],
+                        "h1": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "data-md": ["JetBrains Mono"]
+                    },
+                    fontSize: {
+                        "data-sm": ["12px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "data-lg": ["16px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "h3": ["18px", { lineHeight: "1.4", fontWeight: "600" }],
+                        "body-sm": ["12px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "h2": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "h1": ["32px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "body-md": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "data-md": ["14px", { lineHeight: "1.4", fontWeight: "500" }]
+                    },
+                    animation: {
+                        'pulse-border': 'pulseBorder 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 200ms ease-out forwards',
+                    },
+                    keyframes: {
+                        pulseBorder: {
+                            '0%, 100%': { borderColor: '#A3A5FF' },
+                            '50%': { borderColor: '#212631' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #F4F6FE;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        /* Material Symbols Outline Override */
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Hover elevation effect */
+        .hover-elevate {
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+        .hover-elevate:hover {
+            transform: translateY(-4px);
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #151B24;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #212631;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464651;
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden text-dm-text bg-dm-bg font-body-md antialiased">
+<!-- SideNavBar (Shared Component Translation) -->
+<nav class="fixed left-0 top-0 h-full w-[64px] border-r border-dm-border bg-dm-rail flex flex-col items-center py-md gap-sm z-50">
+<!-- Logo Header area implied, but for rail it's usually just icon -->
+<div class="h-12 w-12 flex items-center justify-center mb-8 border-b border-dm-border pb-4 w-full cursor-pointer hover:bg-dm-muted transition-colors duration-200">
+<span class="font-h3 text-dm-primary">DM</span>
+</div>
+<!-- Tab: Chat -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+</a>
+<!-- Tab: Workflows (ACTIVE) -->
+<a class="relative flex items-center justify-center h-12 w-12 before:absolute before:left-0 before:h-6 before:w-1 before:bg-dm-primary before:rounded-full bg-dm-muted scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+</a>
+<!-- Tab: Documents -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</a>
+<!-- Tab: Classification -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="category">category</span>
+</a>
+<!-- Tab: Library Health -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="health_and_safety">health_and_safety</span>
+</a>
+<!-- Tab: Governance -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+</a>
+<!-- Tab: Skills -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+</a>
+<!-- Spacer -->
+<div class="flex-grow"></div>
+<!-- Tab: Settings -->
+<a class="flex items-center justify-center h-12 w-12 text-dm-secondary hover:bg-dm-muted transition-colors duration-200 scale-95 transition-transform duration-100 rounded mb-4" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</a>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-[64px] flex-1 overflow-y-auto w-full flex justify-center py-12">
+<!-- Centered Column -->
+<div class="w-full max-w-[780px] flex flex-col gap-8 px-6 animate-fade-in" style="animation-delay: 50ms;">
+<!-- ARRIVAL CARD (Pulsing Border) -->
+<div class="bg-dm-card border border-dm-border animate-pulse-border relative overflow-hidden flex flex-col hover-elevate">
+<!-- Left Accent Line -->
+<div class="absolute left-0 top-0 bottom-0 w-[4px] bg-dm-primary"></div>
+<div class="p-6 pl-8 flex flex-col gap-4">
+<!-- Header Area -->
+<div class="flex items-center justify-between">
+<div class="bg-dm-muted text-dm-secondary font-data-sm px-2 py-1 border border-dm-border rounded-sm uppercase tracking-wide">
+                            Just drafted
+                        </div>
+</div>
+<!-- Title -->
+<h2 class="font-h3 text-[18px] text-dm-text">New starter onboarding check</h2>
+<!-- Source Line -->
+<div class="flex flex-col sm:flex-row sm:items-baseline gap-2 text-dm-secondary font-body-md border-l-2 border-dm-muted pl-3 py-1">
+<p class="leading-relaxed"><span class="text-dm-dim">From:</span> When someone joins, check their paperwork is complete and flag anything missing before their first day…</p>
+<button class="text-dm-primary hover:text-dm-text transition-colors text-sm whitespace-nowrap underline decoration-dm-primary/30 underline-offset-4">
+                            See what I asked for
+                        </button>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="px-6 py-4 bg-dm-bg/50 border-t border-dm-border flex items-center justify-between pl-8">
+<div class="flex gap-3">
+<button class="px-4 py-2 text-sm font-medium text-dm-text bg-transparent border border-dm-border rounded-sm hover:bg-dm-muted transition-colors">How long it looks back</button>
+<button class="px-4 py-2 text-sm font-medium text-dm-text bg-transparent border border-dm-border rounded-sm hover:bg-dm-muted transition-colors">How long it looks back</button>
+</div>
+<button class="px-5 py-2 text-sm font-medium text-dm-bg bg-dm-primary rounded-sm hover:bg-dm-text transition-colors">
+                        Publish…
+                    </button>
+</div>
+</div>
+<!-- DECISIONS LIST -->
+<div class="flex flex-col gap-4 mt-4 animate-fade-in" style="animation-delay: 100ms;">
+<h3 class="font-data-md text-dm-secondary uppercase tracking-widest text-xs mb-2">What I decided for you</h3>
+<div class="flex flex-col border border-dm-border bg-dm-raised rounded-sm overflow-hidden hover-elevate">
+<!-- Row 1: Settled -->
+<div class="flex items-start gap-4 p-4 border-b border-dm-border hover:bg-dm-card transition-colors">
+<span class="material-symbols-outlined text-dm-success mt-0.5">check_circle</span>
+<div class="flex flex-col w-full">
+<div class="flex items-center justify-between">
+<span class="text-dm-text font-medium">What it reads</span>
+<span class="text-dm-success font-data-sm text-xs">Settled</span>
+</div>
+</div>
+</div>
+<!-- Row 2: Needs you (Input) -->
+<div class="flex items-start gap-4 p-4 border-b border-dm-border bg-dm-warning/5 hover:bg-dm-warning/10 transition-colors">
+<span class="material-symbols-outlined text-dm-warning mt-0.5">error</span>
+<div class="flex flex-col w-full gap-3">
+<div class="flex items-center justify-between">
+<span class="text-dm-text font-medium">How it recognises the thing it's about</span>
+<span class="text-dm-warning font-data-sm text-xs">Needs you</span>
+</div>
+<div class="flex items-center gap-2">
+<input class="bg-dm-card border border-dm-border text-dm-text text-sm rounded-sm px-3 py-1.5 w-64 focus:border-dm-primary focus:ring-0 outline-none" type="text" value="Extract from HR portal"/>
+<button class="px-3 py-1.5 text-xs font-medium text-dm-text bg-transparent border border-dm-border rounded-sm hover:bg-dm-muted transition-colors">How it recognises the thing it's about</button>
+</div>
+</div>
+</div>
+<!-- Row 3: Not recorded -->
+<div class="flex items-start gap-4 p-4 border-b border-dm-border hover:bg-dm-card transition-colors">
+<span class="material-symbols-outlined text-dm-dim mt-0.5">radio_button_unchecked</span>
+<div class="flex flex-col w-full">
+<div class="flex items-center justify-between">
+<span class="text-dm-text font-medium">How long it looks back</span>
+<span class="text-dm-dim font-data-sm text-xs">Not recorded</span>
+</div>
+</div>
+</div>
+<!-- Row 4: Needs you (Text) -->
+<div class="flex items-start gap-4 p-4 border-b border-dm-border bg-dm-warning/5 hover:bg-dm-warning/10 transition-colors">
+<span class="material-symbols-outlined text-dm-warning mt-0.5">error</span>
+<div class="flex flex-col w-full gap-1">
+<div class="flex items-center justify-between">
+<span class="text-dm-text font-medium">What it must cite</span>
+<span class="text-dm-warning font-data-sm text-xs">Needs you</span>
+</div>
+<p class="text-dm-secondary text-sm">You cannot publish until this is settled.</p>
+</div>
+</div>
+<!-- Row 5: Settled -->
+<div class="flex items-start gap-4 p-4 hover:bg-dm-card transition-colors">
+<span class="material-symbols-outlined text-dm-success mt-0.5">check_circle</span>
+<div class="flex flex-col w-full">
+<div class="flex items-center justify-between">
+<span class="text-dm-text font-medium">How it decides</span>
+<span class="text-dm-success font-data-sm text-xs">Settled</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RECEIPT BLOCK -->
+<div class="mt-4 border border-dm-border bg-dm-card rounded-sm p-5 hover-elevate animate-fade-in" style="animation-delay: 150ms;">
+<h4 class="font-data-md text-dm-text uppercase tracking-wider text-sm mb-4 border-b border-dm-border pb-2">What I applied</h4>
+<div class="grid grid-cols-2 gap-4 mb-6">
+<div class="flex flex-col">
+<span class="text-dm-dim text-xs uppercase tracking-wider font-data-sm mb-1">Model</span>
+<span class="text-dm-text font-data-md">GPT-4o</span>
+</div>
+<div class="flex flex-col">
+<span class="text-dm-dim text-xs uppercase tracking-wider font-data-sm mb-1">Reads from</span>
+<span class="text-dm-text font-data-md">People</span>
+</div>
+</div>
+<p class="text-dm-dim text-xs italic font-body-sm">This block is absent when nothing was applied.</p>
+</div>
+<!-- Bottom Spacer -->
+<div class="h-16 w-full"></div>
+</div>
+</main>
+
+<script>
+(function(){
+  var HOPS = [["Open in the builder","builder-spine"],["Publish","publish"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"draft-arrival", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

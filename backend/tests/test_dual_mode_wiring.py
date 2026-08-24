@@ -1099,7 +1099,7 @@ async def test_ask_user_prompt_emits_on_producer_transport_keeps_value_on_run_id
         captured["subscribe_tcid"] = tool_call_id
         return None  # timeout → no answer (we only assert the transport routing)
 
-    import app.services.harness.phase_types as pt
+    import app.services.harness.human_input as pt
     _orig_sub = pt.subscribe_for_response
     pt.subscribe_for_response = _fake_subscribe
     try:

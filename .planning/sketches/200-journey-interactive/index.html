@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sketch 200 — The workflow journey · now vs proposed</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060A0F; --rail:#080B11; --card:#0D1117; --raised:#0F141B; --muted:#151B24;
+    --border:#212631; --text:#F4F6FE; --sec:#9AA3B5; --dim:#6B7383;
+    --primary:#A3A5FF; --violet:#895AF6; --success:#21C45D; --warning:#F5A524; --danger:#DC2626;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:400 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif;
+    display:grid; grid-template-columns:250px 1fr 344px; height:100vh; overflow:hidden;
+  }
+  h1,h2,h3{font-family:Manrope, Inter, sans-serif}
+  .mono{font-family:"JetBrains Mono", ui-monospace, monospace}
+
+  .map{background:var(--rail); border-right:1px solid var(--border); overflow-y:auto; padding:20px 0}
+  .map h1{font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--sec); padding:0 20px 4px}
+  .map .sub{font-size:11px; color:var(--dim); padding:0 20px 16px; line-height:1.5}
+  .step{display:block; width:100%; text-align:left; background:none; border:0; cursor:pointer;
+    padding:10px 20px 10px 18px; border-left:2px solid transparent; color:var(--sec); font:inherit; transition:background .2s,color .2s}
+  .step:hover{background:#0d1117; color:var(--text)}
+  .step[aria-current="true"]{border-left-color:var(--primary); background:#0d1117; color:var(--text)}
+  .step .t{display:block; font-size:13px; font-weight:500}
+  .step .s{display:block; font-size:11px; color:var(--dim); margin-top:2px}
+  .step .flags{display:flex; gap:4px; margin-top:6px; align-items:center}
+  .step .ready{font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--success); margin-left:auto}
+  .dot{width:6px;height:6px;border-radius:9999px;display:inline-block}
+  .legend{margin:20px 20px 0; padding-top:16px; border-top:1px solid var(--border)}
+  .legend .row{display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); margin-bottom:7px}
+
+  .stage{display:flex; flex-direction:column; min-width:0; overflow:hidden}
+  .bar{display:flex; align-items:center; gap:12px; padding:0 20px; height:52px; border-bottom:1px solid var(--border); flex:0 0 auto}
+  .bar .title{font-family:Manrope; font-size:15px; font-weight:600}
+  .bar .sep{color:var(--dim)} .bar .meta{font-size:12px; color:var(--dim)}
+  .spacer{flex:1}
+  .toggle{display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden}
+  .toggle button{background:transparent; border:0; color:var(--sec); font:500 12px Inter,sans-serif; padding:7px 14px; cursor:pointer; transition:background .2s,color .2s}
+  .toggle button[aria-pressed="true"]{background:var(--primary); color:#0800a3}
+  .toggle button:not([aria-pressed="true"]):hover{background:var(--muted); color:var(--text)}
+
+  .canvas{flex:1; overflow:auto; padding:20px; background:var(--bg)}
+  .frame{width:1440px; max-width:100%; margin:0 auto; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--card); position:relative}
+  .frame img{display:block; width:100%; height:auto}
+  .frame iframe{display:block; width:1440px; max-width:100%; height:900px; border:0; background:var(--card)}
+  .empty{padding:56px 40px; text-align:center; color:var(--dim); line-height:1.7}
+  .empty strong{display:block; color:var(--sec); font-family:Manrope; font-size:15px; margin-bottom:10px}
+  .empty .why{display:inline-block; margin-top:16px; text-align:left; border:1px solid var(--border); background:var(--raised); border-radius:8px; padding:14px 16px; font-size:12px; max-width:640px; line-height:1.6}
+  .empty code{background:var(--muted); padding:1px 5px; border-radius:4px; font-size:11px; color:var(--sec)}
+
+  .hops{display:flex; flex-wrap:wrap; gap:8px; padding:14px 20px; border-top:1px solid var(--border); flex:0 0 auto; align-items:center}
+  .hops .lbl{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin-right:4px}
+  .hop{background:var(--raised); border:1px solid var(--border); color:var(--text); font:500 12px Inter,sans-serif; padding:7px 13px; border-radius:8px; cursor:pointer; transition:border-color .2s, transform .2s}
+  .hop:hover{border-color:var(--primary); transform:translateY(-2px)}
+
+  .gap{background:var(--rail); border-left:1px solid var(--border); overflow-y:auto; padding:20px}
+  .gap h2{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--sec); margin-bottom:4px}
+  .gap .lede{font-size:11px; color:var(--dim); margin-bottom:16px; line-height:1.55}
+  .item{border:1px solid var(--border); background:var(--card); border-radius:8px; padding:12px; margin-bottom:10px}
+  .item .what{font-size:12.5px; line-height:1.5; margin-bottom:8px}
+  .item .note{font-size:11px; color:var(--dim); line-height:1.55; margin-top:8px; padding-top:8px; border-top:1px solid var(--border)}
+  .tag{display:inline-flex; align-items:center; gap:5px; font:600 10px Inter,sans-serif; letter-spacing:.05em; text-transform:uppercase; padding:3px 8px; border-radius:9999px}
+  .cost{margin-top:18px; padding-top:16px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); line-height:1.7}
+  .cost b{color:var(--sec)}
+  code{background:var(--muted); padding:1px 5px; border-radius:4px; font-size:11px; color:var(--sec)}
+  .kbd{font:500 10px "JetBrains Mono",monospace; border:1px solid var(--border); border-radius:4px; padding:1px 5px; color:var(--dim)}
+</style>
+</head>
+<body>
+
+<nav class="map">
+  <h1>The journey</h1>
+  <p class="sub">Seven screens a person passes through. <strong style="color:var(--sec)">Now</strong> is a real capture of the shipped product — evidence, not a drawing. <span class="kbd">←</span> <span class="kbd">→</span> move · <span class="kbd">space</span> flips.</p>
+  <div id="steps"></div>
+  <div class="legend">
+    <div class="row"><span class="dot" style="background:#21C45D"></span> already shipped</div>
+    <div class="row"><span class="dot" style="background:#A3A5FF"></span> frontend only — buildable now</div>
+    <div class="row"><span class="dot" style="background:#F5A524"></span> needs backend / new data</div>
+    <div class="row"><span class="dot" style="background:#6B7383"></span> not captured yet</div>
+  </div>
+</nav>
+
+<main class="stage">
+  <div class="bar">
+    <span class="title" id="scr-title">—</span><span class="sep">·</span><span class="meta" id="scr-sub"></span>
+    <span class="spacer"></span>
+    <div class="toggle" role="group" aria-label="Compare">
+      <button id="btn-now" aria-pressed="true">Now — shipped</button>
+      <button id="btn-prop" aria-pressed="false">Proposed</button>
+    </div>
+  </div>
+  <div class="canvas"><div class="frame" id="frame"></div></div>
+  <div class="hops"><span class="lbl">From here you can</span><span id="hops"></span></div>
+</main>
+
+<aside class="gap">
+  <h2>What changes on this screen</h2>
+  <p class="lede">Every row carries what it COSTS. A screen whose rows are all blue can ship in a presentation-only phase. An amber row cannot — which is exactly what Phase&nbsp;199 was chartered to refuse.</p>
+  <div id="gaps"></div>
+  <div class="cost" id="cost"></div>
+</aside>
+
+<script>
+/* ⚠ DELIBERATELY NOT AN ES MODULE, AND NO fetch().
+   The first build of this file used `import` and a HEAD probe. Both are blocked over
+   file://, so double-clicking rendered the static chrome and silently killed everything
+   dynamic — it looked "empty" while every asset was present. A prototype that requires a
+   web server to prove a design is a prototype nobody opens. Plain script, plain <img>,
+   plain <iframe>: works from a double-click. */
+
+var JOURNEY = [
+  { id:"library", title:"The library", sub:"Find one workflow among 285",
+    now:"../200-journey-now/now-01-library.png", proposed:"screens/library.html", ready:true,
+    next:[["+ Build a workflow","doors"],["Run","run-dialog"],["Open (a draft)","builder-spine"]],
+    gap:[
+      {what:"The state word renders TWICE on name-colliding rows", needs:"frontend", note:"BUG-260819-01, open. Confirmed live: '… Shared starter · SHARED · Shared starter · …'"},
+      {what:"Card hierarchy already close to the sheet", needs:"none", note:"192.2 shipped variant C — run gutter, name leads, run truth, then state in business words."}
+    ]},
+  { id:"doors", title:"The two doors", sub:"Where authoring actually begins",
+    now:null, proposed:"screens/doors.html", ready:true,
+    next:[["Describe it","draft-arrival"],["Build it myself","builder-spine"],["\u2190 Workflows","library"]],
+    gap:[
+      {what:"THE JOURNEY WAS STARTING ONE STEP TOO LATE", needs:"frontend", note:"Sheet c9 was uncovered entirely. Nobody arrives at a five-step spine — they pick a door, describe what they want, and receive a draft."},
+      {what:"The describe box now REFUSES OUT LOUD", needs:"none", note:"199-08 built this. The CTA had been gated since Phase 124 and said nothing at all — a control that refused silently."},
+      {what:"The knowledge picker's three states (none / one / no folders at all)", needs:"frontend", note:"c9 draws all three. A two-state picker cannot express 'you have no folders yet'."}
+    ]},
+  { id:"draft-arrival", title:"The draft arrives", sub:"What I decided for you",
+    now:null, proposed:"screens/draft-arrival.html", ready:true,
+    next:[["Open in the builder","builder-spine"],["Publish\u2026","publish"]],
+    gap:[
+      {what:"Sheet c5 was uncovered entirely — arrival card, decisions list, receipt", needs:"frontend", note:"All three already exist as shipped components (DraftArrivalCard, DecisionsList, SeedReceipt). They were never drawn into the journey."},
+      {what:"The decisions list needs THREE arms, never two", needs:"none", note:"D-20. An ABSENT readiness renders nothing affirmative, which is not a green one. A boolean re-introduces 'unknown reads as satisfied'."},
+      {what:"Only the grounding row may claim a publish requirement", needs:"none", note:"Its sentence arrives on the wire. The other four would be claiming a gate nothing enforces."}
+    ]},
+  { id:"builder-spine", title:"The authoring spine", sub:"The order it will run in",
+    now:"../200-journey-now/now-03-builder-spine.png", proposed:"screens/builder-spine.html", ready:true,
+    next:[["Select a step","step-panel"],["Canvas","builder-canvas"],["◆ Publish…","publish"],["← Workflows","library"]],
+    gap:[
+      {what:"<code>READ-ONLY GRAPH · ordered by phase_index · run order (i→i+1) · on-fail branch (skip_to_phase) · no depends_on · no parallel lanes</code>", needs:"frontend", note:"11px mono, visible at rest. The noisiest string in the product. Kept by DEC-199-02-F as a locked 019-D contract."},
+      {what:"Per-step <code>llm_agent</code> chip and <code>phase_index N</code> line", needs:"frontend", note:"Kept by D-187-16 as the spine's 'measured basis'. The SAME step reads 'AI agent step' on the canvas — two views, two languages."},
+      {what:"Per-step model name, type badge, branch TRAVERSED/SKIPPED", needs:"frontend", note:"All four are already in the definition the client holds."},
+      {what:"Per-step timings and total runtime (sheet c3 col 3)", needs:"data", note:"MEASURED: WorkflowRunPhase carries exactly slug, phase_index, status, phase_type. No timestamps at all."}
+    ]},
+  { id:"builder-canvas", title:"The canvas", sub:"The same workflow, spatially",
+    now:"../200-journey-now/now-05-builder-canvas.png", proposed:"screens/builder-canvas.html", ready:true,
+    next:[["Select a node","step-panel"],["Spine","builder-spine"]],
+    gap:[
+      {what:"Connections carry no payload label", needs:"data", note:"199-05's flagship CANNOT-EXPRESS. Sheet c1 draws '312 contracts → 48 extracted → 12 flagged'."},
+      {what:"Four of c1's five connection states are unexpressed", needs:"frontend", note:"199-05, measured. Only the shipped one exists."},
+      {what:"A branch node does not show its own condition", needs:"frontend", note:"on_failure: skip_to_phase:&lt;slug&gt; IS in the definition. This half is frontend-only and was never built."},
+      {what:"Node glyphs are large filled circles, not the line vocabulary", needs:"frontend", note:"Sheet c1 uses small inline line marks. icon-convention §4 has no row for three shipped marks (199-05)."}
+    ]},
+  { id:"step-panel", title:"The step panel", sub:"Refine one step",
+    now:"../200-journey-now/now-04-phase-form-panel.png", proposed:"screens/step-panel.html", ready:true,
+    next:[["Close","builder-spine"],["◆ Publish…","publish"]],
+    gap:[
+      {what:"24 raw snake_case tool ids against 3 human-named ones", needs:"frontend", note:"MEASURED live. The inconsistency reads worse than the noise — 3 of 27 named makes it look half-finished."},
+      {what:"Sheet c4's MODEL / GROUNDING / EXTERNAL ACTION card sections", needs:"frontend", note:"modelFitness.ts, the governance dial and the readiness contract ALL already exist. They were never composed into the sheet's shape."},
+      {what:"<code>Failed to read registry</code> error state", needs:"none", note:"199-06 BUILT this — the picker says it now instead of vanishing."},
+      {what:"<code>Locked by Alex M.</code> — a lock attributed to a person", needs:"data", note:"Who holds a lock is not on the wire."},
+      {what:"<code>Will overwrite 1,200 records</code> armed-action consequence", needs:"data", note:"No row count is computed anywhere."}
+    ]},
+  { id:"publish", title:"The publish gauntlet", sub:"Nine stages and a judge that can block",
+    now:"../200-journey-now/now-06-publish-gauntlet.png", proposed:"screens/publish.html", ready:true,
+    next:[["Publish ▸ run the gauntlet","run-surface"],["Close","builder-spine"]],
+    gap:[
+      {what:"The 9-pip strip is drawn in EMOJI", needs:"frontend", note:"Found in this capture. The adopted language forbids emoji outright. Should be the line-icon vocabulary."},
+      {what:"<code>needs kickoff_prompt</code> and <code>GOLDEN_INPUT — A REPRESENTATIVE KICKOFF PROMPT</code>", needs:"frontend", note:"Two more mechanism strings, both mono. Found in this capture, not previously listed anywhere."},
+      {what:"The judge hard-wall with no override", needs:"none", note:"Shipped and correct. 199-03 proved BOTH 'no override' guards were blind and replaced them."}
+    ]},
+  { id:"run-dialog", title:"The run dialog", sub:"Collect what this run needs, nothing else",
+    now:"../200-journey-now/now-02-run-dialog.png", proposed:"screens/run-dialog.html", ready:true,
+    next:[["▶ Run workflow","run-surface"],["Cancel","library"]],
+    gap:[
+      {what:"<code>This workflow expects: kickoff_prompt</code> — a raw identifier in mono", needs:"frontend", note:"Deferred by 199-10 with a named re-open trigger. Needs an authored label per input key."},
+      {what:"c6's <code>Target nodes</code> / <code>Estimated time</code> correctly REFUSED", needs:"none", note:"Nothing computes them. Refusing was right — keep refusing."}
+    ]},
+  { id:"run-surface", title:"The run surface", sub:"Watch it work",
+    now:null, proposed:"screens/run-surface.html", ready:true,
+    next:[["← Workflows","library"]],
+    gap:[
+      {what:"NOT YET CAPTURED — needs a live run", needs:"capture", note:"An honest hole in this prototype. Left empty rather than drawn from imagination."},
+      {what:"Per-step counts in the live column (sheet c3 col 2)", needs:"data", note:"'312 docs matched', '48 fields extracted' — nothing emits these."},
+      {what:"The execution trace and total runtime (col 3)", needs:"data", note:"Same missing timestamps as the spine."}
+    ]},
+  { id:"node-identity", title:"SHEET · The step node", sub:"Every kind, every state",
+    now:null, proposed:"screens/node-identity.html", ready:true, sheet:true,
+    next:[["\u2190 Back to the canvas","builder-canvas"]],
+    gap:[
+      {what:"Shape carries the KIND, the mark carries WHICH ONE", needs:"frontend", note:"Rounded = does work. Notched + violet = waits for a person. Hexagon = chooses what happens next."},
+      {what:"external_action was ALREADY a shipped node kind", needs:"none", note:"PHASE_GLYPHS ships seven keys and one is external_action. A step that calls another application had a seat reserved before this sketch began."},
+      {what:"llm_judge_rubric ships in the backend with NO glyph", needs:"frontend", note:"Seven glyphs, eight types. A real gap in the product, found by this sweep — not a sketch problem."},
+      {what:"A fan-out router is drawn DASHED and tagged NOT BUILT", needs:"data", note:"The roadmap records 'the spine is LINEAR by design'. Drawing it as real would design past a decision nobody has taken."}
+    ]},
+  { id:"run-panel-parts", title:"SHEET · The run panel", sub:"The parts that only appear mid-run",
+    now:null, proposed:"screens/run-panel-parts.html", ready:true, sheet:true,
+    next:[["\u2190 Back to the run","run-surface"]],
+    gap:[
+      {what:"Ask card, paused cue, file preview, version diff", needs:"frontend", note:"Sheet c8 was 5-of-6 uncovered by the journey. These are states, not steps — they belong on a specimen sheet."},
+      {what:"An unknown file time says 'time unknown'", needs:"none", note:"Never a blank, never a dash, never a zero. 199-07 already built this on the real panel."}
+    ]},
+  { id:"connections", title:"SHEET · Connections", sub:"The other applications",
+    now:null, proposed:"screens/connections.html", ready:true, sheet:true,
+    next:[["\u2190 Back to the step panel","step-panel"]],
+    gap:[
+      {what:"\u26a0 THE BRAND MARKS ARE PLACEHOLDERS, NOT REAL LOGOS", needs:"none", note:"MEASURED: svg count 0, all nine icon slots point at gstatic stitch-placeholder-300x300.svg. Stitch CANNOT emit third-party brand marks. Not a prompt problem and not a build problem \u2014 @lobehub/icons is installed, providerLogo.tsx is the single-source seam, and icon-convention.md \u00a71 already mandates it. The sheet establishes layout, states and vocabulary; the marks come from the package at build time."},
+      {what:"Provider-shaped: ONE account, MANY capabilities", needs:"frontend", note:"SEED-144. Never one connection per action."},
+      {what:"Every capability that writes must be ARMED", needs:"frontend", note:"SEED-146 \u2014 every connector capability is a WRITE. Never a bare toggle."},
+      {what:"The same connection works in chat AND workflows", needs:"frontend", note:"SEED-145 \u2014 connections are PLATFORM assets, not workflow assets."}
+    ]},
+  { id:"fork-delete", title:"SHEET · Fork + delete", sub:"Two dialogs, deliberately unequal",
+    now:null, proposed:"screens/fork-delete.html", ready:true, sheet:true,
+    next:[["← Back to the library","library"]],
+    gap:[
+      {what:"A harmless action asks lightly; a permanent one asks heavily", needs:"none", note:"The graded guard ladder, measured live on the shipped product: delete scores 4/4 guard atoms, fork 0/4, and the ordering is strict."},
+      {what:"The fork field opens EMPTY, and the clash never blocks", needs:"none", note:"A prefilled name is a confirmation wearing an input’s clothes. Verified in the running app."},
+      {what:"The delete control does not exist until the counts do", needs:"none", note:"While the preview is in flight the sheet names no victim and offers no destructive control — the absence is ORDERING, not a dead button."}
+    ]},
+];
+
+var NEEDS = {
+  none:     {label:"already shipped", color:"#21C45D"},
+  frontend: {label:"frontend only",   color:"#A3A5FF"},
+  data:     {label:"NEEDS BACKEND",   color:"#F5A524"},
+  capture:  {label:"not captured",    color:"#6B7383"}
+};
+
+var idx = 0, mode = "now";
+function $(id){ return document.getElementById(id); }
+
+function renderSteps(){
+  $("steps").innerHTML = JOURNEY.map(function(s,i){
+    var kinds = s.gap.map(function(g){return g.needs;}).filter(function(v,j,a){return a.indexOf(v)===j;});
+    var dots = kinds.map(function(k){ return '<span class="dot" style="background:'+NEEDS[k].color+'"></span>'; }).join("");
+    return '<button class="step" data-i="'+i+'" aria-current="'+(i===idx)+'">'
+      + '<span class="t">'+(s.sheet?'':'')+s.title+'</span><span class="s">'+s.sub+'</span>'
+      + '<span class="flags">'+dots+(s.ready?'<span class="ready">proposed ready</span>':'')+'</span></button>';
+  }).join("");
+  Array.prototype.forEach.call(document.querySelectorAll(".step"), function(b){
+    b.onclick = function(){ idx = +b.dataset.i; render(); };
+  });
+}
+
+function renderFrame(){
+  var s = JOURNEY[idx], f = $("frame");
+  if (mode === "now"){
+    f.innerHTML = s.now
+      ? '<img src="'+s.now+'" alt="'+s.title+' — shipped today">'
+      : '<div class="empty"><strong>Not captured yet</strong>This screen needs a live run to capture honestly.<br>Left empty rather than drawn from memory.</div>';
+    return;
+  }
+  if (!s.ready){
+    f.innerHTML = '<div class="empty"><strong>Not generated yet</strong>'
+      + 'This slot is wired and renders the generated screen the moment it lands.'
+      + '<div class="why"><b style="color:var(--warning)">Why it is empty:</b> my Stitch '
+      + '<code>generate_screen_from_text</code> calls fail 100% of the time — clean project, '
+      + '<code>GEMINI_3_1_PRO</code> set explicitly, long prompt and four-word prompt alike. '
+      + 'The operator\'s manual runs in the Stitch UI succeed with the identical prompt, so it is '
+      + 'the MCP path, not the model or the wording.<br><br>'
+      + 'The prompt for this screen is ready to paste: <code>PROMPTS.md</code>. '
+      + 'The design language it inherits is <code>../200-journey-now/DESIGN-journey.md</code>.</div></div>';
+    return;
+  }
+  f.innerHTML = '<iframe src="'+s.proposed+'" title="'+s.title+' — proposed"></iframe>';
+}
+
+function renderGaps(){
+  var s = JOURNEY[idx];
+  $("gaps").innerHTML = s.gap.map(function(g){
+    var n = NEEDS[g.needs];
+    return '<div class="item"><div class="what">'+g.what+'</div>'
+      + '<span class="tag" style="color:'+n.color+'; background:'+n.color+'26">'+n.label+'</span>'
+      + (g.note ? '<div class="note">'+g.note+'</div>' : '') + '</div>';
+  }).join("");
+
+  var all = []; JOURNEY.forEach(function(x){ all = all.concat(x.gap); });
+  function c(k){ return all.filter(function(g){return g.needs===k;}).length; }
+  $("cost").innerHTML = '<b>Across the whole journey:</b><br>'
+    + c("frontend")+' changes are frontend-only · '
+    + c("data")+' need the wire to carry something new · '
+    + c("none")+' already ship · '
+    + c("capture")+' still to capture.<br><br>'
+    + 'Those '+c("data")+' amber rows are why a second presentation-only phase cannot close this gap.';
+}
+
+function renderHops(){
+  var s = JOURNEY[idx];
+  $("hops").innerHTML = s.next.map(function(h){
+    var to = -1; JOURNEY.forEach(function(x,i){ if(x.id===h[1]) to=i; });
+    return '<button class="hop" data-to="'+to+'">'+h[0]+' →</button>';
+  }).join(" ");
+  Array.prototype.forEach.call(document.querySelectorAll(".hop"), function(b){
+    b.onclick = function(){ idx = +b.dataset.to; render(); };
+  });
+}
+
+function render(){
+  var s = JOURNEY[idx];
+  $("scr-title").textContent = s.title;
+  $("scr-sub").textContent = s.sub;
+  $("btn-now").setAttribute("aria-pressed", mode==="now");
+  $("btn-prop").setAttribute("aria-pressed", mode==="proposed");
+  renderSteps(); renderFrame(); renderGaps(); renderHops();
+}
+
+$("btn-now").onclick  = function(){ mode="now";      render(); };
+$("btn-prop").onclick = function(){ mode="proposed"; render(); };
+
+window.addEventListener("message", function(e){
+  var m = e.data || {};
+  if (m.type === "hop"){
+    var to = -1; JOURNEY.forEach(function(x,i){ if(x.id===m.to) to=i; });
+    if (to >= 0){ idx = to; render(); }
+  }
+  if (m.type === "wired"){
+    var bad = m.missed && m.missed.length;
+    var bar = document.createElement("div");
+    bar.style.cssText = "position:absolute;left:0;right:0;bottom:0;padding:6px 12px;font:500 11px Inter,sans-serif;"
+      + "background:"+(bad?"#F5A52426":"#21C45D26")+";color:"+(bad?"#F5A524":"#21C45D")
+      + ";border-top:1px solid "+(bad?"#F5A524":"#21C45D")+"66;";
+    bar.textContent = bad
+      ? m.wired+" hotspot(s) wired · NOT FOUND on this screen: "+m.missed.join(", ")+" — the generated screen does not carry these labels"
+      : m.wired+" hotspot(s) wired — every transition label was found";
+    $("frame").appendChild(bar);
+  }
+});
+
+document.addEventListener("keydown", function(e){
+  if (e.key === "ArrowRight"){ idx = (idx+1) % JOURNEY.length; render(); }
+  if (e.key === "ArrowLeft"){  idx = (idx-1+JOURNEY.length) % JOURNEY.length; render(); }
+  if (e.key === " "){ e.preventDefault(); mode = (mode==="now" ? "proposed" : "now"); render(); }
+});
+
+render();
+</script>
+</body>
+</html>

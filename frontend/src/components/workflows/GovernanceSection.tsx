@@ -185,8 +185,25 @@ export interface GovernanceSectionProps {
   citationPolicy?: string
 }
 
-const SECTION_CLASSES =
-  "mt-3 rounded border border-border bg-muted/40 px-2.5 py-2"
+/**
+ * ⚠ 200 (the step-panel port) — THE SHELL WEARS THE SHEET'S CARD SHAPE NOW, and the words
+ * inside it did not move. The reference (`screens/step-panel.html`) draws every group as a
+ * small-caps outside label over an INSET panel darker than the aside around it; the shipped
+ * `bg-muted/40` strip read as a tinted heading, which is the "three headings and a dense
+ * form" the operator's verdict named. This section is one of the sheet's seven cards
+ * (`How strictly it is held`), so it takes the same shape as its siblings — otherwise the
+ * one card carrying the governance decision is the one that does not look like a card.
+ *
+ * ⚠ `SECTION_HEADING` IS UNTOUCHED. It doubles as the dial group's accessible name and is a
+ * `RAIL_MARKERS` entry in `PhaseFormPanel.rails.test.tsx`; only its typography moved.
+ */
+const SECTION_CLASSES = "mt-3 flex flex-col gap-1.5"
+
+/** The sheet's inset panel — the same two class strings `StepCardSection.tsx` uses. */
+const SECTION_BODY_CLASSES = "rounded border border-border bg-background p-3"
+
+const SECTION_HEADING_CLASSES =
+  "text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
 
 const DIAL_CLASSES =
   "mt-1.5 inline-flex rounded-full border border-border bg-muted p-[3px]"
@@ -261,7 +278,8 @@ export function GovernanceSection({
       data-cause={cause ?? "none"}
       className={SECTION_CLASSES}
     >
-      <h3 className="text-[11px] font-medium text-foreground">{SECTION_HEADING}</h3>
+      <h3 className={SECTION_HEADING_CLASSES}>{SECTION_HEADING}</h3>
+      <div className={SECTION_BODY_CLASSES}>
 
       {hasDial ? (
         <>
@@ -408,6 +426,7 @@ export function GovernanceSection({
             {ACTION_RISK_ARMED_NOTE}
           </p>
         )}
+      </div>
       </div>
     </section>
   )

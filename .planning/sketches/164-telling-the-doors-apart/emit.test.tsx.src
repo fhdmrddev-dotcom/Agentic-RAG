@@ -1,0 +1,139 @@
+/**
+ * SKETCH 164 EMITTER — THROWAWAY. Deleted immediately after it runs.
+ *
+ * This is not a test. It renders the REAL `WorkflowDoorSwitch` and the REAL
+ * `library/RunModal` under jsdom and writes their actual `innerHTML` to
+ * `.planning/sketches/164-telling-the-doors-apart/dom.generated.json`.
+ *
+ * WHY it exists: sketch 163 emitted its build contract FROM THE SKETCH, so the
+ * sketch could still describe an atom the card structurally cannot render — which
+ * is exactly how UAT U8 failed in 192.1 (SEED-155). This inverts that: the
+ * acceptance bar is generated FROM THE BUILD, so layout drift is impossible by
+ * construction and only WORDS can vary between variants.
+ */
+import { describe, it, vi, beforeEach } from "vitest"
+import { render } from "@testing-library/react"
+import fs from "node:fs"
+import path from "node:path"
+
+const { mockGenerateWorkflow, mockListFolders, mockListSkills } = vi.hoisted(() => ({
+  mockGenerateWorkflow: vi.fn(),
+  mockListFolders: vi.fn(),
+  mockListSkills: vi.fn(),
+}))
+vi.mock("@/lib/api", () => ({
+  generateWorkflow: mockGenerateWorkflow,
+  createWorkflowDraft: vi.fn(),
+  updateWorkflowDraft: vi.fn(),
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
+}))
+
+import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"
+import { RunModal } from "./library/RunModal"
+
+const strictDef = {
+  slug: "vendor-risk",
+  version: 2,
+  name: "Vendor-risk review",
+  business_requirement: "Review a vendor's risk posture and produce a cited report.",
+  input_keys: ["vendor_name", "review_period"],
+  phases: [
+    { slug: "pull", phase_index: 0, name: "Pull", config: { phase_type: "programmatic" } },
+    {
+      slug: "emit",
+      phase_index: 1,
+      name: "Render report",
+      config: { phase_type: "llm_emit", citation_policy: "strict" },
+      validators: [{ kind: "citations_required" }, { kind: "llm_judge_rubric" }],
+    },
+  ],
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockListFolders.mockResolvedValue([])
+  mockListSkills.mockResolvedValue([])
+  mockGenerateWorkflow.mockResolvedValue({ ok: true, definition: { slug: "vendor-risk", phases: [] } })
+})
+
+const OUT = path.resolve(
+  __dirname,
+  "../../../../.planning/sketches/164-telling-the-doors-apart/dom.generated.json",
+)
+
+describe("sketch 164 emitter", () => {
+  it("dumps the real rendered DOM", () => {
+    const dumps: Record<string, string> = {}
+
+    // ── The CHOOSER (door === "both") — what a fresh Create actually lands on.
+    {
+      const { container, unmount } = render(<WorkflowDoorSwitch onDescribeDraft={vi.fn()} />)
+      dumps.chooser = container.innerHTML
+      unmount()
+    }
+
+    // ── The DESCRIBE door — the fast door's own surface, incl. its header strip,
+    //    the hint, and the switch-to-govern strip.
+    {
+      const { container, unmount } = render(
+        <WorkflowDoorSwitch def={strictDef} initialDoor="describe" onDescribeDraft={vi.fn()} />,
+      )
+      dumps.describe = container.innerHTML
+      unmount()
+    }
+
+    // ── The GOVERN door — added 2026-08-13 (193-04 / D-23). The reason it is here
+    //    matters more than the block: `🔧 Author & govern` (the govern strip's
+    //    current-door label) was NEVER in the COPY table and was NEVER captured, so
+    //    after variant D ships it would be the one surviving instance in the product
+    //    of the exact wording SEED-147 reports as illegible — on the door whose card
+    //    now reads "Build it myself". A contract cannot govern a string no dump holds.
+    //
+    //    STANDALONE (no `inline`) on purpose: that is the flag-OFF path, the one whose
+    //    bytes `WorkflowBuilderPage.header.test.tsx` already pins, and the only one where
+    //    the current-door label renders inside this shell's OWN band.
+    {
+      const { container, unmount } = render(
+        <WorkflowDoorSwitch def={strictDef} initialDoor="govern" onDescribeDraft={vi.fn()} />,
+      )
+      dumps.govern = container.innerHTML
+      unmount()
+    }
+
+    // ── The RUN modal — the shipped template-upload control in its real context.
+    {
+      const wf = {
+        id: "b7c1f2a4-0000-4000-8000-000000000001",
+        slug: "vendor-risk",
+        version: 2,
+        name: "Vendor-risk review",
+        definition: strictDef,
+      }
+      const { container, unmount } = render(
+        <RunModal
+          wf={wf as never}
+          folders={[]}
+          authorDefaultFolderId={null}
+          kickoff=""
+          submitting={false}
+          onKickoffChange={vi.fn()}
+          onCancel={vi.fn()}
+          onRun={vi.fn()}
+        />,
+      )
+      dumps.runModal = container.innerHTML
+      unmount()
+    }
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true })
+    fs.writeFileSync(OUT, JSON.stringify(dumps, null, 2), "utf8")
+    // eslint-disable-next-line no-console
+    console.log(
+      "EMITTED",
+      Object.entries(dumps)
+        .map(([k, v]) => `${k}=${v.length}B`)
+        .join(" "),
+    )
+  })
+})

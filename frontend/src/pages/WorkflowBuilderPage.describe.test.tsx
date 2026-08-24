@@ -21,11 +21,50 @@
  * ── WHAT IS PINNED, AND WHY THAT REGION ────────────────────────────────────────────
  *
  * The CTA region: the flex column at `WorkflowBuilderPage.tsx:1450-1465` holding the
- * `Draft the workflow` button and the `describe-hint` line beneath it. That is where the
+ * `DESCRIBE_CTA` button and the `describe-hint` line beneath it. That is where the
  * door lands, so that is where the pin sits. It is resolved by WALKING UP from the
  * `describe-hint` node rather than by a CSS class — a class-based selector would silently
  * start matching a different node after a Tailwind edit, and a pin that quietly moved to
  * another element is worse than no pin.
+ *
+ * ── ⚠ PHASE 193-08 (2026-08-13) — THIS SUITE NEEDED **NO** RE-CAPTURE, AND THAT IS A ───
+ *    MEASUREMENT, NOT AN OVERSIGHT.
+ *
+ * `193-08` ships variant D: every governed door word changes, and it re-captured three other
+ * suites to say so. This one was named in the same plan's `files_modified` on the expectation
+ * that it would red too. IT DID NOT — 19/19 green, unedited, with the CTA-region literal
+ * below untouched. The reason is worth writing down, because it is the shape of a real gap:
+ *
+ *   THE WORDS ON THIS SCREEN ARE A **SECOND HOME**. `193-05` moved the door surface's copy
+ *   into `components/workflows/doorVocabulary.ts`, but the strings pinned here are
+ *   `WorkflowBuilderPage.tsx`'s OWN literals — the CTA at `:1527` and the three hint
+ *   fragments at `:1531-1533`. The DOOR renders `describe-draft` from `DESCRIBE_CTA`; this
+ *   page renders a visually identical, textually identical, and completely separate copy.
+ *   No plan in Phase 193 owns `WorkflowBuilderPage.tsx`, so after variant D ships the loose
+ *   door reads "Write the first draft" while the govern door's first screen still reads the
+ *   column-A wording.
+ *
+ * That divergence is REAL, is VISIBLE to a user who opens each door in turn, and is recorded as a
+ * deferred item with its trigger in `193-08-SUMMARY.md` § Deferred rather than fixed inside a
+ * plan whose `files_modified` does not include the page. When someone does move these four
+ * strings into `doorVocabulary`, THIS suite reds — and that red is the correct signal.
+ *
+ * ── ✅ CLOSED, SAME DAY, AND THE PREDICTION ABOVE IS WHY THIS NOTE CAN BE TRUSTED ───────
+ *
+ * The operator took the fix rather than the deferral (2026-08-13, after `193-09`), and the
+ * paragraph above called the outcome exactly: moving the strings redded **24 cases across five
+ * suites**, and every one of those reds was this file and its neighbours doing their job. The
+ * deferral is closed; the trigger is spent.
+ *
+ * FOUR strings were predicted and **FIVE** were found — `DESCRIBE_H1` was duplicated too, and it
+ * only surfaced because the page was swept programmatically against all 21 governed values
+ * instead of being read by eye. That is the correction this note exists to carry forward.
+ *
+ * WHAT CHANGED HERE, precisely: the CTA and heading are now queried by `DESCRIBE_CTA` /
+ * `DESCRIBE_H1` rather than by hard-coded names — a literal query is exactly what let the page's
+ * copy rot without any suite reddening — and the `outerHTML` literal below was re-captured
+ * WORDS-ONLY, proved by the ordered TAG-token sequence being identical before and after (23 tags),
+ * never by re-recording whatever the page happened to render.
  *
  * ── THE OUTERHTML LITERAL ──────────────────────────────────────────────────────────
  *
@@ -62,6 +101,11 @@ const {
   mockListDrafts,
   mockDeletePreview,
   mockDeleteCascade,
+  // 193.1-08: the two seams the pre-draft row's host reaches. ADDED to the enumeration this
+  // file's own docblock demands — an omitted symbol hands back `undefined` and the failure
+  // surfaces far from its cause. Neither is called by any case written before this plan.
+  mockReadPlaceholders,
+  mockUploadTemplate,
 } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
   mockCreate: vi.fn(),
@@ -76,6 +120,8 @@ const {
   mockListDrafts: vi.fn(),
   mockDeletePreview: vi.fn(),
   mockDeleteCascade: vi.fn(),
+  mockReadPlaceholders: vi.fn(),
+  mockUploadTemplate: vi.fn(),
 }))
 
 vi.mock("@/lib/api", () => {
@@ -97,19 +143,35 @@ vi.mock("@/lib/api", () => {
     updateWorkflowDraft: mockUpdate,
     listFolders: mockListFolders,
     listSkills: mockListSkills,
+    // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections
+    // too. DECLARED rather than left undefined (`196-08`: a whole-module factory mock that
+    // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
+    // absence — every external face renders its destination-free sentence.
+    listConnectorConnections: () => Promise.resolve([]),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
+    // 196-08 (AUTH-04): the Builder now reads the author model registry on mount, so this
+    // factory owes the export or the page throws before rendering anything — the same shape
+    // `getGroundingBundle` had to be added for, one phase earlier. An empty registry is the
+    // right stub here: these rows are about the draft flow, not the picker.
+    getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
     publishWorkflow: mockPublish,
     listPublishedWorkflows: mockListPublished,
     listStarterWorkflows: mockListStarters,
     listDraftWorkflows: mockListDrafts,
     getWorkflowDeletePreview: mockDeletePreview,
     deleteWorkflowCascade: mockDeleteCascade,
+    readTemplatePlaceholdersFromFile: mockReadPlaceholders,
+    uploadWorkflowTemplate: mockUploadTemplate,
     WorkflowConflictError,
     WorkflowNotFoundError,
   }
 })
 
+// Phase 193 fast-fix (AUTH-01): this suite queried the CTA by a hard-coded literal, so when
+// variant D landed in `doorVocabulary.ts` the page's own copy went stale WITHOUT this file
+// reddening — it was pinning the inconsistency. Named ids cannot drift apart from the source.
+import { DESCRIBE_CTA, DESCRIBE_H1 } from "@/components/workflows/doorVocabulary"
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
@@ -119,6 +181,13 @@ import {
   STARTER_DOOR_LINE,
   starterSeedSentence,
 } from "@/components/workflows/definitionOps"
+// 193.1-08: the row's two footing values, IMPORTED rather than re-typed — a literal here
+// would be a second home for a governed sentence and would go stale silently at the next
+// reword, which is the exact defect `doorVocabulary` exists to remove.
+import {
+  FOOTING_LOADING,
+  footingFields,
+} from "@/components/workflows/templateFirstVocabulary"
 
 /** The canvas flag is OFF in every one of these. Three ways of being off, because
  *  D-181-01 is a statement about all of them and "operators too" is the one that a
@@ -208,7 +277,7 @@ function ctaRegion(): Element {
   const hint = screen.getByTestId("describe-hint")
   const region = hint.parentElement
   expect(region).not.toBeNull()
-  expect(region!.contains(screen.getByRole("button", { name: "Draft the workflow" }))).toBe(true)
+  expect(region!.contains(screen.getByRole("button", { name: DESCRIBE_CTA }))).toBe(true)
   return region!
 }
 
@@ -225,14 +294,14 @@ describe("Builder describe screen, canvas flag OFF — the surface is reachable 
       await renderDescribeScreen(variant.value)
 
       // The screen itself: the prompt, the box, the CTA, the hint.
-      expect(screen.getByRole("heading", { name: "What recurring work should this automate?" })).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: DESCRIBE_H1 })).toBeInTheDocument()
       expect(screen.getByLabelText("business requirement")).toBeInTheDocument()
-      expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeInTheDocument()
 
       // …and the region the door lands in resolves by walking up from the hint, and
       // reads as one addressable string.
       expect(ctaRegion().contains(screen.getByTestId("describe-hint"))).toBe(true)
-      expect(describeRegion()).toContain("Draft the workflow")
+      expect(describeRegion()).toContain(DESCRIBE_CTA)
       // No flag-on chrome leaked in: the merged header bar is gated on `canvasEnabled`.
       expect(screen.queryByTestId("builder-header-bar")).toBeNull()
     })
@@ -262,7 +331,7 @@ describe("Builder describe screen, canvas flag OFF — the surface is reachable 
  * being proved is that these two audiences receive the same bytes.
  */
 const FLAG_OFF_DESCRIBE_MARKUP =
-  `<div class="flex flex-col items-center gap-3"><button type="button" disabled="" class="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Draft the workflow</button><p data-testid="describe-hint" class="text-center text-[13px] text-muted-foreground">You describe the goal — the AI <b class="font-medium text-foreground">drafts the phases</b>, <b class="font-medium text-foreground">sets the strictness</b>, and <b class="font-medium text-foreground">asks about anything it had to guess</b>.</p></div>`
+  `<div class="flex flex-col items-center gap-3"><button type="button" disabled="" class="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Write the first draft</button><p data-testid="describe-hint" class="text-center text-[13px] text-muted-foreground">You describe the goal — the AI <b class="font-medium text-foreground">writes the steps</b>, <b class="font-medium text-foreground">sets how strict it is</b>, and <b class="font-medium text-foreground">asks about anything it had to guess</b>.</p></div>`
 
 describe("Builder describe screen, canvas flag OFF — the markup itself is pinned", () => {
   it("matches the captured flag-off describe-screen CTA region byte for byte", async () => {
@@ -387,7 +456,7 @@ describe("Builder describe screen, canvas flag ON — the template door (Req 6)"
 
     const box = screen.getByLabelText("business requirement") as HTMLTextAreaElement
     expect(box.value).toBe("")
-    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeDisabled()
 
     fireEvent.click(screen.getByTestId("starter-door-trigger"))
     const row = await screen.findByTestId("starter-door-row-risk-register")
@@ -400,7 +469,7 @@ describe("Builder describe screen, canvas flag ON — the template door (Req 6)"
     expect(screen.getByTestId("describe-hint")).toBeInTheDocument()
     expect(screen.queryByTestId("builder-grid")).toBeNull()
     // …and the shipped `canDraft` rule did the rest: a non-empty box enables the CTA.
-    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeEnabled()
   })
 
   it("the row with NO business_requirement seeds its NAME — the documented fallback", async () => {
@@ -498,6 +567,204 @@ describe("Builder describe screen — an OMITTED initialProjectFolderId is today
   it("an OPERATOR-LIKE map with the prop absent still produces the IDENTICAL CTA markup", async () => {
     mockListFolders.mockResolvedValue(PAGE_FOLDERS)
     await renderDescribeScreen(OFF_VARIANTS[2].value)
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 193.1-08 (D-24 / SC#1 / SC#4 / D-07 / D-08) — THE PRE-DRAFT ATTACH ROW,
+// MOUNTED ON **THIS PAGE'S** DESCRIBE SCREEN.
+//
+// APPENDED, and NOT ONE ASSERTION ABOVE THIS LINE MOVES. `FLAG_OFF_DESCRIBE_MARKUP`
+// (`:307`) and the `/template|starter/i` word guard (`:324`) are both UNTOUCHED, and that
+// is the mount's whole placement argument rather than a happy accident: both are scoped to
+// the CTA flex column reached by walking UP from `describe-hint`, and the row is spliced as
+// a SIBLING **above** that column. A mount inside it would red two independent assertions.
+//
+// ⚠ EVERY CASE BELOW NAMES THIS FILE IN ITS TITLE, AND THE REASON IS MECHANICAL RATHER THAN
+// stylistic. There are TWO near-identical pre-draft describe screens, and the splice anchor
+// `<div className="flex flex-col items-center gap-3">` occurs in BOTH of them
+// (`WorkflowBuilderPage.tsx` and `WorkflowDoorSwitch.tsx`) — it was unique only within
+// sketch 165's DUMP, which is all its build script ever asserted. A suite that asserted
+// "the row is on the describe screen" would pass against the wrong component. So the first
+// case pins the SURFACE by two nodes that can only be this one.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/** A held document, in the shape the native picker hands over. */
+function docxFile(name = "status-report.docx"): File {
+  return new File(["PK"], name, {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  })
+}
+
+/** Pick a document through the row's own native input — the path a person actually takes. */
+function pickDocument(file: File) {
+  const input = screen.getByTestId("describe-template-input") as HTMLInputElement
+  fireEvent.change(input, { target: { files: [file] } })
+}
+
+describe("WorkflowBuilderPage.tsx — the pre-draft attach row is on THIS page's describe screen", () => {
+  it("WorkflowBuilderPage.tsx: the row renders on the BUILDER's screen — proved by two surface-unique nodes", async () => {
+    /**
+     * The identification, not a convenience. `project-folder-picker` is an INLINE `<select>`
+     * declared by this page (`:1587`); the loose door renders the same testid out of
+     * `DescribeKbPicker`, so the id ALONE cannot separate them — the TAG can, and the door's
+     * `switch-strip` (`WorkflowDoorSwitch.tsx:335`) exists on that surface and nowhere else.
+     */
+    mockListFolders.mockResolvedValue(PAGE_FOLDERS)
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    const picker = await screen.findByTestId("project-folder-picker")
+    expect(picker.tagName).toBe("SELECT")
+    // …and its option list is the one THIS page builds from `folderOptions`.
+    expect(picker.querySelector('option[value=""]')?.textContent).toBe("No specific knowledge base")
+    // The door switch's own surface is absent — this is not that component.
+    expect(screen.queryByTestId("switch-strip")).toBeNull()
+    expect(screen.queryByTestId("door-describe")).toBeNull()
+    // And the row is here, on this screen.
+    expect(screen.getByTestId("describe-template-row")).toBeInTheDocument()
+  })
+
+  it("WorkflowBuilderPage.tsx: the row is a SIBLING ABOVE the CTA group — BOTH pinned guards hold, unedited", async () => {
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    const row = screen.getByTestId("describe-template-row")
+    // Outside the pinned region…
+    expect(ctaRegion().contains(row)).toBe(false)
+    // …and above it in document order, which is where the sketch's own splice puts it.
+    expect(row.compareDocumentPosition(ctaRegion()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The two guards this plan promised to leave green with ZERO edits.
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+    expect(ctaRegion().textContent ?? "").not.toMatch(/template|starter/i)
+  })
+
+  it("WorkflowBuilderPage.tsx: SC#4 — with no document held nothing new renders and the CTA is enabled exactly as today", async () => {
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    // The reading is `idle`, so the row shows its control and NO reading block at all.
+    expect(screen.queryByTestId("describe-template-fields-region")).toBeNull()
+    expect(screen.queryByTestId("describe-template-footing")).toBeNull()
+    expect(screen.queryByTestId("describe-template-clear")).toBeNull()
+    // Not one request was issued — D-08 is the ABSENCE of a read, not a read that returns fast.
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(0)
+
+    // The shipped CTA rule, unchanged: empty box disabled, typed box enabled.
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeEnabled()
+  })
+
+  for (const variant of OFF_VARIANTS) {
+    it(`WorkflowBuilderPage.tsx: the row renders with the canvas flag OFF too — ${variant.name}`, async () => {
+      /**
+       * ⚠ DELIBERATELY NOT GATED ON `canvasEnabled`, and this is the case that says so.
+       * Gating it would inherit the flag-off escape hatch that let the starter door ship
+       * INSIDE the pinned region; AUTH-03 is not a canvas feature, and the flag-off Spine is
+       * the surface most authors are on.
+       */
+      await renderDescribeScreen(variant.value)
+      expect(screen.getByTestId("describe-template-row")).toBeInTheDocument()
+      // The starter door is the flag-gated neighbour, and it is correctly absent here — so
+      // this case cannot pass by the row having quietly acquired the same gate.
+      expect(screen.queryByTestId("starter-door-trigger")).toBeNull()
+    })
+  }
+
+  it("WorkflowBuilderPage.tsx: the row is present with the canvas flag ON as well — one row, both flags", async () => {
+    await renderDescribeScreen(FLAG_ON)
+    expect(screen.getByTestId("describe-template-row")).toBeInTheDocument()
+    // The flag-gated neighbour IS here, which proves the flag really was on for this render.
+    expect(screen.getByTestId("starter-door-trigger")).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowBuilderPage.tsx — supplying a document on THIS page's describe screen", () => {
+  it("WorkflowBuilderPage.tsx: picking a document issues ONE read, disables the CTA, and SAYS WHY (D-07 + D-09)", async () => {
+    // A read that never settles, so the in-flight arm is observable rather than raced.
+    mockReadPlaceholders.mockImplementation(() => new Promise(() => {}))
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    // Typed text alone would enable the CTA — established first, so the disable below is
+    // attributable to the read and to nothing else.
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeEnabled()
+
+    pickDocument(docxFile())
+
+    await waitFor(() => expect(mockReadPlaceholders).toHaveBeenCalledTimes(1))
+    // ⚠ D-07: the blind draft is IMPOSSIBLE, not merely unlikely.
+    await waitFor(() => expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeDisabled())
+    // ⚠ D-09 ships WITH D-07: a control that is waiting and does not say why reads as broken.
+    // The sentence is READ OFF the vocabulary module, never re-typed here.
+    expect(screen.getByTestId("describe-template-footing")).toHaveTextContent(FOOTING_LOADING)
+    // Nothing was generated while waiting.
+    expect(mockGenerate).toHaveBeenCalledTimes(0)
+  })
+
+  it("WorkflowBuilderPage.tsx: when the read resolves to fields the CTA re-enables and the spec block lists the names", async () => {
+    mockReadPlaceholders.mockResolvedValue({
+      read: "ok",
+      placeholders: ["project_name", "overall_rag_status", "risks_blockers"],
+    })
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    pickDocument(docxFile())
+
+    const list = await screen.findByTestId("describe-template-fields")
+    const names = Array.from(list.querySelectorAll("li")).map((li) => li.textContent)
+    expect(names).toEqual(["project_name", "overall_rag_status", "risks_blockers"])
+    // The CTA is live again — the gate was the read, and the read is answered.
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeEnabled()
+    // The count in the footing is DERIVED from the list a person can see, never from a fixture.
+    expect(screen.getByTestId("describe-template-footing")).toHaveTextContent(
+      footingFields(names.length),
+    )
+    // The held document's own name is on screen beside its fields.
+    expect(screen.getByTestId("describe-template-filename")).toHaveTextContent("status-report.docx")
+  })
+
+  it("WorkflowBuilderPage.tsx: the supplied document's fields reach `/generate` — the wire, through THIS page's CTA", async () => {
+    /**
+     * The wire itself is Plan 07's and is asserted at the hook. What is asserted HERE is that
+     * this page's CTA — the app's only `/generate` caller — carries it once the row this plan
+     * mounted is the thing that supplied the document. Without the mount there was no way to
+     * reach this body from this screen at all, which is why Plan 07's two key-set literals
+     * correctly did NOT move.
+     */
+    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    mockGenerate.mockResolvedValue({ ok: true, definition: { slug: "s", phases: [] } })
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    pickDocument(docxFile())
+    await screen.findByTestId("describe-template-fields")
+
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+    await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(1))
+    expect(mockGenerate.mock.calls[0][0]).toMatchObject({ template_placeholders: ["project_name"] })
+  })
+
+  it("WorkflowBuilderPage.tsx: removing the document returns the screen to its no-document state", async () => {
+    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    pickDocument(docxFile())
+    await screen.findByTestId("describe-template-fields")
+
+    fireEvent.click(screen.getByTestId("describe-template-clear"))
+
+    await waitFor(() => expect(screen.queryByTestId("describe-template-fields-region")).toBeNull())
+    expect(screen.queryByTestId("describe-template-footing")).toBeNull()
+    // …and the CTA-region pin is STILL the wave-1 literal — a mis-pick never touched it.
     expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
   })
 })

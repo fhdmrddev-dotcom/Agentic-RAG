@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -45,6 +46,153 @@ class ThreadSnapshotResponse(BaseModel):
     since_cursors: dict[str, str]
 
 
+def phase_output_object(raw: object) -> dict | None:
+    """One ``workflow_phases.output`` jsonb value as a dict — or ``None``. THE READ-SIDE UNWRAP.
+
+    Phase 200.1 / **D-200.1-01**. Sited immediately above ``declared_phase_measure`` on purpose:
+    the read side keeps exactly ONE home (see that function's docblock for why), and this is
+    that home gaining a helper — never a second copy of the read.
+
+    ⚠ **THE COLUMN HAS TWO SHAPES IN IT, AND THAT IS MEASURED RATHER THAN SUSPECTED.**
+    ``db/workflows.py``'s terminal phase writers bound ``json.dumps(output)`` into a
+    ``$2::jsonb`` parameter on a pool that ALREADY registers a jsonb codec with
+    ``encoder=json.dumps`` (``dependencies._init_pg_connection`` — D-073-06, whose own docblock
+    says the codec exists precisely so *"call sites pass plain Python dicts/lists"*). Encoded
+    twice, the value lands as a jsonb **string scalar** holding JSON text — migration 122's root
+    cause, one column over. Measured against the live local DB on 2026-08-20: **527 of 588**
+    non-null ``output`` values are ``jsonb_typeof = 'string'``, and that includes **484 of 484**
+    ``completed`` rows. ``completed`` is exactly the status that can carry a measure, so the
+    failure rate on the rows that matter was **100%**, not 90%: ``_measure`` is reachable on
+    **13** rows THROUGH this unwrap and on **ZERO** rows without it. ``declared_phase_measure``
+    opened with a bare dict-only type test on ``raw`` and degraded to ``(None, None)``
+    **silently** — built, gated, green and structurally unreachable for four months.
+
+    ⚠ **THE OLD GUARD IS DESCRIBED HERE AND DELIBERATELY NOT SPELLED.** This repo has recorded
+    that trap firing three times (``toolNames.ts`` read `3` where its guard required `0`, all
+    comments): a docblock that quotes the forbidden form makes the acceptance grep count its own
+    prose and report a fix that landed as a fix that did not. The verbatim pre-change predicate
+    lives in ONE place — ``tests/unit/test_200_1_phase_output_shape.py``, where it is re-stated
+    locally and driven as the counterfactual.
+
+    CONTRACT. A ``dict`` passes through unchanged. A ``str`` is ``json.loads``-ed and returned
+    ONLY if it parses to a dict. ``None``, a non-``str`` non-``dict``, an unparseable string, and
+    a string that parses to a list / number / bool / null all return ``None``.
+
+    ⚠ **IT MUST NEVER RAISE** (T-200.1-01). It reads model-influenced jsonb, and a parser that
+    raises here 500s the run page for the owner of a run whose model wrote something odd.
+    ``ValueError`` and ``TypeError`` are caught — the same two ``_coerce_definition``
+    (``api/workflow_runs.py``) catches, which is the shipped precedent for this shape, and whose
+    degrade-to-``None`` silence is mirrored deliberately rather than reinvented.
+
+    ─── D-200.1-01 — BOTH (a) AND (b) ARE TAKEN. NO MIGRATION. ──────────────────────────────
+    · **(a) repairs the READ and is the load-bearing half.** It is the only half that reaches the
+      588 historical rows — the 484 ``completed`` ones, and the 479 carrying ``output.text`` that
+      the deliverable-by-type arm reads through this same door. Nothing else reaches history.
+    · **(b) repairs the WRITER** (``db/workflows.py``'s three terminal phase writers), because
+      leaving it wrong mints roughly three new bad rows per run, and because (a) makes the reader
+      tolerate BOTH shapes, so the flip cannot break a consumer.
+    · **THE SIBLING DEFERRAL IS HONOURED, and the reason it does not transfer is stated rather
+      than assumed.** ``STATE.md`` and migration 123's header leave ``workflow_runs.inputs``
+      (**230 of 230** string) and ``workflow_definitions.definition`` (**261 of 291**) in the old
+      shape because *"flipping a writer alone gives a table with two shapes in it."* ``output``
+      ALREADY has two shapes — 527 string against 61 object, and the object rows are
+      ``pending``/``cancelled``/``skipped``, written by a path that binds the dict directly, which
+      is what makes the split diagnostic rather than coincidental. And migration 123's own stated
+      condition for repairing a column alone is *"one reader that already accepts BOTH shapes"* —
+      which is precisely what (a) creates here. **Neither ``inputs`` nor
+      ``workflow_definitions.definition`` is touched by this phase**, and their re-open trigger is
+      carried forward VERBATIM: the next phase that touches either on the WRITE path.
+    · **NO MIGRATION — and the reason, not the assurance.** The read repair reaches every row, so
+      a data migration buys nothing the read does not already buy, while running a blind
+      ``#>> '{}'``-then-``::jsonb`` cast over 527 rows of MODEL-INFLUENCED content is strictly
+      more risk than the two-row ``definition_snapshot`` case migration 123 was written for.
+      ⚠ **Re-open trigger, named so it is not a silence: the first phase that needs ``output``
+      queryable IN SQL** — a ``->> 'text'`` predicate, an index, or a feed's ``WHERE`` /
+      ``ORDER BY``. At that point read-side tolerance is not enough, because SQL sees the raw
+      column and never this helper.
+    ─────────────────────────────────────────────────────────────────────────────────────────
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            decoded = json.loads(raw)
+        # ⚠ `RecursionError` IS NOT A `ValueError`, AND THIS FUNCTION'S CONTRACT SAYS IT NEVER
+        # RAISES. `json.loads` recurses per nesting level, so a deeply-nested payload —
+        # `"[[[[...]]]]"` — blows the interpreter's stack and escapes a `(ValueError, TypeError)`
+        # catch entirely. Reproduced against this repo's own Python by the phase's code review;
+        # the docblock above and this module's test suite both assert "must never raise", so the
+        # narrow catch was contradicting a promise made two paragraphs up.
+        #
+        # This matters because the input is MODEL-INFLUENCED: executor output is persisted
+        # verbatim into `workflow_phases.output`. Both call sites are reachable — the run read
+        # (`api/workflow_runs.py`) and the thread reconcile (`api/threads.py`), the latter with
+        # no enclosing try/except at the call site.
+        #
+        # `RecursionError` inherits from `RuntimeError`, not `ValueError`, so it must be named.
+        # Returning `None` is the right answer rather than re-raising: an unreadable payload is
+        # exactly the "not an object" case this function already reports as `None`, and the
+        # absent arm downstream renders honestly (no count, no answer) rather than blanking a page.
+        except (ValueError, TypeError, RecursionError):
+            return None
+        return decoded if isinstance(decoded, dict) else None
+    return None
+
+
+def declared_phase_measure(raw: object) -> tuple[int | None, str | None]:
+    """Extract the executor-DECLARED ``(count, noun)`` from a phase's ``output`` jsonb.
+
+    Phase 200 / D-07. A phase type declares a measure ONLY where a count is already a fact
+    in its own output; the executor writes ``output["_measure"] = {"count", "noun"}``
+    (``harness/phase_types.py``) and FOUR of the seven types write no such key at all.
+
+    ⚠ **THIS IS THE ONE HOME FOR THE READ SIDE, and it is sited here on purpose.** It has
+    exactly TWO consumers, and they are the two independent wire models for the same
+    ``workflow_phases`` rows: ``WorkflowPhaseState`` below (the CHAT surface's workspace
+    panel, via the ungated ``GET /threads/{id}/workflow``) and ``WorkflowRunPhaseRead``
+    (``api/workflow_runs.py`` — the RUN PAGE, via the canvas-gated ``GET
+    /workflow-runs/{id}``). A second copy is how the two surfaces come to disagree about
+    the same row, which is the exact failure this phase exists to prevent. This module is
+    already imported by both and carries no heavy dependencies, so it is the cheapest
+    shared home; ``phase_types.py`` — where the WRITE side lives — pulls the provider
+    services in at import time and cannot be reached from the API layer.
+
+    ⚠ **``0`` AND ``None`` ARE DIFFERENT ANSWERS AND THIS FUNCTION MUST NOT COLLAPSE THEM.**
+    ``(0, "sources")`` means the step searched and found nothing — a real measurement.
+    ``(None, None)`` means this phase type declares no count at all. Hence the explicit
+    ``isinstance(count, int)`` test rather than a truthiness check or an ``or None``: both
+    of those silently turn an honest zero into an absence, and the client renders nothing
+    for ``null`` while rendering "0 sources" for ``0``.
+
+    ⚠ ``bool`` is excluded deliberately — it is a subclass of ``int`` in Python, so a stray
+    ``{"count": true}`` would otherwise serialize as ``1``.
+
+    Defensive by construction: this reads model-influenced jsonb, so every layer is
+    ``isinstance``-guarded and anything unexpected degrades to ``(None, None)`` rather than
+    raising. Never ``raw["_measure"]``.
+
+    ⚠ **Phase 200.1 / D-200.1-01 — THE FIRST LINE IS NOW AN UNWRAP, NOT AN ``isinstance``
+    TEST.** This function opened with a bare dict-only type test on ``raw`` (not spelled here —
+    see ``phase_output_object``'s note on why), and the column it reads is a jsonb STRING SCALAR
+    on **484 of 484** ``completed`` rows, so the
+    declared count reached nobody for four months. ``phase_output_object`` above carries the
+    measurement and the decision; everything below this line is unchanged, deliberately.
+    """
+    output = phase_output_object(raw)
+    if output is None:
+        return None, None
+    measure = output.get("_measure")
+    if not isinstance(measure, dict):
+        return None, None
+    count = measure.get("count")
+    noun = measure.get("noun")
+    if not isinstance(count, int) or isinstance(count, bool):
+        return None, None
+    if not isinstance(noun, str) or not noun:
+        return None, None
+    return count, noun
+
+
 class WorkflowPhaseState(BaseModel):
     """Phase 098-UAT run-honesty fix (B) — one ``workflow_phases`` row's durable
     per-phase status, surfaced so the frontend reconcile floor can rebuild an
@@ -58,6 +206,41 @@ class WorkflowPhaseState(BaseModel):
     phase_index: int
     status: str
     phase_type: str | None = None
+
+    # ── 200 (DES-02 / D-05 / D-07) — the same four facts `WorkflowRunPhaseRead` carries ──
+    # ⚠ THIS IS A SECOND, INDEPENDENT WIRE MODEL FOR THE SAME `workflow_phases` ROWS, and
+    # that is why these fields are duplicated here rather than shared. `WorkflowRunPhaseRead`
+    # (`api/workflow_runs.py`) feeds the RUN PAGE through a canvas-gated route; this one
+    # feeds the CHAT surface's workspace panel (PhaseTimeline / PhaseCard) through an
+    # UNGATED one. **Widening only the other model would ship a run page with durations and
+    # a chat panel without them** — the same facts, two surfaces, silently disagreeing.
+    # The two models must be widened in the SAME commit; they are the two halves of one
+    # contract, not a model and its copy.
+    #
+    # ⚠ **D-200.1-02-A — THE FIRST RECORDED EXCEPTION TO THE RULE ABOVE, written HERE so a
+    # reader of the rule finds the exception where the rule is.** Phase 200.1 (RUN-04) added
+    # `deliverable_text` to `WorkflowRunPhaseRead` and DELIBERATELY did not add it here.
+    # The rule's own stated purpose — "the same facts, two surfaces, silently disagreeing" —
+    # does not apply, because **the chat surface ALREADY renders this text: it is the
+    # assistant's message.** Adding the field here would put a SECOND rendering of the same
+    # words on the same screen, the exact duplication `RunTranscript` removed from the run
+    # page. The four fields above were different in kind: NEITHER surface had them, so
+    # widening one alone would have been a real disagreement.
+    # Declining also keeps the new exposure behind the narrower door — `GET
+    # /threads/{id}/workflow`, which serves this model, carries no canvas gate; the run read
+    # does (T-200.1-11).
+    # ⚠ RE-OPEN TRIGGER: a chat-surface affordance that needs the deliverable INDEPENDENTLY
+    # of the message stream. The full argument, with its payload sibling `D-200.1-02-B`,
+    # is recorded beside the field in `api/workflow_runs.py`.
+    #
+    # Semantics are identical and are stated once, in `WorkflowRunPhaseRead`'s field
+    # descriptions. The two that matter most: a NULL timestamp means TIME NOT RECORDED
+    # (there is no backfill — D-06), and `step_count` distinguishes `0` (a real measurement
+    # of nothing) from `null` (this phase type declares no count) — never `?? 0`.
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    step_count: int | None = None
+    step_noun: str | None = None
 
 
 class ThreadWorkflowState(BaseModel):
@@ -113,6 +296,37 @@ class ThreadWorkflowState(BaseModel):
     # ADDITIVE and OPTIONAL — every existing consumer ignores it (the ``latest_producer_run_id``
     # precedent directly above is the same shape for the same reason).
     last_workflow_run_id: UUID | None = None
+    # Phase 194.1 (D-09 AMENDED) — the LAST run's status and its two timestamps, keyed to
+    # ``phases_source_run_id``: the SAME anchor-then-latest id that already sources ``phases``
+    # below and ``last_workflow_run_id`` directly above. Nothing new is queried — both arms of
+    # that resolution simply widen a SELECT they already issue.
+    #
+    # WHY THEY ARE NEEDED. ``run_status`` above is populated ONLY inside
+    # ``if active_workflow_run_id is not None:`` (``threads.py:1091``; the plan quoted 1092 —
+    # corrected on measurement). So after a stop, ``finish_run`` has NULLed the anchor and the
+    # frame reads ``run_status = None`` / ``mode = "deep"`` / ``locked = False`` while
+    # ``phases[]`` and ``last_workflow_run_id`` BOTH survive. That gap is these three fields:
+    # the thread knows which run it held and how far it got, but not that it was stopped,
+    # when it started, or when it last moved.
+    #
+    # ⚠ ``last_run_status`` is the ``workflow_runs.status`` of the LAST run this thread held.
+    # It is NOT ``run_status`` above, which is the LIVE anchor's status and stays anchor-based
+    # and byte-unchanged. Both are plain ``str | None`` and a swap TYPECHECKS — the same trap
+    # ``last_workflow_run_id``'s own docblock records about the two id types.
+    #
+    # ⚠ THE ELAPSED ANCHOR IS ``created_at`` -> ``updated_at``, i.e. from QUEUED to LAST UPDATE,
+    # and ``claimed_at`` is deliberately NOT offered. Measured (``WorkflowRunPage.tsx:759-768``):
+    # 5 of 181 ``workflow_runs`` carry ``claimed_at`` and 0 of 149 COMPLETED rows do —
+    # ``claim_run``'s CAS lease is the distributed-worker path and the in-process producer never
+    # takes it, so a ``claimed_at`` anchor would be absent on essentially every run. Any surface
+    # printing the interval owes that disclosure; it is not a wall-clock run duration.
+    #
+    # ADDITIVE and OPTIONAL — every existing consumer ignores all three (the
+    # ``latest_producer_run_id`` and ``last_workflow_run_id`` precedents directly above are the
+    # same shape for the same reason).
+    last_run_status: str | None = None
+    last_run_created_at: datetime | None = None
+    last_run_updated_at: datetime | None = None
     # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
     # (ordered by phase_index), so the frontend reconcile floor can rebuild an
     # honest timeline for a TERMINAL run (which previously returned [] / blanked).

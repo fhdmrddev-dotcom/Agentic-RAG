@@ -1,15 +1,54 @@
 ---
 id: BUG-260731-01
-title: OPEN QUESTION — the Settings judge-model knob may be inert, because every judge consumer resolves it from the env-backed config.Settings singleton, not the DB app_settings row
+title: CONFIRMED — the Settings judge-model knob IS inert; every judge consumer resolves from the env-backed config.Settings singleton, so the judge silently runs the hardcoded fallback claude-opus-4-8 instead of the operator's choice
 reported: 2026-07-31
 surface: Agentic-RAG
-severity: major
-status: open
+severity: critical
+status: closed
 affected_areas: [backend/harness, workflows/publish-gauntlet, settings, eval/judge, observability]
-folded_into: null
-verified_closed_by: null
-related_seeds: [SEED-116, SEED-117]
-re_open_trigger: null
+folded_into: "196"
+verified_closed_by: "196"
+closed_by_plan: "196-02"
+closed_on: 2026-08-18
+closing_evidence: "Both halves of this report's OWN binding condition are discharged, and each is named
+  rather than asserted. (1) THE TEST EXISTS: backend/tests/unit/test_196_judge_model_db_backed.py —
+  six functions / nine cases, one per consumer, observed RED against develop on all four
+  (`AssertionError: assert 'claude-opus-4-8' == 'deepseek-v4-pro'`, four times) BEFORE any production
+  line moved, with both controls GREEN at that point (the empty-row negative control parametrized
+  across all four, and the consumer-4 precedence control). Post-fix: 19 passed, every `assert` line
+  byte-identical to the RED run. (2) THE THREE-ROW MEASUREMENT RE-RAN, live against 127.0.0.1:54322 on
+  2026-08-18: app_settings.harness_judge_model = 'deepseek-v4-pro' (unchanged — nothing was written);
+  settings.harness_judge_model = None (unchanged — the field stays in config.py deliberately);
+  and `resolve_judge_model(await load_app_settings_async())` -> 'deepseek-v4-pro', where
+  `resolve_judge_model(settings)` returned 'claude-opus-4-8'. ALL FOUR consumers were rewired
+  (eval judge shot, recorded eval judge model, publish-gauntlet hard wall, in-run llm_judge_rubric
+  rung 3); `grep -c 'resolve_judge_model(settings)'` across the three service files returns 1 hit and
+  it is the `def` line the plan forbids changing — ZERO call sites remain. ⚠ LIVE CONSEQUENCE, named
+  rather than discovered: the publish-gauntlet judge on the operator's box is now `deepseek-v4-pro`,
+  not `claude-opus-4-8`. A real publish shot observed routing to that provider is UAT row U-B1 and is
+  NOT claimed here — a unit test cannot prove it. ⚠ Judge FITNESS (SEED-135 item 6) was explicitly NOT
+  claimed by 196 (D-16) and is untouched by this closure; that hypothesis has never been
+  live-verified. Related, deliberately left open: SEED-174 records TWO more resolvers of this exact
+  duck-typed shape, one of which (skill_proposer_service.py:366) is a genuine further instance that is
+  latent only because app_settings.skill_builder_model is currently empty."
+related_seeds: [SEED-116, SEED-117, SEED-135, SEED-174]
+re_open_trigger: "CLOSED 2026-08-18 by plan 196-02, on the evidence in `closing_evidence` above.
+  RE-OPEN if a judge consumer is ever again found reading `app.config.settings`, or if
+  `test_196_judge_model_db_backed.py` is deleted or weakened. ⚠ The ORIGINAL folding note is preserved
+  verbatim below, because it is what made the condition binding.
+  >>>> ORIGINAL (2026-08-17), verbatim: FOLDED at /gsd:discuss-phase 196 (2026-08-17), on an EXPLICIT operator decision that
+  deliberately widens that phase's canvas-only scope fence — recorded as 196-CONTEXT.md D-17. Direction
+  chosen: route the four judge consumers off `app.config.settings` onto the DB-backed
+  UserEffectiveSettings the rest of the app uses. The report's alternative (declare the knob
+  system-level in the UI) was considered and REJECTED — it leaves the operator's stated goal, running a
+  cheaper judge, impossible. ⚠ THE REPORT'S OWN BINDING CONDITION CARRIES INTO THE PHASE: the fix MUST
+  ship a test that sets `app_settings.harness_judge_model` and asserts the RESOLVED model changes —
+  'the absence of that test is why this survived from 2026-07-31 to 2026-08-17'. Flip to `closed` ONLY
+  when that test exists and the three-row measurement above re-runs with resolve_judge_model returning
+  the operator's value. RE-OPEN if a judge consumer is later found still reading the env singleton, or
+  if 196 ships without the regression test. ⚠ Judge FITNESS (SEED-135 item 6 — `gemini-3.5-flash` is
+  `emit_tier: force` and still returned no verdict) is explicitly NOT claimed by 196 (D-16) and remains
+  deferred pending live verification of the sanitized-payload hypothesis."
 reproduces_on:
   branch: develop
   commit: a724f275
@@ -17,6 +56,97 @@ reproduces_on:
 ---
 
 # BUG-260731-01: Is the `harness_judge_model` Settings knob actually wired to the judge shot?
+
+## ✅ CLOSED 2026-08-18 — plan `196-02`. The knob obeys.
+
+**All four judge consumers now resolve `harness_judge_model` from the DB-backed
+`UserEffectiveSettings` instead of the env-level `app.config.settings` singleton.** The full evidence
+is in the frontmatter's `closing_evidence`; the short form is that **the report's own binding
+condition demanded a test that sets the row and asserts the RESOLVED model changes, and that test
+exists, was observed RED on all four consumers before any production line moved, and the three-row
+measurement re-ran with `resolve_judge_model` returning the operator's value.**
+
+| Source | 2026-08-17 (the defect) | 2026-08-18 (after `196-02`) |
+|---|---|---|
+| `app_settings.harness_judge_model` | `deepseek-v4-pro` | `deepseek-v4-pro` — **unchanged; nothing was written** |
+| `settings.harness_judge_model` (env singleton) | `None` | `None` — **unchanged; the field stays in `config.py`** |
+| **what the judge actually uses** | **`claude-opus-4-8`** | ✅ **`deepseek-v4-pro`** |
+
+⚠ **`resolve_judge_model`'s body, signature and resolution order were NOT changed.** The defect lived
+entirely in **what the four consumers handed it** — it is duck-typed
+(`getattr(settings, "harness_judge_model", None)`), so it accepts either settings object without
+complaint, which is what made passing the wrong one silent by construction. *Fix the argument, never
+the resolver.*
+
+⚠ **The env-singleton resolution still returns `claude-opus-4-8` when asked directly. It is simply no
+longer what any consumer asks.**
+
+⚠ **TWO THINGS THIS CLOSURE DOES NOT COVER, named so they are not read into it:**
+
+1. **UAT row `U-B1` is OWED** — a real publish shot observed routing to `deepseek` in
+   `workflow_runs` / `harness_audit`. A unit test cannot prove it, and this closure does not claim it.
+2. **Judge FITNESS is untouched** (`SEED-135` item 6 — a registry-known, `emit_tier: force` model that
+   still returned no verdict). Phase 196 explicitly declined it (D-16) because the leading explanation
+   has **never been live-verified**; it remains an unverified hypothesis, not a cause.
+
+**And the class defect is bigger than this instance.** `SEED-174` records **two more resolvers of the
+identical duck-typed shape**, copied verbatim from this one — including
+`skill_proposer_service.py:366`, which reads the env singleton for a knob that **does** have a column
+and a UI control, and is latent today only because the operator's row happens to be empty.
+
+---
+
+## ⚠ CONFIRMED 2026-08-17 — the decisive test ran, and the knob is INERT
+
+**This report no longer needs to be read as an open question.** The two readings below are resolved:
+the defect reading is correct. Measured on `develop` at `d84b024e`, immediately after the operator
+changed the knob through the Settings UI expecting it to reduce reliance on top-tier models.
+
+| Source | Value |
+|---|---|
+| `app_settings.harness_judge_model` — **what the operator set in the UI** | **`deepseek-v4-pro`** |
+| `settings.harness_judge_model` — the env singleton every judge consumer reads | **`None`** |
+| `resolve_judge_model(settings)` — **what the judge shot actually uses** | **`claude-opus-4-8`** |
+
+Commands, both from the repo root:
+
+```bash
+backend/venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'backend');   from app.config import settings;   from app.services.harness.validator_kinds import resolve_judge_model;   print(getattr(settings,'harness_judge_model',None), resolve_judge_model(settings))"
+# -> None claude-opus-4-8
+
+# psycopg2 @ 127.0.0.1:54322
+select harness_judge_model from app_settings;   -- -> deepseek-v4-pro
+```
+
+**And nothing closes the gap at runtime.** `grep` for any write of the DB value onto the singleton
+(`setattr(settings, …)` / `settings.harness_judge_model = …`) returns **nothing**.
+`user_settings.py:910` loads the column into `UserEffectiveSettings` — the DB-backed object — but the
+four consumers tabulated below all import `app.config.settings`, which never receives it.
+
+### Why this is worse than "a setting does not apply"
+
+1. **The fallback is a TOP-TIER model.** The operator's stated goal was to *reduce* reliance on
+   expensive models; the inert knob means every eval judge and every publish-gauntlet judge has been
+   running `claude-opus-4-8`. The setting fails in the expensive direction, silently.
+2. **The publish gauntlet's judge is a HARD WALL.** Its verdict decides whether a workflow may
+   publish. An operator who believes they have changed the judge has changed nothing about a gate.
+3. **The UI confirms the write.** The value really does land in `app_settings` — so the Settings
+   surface reports success truthfully about the row and misleadingly about the effect.
+4. ⚠ **This also invalidates any prior tuning of the judge.** Every judge verdict recorded since the
+   knob shipped was produced by the fallback, whatever the row said.
+
+### What a fix must do
+
+Route the four consumers through the DB-backed settings (the same `UserEffectiveSettings` path the
+rest of the app uses) rather than `app.config.settings` — **or**, if the env singleton is deliberate
+for a system-level shot, make the Settings UI say so instead of offering a knob that does nothing.
+⚠ Either way the fix must include a test that sets the row and asserts the RESOLVED model changes;
+the absence of that test is why this survived from 2026-07-31 to 2026-08-17.
+
+---
+
+## The original report, preserved
+
 
 > **Read this as an open question, not a finding.** Two lines of evidence point in opposite
 > directions and neither has been closed out. A named decisive test is in

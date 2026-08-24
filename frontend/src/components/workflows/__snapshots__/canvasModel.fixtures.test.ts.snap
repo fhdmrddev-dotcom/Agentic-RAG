@@ -76,6 +76,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "ariaRole": "button",
       "data": {
         "armed": false,
+        "condition": "If the check fails → Wait for your approval",
         "grounded": false,
         "notConnected": false,
         "phaseIndex": 1,

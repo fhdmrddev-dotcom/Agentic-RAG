@@ -1,0 +1,394 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Agentic Workflow Studio - Find contracts</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface": "#131318",
+                      "on-secondary": "#28313f",
+                      "surface-container-lowest": "#0e0e13",
+                      "on-secondary-container": "#acb5c8",
+                      "surface-container-low": "#1b1b21",
+                      "error": "#ffb4ab",
+                      "secondary-fixed": "#dae3f6",
+                      "primary-container": "#a3a5ff",
+                      "surface-container-highest": "#35343a",
+                      "inverse-surface": "#e4e1e9",
+                      "inverse-on-surface": "#303036",
+                      "secondary-container": "#3e4757",
+                      "on-primary-container": "#353789",
+                      "on-primary-fixed-variant": "#3b3d8f",
+                      "primary-fixed": "#e1e0ff",
+                      "surface-bright": "#39383f",
+                      "on-tertiary-fixed": "#221b00",
+                      "on-surface-variant": "#c7c5d3",
+                      "surface-container-high": "#2a292f",
+                      "on-tertiary-fixed-variant": "#544600",
+                      "secondary-fixed-dim": "#bec7da",
+                      "tertiary-fixed-dim": "#e3c54a",
+                      "outline": "#918f9c",
+                      "surface-container": "#1f1f25",
+                      "surface-dim": "#131318",
+                      "inverse-primary": "#5355a9",
+                      "error-container": "#93000a",
+                      "surface-variant": "#35343a",
+                      "on-error": "#690005",
+                      "on-primary": "#242478",
+                      "surface-tint": "#c1c1ff",
+                      "outline-variant": "#464651",
+                      "on-tertiary-container": "#4e4000",
+                      "tertiary-container": "#c8ac33",
+                      "background": "#131318",
+                      "tertiary": "#e5c74c",
+                      "on-secondary-fixed-variant": "#3e4757",
+                      "tertiary-fixed": "#ffe16c",
+                      "on-surface": "#e4e1e9",
+                      "on-secondary-fixed": "#131c2a",
+                      "on-background": "#e4e1e9",
+                      "secondary": "#bec7da",
+                      "on-primary-fixed": "#0b0664",
+                      "primary-fixed-dim": "#c1c1ff",
+                      "on-error-container": "#ffdad6",
+                      "primary": "#c3c4ff",
+                      "on-tertiary": "#3a3000",
+                      
+                      // Custom Theme Mapping from prompt constraints
+                      "deep-midnight-bg": "#060A0F",
+                      "deep-midnight-rail": "#080B11",
+                      "deep-midnight-card": "#0D1117",
+                      "deep-midnight-raised": "#0F141B",
+                      "deep-midnight-muted": "#151B24",
+                      "deep-midnight-border": "#212631",
+                      "deep-midnight-text": "#F4F6FE",
+                      "deep-midnight-secondary": "#9AA3B5",
+                      "deep-midnight-dim": "#6B7383",
+                      "deep-midnight-primary": "#A3A5FF",
+                      "deep-midnight-violet": "#895AF6",
+                      "deep-midnight-success": "#21C45D",
+                      "deep-midnight-warning": "#F5A524",
+                      "deep-midnight-danger": "#DC2626",
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "sm": "8px",
+                      "xl": "32px",
+                      "lg": "24px",
+                      "xs": "4px",
+                      "unit": "4px",
+                      "rail_width": "64px",
+                      "md": "16px",
+                      "margin": "24px"
+              },
+              "fontFamily": {
+                      "h3": ["Manrope"],
+                      "data-sm": ["JetBrains Mono"],
+                      "data-md": ["JetBrains Mono"],
+                      "body-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "h2": ["Manrope"],
+                      "h1": ["Manrope"],
+                      "body-sm": ["Inter"],
+                      "data-lg": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "h3": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "data-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                      "data-md": ["14px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "h2": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "body-sm": ["12px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "data-lg": ["16px", {"lineHeight": "1.4", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body { background-color: #060A0F; color: #F4F6FE; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #151B24; }
+        ::-webkit-scrollbar-thumb { background: #212631; border-radius: 2px; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .bg-grid-pattern {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(33, 38, 49, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(33, 38, 49, 0.3) 1px, transparent 1px);
+        }
+        
+        /* Focus styles for accessibility without glow */
+        *:focus-visible {
+            outline: 1px solid #A3A5FF;
+            outline-offset: -1px;
+        }
+        
+        /* Remove default select styling */
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239AA3B5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 16px;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex overflow-hidden font-body-md text-deep-midnight-text selection:bg-deep-midnight-primary selection:text-deep-midnight-bg antialiased">
+<!-- Left Rail Navigation -->
+<nav class="w-[56px] h-full bg-deep-midnight-rail border-r border-deep-midnight-border flex flex-col items-center py-4 shrink-0 z-50">
+<!-- App Mark -->
+<button aria-label="App Menu" class="w-8 h-8 flex items-center justify-center rounded bg-deep-midnight-muted text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors mb-6 group cursor-pointer">
+<span class="material-symbols-outlined text-xl">dataset</span>
+</button>
+<!-- New Chat Action -->
+<button aria-label="New Chat" class="w-8 h-8 flex items-center justify-center rounded border border-deep-midnight-border text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors mb-6 group cursor-pointer">
+<span class="material-symbols-outlined text-lg">add</span>
+</button>
+<!-- Navigation Tabs -->
+<div class="flex flex-col gap-2 w-full px-2">
+<!-- Inactive Tab -->
+<button aria-label="Chat" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">chat</span>
+</button>
+<!-- Active Tab: Workflows -->
+<button aria-label="Workflows" class="w-full aspect-square flex items-center justify-center rounded bg-deep-midnight-raised text-deep-midnight-primary border-l-2 border-deep-midnight-primary transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">account_tree</span>
+</button>
+<!-- Inactive Tabs -->
+<button aria-label="Documents" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">description</span>
+</button>
+<button aria-label="Classification" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">category</span>
+</button>
+<button aria-label="Library Health" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">health_and_safety</span>
+</button>
+<button aria-label="Governance" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">policy</span>
+</button>
+<button aria-label="Skills" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">bolt</span>
+</button>
+</div>
+<div class="mt-auto flex flex-col gap-2 w-full px-2">
+<button aria-label="Settings" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer">
+<span class="material-symbols-outlined text-xl">settings</span>
+</button>
+<button aria-label="Account" class="w-full aspect-square flex items-center justify-center rounded text-deep-midnight-dim hover:text-deep-midnight-text hover:bg-deep-midnight-raised transition-colors group relative cursor-pointer mt-2">
+<span class="material-symbols-outlined text-xl">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area: Dimmed Workflow Canvas -->
+<main class="flex-1 h-full relative bg-deep-midnight-bg bg-grid-pattern overflow-hidden flex flex-col items-center justify-center opacity-60 pointer-events-none">
+<!-- Mock Canvas Nodes -->
+<div class="absolute top-[20%] left-[30%] w-64 border border-deep-midnight-border bg-deep-midnight-card rounded p-4 flex flex-col gap-3">
+<div class="flex items-center gap-2 text-deep-midnight-secondary text-sm">
+<span class="material-symbols-outlined text-sm">description</span>
+<span class="font-medium">Document Source</span>
+</div>
+<div class="h-2 w-full bg-deep-midnight-muted rounded"></div>
+</div>
+<!-- Connection Line -->
+<svg class="absolute top-[28%] left-[45%] w-32 h-16 pointer-events-none" viewBox="0 0 100 50">
+<path d="M 0 0 C 50 0 50 50 100 50" fill="none" stroke="#212631" stroke-width="2"></path>
+</svg>
+<div class="absolute top-[35%] left-[50%] w-72 border border-deep-midnight-primary bg-deep-midnight-raised rounded p-4 flex flex-col gap-3 shadow-[0_0_0_1px_rgba(163,165,255,0.2)]">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 text-deep-midnight-text text-sm">
+<span class="material-symbols-outlined text-sm text-deep-midnight-secondary">bolt</span>
+<span class="font-medium">AI Agent Step</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-deep-midnight-primary"></span>
+</div>
+<div class="text-sm text-deep-midnight-secondary">Find contracts renewing...</div>
+</div>
+</main>
+<!-- Right Side Step Panel -->
+<aside class="w-[400px] h-full bg-deep-midnight-card border-l border-deep-midnight-border flex flex-col shrink-0 relative z-40 overflow-y-auto">
+<!-- Panel Header -->
+<header class="p-6 border-b border-deep-midnight-border flex flex-col gap-3 shrink-0">
+<div class="flex items-start justify-between gap-4">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 border border-deep-midnight-border rounded text-[11px] font-medium text-deep-midnight-secondary bg-deep-midnight-muted tracking-wide uppercase">AI Agent Step</span>
+</div>
+<h2 class="font-h3 text-[15px] font-semibold text-deep-midnight-text leading-snug">Find contracts renewing in the next 90 days</h2>
+</div>
+<button aria-label="Close panel" class="w-8 h-8 flex items-center justify-center text-deep-midnight-dim hover:text-deep-midnight-text rounded hover:bg-deep-midnight-raised transition-colors shrink-0 cursor-pointer">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+<button class="flex items-center gap-1.5 text-xs text-deep-midnight-dim hover:text-deep-midnight-secondary transition-colors w-fit cursor-pointer mt-1">
+<span class="material-symbols-outlined text-sm">info</span>
+<span class="">Explain each field</span>
+</button>
+</header>
+<!-- Panel Content -->
+<div class="p-6 flex flex-col gap-8 flex-1">
+<!-- GROUP 1: WHAT IT DOES -->
+<section class="flex flex-col gap-3">
+<h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">What it does</h3>
+<div class="flex flex-col gap-2">
+<textarea class="w-full bg-deep-midnight-bg border border-deep-midnight-border rounded p-3 text-sm text-deep-midnight-text placeholder-deep-midnight-dim focus:border-deep-midnight-primary focus:outline-none resize-y min-h-[100px] leading-relaxed" placeholder="Provide instructions for this agent step...">Review the attached documents and extract all contracts that have a renewal date falling within the next 90 days from today. List the vendor name, contract value, and exact renewal date.</textarea>
+</div>
+</section>
+<!-- GROUP 2: MODEL -->
+<section class="flex flex-col gap-3">
+<h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">Model</h3>
+<div class="flex flex-col gap-3 p-4 border border-deep-midnight-border rounded bg-deep-midnight-bg">
+<div class="flex flex-col gap-2">
+<select class="w-full bg-deep-midnight-card border border-deep-midnight-border rounded px-3 py-2 text-sm text-deep-midnight-text focus:border-deep-midnight-primary focus:outline-none cursor-pointer">
+<option>Use the run's model — today that would be GPT-4o</option>
+<option>Claude 3.5 Sonnet</option>
+<option>Llama 3 Instruct</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-1.5 px-2 py-1 rounded border border-deep-midnight-success/20 bg-deep-midnight-success/5 w-fit">
+<span class="material-symbols-outlined text-[14px] text-deep-midnight-success">check_circle</span>
+<span class="text-xs font-medium text-deep-midnight-success">Strong for judging</span>
+</div>
+</div>
+</div>
+<!-- Error Row -->
+<div class="flex items-start gap-2 p-3 border border-deep-midnight-danger/30 rounded bg-deep-midnight-danger/5">
+<span class="material-symbols-outlined text-[16px] text-deep-midnight-danger mt-0.5">error</span>
+<span class="text-sm text-deep-midnight-text">We couldn't load the list of models.</span>
+</div>
+</section>
+<!-- GROUP 3: WHAT IT CAN REACH -->
+<section class="flex flex-col gap-3">
+<h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">What it can reach</h3>
+<div class="flex flex-col gap-5 p-4 border border-deep-midnight-border rounded bg-deep-midnight-bg">
+<!-- Folders row -->
+<div class="flex flex-col gap-2">
+<span class="text-xs font-medium text-deep-midnight-secondary">Folders it can read</span>
+<div class="flex items-center gap-2 flex-wrap"><div class="flex flex-col gap-2 w-full"><div class="flex items-center justify-between p-3 rounded border border-deep-midnight-border bg-deep-midnight-raised"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm text-deep-midnight-dim">folder</span><span class="text-sm">Contracts</span></div><button class="text-deep-midnight-primary text-xs font-medium">Lock</button></div><div class="flex flex-col gap-1 p-3 rounded border border-deep-midnight-border bg-deep-midnight-raised"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm text-deep-midnight-dim">folder</span><span class="text-sm">Compliance</span><span class="material-symbols-outlined text-sm text-deep-midnight-dim">lock</span></div><span class="text-[11px] text-deep-midnight-dim">Locked — only the person who locked it can release it</span></div><button class="flex items-center gap-2 p-3 rounded border border-dashed border-deep-midnight-border text-deep-midnight-dim hover:text-deep-midnight-text transition-colors w-full"><span class="material-symbols-outlined text-sm">add</span><span class="text-sm">Add a source</span></button></div></div>
+</div>
+<hr class="border-t border-deep-midnight-border w-full">
+<!-- Actions Grid -->
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-xs font-medium text-deep-midnight-secondary">What this step can do</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<!-- Active Pills -->
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-primary bg-deep-midnight-primary/10 text-xs font-medium text-deep-midnight-primary transition-colors cursor-pointer whitespace-nowrap">
+                                Read a document
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-primary bg-deep-midnight-primary/10 text-xs font-medium text-deep-midnight-primary transition-colors cursor-pointer whitespace-nowrap">
+                                Search documents
+                            </button>
+<!-- Inactive Pills -->
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Run code
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Search a saved view
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Write a file
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Track its to-dos
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Ask a person
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Attach a skill file
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Browse the web
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Read related documents
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Query tables
+                            </button>
+<button class="flex items-center px-3 py-1.5 rounded border border-deep-midnight-border bg-deep-midnight-card text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text hover:border-deep-midnight-secondary transition-colors cursor-pointer whitespace-nowrap">
+                                Remember something
+                            </button>
+</div>
+</div>
+<div class="text-[11px] text-deep-midnight-dim mt-1">
+                        Pick from the tools this workspace allows — you cannot add one by typing.
+                    </div>
+</div>
+</section><section class="flex flex-col gap-3"><h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">What it changes outside this workflow</h3><div class="flex flex-col gap-3"><div class="flex flex-col gap-2 p-4 border-l-2 border-l-[#F5A524] border-t border-r border-b border-deep-midnight-border bg-deep-midnight-bg"><div class="flex items-center justify-between"><span class="text-sm font-semibold">Writes to your database</span><span class="px-1.5 py-0.5 rounded bg-deep-midnight-muted border border-deep-midnight-border text-[10px] font-bold text-deep-midnight-secondary">NEEDS ARMING</span></div><p class="text-sm text-deep-midnight-text">This step can change records that live outside this workflow.</p></div><div class="p-3 rounded border border-deep-midnight-border bg-deep-midnight-bg opacity-60"><span class="text-sm">Sends a Slack message</span></div></div></section>
+<!-- GROUP 4: HOW STRICTLY IT IS HELD -->
+<section class="flex flex-col gap-3"><h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">Files it starts from</h3><div class="flex flex-col gap-2"><div class="p-3 rounded border border-deep-midnight-border bg-deep-midnight-bg opacity-60 italic text-sm">Nothing attached yet</div><div class="flex items-center gap-2 p-3 rounded border border-deep-midnight-border bg-deep-midnight-bg"><span class="material-symbols-outlined text-sm text-deep-midnight-dim">description</span><span class="text-sm">Renewal brief template</span></div><div class="flex flex-col gap-1 p-3 rounded border border-deep-midnight-border bg-deep-midnight-bg"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm text-deep-midnight-dim">description</span><span class="text-sm">Compliance schema</span></div><span class="text-xs text-[#DC2626]">We could not read this file</span></div></div></section><section class="flex flex-col gap-3 pb-8">
+<h3 class="text-[11px] font-semibold tracking-widest text-deep-midnight-dim uppercase font-data-sm">How strictly it is held</h3>
+<div class="flex flex-col gap-4 p-4 border border-deep-midnight-border rounded bg-deep-midnight-bg">
+<!-- Toggle Switch Area -->
+<div class="flex items-center gap-3">
+<div class="flex items-center bg-deep-midnight-card border border-deep-midnight-border rounded p-1 w-fit">
+<button class="px-4 py-1.5 rounded text-xs font-medium text-deep-midnight-secondary hover:text-deep-midnight-text transition-colors cursor-pointer">
+                                Loose
+                            </button>
+<button class="px-4 py-1.5 rounded bg-deep-midnight-raised border border-deep-midnight-border text-xs font-medium text-deep-midnight-text transition-colors cursor-pointer">
+                                Strict
+                            </button>
+</div>
+</div>
+<!-- Explanatory Text -->
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[16px] text-deep-midnight-primary mt-0.5">shield</span>
+<p class="text-sm text-deep-midnight-text leading-snug">
+                            Every claim must be cited from your documents.
+                        </p>
+</div>
+</div>
+</section>
+<div class="mt-auto pt-4 border-t border-deep-midnight-border"><div class="flex flex-col gap-3 p-4 border-l-2 border-l-[#F5A524] border-t border-r border-b border-deep-midnight-border bg-deep-midnight-bg"><h4 class="text-sm font-semibold">2 things still missing</h4><div class="flex flex-col gap-2"><div class="flex items-center justify-between text-sm"><span class="text-deep-midnight-text">Choose a model</span><span class="material-symbols-outlined text-deep-midnight-dim">chevron_right</span></div><div class="flex items-center justify-between text-sm"><span class="text-deep-midnight-text">Connect a knowledge source</span><span class="material-symbols-outlined text-deep-midnight-dim">chevron_right</span></div></div></div></div></div>
+</aside><div class="w-[44px] h-full bg-[#080B11] border-l border-deep-midnight-border flex flex-col items-center py-4 shrink-0 z-50"><button class="w-8 h-8 flex items-center justify-center text-deep-midnight-dim hover:text-deep-midnight-text transition-colors cursor-pointer"><span class="material-symbols-outlined">chevron_right</span></button></div>
+
+
+
+<script>
+(function(){
+  var HOPS = [["Publish","publish"],["Close","builder-spine"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"step-panel", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

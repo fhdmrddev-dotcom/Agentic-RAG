@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Connections - Component Specimen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "tertiary": "#e5c74c",
+                        "primary-fixed": "#e1e0ff",
+                        "on-surface-variant": "#c7c5d3",
+                        "secondary-fixed": "#dae3f6",
+                        "on-secondary": "#28313f",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#3e4757",
+                        "on-tertiary": "#3a3000",
+                        "inverse-surface": "#e4e1e9",
+                        "background": "#131318",
+                        "inverse-on-surface": "#303036",
+                        "surface-tint": "#c1c1ff",
+                        "surface-bright": "#39383f",
+                        "outline": "#918f9c",
+                        "on-primary-container": "#353789",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "surface-dim": "#131318",
+                        "outline-variant": "#464651",
+                        "on-tertiary-fixed": "#221b00",
+                        "surface-container": "#1f1f25",
+                        "primary-container": "#a3a5ff",
+                        "tertiary-container": "#c8ac33",
+                        "surface-container-lowest": "#0e0e13",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "surface-variant": "#35343a",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "on-primary": "#242478",
+                        "surface-container-highest": "#35343a",
+                        "surface-container-low": "#1b1b21",
+                        "primary": "#c3c4ff",
+                        "tertiary-fixed": "#ffe16c",
+                        "on-tertiary-container": "#4e4000",
+                        "inverse-primary": "#5355a9",
+                        "on-secondary-fixed": "#131c2a",
+                        "on-secondary-container": "#acb5c8",
+                        "on-error-container": "#ffdad6",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#bec7da",
+                        "on-surface": "#e4e1e9",
+                        "surface": "#131318",
+                        "secondary": "#bec7da",
+                        "error-container": "#93000a",
+                        "on-background": "#e4e1e9",
+                        "surface-container-high": "#2a292f",
+                        "on-primary-fixed": "#0b0664",
+                        
+                        // Custom palette overrides from prompt
+                        "page": "#060A0F",
+                        "card": "#0D1117",
+                        "raised": "#0F141B",
+                        "muted-fill": "#151B24",
+                        "border-color": "#212631",
+                        "text-color": "#F4F6FE",
+                        "text-secondary": "#9AA3B5",
+                        "text-dim": "#6B7383",
+                        "primary-indigo": "#A3A5FF",
+                        "accent-violet": "#895AF6",
+                        "status-success": "#21C45D",
+                        "status-warning": "#F5A524",
+                        "status-danger": "#DC2626"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "xs": "4px",
+                        "gutter": "16px",
+                        "rail_width": "64px",
+                        "xl": "32px",
+                        "unit": "4px",
+                        "lg": "24px",
+                        "sm": "8px",
+                        "margin": "24px",
+                        "md": "16px"
+                    },
+                    fontFamily: {
+                        "data-lg": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h3": ["Manrope"],
+                        "h1": ["Manrope"],
+                        "data-md": ["JetBrains Mono"],
+                        "data-sm": ["JetBrains Mono"],
+                        "h2": ["Manrope"],
+                        "body-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "data-lg": ["16px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "body-md": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "h3": ["18px", { lineHeight: "1.4", fontWeight: "600" }],
+                        "h1": ["32px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "data-md": ["14px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "data-sm": ["12px", { lineHeight: "1.4", fontWeight: "500" }],
+                        "h2": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "body-sm": ["12px", { lineHeight: "1.5", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #F4F6FE;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        h1, h2, h3 {
+            font-family: 'Manrope', sans-serif;
+        }
+        .data-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Toggle Switch Custom Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #A3A5FF;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #A3A5FF;
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-xl px-margin md:px-xl max-w-[1440px] mx-auto">
+<!-- Header -->
+<header class="mb-xl pb-md border-b border-border-color">
+<h1 class="font-h1 text-h1 text-text-color mb-sm">Connections</h1>
+<p class="font-body-md text-body-md text-text-secondary">Other applications this workspace can reach. Connect once, use anywhere.</p>
+</header>
+<main class="space-y-xl">
+<!-- SECTION 1 -->
+<section>
+<h2 class="font-data-sm text-data-sm text-text-secondary uppercase tracking-widest mb-md">SECTION 1 — WHAT IS CONNECTED</h2>
+<div class="max-w-[780px] space-y-[1px] bg-border-color rounded border border-border-color overflow-hidden">
+<!-- Slack -->
+<div class="flex items-center justify-between p-md bg-card">
+<div class="flex items-center gap-md">
+<img alt="" class="w-[20px] h-[20px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium">Slack</div>
+<div class="font-body-sm text-body-sm text-text-dim">Connected by Sarah, 2 days ago</div>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<span class="font-body-sm text-body-sm text-status-success">Connected</span>
+<span class="material-symbols-outlined text-status-success text-[18px]">check</span>
+</div>
+</div>
+<!-- Google Drive -->
+<div class="flex items-center justify-between p-md bg-card">
+<div class="flex items-center gap-md">
+<img alt="" class="w-[20px] h-[20px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium">Google Drive</div>
+<div class="font-body-sm text-body-sm text-text-dim">Connected by Sarah, 5 days ago</div>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<span class="font-body-sm text-body-sm text-status-success">Connected</span>
+<span class="material-symbols-outlined text-status-success text-[18px]">check</span>
+</div>
+</div>
+<!-- Jira -->
+<div class="flex items-center justify-between p-md bg-card">
+<div class="flex items-center gap-md">
+<img alt="" class="w-[20px] h-[20px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium">Jira</div>
+<div class="font-body-sm text-body-sm text-text-dim">Connection expired</div>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<span class="font-body-sm text-body-sm text-status-warning">Needs signing in again</span>
+<button class="px-md py-sm border border-border-color rounded bg-transparent font-body-sm text-body-sm text-text-color hover:bg-muted-fill transition-colors">Sign in</button>
+</div>
+</div>
+<!-- GitHub -->
+<div class="flex items-center justify-between p-md bg-card">
+<div class="flex items-center gap-md">
+<img alt="" class="w-[20px] h-[20px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium">GitHub</div>
+<div class="font-body-sm text-body-sm text-text-dim">Not connected</div>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<span class="font-body-sm text-body-sm text-text-dim">Not connected</span>
+<button class="px-md py-sm border border-border-color rounded bg-transparent font-body-sm text-body-sm text-text-color hover:bg-muted-fill transition-colors">Connect</button>
+</div>
+</div>
+<!-- Notion -->
+<div class="flex items-center justify-between p-md bg-card">
+<div class="flex items-center gap-md">
+<img alt="" class="w-[20px] h-[20px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium">Notion</div>
+<div class="font-body-sm text-body-sm text-text-dim">Not connected</div>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<span class="font-body-sm text-body-sm text-text-dim">Not connected</span>
+<button class="px-md py-sm border border-border-color rounded bg-transparent font-body-sm text-body-sm text-text-color hover:bg-muted-fill transition-colors">Connect</button>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2 -->
+<section>
+<h2 class="font-data-sm text-data-sm text-text-secondary uppercase tracking-widest mb-md">SECTION 2 — ONE CONNECTION, MANY THINGS IT CAN DO</h2>
+<div class="max-w-[780px] bg-card border border-border-color rounded flex flex-col">
+<div class="p-md flex items-center gap-md border-b border-border-color bg-raised">
+<img alt="" class="w-[24px] h-[24px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<span class="font-h3 text-h3 text-text-color">Slack Enterprise (Marketing)</span>
+</div>
+<div class="flex flex-col space-y-[1px] bg-border-color">
+<!-- Row 1 -->
+<div class="flex items-center justify-between p-md bg-card">
+<span class="font-body-md text-body-md text-text-color">Read messages in a channel</span>
+<div class="flex items-center gap-md">
+<span class="px-sm py-xs bg-muted-fill rounded border border-border-color font-data-sm text-data-sm text-text-dim">READS ONLY</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-muted-fill peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border-color after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-indigo"></div>
+</label>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between p-md bg-card">
+<span class="font-body-md text-body-md text-text-color">Search past conversations</span>
+<div class="flex items-center gap-md">
+<span class="px-sm py-xs bg-muted-fill rounded border border-border-color font-data-sm text-data-sm text-text-dim">READS ONLY</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-muted-fill peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border-color after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-indigo"></div>
+</label>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center justify-between p-md bg-card">
+<span class="font-body-md text-body-md text-text-color">Post a message</span>
+<div class="flex items-center gap-md">
+<span class="px-sm py-xs bg-muted-fill rounded border border-status-warning/20 font-data-sm text-data-sm text-status-warning">CHANGES THINGS</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-muted-fill peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:text-dim after:bg-text-dim after:border-border-color after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-indigo"></div>
+</label>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="flex items-center justify-between p-md bg-card">
+<span class="font-body-md text-body-md text-text-color">Create a channel</span>
+<div class="flex items-center gap-md">
+<span class="px-sm py-xs bg-muted-fill rounded border border-status-warning/20 font-data-sm text-data-sm text-status-warning">CHANGES THINGS</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-muted-fill peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:text-dim after:bg-text-dim after:border-border-color after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-indigo"></div>
+</label>
+</div>
+</div>
+</div>
+<div class="p-md bg-raised border-t border-border-color">
+<p class="font-body-sm text-body-sm text-text-secondary">Reading is safe. Anything that changes something has to be armed before a workflow can use it.</p>
+</div>
+</div>
+</section>
+<!-- SECTION 3 -->
+<section>
+<h2 class="font-data-sm text-data-sm text-text-secondary uppercase tracking-widest mb-md">SECTION 3 — ARMING SOMETHING THAT CHANGES THINGS</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- AT REST -->
+<div class="bg-card border border-border-color rounded p-md flex flex-col gap-sm">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-text-color">Post a message</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" disabled="" type="checkbox"/>
+<div class="w-9 h-5 bg-muted-fill rounded-full peer after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-text-dim after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-text-dim">Off. A workflow cannot post anything.</p>
+</div>
+<!-- ARMING -->
+<div class="bg-card border border-border-color rounded flex relative overflow-hidden">
+<div class="w-[4px] h-full bg-status-warning absolute left-0 top-0"></div>
+<div class="p-md pl-[20px] flex flex-col gap-md w-full">
+<div>
+<div class="font-body-md text-body-md text-text-color font-medium mb-xs">Let workflows post to Slack?</div>
+<p class="font-body-sm text-body-sm text-text-secondary">Anything you approve here can post messages that other people will see.</p>
+</div>
+<div class="flex items-center gap-sm mt-auto">
+<button class="px-md py-sm border border-border-color rounded bg-transparent font-body-sm text-body-sm text-text-color hover:bg-muted-fill transition-colors">Cancel</button>
+<button class="px-md py-sm border border-status-warning bg-status-warning rounded font-body-sm text-body-sm text-[#060A0F] font-medium hover:opacity-90 transition-opacity">Turn it on</button>
+</div>
+</div>
+</div>
+<!-- ON -->
+<div class="bg-card border border-border-color rounded p-md flex flex-col gap-sm">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md text-text-color">Post a message</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" disabled="" type="checkbox"/>
+<div class="w-9 h-5 bg-primary-indigo rounded-full peer after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary">Turned on by you, recorded in the audit log.</p>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-xl">
+<!-- SECTION 4 -->
+<section>
+<h2 class="font-data-sm text-data-sm text-text-secondary uppercase tracking-widest mb-md">SECTION 4 — HOW A CONNECTION APPEARS INSIDE A STEP</h2>
+<div class="w-full max-w-[400px] bg-card border border-border-color rounded flex flex-col">
+<div class="p-md flex flex-col gap-md border-b border-border-color">
+<div class="font-body-md text-body-md text-text-color font-medium">What it can reach</div>
+<div class="flex flex-col gap-xs">
+<span class="font-body-sm text-body-sm text-text-dim">Folders it can read</span>
+<div class="flex flex-wrap gap-sm">
+<div class="flex items-center gap-xs px-sm py-[4px] bg-muted-fill border border-border-color rounded w-fit">
+<span class="material-symbols-outlined text-[16px] text-text-secondary">folder</span>
+<span class="font-body-sm text-body-sm text-text-color">Contracts</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-body-sm text-body-sm text-text-dim">Other applications</span>
+<div class="flex flex-wrap gap-sm">
+<div class="flex items-center gap-xs px-sm py-[4px] bg-muted-fill border border-border-color rounded w-fit">
+<img alt="" class="w-[14px] h-[14px] object-contain rounded-[2px]" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<span class="font-body-sm text-body-sm text-text-color">Slack</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-[4px] bg-muted-fill border border-border-color rounded w-fit">
+<img alt="" class="w-[14px] h-[14px] object-contain rounded-[2px]" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<span class="font-body-sm text-body-sm text-text-color">Google Drive</span>
+</div>
+<button class="flex items-center gap-xs px-sm py-[4px] bg-transparent border border-border-color border-dashed rounded w-fit hover:bg-muted-fill transition-colors">
+<span class="font-body-sm text-body-sm text-text-secondary">+ Add</span>
+</button>
+</div>
+</div>
+</div>
+<div class="p-md bg-raised">
+<p class="font-body-sm text-body-sm text-text-secondary">Only connections you have already armed appear here.</p>
+</div>
+</div>
+</section>
+<!-- SECTION 5 -->
+<section>
+<h2 class="font-data-sm text-data-sm text-text-secondary uppercase tracking-widest mb-md">SECTION 5 — THE SAME CONNECTION IN CHAT</h2>
+<div class="w-full max-w-[400px] flex flex-col gap-md">
+<!-- Chat Bubble Fragment -->
+<div class="bg-card border border-border-color rounded p-md flex flex-col gap-sm w-fit max-w-[85%] self-start">
+<p class="font-body-md text-body-md text-text-color">I've drafted the response and sent it to the team for review.</p>
+<!-- Tool Block -->
+<div class="flex items-center gap-sm bg-muted-fill border border-border-color rounded px-sm py-[6px] mt-xs">
+<img alt="" class="w-[16px] h-[16px] object-contain rounded-sm" src="https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg"/>
+<span class="font-body-sm text-body-sm text-text-color">Posted to #vendor-renewals</span>
+<span class="font-data-sm text-data-sm text-text-dim ml-auto pl-sm">14:20</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-text-secondary mt-sm">A connection belongs to the workspace, not to one workflow — the same one works in chat.</p>
+</div>
+</section>
+</div>
+</main>
+
+<script>
+(function(){
+  var HOPS = [];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"connections", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

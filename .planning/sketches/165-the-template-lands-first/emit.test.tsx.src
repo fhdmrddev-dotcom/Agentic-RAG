@@ -1,0 +1,206 @@
+/**
+ * SKETCH 165 EMITTER — THROWAWAY. Deleted immediately after it runs.
+ *
+ * This is not a test. It renders the REAL `WorkflowDoorSwitch` (describe door) and
+ * the REAL `TemplateAttachSection` under jsdom and writes their actual `innerHTML`
+ * to `.planning/sketches/165-the-template-lands-first/dom.generated.json`.
+ *
+ * WHY it exists — the 164 arrow, unchanged. Sketch 163 emitted its contract FROM the
+ * running sketch, so the sketch stayed the source of truth and could still describe an
+ * atom the shipped card structurally cannot render. That is exactly how UAT row U8 failed
+ * in 192.1 (SEED-155). 164 inverted the arrow; 165 keeps it inverted.
+ *
+ * ⚠ 165 HAS A SECOND SURFACE 164 DID NOT HAVE, AND IT IS THE WHOLE POINT.
+ * `TemplateAttachSection.tsx` SHIPPED (Phase 193 + quick task 260814-q5r). The "what this
+ * template asks for" list — the surface this sketch's chosen answer puts on the pre-draft
+ * screen — is therefore a REAL component with real copy and four real arms, not a proposal.
+ * So the sketch RENDERS it rather than redrawing it, which is precisely the discipline
+ * SEED-155 asks for: *if it depicts a surface consuming an existing component, it must
+ * RENDER it, not redraw it.*
+ *
+ * WHAT REMAINS A PROPOSAL, said plainly: the attach CONTROL on the pre-draft screen
+ * (`📎 Filling in a template?`) exists in no component today. Its nodes are marked NEW in
+ * the contract and it carries ordinary sketch-drift risk. Nothing else on the page does.
+ */
+import { describe, it, vi, beforeEach } from "vitest"
+import { render, fireEvent, act } from "@testing-library/react"
+import fs from "node:fs"
+import path from "node:path"
+
+const { mockGenerateWorkflow, mockListFolders, mockListSkills, mockUseTemplatePlaceholders } =
+  vi.hoisted(() => ({
+    mockGenerateWorkflow: vi.fn(),
+    mockListFolders: vi.fn(),
+    mockListSkills: vi.fn(),
+    mockUseTemplatePlaceholders: vi.fn(),
+  }))
+
+vi.mock("@/lib/api", () => ({
+  generateWorkflow: mockGenerateWorkflow,
+  createWorkflowDraft: vi.fn(),
+  updateWorkflowDraft: vi.fn(),
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
+  uploadWorkflowTemplate: vi.fn(),
+  WorkflowTemplateUploadError: class extends Error {},
+}))
+
+// The fields hook is mocked rather than the network, so each arm is reached by its OWN
+// state rather than by a fixture that happens to produce it. `useTemplatePlaceholders`'s
+// four kinds ARE the four arms `TemplateAttachSection` renders.
+vi.mock("@/hooks/useTemplatePlaceholders", () => ({
+  useTemplatePlaceholders: (...args: unknown[]) => mockUseTemplatePlaceholders(...args),
+}))
+
+import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"
+import { TemplateAttachSection } from "./TemplateAttachSection"
+
+/**
+ * THE REAL EIGHT. Measured by parsing the actual `pm-weekly-status-report.docx` during
+ * quick task 260814-q5r and recorded verbatim in SEED-157. NOT invented, and NOT
+ * alphabetised by me — this is the order the parser returns.
+ */
+const PM_WEEKLY_FIELDS = [
+  "accomplishments",
+  "milestones",
+  "overall_rag_status",
+  "planned_next",
+  "project_name",
+  "reporting_period",
+  "risks_blockers",
+  "summary",
+]
+
+const TEMPLATE_FILENAME = "pm-weekly-status-report.docx"
+
+const strictDef = {
+  slug: "vendor-risk",
+  version: 2,
+  name: "Vendor-risk review",
+  business_requirement: "Review a vendor's risk posture and produce a cited report.",
+  input_keys: ["vendor_name", "review_period"],
+  phases: [
+    { slug: "pull", phase_index: 0, name: "Pull", config: { phase_type: "programmatic" } },
+    {
+      slug: "emit",
+      phase_index: 1,
+      name: "Render report",
+      config: { phase_type: "llm_emit", citation_policy: "strict" },
+      validators: [{ kind: "citations_required" }, { kind: "llm_judge_rubric" }],
+    },
+  ],
+}
+
+/**
+ * ⚠ REAL FOLDERS, NOT `[]`. `DescribeKbPicker` renders NOTHING when there are no folders
+ * to offer, so an empty list would silently delete the very control the new one sits under
+ * — and the sketch would then be drawing an insertion point that does not exist on screen.
+ * The chosen answer puts the template control directly below this picker; it has to be
+ * visible for that placement to be judged at all.
+ */
+const FOLDERS = [
+  { id: "f1", name: "Client deliverables", parent_id: null },
+  { id: "f2", name: "Project Atlas", parent_id: null },
+  { id: "f3", name: "Weekly reporting", parent_id: null },
+]
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockListFolders.mockResolvedValue(FOLDERS)
+  mockListSkills.mockResolvedValue([])
+  mockGenerateWorkflow.mockResolvedValue({ ok: true, definition: { slug: "vendor-risk", phases: [] } })
+})
+
+const OUT = path.resolve(
+  __dirname,
+  "../../../../.planning/sketches/165-the-template-lands-first/dom.generated.json",
+)
+
+/** Render `TemplateAttachSection` with the fields hook forced to one state. */
+function dumpFields(state: unknown, filename?: string): string {
+  mockUseTemplatePlaceholders.mockReturnValue(state)
+  const { container, unmount } = render(
+    <TemplateAttachSection
+      definitionId="b7c1f2a4-0000-4000-8000-000000000001"
+      filename={filename}
+      assetId={filename ? "u1/_library/d1/abc12345-template.docx" : undefined}
+      onAttached={vi.fn()}
+    />,
+  )
+  const html = container.innerHTML
+  unmount()
+  return html
+}
+
+describe("sketch 165 emitter", () => {
+  it("dumps the real rendered DOM", async () => {
+    const dumps: Record<string, string> = {}
+
+    // ── The DESCRIBE door, exactly as it ships today. This is the screen the phase
+    //    changes, and variant A is this DOM byte-for-byte.
+    //
+    //    ⚠ WITH TEXT TYPED IN, deliberately. An empty box leaves `describe-draft`
+    //    `disabled` — a greyed CTA at 40% opacity — and every variant would then be
+    //    compared in a state no author ever judges the screen in. The requirement below
+    //    is a real one of this product's own shape, not lorem.
+    {
+      mockUseTemplatePlaceholders.mockReturnValue({ kind: "idle" })
+      const { container, unmount } = render(
+        <WorkflowDoorSwitch def={strictDef} initialDoor="describe" onDescribeDraft={vi.fn()} />,
+      )
+      // ⚠ FLUSH THE FOLDER FETCH BEFORE CAPTURING. `DescribeKbPicker` fetches on mount and
+      //    renders a hidden `data-state="loading"` marker until the promise settles. A
+      //    synchronous capture therefore dumps the LOADING screen — which is a real state,
+      //    but not the one this sketch's placement question is about, and it would show no
+      //    picker for the new control to sit under.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      const box = container.querySelector('[data-testid="describe-box"]') as HTMLTextAreaElement
+      act(() => {
+        fireEvent.change(box, {
+          target: {
+            value:
+              "Every Monday, pull last week's project updates from the Weekly reporting folder and write the client status report.",
+          },
+        })
+      })
+      dumps.describe = container.innerHTML
+      unmount()
+    }
+
+    // ── The SHIPPED fields surface with the REAL eight keys. This is what the chosen
+    //    answer ("the fields ARE the visible spec") puts on the pre-draft screen — and
+    //    because it already ships, the sketch renders it instead of drawing a version
+    //    of it that could differ.
+    dumps.fieldsOk = dumpFields({ kind: "fields", fields: PM_WEEKLY_FIELDS }, TEMPLATE_FILENAME)
+
+    // ── The same surface with NOTHING attached — the state the pre-draft screen is in
+    //    before the author picks a file. Its copy is the shipped `TEMPLATE_NONE_NOTE`.
+    dumps.fieldsIdle = dumpFields({ kind: "idle" }, undefined)
+
+    // ── ⚠ THE WALL. `definitionId: null` renders the shipped `TEMPLATE_UNSAVED_REFUSAL`:
+    //    "Save this draft first — a template attaches to a saved workflow."
+    //    At describe time NO workflow exists, so this is the sentence template-first has
+    //    to get through. Captured so the sketch cannot quietly pretend it is not there.
+    {
+      mockUseTemplatePlaceholders.mockReturnValue({ kind: "idle" })
+      const { container, unmount } = render(
+        <TemplateAttachSection definitionId={null} onAttached={vi.fn()} />,
+      )
+      dumps.unsaved = container.innerHTML
+      unmount()
+    }
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true })
+    fs.writeFileSync(OUT, JSON.stringify(dumps, null, 2), "utf8")
+    // eslint-disable-next-line no-console
+    console.log(
+      "EMITTED",
+      Object.entries(dumps)
+        .map(([k, v]) => `${k}=${v.length}B`)
+        .join(" "),
+    )
+  })
+})

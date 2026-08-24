@@ -29,6 +29,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { fireEvent, render, screen, within } from "@testing-library/react"
 
+import { FieldGuidance } from "./FieldGuidance"
 import governanceSectionSource from "./GovernanceSection?raw"
 import { GovernanceSection, type GovernanceSectionProps } from "./GovernanceSection"
 import {
@@ -580,5 +581,95 @@ describe("GovernanceSection — source purity", () => {
     expect('const KB = ["search_documents", "read_document"]').toMatch(
       /\[\s*["'][a-z_]+_documents?["']\s*,\s*["'][a-z_]+["']/,
     )
+  })
+})
+
+// ── 199-06 (DES-01) — THE DENSITY CEILING CANNOT REACH THE REFUSAL ────────────────────
+//
+// Phase 199-06 folded this panel's per-field guidance behind one switch. The threat that
+// change carries (T-199-06-02) is not that the dial breaks — it is that a control which
+// VISIBLY REFUSES quietly degrades into one that is merely DISABLED, because its reason
+// went behind a click. That is a governance regression wearing a tidy-up.
+//
+// The claim asserted here is structural rather than incidental: this component reads no
+// guidance context at all, so the ceiling has no mechanism by which to reach it. The cases
+// mount the section inside the real provider, at its COLLAPSED reading, and drive the same
+// assertions criterion 12 already makes — a fence is only worth having if it fails when the
+// property fails, so the wrapper is the shipped one and not a stub.
+describe("GovernanceSection 199-06 — the refusal survives the panel's density ceiling", () => {
+  it("SOURCE — the section reads NO guidance context, so the ceiling cannot reach it", () => {
+    const src = governanceSectionSource as string
+    // Built, never spelled: this file greps the component for a token, so a comment naming
+    // it would be counted by its own fence (the 187-24 trap, hit twice in this phase).
+    expect(src.split("use" + "FieldGuidance").length - 1).toBe(0)
+    expect(src.split("Field" + "Guidance").length - 1).toBe(0)
+    // NON-VACUITY — the source really was loaded and really is this component.
+    expect(src.length).toBeGreaterThan(1000)
+    expect(src).toContain("export function GovernanceSection")
+  })
+
+  it("POSITIVE CONTROL — that needle really can find what it forbids", () => {
+    const planted = 'const shown = use' + 'FieldGuidance()'
+    expect(planted.split("use" + "FieldGuidance").length - 1).toBe(1)
+  })
+
+  it("at the COLLAPSED reading the refusal is still real DOM text, character-identical", () => {
+    render(
+      <FieldGuidance>
+        <GovernanceSection
+          phaseType="llm_agent"
+          availableTools={["search_documents"]}
+          kbTools={KB_TOOLS}
+          groundingEscalated={false}
+          actionRiskArmed
+          onGovernanceChange={() => {}}
+        />
+      </FieldGuidance>,
+    )
+    // The ceiling really is collapsed — otherwise this case would prove nothing.
+    expect(screen.getByTestId("field-guidance-toggle").getAttribute("aria-expanded")).toBe("false")
+    // …and every atom of the refusal is on screen anyway.
+    expect(screen.getByText(GROUNDING_LOCK_REFUSAL)).toBeInTheDocument()
+    expect(screen.getByText(GROUNDING_WHY_DETECTED)).toBeInTheDocument()
+    expect(screen.getByText(GROUNDING_TOOL_LIST_IS_THE_CONTROL)).toBeInTheDocument()
+    expect(screen.getByText(GROUNDING_ATTACHED_GATE)).toBeInTheDocument()
+    expect(screen.getByText(ACTION_RISK_ARMED_NOTE)).toBeInTheDocument()
+  })
+
+  it("⚠ it REFUSES, it is not merely disabled — the reason is still WIRED to the control", () => {
+    render(
+      <FieldGuidance>
+        <GovernanceSection
+          phaseType="llm_agent"
+          availableTools={["search_documents"]}
+          kbTools={KB_TOOLS}
+          groundingEscalated={false}
+          actionRiskArmed={false}
+          onGovernanceChange={() => {}}
+        />
+      </FieldGuidance>,
+    )
+    const loose = looseButton() as HTMLButtonElement
+    // A disabled control with an unreachable reason is the regression. The round trip —
+    // control → aria-describedby → visible sentence — is what makes it a refusal instead.
+    expect(loose).toBeDisabled()
+    const describedBy = loose.getAttribute("aria-describedby")
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy as string)?.textContent).toBe(GROUNDING_LOCK_REFUSAL)
+    // …and the reason is STILL not hiding on a title attribute.
+    expect(loose).not.toHaveAttribute("title")
+    // Struck through and dimmed — refused, never hidden (142-B), still true after the change.
+    expect(loose.className).toContain("line-through")
+  })
+
+  it("both sides of the DOOR carry their binding words at the collapsed reading", () => {
+    render(
+      <FieldGuidance>
+        <GovernanceSection {...({ phaseType: "llm_agent", availableTools: [], kbTools: KB_TOOLS, groundingEscalated: false, actionRiskArmed: false, onGovernanceChange: () => {} })} />
+      </FieldGuidance>,
+    )
+    expect(looseButton()).toHaveTextContent(GROUNDING_DIAL_LOOSE_LABEL)
+    expect(strictButton()).toHaveTextContent(GROUNDING_DIAL_STRICT_LABEL)
+    expect(screen.getByTestId("governance-arm")).toHaveTextContent(ACTION_RISK_ARM_LABEL)
   })
 })

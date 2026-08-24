@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 170 — The thread that remembers the stop (Phase 194.1)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding-top: 52px; background: var(--color-bg); color: var(--color-text);
+         font-family: var(--font-sans); font-size: var(--text-base); -webkit-font-smoothing: antialiased; }
+  h1,h2,h3,h4 { font-family: var(--font-headline); margin: 0; }
+
+  #variant-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 8px 16px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #variant-nav .brand { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); margin-right: 10px; }
+  .variant-tab { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted);
+    font-size: var(--text-xs); padding: 5px 11px; border-radius: var(--radius-full); cursor: pointer;
+    transition: all .15s ease; font-family: var(--font-sans); }
+  .variant-tab:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .variant-tab.broken.active { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / .5); color: hsl(0 80% 78%); }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 26px 24px 90px; }
+  .lede { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.65; max-width: 82ch; }
+  .lede strong { color: var(--color-text); font-weight: 600; }
+  .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-text-dim); margin-bottom: 7px; }
+
+  .driver { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: 14px 16px; margin: 20px 0 26px; }
+  .driver .grp { display: flex; flex-direction: column; gap: 6px; }
+  .driver label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-dim); }
+  .seg { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button { background: transparent; border: 0; border-right: 1px solid var(--color-border);
+    color: var(--color-text-muted); font-size: var(--text-xs); padding: 6px 11px; cursor: pointer;
+    transition: all .15s ease; font-family: var(--font-sans); }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: var(--color-muted); color: var(--color-text); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* ═══ the chat + panel stage ═══ */
+  .stage { display: grid; grid-template-columns: 1fr 288px; gap: 0;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; background: var(--color-bg); }
+  @media (max-width: 980px) { .stage { grid-template-columns: 1fr } }
+  .chat { padding: 20px 22px 18px; min-height: 300px; display: flex; flex-direction: column; gap: 16px; }
+  .panel { border-left: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+
+  .msg { display: flex; gap: 11px; align-items: flex-start; }
+  .msg.user { justify-content: flex-end; }
+  .avatar { width: 27px; height: 27px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); }
+  .avatar.ghost { background: transparent; border-style: dashed; border-color: hsl(0 72% 51% / .5); color: hsl(0 72% 51% / .6); }
+  .bubble-user { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg); padding: 9px 13px;
+    font-size: var(--text-sm); max-width: 74%; }
+  .body-col { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .assistant-text { font-size: var(--text-sm); line-height: 1.62; color: var(--color-text); }
+  .assistant-text.partial::after { content: ''; }
+
+  /* shipped RunCard strip */
+  .runstrip { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; }
+  .runstrip:hover { background: hsl(220 25% 14% / .3); }
+  .runstrip .bot { color: hsl(239 100% 82% / .6); }
+  .runstrip .mono { font-family: var(--font-mono); }
+  .runstrip .chev { margin-left: auto; opacity: .55; }
+
+  /* 174 D1 dim inline / D2 dashed body */
+  .term-inline { display: inline-flex; align-items: center; gap: 8px; margin-top: 2px;
+    font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+  .term-inline .gl { color: var(--color-text-muted); font-size: 13px; }
+  .term-body { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
+    border-radius: var(--radius-md); background: hsl(220 30% 9% / .5);
+    border: 1px dashed var(--color-border); font-family: var(--font-mono);
+    font-size: var(--text-sm); color: var(--color-text-muted); }
+  .term-body .sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+
+  /* the durable receipt (variant B) */
+  .receipt { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    padding: 10px 13px; border-radius: var(--radius-md); background: hsl(220 30% 9% / .55);
+    border: 1px solid var(--color-border); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .receipt .mk { color: var(--color-text-muted); font-size: 13px; }
+  .receipt .who { color: var(--color-text); font-weight: 600; }
+  .receipt .mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+  .receipt .seam { margin-left: auto; font-size: var(--text-xs); color: var(--color-primary); cursor: pointer; }
+  .receipt .seam:hover { opacity: .8; }
+
+  /* approval card */
+  .askcard { border: 1px solid hsl(38 92% 60% / .4); background: var(--color-warning-dim);
+    border-radius: var(--radius-md); padding: 12px 14px; }
+  .askcard h4 { font-size: var(--text-sm); margin-bottom: 4px; }
+  .askcard p { margin: 0 0 10px; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }
+  .askcard .acts { display: flex; gap: 8px; }
+  .askcard button { font-size: var(--text-xs); padding: 5px 11px; border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+  .askcard button.go { border-color: hsl(38 92% 60% / .5); color: hsl(38 92% 74%); }
+  .askcard.zombie { position: relative; }
+  .askcard.zombie::after {
+    content: 'ZOMBIE — the run is already cancelled in Postgres';
+    position: absolute; right: 9px; top: 9px; font-family: var(--font-mono); font-size: 9px;
+    letter-spacing: .06em; color: hsl(0 80% 78%); border: 1px solid hsl(0 72% 51% / .5);
+    padding: 1px 6px; border-radius: 3px; background: var(--color-danger-dim);
+  }
+  .ask-retired { border: 1px dashed var(--color-border); background: hsl(220 30% 9% / .5);
+    border-radius: var(--radius-md); padding: 11px 13px; font-family: var(--font-mono);
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }
+
+  /* the panel spine */
+  .panel-sec { padding: 11px 13px; border-bottom: 1px solid var(--color-border-soft); }
+  .panel-sec h5 { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--color-text-dim); margin: 0 0 9px; font-weight: 400; }
+  .step { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: var(--text-xs); }
+  .step .mk { width: 13px; text-align: center; font-size: 11px; }
+  .step.done .mk { color: var(--color-success); }
+  .step.run .mk { color: var(--color-primary); }
+  .step.stop .mk { color: var(--color-text-muted); }
+  .step.pend { opacity: .45; }
+  .step .nm { flex: 1; min-width: 0; }
+  .step .el { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .panel-clock { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); }
+  .panel-clock.wrong { color: hsl(0 80% 76%); }
+
+  /* callouts */
+  .note { border: 1px solid var(--color-border); border-left: 3px solid var(--color-warning);
+    background: var(--color-warning-dim); border-radius: var(--radius-sm); padding: 12px 15px;
+    margin: 20px 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.65; }
+  .note.bad { border-left-color: var(--color-danger); background: var(--color-danger-dim); }
+  .note.good { border-left-color: var(--color-success); background: var(--color-success-dim); }
+  .note strong { color: var(--color-text); }
+  .note code, .lede code, td code { font-family: var(--font-mono); font-size: .92em;
+    background: hsl(220 30% 11% / .8); padding: 1px 5px; border-radius: 3px; color: var(--color-text-muted); }
+
+  table.cost { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: var(--text-sm); }
+  table.cost th, table.cost td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; line-height: 1.6; }
+  table.cost th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-dim); font-weight: 400; }
+  table.cost td { color: var(--color-text-muted); }
+  table.cost td strong { color: var(--color-text); }
+
+  .variant { display: none; } .variant.active { display: block; }
+  .vh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .vh h2 { font-size: var(--text-xl); }
+  .tag { font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: var(--radius-full); border: 1px solid var(--color-border); color: var(--color-text-dim); }
+  .tag.new { border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .tag.ship { border-color: hsl(142 71% 45% / .4); color: hsl(142 60% 62%); }
+  .tag.risk { border-color: hsl(0 72% 51% / .45); color: hsl(0 78% 74%); }
+  .stagelabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--color-text-dim); margin: 22px 0 8px; }
+  hr.sep { border: 0; border-top: 1px solid var(--color-border-soft); margin: 30px 0; }
+
+  #sketch-tools { position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 12px; background: rgba(0,0,0,.78); color: #fff; padding: 8px 12px; border-radius: 8px;
+    opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center; }
+  #sketch-tools select, #sketch-tools button { background: #1a1a1a; color: #fff; border: 1px solid #444;
+    border-radius: 4px; font-size: 11px; padding: 3px 7px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 170 · phase 194.1 · SC#3</span>
+  <button class="variant-tab broken active" data-v="today" onclick="showVariant('today')">Today (broken)</button>
+  <button class="variant-tab" data-v="a" onclick="showVariant('a')">A: The dim tier</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: The durable receipt ★ Selected</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Chat stays thin</button>
+  <button class="variant-tab" data-v="contract" onclick="showVariant('contract')">The contract</button>
+</div>
+
+<div class="wrap">
+
+  <div class="kicker">Drive it — two moments, three shapes of run</div>
+  <div class="driver">
+    <div class="grp">
+      <label>When you are looking</label>
+      <div class="seg" id="seg-moment">
+        <button class="on" data-m="live5">Live · +5 s after the stop</button>
+        <button data-m="live13">Live · +13 s</button>
+        <button data-m="return">You navigated away and came back</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>What the run had done when you stopped it</label>
+      <div class="seg" id="seg-shape">
+        <button class="on" data-k="partial">Written some output</button>
+        <button data-k="nothing">Nothing visible yet</button>
+        <button data-k="approval">Waiting at an approval</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════ TODAY ═════════════ -->
+  <div class="variant active" id="variant-today">
+    <div class="vh"><h2>Today — two failures, in opposite directions</h2><span class="tag ship">045a83dc</span></div>
+    <p class="lede">
+      The operator, during Phase 194 UAT: <em>“if the workflow is stopped, if I navigate back to the
+      thread of this workflow that was — there is nothing showing that this workflow is stopped, it's
+      only showing the original prompt.”</em>
+    </p>
+    <p class="lede" style="margin-top:10px">
+      <strong>The stored truth is right in both moments.</strong> Phase 194 verified it on seven live
+      runs — <code>workflow_runs.status = 'cancelled'</code>, the interrupted <code>workflow_phases</code>
+      row cancelled, completed phases untouched, <code>threads.active_workflow_run_id = NULL</code>.
+      Only the display is wrong, and it is wrong <strong>in opposite directions at the two moments a
+      person actually looks</strong>:
+    </p>
+    <table class="cost">
+      <tr><th>Moment</th><th>What the screen says</th></tr>
+      <tr><td><strong>Live</strong>, still on the page</td>
+        <td>The run renders as <strong>Running</strong>. At +13 s the word “Stopped” appears
+          <strong>nowhere</strong> while Postgres reads <code>cancelled</code>. At an approval it still
+          offers a card that can never be honoured.</td></tr>
+      <tr><td><strong>On return</strong>, after leaving and coming back</td>
+        <td>The “this was stopped” signal is <strong>gone entirely</strong> — indistinguishable from a
+          run that never started, or one that finished.</td></tr>
+    </table>
+    <div id="stage-today"></div>
+  </div>
+
+  <!-- ═════════════ A ═════════════ -->
+  <div class="variant" id="variant-a">
+    <div class="vh"><h2>A — The dim tier, extended to the workflow thread</h2>
+      <span class="tag ship">reuses 174 D1/D2</span></div>
+    <p class="lede">
+      Phase 174 already decided what a deliberate stop looks like in chat: <strong>tier 1, dim and
+      calm</strong> — <code>⊘ Response stopped</code> as a thin mono line, or the dashed
+      <code>⊘ Cancelled — no output yet</code> body when nothing was written. <em>Loudness earned by
+      severity; the user did it on purpose, so it stays quiet.</em> A applies that vocabulary,
+      unchanged, to a workflow thread.
+    </p>
+    <div class="note">
+      <strong>The honest catch, and it is the reason A may not be enough.</strong> 174's markers hang
+      off the <em>assistant message</em>. A workflow stop leaves a thread whose assistant row may carry
+      <strong>no content at all</strong> — and <code>runs.message_id</code> is <code>NULL</code> on
+      <strong>587 of 607</strong> harness runs (measured, <code>194-MEASUREMENTS.md</code>). Switch the
+      driver to <em>Nothing visible yet</em> and judge whether A has anything to attach to.
+    </div>
+    <div id="stage-a"></div>
+  </div>
+
+  <!-- ═════════════ B ═════════════ -->
+  <div class="variant" id="variant-b">
+    <div class="vh"><h2>B — A durable receipt, read from the run</h2><span class="tag new">proposal</span>
+      <span class="tag ship">★ SELECTED 2026-08-16</span></div>
+    <div class="note good">
+      <strong>Selected on a measurement, not on appearance — the three variants look alike and the
+      difference is not visual.</strong> Phase 194 verified on seven live runs that a stop sets
+      <code>threads.active_workflow_run_id = NULL</code>. <strong>The thread anchor is cleared by the
+      very event the thread now has to remember</strong> — and <code>RunSoul</code> and
+      <code>RunSeam</code> both resolve their run <em>from that anchor</em>, so neither can carry the
+      reading either. A mark that survives the return therefore <strong>must</strong> come from a
+      <code>workflow_runs</code>-by-thread read. There is no cheaper construction; A and C are reading
+      from places the stop has already emptied, or that can be absent.
+      <br><br>
+      ⚠ <strong>One claim on this page is corrected rather than defended:</strong> variant A's note
+      says <em>"there is no assistant message to hang this on."</em> That is stronger than what was
+      measured — a NULL <code>runs.message_id</code> means the run cannot be joined to a message
+      <em>from the run side</em>; it does not prove no assistant row exists. A's real weakness is that
+      its mark is a <strong>message</strong> property while the thing that stopped is a
+      <strong>run</strong>.
+      <br><br>
+      ⚠ <strong>Converges with sketch 171.</strong> This line and 171's run-anchored kickoff line are
+      <strong>one component in two states</strong> — see 171's README.
+    </div>
+    <p class="lede">
+      One line, rendered for any thread that owns a workflow run, <strong>derived from
+      <code>workflow_runs</code> rather than from a message</strong>. It cannot be lost, because it is
+      not attached to anything that can be missing: <code>⊘ Stopped by you · 2 of 3 steps ·
+      2m 18s</code>, with a seam back to the run.
+    </p>
+    <p class="lede" style="margin-top:10px">
+      It is the shipped <code>RunCard</code> strip's sentence — <code>Run · {n} steps · ■ cancelled ·
+      {elapsed}</code> — promoted from <em>a property of the message</em> to <em>a property of the
+      thread</em>. Drive all three shapes: B reads identically in every one, which is the whole claim.
+    </p>
+    <div class="note bad">
+      <strong>The cost, stated rather than buried.</strong> Chat does not read <code>workflow_runs</code>
+      by thread today. B adds a read the chat surface does not have — and Phase 194's <code>D-14</code>
+      already examined this exact file and <strong>declined</strong> to thicken the receipt, on the
+      grounds that <em>the panel owns the meaningful phase spine and chat carries a thin run
+      receipt</em> (the 094/103 split). B is a deliberate argument against a decision made eleven days
+      ago. If it wins, that reversal is the decision to record.
+    </div>
+    <div id="stage-b"></div>
+  </div>
+
+  <!-- ═════════════ C ═════════════ -->
+  <div class="variant" id="variant-c">
+    <div class="vh"><h2>C — Chat stays thin; the panel spine carries it</h2>
+      <span class="tag ship">honours 094/103 strictly</span></div>
+    <p class="lede">
+      The strictest reading of the shipped split: the run's detail belongs to the workspace panel, and
+      the thread carries only what a transcript needs. The spine already reads
+      <code>act ■ Stopped</code> correctly <strong>after a reload</strong> — C's work is making it read
+      that way <em>live</em>, and leaving chat alone.
+    </p>
+    <div class="note bad">
+      <strong>Judge C against the actual complaint.</strong> The operator was looking at
+      <strong>the thread</strong>. Collapse the panel — the rail is a legitimate, common state — and C
+      has nothing. It is the cheapest variant and the one most likely to close the bug on paper while
+      leaving the reported experience intact.
+    </div>
+    <div id="stage-c"></div>
+  </div>
+
+  <!-- ═════════════ CONTRACT ═════════════ -->
+  <div class="variant" id="variant-contract">
+    <div class="vh"><h2>The contract</h2></div>
+
+    <p class="lede">
+      Three things bind whichever variant wins, and one of them is a decision this sketch cannot make
+      alone.
+    </p>
+
+    <table class="cost">
+      <tr><th>#</th><th>Rule</th><th>Why</th></tr>
+      <tr><td>1</td>
+        <td><strong>The mark is derived from persisted state, never from live streaming state.</strong></td>
+        <td>Phase 174 D1 already says this — <em>“derive it from persisted <code>runs.status</code> so
+          it survives reload”</em> — and <code>BUG-260710-01</code> is the same family failing on the
+          Deep surface, <code>status: folded</code> into 174 with <code>verified_closed_by: null</code>.
+          A live-only badge is how this bug is two months old.</td></tr>
+      <tr><td>2</td>
+        <td><strong>A pending approval must not survive the stop.</strong></td>
+        <td>The zombie card is the sharper half of <code>BUG-260816-02</code>: it invites an action that
+          will silently go nowhere. ⚠ It must be <strong>retired with a sentence</strong>, not silently
+          removed — a card that vanishes mid-read is its own small dishonesty.</td></tr>
+      <tr><td>3</td>
+        <td><strong>The stop must not read as though nothing survived.</strong></td>
+        <td>Phase 194 <code>D-13</code> keeps a stopped run's completed phases and explicitly rejects
+          <em>“collapsing to a bare <code>cancelled</code> that hides partial work … it discards
+          evidence the database still holds.”</em> Every variant here carries the step count in the
+          same sentence as the word.</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;font-size:var(--text-lg)">⚠ The decision this sketch cannot make alone</h3>
+    <div class="note">
+      <strong><code>BUG-260710-01</code> and <code>BUG-260816-02</code> are the same family on two
+      surfaces, and they must be looked at together.</strong> One is a Deep chat <em>message</em>
+      losing its badge; this is a <em>harness run</em> whose thread carries a spine, a receipt and a
+      kickoff prompt — a different renderer over a different source of truth
+      (<code>workflow_runs</code> + <code>workflow_phases</code>, not <code>runs</code>). <strong>A fix
+      to one does not automatically fix the other.</strong> Whether 194.1 closes both or only the
+      workflow half is a scoping call for <code>194.1-CONTEXT.md</code> — and if it closes only one,
+      the other's frontmatter must say so, because <code>status:</code> <em>is</em> the index a routing
+      scan reads.
+    </div>
+
+    <h3 style="margin-top:28px;font-size:var(--text-lg)">PROVENANCE</h3>
+    <table class="cost">
+      <tr><th>Region</th><th>Status</th></tr>
+      <tr><td><code>Run · {n} steps · ■ cancelled · {elapsed}</code> strip, with the Bot mark and the
+        expand chevron</td>
+        <td><span class="tag ship">shipped verbatim</span> — <code>RunCard.tsx:375-400</code>. The step
+          count and the word are already in one sentence, by decision (D-13).</td></tr>
+      <tr><td><code>⊘ Response stopped · 1,606 chars · 12s</code> and the dashed
+        <code>⊘ Cancelled — no output yet</code> body</td>
+        <td><span class="tag ship">shipped design</span> — Phase 174 D1/D2,
+          <code>references/run-state-honesty.md</code>. ⚠ Sketched and adopted; never
+          <code>verified_closed_by</code> anything.</td></tr>
+      <tr><td>The panel spine reading <code>act ■ Stopped</code> · <code>Phase 2 of 3, act, stopped</code></td>
+        <td><span class="tag ship">shipped</span> — Phase 194 plan 194-04 widened
+          <code>Phase["status"]</code> and gave the panel the word. Correct on reload today.</td></tr>
+      <tr><td><strong>The durable thread receipt (variant B)</strong></td>
+        <td><span class="tag new">PROPOSAL</span> — and a deliberate argument against Phase 194's
+          <code>D-14</code>.</td></tr>
+      <tr><td><strong>The retired-approval sentence</strong></td>
+        <td><span class="tag new">PROPOSAL</span> — net-new copy.</td></tr>
+      <tr><td>The approval card's own wording</td>
+        <td><span class="tag risk">OBSERVED, not sourced</span> — transcribed from the Phase 194 UAT
+          report (<em>“Approve this step / Do not run it”</em>), which recorded it from the screen. A
+          build must read the real <code>PendingAskCard</code> rather than this page.</td></tr>
+    </table>
+
+    <div class="note good">
+      <strong>Also fixed on every tab, without being a variant:</strong> one avatar, not two, and the
+      clock reading <strong>2m 18s</strong> after nav-back rather than restarting. That is Phase 174
+      <strong>D6</strong> — <em>anchor elapsed to <code>started_at</code>, never component mount</em> —
+      and it is drawn here as an outcome, not re-decided. <strong>How</strong> two avatars stop being
+      drawable is <strong>sketch 171</strong>.
+    </div>
+  </div>
+
+</div>
+
+<div id="sketch-tools" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.35'">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='420px'">375</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='800px'">768</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='1240px'">full</button>
+</div>
+
+<script>
+var VS = ['today', 'a', 'b', 'c'];
+var d = { moment: 'live5', shape: 'partial' };
+
+function isReturn() { return d.moment === 'return'; }
+
+/* ── the kickoff prompt (always present — it is all today shows) ── */
+function userMsg() {
+  return '<div class="msg user"><div class="bubble-user">Run the weekly status report for the '
+    + 'Northwind account and put it in the client template.</div></div>';
+}
+
+/* ── the assistant column, per variant ─────────────────────────── */
+function assistantCol(v) {
+  var partial = d.shape === 'partial';
+  var nothing = d.shape === 'nothing';
+  var approval = d.shape === 'approval';
+  var ret = isReturn();
+
+  var out = '';
+
+  /* --- TODAY --------------------------------------------------- */
+  if (v === 'today') {
+    if (ret) {
+      /* the reported bug: only the prompt */
+      return { avatar: null, html: '<div class="term-inline" style="color:hsl(0 80% 76%)">'
+        + 'nothing at all — the thread ends at the prompt above</div>' };
+    }
+    if (partial) {
+      out += '<div class="assistant-text">Collected 14 updates across 4 workstreams. Drafting the '
+        + 'summary section for the Northwind account…</div>';
+      out += '<div class="runstrip"><span class="bot">◆</span><span>Run · 2 steps</span>'
+        + '<span>·</span><span>● running</span><span>·</span><span class="mono">'
+        + (d.moment === 'live13' ? '2m 31s' : '2m 23s') + '</span><span class="chev">⌄</span></div>';
+    }
+    if (nothing) {
+      out += '<div class="term-inline" style="color:hsl(0 80% 76%)">an empty bubble — avatar, no body</div>';
+      out += '<div class="runstrip"><span class="bot">◆</span><span>Run · 2 steps</span>'
+        + '<span>·</span><span>● running</span><span class="chev">⌄</span></div>';
+    }
+    if (approval) {
+      out += '<div class="askcard zombie"><h4>Approve this step</h4>'
+        + '<p>“Send the report to the Northwind distribution list.” This step will contact an '
+        + 'outside service.</p><div class="acts"><button class="go">Approve this step</button>'
+        + '<button>Do not run it</button></div></div>';
+      out += '<div class="term-inline" style="color:hsl(0 80% 76%)">'
+        + (d.moment === 'live13' ? '+13 s — unchanged. “Stopped” appears nowhere on the surface.'
+                                 : '+5 s — the card is still actionable.') + '</div>';
+    }
+    return { avatar: '◆', html: out };
+  }
+
+  /* --- A · the dim tier ---------------------------------------- */
+  if (v === 'a') {
+    if (partial) {
+      out += '<div class="assistant-text">Collected 14 updates across 4 workstreams. Drafting the '
+        + 'summary section for the Northwind account…</div>';
+      out += '<div class="term-inline"><span class="gl">⊘</span> Response stopped '
+        + '<span>· 2 of 3 steps · 2m 18s</span></div>';
+    }
+    if (nothing) {
+      out += '<div class="term-body"><span><span class="gl">⊘</span> Cancelled — no output yet</span>'
+        + '<span class="sub">stopped at 2m 18s, after 2 of 3 steps, before anything was written</span></div>';
+      out += '<div class="term-inline" style="color:hsl(38 92% 72%)">'
+        + '⚠ there is no assistant message to hang this on — 587 of 607 harness runs leave '
+        + 'runs.message_id NULL</div>';
+    }
+    if (approval) {
+      out += '<div class="ask-retired">⊘ This step was waiting for you — the run was stopped.</div>';
+      out += '<div class="term-inline"><span class="gl">⊘</span> Response stopped '
+        + '<span>· 2 of 3 steps · 2m 18s</span></div>';
+    }
+    return { avatar: '◆', html: out };
+  }
+
+  /* --- B · the durable receipt --------------------------------- */
+  if (v === 'b') {
+    if (partial) {
+      out += '<div class="assistant-text">Collected 14 updates across 4 workstreams. Drafting the '
+        + 'summary section for the Northwind account…</div>';
+    }
+    if (approval) {
+      out += '<div class="ask-retired">⊘ This step was waiting for you — the run was stopped.</div>';
+    }
+    out += '<div class="receipt"><span class="mk">⊘</span>'
+      + '<span class="who">Stopped by you</span>'
+      + '<span class="mono">Weekly status report v3 · 2 of 3 steps · 2m 18s</span>'
+      + '<span class="seam">Open the run ›</span></div>';
+    if (nothing) {
+      out += '<div class="term-inline">the receipt is the whole answer — it needs no message to exist</div>';
+    }
+    return { avatar: '◆', html: out };
+  }
+
+  /* --- C · chat stays thin ------------------------------------- */
+  if (v === 'c') {
+    if (partial) {
+      out += '<div class="assistant-text">Collected 14 updates across 4 workstreams. Drafting the '
+        + 'summary section for the Northwind account…</div>';
+      out += '<div class="runstrip"><span class="bot">◆</span><span>Run · 2 steps</span>'
+        + '<span>·</span><span>■ cancelled</span><span>·</span><span class="mono">2m 18s</span>'
+        + '<span class="chev">⌄</span></div>';
+    }
+    if (nothing) {
+      out += '<div class="runstrip"><span class="bot">◆</span><span>Run · 2 steps</span>'
+        + '<span>·</span><span>■ cancelled</span><span class="chev">⌄</span></div>';
+      out += '<div class="term-inline" style="color:hsl(38 92% 72%)">⚠ the strip rides on a message '
+        + 'row; with none, chat shows nothing and only the panel knows</div>';
+    }
+    if (approval) {
+      out += '<div class="ask-retired">⊘ This step was waiting for you — the run was stopped.</div>';
+      out += '<div class="runstrip"><span class="bot">◆</span><span>Run · 2 steps</span>'
+        + '<span>·</span><span>■ cancelled</span><span>·</span><span class="mono">2m 18s</span>'
+        + '<span class="chev">⌄</span></div>';
+    }
+    return { avatar: '◆', html: out };
+  }
+  return { avatar: null, html: '' };
+}
+
+/* ── the panel spine ───────────────────────────────────────────── */
+function panelCol(v) {
+  var live = !isReturn();
+  var todayLive = (v === 'today' && live);
+  var stoppedRead = todayLive
+    ? { cls: 'run', mk: '●', word: 'running' }
+    : { cls: 'stop', mk: '■', word: 'stopped' };
+
+  var clockWrong = (v === 'today' && isReturn());
+  var clock = clockWrong ? '28s' : '2m 18s';
+
+  var thisRun = '';
+  if (v === 'today' && !isReturn()) {
+    thisRun = '<div class="panel-sec"><h5>This run</h5>'
+      + '<div class="step"><span class="nm" style="color:hsl(0 80% 76%)">Stop</span>'
+      + '<span class="el">still offered</span></div></div>';
+  }
+
+  return '<div class="panel-sec"><h5>This workflow</h5>'
+    + '<div class="step"><span class="nm">Weekly status report</span>'
+    + '<span class="panel-clock ' + (clockWrong ? 'wrong' : '') + '">' + clock + '</span></div>'
+    + (clockWrong ? '<div class="el" style="color:hsl(0 80% 76%);font-family:var(--font-mono);'
+        + 'font-size:10px;margin-top:4px">timer reseeded from mount — BUG-260610-01</div>' : '')
+    + '</div>'
+    + thisRun
+    + '<div class="panel-sec"><h5>Workflow · 3</h5>'
+    + '<div class="step done"><span class="mk">✓</span><span class="nm">gather</span><span class="el">41s</span></div>'
+    + '<div class="step ' + stoppedRead.cls + '"><span class="mk">' + stoppedRead.mk + '</span>'
+    +   '<span class="nm">act</span><span class="el">' + stoppedRead.word + '</span></div>'
+    + '<div class="step pend"><span class="mk">○</span><span class="nm">emit</span>'
+    +   '<span class="el">' + (v === 'today' && live ? 'pending' : 'not run') + '</span></div>'
+    + '</div>';
+}
+
+/* ── assemble ──────────────────────────────────────────────────── */
+function renderStage(v) {
+  var a = assistantCol(v);
+  var dup = (v === 'today' && isReturn() === false && d.shape !== 'approval')
+    ? '<div class="msg"><div class="avatar ghost">◆</div><div class="body-col">'
+      + '<div class="term-inline" style="color:hsl(0 80% 76%)">a second, empty avatar — '
+      + 'BUG-260610-01, re-observed 2026-08-16</div></div></div>'
+    : '';
+
+  var assistant = a.avatar
+    ? '<div class="msg"><div class="avatar">' + a.avatar + '</div>'
+      + '<div class="body-col">' + a.html + '</div></div>'
+    : '<div class="msg"><div class="body-col">' + a.html + '</div></div>';
+
+  var label = isReturn()
+    ? 'the thread, reopened after navigating away'
+    : 'the thread, live, ' + (d.moment === 'live13' ? '+13 s' : '+5 s') + ' after pressing Stop';
+
+  return '<div class="stagelabel">' + label + '</div>'
+    + '<div class="stage"><div class="chat">' + userMsg() + dup + assistant + '</div>'
+    + '<div class="panel">' + panelCol(v) + '</div></div>';
+}
+
+function render() {
+  VS.forEach(function (v) {
+    var host = document.getElementById('stage-' + v);
+    if (host) host.innerHTML = renderStage(v);
+  });
+}
+
+function showVariant(id) {
+  var tabs = document.querySelectorAll('.variant-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var t = document.querySelector('.variant-tab[data-v="' + id + '"]');
+  if (t) t.classList.add('active');
+  var vs = document.querySelectorAll('.variant');
+  for (var j = 0; j < vs.length; j++) vs[j].classList.remove('active');
+  document.getElementById('variant-' + id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('seg-moment').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  d.moment = b.dataset.m;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on'); render();
+});
+document.getElementById('seg-shape').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  d.shape = b.dataset.k;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on'); render();
+});
+
+render();
+</script>
+</body>
+</html>

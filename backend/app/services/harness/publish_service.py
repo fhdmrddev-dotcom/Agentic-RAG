@@ -55,6 +55,7 @@ metadata. The governance trail is honest about whether a real run was created.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -192,9 +193,32 @@ async def publish_workflow(
     # phase (or a validator whose on_failure routes to ask_user) BLOCKS on an
     # unsubscribed ask_user prompt for which no human is watching, dead-ending the
     # publish golden run. Block such definitions PRE-RUN with a named failure (cheap —
-    # no provider call) so the golden run is never driven for them. The full
-    # background-job publish that COULD validate interactive phases is the deferred
-    # Phase-103 rework — this is the honest minimum-viable cut.
+    # no provider call) so the golden run is never driven for them. This is the honest
+    # minimum-viable cut.
+    #
+    # ⚠ SUPERSEDED — D-14 / code-review WR-05 (2026-08-15). THE SENTENCE THIS PARAGRAPH
+    # USED TO END WITH IS QUOTED HERE RATHER THAN DELETED, because a deferral that lives
+    # only in a deleted comment is exactly as invisible as one that was never written.
+    # It read, verbatim: *"The full background-job publish that COULD validate interactive
+    # phases is the deferred Phase-103 rework."* That sentence is precisely what
+    # ``SEED-164`` was planted to retire — it named work scheduled NOWHERE (zero roadmap
+    # phases, zero owning seeds, zero deferred-item entries) and attached a phase number
+    # to it, so it read like a plan for a year while Phase 103 itself had long shipped.
+    # Phase 193.2 removed it from ``_interactive_phase_failures``' docstring below and
+    # left it standing HERE, so two blocks in one file said opposite things; this is that
+    # half. ⚠ It is quoted on ONE line on purpose: split across two, as it shipped, a
+    # line-oriented ``grep`` for the phrase returned NOTHING and read as "already fixed".
+    #
+    # WHAT IS TRUE NOW, WITH THE DEFERRAL KEPT INSTEAD OF EVAPORATED. A publish that can
+    # VALIDATE an interactive phase — a durable pause with a real subscriber, or the
+    # cheaper "skip/stub the step during the golden run, keep it in the published
+    # definition for real runs" shape the operator proposed — is a named capability NEED
+    # with a durable home:
+    # ``.planning/seeds/SEED-164-a-workflow-that-legitimately-pauses-for-a-person.md``.
+    # It is a seed rather than a schedule, and nothing here promises it. Its PRIMARY
+    # re-open trigger is this gate itself: any phase that touches the publish gauntlet or
+    # ``_interactive_phase_failures`` re-opens SEED-164 by definition — that is the
+    # concrete condition which stops this deferral evaporating a second time.
     interactive_failures = _interactive_phase_failures(definition)
     if interactive_failures:
         return await _block(
@@ -499,43 +523,183 @@ def _structural_failures(final_output) -> list:
     return []
 
 
+#: T-193.2-01 — the ceiling on a model- or author-authored ``PhaseSpec.name`` before it is
+#: embedded in the refusal below. ``name`` is an UNBOUNDED ``str | None``
+#: (``models/harness.py:364``) and the value it carries now reaches THREE surfaces: a
+#: ``text-[12px] leading-snug`` span in a ``shrink-0`` header slot
+#: (``PublishGauntlet.tsx:932-939``), an ``aria-describedby`` label, and — via ``_block`` —
+#: the PERSISTED ``harness_audit.metadata.named_failures`` payload. Unclamped, a 10 KB step
+#: name becomes a 10 KB refusal in a one-line slot AND a 10 KB audit row.
+#:
+#: 72 is chosen rather than magic: it keeps a LABELLED message (see the measured lengths on
+#: the literals below) in the same order of magnitude as the two shipped siblings this copy
+#: sits beside — the pre-193.2 interactive message at 105 characters and
+#: ``BUSINESS_REQUIREMENT_MISSING_MESSAGE`` at 99 — instead of an order above them.
+#:
+#: ⚠ XSS IS NOT THE THREAT AND THIS IS NOT AN ESCAPE FUNCTION. The message reaches React as
+#: a TEXT CHILD and there is no ``dangerouslySetInnerHTML`` anywhere on this path. Do NOT
+#: "harden" this into HTML-escaping: it would mangle ordinary copy (an apostrophe or an
+#: ampersand in a step name) to defend against something the renderer already prevents.
+#: What IS defended here is LENGTH and ONE-LINE SHAPE.
+_LABEL_MAX_CHARS = 72
+
+#: The four refusal literals (D-12/D-13). ⚠ ARM 1 AND ARM 2 SHARE NO SENTENCE, and that is a
+#: correctness property rather than style — they describe DIFFERENT things, and 193.1's D-26
+#: defect in ``grounding.py`` was precisely ONE string serving both meanings. Arm 1 is about
+#: the STEP (remove it); arm 2 is about a step's FAILURE ROUTE (change it). A later
+#: "simplification" that collapses them back onto one literal is a regression and is pinned
+#: by a test driven RED against exactly that plant.
+#:
+#: ⚠ NO INTERNAL IDENTIFIER AND NO SLUG APPEARS IN ANY BRANCH. The pre-193.2 message read
+#: *"interactive phases (llm_human_input / ask_user dispositions) cannot be validated in a
+#: synchronous publish"* — two engine identifiers aimed at a person who chose neither and can
+#: see neither word anywhere on the canvas. That is ``BUG-260815-01``, and it is the same
+#: failure class as ``BUG-260809-02`` (whose message named an internal snake_case field).
+#:
+#: ⚠ NOTHING UNSCHEDULED IS PROMISED (D-14). No "planned", "coming", "soon", "deferred" or
+#: "future release" — the capability a workflow that legitimately pauses for a person would
+#: need is ``SEED-164``, which is a seed and not a schedule.
+_INTERACTIVE_STEP_NAMED = (
+    'Publishing runs this workflow from start to finish, and the step "{label}" stops to '
+    "wait for a person. Remove that step to publish."
+)
+_INTERACTIVE_STEP_UNNAMED = (
+    "Publishing runs this workflow from start to finish, and one step stops to wait for a "
+    "person. Remove that step on the canvas to publish."
+)
+_INTERACTIVE_FALLBACK_NAMED = (
+    'Publishing cannot pause for anyone, and "{label}" asks a person whenever its check '
+    "fails. Change that check's fallback to publish."
+)
+_INTERACTIVE_FALLBACK_UNNAMED = (
+    "Publishing cannot pause for anyone, and one step asks a person whenever its check "
+    "fails. Change that check's fallback on the canvas to publish."
+)
+
+
+#: The Unicode GENERAL CATEGORIES ``_clean_label`` collapses to a space, stated as a CLASS
+#: rather than as a list of codepoints — which is the whole correction made here.
+#:
+#: ⚠ CORRECTED ON MEASUREMENT, 2026-08-15 (code review ``WR-02``), AND THE PREVIOUS RULE IS
+#: RECORDED BESIDE IT RATHER THAN ERASED. As first shipped the scrub was
+#: ``ch.isspace() or ord(ch) < 32 or ord(ch) == 127`` — i.e. exactly category ``Cc`` plus
+#: whitespace. Driven against the shipped function over a 31-codepoint table
+#: (``test_publish_service.py::_HOSTILE_CODEPOINTS``), **22 survived it and every single
+#: survivor was category ``Cf``**: ``U+00AD`` (soft hyphen), ``U+200B`` (zero-width space),
+#: ``U+200E``/``U+200F`` (the directional marks), ``U+202A``–``U+202E`` (the bidi embeddings
+#: and the RIGHT-TO-LEFT OVERRIDE), ``U+2066``–``U+2069`` (the directional isolates),
+#: ``U+2060`` (word joiner), ``U+FEFF`` (BOM/ZWNBSP) and the rest.
+#:
+#: ⚠ FIXING THIS BY NAMING THE FOUR CODEPOINTS A REVIEWER HAPPENED TO TRY WOULD REPRODUCE THE
+#: EXACT BLINDNESS BEING FIXED. The rule is the category, and the test that guards it asserts
+#: an INDEPENDENT literal table of hostile codepoints rather than re-deriving this predicate.
+#:
+#: WHAT IS EXCLUDED, AND WHY — audit this list rather than re-deriving it:
+#:   ``Cc``  control            — the original rule; a newline or a ``\\x07`` breaks the
+#:                                one-line shape this function exists to guarantee.
+#:   ``Cf``  format             — THE CLASS THAT WAS MISSING. Zero-width and bidi-control
+#:                                characters are INVISIBLE in the refusal yet change what the
+#:                                operator reads: ``U+202E`` reverses the *displayed* order of
+#:                                everything after it, including the actionable clause, and
+#:                                ``U+200B`` makes an operator ``grep`` disagree with the
+#:                                screen. Display spoofing and hidden content — NOT injection
+#:                                (see the ``_LABEL_MAX_CHARS`` note above: React renders this
+#:                                as a text child and there is no ``dangerouslySetInnerHTML``
+#:                                on the path).
+#:   ``Cs``  surrogate          — never a legible character on its own.
+#:   ``Co``  private use        — renders as whatever a font decides; carries no shared meaning.
+#:   ``Zl``/``Zp`` line + paragraph separators — ``U+2028``/``U+2029`` are line breaks that
+#:                                ``isspace()`` already catches; named so the one-line
+#:                                guarantee does not silently depend on that coincidence.
+#:
+#: WHAT IS DELIBERATELY **NOT** EXCLUDED, and why — both are named so the omissions read as
+#: decisions rather than oversights:
+#:   ``Cn``  unassigned         — Python's ``unicodedata`` is pinned to the Unicode version its
+#:                                build ships. A character assigned in a LATER Unicode version
+#:                                reads as ``Cn`` here, so excluding it would mangle a
+#:                                legitimate label written in a newer script. Unassigned
+#:                                codepoints render as tofu; they do not spoof.
+#:   ``Mn``  non-spacing marks  — excluding them would destroy ordinary Arabic, Hindi, Hebrew
+#:                                and Vietnamese step names. Stacked-diacritic ("Zalgo") noise
+#:                                is bounded by ``_LABEL_MAX_CHARS`` instead.
+_NON_PRINTING_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
+
+
+def _clean_label(raw) -> str | None:
+    """The single-line, length-bounded form of a phase ``name`` — or ``None`` (D-13).
+
+    ``None`` is the signal for the caller's DEGRADED, name-free literal, and it is returned
+    for a missing name, a non-string, and a name that trims empty.
+
+    ⚠ THE DEGRADATION IS NEVER THE SLUG and NEVER A STEP NUMBER. The slug reintroduces the
+    exact defect this rewrite exists to fix; and ``PhaseNodeCard`` puts no ``phase_index`` on
+    the node face, so *"Step 3"* would name something the author cannot read on the canvas.
+
+    ⚠ ``nodeTitle()``'s name → config-derived → type-sentence ladder
+    (``phaseVocabulary.ts:231-240``) is DELIBERATELY NOT PORTED HERE. That ladder is computed
+    AT RENDER and never stored (``models/harness.py:420-435``), and a second implementation of
+    a derivation is forbidden by name in this repo. The server degrades to a true, name-free
+    sentence instead of guessing at a title the client owns.
+
+    ⚠ THE SCRUB IS BY UNICODE GENERAL CATEGORY, NOT BY CODEPOINT RANGE (``WR-02``, 2026-08-15).
+    Every character in ``_NON_PRINTING_CATEGORIES`` — ``Cc`` control, ``Cf`` **format**, ``Cs``
+    surrogate, ``Co`` private-use, ``Zl``/``Zp`` line + paragraph separator — plus anything
+    ``str.isspace()`` accepts, becomes a single space, and runs are then collapsed. The
+    constant's own comment records which classes are excluded, which two (``Cn``, ``Mn``) are
+    deliberately NOT, and the 22-of-31 measurement that forced the change. **The invariant this
+    function now delivers is: no non-printing character survives into copy** — the previous
+    docstring's *"single-line"* claim was true only of ``Cc``.
+    """
+    if not isinstance(raw, str):
+        return None
+    # Collapse EVERY whitespace run and non-printing character to a single space. A newline in
+    # a model-authored name breaks the one-line shape on BOTH surfaces this string feeds; a
+    # format character (``Cf``) breaks something worse — it is invisible while changing what
+    # the operator reads. ``Cc`` here is exactly the retired ``ord(ch) < 32 or ord(ch) == 127``
+    # test, so nothing the old rule caught is let through.
+    scrubbed = "".join(
+        " " if (ch.isspace() or unicodedata.category(ch) in _NON_PRINTING_CATEGORIES) else ch
+        for ch in raw
+    )
+    collapsed = " ".join(scrubbed.split())
+    if not collapsed:
+        return None
+    if len(collapsed) > _LABEL_MAX_CHARS:
+        # One-character ellipsis, so the clamped label is EXACTLY _LABEL_MAX_CHARS.
+        return collapsed[: _LABEL_MAX_CHARS - 1].rstrip() + "…"
+    return collapsed
+
+
 def _interactive_phase_failures(definition) -> list:
-    """Named failures for any INTERACTIVE phase blocking the synchronous publish (WR-04).
+    """Named failures for any INTERACTIVE validator blocking synchronous publish (WR-04).
 
     Returns one ``{"phase": <slug>, "message": ...}`` entry per phase that would
     dead-end the synchronous publish golden run by blocking on a human:
 
-      - an ``llm_human_input`` phase (``config.phase_type == "llm_human_input"``), or
       - any validator whose ``on_failure == "ask_user"`` (the D-11 interactive
         disposition — it pauses the run waiting for a human to choose).
 
-    Empty list == no interactive phases (the publish proceeds to the golden run). This
-    is a PRE-RUN lint-class check (no provider call) — it short-circuits BEFORE any
-    golden run so an unsubscribed ``ask_user`` prompt can never wedge the publish.
+    Empty list == no blocking interactive phases (the publish proceeds to the golden run).
 
-    The full background-job publish that COULD validate interactive phases (a human
-    subscriber, a durable resume) is the DEFERRED Phase-103 rework — out of scope here.
+    ⚠ 200.3 (SEED-164): ``llm_human_input`` is permitted and no longer refused here.
+    During the golden run, ``_exec_llm_human_input`` auto-continues with the first configured
+    choice (or "Approved") when ``ctx.is_golden_run`` is True, enabling publishing while
+    preserving interactive pausing for real live runs.
     """
     failures: list = []
     for phase in getattr(definition, "phases", []) or []:
         slug = getattr(phase, "slug", None)
-        config = getattr(phase, "config", None)
-        if getattr(config, "phase_type", None) == "llm_human_input":
-            failures.append(
-                {
-                    "phase": slug,
-                    "message": "interactive phases (llm_human_input / ask_user "
-                    "dispositions) cannot be validated in a synchronous publish",
-                }
-            )
-            continue  # one finding per phase is enough
+        label = _clean_label(getattr(phase, "name", None))
         for v in getattr(phase, "validators", []) or []:
             if getattr(v, "on_failure", None) == "ask_user":
                 failures.append(
                     {
                         "phase": slug,
-                        "message": "interactive phases (llm_human_input / ask_user "
-                        "dispositions) cannot be validated in a synchronous publish",
+                        "message": (
+                            _INTERACTIVE_FALLBACK_NAMED.format(label=label)
+                            if label
+                            else _INTERACTIVE_FALLBACK_UNNAMED
+                        ),
                     }
                 )
                 break  # one finding per phase is enough
@@ -937,7 +1101,8 @@ async def _judge_golden_output(
 
     Returns the JudgeVerdict dict, or ``{"failure": <reason>}`` on an honest failure.
     """
-    from app.config import get_model_capability, settings
+    from app.config import get_model_capability
+    from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
     from app.services.harness.validator_kinds import (  # function-local
         JUDGE_RUBRIC_CORE,
         JudgeVerdict,
@@ -949,7 +1114,13 @@ async def _judge_golden_output(
     # SAME registry default (claude-opus-4-8 / gpt-5.5) the in-run validator resolves;
     # never the run model (no self-judging; a coerce-tier run model never becomes the
     # publish blocker's weak link).
-    model = resolve_judge_model(settings)
+    #
+    # Phase 196 (D-17 / BUG-260731-01): the resolver is handed the DB-backed effective
+    # settings (app_settings.harness_judge_model — what the operator actually set in the
+    # Settings UI), NOT the env-level ``app.config.settings`` singleton whose attr is None
+    # on every UI-configured install. This gauntlet is a HARD WALL, so an inert knob here
+    # meant the publish grade was silently taken by a model the operator never chose.
+    model = resolve_judge_model(await load_app_settings_async())
     if model is None:
         return {"failure": "no judge model resolved (Settings.harness_judge_model unset)"}
 

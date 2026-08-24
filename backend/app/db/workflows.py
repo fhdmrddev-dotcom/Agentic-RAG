@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -92,6 +93,124 @@ logger = logging.getLogger(__name__)
 # user input, spliced into an f-string. Every VALUE still travels as ``$N``.
 CONCURRENCY_TOKEN_SQL = (
     "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')"
+)
+
+# ── Phase 192.2 (LIB-06 / D-07) — the LAST-RUN LATERAL, in ONE place ─────────────────
+#
+# LIB-06's question is *does this one work*, and the answer already exists: measured against
+# the live local DB on 2026-08-19, ``workflow_runs`` holds **228 rows** (186 completed / 31
+# failed / 11 cancelled) across **48 distinct definitions**, and **all 228 carry a non-NULL
+# ``user_id``**. ⚠ NO MIGRATION, NO NEW COLUMN, NO NEW WRITE — the three library feeds simply
+# never read the table. This constant is the whole of the read.
+#
+# ⚠ ``LEFT``, AND ``LATERAL``, AND BOTH WORDS ARE LOAD-BEARING FOR A MEASURED REASON.
+#   • ``LEFT`` — 69% of the library (81 of 117 real rows) is drafts and only 48 definitions
+#     have ANY run, so an INNER join would silently HIDE most of the library. The card would
+#     answer "does this one work" by deleting everything that has not been tried.
+#   • ``LATERAL … LIMIT 1`` — one row per definition. A plain join to ``workflow_runs``
+#     multiplies rows by run count, and the live data makes that concrete rather than
+#     theoretical: one definition carries **24** runs, another **22**, another **20**. The
+#     library would render those workflows 24, 22 and 20 times.
+#
+# ⚠ THE SCOPE CLAUSE ``r.user_id = $1`` IS THE SECURITY BOUNDARY OF THIS JOIN, NOT A FILTER.
+# These feeds run on a service-role pool that BYPASSES RLS, so whatever the SQL returns is
+# what the caller gets — the mig-116 / CR-01 shape Phase 190's review caught. A GLOBAL
+# published row (``is_system_global``) is world-readable, and five of them carry 20 / 15 / 11
+# / 7 / 1 real runs belonging to ONE user; an UNSCOPED lateral would hand every other caller
+# that activity. Scoping by ``user_id`` is strictly NARROWER than scoping by ``org_id`` — a
+# user belongs to one org — so the cross-ORG case is excluded by construction rather than by
+# a second clause that could later be edited away. ⚠ A legacy run with a NULL ``user_id`` is
+# attributed to NOBODY (``NULL = $1`` is not true): fail-closed, never fail-open.
+#
+# ⚠ IT BINDS ``$1`` AND NEVER A NEW PLACEHOLDER. All three feeds ALREADY bind the caller as
+# ``$1``, so the join introduces no binding and cannot renumber the published feed's ``$2``
+# project filter. No f-string, no ``%``, no user input reaches this text (T-192.2-12).
+#
+# ⚠ THE OUTPUT COLUMNS ARE RENAMED AT THE SUBQUERY BOUNDARY, AND THAT IS NOT COSMETIC.
+# ``workflow_runs`` has ``id``, ``status`` AND ``updated_at``, and the outer queries carry all
+# three BARE — ``WHERE status = 'published'``, ``ORDER BY updated_at DESC, id DESC``. Exposing
+# them under their own names would make every one of those clauses AMBIGUOUS and each feed
+# would raise. ``AS last_run_at`` / ``AS last_run_status`` is what keeps the shipped WHERE and
+# ORDER BY byte-identical.
+#
+# ⚠ THE ORDER KEY IS THE RUN'S OWN ``created_at``, NEVER the definition's ``updated_at`` —
+# those are different facts and this phase must not conflate them (on a published definition
+# ``updated_at`` is the PUBLISH time, deliberately, because the row is immutable afterwards).
+# The ``, r.id DESC`` tiebreaker is the review-WR-03 lesson applied PROSPECTIVELY rather than
+# defensively: measured 2026-08-19 there are **0** ``(definition_id, created_at)`` collisions
+# in all 228 rows, so this fixes no observed reshuffle — it refuses to depend on a uniqueness
+# nothing enforces, since ``now()`` is transaction-scoped. ``workflow_runs.id`` is the PRIMARY
+# KEY, so the order is total.
+#
+# ⚠ ONE CONSTANT, NOT THREE COPIES, and the second reason is stated rather than left to be
+# discovered. The first reason is the obvious one — three feeds must agree on the ``lr.*``
+# aliases or a projection references a column its own join does not expose. The second:
+# ``test_workflows_updated_at`` reads ``inspect.getsource(list_starter_workflows)`` and
+# asserts ``"id DESC" not in`` it, to pin that the STARTERS SHELF stays alphabetical (D-16).
+# A lateral inlined there would red that fence with a SUBQUERY's ordering, which is not the
+# shelf's ordering — the 187-24 trap, a needle judging something it was never written to
+# judge. Keeping the join here leaves that fence judging exactly its own property, and
+# ``test_library_run_facts.test_the_starters_shelf_ordering_is_untouched`` re-pins the shelf
+# clause AND this constant's ordering so neither goes unguarded.
+#
+# NO INDEX, NO MIGRATION, and the evidence rather than the assurance: ``workflow_runs`` is
+# **228 rows** and already carries ``idx_workflow_runs_user_id``, which is the selective half
+# of this predicate (one user owns all 228 today, but the index is what the planner reaches
+# for as that changes). There is no index on ``definition_id`` and none is added — the
+# precedent is recorded in ``list_published_workflows``' own docstring: "NO expression index,
+# ZERO migration … sufficient at current scale". Re-open at ~10k runs.
+_LAST_RUN_LATERAL_SQL = (
+    "LEFT JOIN LATERAL ("
+    "SELECT r.created_at AS last_run_at, r.status AS last_run_status "
+    "FROM workflow_runs r "
+    "WHERE r.definition_id = wd.id AND r.user_id = $1 "
+    "ORDER BY r.created_at DESC, r.id DESC "
+    "LIMIT 1"
+    ") lr ON TRUE "
+)
+
+# ── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — the ROW-LEVEL run bit ───────────────
+#
+# ⚠ THIS CONSTANT IS DELIBERATELY UNSCOPED, AND THAT IS THE WHOLE POINT OF IT EXISTING.
+# The lateral one line above answers *have YOU run this*. This answers *has ANYBODY run this*.
+# Everything the lateral's docblock argues — ``LEFT``, ``LATERAL … LIMIT 1``, the ``$1``, the
+# renames, one constant not three copies — is stated there and is NOT restated here; only what
+# is NEW is written down.
+#
+# ⚠ WHAT IS NEW, AND WHY IT HAD TO BE. ``192.2-VERIFICATION.md`` gap 1 / review **CR-01**
+# (BLOCKER): the lateral is correctly caller-scoped, but every downstream artifact rendered its
+# NULL as a ROW-LEVEL fact. Measured 2026-08-19, five ``is_system_global`` published rows carry
+# **20 / 15 / 11 / 7 / 1** runs belonging to ONE user, and ``/starters`` + ``/published``'s
+# global branch serve those same rows to everybody — so every other caller read an explicit
+# "Never run" about a workflow that had run twenty times. A caller-scoped fact rendered as a
+# row-level one is not merely unhelpful; it is false. THE FIX IS A SECOND FACT, NOT A WIDER
+# FIRST ONE — ``r.user_id = $1`` above stays byte-identical (DEC-08-B).
+#
+# ⚠ THE DISCLOSURE BUDGET, VERBATIM FROM DEC-08-A, AND IT IS OPERATOR-LOCKED. This bit may
+# reveal that SOMEBODY ran a workflow the caller CAN ALREADY SEE. It may reveal NOTHING ELSE:
+# **no count, no timestamp, no user id, no org id, no status** — ``EXISTS`` and nothing more.
+# A future edit that grows this constant a ``count(*)``, a ``MAX(created_at)``, a ``user_id``
+# or a ``status`` is a CROSS-TENANT DISCLOSURE, not an enhancement, and
+# ``test_library_run_facts.test_the_row_level_bit_discloses_existence_and_nothing_else``
+# sweeps this constant's VALUE (never the module source) to say so, with a synthetic positive
+# control. Re-open trigger for the trade itself: the first workflow row visible to a caller who
+# is not entitled to know it has been exercised at all.
+#
+# ⚠ WHY IT IS SAFE ON A WORLD-READABLE ROW. It is emitted ONLY for rows the caller can already
+# see, because it rides each feed's existing ``WHERE`` — and that predicate is untouched by
+# this change (the projection widens; the predicate does not, for the third phase running).
+#
+# ⚠ IT MUST LIVE IN THE OUTER PROJECTION, NEVER INSIDE THE LATERAL. Folded into
+# ``_LAST_RUN_LATERAL_SQL`` it would inherit ``r.user_id = $1`` and answer the same question
+# twice — the bug, restated as a fix. It binds NO placeholder, which is why branch B's
+# ``${len(params)}`` project filter is not renumbered (T-192.2-35, proved live rather than
+# assumed). The inner alias is ``r2``, never ``r``, so it cannot be misread as the lateral's
+# correlation name. ⚠ The correlation is ``wd.id`` — all four projection sites alias
+# ``workflow_definitions`` as ``wd``, and a MISCORRELATED ``EXISTS`` returns TRUE for EVERY
+# ROW, i.e. the exact opposite lie, looking green everywhere. NO INDEX, NO MIGRATION, NO NEW
+# COLUMN, NO NEW WRITE — same 228 rows, same recorded re-open trigger at ~10k runs.
+_HAS_ANY_RUN_SQL = (
+    "EXISTS (SELECT 1 FROM workflow_runs r2 WHERE r2.definition_id = wd.id) AS has_any_run "
 )
 
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
@@ -193,14 +312,88 @@ async def create_workflow_run(
     only marks the row so the receipt VIEW (Phase 107) can distinguish "what good
     looked like at publish approval" from a normal run.
 
+    ── Migration 122 — THE DEFINITION SNAPSHOT, AND WHY IT IS WRITTEN *HERE* ────────────
+
+    ``workflow_runs.definition_snapshot`` is written in the INSERT below, serialized from
+    the ``definition`` parameter this function already receives.
+
+    ⚠ THE SITE IS THE WHOLE POINT, not a convenience. The very next statement iterates
+    ``definition.phases`` to write this run's ``workflow_phases`` rows, so the snapshot and
+    the phase rows are two projections of ONE in-memory object inside ONE transaction. They
+    cannot drift apart, and no second read, second query or re-resolution is involved. A
+    snapshot taken anywhere else would be a second source and would owe its own proof that
+    it matches.
+
+    ⚠ WHAT IT FIXES, measured rather than argued: ``workflow_definitions.definition`` is
+    MUTABLE while ``status = 'draft'``, and a draft can be rewritten under a run that
+    already has phase rows. On the local database 2026-08-20, **21 of 228 runs point at a
+    draft, 14 of those drafts have been edited since, and on 2 the phase ORDER changed** —
+    at which point the run surface's ``phase_index`` join (D-188-01) reports each step's
+    state as its NEIGHBOUR's. Published definitions are immutable and show zero crossings.
+    ``get_workflow_run``'s docstring already promised *"the definition version that RAN"*;
+    until this column that promise was protected against the SLUG moving and not against
+    the ROW moving.
+
+    ⚠⚠ THE ORIGINAL PARAGRAPH HERE WAS **WRONG ON ITS CENTRAL FACT**, IT SHIPPED, AND THE
+    FIRST TWO REAL RUNS PROVED IT. It is quoted in full rather than deleted, because the
+    false clause is the whole lesson:
+
+        "⚠ ``json.dumps`` + ``$N::jsonb``, matching ``inputs`` one line above — **this file
+         does NOT install a pool JSONB codec.** ``mode="json"`` is REQUIRED, not stylistic
+         … ⚠ AND IT MUST LAND AS A JSONB OBJECT, never a JSON string scalar."
+
+    **The file does not install a codec. THE POOL DOES**, and the pool is what this function
+    acquires from. ``dependencies._init_pg_connection`` registers a ``jsonb`` codec with
+    ``encoder=json.dumps`` on EVERY connection the pool creates (Phase 073 / D-073-06), and
+    its own docblock says why: *"Registering here lets call sites pass plain Python
+    dicts/lists."* So a call site that hands over an ALREADY-DUMPED STRING gets it dumped a
+    SECOND time, and what lands is a jsonb STRING SCALAR containing the JSON text.
+
+    ⚠ MEASURED, NOT REASONED ABOUT (2026-08-20, against the live local database):
+
+      · ``jsonb_typeof(definition_snapshot)`` = ``string`` on **2 of 2** rows written since
+        migration 122 — i.e. every row the column has ever held.
+      · ``jsonb_typeof(inputs)`` = ``string`` on **230 of 230** rows.
+      · ``jsonb_typeof(workflow_definitions.definition)`` = ``string`` on **261 of 291**.
+      · Driven directly against asyncpg: with the pool's codec installed, a pre-dumped string
+        stores as ``string`` and ``-> 'phases'`` returns ``None``; the plain dict stores as
+        ``object`` and ``-> 'phases'`` returns the array. Without the codec BOTH forms store
+        as ``object`` — which is exactly why a probe on a bare connection exonerates this code
+        and a probe through the pool convicts it.
+
+    **This is the root cause of the recorded "jsonb string-scalar trap"** — the shape that
+    makes ``definition->'phases'`` return SQL NULL instead of erroring, and that has now
+    produced a confident, vacuous ``0`` in two separate investigations plus a RED
+    ``test_migration_122``.
+
+    ⚠ THE FIX IS TO STOP PRE-ENCODING, NOT TO ADD A CAST. ``$7::jsonb`` is fine; the parameter
+    is what was wrong. ``mode="json"`` is STILL REQUIRED and for the original reason: the model
+    holds ``UUID`` and ``datetime`` members, and the codec's ``json.dumps`` refuses them just
+    as the manual one did. So the value handed over is ``model_dump(mode="json")`` — a plain
+    dict of JSON-safe primitives — and the codec does the one encode.
+
+    ⚠ SCOPE, STATED SO THE SILENCE IS NOT MISTAKEN FOR AN OVERSIGHT. **Only this column is
+    fixed here.** ``inputs`` on the line above, and the four ``definition`` writes elsewhere in
+    this file, have the identical defect and are DELIBERATELY LEFT: they have 230 and 261
+    rows respectively written in the old shape, and flipping the writer would make new rows
+    objects while old rows stay strings — every reader of those columns then needs an audit,
+    which is a change with its own blast radius and its own migration question. ``definition_snapshot``
+    is fixable alone because it has TWO rows, both from today, and its one reader
+    (``api/workflow_runs.py:_coerce_definition``) already accepts BOTH shapes by design. Re-open
+    trigger: the next phase that touches ``inputs`` or ``workflow_definitions.definition`` on
+    the write path — see ``SEED-190``'s sibling note and ``.planning/STATE.md``.
+
+    ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value; it
+    went RED on the first two real runs, which is the pin working exactly as written.
+
     Returns the new workflow_run id.
     """
     async with pool.acquire() as con:
         async with con.transaction():
             run_id = await con.fetchval(
                 """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run)
-                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6)
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb)
                 RETURNING id
                 """,
                 thread_id,
@@ -209,6 +402,11 @@ async def create_workflow_run(
                 model,
                 user_id,
                 is_golden_run,
+                # ⚠ THE PLAIN DICT, NOT A PRE-DUMPED STRING — see the migration-122 paragraph
+                # in this function's docstring. The pool's jsonb codec (`_init_pg_connection`)
+                # encodes it; handing over a string gets it encoded TWICE and stores a jsonb
+                # STRING SCALAR, which is what the first two real runs did.
+                definition.model_dump(mode="json"),
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
@@ -272,9 +470,43 @@ async def list_published_workflows(
     if owned_only:
         # D-143-2b — the Workflows-page Published shelf only; drop the bare
         # is_system_global so curated globals live solely in the Starters shelf.
+        #
+        # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected
+        # FOR SERVER-SIDE COMPUTATION ONLY. The API layer consumes the raw ``created_by``
+        # to compute the one bit ``PublishedWorkflow.is_mine`` and NEVER serializes it —
+        # this pool bypasses RLS, so whatever leaves the API layer is what the caller gets.
+        # The projection widens; the predicate does NOT.
+        #
+        # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins the same projection, and the
+        # same sentence applies verbatim — THE PROJECTION WIDENS; THE PREDICATE DOES NOT.
+        # It is the recency half of the library's identity line ("changed <rel>"), an
+        # ADDITIVE column on an existing NOT NULL field (full-schema.sql:1941) kept fresh
+        # by the ``workflow_definitions_set_updated_at`` trigger — no migration, no new
+        # column, and not one byte of the WHERE / ORDER BY / $N binding below is touched.
+        #
+        # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join that SAME
+        # projection, and THE SENTENCE ABOVE APPLIES VERBATIM ONCE MORE — the projection
+        # widens; the predicate does NOT. The data is 228 rows that already exist in
+        # ``workflow_runs``, so there is no migration, no new column and no new write here
+        # either; what is new is only that the feed finally READS them.
+        # ⚠ The one thing 192.1's sentence does NOT cover, because ``updated_at`` needed no
+        # join at all: this arrives through ``_LAST_RUN_LATERAL_SQL``, and a JOIN is the one
+        # edit that can move rows INTO a result set. It is ``LEFT`` so never-run rows survive
+        # and ``LATERAL … LIMIT 1`` so no row multiplies, it reuses the ``$1`` bound below
+        # rather than adding a placeholder, and it is owner-scoped so a world-readable global
+        # row cannot leak another caller's activity. The full argument is on the constant.
+        #
+        # Phase 192.2 gap round 1 (CR-01): ``has_any_run`` joins the projection LAST — the
+        # existing columns, then the two CALLER-SCOPED run columns, then the one ROW-LEVEL
+        # bit. It is a projection-only ``EXISTS``: it binds no placeholder, touches no WHERE
+        # and no ORDER BY, and cannot move a row into or out of this result set.
         sql = (
-            "SELECT id, slug, name, definition FROM workflow_definitions "
-            "WHERE status = 'published' AND created_by = $1"
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+            "lr.last_run_at, lr.last_run_status, "
+            + _HAS_ANY_RUN_SQL
+            + "FROM workflow_definitions wd "
+            + _LAST_RUN_LATERAL_SQL
+            + "WHERE status = 'published' AND created_by = $1"
         )
     else:
         sql = (
@@ -284,19 +516,131 @@ async def list_published_workflows(
             # ``definition``. This is purely ADDITIVE — the pre-103 id/slug/name
             # picker callers ignore the extra column (asyncpg's pool codec decodes
             # the JSONB to a dict).
-            "SELECT id, slug, name, definition FROM workflow_definitions "
-            "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
+            #
+            # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected
+            # FOR SERVER-SIDE COMPUTATION ONLY — consumed inside the API layer to compute
+            # ``is_mine``, never serialized. Projection only; the predicate is untouched.
+            #
+            # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins that projection. The
+            # projection widens; the predicate does NOT — this branch's
+            # ``(is_system_global = true OR created_by = $1)`` is byte-identical to what
+            # shipped, and ``test_dual_mode_wiring.py:256`` asserts that exact substring.
+            #
+            # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join it too,
+            # through the shared ``_LAST_RUN_LATERAL_SQL``. ⚠ THIS BRANCH IS THE ONE WHERE THE
+            # OWNER-SCOPE ON THE LATERAL EARNS ITS KEEP: it is the branch that returns
+            # ``is_system_global`` rows to EVERY caller, and five of those globals carry
+            # 20 / 15 / 11 / 7 / 1 real runs belonging to ONE user. An unscoped lateral here
+            # would be a cross-tenant read of run activity on a world-readable row. The
+            # predicate itself is still byte-identical, and the join adds columns only.
+            #
+            # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here, and THIS IS
+            # THE BRANCH THE DEFECT WAS MEASURED ON. It returns the ``is_system_global`` rows
+            # to EVERY caller, and the five carrying 20 / 15 / 11 / 7 / 1 runs read an explicit
+            # "Never run" for everybody but the one user who ran them. The scoped pair stays
+            # scoped; the unscoped bit says only that SOMEBODY has — existence and nothing else
+            # (DEC-08-A). ⚠ It binds no placeholder, which is precisely why the ``$2`` project
+            # filter appended below is not renumbered.
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+            "lr.last_run_at, lr.last_run_status, "
+            + _HAS_ANY_RUN_SQL
+            + "FROM workflow_definitions wd "
+            + _LAST_RUN_LATERAL_SQL
+            + "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]
     if project_folder_id is not None:
         params.append(str(project_folder_id))  # definition->>'key' returns TEXT → bind str
         sql += f" AND definition->>'project_folder_id' = ${len(params)}"
-    sql += " ORDER BY name"
+    # ── SITE 1 of 3 — Phase 193.2 (BUG-260815-02, D-15 / D-16): RECENCY, not alphabet ──
+    #
+    # ⚠ THE DIVERGENCE BELOW IS A DECISION, NOT AN INCONSISTENCY, AND THIS IS WHERE IT IS
+    # RECORDED SO A LATER READER FINDS THE REASONING RATHER THAN A PUZZLE. This feed and
+    # ``list_draft_workflows`` — the two that hold the author's OWN work — order by
+    # ``updated_at DESC``. ``list_starter_workflows`` — the curated catalogue the author
+    # did NOT write — deliberately KEEPS ``ORDER BY name``, because "the most recently
+    # updated starter" is meaningless to someone browsing a shelf of examples.
+    # ``BUG-260815-02`` explicitly warns *"change them together or the feeds disagree"* and
+    # this decision (D-16) deliberately does NOT — accepted with eyes open, on the recorded
+    # condition that the divergence lives in the code. Do not "tidy" it back to uniformity:
+    # that restores the blocking defect. Pinned by
+    # ``test_the_d16_divergence_is_recorded_at_all_three_sites``.
+    #
+    # THE DEFECT (``BUG-260815-02``, severity `blocking`): a just-published workflow was
+    # UNFINDABLE. The AI names the workflow, so the author does not know the name they are
+    # looking for, and all three feeds sorted alphabetically — nothing anywhere surfaced the
+    # thing that had just changed.
+    #
+    # WHY ``updated_at`` AND NOT ``created_at`` (D-15): the column is already on the wire
+    # and already consumed by ``relativeChanged``'s nine bands
+    # (``library/libraryFilter.ts:86`` and `:112`), so the card's "changed <rel>" text and
+    # the list order read the SAME column and agree BY CONSTRUCTION rather than by
+    # discipline. And on THIS feed the two candidates coincide exactly: the publish flip is
+    # an ``UPDATE`` and ``workflow_definitions_set_updated_at`` is an unconditional
+    # ``BEFORE UPDATE … FOR EACH ROW`` trigger, after which
+    # ``workflow_definitions_block_published`` freezes the row — so here
+    # ``ORDER BY updated_at DESC`` IS ``ORDER BY publish-time DESC``, and D-15's rejection
+    # of ``created_at DESC`` costs nothing at all.
+    #
+    # WHAT IS PRESERVED — and on this pool that is the whole safety argument: NOT ONE BYTE
+    # of the two ``WHERE`` branches, the ``params`` list or the ``$N`` binding above is
+    # touched. This pool bypasses RLS, so the predicate IS the access boundary; the
+    # ``ORDER BY`` is appended AFTER the predicate and AFTER the ``$N`` project filter, so
+    # it cannot widen visibility. Both clauses are static literals — no user input reaches
+    # the sort. Pinned by the three ``*_predicate*_byte_identical_to_what_shipped`` cases.
+    #
+    # ⚠ SHARED-CONSUMER CONSEQUENCE, STATED HERE RATHER THAN DISCOVERED LATER — and it is
+    # unique to THIS site. With the DEFAULT ``owned_only=False`` this feed is not just the
+    # Workflows-page Published shelf: it also serves the **composer's Harness workflow
+    # picker**, **``WorkspacePanel``'s run-soul** and **``threads.py``'s kickoff** (`:97`
+    # imports it). All three therefore move from alphabetical to recency. That is
+    # defensible — recency is arguably better in a picker too — but it is a user-visible
+    # change OUTSIDE the library. MEASURED at the time of the change: no test and no
+    # frontend module asserts alphabetical order for any of those three surfaces.
+    #
+    # NO MIGRATION, and the evidence rather than the assurance: there is no index on
+    # ``name`` either, so the shipped sort was ALREADY unindexed and the plan shape is
+    # unchanged. ``workflow_definitions`` is 225 rows; the largest single feed measured is
+    # 118. The precedent is recorded twenty lines up in this same docstring — "NO
+    # expression index, ZERO migration … sufficient at current scale". No file under
+    # ``supabase/migrations/`` is added by this phase.
+    #
+    # ⚠ AMENDED 2026-08-15 (code review ``WR-03``) — ``, id DESC`` IS A CORRECTNESS FIX, NOT
+    # A TIDY-UP, AND IT IS RECORDED BESIDE THE PARAGRAPHS ABOVE RATHER THAN OVER THEM.
+    # ``updated_at`` is NOT unique and Postgres' ``now()`` is TRANSACTION-scoped, so every
+    # row touched by one migration or one bulk update carries an identical timestamp.
+    # Censused against the live local DB (``127.0.0.1:54322``, 225 rows) on the day of the
+    # amendment: 39 published rows share ``2026-07-18 20:43:42.856183+00`` (and 2 more share
+    # another), 24 draft rows share the same instant. Within a tie Postgres guarantees NO
+    # order, so a THIRD of the library was free to reshuffle between two fetches — on the
+    # very feed whose purpose is "find the thing that just changed". The clause this
+    # replaced was total in practice under ``ORDER BY name`` (names are near-unique) and
+    # stopped being total the moment the sort key became a timestamp.
+    #
+    # WHY ``id``: it is this table's PRIMARY KEY (``workflow_definitions_pkey``) — therefore
+    # NOT NULL and unique, measured against ``pg_constraint``/``pg_attribute`` rather than
+    # assumed — and it is ALREADY in the SELECT list above, so the projection does not widen
+    # by one byte. No migration, no index (there is none on ``updated_at`` either, so nothing
+    # regresses), no schema change.
+    #
+    # ⚠ IT ORDERS WITHIN TIES AND NOWHERE ELSE — measured, not argued. Both clauses were
+    # driven over all three live predicate shapes (drafts 78 rows, owned published 28,
+    # published-with-globals 91): the sequence of ``updated_at`` VALUES is identical with and
+    # without the tiebreaker, the top row is unchanged, every position that moved sits inside
+    # a tie group (zero outside), and two consecutive runs agree exactly. D-15's recency is
+    # therefore untouched — a freshly published row holds a unique fresh timestamp, is in no
+    # tie, and still lands first. Pinned by
+    # ``test_the_two_author_feeds_order_by_recency_and_starters_stay_alphabetical``, whose
+    # needle is the FULL clause on purpose: ``"ORDER BY updated_at DESC"`` is a PREFIX of
+    # this one, so the shorter needle stays green against a feed with no tiebreaker at all.
+    sql += " ORDER BY updated_at DESC, id DESC"
     rows = await pool.fetch(sql, *params)
     return [dict(r) for r in rows]
 
 
-async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
+async def list_starter_workflows(
+    pool: asyncpg.Pool, *, user_id: UUID | None = None
+) -> list[dict]:
     """Curated global starters — the Starters shelf feed (Phase 143 / WF-01, D-143-2).
 
     Returns the ``status='published' AND is_system_global=true`` definitions carrying the
@@ -313,12 +657,85 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     T-091-03) applies only to user-supplied values, of which this query has none
     (V5 — no injection surface). Returns the id/slug/name/definition the shelf card
     needs (mirrors ``list_published_workflows``' additive ``definition`` column).
+
+    ⚠ THE KEYWORD-ONLY ``user_id`` (Phase 192.2 / LIB-06, D-07) IS NOT A SCOPE ON THE SHELF —
+    IT IS THE SCOPE ON THE RUN FACTS, and the distinction is the whole security argument for
+    this signature change. The shelf's own three-clause predicate is untouched and still
+    returns the SAME curated globals to every caller; the id is bound as ``$1`` and consumed
+    ONLY inside ``_LAST_RUN_LATERAL_SQL``, so it decides whose ``last_run_at`` /
+    ``last_run_status`` this caller sees on a row everybody can see. The Starters shelf needs
+    it for the reason RESEARCH C-6 records: ``PublishedWorkflow`` is ONE model serving TWO
+    feeds, so a field added for ``/published`` and not mirrored here leaves every starter card
+    silently missing its run facts while the type says it has them (192.1 hit this exact trap
+    with ``updated_at``). Measured 2026-08-19: the live shelf is 3 rows, exactly ONE of which
+    has ever been run — both arms are real.
+
+    ⚠ DEFAULTED TO ``None``, AND THAT DEFAULT IS FAIL-CLOSED RATHER THAN CONVENIENT. With no
+    id the bind is SQL NULL, ``r.user_id = $1`` is never true, and every row comes back with
+    both facts NULL — "we do not know", never "everyone's runs". The default exists so the
+    shipped positional call ``list_starter_workflows(pool)`` (``test_starter_workflows.py``)
+    stays valid; it can only ever REMOVE information.
     """
+    # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected FOR
+    # SERVER-SIDE COMPUTATION ONLY — ``get_starter_workflows`` computes ``is_mine`` from the
+    # raw ``created_by`` and never serializes it. Projection only; the predicate is untouched.
+    #
+    # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins that projection. The projection
+    # widens; the predicate does NOT — the three-clause WHERE and the ``ORDER BY name``
+    # below are byte-identical to what shipped. Note this feed serves the SAME
+    # ``PublishedWorkflow`` model as ``/published`` (RESEARCH C-6: one model, two feeds),
+    # so both SELECT lists must carry the column or one shelf renders no "changed" segment.
+    #
+    # ── SITE 2 of 3 — Phase 193.2 (BUG-260815-02, D-16): THIS ONE STAYS ALPHABETICAL ──
+    #
+    # ⚠ THE ``ORDER BY name`` BELOW IS DELIBERATE AND IS THE ONLY ONE LEFT IN THIS MODULE.
+    # Its two siblings — ``list_published_workflows`` and ``list_draft_workflows`` — moved to
+    # ``ORDER BY updated_at DESC`` in Phase 193.2 to fix ``BUG-260815-02`` (severity
+    # `blocking`: a just-published workflow was unfindable, because the AI names it and every
+    # feed sorted by that name). **This feed did not move, and that asymmetry is the decision
+    # rather than an oversight.** These rows are the CURATED starters — a fixed catalogue the
+    # author did not write and does not edit — so "the most recently updated starter" carries
+    # no information for someone browsing examples, while a stable alphabet does. Recency
+    # answers "what did I just do?"; nobody asks that of a shelf they did not touch.
+    #
+    # ``BUG-260815-02`` warns *"change them together or the feeds disagree"* and D-16
+    # deliberately does NOT — accepted with eyes open, on the recorded condition that the
+    # divergence lives in the code, which is what this comment is. **Do not "fix" the
+    # inconsistency by making this feed match its siblings**: uniformity here buys nothing and
+    # a later reader who quietly restores it is the failure mode
+    # ``test_the_d16_divergence_is_recorded_at_all_three_sites`` exists to catch.
+    #
+    # NOTHING ELSE MOVES: the three-clause ``WHERE`` and the whole projection are still
+    # byte-identical to what shipped (this pool bypasses RLS, so that predicate is the access
+    # boundary), and no migration is added — there is no index on ``name`` and never was.
+    #
+    # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join that projection
+    # via the shared ``_LAST_RUN_LATERAL_SQL``. ⚠ NOTHING ABOUT THE SHELF ITSELF MOVES — the
+    # three-clause WHERE is byte-identical, ``ORDER BY name`` is byte-identical (D-16's
+    # divergence stands), and the ``$1`` bound below is read ONLY by the lateral. It is the
+    # ONE constant on purpose: a lateral inlined here would carry ``id DESC`` into this
+    # function's source and red ``test_workflows_updated_at``'s alphabetical-shelf fence with
+    # a SUBQUERY's ordering, which is not this shelf's ordering. See the constant's own
+    # comment; ``test_library_run_facts.test_the_starters_shelf_ordering_is_untouched``
+    # re-pins both halves so neither is left to that coincidence.
+    #
+    # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here TOO, and this shelf
+    # is the reason the operator chose the row-level fact over rewording the caller-scoped one
+    # (DEC-08-A). It is WORLD-READABLE and it is the shelf a newcomer meets first: measured
+    # 2026-08-19 it is 3 rows, ONE of which has ever been run — so for every caller but that
+    # runner, LIB-06's own question (*does this one work*) went unanswered on the exact rows it
+    # most needed answering. ⚠ ``ORDER BY name`` and the three-clause WHERE stay byte-identical;
+    # the bit is projection-only and binds nothing.
     rows = await pool.fetch(
-        "SELECT id, slug, name, definition FROM workflow_definitions "
-        "WHERE status = 'published' AND is_system_global = true "
+        "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+        "lr.last_run_at, lr.last_run_status, "
+        + _HAS_ANY_RUN_SQL
+        + "FROM workflow_definitions wd "
+        + _LAST_RUN_LATERAL_SQL
+        + "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
-        "ORDER BY name"
+        "ORDER BY name",
+        user_id,
     )
     return [dict(r) for r in rows]
 
@@ -501,10 +918,103 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # Phase 186 (D-186-07): and ``token``, so the Open-a-draft path arrives in the
         # builder already holding a concurrency token — otherwise the first autosave
         # would have to guess one, or write unguarded.
-        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token "
-        f"FROM workflow_definitions "
-        f"WHERE status = 'draft' AND created_by = $1 "
-        f"ORDER BY name",
+        #
+        # Phase 192.1 (LIB-05 / D-15): and a SEPARATE ``updated_at``. The projection
+        # widens; the predicate does NOT.
+        #
+        # ⚠ D-16 IS A FENCE, NOT ADVICE, AND THIS LINE IS WHERE IT BINDS. ``token`` on the
+        # very same row is ALREADY ``updated_at`` in disguise —
+        # ``CONCURRENCY_TOKEN_SQL`` (:93-95) is
+        # ``to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`` — so
+        # the cheap-looking move is to reuse it and skip this column. DO NOT. The token is
+        # OPAQUE by contract (``api.ts:3334-3345`` forbids parsing it): Postgres keeps
+        # MICROSECONDS and a JS date value keeps only milliseconds, so a
+        # parsed-and-re-rendered token is truncated, matches ZERO rows, and every later
+        # save then refuses as stale — probed against the live database 2026-08-01. Two
+        # columns off one source field is the correct shape: one the server compares
+        # byte-for-byte, one the client may format.
+        #
+        # ── SITE 3 of 3 — Phase 193.2 (BUG-260815-02, D-15 / D-16): RECENCY ────────────
+        #
+        # ⚠ TWO DIFFERENT DECISIONS SHARE THE ID ``D-16`` ON THIS ONE FUNCTION, AND THE
+        # AMBIGUITY IS NAMED HERE RATHER THAN LEFT FOR A READER TO TRIP OVER. Twelve lines
+        # up, "⚠ D-16 IS A FENCE, NOT ADVICE" is **Phase 192.1's** D-16 — *the opaque token
+        # is not the timestamp*. The ``D-16`` in this block is **Phase 193.2's** — *the two
+        # author feeds order by recency and the starters shelf does not*. Both bind; they
+        # are unrelated. ``BUG-260815-02`` is the token that disambiguates them, which is
+        # why ``test_the_d16_divergence_is_recorded_at_all_three_sites`` asserts it: a bare
+        # ``D-16`` needle was MEASURED to pass on this function against the PRE-change
+        # source, satisfied entirely by 192.1's comment about something else.
+        #
+        # THE CHANGE: ``ORDER BY name`` → ``ORDER BY updated_at DESC``. This feed and
+        # ``list_published_workflows`` hold the author's OWN work, so the row that just
+        # changed belongs at the top; ``list_starter_workflows`` keeps the alphabet (D-16).
+        # ``BUG-260815-02`` (severity `blocking`) is a just-published workflow being
+        # unfindable — the AI names it, so the author cannot search for a name they never
+        # chose.
+        #
+        # WHY THIS COLUMN (D-15): ``updated_at`` is already on the wire and already drives
+        # ``relativeChanged``'s nine bands (``library/libraryFilter.ts:86``, `:112`), so the
+        # card's "changed <rel>" text and the row order read the same column and agree by
+        # construction. ⚠ And note what is NOT used: the ``token`` alias on this very row is
+        # ``updated_at`` in disguise, and sorting by it would be a string sort over a
+        # ``to_char`` render — the sort reads the real ``timestamptz`` column, which is the
+        # same two-columns-off-one-field rule 192.1's D-16 states directly above.
+        #
+        # WHAT IS PRESERVED: the ``WHERE status = 'draft' AND created_by = $1`` owner scope
+        # and the ``CONCURRENCY_TOKEN_SQL`` projection are byte-identical to what shipped —
+        # the service role bypasses RLS, so that predicate is the boundary, and the sort key
+        # is appended after it as a static literal with no user input. No migration: there
+        # is no index on ``name`` either, the table is 225 rows, and the largest feed
+        # measured is 118.
+        #
+        # ⚠ AMENDED 2026-08-15 (code review ``WR-03``) — the same amendment as SITE 1, for
+        # the same measured reason, recorded BESIDE the paragraphs above rather than over
+        # them. ``updated_at`` is not unique and ``now()`` is transaction-scoped: **24 draft
+        # rows on the live local DB share one instant** (``2026-07-18 20:43:42.856183+00``),
+        # and Postgres guarantees no order inside a tie. ``id`` is the PRIMARY KEY — NOT
+        # NULL, unique, and already in the SELECT list above — so the sort becomes total
+        # with no projection change, no index and no migration. Measured over this feed's
+        # own live predicate (78 rows): the ``updated_at`` value sequence is unchanged, the
+        # top row is unchanged, every moved position is inside a tie group, and repeated
+        # runs agree. ⚠ And note again what is NOT used as the tiebreaker: ``token`` on this
+        # very row is ``updated_at`` in disguise, so it would break ties by the same field
+        # that created them — ``id`` is the only column here that is unique by construction.
+        #
+        # ── Phase 192.2 (LIB-06 / D-07) — the run facts join this projection too ──────
+        #
+        # ⚠ A DRAFT CAN HAVE RUNS, AND THAT IS THE POINT RATHER THAN AN EDGE CASE. The
+        # publish gauntlet's GOLDEN RUN is a real ``workflow_runs`` row against a draft, and
+        # the live DB carries drafts with 3, 2 and 2 of them. "Your test run failed" is
+        # exactly the answer LIB-06 asks the library to give, so no ``is_golden_run`` filter
+        # is applied — a golden run IS a run of this draft.
+        #
+        # ⚠ AND NOTE WHICH COLUMN IS **NOT** BEING REUSED, because this function already
+        # carries the identical trap twice above. ``token`` is ``updated_at`` in disguise and
+        # ``updated_at`` is the DRAFT's edit time — neither is a run time, and a card that
+        # showed "changed 2 minutes ago" as "ran 2 minutes ago" would be lying about the one
+        # fact this phase exists to tell the truth about. ``last_run_at`` is the RUN's own
+        # ``created_at``, from a different table.
+        #
+        # The owner scope below is untouched and the lateral is scoped to the SAME ``$1``, so
+        # this feed's answer cannot widen: a caller sees their own drafts and their own runs
+        # of them, exactly as before plus two columns.
+        #
+        # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here for CONSISTENCY
+        # rather than because this shelf can lie the way the two published ones can — a draft
+        # is owner-scoped, so on this feed the caller IS the only person with runs and the bit
+        # agrees with ``last_run_at`` today. It is projected anyway because the library speaks
+        # ONE language across its three shelves, and because "today the two agree" is an
+        # UNSTATED invariant nothing enforces: the publish gauntlet's golden run is written by
+        # the run lifecycle, not by the shelf. ⚠ And it is a FOURTH time-shaped-adjacent fact
+        # that is NOT ``token`` and NOT ``updated_at``; see the paragraph above.
+        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at, "
+        f"lr.last_run_at, lr.last_run_status, "
+        + _HAS_ANY_RUN_SQL
+        + f"FROM workflow_definitions wd "
+        + _LAST_RUN_LATERAL_SQL
+        + f"WHERE status = 'draft' AND created_by = $1 "
+        f"ORDER BY updated_at DESC, id DESC",
         user_id,
     )
     return [dict(r) for r in rows]
@@ -806,7 +1316,7 @@ async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
     """
     rows = await pool.fetch(
         """
-        SELECT id, slug, phase_index, status, output
+        SELECT id, slug, phase_index, status, output, started_at, completed_at
         FROM workflow_phases
         WHERE workflow_run_id = $1
         ORDER BY phase_index
@@ -897,7 +1407,7 @@ async def get_active_phase(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
     """
     row = await pool.fetchrow(
         """
-        SELECT id, slug, phase_index, status, output
+        SELECT id, slug, phase_index, status, output, started_at, completed_at
         FROM workflow_phases
         WHERE workflow_run_id = $1 AND status = 'active'
         ORDER BY phase_index
@@ -1002,29 +1512,135 @@ async def get_pending_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
 
 
 # ── workflow_phases writes (PHASE-KEYED → id) ────────────────────────────────
-async def mark_phase_active(pool: asyncpg.Pool, phase_id: UUID) -> None:
+async def mark_phase_active(pool: asyncpg.Pool, phase_id: UUID) -> datetime | None:
     """Flip a phase to ``active`` BEFORE its work runs (Pitfall 1: durable-first).
 
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-05): THE ONE ``started_at`` WRITE SITE ────────────────
+    This is the ONLY writer of ``workflow_phases.started_at`` in the tree, and it is the
+    right one precisely because it happens BEFORE the phase's work: the durable-first flip
+    IS the moment the step began. **No other site may write that column** — a second home
+    would let two "when did this start" answers disagree.
+
+    ⚠ WHY ``created_at`` COULD NOT SUBSTITUTE, which is D-05's whole argument.
+    ``create_workflow_run`` batch-INSERTs EVERY phase row of a run inside one transaction
+    (:334 above), so ``created_at`` is the moment the RUN was created — identical across all
+    of a run's phases and unrelated to when any of them began work. And ``updated_at`` is
+    overwritten by all seven status writers on every transition, so it only ever means "the
+    last time anything about this row moved". Neither could answer "how long did this step
+    take"; a per-step duration was genuinely underivable before migration 121.
+
+    ⚠ RETURNS THE TIMESTAMP THE DATABASE ACTUALLY WROTE — via ``RETURNING``, not a
+    Python-side ``datetime.now()`` computed alongside. The engine emits this value on the
+    ``phase_started`` SSE frame so a live tick has an anchor without polling, and emitting a
+    number the row does not carry would be exactly the dishonesty this phase exists to
+    remove. ``fetchval`` (not ``execute``) is what makes ``RETURNING`` readable; the write
+    is otherwise byte-identical and still ONE statement.
+
+    Returns ``None`` when no row matched — the caller treats a missing anchor as "not
+    recorded" and renders nothing, never a zero.
     """
-    await pool.execute(
-        "UPDATE workflow_phases SET status='active', updated_at=now() WHERE id = $1",
+    return await pool.fetchval(
+        "UPDATE workflow_phases SET status='active', updated_at=now(), started_at = now() WHERE id = $1 RETURNING started_at",
         phase_id,
     )
 
 
-async def complete_phase(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> None:
+async def complete_phase(
+    pool: asyncpg.Pool, phase_id: UUID, output: dict
+) -> datetime | None:
     """Flip to ``completed`` AND write ``output`` in ONE atomic UPDATE.
 
     Called ONLY after the output is durable. The status flip and the output
     write are a single statement (never two) so a crash between them is
     impossible — the resumability invariant (HARNESS-03).
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-05): ONE OF THE FIVE ``completed_at`` WRITE SITES ─────
+    The other four are ``fail_phase``, ``record_phase_not_sent``, ``cancel_phase`` and
+    ``cancel_active_phases``. ⚠ ``skip_phase`` writes NEITHER timestamp, deliberately: a
+    skipped phase never ran, so both columns stay NULL and the row reads *never ran* rather
+    than a zero duration. That silence is D-06's, and it is not an omission to "fix".
+
+    ⚠ RETURNS THE TIMESTAMP THE DATABASE ACTUALLY WROTE (``RETURNING``), for the same
+    reason ``mark_phase_active`` does: the engine puts this value on the ``phase_completed``
+    SSE frame, and a Python-side ``datetime.now()`` computed beside the write would be a
+    number the row does not carry.
+
+    ⚠ ``RETURNING`` COMPOSES WITH THE ``IS DISTINCT FROM 'cancelled'`` FENCE RATHER THAN
+    WEAKENING IT, and that is the useful part: when the fence refuses the write (a Stop
+    already cancelled this phase — the L-01 residue) NO row is returned, so this yields
+    ``None`` and the caller emits no completion timestamp for a step that was never
+    completed. The guard and the return value agree by construction.
+
+    ── 200.1 / D-200.1-01(b): THIS WRITER STOPPED PRE-ENCODING ──────────────
+    This function, ``fail_phase`` and ``record_phase_not_sent`` each bound
+    ``json.dumps(...)`` into their ``$2::jsonb`` parameter on a pool that ALREADY installs a
+    jsonb codec with ``encoder=json.dumps`` (``dependencies._init_pg_connection``, D-073-06).
+    Encoded twice, every value landed as a jsonb **STRING SCALAR** — measured at **527 of 588**
+    non-null ``output`` values, including **484 of 484** ``completed`` rows. That is migration
+    122's root cause one column over, and the full narrative is in ``create_workflow_run``'s
+    docstring above. **The fix is to stop pre-encoding, not to add a cast:** ``$2::jsonb`` is
+    fine and is unchanged, and so is every other byte of the SQL.
+
+    ⚠ **A FINDING THIS PLAN MEASURED AND IS DELIBERATELY *NOT* FIXING — recorded here because
+    a finding that lives nowhere is a finding that was deleted.** ``load_run_phases`` SELECTs
+    ``output``, and ``harness_engine.py``'s F7 resume re-fold reads ``r.get("output") or {}``
+    into an ``accumulated_outputs: dict[str, dict]``. On a string-scalar row the pool codec
+    decodes to a Python **``str``**, so **the resumed run's grounding re-fold has been folding
+    STRINGS** — the same silent degradation as ``declared_phase_measure``, in a THIRD consumer,
+    and the reason ``isinstance`` guards downstream (``_is_llm_human_input``,
+    ``_active_tool_call_id``) have been quietly falling through. **(b) repairs this for NEW rows
+    and does NOT repair it for the 527 historical ones.** That is outside RUN-04's scope — the
+    fix belongs with an audit of the resume path's own shape assumptions, not with a parameter
+    change. ⚠ **Re-open trigger, named rather than left silent: the next phase that touches the
+    resume path or the startup sweep.**
+
+    ⚠ **THE SIBLING COLUMNS ARE UNTOUCHED AND THAT IS A DECISION.** ``json.dumps(inputs)`` in
+    ``create_workflow_run`` and the four ``definition`` writes elsewhere in this file keep the
+    old shape; their re-open trigger is carried forward VERBATIM from migration 123's header
+    (the next phase that touches either on the WRITE path). ``output`` is repairable now
+    precisely because it ALREADY has two shapes in it — 527 string against 61 object — and
+    because ``models/thread.py::phase_output_object`` now accepts both.
     """
-    await pool.execute(
-        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now() WHERE id = $1",
+    return await pool.fetchval(
+        # ── L-01 RESIDUE AT THE PHASE LEVEL (added 2026-08-16) ───────────────
+        # ⚠ THIS CLAUSE EXISTS BECAUSE THE RUN-LEVEL GUARD CREATED A CONTRADICTION
+        # IT DID NOT CLOSE. `finish_run` now refuses to overwrite a terminal
+        # `workflow_runs.status`, so a user's Stop survives. The four terminal
+        # `workflow_phases` writers had NO equivalent — measured:
+        # `git show 9dbd57f5 -- backend/app/db/workflows.py | grep -cE "^\+.*workflow_phases"`
+        # returns 0. So on the known L-01 residue (the far-worker producer keeps
+        # running after a Stop) worker B could write `completed` over worker A's
+        # `cancelled` phase, and the run would read `cancelled` while its spine
+        # showed that very step DONE — with `runStepCount.ts` counting it toward
+        # "N of M steps". Making the run row honest while leaving the phase rows
+        # unguarded is a WORSE state than leaving both dishonest, because the two
+        # surfaces then disagree.
+        #
+        # ⚠ SCOPED DELIBERATELY NARROWER THAN `finish_run`'s GUARD, and the reason
+        # is that the wider one is not provable here. `finish_run` refuses ANY
+        # terminal→different-terminal write; a phase cannot take that rule, because
+        # a retry legitimately re-runs a phase (`mark_phase_active` at
+        # `harness_engine.py:1579`) and a `failed`→`completed` transition may be
+        # correct. **`cancelled` is the one phase status nothing legitimately
+        # transitions OUT of**: its only writers are `cancel_phase` and
+        # `cancel_active_phases`, both on the Stop path, and the run itself is
+        # terminal by then. So the fence is `IS DISTINCT FROM 'cancelled'` and
+        # nothing else. A broader guard would strand retried phases — a far worse
+        # failure than the one being fixed.
+        #
+        # `IS DISTINCT FROM` rather than `<>` on purpose: `status` is NOT NULL
+        # today, and `<>` would silently stop matching if that ever changed.
+        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled' RETURNING completed_at",
         phase_id,
-        json.dumps(output),
+        # ⚠ THE PLAIN DICT, NOT A PRE-DUMPED STRING — 200.1 / D-200.1-01(b). See the
+        # migration-122 paragraph in `create_workflow_run` above for the full root cause:
+        # the POOL installs a jsonb codec with `encoder=json.dumps`, so a pre-encoded string
+        # is encoded a SECOND time and lands as a jsonb STRING SCALAR. The `$2::jsonb` cast
+        # is fine and stays; the PARAMETER is what was wrong.
+        output,
     )
 
 
@@ -1044,9 +1660,12 @@ async def fail_phase(
     """
     payload: dict = {**(output or {}), "_failure_reason": reason}
     await pool.execute(
-        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
-        json.dumps(payload),
+        # ⚠ THE PLAIN DICT — 200.1 / D-200.1-01(b), see `complete_phase`. `payload` is still
+        # composed here and `_failure_reason` still wins on a key collision; only the encode
+        # moved to the pool's codec.
+        payload,
     )
 
 
@@ -1054,9 +1673,19 @@ async def skip_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
     """Mark a phase ``skipped`` (skip_to_phase routing — Plan 05).
 
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-06): THIS IS THE ONE STATUS WRITER THAT TOUCHES NEITHER ──
+    ⚠ **THE ABSENCE IS DELIBERATE AND MUST NOT BE "FIXED".** Six of the seven
+    ``workflow_phases`` status writers now stamp a timestamp; this one stamps none. A skipped
+    phase NEVER RAN — it was routed around, not executed — so it has no start instant and no
+    completion instant, and both columns stay NULL. The row then reads *never ran*, which is
+    a DIFFERENT client-facing state from *time not recorded* (a phase that did run, before
+    migration 121 existed). Writing ``completed_at`` here would claim the step finished;
+    writing ``started_at`` would claim it began. D-06 calls this CORRECT SILENCE, and it is
+    the count-side twin of the rule that a type with no real number emits no key at all.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='skipped', updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='skipped', updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
     )
 
@@ -1087,9 +1716,111 @@ async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
-        json.dumps(output),
+        # ⚠ THE PLAIN DICT — 200.1 / D-200.1-01(b), see `complete_phase`. This writer copies
+        # `complete_phase` and that includes how it binds its parameter.
+        output,
+    )
+
+
+async def cancel_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
+    """Flip the interrupted phase to ``cancelled`` — the ENGINE arm (194 / RUN-01, D-04).
+
+    WHAT THIS STATUS MEANS. The phase that was RUNNING when the user stopped the run.
+    It did NOT ``fail`` — nothing went wrong, the step was interrupted. It was NOT
+    ``skipped`` — it was never routed around; it started, it did work, and a person
+    ended the run underneath it. It is plainly not ``completed`` (it produced no phase
+    output), not ``pending`` (it had already started), and not ``recorded_not_sent``
+    (189's governed-external-action outcome, which has nothing to do with a stop).
+    None of the six shipped statuses is true of that outcome.
+
+    ⚠ REUSING ``failed`` OR ``skipped`` WAS OFFERED AND REJECTED (D-04). Phase 194's
+    entire requirement is honesty about what a stopped run did and did not do; writing
+    ``failed`` on a phase that did not fail, or ``skipped`` on a phase that ran, is
+    precisely the dishonesty the phase exists to remove.
+
+    ⚠ THE COLUMN STORES THE SLUG (D-17). ``cancelled`` is the literal in
+    ``workflow_phases_status_check`` (migration 119). The sentence a person reads —
+    "Run cancelled — no deliverable produced" — is RENDERED by the client's vocabulary
+    layer from this slug and appears in no query and no constraint.
+
+    ⚠ COMPLETED PHASES ARE UNTOUCHED (D-07 / D-13, inherited verbatim). Their outputs
+    are already durable and ``finish_run`` does not touch them. This writer moves ONE
+    row, named by its id — the phase the caller already knows was interrupted. It is
+    not a bulk terminalize and must never become one.
+
+    ⚠ WHERE THIS IS CALLED FROM, AND WHY THERE ARE TWO. This is the ENGINE arm's
+    writer. The engine's cancel/escape path holds ``phase_id`` in the same loop
+    iteration, so it is the only home that knows WHICH phase the user interrupted
+    without a query — and the only home that can distinguish "the phase the user
+    interrupted" from "some phase row that happens to be ``active``". The engineless
+    zombie / no-producer arm has no engine, no loop and no ``phase_id`` at all; it uses
+    the RUN-KEYED sibling ``cancel_active_phases`` below. Collapsing the two would cost
+    the engine arm its certainty or leave the zombie arm with nothing to call.
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE (T-194-06-03). The workflow cluster reads
+    through a service-role pool that BYPASSES RLS, so a WHERE clause is the access
+    boundary — but this writer takes no user-supplied filter, only a key. Ownership is
+    enforced by the CALLER (the owner-scoped, anchor-confirmed cancel route), the same
+    division ``_cancel_run_internals`` already keeps (T-147-06).
+    PHASE-KEYED write → ``WHERE id=$1``.
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE id = $1",
+        phase_id,
+    )
+
+
+async def cancel_active_phases(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a run's in-flight phase row(s) to ``cancelled`` — the ENGINELESS arm (194 / RUN-01).
+
+    WHAT THIS STATUS MEANS. Identical to ``cancel_phase`` above and stated once there:
+    the phase that was RUNNING when the user stopped the run — not failed, not skipped,
+    interrupted. ⚠ Reusing ``failed`` or ``skipped`` was OFFERED AND REJECTED (D-04).
+
+    ⚠ THE COLUMN STORES THE SLUG (D-17). ``cancelled`` is the literal in
+    ``workflow_phases_status_check`` (migration 119). The sentence a person reads —
+    "Run cancelled — no deliverable produced" — is RENDERED by the client's vocabulary
+    layer from this slug and appears in no query and no constraint.
+
+    ⚠ COMPLETED PHASES ARE UNTOUCHED (D-07 / D-13, inherited verbatim), AND THE
+    ``AND status = 'active'`` CLAUSE IS THE MECHANISM — not a convention, not belt-and-
+    braces. It is the only thing standing between this writer and a bulk terminalize of
+    every phase on the run. Widening it to a set — or dropping it — would rewrite
+    ``completed`` rows whose outputs are already durable, which D-07 forbids outright;
+    ``failed``, ``skipped`` and ``recorded_not_sent`` rows are equally out of its reach
+    and must stay so.
+
+    ⚠ RUN-KEYED write → ``WHERE workflow_run_id=$1``. The column is
+    ``workflow_run_id``. ``workflow_phases`` has NO plain ``run_id`` column and naming
+    one raises Postgres 42703 — the trap ``get_active_phase`` records above, whose
+    predicate this applies as a WRITE.
+
+    ⚠ A SET-PREDICATE, DELIBERATELY — never a read-then-update-by-id. Exactly one
+    ``active`` row per run is TYPICAL, NOT GUARANTEED (measured: 3 runs have exactly 1
+    each, 0 runs have more; ``get_active_phase`` itself hedges with ``ORDER BY
+    phase_index LIMIT 1``). One predicate UPDATE is correct for 0, 1 or N matching
+    rows, raises on none of the three, and needs no prior read.
+
+    ⚠ WHERE THIS IS CALLED FROM, AND WHY THERE ARE TWO. This is the zombie /
+    no-producer arm's writer — the path with no engine, no loop and no ``phase_id``,
+    where the row must be FOUND rather than named. The engine arm uses the PHASE-KEYED
+    ``cancel_phase`` above, which is the only home that can distinguish "the phase the
+    user interrupted" from "some phase row that happens to be ``active``".
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE (T-194-06-03). The workflow cluster reads
+    through a service-role pool that BYPASSES RLS, so a WHERE clause is the access
+    boundary — but this writer takes no user-supplied filter, only a key. Ownership is
+    enforced by the CALLER (the owner-scoped, anchor-confirmed cancel route), the same
+    division ``_cancel_run_internals`` already keeps (T-147-06).
+
+    ⚠ The predicate below is written on ONE source line ON PURPOSE (193.2-08: a rule
+    written WRAPPED failed its own literal ``grep -q`` and read as "already fixed").
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE workflow_run_id = $1 AND status = 'active'",
+        workflow_run_id,
     )
 
 
@@ -1108,8 +1839,175 @@ async def advance_current_phase(
     )
 
 
+async def pause_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a run to ``paused`` — the D-10 human gate, and the FIRST writer of this status.
+
+    ⚠ ``workflow_runs.status = 'paused'`` HAD **ZERO WRITERS IN THE ENTIRE BACKEND**
+    before Phase 200. ``grep -rn "'paused'" backend/app --include=*.py`` returned seven
+    hits and **all seven were READS** — the delete-cascade in-flight sweep
+    (``api/workflows.py``), the lock banner (``:1180``), ``find_resumable_runs``
+    (``:1296``) and the claim/lease writes. The literal has been admitted by
+    ``workflow_runs_status_check`` since migration 057 and nothing has ever written it.
+    So there is no pause semantics to copy here, only a SHAPE: ``cancel_active_phases``'
+    single keyed ``pool.execute`` with ``$N`` placeholders and a docstring naming the key
+    axis and the ownership division.
+
+    ⚠ **THIS MUST NOT BE ``finish_run``, AND THE REASON IS MEASURED RATHER THAN
+    STYLISTIC.** ``finish_run``'s guard (``status NOT IN ('completed','failed',
+    'cancelled')``) would happily ACCEPT a ``'paused'`` write — but it clears
+    ``threads.active_workflow_run_id`` in the SAME transaction (092 SC#2), and
+    ``find_resumable_runs`` (``:1251``) requires ``t.active_workflow_run_id = wr.id``.
+    Reusing it would make every paused run **permanently unresumable**: the boot sweep
+    would find nothing, forever. That is Pitfall 4, and it is why this is a separate
+    writer rather than a second argument to an existing one.
+
+    ⚠ RUN-KEYED write → ``WHERE id = $1``. The guard is
+    ``status NOT IN ('completed','failed','cancelled')`` so this can never RESURRECT a
+    terminal run — a Stop that landed on another worker while the gate was waiting keeps
+    its terminal status, and this write finds 0 rows. It is deliberately NOT narrowed to
+    ``status = 'active'``: a re-entered pause (the same gate timing out twice across a
+    re-drive) must stay idempotent rather than silently no-op, and ``cap_paused`` is a
+    non-terminal state a run can legitimately be in when a later phase's gate elapses.
+
+    ⚠ THE THREAD ANCHOR IS NOT TOUCHED HERE, AND ITS ABSENCE IS THE POINT. A paused run
+    is still the thread's CURRENT run; the anchor is what makes it findable again.
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE. The workflow cluster reads through a
+    service-role pool that BYPASSES RLS, so a WHERE clause is the access boundary — but
+    this writer takes no user-supplied filter, only a key. Ownership is enforced by the
+    CALLER (the engine reached this run through an owner-scoped kickoff or an
+    owner-scoped, anchor-confirmed answer), the same division ``cancel_active_phases``
+    keeps.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs SET status = 'paused' WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
+        workflow_run_id,
+    )
+
+
+async def resume_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a ``paused`` run back to ``active`` — the answer-triggered re-drive (D-10).
+
+    The exact inverse of ``pause_run`` above and narrower than it on purpose:
+    ``AND status = 'paused'`` means this can only ever move a run OUT of the one state
+    ``pause_run`` put it in. It cannot resurrect a terminal run, cannot disturb a
+    ``cap_paused`` run (whose Continue path owns its own transition), and no-ops on a run
+    somebody else already resumed — so two answers racing on two workers produce one
+    transition, not two.
+
+    ⚠ WITHOUT THIS, A RE-DRIVEN RUN WOULD REPORT ``paused`` WHILE IT IS RUNNING, which is
+    the same class of user-visible lie D-10 exists to remove. The status is the only
+    column written; the thread anchor is untouched (it was never cleared — see
+    ``pause_run``).
+
+    ⚠ RUN-KEYED write → ``WHERE id = $1``. Ownership is the CALLER's, exactly as above:
+    the answer route resolves the run owner-scoped and anchor-confirmed before it ever
+    reaches here.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs SET status = 'active' WHERE id = $1 AND status = 'paused'",
+        workflow_run_id,
+    )
+
+
+async def get_ask_user_response(
+    pool: asyncpg.Pool, run_id: UUID, tool_call_id: str
+) -> dict | None:
+    """The durable ask_user RESPONSE payload for ``tool_call_id`` — or ``None``.
+
+    ⚠ THIS EXISTS BECAUSE THE RESUME CONTRACT WAS ONLY HALF TRUE, AND THE HALF THAT WAS
+    MISSING IS THE ONE A PERSON NOTICES. ``resume_stranded_workflows``' docstring says of
+    an already-answered ask_user phase: *"the answer is durable → do NOT re-ask; let
+    ``run_workflow`` re-run the phase, which re-reads the durable answer and proceeds."*
+    **Nothing re-read it.** ``_exec_llm_human_input`` mints a fresh ``uuid4().hex``
+    ``tool_call_id`` on every entry and blocks on a brand-new channel, so a re-driven
+    phase asked the question AGAIN. ``ask_user_response_exists`` (:1342) could answer
+    *whether* an answer exists but never hand it back.
+
+    It is the EXISTS query above, kept structurally identical and SELECTing the payload
+    instead of a boolean — same ``role='system'`` scan (the /pending way, never the
+    filtered /snapshot path), same ``ask_user_response`` kind discriminator, same
+    per-call id match, and the same RUN-SCOPING correlation (WR-06): the response row
+    carries no ``run_id``, so a matching PROMPT row for the SAME ``tool_call_id`` must
+    belong to THIS run. A thread with several workflow runs cannot cross-feed answers.
+
+    ⚠ ``expired`` rows are EXCLUDED. The terminal-site cleanup (096-09) writes a row
+    shaped exactly like a response but carrying ``expired: true``; consuming one as an
+    answer would resurrect precisely the silent-empty-approval this phase removes.
+
+    Returns ``{"response_text": str, "choice_index": int | None}`` for the LATEST
+    matching row, or ``None``. Owner-scoping is the caller's, as everywhere in this
+    module: the pool bypasses RLS and the ``WHERE`` clause is the boundary.
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT r.tool_calls
+        FROM messages r
+        JOIN workflow_runs wr ON wr.thread_id = r.thread_id
+        JOIN messages p
+          ON p.thread_id = wr.thread_id
+         AND p.role = 'system'
+         AND p.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+         AND p.tool_calls->0->>'tool_call_id' = $2
+         AND p.tool_calls->0->>'run_id' = $1::text
+        WHERE wr.id = $1
+          AND r.role = 'system'
+          AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+          AND r.tool_calls->0->>'tool_call_id' = $2
+          AND COALESCE((r.tool_calls->0->>'expired')::boolean, false) = false
+        ORDER BY r.created_at DESC
+        LIMIT 1
+        """,
+        run_id,
+        tool_call_id,
+    )
+    if row is None:
+        return None
+    tcs = row["tool_calls"] or []
+    payload = tcs[0] if tcs else {}
+    return {
+        "response_text": payload.get("response_text"),
+        "choice_index": payload.get("choice_index"),
+    }
+
+
 async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
-    """Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2).
+    """Terminal run status write (``completed`` / ``failed`` / ``cancelled``) + lock-clear (SC#2).
+
+    ⚠ CORRECTED (Phase 194). This docstring's first line previously read, verbatim:
+    "Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2)." — and
+    it is quoted here rather than deleted, because it was NARROWER THAN THE FUNCTION and
+    a reader who trusted it drew exactly the wrong conclusion. It never restricted
+    ``status``; it merely failed to mention the third value two shipped callers have been
+    passing for a year:
+      * ``backend/app/services/run_producer.py:262`` — the F2 harness-failure terminalize
+        has passed ``"cancelled"`` since the v2.8 cancel-honesty fix, whenever the
+        producer's ``terminal_status`` is ``cancelled`` (a user Stop).
+      * ``backend/app/api/workflows.py:1518`` — ``delete_workflow_cascade`` passes
+        ``"cancelled"`` for every in-flight run it tears down.
+    And the schema has admitted it from the beginning: ``workflow_runs_status_check`` was
+    created with ``cancelled`` in ``supabase/migrations/057_workflow_runs.sql:19`` and
+    re-asserted in ``063_dual_mode_continue.sql:55-57`` when ``cap_paused`` was added.
+    ⇒ THE CORRECTED CONTRACT: a terminal ``workflow_runs`` status write for ``completed``,
+    ``failed`` OR ``cancelled``, plus the thread anchor clear, in ONE transaction,
+    idempotent on a re-run. Phase 194 adds new callers on the cancel path and the old
+    first line would have read as a refusal to serve them.
+
+    ⚠ THE CROSS-WORKER INTERLEAVE — NAMED HERE RATHER THAN GUARDED, because a caller is
+    who needs to know. A Stop landing on worker A (``_cancel_run_internals`` Step 3b →
+    ``finish_run``) while worker B's producer is mid-F2 can interleave two
+    ``UPDATE workflow_runs SET status = $2 WHERE id = $1`` writes against the same row.
+    That is safe today for one reason only, and the reason is worth stating precisely:
+    the interleave is BENIGN BY VALUE-IDENTITY, NOT BY EXCLUSION — both writes carry the SAME VALUE, row-level locking serialises them, and the anchor clear is idempotent (it finds 0 rows on the second pass).
+    THE ONE THING A CALLER MUST NEVER DO IS MAKE THE TWO WRITES DISAGREE — e.g. one passing 'failed' while the other passes 'cancelled'. That prohibition IS the whole guard.
+    Nothing here serialises the two workers, and adding a lock would be the wrong fix: the
+    value-identity property is cheaper and it is what the shipped paths already satisfy.
+
+    ⚠ THIS FUNCTION WRITES NO ``workflow_phases`` ROW, AND MUST NOT LEARN TO. It is
+    called on the ``completed`` path (``harness_engine.py``'s success arm) and by the
+    delete cascade; a phase write here would change behaviour on paths Phase 194 must not
+    touch. The cancel path's phase terminalize lives in ``cancel_phase`` /
+    ``cancel_active_phases`` above, called from the two cancel sites (194 / D-07).
 
     workflow_runs table, keyed by its own ``id``. Mirror ``_shielded_finalize``:
     this durable UPDATE happens BEFORE the terminal SSE sentinel.
@@ -1125,14 +2023,60 @@ async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
     """
     async with pool.acquire() as con:
         async with con.transaction():
+            # ── L-01 / RUN-01 — THE TERMINAL GUARD (added 2026-08-16) ─────────
+            #
+            # ⚠ THIS ENFORCES THE PROHIBITION THE DOCSTRING ABOVE ALREADY DECLARES,
+            # because that prohibition was prose and prose cannot bind a producer
+            # running on another worker. The docstring says the interleave is
+            # "BENIGN BY VALUE-IDENTITY" and that "THE ONE THING A CALLER MUST NEVER
+            # DO IS MAKE THE TWO WRITES DISAGREE". **Shipped code already breaks it.**
+            #
+            # Measured (Phase 194, SC#2 FAILED; re-confirmed at 194.1's UAT): at the
+            # shipped WORKER_COUNT=2, a Stop landing on worker A writes `cancelled`
+            # while worker B's still-running producer reaches its success arm and
+            # writes `completed` OVER IT — on roughly HALF of all stops. The user
+            # pressed Stop and the run reports that it finished.
+            #
+            # A terminal status is FINAL. The first terminal write wins; a later,
+            # DIFFERENT terminal value is refused. `status = $2` keeps the re-run
+            # idempotency the docstring promises (both cancel sites can land twice).
+            # Non-terminal states (`active`, `paused`, `cap_paused`) are untouched —
+            # they are exactly what this function exists to move a run OUT of.
+            #
+            # ⚠ WHAT THIS DOES **NOT** FIX, stated here so the guard is never read as
+            # more than it is: the far-worker producer KEEPS RUNNING. This makes the
+            # run REPORT honestly; it does not make the work STOP. Halting the
+            # producer (an in-loop status re-read, or a Redis cancel channel that
+            # reaches a producer not parked on an `ask_user:*` channel) is the
+            # separate, larger L-01 fix, and it is still OWED. Do not let a ticked
+            # RUN-01 be read as "the work stops" — it is not the same claim.
+            #
+            # ⚠ NOT A SECOND CONCERN (G-5, and this file fires hardest of any backend
+            # module at 18 phases): this narrows the WHERE of a status write the
+            # function already owns. Zero new writes, zero new params, no schema
+            # change, no migration — `status` was already the only column written.
             await con.execute(
-                "UPDATE workflow_runs SET status = $2 WHERE id = $1",
+                "UPDATE workflow_runs SET status = $2 "
+                "WHERE id = $1 "
+                "  AND (status IS NULL "
+                "       OR status NOT IN ('completed', 'failed', 'cancelled') "
+                "       OR status = $2)",
                 run_id,
                 status,
             )
             # Clear the per-thread lock anchor in the SAME transaction — no
             # dangling lock survives a terminal run (SC#2). Keyed by the FK
             # target (= this run id), so it only clears the thread this run owns.
+            #
+            # ⚠ DELIBERATELY **UNCONDITIONAL**, and it must stay that way even
+            # though the status write above can now be refused. The two are not
+            # coupled: a refused status write means the run was ALREADY terminal,
+            # in which case the first `finish_run` cleared this anchor and the
+            # statement no-ops on 0 rows (the idempotency the docstring promises).
+            # Gating the clear on the status write's row count would reintroduce
+            # exactly the dangling-lock failure the shared transaction exists to
+            # prevent — a thread stranded as locked because a second, refused
+            # terminalize skipped the clear.
             await con.execute(
                 "UPDATE threads SET active_workflow_run_id = NULL "
                 "WHERE active_workflow_run_id = $1",

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>COMPONENT SHEET — THE BUILDER CHROME</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary": "#242478",
+                        "surface-container-highest": "#303540",
+                        "primary-fixed": "#e1e0ff",
+                        "on-secondary-fixed": "#23005c",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "surface-bright": "#343945",
+                        "secondary-container": "#571ac2",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-tertiary-container": "#004c1e",
+                        "on-secondary": "#3b0091",
+                        "inverse-primary": "#5355a9",
+                        "primary": "#c3c4ff",
+                        "on-tertiary": "#003915",
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "secondary-fixed": "#e9ddff",
+                        "surface-container-lowest": "#090e18",
+                        "on-secondary-container": "#c3abff",
+                        "background": "#060A0F",
+                        "primary-container": "#a3a5ff",
+                        "outline": "#918f9c",
+                        "tertiary-container": "#26c760",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "surface-container-low": "#171c26",
+                        "error": "#ffb4ab",
+                        "error-container": "#93000a",
+                        "surface-container": "#1b202a",
+                        "on-surface-variant": "#c7c5d3",
+                        "surface-container-high": "#252a35",
+                        "surface-dim": "#0e131e",
+                        "surface-tint": "#c1c1ff",
+                        "surface": "#0e131e",
+                        "on-tertiary-fixed": "#002109",
+                        "tertiary": "#4ee478",
+                        "on-surface": "#dee2f1",
+                        "secondary": "#d0bcff",
+                        "tertiary-fixed-dim": "#4be176",
+                        "outline-variant": "#212631",
+                        "on-background": "#dee2f1",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-variant": "#303540",
+                        "inverse-surface": "#dee2f1",
+                        "inverse-on-surface": "#2b303c",
+                        "on-primary-container": "#353789"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #060A0F; color: #dee2f1; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(13, 17, 23, 0.7); backdrop-filter: blur(12px); border: 1px solid #212631; }
+        
+        /* Subtle shaping phase indicator animation */
+        @keyframes pulse-subtle {
+            0% { opacity: 0.5; box-shadow: 0 0 0 0 rgba(163, 165, 255, 0.4); }
+            70% { opacity: 1; box-shadow: 0 0 0 4px rgba(163, 165, 255, 0); }
+            100% { opacity: 0.5; box-shadow: 0 0 0 0 rgba(163, 165, 255, 0); }
+        }
+        .shaping-indicator {
+            position: relative;
+        }
+        .shaping-indicator::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #a3a5ff, transparent);
+            animation: pulse-subtle 3s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8 md:p-12 lg:p-16 max-w-7xl mx-auto space-y-16">
+<header class="mb-16">
+<h1 class="font-headline text-3xl font-bold tracking-tight text-on-surface mb-2">COMPONENT SHEET</h1>
+<p class="text-on-surface-variant font-label uppercase tracking-widest text-xs font-semibold">The Builder Chrome</p>
+</header>
+<!-- SECTION 1: THE HEADER BAR -->
+<section class="space-y-6">
+<h2 class="text-xs font-label uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-outline-variant inline-block">1. The Header Bar</h2>
+<div class="space-y-8">
+<!-- State 1: Clean Saved Draft -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Clean Saved Draft</p>
+<div class="flex items-center justify-between h-14 px-4 bg-[#0D1117] border-y border-outline-variant w-full relative">
+<div class="flex items-center gap-4 flex-1 min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-3 min-w-0 shaping-indicator pb-1">
+<input class="bg-transparent border-none p-0 text-sm font-headline font-medium text-on-surface focus:ring-0 w-64 truncate hover:bg-surface-container-low transition-colors rounded px-1 -ml-1" type="text" value="Quarterly vendor risk review"/>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant uppercase tracking-wider border border-outline-variant">Draft</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<div class="flex items-center gap-1.5 text-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Saved just now</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary px-3 py-1.5 rounded text-xs font-medium transition-colors">
+                            Publish
+                        </button>
+</div>
+</div>
+</div>
+<!-- State 2: Unsaved Changes -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Unsaved Changes</p>
+<div class="flex items-center justify-between h-14 px-4 bg-[#0D1117] border-y border-outline-variant w-full relative">
+<div class="flex items-center gap-4 flex-1 min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-3 min-w-0 shaping-indicator pb-1">
+<input class="bg-transparent border-none p-0 text-sm font-headline font-medium text-on-surface focus:ring-0 w-64 truncate hover:bg-surface-container-low transition-colors rounded px-1 -ml-1" type="text" value="Quarterly vendor risk review"/>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant uppercase tracking-wider border border-outline-variant">Draft</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<div class="flex items-center gap-1.5 text-xs text-primary-container">
+<div class="w-1.5 h-1.5 rounded-full bg-primary-container"></div>
+<span>Unsaved changes</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary px-3 py-1.5 rounded text-xs font-medium transition-colors">
+                            Publish
+                        </button>
+</div>
+</div>
+</div>
+<!-- State 3: Published & Locked -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Published &amp; Locked</p>
+<div class="flex items-center justify-between h-14 px-4 bg-[#0D1117] border-y border-outline-variant w-full relative">
+<div class="flex items-center gap-4 flex-1 min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">lock</span>
+<span class="text-sm font-headline font-medium text-on-surface-variant truncate select-none">Quarterly vendor risk review</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label font-medium bg-tertiary-container/10 text-tertiary uppercase tracking-wider border border-tertiary-container/20">Published</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<div class="flex items-center gap-1.5 text-xs text-tertiary">
+<span class="material-symbols-outlined text-[14px]">check</span>
+<span>Published</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<button class="border border-outline-variant text-on-surface-variant hover:text-on-surface px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px]">edit</span> Edit Draft
+                        </button>
+</div>
+</div>
+</div>
+<!-- State 4: Empty Name -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Empty Name</p>
+<div class="flex items-center justify-between h-14 px-4 bg-[#0D1117] border-y border-outline-variant w-full relative">
+<div class="flex items-center gap-4 flex-1 min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-3 min-w-0 shaping-indicator pb-1">
+<input class="bg-transparent border-none p-0 text-sm font-headline font-medium text-on-surface-variant focus:text-on-surface focus:ring-0 w-40 truncate hover:bg-surface-container-low transition-colors rounded px-1 -ml-1 placeholder-on-surface-variant/50" placeholder="Untitled Workflow" type="text"/>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant uppercase tracking-wider border border-outline-variant">Draft</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0 opacity-50 pointer-events-none">
+<div class="flex items-center gap-1.5 text-xs text-on-surface-variant">
+<span>Saved just now</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<button class="bg-surface-container-high text-on-surface-variant px-3 py-1.5 rounded text-xs font-medium">
+                            Publish
+                        </button>
+</div>
+</div>
+</div>
+<!-- State 5: Long Name -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Long Name Truncation</p>
+<div class="flex items-center justify-between h-14 px-4 bg-[#0D1117] border-y border-outline-variant w-full relative">
+<div class="flex items-center gap-4 flex-1 min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+</button>
+<div class="w-px h-4 bg-outline-variant"></div>
+<div class="flex items-center gap-3 min-w-0 shaping-indicator pb-1 flex-1">
+<input class="bg-transparent border-none p-0 text-sm font-headline font-medium text-on-surface focus:ring-0 w-full truncate hover:bg-surface-container-low transition-colors rounded px-1 -ml-1" title="Enterprise Q3 Comprehensive Compliance and Vendor Risk Assessment 2024" type="text" value="Enterprise Q3 Comprehensive Compliance and Vendor Risk Assessment 2024"/>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label font-medium bg-surface-container-high text-on-surface-variant uppercase tracking-wider border border-outline-variant shrink-0">Draft</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0 ml-8">
+<div class="flex items-center gap-1.5 text-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="hidden sm:inline">Saved just now</span>
+</div>
+<div class="w-px h-4 bg-outline-variant"></div>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary px-3 py-1.5 rounded text-xs font-medium transition-colors">
+                            Publish
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: THE SAVE REGION -->
+<section class="space-y-6">
+<h2 class="text-xs font-label uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-outline-variant inline-block">2. The Save Region</h2>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<!-- Saved -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3 items-center justify-center h-24">
+<div class="flex items-center gap-2 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>Saved just now</span>
+</div>
+</div>
+<!-- Unsaved -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3 items-center justify-center h-24">
+<div class="flex items-center gap-2 text-sm text-primary-container">
+<div class="w-1.5 h-1.5 rounded-full bg-primary-container"></div>
+<span>Unsaved changes</span>
+</div>
+</div>
+<!-- Saving -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3 items-center justify-center h-24">
+<div class="flex items-center gap-2 text-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+<span>Saving...</span>
+</div>
+</div>
+<!-- Failed -->
+<div class="glass-panel p-4 rounded-lg flex flex-col gap-3 items-center justify-center h-24 border-error/30 bg-error/5">
+<div class="flex items-center gap-2 text-sm text-error">
+<span class="material-symbols-outlined text-[16px]">cloud_off</span>
+<span>Save failed — Check connection</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: THE PUBLISH BUTTON -->
+<section class="space-y-6">
+<h2 class="text-xs font-label uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-outline-variant inline-block">3. The Publish Button (Gated)</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Ready -->
+<div class="glass-panel p-6 rounded-lg flex flex-col items-center justify-center gap-2 h-32">
+<p class="text-[10px] font-label uppercase text-on-surface-variant tracking-wider mb-2">Ready</p>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary px-4 py-2 rounded text-sm font-medium transition-colors w-full max-w-[120px]">
+                    Publish
+                </button>
+</div>
+<!-- Refused -->
+<div class="glass-panel p-6 rounded-lg flex flex-col items-center justify-center gap-2 h-32">
+<p class="text-[10px] font-label uppercase text-on-surface-variant tracking-wider mb-2">Refused</p>
+<div class="flex flex-col items-center gap-1.5 w-full">
+<button class="bg-surface-container-high text-on-surface-variant/50 px-4 py-2 rounded text-sm font-medium w-full max-w-[120px] cursor-not-allowed">
+                        Publish
+                    </button>
+<span class="text-[10px] text-error/80 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">info</span> Needs 2 grounded phases
+                    </span>
+</div>
+</div>
+<!-- Publishing -->
+<div class="glass-panel p-6 rounded-lg flex flex-col items-center justify-center gap-2 h-32">
+<p class="text-[10px] font-label uppercase text-on-surface-variant tracking-wider mb-2">Publishing</p>
+<button class="bg-primary-container/80 text-on-primary-container px-4 py-2 rounded text-sm font-medium w-full max-w-[120px] flex items-center justify-center gap-2 cursor-wait">
+<span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                    Publishing...
+                </button>
+</div>
+<!-- Published -->
+<div class="glass-panel p-6 rounded-lg flex flex-col items-center justify-center gap-2 h-32">
+<p class="text-[10px] font-label uppercase text-on-surface-variant tracking-wider mb-2">Published</p>
+<button class="bg-tertiary-container/20 text-tertiary border border-tertiary-container/30 px-4 py-2 rounded text-sm font-medium w-full max-w-[120px] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">check</span>
+                    Published
+                </button>
+</div>
+</div>
+</section>
+<!-- SECTION 4: THE PROBLEMS TRAY -->
+<section class="space-y-6">
+<h2 class="text-xs font-label uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-outline-variant inline-block">4. The Problems Tray</h2>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<!-- Active Tray -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Active</p>
+<div class="glass-panel rounded-lg border-error/20 bg-error/5 overflow-hidden w-full max-w-md">
+<div class="px-4 py-3 border-b border-error/10 flex items-center justify-between bg-error/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-[18px]">warning</span>
+<h3 class="text-sm font-headline font-semibold text-error">3 Issues preventing publish</h3>
+</div>
+<button class="text-error/70 hover:text-error">
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+<div class="p-2 space-y-1">
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded cursor-pointer transition-colors group">
+<span class="material-symbols-outlined text-error/70 text-[16px] mt-0.5">error</span>
+<div>
+<p class="text-sm text-on-surface font-medium">Phase 2: Missing model</p>
+<p class="text-xs text-on-surface-variant mt-0.5">A generation model must be selected to run this step.</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 ml-auto text-[16px] transition-opacity">chevron_right</span>
+</div>
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded cursor-pointer transition-colors group">
+<span class="material-symbols-outlined text-error/70 text-[16px] mt-0.5">error</span>
+<div>
+<p class="text-sm text-on-surface font-medium">Phase 4: No knowledge source</p>
+<p class="text-xs text-on-surface-variant mt-0.5">Retrieve step requires at least one connected datastore.</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 ml-auto text-[16px] transition-opacity">chevron_right</span>
+</div>
+<div class="flex items-start gap-3 p-2 hover:bg-surface-container-low rounded cursor-pointer transition-colors group">
+<span class="material-symbols-outlined text-error/70 text-[16px] mt-0.5">error</span>
+<div>
+<p class="text-sm text-on-surface font-medium">Phase 5: Output schema invalid</p>
+<p class="text-xs text-on-surface-variant mt-0.5">JSON schema definition contains syntax errors.</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 ml-auto text-[16px] transition-opacity">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Cleared Tray -->
+<div class="space-y-2">
+<p class="text-xs font-label uppercase text-on-surface-variant/70">Cleared</p>
+<div class="glass-panel rounded-lg border-dashed p-8 flex flex-col items-center justify-center text-center h-full min-h-[200px] bg-transparent">
+<span class="material-symbols-outlined text-on-surface-variant/30 text-4xl mb-3">check_circle</span>
+<p class="text-sm text-on-surface-variant">No blocking issues.</p>
+<p class="text-xs text-on-surface-variant/50 mt-1">Tray collapses entirely when cleared.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 5: THE STEP PICKER -->
+<section class="space-y-6 pb-16">
+<h2 class="text-xs font-label uppercase tracking-widest text-on-surface-variant mb-4 pb-2 border-b border-outline-variant inline-block">5. The Step Picker</h2>
+<div class="glass-panel p-6 rounded-xl w-full max-w-2xl">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline text-lg font-medium text-on-surface">Add Step</h3>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">search</span>
+<input class="bg-surface-container border border-outline-variant rounded-full py-1.5 pl-9 pr-4 text-sm text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container/50 w-48 transition-all" placeholder="Search actions..." type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<!-- Fetch -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">travel_explore</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Find documents</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Fetch documents from your knowledge base.</p>
+</div>
+</button>
+<!-- Extract -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">find_in_page</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Pull out specific details</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Pull specific entities from raw text.</p>
+</div>
+</button>
+<!-- Judge -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">gavel</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Weigh against policy</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Evaluate inputs against defined criteria.</p>
+</div>
+</button>
+<!-- Branch -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">account_tree</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Decide which way to go</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Route flow based on conditional logic.</p>
+</div>
+</button>
+<!-- Draft -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit_document</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Write a document</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Generate net-new text or reports.</p>
+</div>
+</button>
+<!-- Publish -->
+<button class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant/50 hover:border-primary-container/50 hover:bg-surface-container-low transition-all text-left group">
+<div class="w-8 h-8 rounded bg-[#151B24] border border-[#212631] flex items-center justify-center shrink-0 group-hover:bg-primary-container/10 group-hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</div>
+<div>
+<p class="font-headline text-sm font-medium text-on-surface group-hover:text-primary-container transition-colors">Send or file result</p>
+<p class="text-xs text-on-surface-variant mt-0.5 line-clamp-2">Send output to external systems.</p>
+</div>
+</button>
+</div>
+</div>
+</section>
+</body></html>

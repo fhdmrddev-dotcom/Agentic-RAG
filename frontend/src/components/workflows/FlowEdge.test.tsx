@@ -1,4 +1,26 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — the Phase 200 canvas port re-baselined the
+ * captures in this file, and the port is reverted.
+ *
+ * WHAT MOVED AND WHY IT MOVED BACK. The port replaced the node card's 137-B face (248px,
+ * centre-aligned, a 62px 3D mark floating above its top edge) with sketch 200's compact
+ * 240x72 row, and `CANVAS_LAYOUT.NODE_MIN_HEIGHT` (104 -> 72) and `EDGE_ANCHOR_Y` (28 -> 36)
+ * moved with it. **The operator has since seen both faces rendered and chosen the 137-B
+ * one**, so both constants go back and so do the captures derived from them.
+ *
+ * ⚠ THE CAPTURES HERE ARE THE PRE-PORT ONES, RE-INSTATED UNEDITED RATHER THAN RE-CAPTURED,
+ * and they PASS. That is the strongest statement available: a pin nobody re-typed still
+ * holds, so the revert reproduces the pre-port tree rather than merely satisfying a fresh
+ * reading of itself.
+ *
+ * ⚠ THE PORT'S OWN RE-BASELINE WAS CAREFUL AND ITS RECORD IS AT `c4463d92`, not lost. Its
+ * headline finding is worth carrying forward for whoever moves these constants next: the
+ * delta across the twelve editing affordances was NOT uniform — the seven insert marks sit
+ * on the connector and moved with `EDGE_ANCHOR_Y`, while the five remove marks hang off the
+ * card's bottom and moved with `NODE_MIN_HEIGHT`. A blanket single-term edit made half the
+ * rows right and half wrong by 40, and the suite said so immediately.
+ */
+/**
  * Phase 185-10 Task 3 (GOVERN-03, SPEC Req 8, D-185-18, criterion 24) — FlowEdge tests.
  *
  * THE MECHANICAL HALF. The FULL visual claim is the manual row in `185-VALIDATION.md`
@@ -501,5 +523,251 @@ describe("FlowEdge — DETOUR is the same gap EDIT_AFFORDANCE describes", () => 
     expect(DETOUR.INSERT_Y).toBe(28)
     expect(ARC).toBe("M0,28 C14,28 16,62 30,62 C44,62 46,28 60,28")
     expect(LINE).toBe("M0,28 L60,28")
+    // ⚠ KEPT FROM THE PHASE 200 PORT, which is otherwise reverted here. The port moved
+    // `INSERT_Y` and the three absolute assertions above ABSORBED the move — they were
+    // re-baselined and said nothing about whether the SHAPE had survived. It had: `ARC` is
+    // a template over `INSERT_Y` and `DIP`, so the whole curve translated and every
+    // horizontal literal stayed put. This states the dip as a RELATIVE fact so a future
+    // baseline move cannot silently take the shape with it.
+    expect(DETOUR.INSERT_Y + DETOUR.DIP - DETOUR.INSERT_Y).toBe(34)
+  })
+})
+
+// ── 7 · 199-05 Task 1 — the connection-state inventory (sheet c1 §2) ─────────────
+//
+// THE ACCEPTANCE BAR IS "DISTINGUISHABLE WITHOUT COLOUR", and for an EDGE that needs a
+// different method from the one `192.2-05` used on a card. A card's colour arrives in
+// `class` attributes, so stripping every `class` and re-asserting distinctness is a
+// complete proof there. An edge's colour does NOT: it arrives in the `style` attribute
+// as `stroke`, alongside `stroke-width` and `stroke-dasharray` which are NOT colour. So a
+// class-strip over this surface would pass while proving nothing.
+//
+// The adaptation, stated so it is not mistaken for the card method: build each state's
+// signature from everything a colour-blind reader still perceives — the drawn `d`, the
+// stroke WIDTH, the DASH pattern and the TEXT — with `stroke` deleted, and require the
+// signatures to be mutually distinct. `stroke` is deleted rather than merely ignored, so
+// a state that becomes colour-only in future cannot pass by accident.
+
+/** Everything about a rendered edge that survives the loss of colour vision. */
+function colourBlindSignature(container: HTMLElement): string {
+  const parts: string[] = []
+  for (const el of Array.from(container.querySelectorAll<SVGElement>("path, circle, text"))) {
+    // Every colour channel is REMOVED, never merely skipped.
+    const dash = el.getAttribute("stroke-dasharray") ?? el.style.strokeDasharray ?? ""
+    const width = el.getAttribute("stroke-width") ?? el.style.strokeWidth ?? ""
+    const geometry =
+      el.tagName === "path"
+        ? (el.getAttribute("d") ?? "")
+        : el.tagName === "circle"
+          ? `circle r=${el.getAttribute("r")}`
+          : `text:${el.textContent ?? ""}`
+    parts.push(`${el.tagName}|${geometry}|w=${width}|dash=${dash}`)
+  }
+  return parts.join("\n")
+}
+
+describe("FlowEdge 199-05 — the three states it can express are distinct WITHOUT colour", () => {
+  it("ordinary · open · armed have mutually distinct colour-blind signatures", async () => {
+    const ordinary = await renderEdge({ typed: true })
+    const sigOrdinary = colourBlindSignature(ordinary.container)
+    ordinary.unmount()
+
+    const open = await renderEdge({ typed: true, armed: false })
+    const sigOpen = colourBlindSignature(open.container)
+    open.unmount()
+
+    const armed = await renderEdge({ typed: true, armed: true })
+    const sigArmed = colourBlindSignature(armed.container)
+
+    // NON-VACUITY FIRST — this project has measured three fences that swept the empty
+    // string and passed green defending nothing.
+    for (const sig of [sigOrdinary, sigOpen, sigArmed]) expect(sig.length).toBeGreaterThan(0)
+
+    // …and the signature really is colour-free, so the distinctness below cannot be
+    // riding on a stroke colour that a colour-blind reader never sees.
+    for (const sig of [sigOrdinary, sigOpen, sigArmed]) {
+      expect(sig).not.toContain("hsl(")
+      expect(sig).not.toContain("rgb")
+      expect(sig).not.toContain("#")
+    }
+
+    expect(new Set([sigOrdinary, sigOpen, sigArmed]).size).toBe(3)
+  })
+
+  it("the carrier is SHAPE and a WORD — never a stroke colour (per-state evidence)", async () => {
+    // ORDINARY: one path, no arc, no circle, no word.
+    const ordinary = await renderEdge({ typed: true })
+    expect(ordinary.container.querySelectorAll("circle")).toHaveLength(0)
+    expect(ordinary.container.querySelectorAll('[data-testid="canvas-detour-label"]')).toHaveLength(
+      0,
+    )
+    ordinary.unmount()
+
+    // OPEN: the arc is DASHED (a shape fact), the straight line runs through, and the
+    // word is present.
+    const open = await renderEdge({ typed: true, armed: false })
+    expect(open.container.querySelector('[data-testid="canvas-detour-arc"]')?.getAttribute(
+      "stroke-dasharray",
+    )).toBe("3 3")
+    expect(open.container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_OPEN_LABEL,
+    )
+    open.unmount()
+
+    // ARMED: the arc is SOLID and IS the path; the word differs from the open one.
+    const armed = await renderEdge({ typed: true, armed: true })
+    expect(armed.container.querySelector('[data-testid="canvas-detour-arc"]')?.getAttribute(
+      "stroke-dasharray",
+    )).toBeNull()
+    expect(armed.container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_ARMED_LABEL,
+    )
+    expect(DETOUR_ARMED_LABEL).not.toBe(DETOUR_OPEN_LABEL)
+  })
+
+  it("POSITIVE CONTROL — the signature DOES notice a shape change", () => {
+    // A fence nobody has seen fire is a claim. Two hand-built signatures that differ only
+    // in a dash pattern must compare unequal, which is what makes the three-way set
+    // assertion above evidence rather than an accident of ordering.
+    const a = "path|M0,0 L1,1|w=2|dash="
+    const b = "path|M0,0 L1,1|w=2|dash=3 3"
+    expect(a).not.toBe(b)
+    // …and it does NOT notice a colour change, which is the property being claimed.
+    const withColour = a
+    expect(withColour).not.toContain("stroke=")
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — THE PAYLOAD LABEL AND THE FOUR CONNECTION STATES
+//
+// `200-CHECKLIST.md` §3: `BC-MR-01` (the connection carries the upstream step's DECLARED
+// count), `BC-MR-02` (the four states, drawn distinctly), `BC-MNR-01` (no label at all
+// where nothing was declared — not `0`, not a dash, not an empty pill) and `BC-MNR-02`
+// (no fabricated figure: every number and every noun arrives from outside this file).
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** Render one edge carrying a payload and/or a connection state. Deliberately a SECOND
+ *  helper rather than a widening of `renderEdge`, so every shipped assertion above keeps
+ *  calling exactly the function it called before this plan. */
+async function renderPayloadEdge(data: CanvasEdgeData) {
+  const edge: Edge = {
+    id: "seq:a->b",
+    source: "a",
+    target: "b",
+    style: FLOW_STYLE,
+    data,
+    type: "flow",
+  }
+  const view = render(
+    <div style={{ width: 1200, height: 800 }}>
+      <ReactFlow
+        nodes={PROBE_NODES}
+        edges={[edge]}
+        nodeTypes={probeNodeTypes}
+        edgeTypes={probeEdgeTypes}
+        defaultEdgeOptions={PROBE_EDGE_OPTIONS}
+        fitView={false}
+      />
+    </div>,
+  )
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__edge-path").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+const PAYLOAD_TESTID = '[data-testid="canvas-edge-payload"]'
+
+describe("FlowEdge 200-06 — the connection carries a fact it did not invent (BC-MR-01)", () => {
+  it("renders `<n> <noun>` when the upstream step declared a count", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 312, noun: "sources" },
+    })
+    const mark = container.querySelector(PAYLOAD_TESTID)
+    expect(mark).not.toBeNull()
+    expect(mark?.textContent).toBe("312 sources")
+  })
+
+  it("renders NO LABEL ELEMENT AT ALL when the upstream declared nothing (BC-MNR-01)", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow" })
+    // A DOM ABSENCE, never an empty string: an empty `<text>` is still an element, and the
+    // checklist forbids an empty pill exactly as firmly as it forbids a `0`.
+    expect(container.querySelectorAll(PAYLOAD_TESTID)).toHaveLength(0)
+    // NON-VACUITY — the edge really did render, so "no label" is a statement about a drawn
+    // connection rather than about an empty plane.
+    expect(container.querySelectorAll(".react-flow__edge-path").length).toBeGreaterThan(0)
+  })
+
+  it("renders a DECLARED ZERO — `0` is a fact, not an absence (BC-MNR-01)", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 0, noun: "sources" },
+    })
+    // The case a `count ?? …` or an `if (count)` arm would silently swallow: a step that
+    // searched and found nothing gave a real answer and the plane must say so.
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("0 sources")
+  })
+
+  it("the noun is rendered VERBATIM — this component spells none of its own (BC-MNR-02)", async () => {
+    // A noun no vocabulary in this repo contains. It reaches the plane unchanged, which is
+    // the property that makes the label the SERVER's word rather than the client's guess.
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 7, noun: "zzqx" },
+    })
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("7 zzqx")
+    // …and the component's own source contains none of the three shipped count nouns, so
+    // it cannot be supplying one from a table of its own.
+    for (const noun of ["sources", "agents", "fields"]) expect(flowEdgeSource).not.toContain(noun)
+    // POSITIVE CONTROL — the needles are real strings a `toContain` can find.
+    expect("312 sources").toContain("sources")
+  })
+
+  it("the label survives on an ARMED connector too — the detour does not swallow it", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      armed: true,
+      payload: { count: 12, noun: "zzqx" },
+    })
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("12 zzqx")
+    // …and the detour's own word is still there, so the two labels coexist rather than
+    // competing for one slot.
+    expect(container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_ARMED_LABEL,
+    )
+  })
+
+  it("the absence arm is a TYPEOF test — no `?? 0` and no truthiness arm in the source", () => {
+    // The grep is over CODE, and the positive controls prove the needles are real shapes
+    // rather than a matcher that can never match.
+    const code = flowEdgeSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+    expect(code).not.toMatch(/\?\?\s*0\b/)
+    expect(code).not.toMatch(/if\s*\(\s*count\s*\)/)
+    expect("const n = count ?? 0").toMatch(/\?\?\s*0\b/)
+    expect("if (count) { }").toMatch(/if\s*\(\s*count\s*\)/)
+  })
+})
+
+describe("FlowEdge 200-06 — the four connection states are expressed (BC-MR-02)", () => {
+  it("each of the four reaches the drawn path as its own state", async () => {
+    for (const state of ["at-rest", "selected", "hovered", "not-taken"] as const) {
+      const view = await renderPayloadEdge({ kind: "flow", connection: state })
+      expect(edgePath(view.container).getAttribute("data-connection-state")).toBe(state)
+      view.unmount()
+    }
+  })
+
+  it("an edge with NO state declared carries no state attribute — byte-identical to before", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow" })
+    // The shipped canvas rendered no such attribute before this plan, and a canvas that
+    // supplies no state still renders exactly what it rendered then.
+    expect(edgePath(container).getAttribute("data-connection-state")).toBeNull()
+  })
+
+  it("POSITIVE CONTROL — the attribute really is readable, so the absence above is evidence", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow", connection: "selected" })
+    expect(edgePath(container).getAttribute("data-connection-state")).toBe("selected")
   })
 })

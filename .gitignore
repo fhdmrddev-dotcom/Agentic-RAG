@@ -64,3 +64,6 @@ claude-code-agentic-rag-masterclass/
 # Phase 089 SC#3 SSE baselines (local-only run captures; not committed)
 scripts/.sse_baseline/
 scripts/.sse_after/
+
+# Per-worktree vite cache created by scripts/bootstrap-worktree.sh
+.vite-cache/

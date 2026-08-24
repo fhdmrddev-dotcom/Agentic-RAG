@@ -3,7 +3,7 @@ id: BUG-260810-01
 title: Settings → Connections shows no "Add connection" button on cloud (local is fine)
 reported: 2026-08-10
 surface: Agentic-RAG
-severity: needs-triage
+severity: medium
 status: open
 affected_areas: [settings/connections, deployment/cloud-parity, admin/feature-visibility]
 folded_into: null
@@ -43,7 +43,42 @@ not a rendering defect.
   Cloud's row was **not** inspected for this report; the claim that its key is absent or
   non-visible is an inference from the observed symptom, not a measurement. Confirm before acting.
 
-## The one question that decides what this is
+## ANSWERED 2026-08-10 — and the answer moved the defect
+
+**The operator confirmed the ⛨ banner IS visible on cloud.** By the table below that means the
+missing Add button is *not* the bug: the tab is honestly reporting that live sending is off.
+
+**But the operator then could not find the switch — because it does not exist.** Measured:
+
+- The Control Room's **Feature visibility** panel (Users & Access tab, `FeatureVisibility.tsx`)
+  renders exactly **five** rows: `skill_studio`, `model_management`, `workflow_authoring`,
+  `governance_health`, `visual_workflow_canvas`. `grep -rn "live_connectors"
+  frontend/src/components/admin/` returns **nothing**.
+- `frontend/src/lib/api.ts`'s `GovernedFeature` union names the same five and not
+  `live_connectors` — so `features.live_connectors` is a type error client-side.
+- The BACKEND accepts the write: `live_connectors` is in `_VISIBILITY_FEATURES`
+  (`api/admin.py:113`), so `PUT /admin/visibility` would flip it. `GET /features` already
+  returns the key. **Server-reachable, UI-unreachable.**
+
+**So the real defect is a dead-end instruction:** the banner's closing line —
+*"An operator turns `live_connectors` on in the Control Room"* — names a technical string
+specifically so the operator can FIND it (the LANG-01 carve-out), and there is nothing there to
+find. This is the THIRD instance of one pattern in two days: BUG-260809-02
+(`business_requirement` demanded with no control), CONN-02 (capability not drivable), and now
+this. Each was found by driving the product, not by any gate.
+
+**It is a KNOWN, OWNED deferral: `D-190-DEF-09`** (`.planning/phases/190-live-connector-slice-connector-security-stretch/deferred-items.md:350`),
+found during plan 190-16 while wiring this very banner. Both halves must land in ONE commit —
+widening the union without the card edits five exhaustive maps for no visible reason; adding the
+card without the union does not typecheck. Measured cost of the union widen alone:
+`tsc -p tsconfig.app.json` **33 → 38**, all five being `Record<GovernedFeature, …>` maps missing a
+key, each a one-line fix. Two are `/admin` source, which Phase 190's **D-25** fenced off.
+
+**Amended routing:** this report now tracks the dead-end instruction, not the missing button. Fold
+`D-190-DEF-09` into the connections milestone — the card must ship in the same milestone that makes
+the switch safe to use, so the operator's first encounter with the control is one they can act on.
+
+## The one question that decided what this is
 
 When the flag is off, a banner is supposed to render: **⛨ "Live sending is off for this
 platform"** (`connectionsCopy.ts:387-394`, D-26 / UI-SPEC §2h).

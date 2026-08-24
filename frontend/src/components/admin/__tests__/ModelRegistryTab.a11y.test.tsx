@@ -52,6 +52,8 @@ function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
     llm_call_timeout_seconds: 600,
     is_default: false,
     is_locked: false,
+    // Phase 196 (AUTH-04): `null` = the shipped state for every pre-migration-120 row.
+    emit_tier: null,
     overridden_fields: [],
     ...overrides,
   }

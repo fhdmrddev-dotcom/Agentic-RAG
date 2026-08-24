@@ -179,6 +179,32 @@ export type DefinitionMeta = {
   [K in keyof BuilderDefinition as K extends "phases" ? never : K]: BuilderDefinition[K]
 }
 
+/**
+ * Phase 193 (AUTH-03) — one entry of the definition's `assets[]`, as the template door mints
+ * it (`backend/app/api/workflows.py`'s `TemplateAssetRef`, itself field-for-field
+ * `app.models.harness.AssetRef`).
+ *
+ * ⚠ DECLARED HERE RATHER THAN IMPORTED FROM THE API CLIENT, and that is a fence obeyed, not
+ * an oversight: this module may not name the API client in ANY import form —
+ * `builderStore.test.ts` sweeps this source for that specifier, and a type-only import
+ * matches its regex exactly like a value one.
+ *
+ * ⚠ AND THE FENCE IS STRICTER THAN IT LOOKS: the sweep reads the RAW source, so it fires on
+ * PROSE too. An earlier draft of this very docblock quoted the import form it was explaining
+ * and turned the fence RED — the same shape 192-05 hit with its `title=` sweep. Do not spell
+ * the specifier here, in any comment, even to describe it.
+ *
+ * The two declarations are structurally identical, so a drift between them is a typecheck
+ * error at the one call site that carries a value across (`WorkflowBuilderPage`'s
+ * `onTemplateAttached`), not a silent divergence.
+ */
+export interface TemplateAssetDescriptor {
+  kind: "template"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
 export interface BuilderStoreState extends TrackedSlice {
   /**
    * The working definition MINUS `phases` — slug, version, business_requirement,
@@ -269,6 +295,15 @@ export interface BuilderStoreState extends TrackedSlice {
    *  (BUG-260809-02). Untracked, and arms `dirty` itself for the same reason
    *  `setProjectFolder` does; see its implementation docblock in the factory below. */
   setBusinessRequirement: (text: string) => void
+  /** Attach (or replace) the workflow's template in `meta.assets[]` — the definition-level
+   *  write Phase 193's authoring door needs. Untracked, and arms `dirty` itself for the
+   *  same reason its two `meta`-writing siblings do; see its implementation docblock. */
+  setTemplateAsset: (asset: TemplateAssetDescriptor) => void
+  /** Set the workflow's human-readable name (D-15) — the FOURTH `meta`-writing sibling.
+   *  Untracked, and arms `dirty` itself for the same reason the three actions above it do;
+   *  see its implementation docblock in the factory below. Writes exactly ONE `meta` key,
+   *  and NEVER the key that identity, forks and versioning key off. */
+  setName: (name: string) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -594,6 +629,49 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         },
 
         /**
+         * ── Phase 193.2-09 (D-06) — THE MARK DEMOTES ON EDIT, IN THIS SAME `set()` ───────
+         *
+         * `193.2-07` added `business_requirement_seeded_by_ai`, stamped server-side when the
+         * generator PROPOSES the requirement, and `193.2-09` renders it as a visible mark on
+         * the Builder header. The moment the author types, the value is no longer purely the
+         * AI's — so the flag is cleared HERE, in the SAME `set()` that writes the text. Not a
+         * second write, and not something the render decides.
+         *
+         * THE SHIPPED RULE THIS MIRRORS. `definitionOps.ts`'s `patchPhaseConfig` clears BOTH
+         * `name` and `name_seeded_by_ai` together, because *"clearing only the name would
+         * leave a provenance marker describing a name that no longer exists"*. Same sentence,
+         * other direction: writing only the text would leave a marker describing text nobody
+         * proposed. Value and marker travel together, or one of them lies.
+         *
+         * ⚠ CLEARED ON **ANY** EDIT — NO CLIENT-SIDE "IS THIS STILL THE AI's SENTENCE?".
+         * Comparing the new text against the seeded value, diffing it, or debouncing the
+         * decision would be exactly the second copy of a server predicate the paragraph below
+         * forbids by name (D-182-06) — and a worse one than a trim would be, because the
+         * server holds no such predicate at all to be a copy OF. Provenance is decided in ONE
+         * place (`workflow_authoring.py`, after validation, ignoring the emitted payload in
+         * both directions); this action only ever RETIRES it.
+         *
+         * WHY `false` RATHER THAN `delete`, and the two are NOT interchangeable here.
+         * `patchPhaseConfig` deletes because `name` / `name_seeded_by_ai` are OPTIONAL keys
+         * where absence is the only honest spelling of "no name", and an explicit `undefined`
+         * would serialize into a backend union with `extra="forbid"`. This field differs in
+         * the one way that matters: `WorkflowDefinition` DECLARES it, `bool = False`, with no
+         * `| None` (`backend/app/models/harness.py`). So `false` is a declared, valid value
+         * that `extra="forbid"` accepts and that means exactly what an absent key would mean
+         * — there is no round-trip identity to protect. What `false` buys is EVIDENCE: the
+         * demote is then directly observable in the PATCH body, whereas an absent key is
+         * indistinguishable from a store that never wrote the field at all. `undefined` is
+         * refused outright — that is the trap `definitionOps` avoided by deleting.
+         *
+         * WHITESPACE STILL GOES THROUGH, and the honest consequence is stated rather than
+         * smoothed: editing a seeded value down to `"   "` clears the flag AND leaves a
+         * whitespace value. Correct on both halves — the server's stamp would refuse to mark
+         * such a value either (`193.2-07`'s empty rule), and the shipped
+         * `REQUIREMENT_INVITATION` placeholder does not show for a whitespace value. That is
+         * today's behaviour and this plan does not change it.
+         *
+         * ── everything below is the quick-260809-klo docblock, unedited ──────────────────
+         *
          * Quick 260809-klo (BUG-260809-02) — write the workflow's one-line business
          * requirement. A WORKFLOW-LEVEL definition edit, and the store half of the one
          * hole that made a canvas-authored workflow UNPUBLISHABLE: the field is declared
@@ -638,7 +716,114 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         setBusinessRequirement: (text) => {
           const s = get()
           if (s.builderPhase !== "drafted") return
-          set({ meta: { ...s.meta, business_requirement: text }, dirty: true })
+          set({
+            meta: {
+              ...s.meta,
+              business_requirement: text,
+              // ONE `set()`: the text and its provenance move together, so no ordering
+              // between two writes can exist for a later reader to get wrong.
+              business_requirement_seeded_by_ai: false,
+            },
+            dirty: true,
+          })
+        },
+
+        /**
+         * Phase 193 (AUTH-03, piece 2) — attach or REPLACE the workflow's template.
+         *
+         * A THIRD STRUCTURAL MIRROR of `setProjectFolder` / `setBusinessRequirement` above,
+         * deliberately: same field class (`meta`), same failure shape, same three reasons —
+         * it sets `dirty` in the SAME `set()` (the subscription below arms `dirty` on a
+         * change to the **`phases`** reference and on nothing else, so a `meta`-only write
+         * would otherwise be a real definition change the leave guard never noticed), it is
+         * UNTRACKED (`partialize` narrows the undo stack to `phases`, so `⌘Z` restores steps
+         * and never the workflow's identity — a template is undone by attaching another),
+         * and it bails outside `drafted` where `meta` is deliberately empty.
+         *
+         * ⚠ IT REPLACES THE TEMPLATE ENTRY AND PRESERVES EVERY OTHER ASSET. `assets[]` is a
+         * mixed list — the run engine's `AssetRef` also carries `reference` assets — and the
+         * one thing this door mints is the single `kind === "template"` entry that
+         * `resolve_template_source` Branch 1 and `WorkflowBuilderPage`'s `nameContext` both
+         * read with `.find(…)`. Appending blindly would leave TWO template entries with
+         * `.find` silently picking the older one, which is the defect shape where a person
+         * attaches a new file and the surface keeps showing the old name.
+         *
+         * A NON-ARRAY OR ABSENT `assets` IS TREATED AS EMPTY, never spread: the field arrives
+         * from server JSONB and the page already reads it defensively for the same reason.
+         */
+        setTemplateAsset: (asset) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          const prior = Array.isArray(s.meta.assets) ? (s.meta.assets as unknown[]) : []
+          const others = prior.filter(
+            (a) => !(typeof a === "object" && a !== null && (a as { kind?: unknown }).kind === "template"),
+          )
+          set({ meta: { ...s.meta, assets: [...others, asset] }, dirty: true })
+        },
+
+        /**
+         * Phase 197 (AUTH-02 · D-15) — write the workflow's human-readable name.
+         *
+         * A FOURTH STRUCTURAL MIRROR of `setProjectFolder` / `setBusinessRequirement` /
+         * `setTemplateAsset` above, deliberately: same field class (`meta`), same failure
+         * shape, same reasons. It is the ONE write path for the name, and the guided
+         * authoring surface routes through it rather than minting a second answer.
+         *
+         * ⚠ IT WRITES EXACTLY ONE `meta` KEY, AND THAT IS THE WHOLE OF D-15.
+         * `selectDefinition` spreads `meta` STRAIGHT into the autosave PATCH body, so
+         * anything this action puts on `meta` ships — and `WorkflowDefinition` is
+         * `extra="forbid"`, so a stray key is a 422 that would destroy the write on the
+         * first autosave. The key this action must never touch is the one identity, forks
+         * and versioning all key off: it is minted once at generation, 193.2 deferred
+         * naming precisely because a rename that moved it is the risk, and leaving it alone
+         * removes that risk entirely. The accepted cost, recorded rather than hidden: the
+         * name and that key may disagree, and LIB-05 already shipped the machinery for
+         * telling same-named workflows apart.
+         *
+         * WHY IT SETS `dirty` EXPLICITLY, rather than relying on the subscription below.
+         * Identical to its three siblings' reason: that subscription arms `dirty` on a
+         * change to the **`phases`** reference and on nothing else. The name lives on
+         * `meta`, so a rename would otherwise be a genuine definition change the leave
+         * guard never noticed — a new `definition` memo identity on the page (autosave even
+         * fires) while `dirty` stayed false, so no `beforeunload`, no leave prompt, and a
+         * toolbar reading clean. Writing and arming in ONE `set()` is what makes that
+         * impossible to forget at a second call site.
+         *
+         * WHY IT IS UNTRACKED. `partialize` (below) narrows the undo stack to `phases` plus
+         * the two edit discriminators, and the `meta` field's own docblock states the rule:
+         * an undo restores STEPS, never the workflow's identity. Typing a name must not
+         * flood the undo stack — and nothing is lost, because native field-level undo still
+         * works INSIDE the input: the page's `⌘Z` listener yields whenever the event target
+         * is an `INPUT`/`TEXTAREA` (`WorkflowBuilderPage.tsx:742-744`).
+         *
+         * ⚠ NO CLIENT-SIDE COMPARISON, NO DIFF, NO DEBOUNCE — AND NO PROVENANCE KEY AT ALL.
+         * `setBusinessRequirement` retires a mark because one EXISTS to retire, stamped
+         * server-side. This field has none: `name_seeded_by_ai` is a **`PhaseSpec`** field
+         * (`backend/app/models/harness.py`) — a STEP-name flag — and `WorkflowDefinition`
+         * declares no definition-level equivalent. Adding one is a new additive-optional
+         * field plus a server-side stamp plus a demote-on-edit, which is a wave rather than
+         * a checkbox; Phase 197 declines it with the reason recorded (the row's own sentence
+         * already says a model chose the name, and D-16 binds such a mark to mean *"a model
+         * wrote this"* and never *"this is good"*). RE-OPEN TRIGGER: any phase that adds a
+         * definition-level provenance field for another reason — the mark comes along free
+         * at that point. Until then, comparing the new text against anything to decide
+         * provenance would be exactly the second copy of a server predicate D-182-06 forbids
+         * by name, and a worse one, because no such server predicate exists to be a copy OF.
+         *
+         * WHY THERE IS NO TRIMMING AND NO EMPTINESS RULE. Whitespace is written THROUGH and
+         * an empty string is written as an empty string. The server owns emptiness
+         * (`grounding.py`), and a client that trimmed, nulled or defaulted here would be a
+         * second copy of a server predicate. No client-side validation rule is added by this
+         * action — the store states what the author typed.
+         *
+         * The `builderPhase !== "drafted"` bail is the shipped guard shape every
+         * document-scoped action carries, keeping the write out of the composing beat where
+         * `meta` is deliberately empty.
+         */
+        setName: (name) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          set({ meta: { ...s.meta, name }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

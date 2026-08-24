@@ -1,0 +1,418 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Workflows - Agentic Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ffb4ab",
+                        "on-surface-variant": "#c7c5d3",
+                        "tertiary-fixed": "#ffe16c",
+                        "outline-variant": "#464651",
+                        "inverse-primary": "#5355a9",
+                        "surface-container-lowest": "#0e0e13",
+                        "tertiary-container": "#c8ac33",
+                        "inverse-on-surface": "#303036",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "on-tertiary": "#3a3000",
+                        "on-secondary-fixed": "#131c2a",
+                        "secondary": "#bec7da",
+                        "surface-tint": "#c1c1ff",
+                        "on-background": "#e4e1e9",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "tertiary": "#e5c74c",
+                        "on-tertiary-fixed": "#221b00",
+                        "secondary-fixed-dim": "#bec7da",
+                        "surface-container": "#1f1f25",
+                        "surface-container-low": "#1b1b21",
+                        "on-error-container": "#ffdad6",
+                        "primary": "#c3c4ff",
+                        "surface": "#131318",
+                        "outline": "#918f9c",
+                        "on-primary-fixed": "#0b0664",
+                        "on-tertiary-container": "#4e4000",
+                        "on-primary-container": "#353789",
+                        "on-secondary-container": "#acb5c8",
+                        "on-surface": "#e4e1e9",
+                        "primary-container": "#a3a5ff",
+                        "background": "#131318",
+                        "surface-variant": "#35343a",
+                        "surface-container-highest": "#35343a",
+                        "surface-container-high": "#2a292f",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "error-container": "#93000a",
+                        "on-error": "#690005",
+                        "secondary-container": "#3e4757",
+                        "on-primary": "#242478",
+                        "secondary-fixed": "#dae3f6",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "on-secondary": "#28313f",
+                        "primary-fixed": "#e1e0ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "surface-dim": "#131318",
+                        "surface-bright": "#39383f",
+                        "inverse-surface": "#e4e1e9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "unit": "4px",
+                        "rail_width": "64px",
+                        "sm": "8px",
+                        "xs": "4px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "lg": "24px"
+                    },
+                    "fontFamily": {
+                        "h3": ["Manrope"],
+                        "h1": ["Manrope"],
+                        "data-sm": ["JetBrains Mono"],
+                        "h2": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "data-md": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "h3": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "data-sm": ["12px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                        "h2": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-sm": ["12px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "data-md": ["14px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                        "data-lg": ["16px", { "lineHeight": "1.4", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #060A0F; color: #e4e1e9; margin: 0; padding: 0; overflow-x: hidden; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; font-size: 20px; }
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #151B24; }
+        ::-webkit-scrollbar-thumb { background: #212631; border-radius: 0; }
+        ::-webkit-scrollbar-thumb:hover { background: #464651; }
+
+        /* Focus state for inputs */
+        input:focus, select:focus { outline: none; border-color: #A3A5FF !important; ring: 0 !important; }
+    </style>
+</head>
+<body class="flex h-screen w-full bg-[#060A0F] font-body-md text-on-surface antialiased overflow-hidden selection:bg-primary-container selection:text-background">
+<!-- Left Nav Rail -->
+<nav class="fixed left-0 top-0 h-full w-[64px] flex flex-col items-center py-md z-50 bg-[#080B11] border-r border-[#212631] flex-shrink-0 transition-colors duration-200 ease-in-out">
+<!-- App Mark -->
+<div class="mb-xl flex items-center justify-center w-10 h-10 rounded text-[#9AA3B5] hover:text-on-surface hover:bg-surface-variant transition-colors cursor-pointer" title="App Mark">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;">square</span>
+</div>
+<div class="mb-sm flex items-center justify-center w-10 h-10 rounded text-[#9AA3B5] hover:text-on-surface hover:bg-surface-variant transition-colors cursor-pointer" title="Expand">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">menu_open</span>
+</div>
+<div class="flex flex-col gap-sm flex-1 w-full px-xs items-center mt-md">
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="New Chat">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">add_comment</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Chat">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">chat</span>
+</button>
+<!-- ACTIVE: Workflows -->
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#060A0F] bg-primary-container relative group" title="Workflows">
+<div class="absolute left-[-16px] w-[2px] h-[24px] bg-primary-container"></div>
+<span class="material-symbols-outlined text-[#9AA3B5]" style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;">account_tree</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Documents">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">description</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Classification">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">category</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Library Health">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">health_and_safety</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Governance">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">policy</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Skills">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">bolt</span>
+</button>
+</div>
+<div class="flex flex-col gap-sm w-full px-xs items-center mt-auto pb-sm border-t border-[#212631] pt-sm">
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors" title="Settings">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">settings</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded text-[#9AA3B5] hover:bg-surface-variant hover:text-on-surface transition-colors mt-sm" title="Account">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[64px] h-full flex flex-col overflow-hidden">
+<!-- Header -->
+<header class="px-margin pt-margin pb-md flex flex-col gap-unit border-b border-[#212631] bg-[#060A0F] shrink-0">
+<h1 class="font-h2 text-h2 text-on-surface">Workflows</h1>
+<p class="font-body-md text-body-md text-[#9AA3B5]">Repeatable, locked automations — author, publish, and run.</p>
+</header>
+<!-- Toolbar -->
+<div class="px-margin py-md flex items-center justify-between border-b border-[#212631] bg-[#0D1117] shrink-0 h-[68px]">
+<div class="flex items-center gap-md">
+<!-- Primary Button -->
+<button class="h-[36px] px-md bg-primary-container text-[#060A0F] font-body-md font-medium rounded-sm flex items-center gap-sm hover:bg-[#b5b7ff] transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">add</span>
+                    Build a workflow
+                </button>
+<!-- Search -->
+<div class="relative w-[280px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7383] text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">search</span>
+<input class="h-[36px] w-full bg-[#0D1117] border border-[#212631] rounded-sm pl-[36px] pr-sm text-body-sm text-on-surface placeholder-[#6B7383] focus:border-primary-container focus:ring-0 transition-colors" placeholder="Search by name or purpose" type="text">
+</div>
+<!-- Filter Pills -->
+<div class="flex items-center gap-sm ml-sm overflow-x-auto no-scrollbar">
+<button class="h-[32px] px-sm bg-[#1a1b3b] border border-[#2c2d61] text-[#c1c1ff] rounded-sm flex items-center gap-xs whitespace-nowrap text-body-sm">
+                        Ready to run
+                        <span class="font-data-sm text-data-sm text-primary-container">31</span>
+</button>
+<button class="h-[32px] px-sm bg-[#151B24] border border-[#212631] text-[#9AA3B5] hover:text-on-surface hover:bg-[#1a212c] rounded-sm flex items-center gap-xs whitespace-nowrap transition-colors text-body-sm">
+                        Yours
+                        <span class="font-data-sm text-data-sm text-[#6B7383]">108</span>
+</button>
+<button class="h-[32px] px-sm bg-[#151B24] border border-[#212631] text-[#9AA3B5] hover:text-on-surface hover:bg-[#1a212c] rounded-sm flex items-center gap-xs whitespace-nowrap transition-colors text-body-sm">
+                        Still building
+                        <span class="font-data-sm text-data-sm text-[#6B7383]">80</span>
+</button>
+<button class="h-[32px] px-sm bg-[#151B24] border border-[#212631] text-[#9AA3B5] hover:text-on-surface hover:bg-[#1a212c] rounded-sm flex items-center gap-xs whitespace-nowrap transition-colors text-body-sm">
+                        Starters
+                        <span class="font-data-sm text-data-sm text-[#6B7383]">3</span>
+</button>
+<button class="h-[32px] px-sm bg-[#151B24] border border-[#212631] text-[#9AA3B5] hover:text-on-surface hover:bg-[#1a212c] rounded-sm flex items-center gap-xs whitespace-nowrap transition-colors text-body-sm">
+                        Makes a file
+                        <span class="font-data-sm text-data-sm text-[#6B7383]">81</span>
+</button>
+<button class="h-[32px] px-sm bg-[#151B24] border border-[#212631] text-[#9AA3B5] hover:text-on-surface hover:bg-[#1a212c] rounded-sm flex items-center gap-xs whitespace-nowrap transition-colors text-body-sm">
+                        Strict
+                        <span class="font-data-sm text-data-sm text-[#6B7383]">77</span>
+</button>
+</div>
+</div>
+<!-- Right-aligned Project Select -->
+<div class="relative min-w-[160px] shrink-0">
+<select class="appearance-none h-[36px] w-full bg-[#0D1117] border border-[#212631] rounded-sm pl-sm pr-[32px] text-body-sm text-on-surface cursor-pointer focus:border-primary-container focus:ring-0">
+<option>All projects</option>
+<option>Project Alpha</option>
+<option>Project Beta</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7383] pointer-events-none text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">arrow_drop_down</span>
+</div>
+</div>
+<!-- Scrollable Content Canvas -->
+<div class="flex-1 overflow-y-auto p-margin bg-[#060A0F]">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md max-w-[1200px] mx-auto">
+<!-- Card 1: Data Sync (Green) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#21C45D] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Data Sync</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v2.4</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<div class="w-2 h-2 rounded-full bg-[#21C45D]"></div>
+<span class="font-body-sm text-body-sm text-[#21C45D]">Worked 2 days ago</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        YOURS • Main • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-primary-container hover:text-[#b5b7ff] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">play_arrow</span>
+                            Run
+                        </button>
+</div>
+</div>
+<!-- Card 2: Report Gen (Red) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#DC2626] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Report Gen</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v1.0</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<div class="w-2 h-2 rounded-full bg-[#DC2626]"></div>
+<span class="font-body-sm text-body-sm text-[#DC2626]">Failed 4 days ago</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        SHARED • Analytics • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-primary-container hover:text-[#b5b7ff] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">play_arrow</span>
+                            Run
+                        </button>
+</div>
+</div>
+<!-- Card 3: Email Blast (Amber) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#F5A524] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Email Blast</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v3.1</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<div class="w-2 h-2 rounded-full bg-[#F5A524]"></div>
+<span class="font-body-sm text-body-sm text-[#F5A524]">Stopped 3 days ago</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        YOURS • Marketing • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-primary-container hover:text-[#b5b7ff] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">play_arrow</span>
+                            Run
+                        </button>
+</div>
+</div>
+<!-- Card 4: Cleanup (Dim) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#6B7383] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Cleanup</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v0.9</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<div class="w-2 h-2 rounded-full bg-[#6B7383]"></div>
+<span class="font-body-sm text-body-sm text-[#9AA3B5]">Never run</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        YOURS • System • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-primary-container hover:text-[#b5b7ff] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">play_arrow</span>
+                            Run
+                        </button>
+</div>
+</div>
+<!-- Card 5: Audit Log (Dim) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#6B7383] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Audit Log</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v2.0</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<span class="material-symbols-outlined text-[14px] text-[#9AA3B5]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">person</span>
+<span class="font-body-sm text-body-sm text-[#9AA3B5]">Run by someone else</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        SHARED • Security • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-primary-container hover:text-[#b5b7ff] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">play_arrow</span>
+                            Run
+                        </button>
+</div>
+</div>
+<!-- Card 6: Draft Workflow (Muted) -->
+<div class="relative bg-[#0D1117] border border-[#212631] rounded-sm flex flex-col p-md hover:bg-[#0f141b] transition-colors group opacity-80">
+<div class="absolute left-0 top-0 bottom-0 w-[3px] bg-[#464651] rounded-l-[1px]"></div>
+<div class="flex justify-between items-start mb-sm pl-xs">
+<div class="flex items-baseline gap-sm">
+<h3 class="font-body-md font-medium text-[#F4F6FE]">Draft Workflow</h3>
+<span class="font-data-sm text-data-sm text-[#6B7383]">v0.1</span>
+</div>
+<button aria-label="More actions" class="text-[#6B7383] hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">more_horiz</span>
+</button>
+</div>
+<div class="flex items-center gap-xs mb-md pl-xs">
+<span class="material-symbols-outlined text-[14px] text-[#9AA3B5]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">build</span>
+<span class="font-body-sm text-body-sm text-[#9AA3B5]">Still building</span>
+</div>
+<div class="font-body-sm text-[11px] leading-tight text-[#6B7383] mb-md pl-xs uppercase tracking-wider">
+                        YOURS • Sandbox • 42 share this name • changed last month
+                    </div>
+<div class="mt-auto pt-sm border-t border-[#212631] flex justify-start pl-xs">
+<button class="text-body-sm font-medium text-on-surface hover:text-[#F4F6FE] flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 0, &quot;wght&quot; 400, &quot;GRAD&quot; 0, &quot;opsz&quot; 24;">open_in_new</span>
+                            Open
+                        </button>
+</div>
+</div>
+</div>
+<!-- Bottom padding for scroll -->
+<div class="h-margin"></div>
+</div>
+</main>
+
+
+
+<script>
+(function(){
+  var HOPS = [["Build a workflow","doors"],["Run","run-dialog"],["Open","builder-spine"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"library", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

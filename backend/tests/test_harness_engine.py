@@ -10,6 +10,13 @@ Every skip names the owning plan so the contract is greppable.
 from __future__ import annotations
 
 import pytest
+
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
 from pydantic import ValidationError
 
 from app.models.harness import (
@@ -455,7 +462,9 @@ async def test_engine_persists_large_phase_output_inline(
         if "SET status='completed'" in sql
     ]
     assert len(completed_args) == 1
-    persisted = _json.loads(completed_args[0][1])  # the output=$2::jsonb json string
+    # 200.1 / D-200.1-01(b): the output=$2::jsonb parameter is now a PLAIN DICT — see
+    # `_phase_output_arg` below for why this no longer `json.loads` anything.
+    persisted = _phase_output_arg(completed_args[0])
     assert persisted == {"text": big_text}, "full output stored inline, no placeholder"
     assert "_spilled_path" not in persisted
 
@@ -733,7 +742,7 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["text"] == "Which doc?"
         assert out["answer"] == "Doc B"
@@ -754,7 +763,7 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["answer"] == "Doc B"
 
@@ -769,13 +778,32 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["answer"] == ""
 
     @pytest.mark.asyncio
     async def test_human_input_clamps_timeout_to_hard_cap(self):
+        """The 1800s clamp, plus — since Phase 200 / D-10 — the pause it now ends in.
+
+        ⚠ THIS CASE WAS DELIBERATELY RED-FLIPPED BY `200-03`, AND THE ORIGINAL
+        ASSERTION IS QUOTED HERE RATHER THAN DELETED. It read, verbatim:
+
+            assert out["answer"] == ""  # no response on timeout
+
+        That line PINNED `BUG-260816-06`: a 300s (default) human gate elapsing with
+        nobody's answer returned normally with an empty answer, `_run_phase_with_gates`
+        wrapped it as `PhaseOutcome("completed", ...)`, and the NEXT phase received `""`
+        AS THE HUMAN'S ANSWER — four of five real runs of `doc_qa_scoped_098uat`
+        completed their approval step that way at exactly the five-minute mark. **A
+        human gate that fails OPEN.** The executor now raises `HumanInputTimeout` and the
+        engine's `pause_run` arm leaves the phase `active` and the run `paused`.
+
+        The CLAMP half is unchanged and is what this case is named for: it pins the
+        ARGUMENT handed to the block primitive, which D-10 does not touch.
+        """
         from app.services.harness import phase_types
+        from app.services.harness.human_input import HumanInputTimeout
         from app.config import settings
 
         captured = {}
@@ -787,10 +815,10 @@ class TestPhaseExecutors:
         # Request way above the 1800s hard cap.
         phase = _phase({"phase_type": "llm_human_input", "prompt": "?",
                         "timeout_seconds": 99999})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
-            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
+            with pytest.raises(HumanInputTimeout):
+                await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert captured["timeout"] == settings.ask_user_max_timeout_seconds
-        assert out["answer"] == ""  # no response on timeout
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -812,6 +840,32 @@ class TestPhaseExecutors:
 
 _RECORDED_SQL = "SET status='recorded_not_sent'"
 _COMPLETED_SQL = "SET status='completed'"
+
+
+def _phase_output_arg(args):
+    """The durable phase output out of a ``workflow_phases`` writer's BOUND ARGS.
+
+    ⚠ **200.1 / D-200.1-01(b) — THESE ASSERTIONS USED TO ``json.loads`` THE BOUND PARAMETER,
+    AND THAT ONLY WORKED BECAUSE THE WRITER PRE-ENCODED IT.** The pre-encode WAS the defect:
+    the pool already installs a jsonb codec with ``encoder=json.dumps``
+    (``dependencies._init_pg_connection``, D-073-06), so every value was encoded twice and
+    landed as a jsonb **STRING SCALAR** — 484 of 484 ``completed`` rows, measured. The three
+    terminal writers now hand the codec a plain dict, so the parameter IS the payload and
+    ``json.loads`` raises ``TypeError`` on it.
+
+    ⚠ **Read through the SHIPPED unwrap rather than re-typing a shape check at each site.**
+    ``phase_output_object`` accepts BOTH shapes, so every caller below stays an assertion
+    about the **CONTENT** and cannot be broken again by the transport. A test that re-states
+    the encoding is a test that PINS the encoding — which is how these sites came to defend
+    the very defect Phase 200.1 exists to repair.
+    """
+    from app.models.thread import phase_output_object
+
+    for a in args:
+        unwrapped = phase_output_object(a)
+        if unwrapped is not None:
+            return unwrapped
+    return None
 
 
 def _external_action_definition(
@@ -991,7 +1045,7 @@ def test_an_approved_external_action_records_not_sent_and_the_run_continues(
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
     )
     assert recorded[0][1][0] == r.ids[0], "the write landed on the wrong phase row"
-    persisted = _json.loads(recorded[0][1][1])
+    persisted = _phase_output_arg(recorded[0][1])
     assert persisted["recorded_intent"]["capability"] == "send_email", (
         "the recorded intent must be durable on the row — the record IS the outcome"
     )
@@ -1369,7 +1423,7 @@ def test_a_failed_send_and_a_recorded_not_sent_step_differ_on_all_three_axes(
         f"the unbound half never reached recorded_not_sent ({recorded_writes!r}); every "
         f"comparison below would be against nothing"
     )
-    record_output = _json.loads(recorded_writes[0][1][1])
+    record_output = _phase_output_arg(recorded_writes[0][1])
 
     # ── run B · the BOUND step whose adapter refuses ─────────────────────────────────
     class _RefusingAdapter:
@@ -1396,11 +1450,11 @@ def test_a_failed_send_and_a_recorded_not_sent_step_differ_on_all_three_axes(
         f"the bound half's refused send did not land `failed`; the engine writes: "
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
     )
-    fail_output = _json.loads(failed_writes[0][1][-1]) if False else None
     fail_args = failed_writes[0][1]
-    fail_output = next(
-        (_json.loads(a) for a in fail_args if isinstance(a, str) and a.startswith("{")), None
-    )
+    # 200.1 / D-200.1-01(b): the scan here used to hunt for a `str` starting with `{` — which
+    # is exactly the pre-encoded shape that no longer exists. `_phase_output_arg` finds the
+    # payload under BOTH shapes, so this axis keeps testing the OUTPUT and not the transport.
+    fail_output = _phase_output_arg(fail_args)
     assert fail_output is not None, f"no durable output on the failed write: {fail_args!r}"
 
     # ── AXIS 1 · the status ───────────────────────────────────────────────────────────
@@ -1705,3 +1759,680 @@ def test_an_output_with_no_sentinel_still_routes_to_complete_phase(
         f"The shared path must be byte-identical."
     )
     assert r.visited == ["p0", "p1"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 10 (RUN-01 / SC#3 / V-16) — THE ENGINE CANCEL ARM
+#
+# When a live producer is Stopped mid-phase, ``DELETE /runs/{id}`` takes Step 3a
+# (``task.cancel()``), the producer raises ``CancelledError``, and the engine's
+# cancel/escape arm is the ONLY place in the system that knows WHICH phase the
+# user interrupted — ``phase_id`` is bound in the same ``while`` iteration,
+# before the ``try``, so it is in scope inside the ``except`` WITHOUT a query.
+#
+# The RUN-KEYED sibling (``cancel_active_phases``, plan 194-09) is the zombie
+# arm's writer: that path has no engine, no loop and no ``phase_id`` at all.
+# Collapsing the two would cost this arm its certainty (RESEARCH § G-C).
+# ═══════════════════════════════════════════════════════════════════════
+
+import asyncio  # noqa: E402
+
+_CANCELLED_SQL = "SET status='cancelled'"
+
+
+class _PoolThatFailsTheCancelWrite:
+    """Delegating pool whose ONLY difference is that the cancel write raises.
+
+    Used to prove a cleanup failure cannot swallow the cancellation. It is a
+    PROXY rather than a subclass so every other write still lands on the real
+    recorder and the case can assert the failing write was ATTEMPTED — a pool
+    that silently dropped it would make the case vacuous.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.attempted: list[tuple] = []
+
+    async def execute(self, sql, *args):
+        if _CANCELLED_SQL in sql:
+            self.attempted.append((sql, args))
+            raise RuntimeError("simulated phase-terminalize failure")
+        return await self._inner.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _cancel_writes(pool):
+    """Every recorded write that composes the ``cancelled`` phase status."""
+    return [(sql, args) for sql, args in pool.calls if _CANCELLED_SQL in sql]
+
+
+async def _drive_engine_through_a_mid_phase_cancel(
+    build_workflow_definition,
+    pool,
+    *,
+    statuses=("pending",),
+    shutting_down=False,
+    exc=None,
+    ctx=None,
+):
+    """Drive ``run_workflow`` into the cancel/escape arm and report what happened.
+
+    Returns ``(raised, expiry_mock, ids, run_id)`` where ``ids`` are the durable
+    phase-row ids in ``phase_index`` order.
+
+    ⚠ THE SHUTDOWN FLAG IS SET **AND RESTORED**, INCLUDING FOR THE NON-SHUTDOWN
+    CASES, and that is load-bearing rather than tidy. ``_APP_SHUTTING_DOWN`` is a
+    process-global that LEAKS ACROSS TESTS: the shared ``client`` fixture is
+    ``with TestClient(app)``, whose teardown runs the lifespan shutdown handler and
+    leaves the flag ``True`` for the rest of the pytest process (measured in plan
+    194-09: False → False → **True** across a fixture's life). A case that merely
+    ASSUMED the flag was False would silently take the graceful-shutdown branch and
+    assert nothing. The PRIOR value is restored rather than hard-reset to ``False``
+    — a fence that repaired global state other suites run in would be changing the
+    very thing it measures.
+    """
+    from app.services import harness_engine
+
+    exc = exc if exc is not None else asyncio.CancelledError()
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": f"p{i}"}}
+            for i in range(len(statuses))
+        ]
+    )
+    run_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in statuses]
+    pool.set_fetch_result(
+        [
+            {
+                "id": ids[i],
+                "slug": f"p{i}",
+                "phase_index": i,
+                "status": st,
+                "output": {},
+            }
+            for i, st in enumerate(statuses)
+        ]
+    )
+
+    async def _boom(*a, **k):
+        raise exc
+
+    ctx = ctx if ctx is not None else type("C", (), {})()
+    prior_flag = harness_engine.is_app_shutting_down()
+    harness_engine.set_app_shutting_down(shutting_down)
+    raised: BaseException | None = None
+    try:
+        with patch.object(
+            harness_engine, "_run_phase_with_gates", new=_boom
+        ), patch.object(
+            harness_engine, "_expire_pending_ask_user", new=AsyncMock()
+        ) as expiry:
+            try:
+                await harness_engine.run_workflow(
+                    run_id, wf, ctx, pool=pool, redis=_NoopRedis()
+                )
+            except BaseException as e:  # noqa: BLE001 — the arm's re-raise IS the subject
+                raised = e
+    finally:
+        harness_engine.set_app_shutting_down(prior_flag)
+    return raised, expiry, ids, run_id
+
+
+@pytest.mark.asyncio
+async def test_a_mid_phase_cancel_marks_the_phase_the_user_interrupted(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """V-16: the interrupted phase is terminalized, keyed on the loop's ``phase_id``.
+
+    The run's rows are ``[completed, active, pending]``; the engine picks up at the
+    ``active`` row. Exactly ONE ``cancelled`` write lands and it is PHASE-KEYED on
+    that row's id — identified without a query, because ``phase_id`` was already
+    bound in this loop iteration.
+    """
+    _raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+
+    writes = _cancel_writes(mock_asyncpg_pool)
+    assert len(writes) == 1, (
+        f"the cancel arm must terminalize the interrupted phase exactly ONCE; "
+        f"recorded cancelled-writes={writes!r}"
+    )
+    sql, args = writes[0]
+    assert "WHERE id = $1" in sql, (
+        f"the engine arm's write must be PHASE-KEYED — it is the only home that knows "
+        f"WHICH phase the user interrupted. SQL={sql!r}"
+    )
+    assert args == (ids[1],), (
+        f"the write must bind the phase_id bound in this loop iteration ({ids[1]}), "
+        f"not some other row. args={args!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_cancellation_still_propagates_after_the_phase_is_marked(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """The arm's ``raise`` stays LAST — the caller still sees the ``CancelledError``.
+
+    Cancellation is already in flight when this arm runs; a cleanup that swallowed
+    or delayed it would leave the producer task alive after a Stop.
+    """
+    raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, mock_asyncpg_pool, statuses=("active",)
+    )
+
+    assert isinstance(raised, asyncio.CancelledError), (
+        f"the cancel/escape arm must re-raise the original cancellation; got {raised!r}"
+    )
+    # ...and it did the write BEFORE re-raising — otherwise the assertion above is
+    # satisfied by an arm that does nothing at all.
+    assert len(_cancel_writes(mock_asyncpg_pool)) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_graceful_shutdown_leaves_the_prompt_and_the_phase_row_resumable(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """096-09 (UAT Test 2) — the gate's scope covers BOTH cleanups, deliberately.
+
+    On a GRACEFUL app shutdown the run stays resumable: the boot sweep re-claims it
+    and re-emits the SAME pending prompt. Expiring the prompt would break that, and
+    terminalizing the phase row would break it too — a phase left ``active`` on a run
+    the sweep will RESUME is correct, because that phase really is still pending work.
+    So the new write sits INSIDE the shipped ``if not is_app_shutting_down():`` scope.
+    Neither cleanup runs here; the cancellation still propagates.
+
+    ⚠ THIS CASE WAS CORRECTLY **GREEN** ON THE TDD RED RUN, and that is recorded here
+    rather than left for a later reader to mistake for a vacuous fence. It asserts the
+    ABSENCE of a cancel write, which was trivially true before the write existed — its
+    job is to RED if the write ever escapes the gate, not to prove the write exists
+    (its four siblings do that). It was driven RED afterwards against a real plant that
+    moved the write outside the gate. The 194-09 lesson: read a RED run case-by-case,
+    never by count.
+    """
+    raised, expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("active",),
+        shutting_down=True,
+    )
+
+    assert _cancel_writes(mock_asyncpg_pool) == [], (
+        "a graceful shutdown must leave the phase row `active` — the sweep will resume it"
+    )
+    assert expiry.await_count == 0, (
+        "096-09: the pending prompt must NOT be expired on a graceful shutdown"
+    )
+    assert isinstance(raised, asyncio.CancelledError), (
+        "the shutdown branch must still re-raise the cancellation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_failing_phase_terminalize_never_swallows_the_cancellation(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """A cleanup failure logs and STILL re-raises — the write is best-effort.
+
+    The pool raises on the cancel write ONLY; every other write still lands, so the
+    case can prove the write was ATTEMPTED rather than quietly skipped.
+    """
+    failing = _PoolThatFailsTheCancelWrite(mock_asyncpg_pool)
+    raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, failing, statuses=("active",)
+    )
+
+    assert failing.attempted, (
+        "the arm never attempted the phase terminalize — the case would be vacuous"
+    )
+    assert failing.attempted[0][1] == (ids[0],)
+    assert isinstance(raised, asyncio.CancelledError), (
+        f"a cleanup failure must never mask the original cancellation; got {raised!r}"
+    )
+
+
+# ── Phase 194 code review CR-02 — a CRASH is not a STOP ──────────────────────
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. The terminalize was placed inside the
+# pre-existing ``except BaseException:`` arm and the exception was never captured or
+# inspected — while that arm's OWN shipped comment says "a crash escapes the same way",
+# and it is right: any non-``TimeoutError`` exception out of ``_execute_phase``
+# propagates through ``_run_phase_with_gates`` (which catches only
+# ``asyncio.TimeoutError``, at :907) and lands here. So a phase that FAILED FOR A REAL
+# REASON was persisted as ``cancelled``, rendered "Stopped by you" on the canvas and
+# "Stopped" on the panel spine — under a ``workflow_runs`` row the producer's terminal
+# classifier writes as ``failed``. A persisted, user-visible false statement, in the
+# phase whose entire requirement is honesty about what a stopped run did.
+#
+# ⚠ AND WHAT THE CRASH ARM MUST **NOT** DO INSTEAD, RECORDED HERE BECAUSE IT WAS
+# OFFERED AND REJECTED: it must not write ``failed`` either. This module's own header
+# states the shipped contract verbatim — "A phase whose execution raises mid-work is
+# left ``active`` (never ``completed``) so a later sweep re-runs it — the
+# crash-leaves-active resume contract" (``harness_engine.py:15-16``). Writing a terminal
+# status on a crash would repeal that contract from inside a cancel fix. So the honest
+# literal for a crash is the one the module already defines: NO terminal write at all,
+# which is exactly the behaviour that shipped for a year before 194. The ``cancelled``
+# write is scoped to a real cancellation and nothing else.
+#
+# ⚠ NO EXISTING CASE DRIVES A NON-``CancelledError`` THROUGH THIS ARM — the drive helper
+# defaults ``exc`` to ``asyncio.CancelledError()``, so the arm's inability to tell a
+# crash from a Stop was unobservable by the suite.
+
+
+@pytest.mark.asyncio
+async def test_a_crashed_phase_is_never_persisted_as_stopped_by_the_user(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (a) — a real crash writes NO ``cancelled`` status, and still propagates.
+
+    ``cancelled`` is rendered to a person as "Stopped by you" / "you ended the run while
+    this step was still working". Nobody ended this run: the step blew up.
+    """
+    raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+        exc=RuntimeError("a provider blew up mid-phase"),
+    )
+
+    assert _cancel_writes(mock_asyncpg_pool) == [], (
+        "a phase that CRASHED was persisted as `cancelled` — the canvas then says "
+        "'Stopped by you' about a failure nobody asked for, under a workflow_runs row "
+        "that reads `failed`"
+    )
+    assert isinstance(raised, RuntimeError), (
+        f"the crash must still propagate unchanged out of the arm; got {raised!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_crashed_phase_keeps_the_crash_leaves_active_resume_contract(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (b) — and it writes no OTHER terminal status either.
+
+    A SEPARATE case from (a) on purpose: ``assert`` short-circuits, and "not cancelled"
+    and "not terminal at all" are two different properties. Repairing (a) by writing
+    ``failed`` instead would leave (a) green and red here — which is the whole point,
+    because this module's header defines the crash contract as leaving the row
+    ``active`` for the resume sweep (``harness_engine.py:15-16``).
+    """
+    _raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+        exc=RuntimeError("a provider blew up mid-phase"),
+    )
+
+    phase_writes = [
+        sql for sql, _args in mock_asyncpg_pool.calls if "UPDATE workflow_phases" in sql
+    ]
+    assert phase_writes, (
+        "the drive composed NO workflow_phases write at all — not even the shipped "
+        "mark-active. The case would be vacuous (the 194-03 empty-sweep lesson)"
+    )
+    for sql in phase_writes:
+        assert "SET status='active'" in sql, (
+            "a crashed phase must be left `active` for the resume sweep — this module's "
+            f"documented crash-leaves-active contract. It wrote: {sql!r}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_arm_tells_a_stop_from_a_crash_by_the_ESCAPE_not_by_a_flag(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (c) — THE DISCRIMINATOR, driven in one case so it cannot be half-satisfied.
+
+    ⚠ THIS IS THE ANTI-OVER-CORRECTION CONTROL AND THE REASON IT IS A THIRD CASE.
+    Cases (a) and (b) are both satisfied by an arm that writes NOTHING EVER — i.e. by
+    deleting the 194 feature outright. This one fails in BOTH directions: it drives the
+    same helper twice, on the same shape of run, changing ONLY the escape, and asserts
+    the two disagree — one ``cancelled`` write for the Stop, zero for the crash.
+    """
+    stop_pool = mock_asyncpg_pool
+    _r1, _e1, stop_ids, _rid1 = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, stop_pool, statuses=("active",),
+        exc=asyncio.CancelledError(),
+    )
+    # ⚠ A SECOND, GENUINELY INDEPENDENT RECORDER — not a proxy over the first. A proxy
+    # that delegated ``execute`` would have written the crash drive's calls into the
+    # Stop drive's log too: the first draft of this case did exactly that and red with
+    # TWO cancelled writes, which is a test bug, not evidence (the 194-11 lesson).
+    crash_pool = type(stop_pool)()
+    _r2, _e2, _crash_ids, _rid2 = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, crash_pool, statuses=("active",),
+        exc=RuntimeError("boom"),
+    )
+
+    stop_writes = _cancel_writes(stop_pool)
+    crash_writes = _cancel_writes(crash_pool)
+    assert len(stop_writes) == 1 and stop_writes[0][1] == (stop_ids[0],), (
+        "a real Stop must still terminalize the interrupted phase — deleting the write "
+        f"is not a fix for CR-02. recorded={stop_writes!r}"
+    )
+    assert crash_writes == [], (
+        f"the same arm wrote `cancelled` for a crash. recorded={crash_writes!r}"
+    )
+
+
+def test_the_cancel_arm_is_the_harness_engines_alone_and_deep_never_enters_it():
+    """Deep runs are unaffected: ``cancel_phase`` is CALLED in exactly one module.
+
+    ⚠ AST-PARSED, NEVER GREPPED. A bare ``grep`` for the identifier matches this
+    project's own docblocks — the trap that tripped 194-02 (twice), 194-03, 194-06
+    and 194-09, the last of them in production source. Only real ``Call`` nodes count.
+
+    ANTI-VACUITY: the counter is first shown to FIND a call that is known to exist
+    (``fail_phase``, three lines below the arm) and to return 0 for a name that does
+    not, so the 1/0 reading below is a measurement rather than a broken parser.
+    """
+    import ast
+    import pathlib
+
+    def _calls_named(src: str, name: str) -> int:
+        tree = ast.parse(src)
+        return sum(
+            1
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == name
+        )
+
+    services = pathlib.Path(__file__).resolve().parents[1] / "app" / "services"
+    engine_src = (services / "harness_engine.py").read_text(encoding="utf-8")
+    deep_src = (services / "agent_loop.py").read_text(encoding="utf-8")
+    assert len(engine_src) > 10_000 and len(deep_src) > 10_000, (
+        "the sweep read nothing — an empty-source fence passes green while seeing "
+        "nothing at all (the 194-03 empty-sweep lesson)"
+    )
+
+    # Positive controls: the counter really can see a call, and really can miss one.
+    assert _calls_named(engine_src, "fail_phase") >= 1, (
+        "the AST counter cannot see a call that is known to exist — it is broken"
+    )
+    assert _calls_named(engine_src, "no_such_writer_anywhere") == 0
+
+    assert _calls_named(engine_src, "cancel_phase") == 1, (
+        "exactly ONE cancel_phase call belongs in the engine — the interrupted-phase "
+        "terminalize on the cancel/escape arm"
+    )
+    assert _calls_named(deep_src, "cancel_phase") == 0, (
+        "the Deep agent loop must not terminalize workflow phases — it runs no workflow "
+        "and never enters the harness engine's cancel arm"
+    )
+
+
+# ── Plan 10 Task 2 — the fences (F-5 phase-keying, F-6 vocabulary, F-S shape) ──
+
+
+def _phase_status_literals_admitted_by(migration_name: str) -> set[str]:
+    """The status literals a migration's CHECK admits, read BELOW ``BEGIN;``.
+
+    ⚠ SCOPING BELOW ``BEGIN;`` IS LOAD-BEARING (inherited from plan 194-09). Migration
+    119's header QUOTES all seven literals in prose, so a whole-file scan would read
+    the documentation as if it were the constraint.
+    """
+    import pathlib
+    import re
+
+    path = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "supabase"
+        / "migrations"
+        / migration_name
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "BEGIN;" in text, f"{migration_name} has no BEGIN; — the scoping is broken"
+    body = text.split("BEGIN;", 1)[1]
+    return set(re.findall(r"'([a-z_]+)'::text", body))
+
+
+@pytest.mark.asyncio
+async def test_the_engine_cancel_arm_leaves_every_other_phase_row_untouched(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """F-5 (V-18 sibling): the write can never reach a row the user did not interrupt.
+
+    THIS IS THE WHOLE REASON HOME A EXISTS. A run-keyed terminalize here would mark
+    whatever happens to be ``active`` — and on a race could repaint work the user
+    COMPLETED, whose outputs are already durable (D-07 / D-13). The clauses are
+    separated so each names a different defect:
+
+      (a) no cancel write may carry the RUN-keyed predicate or bind the run_id;
+      (b) the completed and pending rows' ids appear in NO recorded write at all.
+
+    ⚠ Clause (a) is the one the run-keyed plant fires, and clause (b) is NOT redundant
+    with it: a read-then-update-by-a-queried-id defect would leave (a) green and red
+    (b). Stated rather than implied, because a fence whose clauses cannot fail
+    independently is one fence wearing two hats (the 194-03 lesson).
+    """
+    _raised, _expiry, ids, run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+    completed_id, active_id, pending_id = ids
+
+    writes = _cancel_writes(mock_asyncpg_pool)
+    assert writes, "no cancel write was recorded — the fence would be vacuous"
+
+    # (a) never a bulk terminalize.
+    for sql, args in writes:
+        assert "workflow_run_id" not in sql, (
+            f"the engine arm's write went RUN-KEYED. That is the zombie arm's writer "
+            f"(`cancel_active_phases`) and it marks whatever happens to be `active` — "
+            f"here the phase_id is already known. SQL={sql!r}"
+        )
+        assert run_id not in args, (
+            f"a cancel write bound the RUN id ({run_id}) instead of the phase id; "
+            f"args={args!r}"
+        )
+
+    # (b) no other row is named anywhere in the drive.
+    every_arg = [a for _sql, args in mock_asyncpg_pool.calls for a in args]
+    assert completed_id not in every_arg, (
+        "the COMPLETED phase row was named in a write. Its output is already durable "
+        "and the stopped run must keep it (D-07 / D-13)."
+    )
+    assert pending_id not in every_arg, (
+        "a phase that never started was named in a write — only the interrupted row moves"
+    )
+    assert active_id in every_arg, (
+        "the interrupted row was never named at all — clause (b) would be vacuous"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_engine_cancel_arm_composes_only_migration_119s_slug(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """F-6 (V-19): the arm writes ``cancelled`` — never ``failed``, never ``skipped``.
+
+    ⚠ SCOPED OVER THE COMPOSED VALUE, NEVER THE MODULE SOURCE. ``harness_engine.py``
+    legitimately names ``fail_phase`` / ``skip_phase`` and their statuses THREE LINES
+    BELOW the arm being fenced, so a raw source sweep would red on shipped, correct
+    code (the 193.2 F-3 lesson, and this phase's own repeated docblock-grep trap).
+    The scope is CHECKED rather than assumed: the case asserts those two shipped names
+    are still present in the source while the composed values contain neither, so if
+    the fence ever stops demonstrating that distinction it fails loudly instead of
+    quietly becoming a tautology.
+
+    The expected slug is DERIVED from the migrations by parsing, never re-typed:
+    119's literals minus 115's must be exactly ``{"cancelled"}``.
+    """
+    import pathlib
+
+    expected = _phase_status_literals_admitted_by(
+        "119_workflow_phases_cancelled.sql"
+    ) - _phase_status_literals_admitted_by("115_workflow_phases_recorded_not_sent.sql")
+    assert expected == {"cancelled"}, (
+        f"migration 119 minus 115 must add exactly one literal; got {expected!r}"
+    )
+    (slug,) = expected
+
+    _raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+
+    # Every phase-status value the drive composed, other than the shipped mark-active.
+    written = [
+        sql
+        for sql, _args in mock_asyncpg_pool.calls
+        if "UPDATE workflow_phases" in sql and "SET status='active'" not in sql
+    ]
+    assert written, "the drive composed no terminal phase write — fence vacuous"
+    for sql in written:
+        assert f"SET status='{slug}'" in sql, (
+            f"the interrupted phase must be written with migration 119's slug "
+            f"({slug!r}); SQL={sql!r}"
+        )
+        assert "status='failed'" not in sql and "status='skipped'" not in sql, (
+            f"D-04: reusing `failed` or `skipped` was OFFERED AND REJECTED. The phase "
+            f"did not fail and was not skipped — it ran and a person ended the run "
+            f"underneath it. SQL={sql!r}"
+        )
+
+    # SCOPE PROOF — the fence is value-scoped, and here is the evidence.
+    engine_src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "app"
+        / "services"
+        / "harness_engine.py"
+    ).read_text(encoding="utf-8")
+    assert "fail_phase" in engine_src and "skip_phase" in engine_src, (
+        "the module no longer names fail_phase/skip_phase, so this fence has stopped "
+        "demonstrating that it is scoped over the composed VALUE rather than the "
+        "source. Fix the fence's premise, do not delete the assertion."
+    )
+
+
+def test_the_new_write_is_shielded_in_its_own_try_and_the_raise_stays_last():
+    """F-S: the arm's SHAPE, parsed — shielded, self-guarded, and re-raising LAST.
+
+    Three mechanisms, each a separate assertion because each is a different defect:
+      1. the write is wrapped in ``asyncio.shield`` — cancellation is already in
+         flight, so an unshielded await would be cancelled BEFORE it wrote;
+      2. it has its OWN ``try/except`` that ``logger.exception``s — a cleanup failure
+         must not mask the escape;
+      3. the handler's LAST statement is a BARE ``raise`` — the cancellation still
+         propagates, and nothing may be appended after it.
+
+    ⚠ AST-PARSED, NEVER GREPPED, and the shape-detector carries a POSITIVE CONTROL:
+    it is first shown to find the SHIPPED ``asyncio.shield(_expire_pending_ask_user(…))``
+    with the identical walk. A detector that could not see the shipped call would be
+    proving nothing about the new one.
+    """
+    import ast
+    import pathlib
+
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "app"
+        / "services"
+        / "harness_engine.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    fn = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef))
+        and n.name == "run_workflow"
+    )
+
+    def _shielded_names(node) -> set[str]:
+        """Names of callables wrapped directly in ``asyncio.shield(...)``."""
+        out = set()
+        for c in ast.walk(node):
+            if (
+                isinstance(c, ast.Call)
+                and isinstance(c.func, ast.Attribute)
+                and c.func.attr == "shield"
+                and isinstance(c.func.value, ast.Name)
+                and c.func.value.id == "asyncio"
+            ):
+                for a in c.args:
+                    if isinstance(a, ast.Call) and isinstance(a.func, ast.Name):
+                        out.add(a.func.id)
+        return out
+
+    # POSITIVE CONTROL — the walk finds the shipped shielded cleanup.
+    assert "_expire_pending_ask_user" in _shielded_names(fn), (
+        "the shield detector cannot see the SHIPPED shielded expiry — it is broken, "
+        "and any verdict it gives about the new write is worthless"
+    )
+
+    handlers = [
+        h
+        for t in ast.walk(fn)
+        if isinstance(t, ast.Try)
+        for h in t.handlers
+        if any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Name)
+            and c.func.id == "cancel_phase"
+            for c in ast.walk(h)
+        )
+    ]
+    assert len(handlers) == 1, (
+        f"the phase terminalize must live in exactly ONE exception handler — the "
+        f"cancel/escape arm; found {len(handlers)}"
+    )
+    arm = handlers[0]
+
+    # It is the BaseException arm (D-06 / BUG-260605-01), not some narrower one.
+    assert isinstance(arm.type, ast.Name) and arm.type.id == "BaseException", (
+        f"the terminalize moved off the cancel/escape arm; it now sits under "
+        f"{ast.dump(arm.type) if arm.type else 'a bare except'}"
+    )
+
+    # 1. shielded.
+    assert "cancel_phase" in _shielded_names(arm), (
+        "the phase terminalize is NOT wrapped in asyncio.shield — cancellation is "
+        "already in flight and an unshielded await is cancelled before it writes"
+    )
+
+    # 2. its own try/except that logs.
+    inner = [
+        t
+        for t in ast.walk(arm)
+        if isinstance(t, ast.Try)
+        and any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Name)
+            and c.func.id == "cancel_phase"
+            for stmt in t.body
+            for c in ast.walk(stmt)
+        )
+    ]
+    assert len(inner) == 1, (
+        f"the terminalize must sit in its OWN try/except so a cleanup failure cannot "
+        f"mask the escape; found {len(inner)} enclosing try bodies"
+    )
+    logged = [
+        h
+        for h in inner[0].handlers
+        if any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Attribute)
+            and c.func.attr == "exception"
+            for c in ast.walk(h)
+        )
+    ]
+    assert logged, "the terminalize's except clause does not logger.exception the failure"
+
+    # 3. the bare re-raise is the LAST statement of the arm.
+    last = arm.body[-1]
+    assert isinstance(last, ast.Raise) and last.exc is None, (
+        f"the cancel/escape arm must END with a bare `raise` — cancellation may not be "
+        f"swallowed or delayed. Last statement is {type(last).__name__}."
+    )

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workflow Run - Vendor Renewal Risk Sweep | Aether Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#060A0F',
+                        surface: '#0D1117',
+                        elevated: '#080B11',
+                        raised: '#0F141B',
+                        muted: '#151B24',
+                        border: '#212631',
+                        primaryText: '#F4F6FE',
+                        secondaryText: '#9AA3B5',
+                        dimText: '#6B7383',
+                        brandPrimary: '#A3A5FF',
+                        brandPrimaryStrong: '#635BFF',
+                        violet: '#895AF6',
+                        success: '#21C45D',
+                        warning: '#F5A524',
+                        danger: '#DC2626'
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                        lg: "1rem",
+                        xl: "1.5rem",
+                        full: "9999px"
+                    },
+                    fontFamily: {
+                        headline: ["Manrope", "sans-serif"],
+                        display: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                        label: ["Inter", "sans-serif"],
+                        mono: ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .pulse-indigo {
+            animation: pulse-indigo 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-indigo {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-page text-primaryText font-body antialiased flex h-screen overflow-hidden">
+<!-- SideNavBar (from JSON) -->
+<nav class="bg-[#080B11] text-[#A3A5FF] font-label text-xs uppercase tracking-widest text-[#6B7383] docked full-height left-0 w-64 border-r border-[#212631]/50 flat no shadows transition-all duration-200 fixed left-0 top-0 h-full flex flex-col pt-20 pb-8 px-4 z-40 md:flex hidden">
+<!-- Brand hidden as per style_brand_logo: hidden -->
+<div class="flex-1 space-y-2 mt-4">
+<a class="flex items-center px-4 py-3 rounded-lg text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">account_tree</span>
+                Workflows
+            </a>
+<a class="flex items-center px-4 py-3 rounded-lg text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">database</span>
+                Knowledge
+            </a>
+<a class="flex items-center px-4 py-3 rounded-lg text-[#A3A5FF] border-r-2 border-[#635BFF] bg-[#A3A5FF]/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">terminal</span>
+                Executions
+            </a>
+<a class="flex items-center px-4 py-3 rounded-lg text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">settings_suggest</span>
+                Settings
+            </a>
+</div>
+<div class="mt-auto space-y-2 mb-6 border-t border-[#212631]/50 pt-4">
+<a class="flex items-center px-4 py-2 rounded-lg text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">help_outline</span>
+                Documentation
+            </a>
+<a class="flex items-center px-4 py-2 rounded-lg text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg">chat_bubble_outline</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 flex flex-col h-full relative overflow-y-auto">
+<!-- Top App Bar (Mobile Only - inferred necessity for mobile navigation) -->
+<header class="md:hidden bg-elevated border-b border-border/50 flex justify-between items-center px-6 py-4 sticky top-0 z-50">
+<h1 class="font-headline font-bold text-lg">Aether</h1>
+<span class="material-symbols-outlined">menu</span>
+</header>
+<!-- Workspace Canvas -->
+<div class="max-w-5xl mx-auto w-full px-6 py-8 md:py-12 flex-1 flex flex-col lg:flex-row gap-8">
+<!-- Left Column: Spine & Core -->
+<div class="flex-1 flex flex-col">
+<!-- Run Receipt (Header) -->
+<div class="mb-12 border-b border-border/50 pb-8 relative">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h1 class="font-headline text-3xl font-bold tracking-tight text-primaryText flex items-center gap-3">
+                                Vendor Renewal Risk Sweep <span class="text-secondaryText text-xl font-medium font-mono">v2.4</span>
+</h1>
+<div class="flex items-center gap-4 mt-3 text-sm font-label text-dimText uppercase tracking-widest">
+<span>Started by Alex M.</span>
+<span>•</span>
+<span class="font-mono text-secondaryText">14:22:05</span>
+<span>•</span>
+<span class="font-mono text-secondaryText">Total Elapsed: 04:12</span>
+</div>
+</div>
+<div class="flex items-center gap-2 bg-brandPrimary/10 px-3 py-1.5 rounded-full border border-brandPrimary/20">
+<div class="w-2 h-2 rounded-full bg-brandPrimary pulse-indigo"></div>
+<span class="font-label text-xs uppercase tracking-widest text-brandPrimary font-semibold">Running</span>
+</div>
+</div>
+</div>
+<!-- The Phase Spine -->
+<div class="relative pl-6">
+<!-- Vertical Line -->
+<div class="absolute left-[11px] top-4 bottom-8 w-[2px] bg-muted"></div>
+<!-- Phase 1: Retrieve (Complete) -->
+<div class="relative flex gap-6 mb-8 group cursor-pointer hover:bg-surface/50 p-3 -ml-3 rounded-lg transition-colors">
+<div class="z-10 bg-page rounded-full p-1 mt-0.5 relative">
+<div class="absolute inset-0 rounded-full bg-success/20 -m-1"></div>
+<span class="material-symbols-outlined text-success text-sm relative z-10" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<h3 class="font-headline font-semibold text-secondaryText text-lg">Retrieve</h3>
+<span class="font-mono text-dimText text-sm">00:15</span>
+</div>
+<p class="text-dimText text-sm mt-1">312 documents matched</p>
+</div>
+</div>
+<!-- Phase 2: Extract (Complete) -->
+<div class="relative flex gap-6 mb-8 group cursor-pointer hover:bg-surface/50 p-3 -ml-3 rounded-lg transition-colors">
+<div class="z-10 bg-page rounded-full p-1 mt-0.5 relative">
+<div class="absolute inset-0 rounded-full bg-success/20 -m-1"></div>
+<span class="material-symbols-outlined text-success text-sm relative z-10" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<h3 class="font-headline font-semibold text-secondaryText text-lg">Extract</h3>
+<span class="font-mono text-dimText text-sm">01:45</span>
+</div>
+<p class="text-dimText text-sm mt-1">48 fields across 12 contracts</p>
+</div>
+</div>
+<!-- Phase 3: Judge (Running) -->
+<div class="relative flex gap-6 mb-8 bg-raised border border-border rounded-xl p-6 -ml-6 shadow-sm">
+<!-- Active connector override -->
+<div class="absolute left-[-1px] top-6 bottom-[-24px] w-[2px] bg-brandPrimary/30 hidden"></div>
+<div class="z-10 bg-raised rounded-full p-1 mt-0.5 relative">
+<span class="material-symbols-outlined text-brandPrimary text-lg pulse-indigo">hourglass_empty</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline font-bold text-primaryText text-xl flex items-center gap-3">
+                                    Judge
+                                </h3>
+<span class="font-mono text-brandPrimary text-sm bg-brandPrimary/10 px-2 py-1 rounded font-medium pulse-indigo">02:12</span>
+</div>
+<div class="bg-surface border border-border rounded-lg p-4 font-body text-sm text-secondaryText flex items-center gap-3">
+<span class="material-symbols-outlined text-dimText text-sm pulse-indigo">data_exploration</span>
+                                Analyzing liability caps for high-risk vendors...
+                            </div>
+</div>
+</div>
+<!-- Phase 4: Branch (Paused / Intervention) -->
+<div class="relative flex gap-6 mb-8 bg-surface border border-warning/50 rounded-xl p-6 -ml-6 shadow-sm relative overflow-hidden">
+<!-- Subtle warning glow top -->
+<div class="absolute top-0 left-0 right-0 h-1 bg-warning/30"></div>
+<div class="z-10 bg-surface rounded-full p-1 mt-0.5 relative">
+<div class="absolute inset-0 rounded-full bg-warning/20 -m-1 pulse-indigo"></div>
+<span class="material-symbols-outlined text-warning text-lg relative z-10" style="font-variation-settings: 'FILL' 1;">front_hand</span>
+</div>
+<div class="flex-1">
+<div class="flex flex-col mb-4">
+<div class="flex items-center gap-3 mb-1">
+<span class="font-label text-[10px] uppercase tracking-widest text-warning font-bold bg-warning/10 px-2 py-0.5 rounded">Paused</span>
+</div>
+<h3 class="font-headline font-bold text-primaryText text-xl">
+                                    Branch: Approve High-Risk Path?
+                                </h3>
+</div>
+<p class="text-primaryText text-sm mb-6 leading-relaxed">
+                                3 contracts contain uncapped liability. Proceed to Risk Committee draft?
+                            </p>
+<div class="flex gap-4">
+<button class="bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning font-semibold py-2 px-6 rounded-lg text-sm transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">check</span>
+                                    Approve
+                                </button>
+<button class="bg-muted border border-border hover:bg-raised text-primaryText font-medium py-2 px-6 rounded-lg text-sm transition-colors">
+                                    Reject
+                                </button>
+</div>
+</div>
+</div>
+<!-- Phase 5: Draft (Waiting) -->
+<div class="relative flex gap-6 mb-8 p-3 -ml-3 opacity-50 grayscale">
+<div class="z-10 bg-page rounded-full p-1 mt-0.5">
+<div class="w-4 h-4 rounded-full border-2 border-dimText"></div>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-medium text-dimText text-lg">Draft</h3>
+</div>
+</div>
+<!-- Phase 6: Publish (Waiting) -->
+<div class="relative flex gap-6 p-3 -ml-3 opacity-50 grayscale">
+<div class="z-10 bg-page rounded-full p-1 mt-0.5">
+<div class="w-4 h-4 rounded-full border-2 border-dimText"></div>
+</div>
+<div class="flex-1">
+<h3 class="font-headline font-medium text-dimText text-lg">Publish</h3>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Context / Outputs -->
+<div class="w-full lg:w-80 flex flex-col gap-6 lg:border-l lg:border-border/50 lg:pl-8">
+<!-- Stop Control -->
+<div class="bg-raised border border-border p-4 rounded-xl">
+<button class="w-full bg-danger/10 hover:bg-danger/20 border border-danger/30 text-danger font-semibold py-3 px-4 rounded-lg text-sm transition-colors flex justify-center items-center gap-2 uppercase tracking-wide">
+<span class="material-symbols-outlined text-sm">stop_circle</span>
+                        Stop Run
+                    </button>
+<p class="text-xs text-dimText text-center mt-3">Will cleanly terminate current phase.</p>
+</div>
+<!-- Outputs Section -->
+<div>
+<h4 class="font-label text-xs uppercase tracking-widest text-dimText mb-4">Accumulated Outputs</h4>
+<div class="space-y-3">
+<!-- File 1 -->
+<div class="bg-surface border border-border p-3 rounded-lg flex items-start gap-3 hover:bg-raised transition-colors cursor-pointer group">
+<div class="bg-muted p-2 rounded-md group-hover:bg-brandPrimary/10 transition-colors">
+<span class="material-symbols-outlined text-secondaryText text-lg group-hover:text-brandPrimary">picture_as_pdf</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm font-medium text-primaryText truncate">risk_summary_v1.pdf</p>
+<div class="flex items-center gap-2 mt-1 text-xs text-dimText font-mono">
+<span>1.2 MB</span>
+<span>•</span>
+<span>02:00 ago</span>
+</div>
+</div>
+</div>
+<!-- File 2 -->
+<div class="bg-surface border border-border p-3 rounded-lg flex items-start gap-3 hover:bg-raised transition-colors cursor-pointer group">
+<div class="bg-muted p-2 rounded-md group-hover:bg-brandPrimary/10 transition-colors">
+<span class="material-symbols-outlined text-secondaryText text-lg group-hover:text-brandPrimary">code</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-sm font-medium text-primaryText truncate">extracted_data.json</p>
+<div class="flex items-center gap-2 mt-1 text-xs text-dimText font-mono">
+<span>42 KB</span>
+<span>•</span>
+<span>01:15 ago</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -119,8 +119,16 @@ vi.mock("@/lib/api", () => {
     updateWorkflowDraft: mockUpdate,
     listFolders: mockListFolders,
     listSkills: mockListSkills,
+    // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections
+    // too. DECLARED rather than left undefined (`196-08`: a whole-module factory mock that
+    // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
+    // absence — every external face renders its destination-free sentence.
+    listConnectorConnections: () => Promise.resolve([]),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
+    // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
+    // reads the author model registry at mount and this factory must declare it.
+    getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
     publishWorkflow: mockPublish,
     listPublishedWorkflows: mockListPublished,
     listStarterWorkflows: mockListStarters,
@@ -165,6 +173,10 @@ import {
 // suite reads the constant rather than a copied literal, so a re-wording cannot leave a
 // green test asserting a sentence the product no longer says.
 import { SAVE_FAILED_SENTENCE } from "@/hooks/useDraftPersistence"
+// Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id. These two sites used a
+// case-insensitive REGEX (/draft the workflow/i), which is why this phase's first literal-only
+// sweep did not see them — a sweep for the quoted string cannot find a regex form.
+import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
 import { WorkflowsPage } from "./WorkflowsPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
@@ -267,7 +279,7 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
 
     // Describe → draft → the drafted editing view.
     await user.type(screen.getByRole("textbox", { name: /business requirement/i }), "vendor risk")
-    await user.click(screen.getByRole("button", { name: /draft the workflow/i }))
+    await user.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await screen.findByTestId("spine-node-research")
 
     // First explicit save → CREATE.
@@ -314,7 +326,7 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
       </EffectiveFeaturesProvider>,
     )
     await user.type(screen.getByRole("textbox", { name: /business requirement/i }), "vendor risk")
-    await user.click(screen.getByRole("button", { name: /draft the workflow/i }))
+    await user.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await screen.findByTestId("spine-node-research")
 
     const save = screen.getByTestId("builder-save-draft")
@@ -484,13 +496,16 @@ describe("WorkflowBuilderPage session — the unsaved-work leave guard (D-184-16
       </EffectiveFeaturesProvider>,
     )
 
-    fireEvent.click(await screen.findByTestId("build-card"))
+    // 192-10 (D-02): the create affordance is the toolbar's, and "the library is back" is
+    // now witnessed by the toolbar itself rather than by a shelf — 157-B replaced three
+    // shelves with one persistent bar, so the bar is the library's presence.
+    fireEvent.click(await screen.findByTestId("library-create"))
     await screen.findByTestId("workflow-doors")
 
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId("builder-back")).toBeNull())
-    expect(screen.getByTestId("drafts-shelf")).toBeInTheDocument()
+    expect(screen.getByTestId("library-toolbar")).toBeInTheDocument()
   })
 
   it("the ← Workflows breadcrumb REFUSES to leave a DIRTY Builder, and leaves once confirmed", async () => {
@@ -522,13 +537,14 @@ describe("WorkflowBuilderPage session — the unsaved-work leave guard (D-184-16
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId("door-govern")).toBeInTheDocument()
-    expect(screen.queryByTestId("drafts-shelf")).toBeNull()
+    // 192-10 (D-02): the library's presence is the toolbar, not a shelf.
+    expect(screen.queryByTestId("library-toolbar")).toBeNull()
 
     // …and once the author says yes, it leaves.
     confirmSpy.mockReturnValue(true)
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(screen.getByTestId("drafts-shelf")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId("library-toolbar")).toBeInTheDocument())
   })
 })
 

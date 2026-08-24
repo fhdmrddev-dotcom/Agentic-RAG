@@ -1,0 +1,920 @@
+
+<div class="s173-root dark">
+  <div class="s173-head">
+    <div class="s173-kicker">Sketch 173 · Phase 197 Guided Authoring · G-2 gate · AUTH-02 · D-07 / D-09 / D-16</div>
+    <h1>One row, five ways</h1>
+    <p class="s173-lede">Sketch 172 asks <em>where</em> the five decisions live. This one asks what <strong>one row</strong> looks
+    like — and it draws all five rows in every state each can actually be in, because the five are not alike: two have shipped
+    empty-state sentences, one has no control anywhere, and <strong>one has no field at all</strong>.</p>
+  </div>
+
+  <div class="s173-mech">
+    <strong>⚠ Read this page as a DRAWING, unlike 172.</strong>
+    <p>172's central surfaces ship, so it renders them. Here the decisions card exists in no component, so almost every node is a
+    proposal — <strong>27 of them</strong>, each tagged <code>data-s173="NEW"</code>. What keeps it honest is that every
+    sentence the product already owns is <strong>parsed out of sketch 172's dump of the real rendered
+    <code>WorkflowBuilderPage</code></strong> rather than re-typed, and row 3 wears the <strong>shipped</strong>
+    <code>AI-proposed</code> mark markup lifted whole. This build asserts that ratio rather than asking you to trust it.</p>
+    <p class="s173-caveat"><strong>D-16 is the floor on every string here.</strong> The mark means <em>a model wrote this</em>. It
+    never means <em>this is good</em> or <em>this is durable</em> — measured: <code>gpt-5.5</code> named one-run parameters in
+    <strong>5 of 5</strong> QBR requirements and all 20 were still correctly stamped, because the stamp's question is the anti-echo
+    one. The shipped explanation obeys this and is asserted to: <em>“The generator proposed this line when this workflow was created. Edit it and this mark clears.”</em></p>
+  </div>
+
+  <div class="s173-tabs">
+    <button class="s173-tab" data-tab="a">A · Ask first</button>
+    <button class="s173-tab" data-tab="b">B · Quiet when answered</button>
+    <button class="s173-tab" data-tab="c">C · Answer first</button>
+    <button class="s173-tab" data-tab="rows">⚠ The five are not alike</button>
+    <button class="s173-tab" data-tab="limit">The D-03 limit line</button>
+  </div>
+
+  <section class="s173-panel" data-panel="a">
+    <div class="s173-axis"><span class="s173-badge s173-badge-baseline">A · ASK FIRST</span>
+      <p>The question leads on every row, in every state — the same words whether the answer is already right or not. Closest to
+      <code>SeedReceipt</code>'s own grammar (a lead sentence, then the facts) and the least clever thing that could work.</p></div>
+    
+  <h3 class="s173-h3">The realistic mixed state — what a fresh generation actually looks like</h3>
+  <p class="s173-note">KB set pre-draft, requirement proposed by the model (<code>SEED-163</code> measured this now happens on
+  every generation), name AI-chosen, deliverable derived, <strong>no template</strong> — the common case on the describe door.
+  <strong>Judge A here first;</strong> the all-answered and all-empty boards below are diagnostics, not screens a user meets.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="a" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row answered</h3>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="a" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">pm-weekly-status-report.docx · 8 fields</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row empty</h3>
+  <p class="s173-note">Two of these five sentences are the product's own (<code>UNBOUND_KB_INVITATION</code>,
+  <code>REQUIREMENT_INVITATION</code>); three are proposals. The shipped pair set the register the other three have to match.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="a" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">No knowledge base · searches everything</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">What must this workflow deliver? · required to publish</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Untitled workflow</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">An answer in chat</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+  </section>
+
+  <section class="s173-panel" data-panel="b" hidden>
+    <div class="s173-axis"><span class="s173-badge s173-badge-b">B · QUIET WHEN ANSWERED</span>
+      <p>A row with a value collapses to a stated fact; a row without one keeps the full question. The card gets much shorter —
+      which is the one thing that directly buys back what sketch 172 measured stacking to cost.</p></div>
+    <p class="s173-note">⚠ <strong>The line B must not cross, and it is D-07's own reasoning.</strong> “Quiet when answered” is
+    legitimate only if <strong>answered means the field is non-empty</strong> — a server-side fact. It may never mean
+    <em>the AI got this right</em>: D-07 rejected a needs-attention row set precisely because <strong>no such predicate exists</strong>.
+    That is why the <code>AI-proposed</code> mark <strong>survives into the quiet state</strong> here rather than disappearing
+    like a resolved warning — asserted in <code>build.cjs</code>, because it is the exact place this variant would rot.</p>
+    
+  <h3 class="s173-h3">The realistic mixed state — what a fresh generation actually looks like</h3>
+  <p class="s173-note">KB set pre-draft, requirement proposed by the model (<code>SEED-163</code> measured this now happens on
+  every generation), name AI-chosen, deliverable derived, <strong>no template</strong> — the common case on the describe door.
+  <strong>Judge B here first;</strong> the all-answered and all-empty boards below are diagnostics, not screens a user meets.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="b" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Knowledge base</span>
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Business requirement</span>
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Name</span>
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Deliverable</span>
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row answered</h3>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="b" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Knowledge base</span>
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Template</span>
+      <strong class="min-w-0 font-semibold">pm-weekly-status-report.docx · 8 fields</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Business requirement</span>
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Name</span>
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full text-[11px] leading-none text-muted-foreground">·</span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-baseline gap-1.5">
+      <span data-s173="NEW" class="shrink-0 text-muted-foreground">Deliverable</span>
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row empty</h3>
+  <p class="s173-note">Two of these five sentences are the product's own (<code>UNBOUND_KB_INVITATION</code>,
+  <code>REQUIREMENT_INVITATION</code>); three are proposals. The shipped pair set the register the other three have to match.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="b" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">No knowledge base · searches everything</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">What must this workflow deliver? · required to publish</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">Untitled workflow</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold text-muted-foreground/70 italic">An answer in chat</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+  </section>
+
+  <section class="s173-panel" data-panel="c" hidden>
+    <div class="s173-axis"><span class="s173-badge s173-badge-c">C · ANSWER FIRST</span>
+      <p>The decision leads at 13 px; the question becomes an 11.5 px caption under it. Reads as <em>“here is what I chose”</em>
+      rather than <em>“here is what I am asking you”</em> — closer to a receipt, further from an interview.</p></div>
+    <p class="s173-note">⚠ <strong>Its risk is SC#1.</strong> The ROADMAP criterion is that the author is <em>“asked the decisions
+    that change the result, rather than receiving a finished draft in one shot.”</em> A card whose questions are captions may read
+    as a better receipt rather than as being asked anything. Judge that against the mixed board, not the all-empty one.</p>
+    
+  <h3 class="s173-h3">The realistic mixed state — what a fresh generation actually looks like</h3>
+  <p class="s173-note">KB set pre-draft, requirement proposed by the model (<code>SEED-163</code> measured this now happens on
+  every generation), name AI-chosen, deliverable derived, <strong>no template</strong> — the common case on the describe door.
+  <strong>Judge C here first;</strong> the all-answered and all-empty boards below are diagnostics, not screens a user meets.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="c" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Which knowledge base should this search?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Is there a template it has to fill?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What must this workflow deliver?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What should this be called?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What does it produce?</div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row answered</h3>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="c" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Which knowledge base should this search?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">pm-weekly-status-report.docx · 8 fields</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Is there a template it has to fill?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What must this workflow deliver?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What should this be called?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What does it produce?</div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+  <h3 class="s173-h3">Every row empty</h3>
+  <p class="s173-note">Two of these five sentences are the product's own (<code>UNBOUND_KB_INVITATION</code>,
+  <code>REQUIREMENT_INVITATION</code>); three are proposals. The shipped pair set the register the other three have to match.</p>
+  <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="c" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">No knowledge base · searches everything</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Which knowledge base should this search?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">Nothing attached — it writes its own format</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">Is there a template it has to fill?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">What must this workflow deliver? · required to publish</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What must this workflow deliver?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">Untitled workflow</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What should this be called?</div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="empty" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full border border-border"></span>
+  <span class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 text-[13px] font-semibold text-muted-foreground/70 italic">An answer in chat</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+    <div data-s173="NEW" class="mt-[1px] text-[11.5px] text-muted-foreground">What does it produce?</div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+  </section>
+
+  <section class="s173-panel" data-panel="rows" hidden>
+    <div class="s173-axis"><span class="s173-badge s173-badge-p">EVIDENCE</span>
+      <p>D-07 says five fixed rows, always all of them, always the same order. It does not say the five are alike — and they are
+      not. This table is why a single row treatment has to survive five quite different shapes.</p></div>
+    <table class="s173-table">
+      <thead><tr><th>row</th><th>the ask (proposed)</th><th>what backs it</th><th>empty state</th><th>the catch</th></tr></thead>
+      <tbody><tr>
+  <td><code>kb</code></td>
+  <td class="s173-rule">Which knowledge base should this search?</td>
+  <td>stored field</td>
+  <td><span class="s173-status s173-status-shipped">SHIPPED</span></td>
+  <td class="s173-where">The shipped empty state already says what unbound MEANS — 'searches everything' — which is a fact about configuration, not a warning. A row that re-words it would be a second truth-teller.</td>
+</tr>
+<tr>
+  <td><code>template</code></td>
+  <td class="s173-rule">Is there a template it has to fill?</td>
+  <td>stored, elsewhere</td>
+  <td><span class="s173-status s173-status-new">PROPOSED</span></td>
+  <td class="s173-where">The only row whose control lives on another surface. Its answered state is the one place this card could usefully show a COUNT, because the count is what tells you the draft was aimed at the right questions (SEED-157).</td>
+</tr>
+<tr>
+  <td><code>requirement</code></td>
+  <td class="s173-rule">What must this workflow deliver?</td>
+  <td>stored field</td>
+  <td><span class="s173-status s173-status-shipped">SHIPPED</span></td>
+  <td class="s173-where">The publish gate's own predicate (grounding.py business_requirement_missing). D-12 says the row reads the SERVER's source, never a copy. It is also the only row that ships a provenance mark today.</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td class="s173-rule">What should this be called?</td>
+  <td>stored, no control</td>
+  <td><span class="s173-status s173-status-new">PROPOSED</span></td>
+  <td class="s173-where">⚠ The drafted view shows the workflow's NAME nowhere at all (measured in sketch 172 — the header renders the slug). So this row is not adding a second control; it is adding the FIRST display.</td>
+</tr>
+<tr>
+  <td><code>deliverable</code></td>
+  <td class="s173-rule">What does it produce?</td>
+  <td><strong>no field</strong></td>
+  <td><span class="s173-status s173-status-new">PROPOSED</span></td>
+  <td class="s173-where">⚠ There is NO FIELD. soulDeliverable() derives this from whether a terminal llm_emit exists. 'Answering' it means editing a step, so an Edit control here would write a cheque the store cannot cash.</td>
+</tr></tbody>
+    </table>
+    <h3 class="s173-h3">⚠ Row 5 is the one that breaks a uniform treatment</h3>
+    <p class="s173-note">There is <strong>no <code>deliverable</code> field.</strong> <code>soulDeliverable()</code> derives the
+    answer from whether a terminal <code>llm_emit</code> step exists — so “answering” row 5 means <em>editing a step</em>, which
+    D-03's write path (<code>builderStore</code>, one <code>set()</code>) does not express as a row edit. All three variants
+    therefore give row 5 a <strong>stated fact instead of a control</strong>. If a build wants row 5 answerable, that is a
+    different and larger change than the other four, and it should be priced before planning rather than discovered inside it.</p>
+    <h3 class="s173-h3">⚠ Row 4 adds the FIRST display, not a second control</h3>
+    <p class="s173-note">Sketch 172 measured it: the drafted header renders the workflow's <strong>slug</strong>, so the
+    <em>name</em> appears nowhere on the screen. D-15 keeps the slug untouched — so after this phase the header would still show
+    <code>vendor-risk-review</code> while this row edits <code>Vendor-risk review</code>. Two strings, one of them invisible.
+    Worth deciding deliberately rather than inheriting.</p>
+  </section>
+
+  <section class="s173-panel" data-panel="limit" hidden>
+    <div class="s173-axis"><span class="s173-badge s173-badge-p">CLAUDE'S DISCRETION</span>
+      <p><code>197-CONTEXT.md</code> leaves open <em>“whether the surface states D-03's limit — and if so, in one line or per
+      affected row.”</em> Both are drawn here so the choice is made by looking.</p></div>
+    <p class="s173-note">The limit is real: answering a row writes into the draft, but <strong>the rest of the draft was built
+    around the old answer</strong>. Changing the KB scope does not re-shape phases written for the old scope. D-03 locks that the
+    surface must not silently discard the author's own edits; it does not lock whether the surface SAYS this.</p>
+
+    <h3 class="s173-h3">One line, at the foot of the card</h3>
+    <p class="s173-note">Cheap, honest, easy to miss — and it sits directly above the “nothing is committed” close, which is the
+    same register. This is what every board on the other three tabs shows.</p>
+    <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="a" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">pm-weekly-status-report.docx · 8 fields</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing an answer does not re-write the steps that were built around the old one.</p>
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+
+    <h3 class="s173-h3">Nowhere at all</h3>
+    <p class="s173-note">The shortest card. Defensible on the grounds that the limit only bites on rows 1 and 2 (scope and
+    template shape the retrieval steps), and that a caveat nobody can act on is noise. ⚠ But <code>SEED-157</code>'s whole finding
+    was a draft built <em>blind to the template</em> — so a silent version of exactly that is the failure this phase exists to
+    stop repeating.</p>
+    <div class="s173-stage"><section data-s173="NEW" data-testid="s173-card" data-treatment="a" class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <h2 data-s173="NEW" class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
+    <button type="button" data-s173="NEW" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"><span aria-hidden="true">✕</span></button>
+  </div>
+  <ul data-s173="NEW" class="mt-3 flex flex-col gap-[9px]">
+<li data-s173="NEW" data-row="kb" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Which knowledge base should this search?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor contracts</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="template" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">Is there a template it has to fill?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">pm-weekly-status-report.docx · 8 fields</strong>
+      
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">In the step panel</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="requirement" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What must this workflow deliver?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Produce a cited vendor-risk brief for each vendor under review this quarter.</strong>
+      <span data-testid="business-requirement-ai-mark" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="name" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What should this be called?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">Vendor-risk review</strong>
+      <span data-s173="NEW" title="The generator proposed this line when this workflow was created. Edit it and this mark clears." class="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground">AI-proposed</span>
+      <button type="button" data-s173="NEW" class="shrink-0 rounded border border-border px-1.5 py-px text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">Edit</button>
+    </div>
+  </span>
+</li>
+<li data-s173="NEW" data-row="deliverable" data-state="answered" class="flex items-start gap-2 text-[12.5px] text-foreground">
+  <span aria-hidden="true" data-s173="NEW" class="mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full border border-border text-[11px] leading-none text-muted-foreground">?</span>
+  <span class="min-w-0 flex-1">
+    <span data-s173="NEW" class="text-muted-foreground">What does it produce?</span>
+    <div class="mt-[2px] flex flex-wrap items-center gap-1.5">
+      <strong class="min-w-0 font-semibold">A file, at the last step — Produce the vendor-risk brief</strong>
+      
+      <span data-s173="NEW" class="shrink-0 font-mono text-[10px] text-muted-foreground/70">no field — set by the last step</span>
+    </div>
+  </span>
+</li>
+  </ul>
+  
+  <p data-s173="NEW" class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+</section></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll(".s173-tab");
+  var panels = document.querySelectorAll(".s173-panel");
+  function show(id){
+    tabs.forEach(function(t){ t.classList.toggle("s173-tab-on", t.dataset.tab === id); });
+    panels.forEach(function(p){ p.hidden = p.dataset.panel !== id; });
+    measure();
+  }
+  tabs.forEach(function(t){ t.addEventListener("click", function(){ show(t.dataset.tab); }); });
+
+  // Card height is the whole of B's argument, so it is measured rather than asserted.
+  function measure(){
+    var panel = document.querySelector(".s173-panel:not([hidden])");
+    if(!panel) return;
+    var note = panel.querySelector("[data-s173-h]");
+    var cards = panel.querySelectorAll('[data-testid="s173-card"]');
+    if(!cards.length) return;
+    if(!note){
+      note = document.createElement("p");
+      note.className = "s173-note";
+      note.setAttribute("data-s173-h", "");
+      var axis = panel.querySelector(".s173-axis");
+      if(axis && axis.nextSibling) panel.insertBefore(note, axis.nextSibling); else panel.appendChild(note);
+    }
+    var hs = [];
+    cards.forEach(function(c){ hs.push(Math.round(c.getBoundingClientRect().height)); });
+    // The label has to come from the panel, not from a constant: the three variant tabs
+    // show mixed/answered/empty, while the limit tab shows with-line/without-line. A fixed
+    // caption was wrong on that tab, which is precisely the kind of quietly-mislabelled
+    // number this whole sketch set exists to avoid publishing.
+    var label = panel.dataset.panel === "limit"
+      ? "Measured card heights on this tab (one line at the foot · no line): "
+      : "Measured card heights on this tab (mixed · all answered · all empty): ";
+    note.textContent = label + hs.join(" px · ") +
+      " px. Sketch 172 measured 662 px of chrome above the graph with a 370 px card — every px saved here is a px the canvas gets back.";
+  }
+  show("a");
+})();
+</script>

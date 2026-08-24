@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Component Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#0e131e",
+                    "on-tertiary-fixed-variant": "#005321",
+                    "on-primary-fixed": "#0b0664",
+                    "on-primary-container": "#353789",
+                    "surface-variant": "#303540",
+                    "on-surface-variant": "#c7c5d3",
+                    "surface-container-high": "#252a35",
+                    "on-error-container": "#ffdad6",
+                    "outline-variant": "#464651",
+                    "tertiary-container": "#26c760",
+                    "surface-container-lowest": "#090e18",
+                    "on-secondary-fixed-variant": "#5415c0",
+                    "surface-container-highest": "#303540",
+                    "on-primary": "#242478",
+                    "on-secondary-fixed": "#23005c",
+                    "outline": "#918f9c",
+                    "surface-bright": "#343945",
+                    "primary-container": "#a3a5ff",
+                    "surface-container-low": "#171c26",
+                    "secondary-fixed-dim": "#d0bcff",
+                    "primary-fixed-dim": "#c1c1ff",
+                    "primary": "#c3c4ff",
+                    "secondary-container": "#571ac2",
+                    "error-container": "#93000a",
+                    "primary-fixed": "#e1e0ff",
+                    "tertiary-fixed-dim": "#4be176",
+                    "on-primary-fixed-variant": "#3b3d8f",
+                    "background": "#0e131e",
+                    "on-secondary": "#3b0091",
+                    "on-secondary-container": "#c3abff",
+                    "surface-tint": "#c1c1ff",
+                    "secondary-fixed": "#e9ddff",
+                    "on-tertiary": "#003915",
+                    "surface-container": "#1b202a",
+                    "on-tertiary-container": "#004c1e",
+                    "inverse-surface": "#dee2f1",
+                    "inverse-primary": "#5355a9",
+                    "on-surface": "#dee2f1",
+                    "error": "#ffb4ab",
+                    "tertiary": "#4ee478",
+                    "on-background": "#dee2f1",
+                    "secondary": "#d0bcff",
+                    "on-error": "#690005",
+                    "surface-dim": "#0e131e",
+                    "on-tertiary-fixed": "#002109",
+                    "tertiary-fixed": "#6bfe8f",
+                    "inverse-on-surface": "#2b303c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": [
+                            "Manrope"
+                    ],
+                    "display": [
+                            "Manrope"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "label": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {}
+    },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .pulse-border {
+            animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(195, 196, 255, 1); }
+            50% { border-color: rgba(195, 196, 255, 0.3); }
+        }
+        
+        /* Compact layout styles */
+        body {
+            background-color: #0d1117; /* Deep midnight */
+            color: #dee2f1; /* on-background */
+        }
+        
+        .card-surface {
+            background-color: #0d1117;
+            border: 1px solid #212631;
+        }
+    </style>
+</head>
+<body class="font-body min-h-screen p-8 md:p-16 flex justify-center">
+<div class="w-full max-w-4xl flex flex-col gap-12">
+<!-- Header -->
+<div class="flex flex-col gap-2 mb-8">
+<h1 class="font-headline text-2xl font-bold tracking-tight text-on-surface">Aether Intelligence Components</h1>
+<p class="text-on-surface-variant font-body text-sm">UI patterns for high-frequency operations.</p>
+</div>
+<!-- SECTION 1: THE PUBLISH GAUNTLET -->
+<section class="flex flex-col gap-6">
+<div class="text-xs font-headline font-bold text-outline uppercase tracking-widest pb-2 border-b border-[#212631]">
+                The Publish Gauntlet
+            </div>
+<!-- AT REST -->
+<div class="flex flex-col gap-3">
+<div class="text-xs font-headline font-semibold text-outline-variant uppercase tracking-wider">AT REST</div>
+<div class="card-surface rounded p-4 flex items-center w-full">
+<div class="flex items-center w-full justify-between gap-1">
+<!-- 8 segments -->
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- IN PROGRESS -->
+<div class="flex flex-col gap-3">
+<div class="text-xs font-headline font-semibold text-primary uppercase tracking-wider">IN PROGRESS</div>
+<div class="card-surface rounded p-4 flex items-center w-full">
+<div class="flex items-center w-full justify-between gap-1">
+<!-- 3 passed -->
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<div class="h-1 flex-1 bg-primary rounded-full"></div>
+<!-- 4th active/pulsing -->
+<div class="h-1 flex-1 border border-primary pulse-border rounded-full bg-primary/10"></div>
+<!-- 4 empty -->
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- SUCCESS -->
+<div class="flex flex-col gap-3">
+<div class="text-xs font-headline font-semibold text-tertiary uppercase tracking-wider">SUCCESS</div>
+<div class="card-surface rounded p-4 flex items-center w-full bg-tertiary/5 border-tertiary/20">
+<div class="flex items-center w-full justify-between gap-1">
+<!-- 8 passed -->
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+<div class="h-1 flex-1 bg-tertiary rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- JUDGE FAILURE (FATAL) -->
+<div class="flex flex-col gap-3">
+<div class="text-xs font-headline font-semibold text-error uppercase tracking-wider">JUDGE FAILURE (FATAL)</div>
+<div class="card-surface rounded p-4 flex flex-col gap-4 bg-error/5 border-error/20">
+<div class="flex items-center w-full justify-between gap-1">
+<!-- 5 passed -->
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<!-- 6th failed -->
+<div class="h-1 flex-1 bg-error rounded-full relative">
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-error rounded-full border-2 border-[#0d1117]"></div>
+</div>
+<!-- 2 empty -->
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+</div>
+<div class="flex justify-between items-center bg-[#0d1117] p-2 px-3 rounded border border-[#212631]">
+<span class="text-sm font-body text-on-surface">The workflow quality does not meet production standards.</span>
+<a class="text-sm font-headline font-semibold text-error hover:text-error-container transition-colors" href="#">View Details</a>
+</div>
+</div>
+</div>
+<!-- MECHANICAL FAILURE (RECOVERABLE) -->
+<div class="flex flex-col gap-3">
+<div class="text-xs font-headline font-semibold text-[#f59e0b] uppercase tracking-wider">MECHANICAL FAILURE (RECOVERABLE)</div>
+<div class="card-surface rounded p-4 flex flex-col gap-4 bg-[#f59e0b]/5 border-[#f59e0b]/20">
+<div class="flex items-center w-full justify-between gap-1">
+<!-- 1 passed -->
+<div class="h-1 flex-1 bg-surface-container-high rounded-full"></div>
+<!-- 2nd warning -->
+<div class="h-1 flex-1 bg-[#f59e0b] rounded-full relative">
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-[#f59e0b] rounded-sm border-2 border-[#0d1117] rotate-45"></div>
+</div>
+<!-- 6 empty -->
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+<div class="h-1 flex-1 bg-surface-container rounded-full opacity-50"></div>
+</div>
+<div class="flex justify-between items-center bg-[#0d1117] p-2 px-3 rounded border border-[#212631]">
+<span class="text-sm font-body text-on-surface">Two phases have no knowledge source.</span>
+<a class="text-sm font-headline font-semibold text-[#f59e0b] hover:text-[#d97706] transition-colors" href="#">View Details</a>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: THE WORKFLOW SOUL -->
+<section class="flex flex-col gap-6 mt-8">
+<div class="text-xs font-headline font-bold text-outline uppercase tracking-widest pb-2 border-b border-[#212631]">
+                The Workflow Soul
+            </div>
+<div class="flex flex-col gap-4">
+<!-- STRICT -->
+<div class="card-surface rounded p-3 flex justify-between items-center hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline-variant text-lg">description</span>
+<span class="font-headline font-medium text-on-surface">Vendor Renewal Risk Sweep</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 rounded bg-surface-container border border-outline-variant">
+<span class="material-symbols-outlined text-sm text-on-surface fill">lock</span>
+<span class="text-xs font-headline font-bold text-on-surface tracking-wide">STRICT</span>
+</div>
+</div>
+<!-- LOOSE -->
+<div class="card-surface rounded p-3 flex justify-between items-center hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline-variant text-lg">description</span>
+<span class="font-headline font-medium text-on-surface">Vendor Renewal Risk Sweep</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 rounded bg-transparent border border-[#212631]">
+<span class="material-symbols-outlined text-sm text-outline-variant">lock_open</span>
+<span class="text-xs font-headline font-medium text-outline-variant tracking-wide">LOOSE</span>
+</div>
+</div>
+<!-- UNDETERMINED -->
+<div class="card-surface rounded p-3 flex justify-between items-center hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline-variant text-lg">description</span>
+<span class="font-headline font-medium text-on-surface">Vendor Renewal Risk Sweep</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 rounded bg-transparent border border-dashed border-outline-variant">
+<span class="material-symbols-outlined text-sm text-outline-variant">help</span>
+<span class="text-xs font-headline font-medium text-outline-variant tracking-wide">UNDETERMINED</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

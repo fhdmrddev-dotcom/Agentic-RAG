@@ -685,12 +685,49 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
 
 async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
     metadata_filter = args.get("metadata_filter") or None
-    results, avg_sim = await search_documents(
-        args["query"], ctx.current_user["id"], ctx.supabase,
-        metadata_filter=metadata_filter,
-        user_settings=ctx.user_settings,
-        folder_ids=ctx.folder_subtree_ids,
-    )
+    try:
+        results, avg_sim = await search_documents(
+            args["query"], ctx.current_user["id"], ctx.supabase,
+            metadata_filter=metadata_filter,
+            user_settings=ctx.user_settings,
+            folder_ids=ctx.folder_subtree_ids,
+        )
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        # BUG-260815-05 — A SEARCH THAT COULD NOT RUN MUST NOT READ AS A SEARCH THAT
+        # FOUND NOTHING. Measured 2026-08-15: the OpenAI balance hit zero, every
+        # `search_documents` raised `RateLimitError insufficient_quota` from the QUERY
+        # embedding (`retrieval_service._vector_search:73` -> `openai_service.embed_texts`),
+        # and the operator was told, three golden runs in a row and by the only surface
+        # they had, *"citations_required: nothing was retrieved (0 sources) — this step
+        # reads your documents and must show where its answer came from"*. That sentence
+        # sent them to re-check their documents, their folder and their prompt, all of
+        # which were correct: 5 docs, 18 chunks, 0 null embeddings, matching org_id.
+        #
+        # ⚠ EVERY document in this product is embedded with an OpenAI model, so EVERY
+        # search must embed its query at retrieval time. Embedding is the one path with
+        # no provider fallback (chat routes across seven providers; embedding does not).
+        # A zero balance therefore silently zeroes retrieval for the WHOLE knowledge
+        # base — the blast radius is not one workflow.
+        #
+        # ⚠ THIS IS THE `resolve_template_placeholders` SHAPE (Phase 193.1, D-26), NOT a
+        # new invention: *could not read* and *nothing to read* must never share a
+        # message. The value here is the honest third state.
+        #
+        # ⚠ The exception is CONVERTED, never re-raised. `agent_loop`'s generic
+        # `except Exception -> "Tool error: ..."` (`agent_loop.py:2598`) already caught
+        # it, but that string is addressed to the MODEL; it is not a retrieval verdict
+        # and it does not reach the phase record the author reads. Returning an explicit
+        # unavailable result puts the reason where a person will meet it.
+        logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
+        return ToolResult(result=json.dumps({
+            "error": "retrieval_unavailable",
+            "detail": (
+                f"The document search could not run — the search provider returned: {exc}. "
+                "This is NOT a result of zero matches: your documents were never queried. "
+                "Say plainly that document search is unavailable; do not state or imply "
+                "that the knowledge base contains no relevant information."
+            ),
+        }))
     # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
     # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
     # clip is the in-app guard for bugs / future tool paths (D-05/D-06). Gated on
@@ -1196,8 +1233,54 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
         .order("is_system", desc=True).order("is_org_shared", desc=True)
     )
     skill_row = _skill_resp.data
+
     if not skill_row:
-        return ToolResult(result=json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."}))
+        # Exact-name miss. Weaker models -- local ones especially -- emit the skill's
+        # HUMAN-READABLE title ("Weekly Report Writer") where the registry stores a slug
+        # ("weekly-report-writer"). Measured 2026-08-18 on openai/gpt-oss-20b: the run
+        # completed but told the operator to upload a template that WAS already attached,
+        # because the miss above returned a dead end -- an error naming no valid
+        # alternative, so the model could not self-correct and reasoned on from a false
+        # premise. A stronger cloud model emits the slug first try and never reaches this
+        # branch, which is exactly why the gap read as "local models are broken".
+        #
+        # Two additive recoveries, both reached ONLY where the code above already failed:
+        #   1. normalised match (casefold, separators unified) -- resolves the title form
+        #   2. an error that LISTS the loadable names, so one retry can succeed
+        import re as _re_local   # module-local idiom used elsewhere in this file
+
+        def _norm(v: str) -> str:
+            return _re_local.sub(r"[\s_-]+", "-", (v or "").strip().casefold())
+
+        _all_resp = await aexec(
+            ctx.supabase.table("skills")
+            .select("id, name, description, instructions, user_id")
+            .or_(_skill_filter)
+            .eq("is_enabled", True)
+            .order("is_system", desc=True).order("is_org_shared", desc=True)
+        )
+        _candidates = _all_resp.data or []
+        if not isinstance(_candidates, list):
+            _candidates = [_candidates]
+
+        _target = _norm(skill_name)
+        # First match wins: the query keeps the is_system > is_org_shared precedence
+        # the exact-match path relies on (SEED-102 / SEED-125), so iteration order IS
+        # the authority order. Never re-sort here.
+        _match = next((c for c in _candidates if _norm(c.get("name")) == _target), None)
+
+        if _match is None:
+            _available = sorted({c.get("name") for c in _candidates if c.get("name")})
+            return ToolResult(result=json.dumps({
+                "error": f"Skill '{skill_name}' not found or not enabled.",
+                "available_skills": _available,
+                "hint": "Call load_skill again with one of the names in available_skills, exactly as written.",
+            }))
+
+        logger.info(
+            "load_skill: resolved '%s' to '%s' by normalised name", skill_name, _match.get("name"),
+        )
+        skill_row = _match
 
     row = skill_row[0] if isinstance(skill_row, list) else skill_row
 
@@ -1230,10 +1313,18 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # skill's name; else the live DB row's body (byte-identical Deep). getattr so a
     # duck-typed ctx stub predating the field still works (096 workflow_run_id
     # precedent). Keyed on skill_name — the SAME value `.eq("name", ...)` looked up.
+    # 2026-08-18: the normalised-name fallback above means `skill_name` (what the MODEL
+    # typed) may differ from `row["name"]` (what actually resolved). This map is keyed by
+    # the REAL skill name, so check the resolved name too -- checking only the caller's
+    # string would silently serve LIVE instructions to a re-eval that asked for DRAFT
+    # ones, and the eval would score the wrong text while reporting success.
     override = getattr(ctx, "skill_instructions_override", None)
     instructions = row["instructions"]
-    if override is not None and skill_name in override:
-        instructions = override[skill_name]
+    if override is not None:
+        for _key in (skill_name, row.get("name")):
+            if _key is not None and _key in override:
+                instructions = override[_key]
+                break
     result_payload = {
         "name": row["name"],
         "instructions": instructions,
@@ -2030,6 +2121,40 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             "stdout": exec_result.stdout or "",
             "stderr": exec_result.stderr or "",
         }
+        # 2026-08-19 — SELF-REPAIR for the single most expensive authoring mistake
+        # observed: the model writes correct code that opens `/sandbox/<file>` but
+        # omits the `skill_files` argument, so the file is never injected. The raw
+        # error it gets back is `PackageNotFoundError` / `FileNotFoundError` naming a
+        # path — which says nothing about the argument it forgot, so it cannot
+        # self-correct. Measured: a local 20B model burned FOUR attempts and 26
+        # minutes on exactly this; a frontier model read the tool schema and got it
+        # right first try. Naming the missing argument turns a dead end into one
+        # retry. Fires ONLY on a failing run that referenced an un-injected
+        # /sandbox path, so a correct call is byte-identical.
+        import re as _re_hint   # module-local idiom (see _handle_load_skill)
+        _stderr_txt = exec_result.stderr or ""
+        if actual_exit_code != 0 or "Traceback" in _stderr_txt:
+            _injected = {
+                (sf.get("filename") or "") for sf in (skill_files_req or [])
+            }
+            _referenced = set(_re_hint.findall(r"/sandbox/([A-Za-z0-9._-]+)", _stderr_txt))
+            # /sandbox/output/<name> is the OUTPUT dir, never an injected input.
+            _missing = {f for f in _referenced if f and f != "output" and f not in _injected}
+            if _missing:
+                _names = ", ".join(sorted(_missing))
+                _llm_payload["missing_skill_file"] = (
+                    f"The code referenced /sandbox/{_names} but that file was NOT injected "
+                    f"into the sandbox, because this execute_code call did not pass a "
+                    f"`skill_files` argument for it. Retry the SAME call with "
+                    f'`skill_files: [{{"skill_name": "<skill name as returned by '
+                    f'load_skill>", "filename": "{sorted(_missing)[0]}"}}]` added. '
+                    f"Do not change the code."
+                )
+                logger.info(
+                    "execute_code: missing_skill_file hint emitted for %s (injected=%s)",
+                    _names, sorted(_injected),
+                )
+
         # Phase 142 (SRH-01 / D-06) — POST-HOC reshape. Classify the completed
         # failure against the fixed KNOWN_MISSING allowlist; on a HIT append a
         # PERMANENT-framed `runtime_gap` note to the MODEL-facing llm_content (so a

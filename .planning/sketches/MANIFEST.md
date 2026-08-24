@@ -1330,3 +1330,1011 @@ against absent behaviour:
 - **156-A:** must survive **375px** (mobile → bottom sheet, per the shipped shell rule). Unlike the
   rejected B, the panel gets **no free focus trap or focus restore** from `Dialog` — both are net-new,
   and the a11y 035-A got for free here has to be built. Name it in the plan, not in review.
+
+---
+
+### Phase 192 session — Workflow Library IA (LIB-01…04) (2026-08-10)
+
+G-2 sketch, BEFORE discuss/spec-phase. First sketch batch of **v3.7 Workflow Product Completion**.
+Grounded by **auditing the shipped `WorkflowsPage.tsx` at HEAD** (1407 L) rather than reasoning from
+the 012/021 sketch-era CSS — SEED-136's read still holds exactly: header has **no create button, no
+search, no sort, no view toggle** (`:479-486`); the body is **one scroll container** (`:518`); shelves
+run Starters → Published → Drafts (`:544`/`:568`/`:604`); the dashed build-card is the **first cell of
+the third grid** (`:613`); and the only two `placeholder` hits in the file are the RunModal kickoff
+textarea and a comment.
+
+**Two operator answers set the whole frame** (intake, 2026-08-10): the page has **two first-class jobs**
+(find-and-run, with authoring a close second), and it must read well at **org scale, 50-200+ workflows**.
+That combination kills the flat 2-column card grid regardless of card quality, and it moves the create
+affordance out of the third grid. Every sketch ships a **12 / 54 / 200 scale selector** so density is
+felt at the real number, not at demo scale (the 045 lesson).
+
+**Three findings the audit produced that no planning document named:**
+
+- **Seven action verbs across three card types** — `Use this →` · `⑂ Tweak` · `▶ Run` ·
+  `⋯ Delete workflow…` · `✎ Open` · `Publish…`. LIB-03 is not one confusing button; it is three card
+  types teaching three vocabularies. **Two of them are the same action in different words** —
+  `onTweak` (`:220`) and `onUseStarter` (`:259`) both fork a draft into the Builder, and the shipped
+  comment at `:250` calls the latter *"a sibling of onTweak"*. **And a draft card's two buttons call the
+  same handler** — `✎ Open` (`:723`) and `Publish…` (`:731`) are both `onClick={onOpen}`.
+- **The explanations that would stop the surprise are `title=` tooltips** (`:857` for Tweak, `:155`
+  region for Use this). **Touch has no hover**, and Phase 185's own graded-governance rule already says
+  a reason must be real DOM text via `aria-describedby`, *never* a `title`. The page breaks a rule the
+  codebase holds elsewhere. Measured across sketch 159: variants A/B/C carry **0** action-level `title=`;
+  the shipped reference tab carries **4**. ⚠ Inherited and unfixed in all four: the phase-type word is
+  still hover-only on every chain glyph.
+- **G-5 FIRES and had been invisible.** `WorkflowsPage.tsx` measures **21 commits across 10 phases**
+  (103/124/143/152/155/165/184/184.1/186/188) at **1407 lines**, and was **absent from the CLAUDE.md
+  hot-file ledger** — so ten phases touched it and not one produced the refactor recommendation G-5
+  requires, because the audit step scans against that table and a file missing from it is invisible to
+  its own guardrail. The row was added 2026-08-10. **Discuss-phase 192 must put the refactor question
+  first**, since 192 is a structural rewrite of this file's library view, not a mount point.
+
+**Vocabulary correction carried into the sketches:** the shipped `PHASE_GLYPHS` (`soulData.ts`) is
+`gear · memo · compass · handshake · raised-hand · package · outbox-tray` (7 types incl. Phase 189's
+`external_action`) — **not** the flat `⚙✎🤖⛓☺◆` set this MANIFEST's older prose still describes.
+Tiers are `STRICT 🔒 / MIDDLE ◐ / LOOSE ○` (`deriveTier.ts`), derived, never stored.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 157 | the-library-at-scale | What organizes 50-200 workflows, and where do *find* and *create* live in the frame? | **B — one list, shelves are filters** ★ | phase-192, lib-01, lib-04, workflows-page, information-architecture, scale, shelves, taxonomy, g2-sketch-gate |
+| 158 | finding-and-narrowing | What is the find instrument, and does it live on the page, in ⌘K, or both? | **A — always-on page search** ★ (B deferred, trigger recorded) | phase-192, lib-01, lib-02, search, filter, command-palette, g2-sketch-gate |
+| 159 | what-a-card-promises | At scale, what does a card show — and what do its actions promise before you click? | **C — one verb, consequence inline** ★ | phase-192, lib-02, lib-03, card, actions, tweak, consequence, a11y, g2-sketch-gate |
+
+**Couplings to decide at pick-time, not after:**
+
+- **159-B implies 157-C.** Both spend the purpose sentence to buy density. Picking the dense row in one
+  and the rich card in the other is not a coherent page.
+- **158-A and 158-B may not be rivals at all.** Phase 156 already settled this split for chat
+  (sketch 078-D: *the column filters what you see; ⌘K jumps anywhere*). If that precedent holds the
+  answer is **both**, and the only real question is whether 192 pays for the global-palette change now.
+  ⌘K reuse is **not free**: `ThreadCommandPalette.tsx` indexes threads only and is hand-rolled on Radix
+  Dialog, **not `cmdk`** — teaching it workflows changes a global component and its shared engine.
+- **Search scope is a decision, not a default.** 158-A matches name **+ purpose sentence** and highlights
+  the hit, so `clause` / `assessments` / `sign-off` find workflows whose titles lack those words. But it
+  is substring matching, **not meaning** — the paraphrase *"the thing that checks vendors"* returns **0**,
+  and the sketch says so on screen. SC#1's literal bar is only *"part of its name"*.
+
+### Winners (operator, 2026-08-10)
+
+| # | Winner | Why it won |
+|---|---|---|
+| 157 | **B — one list, shelves are filters** | SEED-136's complaint is not that the shelves are ugly, it is that *the page's own commissioner cannot say what the three categories are for*. **A renames that question; B removes it.** A's ownership axis (Yours / Team / Starters) is the conservative fix and only wins if "is this mine?" is genuinely the question a person arrives with — at org scale, arriving to *run a known thing* is more common, and ownership is then just a third wall to scroll past. B makes every shelf a **filter with an honest live count**, which is the same move 155-C won on three months earlier: a category that is a chip survives a fourth category; a category that is a place needs a fourth shelf. It also fixes SC#4 **structurally** rather than by promotion — create leads the toolbar because authoring is the close-second job, so it can never drift back down a grid. C was not wrong, it was **premature**: it spends the purpose sentence for density, and 159-C keeps the card, so C here would have contradicted the card decision. |
+| 158 | **A — always-on page search** | Decided on a use-count argument, not taste: at 200 workflows the field is opened **every visit**, so C's calm-at-rest saving is imaginary and its tap is pure recurring cost — *a control you always open should always be open*. A is also the path of least resistance for the stack (`ui/input.tsx` exists, no new dependency, page-local blast radius) and it discharges **both** SC#1 and SC#2 by itself. **B is deferred, not rejected**, with a three-condition re-open trigger in the sketch README — the Phase-156 precedent (078-D) says a page filter and a global jump box are different instruments and both can be true; 192 simply does not pay for a global-component change to get there. |
+| 159 | **C — one verb, consequence inline** | A and C agree on the thing that actually matters — **the consequence is real DOM text, never a `title=`** — and differ only on how much of it to print. A repeats a two-line block on every card; at 200 cards that is the same clutter LIB-02 is trying to cure. C keeps A's *rule* and spends it once, on the only action whose result is not obvious from its name. B lost for a reason worth recording: it buys density by clipping the purpose sentence, which is exactly the atom the 046-A soul makes the hero — **and picking B would have forced 157-C**, so the card decision and the frame decision stay coherent by construction. |
+
+**Obligations the winners inherit** — carry these into `/gsd:discuss-phase 192` and `/gsd:plan-phase 192` rather than rediscovering them:
+
+- **G-5 FIRST, before the feature.** `WorkflowsPage.tsx` is now on the hot-file ledger at **21 commits /
+  10 phases / 1407 L**, and 157-B is a structural rewrite of its library view. Per G-5 the discuss-phase
+  **must produce a refactor recommendation as the first option**. The named seam: three card components
+  → `components/workflows/library/`, `RunModal` and the WFIN-03 delete Sheet → their own modules,
+  leaving the page as composition — the shape the 188.2 card cut used.
+- **157-B commits the chips to being the RIGHT chips.** A flat list is only navigable if the filter set
+  is. The sketch ships six (*Ready to run · Yours · Still building · Starters · Makes a file · 🔒 Strict*)
+  and every one recounts against the live search so a chip can never promise results it cannot deliver.
+  Which six ship is a **decision owed at plan time**, not a detail.
+- **157-B deletes a place, so the three shelf names must be re-homed, not just dropped.** "Starters" is
+  provenance, "Published" is state, "Drafts & seeds" is two things — each becomes a chip with a
+  *plain-language* label (the 146 LANG-01 pattern), and the `GET /workflows/published` chip that
+  currently renders a literal endpoint string to end users goes with it.
+- **158-A must decide its search SCOPE deliberately.** Name-only is SC#1's literal bar; name + purpose
+  is what the sketch demonstrates and is measurably more useful (`clause` / `assessments` / `sign-off`
+  each find workflows whose titles lack the word). Whichever ships, it is **substring matching, not
+  meaning** — do not let copy, placeholder text or a later summary imply semantic search.
+- **159-C's consequence line is an a11y contract, not a caption.** It is real DOM text wired with
+  `aria-describedby` — the Phase-185 rule — because **touch has no hover**. The two shipped `title=`
+  explanations (`:857` Tweak, `:155` region Use this) are removed *by being replaced*, never by being
+  deleted and left unexplained.
+- **159-C inherits the naming collapse.** `⑂ Tweak` and `Use this →` are the same action in different
+  words (`onTweak` `:220`, `onUseStarter` `:259`, and the shipped comment at `:250` says so); a draft
+  card's `✎ Open` and `Publish…` call **one handler** (`:723` / `:731`). Seven verbs should not survive
+  this phase intact — but note that collapsing them touches behaviour, so it is a **scope call for
+  discuss-phase**, not a silent rename during execution.
+- **⚠ Carried, unfixed, inherited by all four tabs:** the phase-type word is still a `title` on every
+  chain glyph — the shipped glyph vocabulary's own hover-only problem. Not introduced by these sketches
+  and not in LIB-01…04's scope; record it rather than let a later reviewer discover it and assume 192
+  added it.
+
+---
+
+### Phase 192.1 session — Workflow Identity (LIB-05) (2026-08-12)
+
+G-2 sketch, BEFORE plan-phase. **Phase 192 shipped the library; 192.1 gives its rows an identity.**
+Nine of eleven G-4 UAT rows passed on live evidence and the operator still could not tell the rows
+apart, because **43 of their 104 workflows are named "Compliance Gap Report."**
+
+Grounded by **re-auditing the shipped `library/` subtree at HEAD**, not by reasoning from 157/159's
+sketch-era CSS — and the audit produced four facts no planning document named:
+
+- **The ordering is complicit, and it is nobody's card design.** Both feeds are `ORDER BY name`
+  (`db/workflows.py:303` published, `:517` drafts) and `LibraryToolbar.tsx` has **no sort control at
+  all** — zero `sort` occurrences. So 43 identical names render as **43 *adjacent* identical rows**.
+  No atom-level treatment touches that.
+- **Duplicate names are a COPY, not a bug.** Both fork handlers spread `...def` and leave `name`
+  untouched — `onTweak` mints the same slug at v(N+1) (`WorkflowsPage.tsx:600-608`), `onUseStarter`
+  mints `<parent>-[a-z0-9]{6}` at v1 (`:656-661`). A customer reaches 43 identical names **by using
+  the product correctly.**
+- **Lineage is DERIVABLE and costs nothing on the wire.** A version fork shares its parent's slug; a
+  copy fork is a `-[a-z0-9]{6}` suffix on it. Measured over the generated fixture: **lineage resolves
+  for 100 % of the 80 forks, 0 unresolved.** The page already builds `draftBySlug`.
+- **The card renders 13 atoms and not one of them is an identity** (`WorkflowCard.tsx:366-565`).
+
+**Two operator decisions set the frame** (intake, 2026-08-12): sketch the write-path question rather
+than assume it (162 exists because the ROADMAP calls it *"the first scope question, not an
+assumption"*), and **confirm `updated_at` as real net-new wire** — so 192.1 is **not frontend-only**,
+the same surprise D-04 sprang on Phase 192.
+
+**The wire cost, graded — two of three SC axes are free:**
+
+| Axis | Cost |
+|---|---|
+| Lineage (SC#2) | **Zero.** Derived from the slug rules. |
+| Recency (SC#3) | **Cheap, net-new.** Additive `updated_at` projection on two queries + two TS types — exactly the `is_mine` shape (D-04). No migration, no predicate change. |
+| Owner *by name* | **Expensive, and nobody asked for it.** The wire has `is_mine` (a boolean, only since 192) and `created_by` (a uuid, never serialized). A human-readable owner needs a users join. **All variants render Yours / Shared and stop there.** |
+
+⚠ **The timestamp is already on the wire and you must not read it.** The drafts feed ships
+`updated_at` disguised as `token` — literally `to_char(updated_at AT TIME ZONE 'UTC', …)`
+(`db/workflows.py:93-95`). `api.ts:3338` forbids parsing it: Postgres keeps microseconds, a JS date
+keeps milliseconds, and a parsed-and-re-rendered token matches **zero rows**, so every later save
+refuses as stale (probed against the live DB 2026-08-01). **Project a separate field; never repurpose
+the token.**
+
+**The fixture is GENERATED, not typed** — `themes/library-fixture-192-1.js` applies the real
+`copyFork`/`versionFork` rules to a set of sources, so the duplicate names *fall out of the product's
+own behaviour*. It reproduces the operator's measured library: **43/41, 10/9, 8/5, 8/4 — all four
+families exact** — 14 duplicated names, 107 rows, 40 % under one name (measured 41 %).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 160 | telling-43-apart | When 43 rows carry one name, what makes a row identifiable at a glance? | **B — disambiguate-on-collision** ★ | phase-192.1, lib-05, identity, lineage, recency, scale, shape, g2-sketch-gate |
+| 161 | where-identity-lives | Where does identity go on a card whose one sentence is already spent? | **A — a second line** ★ | phase-192.1, lib-05, card, atom-budget, sentence-slot, a11y, g2-sketch-gate |
+| 162 | naming-at-the-fork | Does the fork name the copy, or does the library derive it? | **B — the fork asks** ★ (reopens D-15) | phase-192.1, lib-05, fork, naming, scope, d-15, write-path, g2-sketch-gate |
+
+**Couplings and reopenings to decide at pick-time, not after:**
+
+- **162-A and 160/161 are NOT rivals.** A governs what the fork *writes*; 160/161 govern what the
+  library *shows*. **SC#1 is a statement about rows that already exist**, so picking A does not remove
+  the need for a read-side treatment. Reading A as "so we can skip the library work" is a misread.
+- **162-B reopens D-15.** The fork is a **direct flip** and the reason is recorded in shipped code
+  (`WorkflowCard.tsx:84-87`): a confirm on a non-destructive reversible action *spends the guard
+  vocabulary the delete relies on*. 159-C's confirm was deliberately not shipped. B is viable only
+  with an answer to **what makes a name prompt different from a confirm** — one candidate: *a prompt
+  that collects something the system cannot know is an input, not a guard.*
+- **161-C's viability turns on one distinction.** C spends the single sentence slot on identity, so a
+  forked row stops stating the fork consequence. **C is only safe if the selector keys on "can this be
+  forked into something new", not on "is this a fork"** — a design decision with a correctness
+  consequence, to settle now rather than in planning.
+- **161-B grows a region the house style treats as scarce.** Phase 185's corner seal claims top-right
+  on the **canvas node card** with a max-2 badge tuple. That rule is *scoped to the canvas*, not to
+  this library card — stated precisely so it is not mis-cited as a blocker, and stated at all so it is
+  not discovered in review.
+- **Every draft has an EMPTY sentence slot today** (`WorkflowCard.tsx:484` — it renders only when
+  `runnable`). Whatever wins, that slot is already paid for.
+
+**⚠ The lesson this session exists to bank — flip 160's `shape` switch.** Set it to *distinct names*
+and every tab, including *Today (shipped)*, becomes perfectly readable. **That is the fixture every
+automated check in Phase 192 ran against.** The phase tested at 12 rows *and* at 107 rows, but never
+at 107 rows carrying 14 duplicated names. **Volume was real; shape was not.** `LIB-02`'s bar — *"a
+card shows what the workflow is for, at a glance"* — is true of one card in isolation and false of the
+list. Standing question for any list-rendering phase: **is the fixture's SHAPE realistic, not just its
+SIZE?**
+
+**⚠ A retraction carried into 162 rather than quietly dropped.** The "two names" propagation defect
+claimed for this phase on 2026-08-12 is **RETRACTED** — generalised from **n=1** before the population
+was measured. `definition->>'name'` returns NULL on a **string scalar**; 83 rows are double-encoded,
+so "85 divergent" was 83 encoding artifacts plus **2 genuine conflicts**, both test fixtures. It is
+*rendered on 162's Today tab* because promoting one observation to a mechanism is the same failure
+this phase exists to correct.
+
+**⚠ Also inherited: a verification lesson about this project's own work.** Phase 192's post-fix
+re-drive located rows by `getElementById` on a known UUID — which proves the code and **cannot prove
+the row was findable**, because the driver never had to find it. The operator, who did, could not.
+**Any UAT row in 192.1 must be driven the way a person drives it: by looking.**
+
+**Verification, driven not asserted:** `node --check` on every extracted inline script plus headless
+JSDOM drives — **160: 40/40 · 161+162: 68/68 (108 total)**. Both `[title]`-attribute fences and the
+script-error channel carry **positive controls** proving they can actually fire; jsdom's own
+unimplemented `window.scrollTo` is excluded **by name**, never by silencing the channel.
+
+#### Winners — operator, 2026-08-12
+
+**160-B · 161-A · 162-B**, plus sketch **163** built afterwards to assemble them.
+
+| # | Winner | Why it won |
+|---|---|---|
+| 160 | **B — disambiguate-on-collision** | Says something *different* on every one of the 43, where A says nearly the same thing 43 times and C leaves row 40 in an undifferentiated block. Accepted cost: the strip is a property of the SET, so a row's wording can shift when an unrelated row is deleted. |
+| 161 | **A — a second line under the name** | Consistent placement and the only variant with room for owner + lineage + when at once. Accepted cost: **a 14th atom on every card** — affordable now that the *"13 atoms is too dense"* diagnosis (`U5-b`) is retracted. |
+| 162 | **B — the fork asks** | The write path IS in scope, and the operator chose the surface that produces the best names. **This REOPENS D-15** — see the decision owed below. |
+
+**⚠ 160-B and 161-A disagree at one edge, and 163 resolves it visibly rather than in prose.** B's
+argument was restraint (the 13 unique-name rows get no strip); A puts a line on every card. **163
+ships it as *quiet*:** a unique-name row keeps the line (A's consistent placement) but carries **no
+discriminator segments** (B's spend-where-it-buys rule). A toolbar toggle shows the strict-B
+alternative. **This is the last open question in the batch** and is owed a recorded decision.
+
+**⚠ A DECISION IS OWED AT PLAN-PHASE: 162-B reopens D-15.** The fork was a **direct flip** because a
+confirm on a non-destructive reversible action *spends the guard vocabulary the delete relies on*
+(`WorkflowCard.tsx:84-87`); 159-C's confirm was deliberately not shipped. The working rationale for
+why a name prompt is not that guard: **it collects something the system cannot know, so it is an
+input, not a guard.** The design carries that claim *mechanically* — it asks for a **name** not a
+confirmation, wears **no destructive styling**, and its primary button is **"Create my copy"**, never
+"Confirm" (asserted in the drive). **Record it as a decision and amend D-15 in the same commit** —
+never leave it silently contradicted.
+
+**The delta this phase makes, in full:** atoms per card **13 → 14**; identity lines **0 → 107**;
+sentence nodes **1 → 1, same text**; soul atoms **5 → 5, consumed unchanged**; net-new test hooks
+**1** (`row-identity`); net-new wire **`updated_at`**. **One line, and a prompt on one verb.**
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 163 | the-assembled-card | What exactly ships — and what keeps the build from drifting from it? | **the assembled card** ★ (one toggle open) | phase-192.1, lib-05, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
+
+---
+
+### ⚠ THE ANTI-DRIFT MECHANISM (operator note, 2026-08-12) — applies to EVERY future sketch session
+
+The operator's standing observation: **"I always see a difference between the sketch we do and the
+actual implementation — the final shape after we finish."** That is true, and the cause is
+**mechanical rather than carelessness**:
+
+1. The sketch is **HTML/CSS**; the build is **React + Tailwind + shadcn**. Nothing transfers
+   automatically, so every string, DOM order and spacing is **re-typed by an executor reading prose**.
+2. **Prose does not typecheck.** This codebase has banked that lesson repeatedly — a wrong
+   `PHASE_GLYPHS` pointer survived every gate in Phase 189 for exactly this reason.
+3. Plans are written from RESEARCH and CONTEXT, **not from the sketch**, so the mockup becomes a
+   reference nobody ever diffs against.
+
+**Three artifacts close it, and 163 is the first session to ship all three:**
+
+- **`BUILD-CONTRACT.generated.md`** — emitted **from the running sketch** by `drive.cjs --emit`, never
+  transcribed: every exact string, every composed string with a worked example, the rendered output
+  for each distinct row shape, and the measured invariants. It cannot go stale by being forgotten.
+- **`drive.cjs`, version-controlled beside the sketch** — its assertions ARE the contract in
+  executable form, and the README maps each one to the React equivalent the phase's own suite must
+  reproduce. (160 and 161/162 now carry their drives too.)
+- **One `COPY` table per sketch** — the sketch renders nothing not declared in it, mirroring the
+  shipped `libraryVocabulary.ts` shape, so **the build ports the object and imports it** rather than
+  hunting strings through JSX. 163 reads `FORK_VERB` and `FORK_CONSEQUENCE` from the *shipped*
+  constants rather than re-typing them, which is the mechanism proving itself: a drifted copy of
+  either would have failed the drive.
+
+**What this still cannot catch, said plainly:** pixel spacing, Tailwind class choices, and
+hover/focus states. Those stay a human comparison at UAT — **and the G-4 rows must name the sketch
+file as the reference**, driven the way a person drives it (**by looking**, never by
+`getElementById` on a known UUID — the verification lesson Phase 192 banked about its own re-drive).
+
+---
+
+## Session: Phase 193 — Authoring Doors + Template Placement (2026-08-13)
+
+G-2 sketch, BEFORE plan-phase. **Phase 192 shipped the library and 192.1 gave its rows an
+identity; 193 is about the two doors you reach from it, and where a template goes.**
+Requirements **AUTH-01** (SEED-147) and **AUTH-03** (SEED-110, closed — placement only).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 164 | telling-the-doors-apart | Which wording lets someone who has never seen the Builder predict what each door does — before clicking? | **D — the mix** (2026-08-13): B's door NAMES (`Draft it for me` / `Build it myself`) + C's two TIER labels (`you write one paragraph` / `you decide every setting`), **derived from B and C in `build.cjs`, never re-typed** — audit 18 matched / 0 missed. A·B·C remain on the page as the comparison that produced it, not as live options. **The header-strip restack is IN SCOPE for 193** (structural, no mockup — 193 owes it a CONTEXT.md decision). | phase-193, auth-01, auth-03, doors, naming, copy, template-placement, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
+
+### ⚠ 164 CLOSES THE HOLE 163 STILL HAD — the arrow of generation is reversed
+
+163 shipped all three anti-drift artifacts and **U8 still failed**, because
+`BUILD-CONTRACT.generated.md` was emitted *from the running sketch*. The sketch stayed the
+source of truth, so it could still draw an atom the card structurally cannot render (SEED-155).
+
+**164 generates FROM THE BUILD.** `emit.test.tsx.src` renders the *real* `WorkflowDoorSwitch`
+and the *real* `library/RunModal` under jsdom; `dom.generated.json` is that actual DOM; the
+variants are the same DOM with **nothing changed but text nodes** from the COPY table; and the
+CSS is built by the project's own `tailwind.config.js`. **Layout drift is impossible for the
+doors panel, because the sketch's layout IS the build's layout.**
+
+Its substitution audit exits non-zero on any string that fails to match the real DOM — i.e. a
+COPY table that has drifted from the component fails the build. **It caught its own bug on run
+1** (37 false "misses" from per-dump rather than aggregated matching); corrected, it reports
+**37 matched / 0 missed**. A green audit is evidence, not decoration.
+
+**What is still ordinary sketch risk, stated rather than implied:** the AUTH-03 template panel
+is a **proposal** (it adds nodes no component has yet, so there was nothing to render), and the
+header-strip *stacking* problem is structural — copy cannot restack a strip, so that stays an
+open CONTEXT.md decision instead of riding along inside a chosen variant.
+
+### ⚠ THREE MEASURED CORRECTIONS TO SEED-147 — the seed said "none yet measured", and nobody had
+
+| Suspect | Verdict |
+|---|---|
+| #1 "Author & govern" is two verbs, one of them jargon | **STANDS** — unchanged since Phase 124. What B and C attack. |
+| #2 the return control reads as a peer of the two doors | **STANDS, and it is STRUCTURAL** — in the govern door the strip is `‹ both doors` + the door label + `🔒 judge always-on`: three visual peers. That is the *"other one"* the operator could not name. |
+| #3 "nothing states the consequence of the choice" | **FALSE as written** — each door card already carries an icon, a tier label, a consequence sentence and an italic footnote, under a heading that says *"nothing is locked, you can switch anytime"*. |
+
+**And the chooser is REACHABLE**, which nothing had verified: `onCreate={openBuilderFresh}` →
+`builderInitial=null` → `initialDoor="both"`. The operator *did* see a chooser. ⇒ The phase is
+therefore **not** "add a consequence line" — it is that the consequence is stated as a
+**feature list in the product's own vocabulary**. Variant C attacks precisely that by naming
+what *you* must supply (one paragraph vs every setting).
+
+### AUTH-03 — the finding that makes it more than copy
+
+**The signal is derivable.** A fill phase admits `render_template` in its phase tool whitelist
+(`backend/app/services/harness/phase_types.py:388`), so *"does this workflow want a template?"*
+is a question the app can honestly answer. Today it never asks: the `Upload template` control
+renders on **every** workflow, quiet and unlabelled — noise on the ~100 rows that will never
+use it, and silent on the ones that need it. Operator pick (2026-08-13): **mark it on the card,
+name it in the Run modal, render nothing for workflows that do not fill one.**
+
+---
+
+## Session: Phase 193.1 — Template-First Authoring (2026-08-14)
+
+G-2 sketch, BEFORE discuss-phase. **AUTH-03's RE-OPENED half.** `REQUIREMENTS.md` records the
+requirement as *"ANSWERED WRONGLY, not delivered"*: Phase 193 shipped the **draft-then-attach**
+path (and quick task `260814-q5r` added the placeholder read on top of it), but a user who
+describes a workflow still gets a draft built **blind to the template it will have to fill**
+(`SEED-157`). A coverage tick here must mean *the workflow knows its template at draft time* —
+not *the user can find where to supply one*.
+
+**Measured before drawing anything:** `POST /workflows/generate` has accepted
+`template_placeholders` since **Phase 103**; the frontend has **never sent it**
+(`WorkflowBuilderPage.tsx` sends `{describe, project_folder_id?}` only). Its sibling
+`template_asset_id` is typed `UUID` while asset ids are Storage **paths** — a measured 422, so
+that channel is unwirable as typed and only `template_placeholders: list[str]` actually works.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 165 | the-template-lands-first | Where does "I have a template" live on the pre-draft screen, and how do its fields become a spec the author can see the draft aimed at — without slowing the person who has no template? | **C — the spec block** (2026-08-14). B rejected on a MEASUREMENT: it renders the fields at **10.5 px under a 14 px picker**, contradicting the intake decision that the fields ARE the visible spec. A and B stay as evidence. | phase-193.1, auth-03, template-first, describe-door, pre-draft, generated-from-build, g2-sketch-gate, seed-157 |
+| 166 | when-there-are-no-eight-fields | The read came back and it wasn't a list. Does the screen still let the author believe their draft is built to their template — and where should the truth live? | **B — the footing line** (2026-08-14). A rejected: silence is SEED-157 recurring WITH a control on screen. C rejected on COST — it reopens the CTA settled as 164's variant D. A and C stay as evidence. | phase-193.1, auth-03, honesty, seed-157, seed-158, seed-159 |
+| 167 | the-template-arrives-late | A template is attached to an already-drafted workflow. What does the app say about the mismatch — and what is it actually entitled to claim? | **C — name check, no claim** (2026-08-14). ⚠ B was NOT rejected for being wrong — it is the stronger idea, rejected on SIZE. NO seed planted (offered and declined); the re-open condition is recorded instead. | phase-193.1, auth-03, sc3, reconcile, honesty, seed-159 |
+
+### Two operator decisions taken at intake (2026-08-14), before any variant was drawn
+
+1. **Entry shape → an optional affordance on the describe screen**, under the KB picker — *not*
+   a second pre-draft chooser and *not* a third top-level door. **Why:** SC#4 (the fast door
+   stays fast) is then satisfied *by construction* — ignore the row and today's behaviour is
+   byte-identical — and it adds no third door to a chooser `SEED-156` says cannot tell its first
+   two apart. **The cost, on record:** template-first never becomes the *default* `SEED-157`
+   proposes.
+2. **Fields shown → the fields ARE the visible spec**, not a quiet "8 fields found" receipt.
+   **Why:** SC#2 becomes visible to the author rather than merely true in the payload. **The
+   cost, on record:** it breaks MANIFEST decision #12's *"3-second read at rest"* on this one
+   screen.
+
+### ⚠ 165–167 GO ONE STEP FURTHER THAN 164 — the central surface is no longer a proposal
+
+164's arrow (generate the sketch **from** the build) is inherited unchanged. What changed is what
+that arrow can now reach:
+
+**164's template panel was a pure PROPOSAL** — it drew nodes no component had, and said so.
+**165–167's central surface is not.** `TemplateAttachSection.tsx` **shipped** in Phase 193 and
+grew its *"What this template asks for"* list in quick task `260814-q5r`. So the fields region on
+these three pages is that component **mounted**, with its four honest arms, its exported
+sentences and the **real eight keys of `pm-weekly-status-report.docx`** — and the keys are
+**parsed out of the dump by `build.cjs`**, never re-typed, so no page can display a field the
+shipped component did not render.
+
+That is the `SEED-155` discipline in its strongest available form: *if a sketch depicts a surface
+consuming an existing component, it must RENDER it, not redraw it.*
+
+| region | source | drift risk |
+|---|---|---|
+| the describe door; the attach section, its fields, its four failure sentences | real rendered DOM | **none — it *is* the build** |
+| the attach control on the pre-draft screen (165) | proposed `NEW` | ordinary |
+| variant C's re-scaled type (165); the reconcile blocks (167) | proposed `NEW`/`CHANGE` | ordinary |
+| the stateless-read route every filled state assumes | **does not exist** | a scope decision — 165's warning tab |
+
+### Each build asserts before it draws — and 166's fence was driven RED
+
+A splice into an anchor that is not there fails **silently** and yields a variant that quietly
+equals the baseline: a green-looking sketch showing nothing. So each `build.cjs` asserts its
+anchors present **and unique**, asserts the eight keys were parsed rather than typed, and asserts
+**every stage actually differs from the shipped DOM** — exiting non-zero otherwise.
+**165: 12 assertions · 166: 22 · 167: 8 — all passing.**
+
+**166's pairwise fence was proved rather than asserted.** It checks that each of the five reading
+arms renders its own node and **none of the other four** — the mechanised form of the shipped
+docblock's rule that *"these two sentences may never merge"*. Planting
+`template-fields-unavailable` inside the `none` dump produced `ASSERTION FAILURE ... found 1`,
+`EXIT=1`, and the dump was restored to green. *A fence nobody has seen fire is a fence nobody
+knows is connected* (the 192.1 lesson: three fences held with nothing defending them).
+
+### ⚠ THE MEASUREMENT THAT CONSTRAINS SC#3 — no variant may claim coverage
+
+**Nothing in the app can compute a coverage verdict at attach time.** `check_coverage`
+(`template_render_service.py:416-460`) is the real computation and runs at **run** time over an
+actual emitted field map; at attach time there are no values. All that exists is a comparison of
+**names** — a heuristic, never a guarantee.
+
+167 is built so that is visible rather than buried: its fixture makes the heuristic **cry wolf on
+purpose**. Two of the eight fields (`project_name`, `reporting_period`) are legitimately supplied
+as **run inputs** — nothing produces them and nothing should — so a naive two-bucket "nothing
+produces this" check flags two perfectly correct fields. Hence **three buckets, never two**, and
+hence `reconcile.disclaim` is load-bearing rather than decorative.
+
+### Three open questions these sketches deliberately do NOT settle
+
+They belong in `193.1-CONTEXT.md` as decisions, never smuggled inside a chosen variant:
+
+1. **The chicken-and-egg route shape.** The shipped upload route requires a saved workflow, and at
+   describe time none exists — so `TemplateAttachSection` mounted there renders its amber
+   `TEMPLATE_UNSAVED_REFUSAL` and **no file input at all**. That dead end is drawn on 165's
+   **wall** tab rather than argued in prose. Every filled state on 165/166 assumes the
+   **stateless read** (the ROADMAP's recommendation); if planning picks *create an empty draft up
+   front* instead, those states change.
+2. **The `loading` race** (166). Nothing stops the author pressing Draft while the read is in
+   flight — producing the blind draft this phase exists to prevent, on a screen that just told
+   them a template was attached. Disable while reading / let the draft wait / let it through and
+   reconcile after: none is drawn.
+3. **Where a LARGE reconcile lives** (167). Every stage puts it on the 320 px rail because that is
+   where the template arrives, but the changes are about the *canvas*. Four rows fit; fifteen do
+   not.
+
+### ⚠ G-5 fires on two files and is a DISCUSS-PHASE obligation, not a sketch one
+
+`frontend/src/pages/WorkflowBuilderPage.tsx` (33 commits / **10 phases** / 2055 L) and
+`backend/app/api/workflows.py` (32 commits / **16 phases** / 1813 L) were both added to the
+hot-file ledger on 2026-08-14 and both are certain to be touched here.
+**`/gsd:discuss-phase 193.1` owes a refactor recommendation as its FIRST option, before the
+planned feature.** Sketching first is correct — it is the G-2 gate — but the refactor call comes
+before planning, not after.
+
+### ✅ WINNERS (operator, 2026-08-14) — and the one shape they add up to
+
+| # | Winner | Why, in one line |
+|---|---|---|
+| **165** | **C — the spec block** | B was rejected on a **measurement**, not a taste: at intake the decision was *"the fields ARE the visible spec"*, and B renders them at **10.5 px under a 14 px picker** — the most consequential thing on the screen would also be the quietest. C costs a `scale` prop on a component that shipped three weeks ago. |
+| **166** | **B — the footing line** | **A** was rejected because silence is `SEED-157` recurring **with a control on screen** — worse than no control. **C** was rejected on **cost, not clarity**: it reopens `Write the first draft`, settled three weeks ago as variant D of sketch 164, and makes a button's width depend on a number read out of an uploaded document. |
+| **167** | **C — name check, no claim** | ⚠ **B was not rejected for being wrong.** It is the stronger idea and matches the phase's thesis — but a second model call, a diff surface, an accept/reject path and a new failure mode is a substantial build for what is here a **safety net**, not the headline feature. |
+
+**In every case the losing variants stay on their page.** They are the comparison that
+produced the pick — **evidence, not live options** — and 165's B in particular is the
+standing record of what *"just mount the shipped component"* actually costs.
+
+### The one shape the three winners add up to
+
+The pre-draft describe screen gains **one optional row** under the knowledge-base picker.
+Ignore it and today's behaviour is byte-identical (SC#4 by construction). Use it and the
+template's fields render **at the screen's own scale, as the spec the draft is aimed at**
+(165-C) — with **one line underneath that always says what the draft will be built from**,
+taking a different value on each of the five reading arms and never merging *"we looked and
+it has none"* with *"we never looked"* (166-B). On an already-drafted workflow the rail
+gains a **three-bucket name check that explicitly disclaims being a coverage check**
+(167-C).
+
+### ⚠ THREE THINGS THE PICKS DO NOT SETTLE — carry them into `193.1-CONTEXT.md` as decisions
+
+Recorded here because a decision that lives only inside a chosen variant is a decision
+nobody made:
+
+1. **The chicken-and-egg route shape.** 165-C's filled states assume the **stateless read**.
+   If planning picks *create an empty draft up front*, those states change. 165's **wall**
+   tab renders the shipped `TEMPLATE_UNSAVED_REFUSAL` — *"Save this draft first"* — with
+   **no file input at all**, which is the dead end that route exists to remove.
+2. **The `loading` race** (166). Nothing stops the author pressing Draft mid-read, which
+   sends a generate call with no `template_placeholders` — the blind draft this phase exists
+   to prevent, on a screen that just told them a template was attached.
+3. **Where a LARGE reconcile lives** (167). Four rows fit on a 320 px rail; fifteen do not.
+
+### ⚠ 167-B — NO SEED WAS PLANTED, and the re-open condition is recorded instead
+
+The *"C now, B as a later phase (plant a seed)"* option was offered **explicitly** and
+**declined**, so writing B up as deferred work would invent a commitment nobody made. What
+is recorded instead is the **condition that would reopen it**, so a later reader can
+recognise the evidence when they see it:
+
+> **If C's false-alarm rate proves annoying in lived use** — an author dismissing the
+> reconcile panel because it keeps flagging correct workflows — that is the evidence C's
+> name heuristic is not enough, and B is the answer. B's full mockup, its `KEEP`-the-run-
+> inputs judgement and its cost breakdown stay on sketch 167's page so nobody has to
+> re-derive them.
+
+`SEED-158` (authoring placeholders into a plain template) and `SEED-159` (a null field
+rendering as a blank cell that lies) are **untouched and remain open** — both were named on
+the sketch pages precisely so nobody solves them inside this phase by accident.
+
+---
+
+## Session: Phase 194.1 — Make the Stop Visible (2026-08-16)
+
+G-2 sketch, BEFORE spec/discuss. **RUN-01's re-opened, user-facing half.** Phase 194 landed the
+durable half and **verified it on seven live runs** (`workflow_runs` + the interrupted
+`workflow_phases` row + the thread anchor + the producer `runs` row). Its own UAT then found
+that **a person cannot perceive any of it**. Same shape as 192 → 192.1 and 193 → 193.1: the
+parent shipped, a real gap was found in lived experience, and the gap gets its own phase rather
+than a third gap-closure round (**G-7**).
+
+**Measured before drawing anything**, at `045a83dc`:
+
+- `grep -c "stopThread\|cancelRun\|Stop" frontend/src/pages/WorkflowRunPage.tsx` → **0**. The
+  surface **▶ Run workflow** sends you to cannot stop the run it is displaying.
+- `grep -ri "stopping" frontend/src` → **0** in production source. A pending-state vocabulary
+  does not exist and is net-new copy, not a re-use.
+- The panel Stop's gate is `showTimeline = isHarness || phases.length > 0` — **phase rows
+  outlive the run**, so a finished run renders a live-looking Stop that produces no request,
+  no screen change (`diffLen: 0`) and one console line whose stated cause is **false**.
+- `runs.message_id` is **NULL on 587 of 607** rows whose thread owns a `workflow_run`
+  (**96.7 %**, all 25 most recent) — so the chat surface has no run key for a harness run.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 168 | the-press-that-says-it-heard-you | What does Stop look like between the press and the run actually ending — and what stands where it stood once there is nothing left to stop? | **B — the control yields** (2026-08-16, operator). Chosen because `⊘` is already shipped tier-1 vocabulary (174 D1/D2) so no net-new glyph is introduced, and a double-press becomes impossible **by construction**. A and C stay as evidence. | phase-194.1, run-01, stop, pressed-state, bug-260816-01, bug-260709-01 |
+| 169 | a-stop-on-the-runs-own-surface | Where does Stop live on a surface that says `👁 View only` — and does pressing it need a guard? | **A — in the title row** (2026-08-16, operator), over the sketch's own lean toward B. Guard: **direct flip**. C rejected on canvas-vocabulary grounds. All variants stay as evidence. | phase-194.1, run-01, stop, workflow-run-page, canvas, action-guards, bug-260816-01 |
+| 170 | the-thread-that-remembers-the-stop | What does a stopped workflow thread show on return — and what happens to the approval card that was on screen when you stopped? | **B — the durable receipt** (2026-08-16). Decided on a MEASUREMENT, not appearance: the stop clears `threads.active_workflow_run_id`, so the anchor cannot be the source and a `workflow_runs`-by-thread read is the only construction that survives. A rejected — its mark is a MESSAGE property while the thing that stopped is a RUN. C rejected against the actual complaint. A and C stay as evidence. | phase-194.1, run-01, run-honesty, zombie-approval, bug-260816-02, bug-260710-01 |
+| 171 | one-run-one-slot | What does the kickoff moment render, such that two assistant nodes cannot be drawn — **without** first knowing which of the three candidate mechanisms is live? | **C — AMENDED** (2026-08-16). ⚠ C **as drawn was REFUTED by measurement after the page was built** — there is no never-vanishes strip at kickoff. The amendment: C must BUILD the run-anchored line, which is the SAME element 170-B needs. A rejected (its dedup key does not exist for harness). B rejected on SCOPE not correctness — re-open if the amended C proves insufficient. | phase-194.1, bug-260610-01, duplicate-avatar, kickoff, unmeasured-mechanism |
+
+### ⚠ 170 × 171 CONVERGE ON ONE COMPONENT — the single most consequential outcome of this session
+
+Recorded at the top of this block because it is easy to lose inside two separate sketch READMEs,
+and *a decision that lives only inside a chosen variant is a decision nobody made.*
+
+**170-B** needs a thread-level reading derived from `workflow_runs` that survives the return.
+**171-C**, once amended, needs a run-anchored line at list level that exists before any assistant
+message does. **These are the same element in two states, not two features:**
+
+> live &nbsp;→&nbsp; `◆ Starting workflow… · Step 2 of 3 · 2m 18s`
+> stopped &nbsp;→&nbsp; `⊘ Stopped by you · 2 of 3 steps · 2m 18s · Open the run ›`
+>
+> …and the assistant message renders **only when it has content**.
+
+One component answers **SC#3** and removes the kickoff double-avatar surface, frontend-only, with
+no dependence on the unmeasured duplicate-avatar mechanism.
+
+### ⚠ 171-C AS DRAWN WAS REFUTED BY MEASUREMENT, AFTER the page was built
+
+Recorded rather than quietly repaired — a sketch that silently fixes its own losing argument
+teaches nobody anything, and this project has the standing habit of recording the loser beside
+the winner.
+
+C's claim is that removing the kickoff placeholder is safe *because the never-vanishes run status
+strip carries the run instead*. **There is no such strip at kickoff.** Measured at `045a83dc`:
+
+```
+MessageList.tsx:217   <RunStatusStrip … placement="header-bare" />
+MessageList.tsx:193   showJumpToLive = !isPinned && isStreaming        ← the gate
+```
+
+The list-level strip is the **↓ Jump to live** chip and appears **only when you have scrolled
+away**. The one always-present `RunStatusStrip` is `RunCard.tsx:336`, in the run-card header —
+**inside the very assistant message C proposes not to render.** C as drawn would produce dead air
+for the whole first-token latency. The sketch's own instruction (*"if that gap feels dead rather
+than calm, C is wrong"*) is answered, and the answer is that it would have been.
+
+**The amendment is what makes C the pick anyway:** the cost C was hiding is a cost 170-B was
+already paying.
+
+### The measurement that decided 170, and it is not a visual one
+
+Phase 194 verified on seven live runs that a stop sets **`threads.active_workflow_run_id = NULL`**
+— *the thread anchor is cleared by the very event the thread now has to remember.* `RunSoul` and
+`RunSeam` both resolve their run **from that anchor**, so neither can carry a returning reading
+either. ⇒ a mark that survives the return **must** come from a `workflow_runs`-by-thread read.
+A and C are reading from places the stop has already emptied, or that can be absent.
+
+### ⚠ Operator feedback on 170/171: "they all look similar to me" — and it is CORRECT
+
+Both sketches render three variants that differ by a short line of text. The difference between
+them is **where the reading comes from and whether it can be absent** — architecture wearing a
+sketch's clothes.
+
+**The lesson for the next G-2 call, worth more than either pick:** the guardrail fired here
+expecting screen judgement and the judgement turned out to be non-visual. When the separating
+condition is a *failure state* (here: a stopped run with no assistant content; a kickoff with no
+strip), a sketch must **lead with the failure state** rather than offer it as one setting among
+six. 168 and 169 did not have this problem — their variants differ on screen.
+
+### ⚠ A claim inside sketch 170 is CORRECTED rather than defended
+
+Variant A's note reads *"there is no assistant message to hang this on — 587 of 607 harness runs
+leave `runs.message_id` NULL."* **That is stronger than what was measured.** A NULL `message_id`
+means the run cannot be joined to a message *from the run side*; it does **not** prove no
+assistant row exists. A's real weakness stands on its own — its mark is a **message** property
+while the thing that stopped is a **run** — and the figure should not be quoted as though A
+rested on it.
+
+### ⚠ What the two picks GUARANTEE, and what they do not
+
+The picks were requested as *"the best ones that guarantee perfect results."* Precisely:
+
+| | |
+|---|---|
+| **Guaranteed** | At the workflow kickoff there is **no assistant node**, so the duplicate artefact **cannot be drawn** — regardless of which of the three candidate mechanisms is live. A structural property, not a repair. And the stopped reading **cannot be lost on return**, because it is not attached to anything the stop empties. |
+| **NOT guaranteed** | The double-mount **race is not fixed** — the surface it rendered on at kickoff is removed. If the same race later affects the **content-bearing** message, the artefact returns. |
+| **NOT covered** | **Plain chat.** The operator reported the duplicate *"not only [in] the workflow, it is in the chat area."* Deep renders `Setting up agent…` too, and changing it breaks the *Deep byte-identical* constraint held since Phase 174. **This closes the workflow half only** — the Deep half is a scoping decision for `194.1-CONTEXT.md`, not something to do silently. |
+| **Still owed** | `194-MEASUREMENTS.md`'s trigger is **not discharged**. A qualifying store dump still tells us which mechanism is live — the difference between *"cannot render twice here"* and *"cannot render twice."* |
+
+### ⚠ 170-B is a NARROW AMENDMENT to Phase 194 D-14, and must be recorded as one
+
+D-14 examined `RunCard.tsx` on 2026-08-16 and **declined** to thicken the receipt, on two grounds:
+*the panel owns the meaningful phase spine and chat carries a thin run receipt* (the 094/103
+split), and *nothing here needs a new source of truth*.
+
+B keeps the first (one line, no spine — the receipt stays thin) and **reverses the second** (it
+adds a `workflow_runs`-by-thread read). That reversal is forced by the anchor-clearing
+measurement above, and it is the decision to record — not a repudiation of D-14.
+
+### ⚠ NEW G-5 FINDING — `MessageList.tsx` is ABSENT from the hot-file ledger
+
+Where the converged run-anchored line would mount. Measured 2026-08-16: **18 commits**, at least
+**6 phases** (`063 068.5 076.1 083 092 095`, plus untagged buckets), **234 lines**. G-5's
+threshold is 3.
+
+Identical invisibility failure to `WorkflowsPage.tsx` (ten phases), `WorkflowDoorSwitch.tsx`
+(six) and `db/workflows.py` (seventeen) — *a guardrail cannot see what is absent from its list.*
+**Add it to the `CLAUDE.md` ledger at discuss-phase**, at which point the phase owes a refactor
+recommendation on it as its first option — alongside the two already owed on `WorkspacePanel.tsx`
+(`14 / 9 / 580`) and `RunCard.tsx` (`21 / 9 / 608`).
+
+### ⚠ The 168-B × 169-A collision, and its resolution
+
+**Recorded here because it is a consequence of the two picks that neither sketch asked about.**
+168-B replaces the control with a *reading*. 169-A puts the control in the *title row*. Combined,
+B-on-terminal wants to render a terminal reading one line above the state row that already **is**
+the terminal reading.
+
+That is precisely the defect the operator reported on **2026-08-06** — `✓ Complete · Ran for
+2m 18s` rendered directly beneath `✓ Complete   Ran for 2m 18s — from when it was queued to its
+last update` — and the fix for it (making `run-band` `sr-only`) is still commented in
+`WorkflowRunPage.tsx`.
+
+> **Resolution: in the title-row mount, B yields to NOTHING.** The slot empties. The state row
+> below *is* the terminal reading and it already ships (`⊘ Cancelled` + `Ran for …`). B's
+> "the slot holds a reading" rule applies in the panel and the tray, where no such row exists.
+
+### Three decisions taken at pick time (2026-08-16), to carry into `194.1-CONTEXT.md`
+
+1. **The sketch's own "B's gate comes free" argument for 169 is CORRECTED, not defended.**
+   `isTerminal` is a component-level const already in scope for **both** rows, so A's liveness
+   gate is one clause reading the same variable — not a new derivation. What genuinely favours A
+   is that the state row is `flex-wrap` and grows a long `claimed_at … → created_at … →
+   updated_at …` string under the ⌥ reveal, so a control there wraps exactly when the row is most
+   crowded. *Measured beside it:* `WorkflowRunPage.test.tsx:676` ships a fence asserting the band
+   *"states the fact and offers NO control"* — ⚠ scoped to the **`sr-only`** `run-band` node, so B
+   would **not** have failed it, but the recorded intent leans A's way.
+2. **Two things now ride on 168-B and are correctness requirements, not polish.** (a) The
+   composer's slot width — a 32 px icon button and a text line differ, and forking B to icon-only
+   there **kills 168's whole premise** of one vocabulary across four mounts. (b) B's losing arm is
+   **load-bearing**: B *removes* the control while stopping, so the timeout is the only route back
+   to a pressable Stop. In A the control merely disables.
+3. **Geometry, not a guard, answers the new misclick risk 169-A creates.** Stop now sits beside
+   *Open the chat thread*, a routinely-clicked link. Recommendation: **Stop at the extreme right,
+   the seam link inboard, with real separation** — a guard would tax the one thing this phase buys
+   (speed of stopping). *Measured, so the move is unblocked:* the seam link is asserted **by text**
+   (`getByText("Open the chat thread")`, two call sites) with **no order, position or byte pin** on
+   that header.
+
+### ⚠ Sketch 171 asks a DIFFERENT question than it appears to, on purpose
+
+`194-MEASUREMENTS.md` opens *"VERDICT: ⏸ NOT MEASURED — DEFERRED with a trigger"* and states
+*"The word 'probably' appears nowhere in this file, and neither does a verdict."* Three
+mechanisms remain consistent with the evidence and are separated **only** by a live store dump
+taken while a harness run streams — which does not exist.
+
+So 171 does **not** ask *"how do we dedupe?"* (unanswerable today, and Phase 174 D6 already
+decided the *outcome*). It asks **"is there one owned slot per run at all?"** — because **B and C
+make the mechanism moot while A requires knowing it.** That asymmetry is available now.
+
+⚠ **B implies persisting `message_id` for harness runs — a backend change**, in a phase whose
+ROADMAP entry says it *"adds no new runtime path."* Most correct, most likely out of scope. That
+is worth knowing **before** planning.
+
+### Method note — these four are HAND-COMPOSED, not generated
+
+Sketches 165–167 used the generated-DOM mechanism (render the real component, splice one block)
+because of `SEED-155`. **These four are hand-composed against class strings and copy constants
+read verbatim from source**, and every page carries a **PROVENANCE** table naming which regions
+are shipped-verbatim and which are proposals. The reason is stated rather than assumed: most of
+what is drawn here **does not exist yet** — there is no stopping state, no canvas Stop, no
+durable stopped mark — so there is no component to render for the new parts.
+
+⚠ **Two limits a build must honour rather than trust this page for:** 169's canvas nodes are a
+**stand-in**, not `PhaseNodeCard` (which has a two-badge ceiling enforced by an
+`@ts-expect-error` control and forbids focusable children — so **this page cannot prove variant
+C's mount fits**); and 170's approval-card wording is **observed from the Phase 194 UAT report,
+not read from source** — a build must read the real `PendingAskCard`.
+
+### Reported bugs these four claim — all still `status: open` by design
+
+`BUG-260816-01` · `BUG-260816-02` · `BUG-260709-01` (re-opened on its own trigger) ·
+`BUG-260610-01` (frontmatter corrected 2026-08-16 — it read `folded` for two months while its own
+body said the avatar half *"Stays OPEN"*). **The fold happens at `/gsd:discuss-phase`**, because
+`status:` **is** the index a routing scan reads, and prose claiming a fold the frontmatter does
+not record is worse than no claim at all.
+
+⚠ **`BUG-260710-01` is the Deep-chat sibling of `BUG-260816-02` and must be looked at in the same
+breath.** Different renderer, different source of truth (`runs` vs `workflow_runs` +
+`workflow_phases`) — a fix to one does **not** automatically fix the other. If 194.1 closes only
+the workflow half, the other's frontmatter must say so.
+
+---
+
+## Session: Phase 197 — Guided Authoring (2026-08-18)
+
+G-2 sketch, **AFTER discuss-phase and BEFORE plan-phase**. `ROADMAP.md:677` flags G-2 on this
+phase; `197-CONTEXT.md` records the guardrail as surfaced and **not overridden**, and the
+discussion deliberately ran first so the sketch had a shape to draw — the project's own precedent
+(*"G-2 sketch, BEFORE plan-phase"*, this file at the 193.1 session).
+
+**The phase's own framing:** a freshly AI-generated draft arrives with the decisions the AI made
+**visible and answerable in place**. D-07 fixes five rows — KB scope, template, business
+requirement, name, deliverable — always all five, always the same order. D-02 says a **new sibling**
+card beside `SeedReceipt`, never a widened receipt, and names the composition problem it expects
+the sketch to solve: *"Two receipts stacked on one screen is a composition problem, and it is the
+sketch's problem."*
+
+### ⚠ RENDERING THE REAL SCREEN SHOWED THE PROBLEM IS A DIFFERENT AND LARGER ONE
+
+**Three of D-07's five rows already have a control on the drafted view.** Measured by rendering
+`WorkflowBuilderPage` with `visual_workflow_canvas` ON — not read about:
+
+| D-07 row | Home on the drafted view **today** | Scale |
+|---|---|---|
+| 1 · KB scope | `project-folder-picker` select in the header identity strip (D-186-15) | **11 px chip** |
+| 2 · Template | `TemplateAttachSection`, inside `PhaseFormPanel` (the per-step side panel) | rail scale |
+| 3 · Requirement | `business-requirement-input` + the shipped `AI-proposed` mark (193.2-09) | **11 px chip** |
+| 4 · Name | **nothing — and no display either** | — |
+| 5 · Deliverable | **derived, not stored** — `soulDeliverable()` reads a terminal `llm_emit` | — |
+
+So the real problem is **a second home for two shipped controls**, on a page whose own source
+states the rule verbatim — `kbAffordance`'s docblock: *"A second, different answer to one question
+is drift."*
+
+⚠ **Row 4 is sharper than "static text".** The emitter handed the page a definition whose `name` is
+`Vendor-risk review` and whose `slug` is `vendor-risk-review`. **The header renders the slug**, so
+the workflow's *name* appears nowhere on the drafted view at all (asserted in `172/build.cjs`).
+D-15 keeps the slug untouched — so after this phase the header would still show the slug while a
+row edits the name: **two strings, one of them invisible.**
+
+⚠ **Row 5 has no field at all.** "Answering" it means editing a step, which D-03's write path
+(`builderStore`, one `set()`) does not express as a row edit. **Price this before planning rather
+than discovering it inside planning.**
+
+### ⚠ THE MEASUREMENT THAT PRICES D-02's LITERAL READING
+
+The graph column ships as `grid-rows-[auto_auto_minmax(0,1fr)]` with the graph pinned by
+`[&>*:last-child]:row-start-3`. Two findings, and the second is the one that decides:
+
+1. **A fourth child STRANDS the graph.** The card auto-places into an implicit fourth row, the
+   `minmax(0,1fr)` row has nothing left to distribute, and the graph — nailed to row 3 —
+   **collapses to 0 px**. `requirementAffordance`'s own docblock predicted *"a control in
+   `graphColumn` would … permanently shorten the flow."* Measured, it does not shorten it: it
+   removes it.
+2. **Adding the fourth row fixes the stranding and NOT the height.** Chrome above the graph
+   measures **662 px** (48 toggle + 243 receipt + 370 card). Swept live on the page:
+
+   | column height | graph gets | |
+   |---|---|---|
+   | 620 px | 25 px | unusable |
+   | 700 px | 25 px | unusable |
+   | 760 px | 46 px | a sliver |
+   | 820 px | 106 px | a sliver |
+   | 900 px | 186 px | workable |
+
+   **At laptop size a stacked second card does not shrink the canvas — it removes it until you
+   scroll**, on the screen whose whole job is showing the workflow that was just built.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 172 | where-the-five-decisions-live | Should the decisions surface OWN controls for the five decisions, or POINT at the ones that already ship — given that three of the five already have a control on the drafted view? | *(open)* | phase-197, auth-02, guided-authoring, decisions-surface, seed-163, generated-from-build, g2-sketch-gate, d-02, d-07 |
+| 173 | one-row-five-ways | What does ONE row look like — ask-first, quiet-when-answered, or answer-first — across all five D-07 rows and every state each can actually be in? | *(open)* | phase-197, auth-02, row-anatomy, d-07, d-09, d-16, g2-sketch-gate, drawing-not-render |
+
+### Sketch 174 was PROPOSED and FOLDED, deliberately
+
+*"What dismissal costs"* — D-04 makes the card dismissible; if it is the only home for a row,
+dismissal deletes the control. It is a real question and it is **downstream of 172**: on variant C
+the card owns no control, so dismissal costs nothing and the question dissolves. It survives as a
+**named cost of variants A and B** on 172's page rather than as its own sketch. **Re-open trigger:**
+172 lands on A or B.
+
+### Method note — 172 RENDERS, 173 DRAWS, and the difference is stated on both pages
+
+172 keeps the 164–167 inverted arrow (`SEED-155`: *if it depicts a surface consuming an existing
+component, it must RENDER it, not redraw it*). Its header, receipt and grid classes are the **real
+rendered DOM**; only the decisions card is hand-composed, and every one of its nodes carries
+`data-s172="NEW"`. **173 is a drawing** — the card exists in no component — and says so at the top;
+what keeps it honest is that every sentence the product owns is parsed out of 172's dump and row 3
+wears the **shipped** `AI-proposed` markup lifted whole.
+
+Builds assert **41** (172) and **25** (173) structural properties and exit non-zero otherwise.
+
+⚠ **Two silent build bugs were caught by those assertions rather than shipping**, both recorded
+because both were the invisible kind: a regex extractor stopped one nesting level early on
+`builder-business-requirement` (three nested spans) and matched the wrong close tag on
+`builder-view-toggle` (which closes on a button, not a div). A splice into a missing anchor fails
+silently and yields a variant that quietly equals the baseline — the exact green-looking-nothing
+failure the audit exists to prevent.
+
+⚠ **And a THIRD: 172's emitter first wrote its dump OUTSIDE the repository.** It lives in
+`frontend/src/pages/`, three levels below the root; 165's lived one directory deeper, and its
+`../../../../` was copied verbatim. The vitest run passed and reported success either way — a
+green test that wrote nothing where anyone would look for it.
+
+### ⚠ A CORRECTION THIS SESSION CARRIES UPSTREAM
+
+`197-CONTEXT.md`'s deferred section lists **BUG-260809-02** as *"(blocking) — a canvas-built
+workflow can never be published … NOT closed by this phase."* Its frontmatter reads
+`status: closed`, `folded_into: quick-260809-klo`,
+`verified_closed_by: live-uat-2026-08-10-local-chrome-devtools-mcp`. **That quick task is what
+shipped the very requirement input these sketches render** — so D-06's recorded consequence does
+not exist, and the control it shipped is half of why variant A installs a second home. Absorbed
+here at the operator's direction rather than re-opening discuss-phase.
+
+### ⚠ What these two pages deliberately do NOT settle
+
+1. **The server-derived readiness verdict (D-13).** No row shows a per-row verdict, because the
+   field does not exist yet and inventing its rendering would be the client-side derivation D-13
+   explicitly refuses.
+2. **Whether row 4 gets a home.** 172-C is only complete if this phase also gives the name one.
+   That is a scope decision, not something a chosen variant may smuggle in.
+3. **Whether row 5 becomes answerable at all.** Larger than the other four; all three 173 variants
+   give it a stated fact instead of a control.
+4. **Hover, focus rings, pixel spacing** — a human comparison at UAT, driven by looking.
+
+### ⚠ SKETCH 174 ADDED THE SAME DAY — and the operator's critique that caused it
+
+172 and 173 are **analysis pages**: tables, provenance contracts, measurement readouts, three
+stages per tab. The operator's response was that they *"included a lot of information"* and did
+not *"represent what the thing looks like"* — a request for **the user-friendly version, with the
+control that does not break the workflow.**
+
+That is a fair read and it is recorded rather than argued with. **A sketch whose job is to let
+someone judge a screen has failed if the screen is the smallest thing on the page.** 172/173 keep
+their job — they are where the reasoning is checkable — and **174 is the picture**: three tabs, one
+caption each, no tables, and a real 780 px screen.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 174 | the-line-that-opens | What does the decisions surface actually LOOK like — and which shape leaves the workflow visible? | *(open — the recommendation)* | phase-197, auth-02, decisions-surface, recommendation, user-facing-mockup, g2-sketch-gate |
+
+### Post-197 — the workflow journey (SEED-182 / 183 / 184)
+
+The operator's review after Phase 197 shipped. Three seeds, ONE journey — sketched together so the composing
+state and the persistent decisions panel are drawn in a settled density language instead of being redrawn after
+it settles. Build order chosen by the operator: **density first**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 175 | what-the-eye-lands-on | What is the density language for the workflow library — what does a card lead with, what defers behind a click, and what does colour carry? | **B — the colourful card.** CALM is the direction; **A REJECTED as too dense**. ⚠ Colour SEMANTICS re-opened: the operator wants lifecycle + belonging, not governance tier → 176 | seed-184, density, progressive-disclosure, library, workflow-card, colour, icons, g2-sketch-gate, measured-refutation |
+| 176 | the-workflows-home | What does the Workflows home page look like when it is CALM — and what should colour actually encode, when the operator cannot tell built from draft from starter from someone else's? (folds BUG-260815-08: header alignment, the uncoloured create button, the search box that does not read as one) | *(open — awaiting operator)* | seed-184, seed-155, bug-260815-08, workflows-home, colour-semantics, lifecycle, calm, header-alignment, g2-sketch-gate |
+| 177 | stitch-regeneration | What does the whole workflow surface look like when a generative design tool (Google Stitch) is given our tokens, our direction, and the three measurements that have already killed ideas? | *(direction only — NOT an acceptance bar; operator ADOPTED the language)* | stitch, mcp, direction-only, calm, seed-155, seed-182, seed-183, seed-184 |
+| 178 | stitch-component-map | If the Stitch mindset is the house style, what does EVERY component look like in it — the atoms, not the pages, including the canvas? | *(direction only — 11 sheets; canvas + builder chrome re-run with business language)* | stitch, component-map, canvas, connections, business-language, adopted-mindset |
+| 179 | what-the-eye-lands-on-honestly | With 41 distinct workflows sharing ONE name, and only the fields the library actually carries, what should the card lead with? ⚠ **RENDERS the real WorkflowCard** — step 3 of the Stitch→sketch loop | **C — the triage board.** Outcome to a 3px gutter, name KEEPS the lead (partially refuting 177/178's "state first"), run+state on one quiet line, ~7 of 9 information rows CUT. ⚠ Needs one owed field (`last_run`, a join not a migration); G-5 on WorkflowCard still undischarged | library-card, renders-real-components, seed-155, g5-refactor-owed, business-vocabulary, last-run, measured-refutation |
+
+**The recommended shape:** the draft lands as it does today; under the receipt sits **one line** —
+*"I made 5 decisions for you"* — that opens on demand, and each row hands you to the control already
+on screen. Closed on arrival, so the D-05 fast door is untouched; owns no control, so nothing drifts;
+**and the workflow stays visible.**
+
+Measured on 174's own page, in a 780 px screen:
+
+| state | decisions element | graph gets |
+|---|---|---|
+| just landed (one line) | **41 px** | **363 px** |
+| opened | 237 px | 167 px |
+| a full always-open card | 276 px | **128 px** |
+
+⚠ **This is also the answer to 172's own measurement.** All three of 172's variants stack a ~370 px
+card above the graph, so **all three pay the 25 px-at-700 px cost** — the shape that does not is the
+one that is closed until asked. 174 is therefore not a fourth peer of A/B/C; it is **172-C plus
+collapsed-by-default**, and if 172-C wins, this is what it should be built as.
+
+Everything on 174 except the decisions line is the **real rendered DOM** — header, receipt, view
+toggle and the whole 5-step spine graph — so it looks like the product rather than like a drawing.
+14 assertions, 0 failing.
+
+### ⚠ 174 WAS REBUILT THE SAME HOUR — the operator caught the real defect
+
+The first cut of 174 drew **two cards**: the shipped receipt (*"Here's what I built — 5 steps"*)
+and a new one (*"I made 5 decisions for you"*), with the second collapsed to one line. The
+operator's response, recorded verbatim because it is the correct reading and the sketch had missed
+it:
+
+> *"you produce two cards … this means the spine [gets] a limited area … the area is very tight,
+> with exception of the one version where I can collapse … we always have to think about not
+> over-complicating the information … information should not be dense but be enough for the user to
+> know what is happening."*
+
+**Both cards say the same kind of thing — here is what the AI just did.** Splitting one thought
+across two frames spends the graph's space on chrome, and collapsing the second one only hides that.
+Collapsing was treating a symptom.
+
+**The shape is now ONE card**: the receipt's own heading, two openable lines, the receipt's own
+closing sentence.
+
+```
+Here's what I built — 5 steps                                    ✕
+  ▸ 3 steps must prove their sources                          why
+  ▸ 5 decisions I made for you                             review
+Everything else is yours to change. Nothing is saved or published yet.
+```
+
+Measured on 174's own page, in a 780 px screen:
+
+| | arrival chrome | the workflow gets |
+|---|---|---|
+| **one card, just landed** | **149 px** | **507 px — 65%** |
+| one card, decisions opened | 334 px | 321 px — 41% |
+| two cards, just landed | 284 px | 363 px — 47% |
+| two cards, opened | 478 px | 169 px — **22%** |
+
+**Merging halves the arrival chrome and hands the workflow 65% of the screen instead of 47%.**
+
+### ⚠ ONE CARD IS A COMPOSITION CHANGE, NOT A CHARTER CHANGE — D-02 SURVIVES INTACT
+
+This is the distinction a plan must not blur. `197-CONTEXT.md` D-02 refuses to widen `SeedReceipt`,
+and correctly — its docblock is fenced (*"authors no sentence of its own"*, *"declares no predicate
+of its own"*, *"imports nothing from the API client"*), and widening its charter costs exactly the
+guarantees that make it checkable.
+
+**Nothing in this shape widens it.** `SeedReceipt` stays the leaf it is; a **PARENT** composes its
+output and the decisions list into one visual card. **One card in the UI, two components
+underneath** — which is what D-02 asked for and what the operator asked for, at the same time.
+
+### The standing principle this session added
+
+> *"Information should not be dense, but enough for the user to know what is happening and how to
+> think."*
+
+Applied here as: **the collapsed state still states both facts** (`3 steps must prove their
+sources`, `5 decisions I made for you`) rather than hiding behind a bare *"details"* — a count and a
+fact per line, never a wall, and never a mystery either. Carry it into 197's copy review.
+
+⚠ **A method note for future sketches.** 172 and 173 are correct and are where the reasoning is
+checkable — but **a sketch whose job is to let someone judge a screen has failed if the screen is
+the smallest thing on the page.** 174 exists because that was true of both. Keep the analysis page,
+but ship a picture beside it.
+
+### ⚠ ALL THREE PAGES RENDERED IN LIGHT MODE, AND EVERY MEASUREMENT PASSED ANYWAY
+
+Found 2026-08-18 by taking a screenshot, after the operator said the states *"look the same"*. Two
+defects, neither visible to a geometry assertion, both now fixed and both asserted:
+
+1. **The Deep Midnight theme was purged.** The tokens live in a base-layer `.dark` rule, and
+   Tailwind drops it unless the literal string `dark` appears in a **scanned** file. The only
+   scanned file is `body.generated.html`; the `class="dark"` on `<html>`/`<body>` lives in
+   `assemble.cjs`, which Tailwind never reads. **So every sketch page in this session was showing a
+   white mockup of a dark product** — which is very plausibly the whole of *"they look the same"*,
+   since a washed-out page flattens every distinction the variants were drawn to show.
+   **Fix:** the token now sits on the page root in all three builds, commented as load-bearing.
+   ⚠ **Check this on the next sketch** — it looks exactly like decoration and will be deleted by
+   someone tidying up.
+2. **The header contradicted the card.** React sets a `<select>`'s value as a DOM **property**, so
+   serialising the real header loses the selection: the picker re-rendered as *"No knowledge base ·
+   searches everything"* while the card beside it read *"Vendor contracts"*. One screen, two
+   answers to one question — on the sketches whose entire subject is that a decision has exactly
+   one answer. **Fix:** the bound option is marked `selected`, asserted in both directions.
+
+**The method lesson, and it is the one worth keeping.** 172 and 173 shipped with 41 and 25 green
+structural assertions, and 174 measured pixel heights on four screens. **Not one of them could see
+that the pages did not look like the product.** Geometry proves composition; only looking proves
+appearance. Take a screenshot before handing a sketch to an operator — this session's own record is
+that the operator's eye caught, in one sentence, what three instrumented builds could not.
+
+### ⚠ AND THE FIXED SCREENS SURFACED A FACT ABOUT THE SHIPPED RECEIPT
+
+With the theme correct, 174's tab 3 makes it plain: **today's `SeedReceipt` is always fully open.**
+It renders both grounding paragraphs and every sealed-step row unconditionally, on every draft.
+
+So the one-card shape is not merely a merge — **it makes that content foldable, which it is not
+today**, and tab 3 versus tab 1 is an honest before/after of the CURRENT screen rather than a
+comparison of two proposals. Carry into planning: the fold improves the arrival moment even setting
+the five decisions aside.
+
+### Phase 200.1 session — the run surface's centre column (2026-08-21)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 201 | what-the-run-column-says | The centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing? | **hero+ledger — the adaptive hero (A/B/D are its states); C ruled out** ★ | run-surface, seed-191, stitch-derived, empty-state |
+| 202 | the-run-column-rendered | The Stitch reference draws a hero + a card-stack "process trace". How much of it survives contact with the data we actually hold — and does the centre column stop reading as a second copy of the right panel? | **C — strict single line** ★ — ⚠ **C makes D-05 load-bearing: with the count still on the spine the centre is a strict subset of it.** Plus 4 findings, incl. the shipped answer rule picking a 61-char status line over a 6,133-char narrative | run-surface, renders-real-components, stitch-derived, seed-155, seed-191, acceptance-bar, phase-200.2 |
+
+⚠ **A LANGUAGE sketch, not the acceptance bar** — it does not render `RunTranscript` /
+`WorkflowRunPage`. A rendered sketch is owed before planning (`SEED-155`).
+
+⚠ **The operator's question reshaped the decision and is recorded in the README:** *"if I selected B,
+what happens if the workflow does not produce the file?"* — **A and B are not rival designs**, they
+are ONE hero slot filled by whatever the run made, and the four arms already ship (`200.1-02`). The
+real choice is **hero + ledger** vs **C, one spine**, and tab **D** (the *neither* arm) is the
+tie-breaker: a hero slot that looks wrong when empty argues for C, which has no slot to leave empty.
+
+✅ **DECIDED 2026-08-21.** The operator declined to pick A or B: *"I want the render to be based on the
+workflow type and the workflow scenario."* That IS the hero+ledger family — one slot the RUN fills by
+deliverable type (file / answer / both / neither). **C is ruled out**: it has no hero slot, so nothing
+for the type to change. ⚠ The hero fixes what the column LEADS WITH; it does not by itself end the
+step-name duplication — the per-step **yields** are the proposal for that, and the rendered sketch
+must settle whether they earn it.

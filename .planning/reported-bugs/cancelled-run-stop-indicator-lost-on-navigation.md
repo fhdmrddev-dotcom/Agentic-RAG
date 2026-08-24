@@ -58,3 +58,30 @@ None needed — the response content and run state are correct; only the visual 
 - Found during Phase 145 UAT: `.planning/phases/145-run-lifecycle-honesty-threads-py-extraction-stretch/145-HUMAN-UAT.md` (Test 3).
 - Related display-desync bugs: `streaming-indicator-top-bottom-desync.md`, `timer-disappears-mid-cycle.md`.
 - Sibling finding same session: BUG-260710-02 (empty cancelled bubble).
+
+---
+
+## Update — the same family reproduces on the WORKFLOW surface (2026-08-16, Phase 194 UAT)
+
+Operator report during Phase 194 UAT, verbatim:
+
+> *"if the workflow is stopped, if I navigate back to the thread of this workflow that was — there is
+> nothing showing that this workflow is stopped, it's only showing the original prompt."*
+
+Filed as **`BUG-260816-02`** rather than merged into this record, and the reason is stated so a later
+reader finds a decision rather than an oversight: **this report is about a Deep-chat MESSAGE losing
+its cancelled badge, and `BUG-260816-02` is about a HARNESS run thread** — a different renderer,
+reading different durable state (`workflow_runs` + `workflow_phases`, not `runs.status`). A fix to one
+does **not** automatically fix the other. They should be reviewed together and, if the fix turns out
+to be shared, closed together.
+
+⚠ **This record's own status is worth a look while doing that.** `status: folded`, `folded_into:
+"174"`, `verified_closed_by: null` — it was folded into Phase 174 and **nobody ever verified it
+closed**. The family demonstrably still reproduces two months later on an adjacent surface, which is
+at least a reason to re-check whether 174 actually closed the Deep-chat half. Left as `folded` here
+rather than re-opened on someone else's evidence: **`BUG-260816-02` is a different surface, so it is
+not proof that this one still reproduces.** Re-open this record only on a driven Deep-chat repro.
+
+`BUG-260816-02` also records a second half this report does not cover: the **live** surface (before
+any navigation) keeps rendering a cancelled run as `Running`, including an actionable
+"Approve this step" card that can never be honoured.

@@ -54,10 +54,26 @@ def _spy_invalidate(monkeypatch):
     return flag
 
 
-def test_columns_constant_is_exactly_the_seven_editable():
+def test_columns_constant_is_exactly_the_eight_editable():
+    """The PATCH allowlist is a CLOSED set, pinned by enumeration.
+
+    ⚠ THIS PIN IS SUPPOSED TO FAIL WHEN THE ALLOWLIST GROWS — that is its whole job. The
+    column names here are interpolated into the upsert's column list, so the set is the
+    SQLi boundary (T-149-11); an entry arriving without a reviewer noticing is exactly what
+    this test exists to prevent. Widening it is legitimate, but only ever DELIBERATELY, in
+    the same commit as the guard for the new column.
+
+    Phase 196 (AUTH-04 / D-14) widened it by ONE reviewed literal, 7 -> 8: ``emit_tier``,
+    the operator-correctable forced-emission tier. Its value guard is
+    ``_MODEL_CAP_ENUM_COLUMNS`` (a closed vocabulary of its own, pinned three ways by
+    backend/tests/unit/test_196_emit_tier_two_layer_pin.py), so the new member does not
+    widen the value surface — only the column surface, by one name that is still a code
+    constant and never client-supplied.
+    """
     assert _MODEL_CAP_COLUMNS == {
         "llm_call_timeout_seconds", "context_window_tokens", "max_output_tokens",
         "native_tools", "enabled", "deprecated", "deprecated_reason",
+        "emit_tier",
     }
 
 

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 176 — The Workflows home</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+.wrap { max-width:1280px; margin:0 auto; padding:var(--space-6) var(--space-5) 140px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-4); max-width:88ch; }
+.lede b { color:var(--color-text); }
+.lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+.fixed3 { border:1px solid var(--color-success-dim); border-left:3px solid var(--color-success);
+  background:color-mix(in srgb, var(--color-success) 7%, transparent); border-radius:var(--radius-md);
+  padding:10px 14px; margin-bottom:var(--space-4); font-size:12px; line-height:1.6; color:var(--color-text-muted); }
+.fixed3 b { color:var(--color-text); }
+
+.pane { display:none; } .pane.on { display:block; }
+
+/* ══ THE PAGE SHELL — calm: one aligned row, real affordances ═══════════════ */
+.page { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-bg-elev1);
+  padding:var(--space-5); }
+.phead { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4);
+  padding-bottom:var(--space-4); border-bottom:1px solid var(--color-border-soft); margin-bottom:var(--space-4); }
+.ptitle { font-size:19px; font-weight:600; letter-spacing:-.01em; }
+.psub { font-size:12.5px; color:var(--color-text-dim); margin-top:3px; }
+/* FIX 1 — the primary action reads as primary */
+.btn-primary { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600;
+  padding:9px 16px; border-radius:var(--radius-md); background:var(--color-primary); color:hsl(240 60% 8%);
+  border:none; cursor:pointer; white-space:nowrap; box-shadow:0 1px 0 rgba(0,0,0,.25); }
+.btn-primary:hover { filter:brightness(1.08); }
+
+/* FIX 2 + 3 — one row that does not wrap; the search reads as a search.
+   ⚠ `align-items:stretch` + one shared control height is load-bearing, and it was
+   caught by measuring rather than by eye: with `align-items:center` the search sat
+   2px above the two selects, because an <input> and a <select> do not resolve the
+   same intrinsic height from identical padding. 2px is invisible in a screenshot
+   and is exactly the "not all the items aligned perfectly" the report describes.
+   Height is set once, here, so no control can drift from the others again. */
+.ctrls { display:flex; align-items:stretch; gap:var(--space-2); margin-bottom:var(--space-4); --ctrl-h:38px; }
+.search { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; padding:0 12px;
+  height:var(--ctrl-h); box-sizing:border-box;
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  transition:border-color var(--dur-fast), box-shadow var(--dur-fast); }
+.search:focus-within { border-color:var(--color-primary-glow); box-shadow:0 0 0 3px var(--color-primary-dim); }
+.search .ico { color:var(--color-text-muted); font-size:13px; }
+.search input { flex:1; min-width:0; background:transparent; border:none; outline:none;
+  color:var(--color-text); font-family:inherit; font-size:13px; }
+.search input::placeholder { color:var(--color-text-dim); }
+.selwrap { position:relative; flex:0 0 auto; display:flex; }
+.selwrap select { appearance:none; background:var(--color-surface); color:var(--color-text);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); padding:0 30px 0 12px;
+  height:var(--ctrl-h); box-sizing:border-box;
+  font-family:inherit; font-size:12.5px; cursor:pointer; }
+.selwrap::after { content:"▾"; position:absolute; right:11px; top:50%; transform:translateY(-50%);
+  color:var(--color-text-dim); font-size:10px; pointer-events:none; }
+
+.chips { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:var(--space-4); }
+.chip { display:inline-flex; align-items:center; gap:7px; font-size:12px; padding:6px 12px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent;
+  color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.chip:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.chip .n { font-family:var(--font-mono); font-size:10.5px; opacity:.7; }
+/* the chip carries the SAME colour the cards carry — filtration and card agree */
+.chip .swatch { width:8px; height:8px; border-radius:2px; }
+
+.count { font-size:11.5px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--space-3); }
+
+/* ══ THE CARD — calm, colour-coded, purpose deferred (175-B carried forward) ═ */
+.card { position:relative; border:1px solid var(--color-border); border-left:3px solid var(--color-border);
+  border-radius:var(--radius-md); background:var(--color-surface); padding:13px 15px; cursor:pointer;
+  transition:background var(--dur-fast), border-color var(--dur-fast); }
+.card:hover { background:var(--color-surface-hi); }
+.c-top { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.c-name { font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.c-when { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex-shrink:0; }
+.c-sub { font-size:11.5px; color:var(--color-text-dim); margin-top:3px; }
+.c-tags { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+.tag { font-size:10.5px; padding:2px 8px; border-radius:var(--radius-full);
+  border:1px solid var(--color-border); color:var(--color-text-muted); }
+/* the ONE state badge — always a word, never colour alone */
+.state { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; padding:2px 9px;
+  border-radius:var(--radius-full); font-weight:600; letter-spacing:.01em; }
+.state .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.c-more { display:none; margin-top:11px; padding-top:10px; border-top:1px solid var(--color-border-soft);
+  font-size:11.5px; color:var(--color-text-muted); line-height:1.6; }
+.card.open .c-more { display:block; }
+
+/* lifecycle palette — three states, theme tokens only */
+.lc-ready  { color:var(--color-success); }
+.lc-draft  { color:var(--color-warning); }
+.lc-starter{ color:var(--color-accent-violet); }
+.card.k-ready   { border-left-color:var(--color-success); }
+.card.k-draft   { border-left-color:var(--color-warning); }
+.card.k-starter { border-left-color:var(--color-accent-violet); }
+
+/* belonging palette — project as the colour (variant B) */
+.card.p0 { border-left-color:var(--color-primary); }
+.card.p1 { border-left-color:var(--color-accent-violet); }
+.card.p2 { border-left-color:var(--color-success); }
+.card.p3 { border-left-color:var(--color-warning); }
+.card.p4 { border-left-color:var(--color-secondary); }
+.card.p5 { border-left-color:var(--color-border); }
+
+/* variant C — grouped sections, colour is a quiet accent */
+.section { margin-bottom:var(--space-5); }
+.shead { display:flex; align-items:center; gap:10px; margin-bottom:var(--space-3); }
+.sbar { width:3px; height:15px; border-radius:2px; }
+.stitle { font-size:12.5px; font-weight:600; letter-spacing:.01em; }
+.scount { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); }
+.card.quiet { border-left-color:var(--color-border); }
+
+.note { font-size:11.5px; color:var(--color-text-dim); line-height:1.62; margin-top:var(--space-4);
+  border-left:2px solid var(--color-border); padding-left:12px; max-width:84ch; }
+.note b { color:var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<nav id="variant-nav">
+  <span class="brand">SKETCH 176 · THE WORKFLOWS HOME</span>
+  <button class="variant-tab active" data-p="a">A · Lifecycle is the colour</button>
+  <button class="variant-tab" data-p="b">B · Belonging is the colour</button>
+  <button class="variant-tab" data-p="c">C · Grouped, colour is quiet</button>
+</nav>
+
+<div class="wrap">
+
+  <p class="lede">
+    <b>Carried from 175:</b> calm wins, the card keeps colour, purpose defers behind a click, and the name cannot be the
+    differentiator — <code>93% of rows share one</code>.
+    <br><br>
+    <b>The question here:</b> the operator cannot tell <i>“which one is built, which one is draft, which one belongs to
+    something else”</i>. All three variants fix the page chrome identically — the variable is <b>what colour MEANS</b>,
+    because putting lifecycle, belonging and governance all on colour at once is how a palette becomes noise.
+  </p>
+
+  <div class="fixed3">
+    <b>BUG-260815-08 is fixed in all three panes, not sketched as a variant — it is a defect, not a taste question.</b>
+    ① the create button is a filled primary action · ② the controls sit on <b>one row that cannot wrap below</b>
+    (the search flexes, the selects do not) · ③ the search box has an icon, a real focus ring and a border, so it reads
+    as something you type into rather than a line of placeholder text.
+  </div>
+
+  <div class="pane on" id="p-a"></div>
+  <div class="pane" id="p-b"></div>
+  <div class="pane" id="p-c"></div>
+
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+  var ROWS = L.rows.slice(0, 18);
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function when(r) { return L.relTime ? L.relTime(r.updatedAt) : "recently"; }
+  function isFile(r) { return /file|doc|deck|sheet|pack|brief/i.test(r.deliverable || ""); }
+
+  /* ── LIFECYCLE: the thing the operator says they cannot see ──────────────
+     Derived from provenance the way the shipped library does: a starter is a
+     starter, a published row is ready to run, anything else is still being
+     built. Three states, because three is the most a person learns at a glance. */
+  function lifecycle(r) {
+    var p = (r.provenance || "draft").toLowerCase();
+    if (p === "starter") return { k: "starter", label: "Starter",       cls: "lc-starter" };
+    if (p === "published") return { k: "ready", label: "Ready to run",  cls: "lc-ready" };
+    return { k: "draft", label: "Still building",                        cls: "lc-draft" };
+  }
+
+  var PROJ_INDEX = {};
+  (L.PROJECTS || []).forEach(function (p, i) { PROJ_INDEX[p.name || "Unbound"] = i; });
+  function projClass(r) {
+    var n = r.projectName || "Unbound";
+    var i = PROJ_INDEX[n];
+    return "p" + (i == null ? 5 : Math.min(i, 5));
+  }
+
+  /* ── the shared page chrome — identical in all three panes ──────────────── */
+  function chrome(chips) {
+    return '' +
+    '<div class="phead">' +
+      '<div><div class="ptitle">Workflows</div>' +
+      '<div class="psub">Repeatable, locked automations — author, publish, and run into a thread.</div></div>' +
+      '<button class="btn-primary"><span>＋</span> Build a workflow</button>' +
+    '</div>' +
+    '<div class="ctrls">' +
+      '<label class="search"><span class="ico">⌕</span>' +
+        '<input type="search" placeholder="Search by name or purpose"></label>' +
+      '<span class="selwrap"><select><option>All projects</option><option>Finance</option>' +
+        '<option>Legal</option><option>Risk &amp; Compliance</option><option>Unbound</option></select></span>' +
+      '<span class="selwrap"><select><option>Recently updated</option><option>Name</option></select></span>' +
+    '</div>' +
+    '<div class="chips">' + chips + '</div>' +
+    '<div class="count">' + ROWS.length + ' of ' + L.rows.length + ' workflows</div>';
+  }
+
+  function chip(label, n, swatchVar, on) {
+    return '<button class="chip' + (on ? " on" : "") + '">' +
+      (swatchVar ? '<span class="swatch" style="background:' + swatchVar + '"></span>' : '') +
+      esc(label) + '<span class="n">' + n + '</span></button>';
+  }
+
+  function counts() {
+    var c = { ready: 0, draft: 0, starter: 0 };
+    ROWS.forEach(function (r) { c[lifecycle(r).k] += 1; });
+    return c;
+  }
+
+  /* ── the card ───────────────────────────────────────────────────────────── */
+  function card(r, mode) {
+    var lc = lifecycle(r);
+    var edge = mode === "belonging" ? projClass(r)
+             : mode === "quiet"     ? "quiet"
+             : "k-" + lc.k;
+    return '<div class="card ' + edge + ' js-t">' +
+      '<div class="c-top"><span class="c-name">' + esc(r.name) + '</span>' +
+        '<span class="c-when">' + esc(when(r)) + '</span></div>' +
+      '<div class="c-sub">' + esc(r.projectName || "No project") + ' · v' + r.version + '</div>' +
+      '<div class="c-tags">' +
+        '<span class="state ' + lc.cls + '"><span class="dot"></span>' + lc.label + '</span>' +
+        '<span class="tag">' + (isFile(r) ? "makes a file" : "answers in chat") + '</span>' +
+      '</div>' +
+      '<div class="c-more">' + esc(r.purpose) + '</div>' +
+    '</div>';
+  }
+
+  var c = counts();
+
+  /* ── A — lifecycle is the colour ────────────────────────────────────────── */
+  document.getElementById("p-a").innerHTML =
+    '<div class="page">' + chrome(
+      chip("Ready to run", c.ready, "var(--color-success)", true) +
+      chip("Still building", c.draft, "var(--color-warning)") +
+      chip("Starters", c.starter, "var(--color-accent-violet)") +
+      chip("Makes a file", ROWS.filter(isFile).length) +
+      chip("Yours", ROWS.length)
+    ) + '<div class="grid">' + ROWS.map(function (r) { return card(r, "lifecycle"); }).join("") + '</div></div>' +
+    '<p class="note"><b>The bet:</b> colour answers the question actually asked — <i>built, draft, or starter</i> — and ' +
+    'the filter chips carry the SAME three colours, so filtering and scanning teach each other. Project drops to a ' +
+    'subtitle. <br><b>The risk:</b> “which belongs to something else” is then only a word, not a colour.</p>';
+
+  /* ── B — belonging is the colour ────────────────────────────────────────── */
+  document.getElementById("p-b").innerHTML =
+    '<div class="page">' + chrome(
+      chip("Finance", 2, "var(--color-primary)") +
+      chip("Legal", 2, "var(--color-accent-violet)") +
+      chip("People Ops", 2, "var(--color-success)") +
+      chip("Risk &amp; Compliance", 1, "var(--color-warning)") +
+      chip("Unbound", 11, "var(--color-border)", true)
+    ) + '<div class="grid">' + ROWS.map(function (r) { return card(r, "belonging"); }).join("") + '</div></div>' +
+    '<p class="note"><b>The bet:</b> colour answers <i>whose is this / what is it for</i>, and lifecycle stays a worded ' +
+    'badge. <br><b>⚠ The risk, and it is measured:</b> most rows are <b>Unbound</b> — so most cards get the neutral ' +
+    'edge and colour tells you nothing about the majority of your library. Colour only earns its place here once ' +
+    'workflows are actually bound to projects.</p>';
+
+  /* ── C — grouped, colour is quiet ───────────────────────────────────────── */
+  var groups = [
+    { k: "ready",   title: "Ready to run",    v: "var(--color-success)" },
+    { k: "draft",   title: "Still building",  v: "var(--color-warning)" },
+    { k: "starter", title: "Starters",        v: "var(--color-accent-violet)" }
+  ];
+  document.getElementById("p-c").innerHTML =
+    '<div class="page">' + chrome(
+      chip("All", ROWS.length, null, true) +
+      chip("Makes a file", ROWS.filter(isFile).length) +
+      chip("Strict", Math.round(ROWS.length * 0.6))
+    ) +
+    groups.map(function (g) {
+      var rows = ROWS.filter(function (r) { return lifecycle(r).k === g.k; });
+      if (!rows.length) return "";
+      return '<div class="section"><div class="shead">' +
+        '<span class="sbar" style="background:' + g.v + '"></span>' +
+        '<span class="stitle">' + g.title + '</span>' +
+        '<span class="scount">' + rows.length + '</span></div>' +
+        '<div class="grid">' + rows.map(function (r) { return card(r, "quiet"); }).join("") + '</div></div>';
+    }).join("") + '</div>' +
+    '<p class="note"><b>The bet — the calmest of the three.</b> Lifecycle becomes STRUCTURE, not chroma: you cannot ' +
+    'confuse a draft with a published workflow because they are not in the same place. Colour shrinks to a 3px section ' +
+    'marker, so the grid itself stays quiet. <br><b>The risk:</b> sorting by recency across the whole library is lost ' +
+    'inside groups, and a library with 107 drafts makes one section enormous.</p>';
+
+  /* expand — purpose behind a click, per 175 */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest(".js-t");
+    if (t) t.classList.toggle("open");
+  });
+
+  var tabs = [].slice.call(document.querySelectorAll(".variant-tab"));
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      [].slice.call(document.querySelectorAll(".pane")).forEach(function (pane) {
+        pane.classList.toggle("on", pane.id === "p-" + tab.dataset.p);
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

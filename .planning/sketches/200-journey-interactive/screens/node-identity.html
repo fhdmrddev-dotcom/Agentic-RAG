@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Step Node Specimen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#918f9c",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "primary": "#c3c4ff",
+                        "on-error-container": "#ffdad6",
+                        "primary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "on-secondary-container": "#acb5c8",
+                        "surface-container-highest": "#35343a",
+                        "surface-container": "#1f1f25",
+                        "on-secondary": "#28313f",
+                        "outline-variant": "#464651",
+                        "background": "#131318",
+                        "secondary-fixed": "#dae3f6",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "secondary": "#bec7da",
+                        "inverse-primary": "#5355a9",
+                        "surface-container-low": "#1b1b21",
+                        "surface-tint": "#c1c1ff",
+                        "tertiary-fixed": "#ffe16c",
+                        "primary-container": "#a3a5ff",
+                        "surface-bright": "#39383f",
+                        "secondary-container": "#3e4757",
+                        "on-primary-fixed": "#0b0664",
+                        "surface": "#131318",
+                        "tertiary": "#e5c74c",
+                        "on-secondary-fixed": "#131c2a",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#353789",
+                        "on-tertiary-container": "#4e4000",
+                        "on-tertiary": "#3a3000",
+                        "error": "#ffb4ab",
+                        "inverse-on-surface": "#303036",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "surface-container-high": "#2a292f",
+                        "inverse-surface": "#e4e1e9",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-tertiary-fixed": "#221b00",
+                        "surface-container-lowest": "#0e0e13",
+                        "on-surface-variant": "#c7c5d3",
+                        "surface-variant": "#35343a",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#bec7da",
+                        "tertiary-container": "#c8ac33",
+                        "on-background": "#e4e1e9",
+                        "on-primary": "#242478",
+                        "surface-dim": "#131318",
+                        "on-surface": "#e4e1e9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin": "24px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "unit": "4px",
+                        "sm": "8px",
+                        "xs": "4px",
+                        "rail_width": "64px",
+                        "md": "16px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "h3": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "h2": ["Manrope"],
+                        "body-sm": ["Inter"],
+                        "data-sm": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"],
+                        "data-md": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "h1": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "h3": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "h2": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-sm": ["12px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "data-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "data-lg": ["16px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "data-md": ["14px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #060A0F; color: #e4e1e9; font-family: 'Inter', sans-serif; }
+        .node-border { border: 1px solid #212631; }
+        .bg-card { background-color: #0D1117; }
+        .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #6B7383; }
+        
+        .pulse-border { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { border-color: #A3A5FF; box-shadow: 0 0 0 0 rgba(163, 165, 255, 0.4); }
+            70% { border-color: #212631; box-shadow: 0 0 0 4px rgba(163, 165, 255, 0); }
+            100% { border-color: #A3A5FF; box-shadow: 0 0 0 0 rgba(163, 165, 255, 0); }
+        }
+
+        .notched-corner {
+            clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px);
+        }
+        
+        .hexagon-shape {
+            clip-path: polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%);
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen p-8 lg:p-16 max-w-[1440px] mx-auto flex flex-col gap-16">
+<header class="flex flex-col gap-sm">
+<h1 class="font-h1 text-h1">The step node</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Every kind, every state, one sheet.</p>
+</header>
+<section class="flex flex-col gap-md">
+<h2 class="section-header">Shape carries what kind of thing it is</h2>
+<div class="flex flex-wrap gap-8 items-end">
+<div class="flex flex-col gap-2 w-[240px]">
+<div class="h-16 bg-card node-border rounded flex items-center justify-center">
+<span class="font-body-md text-on-surface">Does work</span>
+</div>
+<span class="font-data-sm text-data-sm text-on-surface-variant text-center">Rounded Rectangle</span>
+</div>
+<div class="flex flex-col gap-2 w-[240px]">
+<div class="h-16 bg-card node-border notched-corner relative flex items-center justify-center">
+<div class="absolute left-0 top-0 bottom-0 w-[4px] bg-[#895AF6]"></div>
+<span class="font-body-md text-on-surface">Waits for a person</span>
+</div>
+<span class="font-data-sm text-data-sm text-on-surface-variant text-center">Notched Rectangle</span>
+</div>
+<div class="flex flex-col gap-2 w-[240px]">
+<div class="h-16 bg-card node-border hexagon-shape flex items-center justify-center">
+<span class="font-body-md text-on-surface">Chooses next</span>
+</div>
+<span class="font-data-sm text-data-sm text-on-surface-variant text-center">Hexagon</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Shape tells you the kind. The mark inside tells you which one.</p>
+</section>
+<section class="flex flex-col gap-md">
+<h2 class="section-header">The kinds that exist today</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Node 1 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Find renewing</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Searches &amp; decides move</span>
+</div>
+</div>
+<!-- Node 2 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">repeat</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Check contracts</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Runs step over items</span>
+</div>
+</div>
+<!-- Node 3 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">edit_document</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Draft summary</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Writes in single pass</span>
+</div>
+</div>
+<!-- Node 4 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">calculate</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Work out totals</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Fixed calculation, no AI</span>
+</div>
+</div>
+<!-- Node 5 -->
+<div class="h-[72px] bg-card node-border notched-corner relative flex items-center px-4 gap-3">
+<div class="absolute left-0 top-0 bottom-0 w-[4px] bg-[#895AF6]"></div>
+<span class="material-symbols-outlined text-[#895AF6] ml-2">person</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Confirm before</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Waits for a person</span>
+</div>
+</div>
+<!-- Node 6 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">grading</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Grade the draft</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Scores against rubric</span>
+</div>
+</div>
+<!-- Node 7 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">note_add</span>
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Produce brief</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[160px]">Makes finished file</span>
+</div>
+</div>
+<!-- Node 8 -->
+<div class="h-[72px] bg-card node-border rounded flex items-center px-4 gap-3 relative overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant">forum</span>
+<div class="flex flex-col w-full">
+<span class="font-body-md text-on-surface">Post to Slack</span>
+<span class="font-body-sm text-on-surface-variant truncate w-[140px]">Acts on another app</span>
+</div>
+<div class="absolute right-0 top-0 text-[9px] bg-[#F5A524]/10 text-[#F5A524] px-1 py-0.5 rounded-bl">OUTSIDE</div>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">A step that touches another application wears that application's own mark. Everything else wears ours.</p>
+</section>
+<section class="flex flex-col gap-md">
+<h2 class="section-header">Interaction States</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+<div class="h-16 bg-card node-border rounded flex items-center justify-center">
+<span class="font-body-sm">At rest</span>
+</div>
+<div class="h-16 bg-card border border-[#464651] rounded flex items-center justify-center transform -translate-y-1 transition-transform">
+<span class="font-body-sm">Hovered</span>
+</div>
+<div class="h-16 bg-card border border-primary rounded flex items-center justify-center">
+<span class="font-body-sm text-primary">Selected</span>
+</div>
+<div class="h-16 bg-card node-border rounded flex items-center justify-center opacity-50 border-dashed">
+<span class="font-body-sm">Moving</span>
+</div>
+<div class="h-16 bg-card node-border rounded flex items-center justify-center relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-[4px] bg-[#F5A524]"></div>
+<span class="font-body-sm text-[#F5A524] ml-2">Needs attention</span>
+</div>
+<div class="h-16 bg-card node-border rounded flex items-center justify-center gap-2 text-on-surface-variant bg-surface-container-low">
+<span class="material-symbols-outlined text-sm">lock</span>
+<span class="font-body-sm">Locked</span>
+</div>
+</div>
+</section>
+<section class="flex flex-col gap-md">
+<h2 class="section-header">Run States</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+<div class="h-16 bg-card node-border rounded flex flex-col items-center justify-center opacity-50">
+<span class="font-body-sm">Waiting</span>
+</div>
+<div class="h-16 bg-card pulse-border rounded flex flex-col items-center justify-center relative">
+<span class="font-body-sm text-primary">Running</span>
+<span class="font-data-sm text-[10px] text-primary absolute bottom-1 right-2">00:15</span>
+</div>
+<div class="h-16 bg-card node-border rounded flex flex-col items-center justify-center border-l-4 border-l-[#10B981]">
+<span class="font-body-sm text-[#10B981]">Worked</span>
+</div>
+<div class="h-16 bg-[#DC2626]/10 border border-[#DC2626]/30 rounded flex flex-col items-center justify-center">
+<span class="font-body-sm text-[#DC2626]">Failed</span>
+</div>
+<div class="h-16 bg-card border border-dashed border-[#464651] rounded flex flex-col items-center justify-center opacity-60">
+<span class="font-body-sm">Not taken</span>
+</div>
+<div class="h-16 bg-card node-border notched-corner relative flex flex-col items-center justify-center">
+<div class="absolute left-0 top-0 bottom-0 w-[4px] bg-[#895AF6]"></div>
+<span class="font-body-sm text-[#895AF6]">Waiting for you</span>
+</div>
+</div>
+</section>
+
+<script>
+(function(){
+  var HOPS = [];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"node-identity", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>

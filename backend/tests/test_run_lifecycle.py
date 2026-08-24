@@ -21,11 +21,26 @@ No live DB / no live Redis: the ``pool`` is an in-memory ``_FakePool`` honoring
 from the ``runs_by_thread:*`` sets — mirroring the fakes in
 ``backend/tests/test_run_reconciler.py`` (the existing analog), extended with the
 ``zadd`` recorder the reconciler fake lacks.
+
+⚠ EXTENDED BY PHASE 194 PLAN 09 (RUN-01 / SC#2) — the SCOPE fences. Everything above
+shipped in Phase 145 and is byte-untouched. The cases appended at the bottom pin the
+four boundaries the zombie arm's new workflow co-write must not cross: the Deep path
+stays byte-identical, the app-shutdown gate's scope is pinned on BOTH arms, a Redis
+outage still cannot fail a Stop, and the ask_user cancel sentinel is still published
+before ``task.cancel()``.
+
+⚠ THESE CASES SEED NOTHING IN ANY DATABASE — every pool is a fake, every writer is
+patched, and no supabase call leaves the process. That is what keeps this suite
+parallel-safe under CLAUDE.md's rule 4.
 """
+import ast
+import pathlib
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from redis.exceptions import RedisError
 
 from app.services.run_lifecycle import finalize_run_terminal, register_run_start
 
@@ -195,3 +210,484 @@ async def test_finalize_cowrites_terminal_and_zrem():
     assert str(run_id) not in redis.active
     # (3) ... AND from the runs_by_thread mirror — one call, both mirrors.
     assert str(run_id) not in redis.by_thread[tkey]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 09 (RUN-01 / SC#2) — the SCOPE fences
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Everything above this banner shipped in Phase 145 and is byte-untouched.
+
+_RUN_PRODUCER_SRC = (
+    pathlib.Path(__file__).resolve().parents[1] / "app/services/run_producer.py"
+)
+
+
+class _CancelFakeRedis:
+    """The Step-3b Redis surface (set / exists / expire / zrem / publish), recording.
+
+    ``raising`` makes EVERY op raise ``RedisError`` — the F-11 outage simulation.
+    ``exists`` returns 0 by default so the synthetic-sentinel branch is skipped.
+    """
+
+    def __init__(self, *, raising=False, exists=0):
+        self.raising = raising
+        self._exists = exists
+        self.calls: list = []
+
+    async def _op(self, name, *a, **k):
+        self.calls.append((name, a, k))
+        if self.raising:
+            raise RedisError(f"simulated Redis outage on {name}")
+        return {"exists": self._exists}.get(name, True)
+
+    async def set(self, *a, **k):
+        return await self._op("set", *a, **k)
+
+    async def exists(self, *a, **k):
+        return await self._op("exists", *a, **k)
+
+    async def expire(self, *a, **k):
+        return await self._op("expire", *a, **k)
+
+    async def zrem(self, *a, **k):
+        return await self._op("zrem", *a, **k)
+
+    async def publish(self, *a, **k):
+        return await self._op("publish", *a, **k)
+
+
+class _AnchorSupabase:
+    """A supabase double returning ``anchor`` for the threads select; no-op on update."""
+
+    def __init__(self, anchor=None):
+        self.anchor = anchor
+        self.ops: list = []
+
+    def table(self, name):
+        return _AnchorSupabase._B(self, name)
+
+    class _B:
+        def __init__(self, sb, table):
+            self._sb, self._table, self._op = sb, table, None
+
+        def select(self, *a, **k):
+            self._op = "select"
+            self._sb.ops.append(("select", self._table))
+            return self
+
+        def update(self, payload=None, *a, **k):
+            self._op = "update"
+            self._sb.ops.append(("update", self._table))
+            return self
+
+        def eq(self, *a, **k):
+            return self
+
+        def maybe_single(self, *a, **k):
+            return self
+
+        def execute(self):
+            res = MagicMock()
+            res.count = None
+            res.data = (
+                {"active_workflow_run_id": self._sb.anchor}
+                if self._op == "select" and self._sb.anchor is not None
+                else None
+            )
+            return res
+
+
+async def _drive_step_3b(monkeypatch, *, anchor, redis=None, finish=None):
+    """Drive ``_cancel_run_internals``'s zombie arm. Patches every writer; seeds nothing.
+
+    ``finish`` is ADDITIVE (194 CR-03): every shipped caller omits it and gets the
+    same plain ``AsyncMock`` it always did, so their behaviour is byte-identical. It
+    exists so one case can drive a FAILING run-status write through the composition.
+    """
+    from app.api.threads import RUN_TASKS
+    from app.services.run_lifecycle import _cancel_run_internals
+
+    rid = uuid4()
+    RUN_TASKS.pop(rid, None)
+
+    monkeypatch.setattr("app.dependencies._pg_pool", _FakePool())
+    fake_finalize = AsyncMock()
+    fake_finish = finish if finish is not None else AsyncMock()
+    fake_cancel_phases = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.run_lifecycle.finalize_run_terminal", fake_finalize
+    )
+    monkeypatch.setattr("app.db.workflows.finish_run", fake_finish)
+    monkeypatch.setattr("app.db.workflows.cancel_active_phases", fake_cancel_phases)
+
+    sb = _AnchorSupabase(anchor=anchor)
+    out = await _cancel_run_internals(
+        run_id=rid,
+        status="streaming",
+        thread_id=str(uuid4()),
+        redis=redis if redis is not None else _CancelFakeRedis(),
+        supabase=sb,
+    )
+    return {
+        "out": out,
+        "sb": sb,
+        "finalize": fake_finalize,
+        "finish": fake_finish,
+        "phases": fake_cancel_phases,
+    }
+
+
+# ── F-3 / V-11: the Deep path through Step 3b is byte-identical ────────────────
+
+@pytest.mark.asyncio
+async def test_deep_run_takes_step_3b_without_entering_the_workflow_branch():
+    """V-11 / F-3 — a Deep run (``active_workflow_run_id IS NULL``) is unchanged.
+
+    A Deep run has no workflow at all, so the workflow co-write must not be entered:
+    ``finish_run`` and ``cancel_active_phases`` are awaited ZERO times, while every
+    shipped arm still fires exactly as it did before 194-09 — ``finalize_run_terminal``
+    once, the standalone 092-03 anchor clear once, and the discriminator still
+    ``"zombie_healed"``.
+
+    ⚠ THE ``if wf_id:`` GUARD IS THE WHOLE SCOPE, and the zero-counts are the only
+    thing that can see it. Without a plant that removes that guard, "the Deep path is
+    byte-identical" is a claim rather than a measurement — which is why F-3's plant is
+    the SCOPE PROOF, not a formality.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        r = await _drive_step_3b(monkeypatch, anchor=None)
+    finally:
+        monkeypatch.undo()
+
+    assert r["out"] == "zombie_healed"
+    assert r["finish"].await_count == 0, (
+        "a Deep run has no workflow_runs row — finish_run must not be called "
+        f"(awaited {r['finish'].await_count}×)"
+    )
+    assert r["phases"].await_count == 0, (
+        "a Deep run has no workflow_phases rows — cancel_active_phases must not be "
+        f"called (awaited {r['phases'].await_count}×)"
+    )
+    assert r["finalize"].await_count == 1, "the shipped chat-side co-write must still fire"
+    assert [o for o in r["sb"].ops if o[0] == "update"], (
+        "the shipped standalone 092-03 anchor clear must still fire on the Deep path"
+    )
+
+
+# ── F-4 / V-12: the app-shutdown gate's SCOPE — TWO arms, TWO assertions ───────
+#
+# ⚠ TWO SEPARATE CASES, NOT ONE COMPOUND ASSERTION, AND THAT IS THE 193.2 LESSON
+# APPLIED. A fence asserting only that Step 3b LACKS the gate leaves the other arm —
+# that F2 still HAS it — completely undefended, and a phase that broke
+# restart-resumability would ship green. Plant (a) reds only arm (a); plant (b) reds
+# only arm (b). Neither plant can red the other, which is the evidence they are two
+# fences rather than one written twice.
+
+@pytest.mark.asyncio
+async def test_step_3b_carries_no_app_shutdown_gate():
+    """V-12 arm (a) / F-4a — Step 3b's workflow co-write fires even mid-shutdown.
+
+    ⚠ THE ARGUMENT LIVES HERE SO THE NEXT READER FINDS IT RATHER THAN RE-DERIVING IT,
+    AND SO NOBODY "FIXES" THIS FENCE BY ADDING THE GATE. 194-CONTEXT warns that "any
+    new terminalize must carry the same gate or it will break restart-resumability."
+    That is TRUE of ``run_producer.py``'s F2 block and MEASURABLY FALSE of Step 3b, for
+    three independent reasons:
+
+      1. STEP 3b IS ONLY REACHABLE ON EXPLICIT CANCEL INTENT. Its two callers are
+         ``DELETE /runs/{id}`` (the owner's Stop) and ``POST /admin/runs/{id}/kill``
+         (the operator's). Neither fires during a shutdown. F2's gate exists precisely
+         because F2 runs on ANY producer exit, shutdown-induced included.
+      2. A SHUTDOWN-AFFECTED RUN CANNOT REACH STEP 3b AT ALL. On graceful shutdown the
+         producer still writes ``runs.status='cancelled'`` (only the WORKFLOW half is
+         gated), so a subsequent DELETE hits Step 2's ``terminal_noop`` — no writes.
+      3. RESUMABILITY IS ALREADY FORFEIT AT STEP 3b. The shipped 092-03 anchor clear
+         runs there UNCONDITIONALLY, and ``find_resumable_runs`` requires
+         ``t.active_workflow_run_id = wr.id``. Once the anchor is cleared the run is
+         unsweepable regardless of its status. Adding the status write cannot remove
+         resumability that is already gone — it only stops the row lying about itself.
+
+    The flag is set for real via ``set_app_shutting_down`` and the PRIOR value is
+    restored in a ``finally`` — not hard-reset to ``False``.
+
+    ⚠ THAT DISTINCTION IS NOT PEDANTRY: ``_APP_SHUTTING_DOWN`` IS A PROCESS-GLOBAL THAT
+    ALREADY LEAKS ACROSS TESTS, measured in this phase rather than assumed. The shared
+    ``client`` fixture is ``with TestClient(app) as c:``, so its teardown runs the app
+    lifespan's shutdown handler (``app/main.py:511-512``), which sets the flag ``True``
+    for the REST of the pytest process. Probed directly: before any client ``False`` →
+    during ``False`` → after teardown ``True``. The leak is pre-existing and out of this
+    plan's scope, but a fence that hard-reset the flag would silently repair a state
+    other suites are running in.
+    """
+    from app.services.harness_engine import is_app_shutting_down, set_app_shutting_down
+
+    monkeypatch = pytest.MonkeyPatch()
+    _prior = is_app_shutting_down()
+    set_app_shutting_down(True)
+    try:
+        r = await _drive_step_3b(monkeypatch, anchor=str(uuid4()))
+    finally:
+        set_app_shutting_down(_prior)
+        monkeypatch.undo()
+
+    assert r["finish"].await_count == 1, (
+        "Step 3b must terminalize the workflow run even while the app is shutting "
+        "down — a shutdown gate here would be wrong for the three reasons above"
+    )
+    assert r["phases"].await_count == 1
+
+
+def test_the_f2_terminalize_still_carries_the_app_shutdown_gate():
+    """V-12 arm (b) / F-4b — ``run_producer.py``'s F2 block STILL has its gate.
+
+    096-09 / Phase 096 UAT Test 2: on a GRACEFUL shutdown F2 must NOT terminalize —
+    leaving ``workflow_runs`` 'active' with the thread anchor intact is precisely what
+    lets the boot-time resume sweep re-claim and re-drive the run. Removing this gate
+    would silently terminalize runs the sweep should have resumed, and no other test in
+    this repository would notice.
+
+    ⚠ ASSERTED OVER THE AST, NEVER OVER THE RAW SOURCE. A bare grep for the gate's name
+    matches the docblocks that EXPLAIN it — including this very module's — so a raw
+    needle cannot tell "the gate is present" from "someone wrote about the gate". This
+    walks to the ``if`` statement that actually guards the workflow terminalize call and
+    asserts the gate appears inside a ``not`` in THAT statement's test expression.
+    """
+    tree = ast.parse(_RUN_PRODUCER_SRC.read_text(encoding="utf-8"))
+
+    def calls(node, name):
+        return any(
+            isinstance(n, ast.Call)
+            and (
+                (isinstance(n.func, ast.Name) and n.func.id == name)
+                or (isinstance(n.func, ast.Attribute) and n.func.attr == name)
+            )
+            for n in ast.walk(node)
+        )
+
+    guards = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.If)
+        and any(calls(b, "_finish_wf") for b in n.body)
+    ]
+    assert len(guards) == 1, (
+        "expected exactly ONE `if` guarding the F2 workflow terminalize; found "
+        f"{len(guards)} — the fence has lost its anchor and must be re-scoped, not "
+        "trusted (a sweep that matches nothing passes over the empty set)"
+    )
+
+    gate_calls = [
+        n
+        for n in ast.walk(guards[0].test)
+        if isinstance(n, ast.UnaryOp)
+        and isinstance(n.op, ast.Not)
+        and calls(n, "is_app_shutting_down")
+    ]
+    assert gate_calls, (
+        "run_producer.py's F2 terminalize has LOST its app-shutdown gate — 096-09 / "
+        "Phase 096 UAT Test 2 restart-resumability is broken. The gate must read "
+        "`and not is_app_shutting_down()` inside the same `if` that calls _finish_wf."
+    )
+
+
+# ── F-11: a Redis outage cannot fail a Stop ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_a_redis_outage_cannot_fail_the_stop():
+    """F-11 — with EVERY Redis op raising, the cancel still succeeds (D-062-13).
+
+    "Postgres ``runs.status`` is the durable cancel record": the discriminator is still
+    ``"zombie_healed"`` and BOTH Postgres writes still land. A Stop that 500s because a
+    cache blipped is a Stop the user has to guess about.
+
+    ⚠ WHICH FORM OF THE PLANT WAS USED, AND WHY — the plan allowed either and asked for
+    the choice to be recorded. The plant is the STRUCTURAL one it preferred: the
+    ``try/except`` around Step 3b's ``EXPIRE`` is DELETED in production source, so that
+    op raises OUTSIDE a try. It was constructible honestly, so the weaker
+    everything-inside-its-try form was not needed. ⚠ Note the shipped ``except`` clauses
+    on the last three arms catch ``(RedisError, OSError)`` and NOT bare ``Exception`` —
+    which is why this fence raises ``RedisError`` specifically. That is a real, narrow
+    limit of the shipped contract and it is stated rather than papered over: an
+    arbitrary non-Redis exception from a Redis client WOULD escape.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        r = await _drive_step_3b(
+            monkeypatch, anchor=str(uuid4()), redis=_CancelFakeRedis(raising=True)
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert r["out"] == "zombie_healed", "a Redis outage must not change the outcome"
+    assert r["finish"].await_count == 1, "the durable workflow_runs write must still land"
+    assert r["phases"].await_count == 1, "the phase terminalize must still land"
+
+
+# ── F-12: the ask_user cancel sentinel is published BEFORE task.cancel() ──────
+
+@pytest.mark.asyncio
+async def test_the_cancel_sentinel_is_published_before_task_cancel(monkeypatch):
+    """F-12 / D-085-04 — sentinel publish, THEN ``task.cancel()``, on the happy arm.
+
+    The sentinel goes first so a paused ``_handle_ask_user`` wakes and returns a normal
+    ``ToolResult`` before ``CancelledError`` propagates. Reversed, a run stopped while
+    waiting at an approval strands the prompt as a submittable-but-dead card.
+
+    ⚠ THIS IS ``BUG-260808-02``'s FOLDED HALF — stopping a run that is waiting at an
+    approval — so this fence is the evidence that fold is honoured rather than assumed.
+    Asserted by CALL SEQUENCE on the two mocks, never by reading the source.
+    """
+    from app.api.threads import RUN_TASKS
+    from app.services.run_lifecycle import _cancel_run_internals
+
+    order: list[str] = []
+
+    async def _fake_publish(*a, **k):
+        order.append("publish_cancel_sentinel")
+
+    monkeypatch.setattr(
+        "app.services.ask_user_service.publish_cancel_sentinel", _fake_publish
+    )
+
+    rid = uuid4()
+    fake_task = MagicMock()
+    fake_task.done.return_value = False
+    fake_task.cancel.side_effect = lambda *a, **k: order.append("task.cancel")
+    RUN_TASKS[rid] = fake_task
+    try:
+        out = await _cancel_run_internals(
+            run_id=rid,
+            status="streaming",
+            thread_id=str(uuid4()),
+            redis=_CancelFakeRedis(),
+            supabase=_AnchorSupabase(),
+        )
+    finally:
+        RUN_TASKS.pop(rid, None)
+
+    assert out == "task_cancelled"
+    assert order == ["publish_cancel_sentinel", "task.cancel"], (
+        f"D-085-04 ordering broken; recorded sequence was {order}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 code review CR-03 — the composition must report whether it wrote
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. ``cancel_workflow_run_internals`` wraps BOTH
+# writes in one ``try: … except Exception: logger.exception(…)`` and returned ``None``
+# on every path — success and total failure were INDISTINGUISHABLE to a caller. Its own
+# docstring justifies that with "the chat-side cancel has already landed by the time
+# this runs", which is TRUE of the Step-3b zombie caller and FALSE of the ``DELETE
+# /runs/{id}`` no-producer arm, where this composition performs the ONLY durable write
+# in the whole request. That arm then answered 204 — "stopped" — over a write that may
+# never have happened, and its comment claimed "this arm has just written it": a claim
+# the code could not make. A guard that only passes by making a comment lie is a broken
+# guard.
+#
+# ⚠ THE BEST-EFFORT CONTRACT IS **NOT** REPEALED. The composition still never raises;
+# it now REPORTS. Step 3b keeps ignoring the return — its best-effort framing is still
+# correct there, because ``runs.status`` has already been written by then — and the
+# case below pins that, so "returns False" can never start failing a zombie heal.
+
+
+async def _drive_the_workflow_composition(monkeypatch, *, finish=None, phases=None):
+    """Call ``cancel_workflow_run_internals`` with both writers patched at their module.
+
+    The helper late-imports from ``app.db.workflows``, so that is where the patch must
+    land (the shipped ``_patch_workflow_writers`` discipline). Seeds nothing anywhere.
+    """
+    from app.services.run_lifecycle import cancel_workflow_run_internals
+
+    monkeypatch.setattr(
+        "app.db.workflows.finish_run", finish if finish is not None else AsyncMock()
+    )
+    monkeypatch.setattr(
+        "app.db.workflows.cancel_active_phases",
+        phases if phases is not None else AsyncMock(),
+    )
+    return await cancel_workflow_run_internals(pool=_FakePool(), workflow_run_id=uuid4())
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_that_both_writes_landed():
+    """CR-03 (a) — the happy path reports success, so a caller can act on it."""
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(monkeypatch)
+    finally:
+        monkeypatch.undo()
+
+    assert out is True, (
+        "the composition must report whether it wrote; a caller whose ONLY durable "
+        f"action this is cannot otherwise tell success from silence. It returned {out!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_a_failed_run_status_write():
+    """CR-03 (b) — the run-status write failing is reported, and still never raises.
+
+    A SEPARATE case from (c) on purpose: ``assert`` short-circuits, and one ``except``
+    covering two writes can be repaired for one of them alone.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(
+            monkeypatch, finish=AsyncMock(side_effect=RuntimeError("pool exhausted"))
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert out is False, (
+        f"finish_run raised and the composition still reported {out!r} — the DELETE "
+        "no-producer arm would answer 204 over a run that stays `active` forever"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_a_failed_phase_write():
+    """CR-03 (c) — the phase write failing is reported too, and still never raises."""
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(
+            monkeypatch, phases=AsyncMock(side_effect=RuntimeError("transient error"))
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert out is False, (
+        f"cancel_active_phases raised and the composition reported {out!r} — the run "
+        "would read `cancelled` with its interrupted step still rendering as running"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_reported_failure_still_cannot_fail_the_zombie_heal():
+    """CR-03 (d) — Step 3b keeps IGNORING the report, deliberately.
+
+    ⚠ THE SCOPE FENCE FOR THIS FIX. Step 3b's best-effort framing is correct there and
+    is not being repealed: ``runs.status`` — the durable cancel record — has already
+    been written by ``finalize_run_terminal`` above it, so a workflow-side failure must
+    still not turn a successful Stop into an error. Only the arm with NO other write
+    (the DELETE no-producer arm) acts on the report.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        r = await _drive_step_3b(monkeypatch, anchor=str(uuid4()))
+        # re-drive with the run-status write raising, everything else identical
+        broken = await _drive_step_3b(
+            monkeypatch,
+            anchor=str(uuid4()),
+            finish=AsyncMock(side_effect=RuntimeError("pool exhausted")),
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert r["out"] == "zombie_healed"
+    assert broken["out"] == "zombie_healed", (
+        "a workflow-side write failure must not change the zombie arm's outcome — the "
+        f"chat-side cancel already landed. It reported {broken['out']!r}"
+    )

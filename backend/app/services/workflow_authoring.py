@@ -64,8 +64,20 @@ AUTHORING_SYSTEM_PROMPT = (
     "- llm_single: one LLM completion with a `prompt` (no tools).\n"
     "- llm_agent: an autonomous agent with a `prompt` and an `available_tools` whitelist.\n"
     "- llm_batch_agents: a fan-out of parallel agents over a `prompt` + `available_tools`.\n"
-    "- llm_human_input: PAUSE and ask the human (`prompt`, optional `options`) — use for "
-    "any 'confirm before finalizing' step.\n"
+    # 193.2 (D-11) — SHORTENED, and length is the whole point. MEASURED from this literal
+    # at runtime, not hand-counted: this bullet was **121** characters, the LONGEST of the
+    # seven and 45% above the six-bullet median of exactly **83.5**; it is now **74**.
+    # The rule being obeyed is the one the `external_action` block below already records
+    # about itself — an over-long bullet is a NUDGE, and a nudge in a generator prompt
+    # skews composition toward the type it describes. What made this one a nudge was not
+    # only its length but its tail: it ENDED with an active invitation ("use for any
+    # 'confirm before finalizing' step"), recommending the ONE phase type the synchronous
+    # publish gate categorically refuses (`publish_service._interactive_phase_failures`).
+    # `BUG-260815-01` measured that composition 2 for 2 with a bound template. What the
+    # type IS stays truthful and complete — it pauses and asks the human, it takes a
+    # `prompt` and optional `options`; only the invitation is gone. The upper precedent
+    # for this band is the `external_action` bullet at 104 characters (F-8 enforces it).
+    "- llm_human_input: PAUSE and ask the human (`prompt`, optional `options`).\n"
     "- llm_emit: a sealed forced emission that produces a typed deliverable (`emitter`).\n"
     # 189 CONN-01 (D-01) — the 7th type. Without this bullet the AI-seed path (Phase 187)
     # can never emit an external_action node and the type is reachable only by hand.
@@ -88,7 +100,50 @@ AUTHORING_SYSTEM_PROMPT = (
     "directly. NEVER create a `render_template` emit phase without a provided template — "
     "at run time it fails with `no_template_bound` and the workflow can NEVER publish. "
     "Default to a simple, publishable text deliverable; reach for a template only when one "
-    "is actually provided.\n\n"
+    "is actually provided.\n"
+    # 193.2 (D-11) — the interactive case joins the DELIVERABLE RULE in the rule's OWN
+    # voice, because it has the same consequence the rule is already labelled for: a
+    # wrong choice makes the workflow unpublishable. One home per concern — the rule
+    # states the POLICY, the grounding states the FACTS the policy reads
+    # (`harness/grounding.py:605-607`); the D-26 arms there are deliberately untouched.
+    #
+    # PROPORTIONALITY, and WHICH BASELINE IT WAS MEASURED AGAINST (D-11). The 83.5-char
+    # median belongs to the phase-type bullet list above, NOT here: this block measured
+    # **769** characters before this clause — already ~9x that median — and RE-MEASURED
+    # from the literal after the edit it is **1202**, so the clause is **433**, roughly
+    # half the single template clause it sits beside. It is proportionate to THIS block,
+    # which is the only comparison that means anything. (Both figures are re-derivable:
+    # split the literal on newlines, take the lines from `DELIVERABLE RULE` to the next
+    # blank one, and join them — the same derivation F-8 uses for the bullets.)
+    #
+    # It states the CONSEQUENCE rather than an unexplained prohibition, deliberately: an
+    # unexplained prohibition in a generator prompt is a rule the model can trade away
+    # against a competing instruction, and `BUG-260815-01` is exactly that trade — told
+    # it MUST fill N named template fields the grounding could not supply, the reasonable
+    # composition was "add a step that asks the human".
+    #
+    # It tells the model what to do INSTEAD, in the same register as the template clause
+    # above, and it explicitly does NOT license inventing data — an unfound fact is
+    # reported as unfound (`SEED-159`: a blank that lies is not an improvement).
+    #
+    # D-14 — it promises NOTHING. A workflow that deliberately pauses for a person and
+    # can still be published is a real capability the operator has named, and it is NOT
+    # scheduled (`SEED-164` exists precisely because a docblock calling something "the
+    # DEFERRED Phase-103 rework" made unscheduled work read like a plan for a year).
+    # This clause states what is true NOW and names nothing that is not on the roadmap.
+    # D-25 — this SUPPRESSES an unwanted step; it does not deliver that capability.
+    #
+    # ⚠ THE PUBLISH GATE STAYS (D-11). A prompt clause reduces how often the model
+    # composes such a step; it can never guarantee absence, so nothing downstream may be
+    # relaxed on the strength of these words. Frequency is measured as k/N by
+    # `backend/tests/integration/test_193_2_authoring_frequency.py` — the phase's claim
+    # is a REDUCTION, never an absence (D-08).
+    "- Do NOT add a step that pauses to ask the human (`llm_human_input`, or a validator "
+    "whose `on_failure` is `ask_user`): publishing VALIDATES a workflow by running it, "
+    "and a run waiting on a person cannot finish — so a workflow containing one cannot "
+    "be published at all. When a fact might be missing, have the step gather it with the "
+    "tools it is given, and have the deliverable say plainly that it could not be found. "
+    "Never invent it.\n\n"
     "Rules — these are HARD constraints enforced after you emit:\n"
     "- `available_tools` may ONLY contain tool names from the provided tool registry.\n"
     "- `skill_ref`, if set, MUST be a skill id from the provided skill registry.\n"
@@ -100,8 +155,30 @@ AUTHORING_SYSTEM_PROMPT = (
     "short, specific, plain-language `name` saying what THAT step does rather than what "
     "its type does — write \"Pull the renewal history\", not \"LLM step\". This per-phase "
     "`name` is what a non-coder reads on the canvas, and it is SEPARATE from the "
-    "definition-level `name` below. Set the definition `slug`, `version` (1), `name`, and "
-    "`status` ('draft')."
+    "definition-level `name` below. "
+    # 193.2 (D-07 / SEED-163) — `business_requirement` joins the SAME sentence that
+    # already names the definition-level fields to set. Measured at HEAD:
+    # `grep -c business_requirement backend/app/services/workflow_authoring.py` → **0**,
+    # while `WF_SCHEMA` (= `WorkflowDefinition.model_json_schema()`) ALREADY advertises
+    # the field (`app/models/harness.py:538`). The schema was never the gap; the prompt
+    # was — so this is one field on one existing sentence, and D-09 holds: no schema
+    # change, `business_requirement` stays OUT of the schema's `required` list.
+    #
+    # The DURABILITY clause is not decoration (D-07, carried verbatim from `SEED-163`'s
+    # "What NOT to do"). `describe` is ONE RUN's task instruction ("produce a QBR for
+    # Northwind covering Q3"); the requirement is what the workflow must deliver for ANY
+    # run ("produce a client-ready QBR for a named account from our own records"). A
+    # verbatim copy of the describe text bakes one run's parameters into the workflow's
+    # definition of done — and the publish gauntlet's later stages read this field,
+    # including the judge's `answers_business_requirement` criterion.
+    #
+    # ⚠ NON-DETERMINISTIC BY DESIGN (D-08). When the model emits nothing here the
+    # behaviour is byte-identical to today's: the field stays None and the author fills
+    # it, exactly as before. Nothing in this module asserts it is always populated.
+    "Set the definition `slug`, `version` (1), `name`, `status` ('draft'), and "
+    "`business_requirement` — ONE line saying what this workflow must deliver on ANY "
+    "run, phrased so it stays true for the next run and the one after, NOT a restatement "
+    "of the particular request described below."
 )
 
 
@@ -230,6 +307,19 @@ async def _check_grounding_fidelity(
     )
 
 
+def _normalised_for_copy_check(text: str) -> str:
+    """Normalise a string for the D-07 describe-copy comparison: strip, collapse every
+    internal whitespace run to a single space, casefold.
+
+    Deliberately CRUDE, and that is the right shape. It is not a similarity metric and
+    must never become one — it answers exactly one question ("is this the same text with
+    different spacing or casing?"), which is the only question the stamp asks. A fuzzy
+    threshold here would refuse provenance for requirements that are genuinely durable
+    but happen to share vocabulary with the describe box, which is the ordinary case.
+    """
+    return " ".join(text.split()).casefold()
+
+
 async def generate_workflow_definition(
     *,
     describe: str,
@@ -243,8 +333,12 @@ async def generate_workflow_definition(
 ) -> dict:
     """Generate ONE grounded ``WorkflowDefinition`` draft from an NL description.
 
-    Returns on success ``{"ok": True, "definition": <model_dump json>}`` (NOT persisted —
-    persistence is REQ-1's explicit ``POST /workflows`` create). On failure returns an
+    Returns on success ``{"ok": True, "definition": <model_dump json>, "readiness": …}``
+    (NOT persisted — persistence is REQ-1's explicit ``POST /workflows`` create). The
+    ``readiness`` key is Phase 197 / D-13: the server's own verdict on whether the draft
+    can be published, in the gate's own words, sourced by IMPORT from
+    ``app.services.harness.grounding``. It is present ONLY here, on the success path — see
+    the block that builds it. On failure returns an
     honest structured error: ``{"ok": False, "error": <code>, "detail": ...}`` where code
     is one of ``no_authoring_model`` / ``could_not_generate`` / ``grounding_failed``. A
     failure NEVER carries a runnable/partial draft (REQ-2 c).
@@ -378,6 +472,99 @@ async def generate_workflow_definition(
         }
     )
 
+    # ── Phase 193.2 (AUTH-03 / D-06, `SEED-163`) — stamp the REQUIREMENT provenance.
+    #
+    # The sibling of the stamp directly above, and it inherits five of that stamp's six
+    # rules unchanged. It is stated here rather than cross-referenced, because a reader
+    # who lands on this stamp must find its rules without first finding the other one.
+    #
+    # SERVER-SIDE, AFTER validation, on the SINGLE success path — so a first-emit result
+    # and a retry-emit result are stamped identically, and it lands BEFORE the slug mint
+    # below for the same reason the name stamp does.
+    #
+    # NEVER READ OFF THE EMITTED PAYLOAD. `WF_SCHEMA` is `WorkflowDefinition`'s own JSON
+    # schema, so the emit tool now ADVERTISES this flag to the model — and the model does
+    # not get to set it. A model that emits `business_requirement_seeded_by_ai: false`
+    # alongside text it just wrote cannot launder that text into looking hand-typed, and
+    # one emitting `true` with an empty requirement cannot manufacture a mark for nothing.
+    # Both directions are asserted (the T-187-02-02 shape, T-193.2-03b here).
+    #
+    # AN EMPTY VALUE IS NEVER STAMPED, and the shipped reason applies verbatim: provenance
+    # for a value that does not exist would make the demote-on-edit rule read a lie.
+    #
+    # `model_copy`, never a mutation in place, and NEVER a model-level validator hook —
+    # the save path persists `model_dump(mode="json")`, so a derivation living in the
+    # model would be baked into the JSONB (see the `WorkflowDefinition` docblock in
+    # `app/models/harness.py`, which points back at this stamp).
+    #
+    # ⚠ THE SIXTH RULE IS NEW — the D-07 WIDENING, and it is a CONTROL, not tidiness.
+    # After this phase a model authors the criterion a model later grades the output
+    # against: `business_requirement` is woven into `JUDGE_RUBRIC_CORE`
+    # (`publish_service.py:1077-1082`) and read by the `answers_business_requirement`
+    # criterion (`validator_kinds.py:142-149`). **Format-string injection is NOT possible**
+    # — the value is substituted *into* `.format()` as data, never itself formatted, so
+    # braces in it are inert. The residual is a WEAKENED GATE: a trivially-satisfiable
+    # AI-authored criterion makes the judge stage easier to pass. **T-193.2-03 — D-09
+    # ACCEPTS that residual**, because the author still presses Publish and D-06's visible
+    # mark lets them see and overrule the proposal. The mechanical part of the mitigation
+    # is right here: a value that is a normalised byte-identical copy of the `describe`
+    # text is REFUSED the mark, because a durable requirement is a HARDER bar than one
+    # run's task instruction, and echoing the instruction back is the cheapest way to
+    # produce a criterion the judge cannot fail.
+    #
+    # ⚠ MEASURED AFTER THE PARAGRAPH ABOVE WAS WRITTEN, AND CORRECTED HERE BESIDE IT
+    # RATHER THAN OVER IT (code-review WR-06, 2026-08-15). THE LAST SENTENCE ABOVE
+    # CREDITS THIS CONTROL WITH A MITIGATION IT DOES NOT DELIVER, and the number is in
+    # `.planning/phases/193.2-from-authored-to-runnable/193.2-FREQUENCY.md` §(c) — 20 real
+    # generations — so the next reader can check it instead of trusting this prose. On the
+    # `kit10` arm **openai named a one-run parameter in 5 of 5 requirements** —
+    # representative: *"Produce a quarterly business review for customer Northwind
+    # Logistics covering Q3 2026 …"* — and **all 5 were stamped `seeded_by_ai: True`. The
+    # copy check fired on 0 of those 5.** (anthropic was 0 of 5 on the same arm: it wrote
+    # durable requirements, so there was nothing there for a control to catch.) A reader
+    # who trusted the paragraph above would conclude the weakened-judge residual is
+    # mechanically mitigated and would not build the real mitigation.
+    #
+    # ⚠ THE CHECK IS NOT BROKEN AND MUST NOT BE "FIXED" HERE. Its question is *"is this
+    # value a normalised copy of the `describe` text?"* and it answers that correctly —
+    # all 20 stamps in that run were correct, including those five, because a requirement
+    # naming one run's parameters IS still genuinely a model's proposal. A fuzzy
+    # similarity threshold was considered and DELIBERATELY REJECTED; the reason is in
+    # `_normalised_for_copy_check`'s own docstring (it would refuse provenance to
+    # requirements that are durable but merely share vocabulary with the describe box,
+    # which is the ordinary case). What was wrong was the CLAIM, not the predicate.
+    #
+    # ⇒ WHAT THIS CONTROL ACTUALLY DOES: it is an ANTI-ECHO guard. It refuses the mark to
+    # the cheapest possible non-requirement — the describe text handed straight back — and
+    # to nothing weaker. **It is not a durability control.** The phrase this phase settled
+    # on, and the one that should be read off the mark anywhere it appears: **the
+    # AI-proposal mark means "a model wrote this", NEVER "this is durable."** The
+    # durability instruction lives in the prompt (D-07, `AUTHORING_SYSTEM_PROMPT`), it is
+    # obeyed only in part, and the real backstop is D-06's visible mark under the author's
+    # eye before they press Publish — which is exactly why D-09's acceptance rests on that
+    # mark rather than on this predicate.
+    #
+    # The predicate is ONE expression: the shipped `bool(x and x.strip())` rule, WIDENED.
+    # It is a widening of "empty was not seeded", not a second concern.
+    #
+    # ⚠ D-08 — WHEN THE MODEL EMITS NOTHING, NOTHING HAPPENS HERE. The field stays blank
+    # and the shipped `REQUIREMENT_INVITATION` placeholder shows, which is TODAY'S EXACT
+    # BEHAVIOUR. No second derive call, no schema-required field, no new string, no
+    # server-side substitute text. D-09 — the publish gate is NOT touched: stage 1's
+    # `business_requirement_missing` only checks non-emptiness and an AI-seeded value
+    # passes it untouched, on purpose.
+    _emitted_requirement = wd.business_requirement
+    wd = wd.model_copy(
+        update={
+            "business_requirement_seeded_by_ai": bool(
+                _emitted_requirement
+                and _emitted_requirement.strip()
+                and _normalised_for_copy_check(_emitted_requirement)
+                != _normalised_for_copy_check(describe)
+            )
+        }
+    )
+
     # Mint a UNIQUE slug for this net-new draft so two same-named generations never
     # collide on UNIQUE(slug, version) at create time (mirrors the existing fixture
     # convention of a short hash suffix). The Tweak fork keeps the published slug (a
@@ -386,4 +573,53 @@ async def generate_workflow_definition(
 
     wd = wd.model_copy(update={"slug": f"{wd.slug}-{uuid.uuid4().hex[:8]}"})
 
-    return {"ok": True, "definition": wd.model_dump(mode="json")}
+    # ── Phase 197 (AUTH-02 / D-13) — the SERVER'S OWN READINESS VERDICT ──────────────
+    #
+    # The arrival card must RENDER a verdict, never DECIDE one (187-24). So the generate
+    # path becomes a SECOND CONSUMER of the one home that already owns this rule —
+    # exactly as `publish_service` stage 1 is — and declares neither the predicate nor
+    # the sentence of its own. A local copy of either is the drift D-klo-DEF-01 predicted
+    # and `grounding.py`'s own section header names ("one source, even trivial").
+    #
+    # ⚠ THE MESSAGE TRAVELS RATHER THAN BEING RE-TYPED IN TYPESCRIPT. D-182-06 forbids a
+    # client-side message map, so the author sees the gate's words VERBATIM — this IS the
+    # UI copy, and it is the same object the publish gauntlet would show.
+    #
+    # ⚠ D-20 — THE PAYLOAD CARRIES EXACTLY ONE ENTRY, AND THAT IS A MEASUREMENT, NOT AN
+    # OMISSION. Every gauntlet stage was enumerated from source: stage 1's
+    # `business_requirement_missing` is the ONLY definition-level predicate. Nothing
+    # anywhere refuses a publish for a missing KB binding, a missing template, a missing
+    # name or a missing deliverable — so a `readiness` that carried four extra greens
+    # would be four claims the server cannot make, which is strictly worse than no field
+    # at all. Adding a key here is a behaviour change to justify against the gauntlet.
+    #
+    # ⚠ THE `message` KEY EXISTS ONLY ON THE `missing` ARM. `"message": None` on the
+    # present arm would be a nullable field and therefore a two-arm read waiting to
+    # happen; the client's union depends on ABSENCE MEANING ABSENCE.
+    #
+    # ⚠ T-197-04 — it is a function of the definition just generated and carries no folder
+    # name, no folder id, no user id and no other row's data: one status token, plus one
+    # fixed server constant on one arm.
+    #
+    # ⚠ IT SITS ON THE SINGLE SUCCESS PATH, AFTER the provenance stamp and AFTER the slug
+    # mint, so the verdict describes the definition actually returned. The four
+    # `{"ok": False, …}` returns above gain NOTHING (T-197-07): a failed generation makes
+    # no claim about publishability.
+    from app.services.harness.grounding import (  # function-local (Pitfall 4 discipline)
+        BUSINESS_REQUIREMENT_MISSING_MESSAGE,
+        business_requirement_missing,
+    )
+
+    readiness: dict = {
+        "business_requirement": (
+            {"status": "missing", "message": BUSINESS_REQUIREMENT_MISSING_MESSAGE}
+            if business_requirement_missing(wd)
+            else {"status": "present"}
+        )
+    }
+
+    return {
+        "ok": True,
+        "definition": wd.model_dump(mode="json"),
+        "readiness": readiness,
+    }

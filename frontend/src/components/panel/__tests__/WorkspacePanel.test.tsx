@@ -30,6 +30,9 @@ import { axe } from "vitest-axe"
 import workspacePanelSource from "@/components/panel/WorkspacePanel?raw"
 import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
+// ⚠ The REAL store — deliberately NOT mocked. See the selector block below: it is
+// what makes two mounts rendered for one thread share one source of truth.
+import { useStreamsStore } from "@/stores/streamsStore"
 import type { ThreadWorkflowState, PublishedWorkflow } from "@/lib/api"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
@@ -69,6 +72,52 @@ const useWorkflowLockForThread = vi.fn()
 // the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
 // (which renders the REAL TodosSection — this file sentinel-mocks it).
 const useDerivedPanel = vi.fn()
+// Phase 194 Plan 03 Task 1 (RUN-01 / SC#1) — the NINTH key.
+//
+// ⚠ THIS MOCK IS AN EXPLICIT OBJECT LITERAL, NOT A PASSTHROUGH. It carried exactly
+// EIGHT keys and no `useStreamActions`, so the moment WorkspacePanel reads that hook
+// the whole file throws. The file already documents this exact failure at :97-100,
+// where Phase 100's fix was to sentinel-mock the CHILD (TemplateUpload). **194 cannot
+// do that, because the caller IS the panel** — the Stop control is mounted by
+// WorkspacePanel itself. Hence a ninth key rather than a ninth sentinel.
+//
+// `stopThread` is the ONE durable cancel path (`stopThread` → DELETE /runs/{id}).
+// It is deliberately a bare vi.fn() here: what the panel owes is the CALL and its
+// ARGUMENT, not the resolver's internals (those are StreamsProvider's own tests).
+const stopThread = vi.fn()
+const useStreamActions = vi.fn()
+/**
+ * Phase 194.1 Plan 05 Task 2 — the TENTH and ELEVENTH keys, and needing them is
+ * itself the measurement rather than plumbing.
+ *
+ * The panel's Stop is no longer an inline `<button>`: it is the shared
+ * `<StopControl>`, which reads these two selectors off the store slice plan 03
+ * shipped. Left out of this explicit object literal they resolve to `undefined`
+ * and the whole file throws on the first panel render — exactly as the ninth key's
+ * comment above predicted about `useStreamActions`. So the fact that this mock
+ * needed two more keys is the proof that the panel's Stop became store-driven.
+ *
+ * ⚠ THEY ARE BACKED BY THE REAL ZUSTAND STORE, NOT BY `mockReturnValue(false)`,
+ * AND THAT CHOICE IS LOAD-BEARING FOR TASK 4. A constant-returning mock would make
+ * every mount's reading independent by construction, which is precisely the
+ * property the cross-mount case exists to DISPROVE — the case would then pass
+ * against a component that owned its flag locally. Backing them with the real
+ * store (`@/stores/streamsStore` is NOT mocked in this file) means two mounts
+ * rendered for one thread genuinely share one source, so a flag moved into either
+ * mount's own `useState` reds. The selector bodies below are copied verbatim from
+ * `StreamsProvider.tsx`'s own exports.
+ *
+ * ⚠ THE HONEST SCOPE OF THAT, stated rather than overclaimed: what this file drives
+ * is the READ topology (two mounts, one source). The WRITE is this suite's own,
+ * because `vi.mock` is FILE-GLOBAL and the real provider cannot be mounted beside a
+ * mocked one. The real `recordStopPress` — its 8s timer, its no-re-arm rule, its
+ * `clearTimeout` — is driven by `StopControl.test.tsx` and
+ * `StreamsProvider.stopping.test.ts`, and this file claims none of it.
+ */
+const useStoppingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stoppingThreads.has(threadId) : false))
+const useStopNotConfirmedForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stopNotConfirmed.has(threadId) : false))
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -78,6 +127,9 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamActions: (...a: unknown[]) => useStreamActions(...a),
+  useStoppingForThread: (t: string | null) => useStoppingForThread(t),
+  useStopNotConfirmedForThread: (t: string | null) => useStopNotConfirmedForThread(t),
 }))
 
 // Stub the heavy timeline child (it reads the real provider hooks); the panel
@@ -122,6 +174,15 @@ vi.mock("@/components/panel/PendingAskCard", () => ({
 
 // eslint-disable-next-line import/first
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
+// Phase 194.1 Plan 05 Task 4 — the COMPOSER, imported here so the cross-mount case
+// can render the two Stops a user genuinely has on screen at once. `MessageInput`
+// imports nothing from `@/providers/StreamsProvider` itself; only the shared
+// `StopControl` it mounts does, so this file's module mock serves both mounts —
+// which is exactly what makes them share one source.
+// eslint-disable-next-line import/first
+import { MessageInput } from "@/components/chat/MessageInput"
+// eslint-disable-next-line import/first
+import { COPY_STOPPING } from "@/components/chat/StopControl"
 
 const thread = { id: "thread-1", title: "T" } as never
 
@@ -152,6 +213,16 @@ function setHooks({
   useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkflowLockForThread.mockReturnValue(lock)
   useDerivedPanel.mockReturnValue(derived)
+  // Phase 194 Plan 03 — reset BEFORE wiring, so a "called exactly once" assertion is
+  // a measurement of THIS test's click and never of a previous test's.
+  stopThread.mockReset()
+  useStreamActions.mockReturnValue({ stopThread })
+  // Phase 194.1 Plan 05 — the stopping slice is PROVIDER-SCOPED in production, so it
+  // outlives every mount; in a test file it therefore also outlives every CASE. Reset
+  // it to the resting arm here for the same reason `stopThread` is reset above: a
+  // reading left behind by a previous case is indistinguishable from one this case
+  // caused.
+  useStreamsStore.setState({ stoppingThreads: new Set(), stopNotConfirmed: new Set() })
 }
 
 function setViewport(width: number) {
@@ -712,7 +783,567 @@ describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direc
   })
 })
 
+// ── Phase 194 Plan 03 Task 1 (RUN-01 / SC#1, validation row V-04) — THE PRIMARY STOP.
+//
+// WHY IT IS HERE AND NOT IN CHAT. This panel is where a user WATCHES a workflow run
+// (the Phase 094/103 decision: the panel owns the meaningful phase spine, chat carries
+// a thin run receipt). Before this plan the panel had **no Stop control of any kind** —
+// every shipped Stop keys off a streaming assistant message in the CHAT bucket, so a
+// user watching the spine had to leave the surface to stop what they were watching.
+//
+// ⚠ THE ID TYPE IS THE WHOLE POINT, AND IT IS A MEASURED LANDMINE, NOT A STYLE CHOICE.
+// `WorkflowLock.runId` carries TWO id types across its write sites: two store a
+// `workflow_runs.id`, two store a producer `runs.run_id`. Its JSDoc asserts only the
+// first. `DELETE /runs/{id}` accepts only the second, and `cancelRun` **swallows 404
+// deliberately** (`api.ts:1259-1269`). So a Stop wired to the lock SILENTLY SUCCEEDS
+// WHILE DOING NOTHING, roughly half the time — the exact dishonesty this phase exists
+// to remove. The panel therefore resolves through `stopThread(threadId)`, which finds
+// the streaming message's runId (the producer id, the correct type) itself.
+//
+// The fixture below makes that measurable rather than assertable: the lock's runId is
+// a string that is NOT the thread id, so passing the wrong one is DETECTABLE.
+describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({})
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
+  })
+
+  /** ⚠ The LIVE half of the D-25 pair. Both nodes present here and only the
+   *  timeline present on the completed run below is what makes the two booleans
+   *  measurable: either assertion alone is satisfied by a single boolean. */
+  it("a LIVE run (lock held) renders BOTH the Stop control and the timeline", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    // POSITIVE CONTROL for the gate: the timeline is mounted, so a later absence
+    // assertion is a measurement of the control and not of the harness gate.
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  /** The lock is the honest "the run is still going" signal, and this case says
+   *  why in a form a plant can red: phases exist here TOO, so a gate keyed on
+   *  `phases.length > 0` (the shipped bug) would render a Stop and this case
+   *  would pass — it is the COMPLETED-run case above that separates them. Kept
+   *  as a pair on purpose. */
+  it("a LIVE run with phases already recorded still renders the Stop (the lock, not the phase count, is the signal)", () => {
+    setHooks({
+      lock: HARNESS_LOCK,
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "done", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+  })
+
+  it("is reachable as a labelled button that names what it stops (not a phase, THE RUN)", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    const stop = screen.getByRole("button", { name: /stop this workflow run/i })
+    expect(stop).toBe(screen.getByTestId("panel-stop-run"))
+    expect(stop).toHaveTextContent(/stop/i)
+  })
+
+  it("clicking it calls stopThread EXACTLY ONCE with the THREAD id — never the lock's run id", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const user = userEvent.setup()
+    renderPanel({ state: "open" })
+    await user.click(screen.getByTestId("panel-stop-run"))
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith("thread-1")
+    // The three ways this goes wrong in production, each asserted rather than implied.
+    expect(stopThread).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+    expect(stopThread).not.toHaveBeenCalledWith(undefined)
+    expect(stopThread).not.toHaveBeenCalledWith(null)
+  })
+
+  /**
+   * ⚠ SUPERSEDED IN PLACE BY 194.1-05 TASK 1 (R7(a) / D-25). The original is
+   * quoted verbatim rather than deleted — a deleted assertion is invisible to
+   * `git log -S` and to the next reader (193.2 WR-05).
+   *
+   * SUPERSEDED (Phase 194 Plan 03):
+   *   it("mounts for a phases-exist thread with no lock (the same gate its two
+   *      siblings use)", () => {
+   *     setHooks({ phases: [ …one running phase… ] })
+   *     renderPanel({ state: "open" })
+   *     expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+   *   })
+   *
+   * ⚠ THAT ASSERTION PINNED THE DEFECT. `BUG-260816-01` / 194 UAT-03 measured the
+   * panel offering "THIS RUN — Stop" on a FINISHED run: the row's gate was
+   * `showTimeline = isHarness || phases.length > 0`, and **phase rows OUTLIVE the
+   * run** (`threads.py:1176-1186`), so the control survived every terminal.
+   * Pressing it produced NO network request and a byte-identical
+   * `document.body.innerText` (`diffLen: 0`). A control that does nothing is the
+   * exact lie this phase exists to remove — so the row now gates on a SECOND
+   * boolean (`showStopRow = isHarness && threadId != null`) and this case asserts
+   * the inverse of what it used to.
+   *
+   * ⚠ TWO ASSERTIONS, NOT ONE, AND THE SECOND IS THE LOAD-BEARING ONE. A
+   * "no Stop on a completed run" case ALONE is passed by the plant that simply
+   * narrows `showTimeline` itself — which is precisely how the Phase 098 UAT
+   * run-honesty regression (fix B: a finished run KEEPS its timeline) would ship
+   * unnoticed. The timeline-still-renders clause is what reds against it.
+   *
+   * ⚠ THE FIXTURE'S TERMINAL STATUS IS `"done"`, NOT `"completed"`, and the
+   * distinction cost a typecheck error before it was measured. `Phase.status` is
+   * `pending | running | done | failed | cancelled | skipped | retrying |
+   * recorded-not-sent | unknown` — `"completed"` belongs to `Message.runStatus`,
+   * an entirely different union. That is the SAME class of mistake
+   * `194.1-BASELINE.md` §11 records against itself (`runStatus: "done"`, where the
+   * SSE terminal KIND was written where the persisted STATUS belonged) — two
+   * vocabularies for one moment, and the compiler is the only thing that tells
+   * them apart. ⚠ The bare `tsc --noEmit` form would NOT have caught it: it
+   * checks ZERO files in this repo. Use `-p tsconfig.app.json`.
+   */
+  it("a COMPLETED run (phases present, lock cleared) offers NO Stop — and its timeline STILL renders", () => {
+    setHooks({
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "done", subAgents: [], pendingAsk: null },
+      ],
+      lock: null,
+    })
+    renderPanel({ state: "open" })
+    // (1) the dead control is gone…
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    // (2) …and the thing the user came to look at is still there. Narrowing
+    //     `showTimeline` would satisfy (1) and destroy (2).
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("renders NOTHING on a Deep / no-run thread — a Deep user sees no new control", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    // POSITIVE CONTROL: no timeline either, which is what "Deep / no-run" means here.
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("renders NOTHING in the empty short-circuit (no activity at all)", () => {
+    setHooks({ todos: [], files: [], asks: [], phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("has no axe violations with the Stop mounted", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const { container } = renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 4 (R1 / D-06) — THE REAL CROSS-MOUNT CASE.
+//
+// ⚠ THIS IS THE ONLY PROOF OF D-06, AND IT IS A CASE A SINGLE-MOUNT TEST
+// STRUCTURALLY CANNOT SEE. Every other Stop case in this phase renders ONE mount,
+// presses it, and watches that same mount change — which is equally consistent
+// with a control that owns its own pressed state. The property D-06 actually
+// claims is that NEITHER mount owns it: the composer Stop and the panel Stop can
+// be on screen for the SAME thread at the same time, and pressing either must
+// retire BOTH, because a second press has to be impossible BY CONSTRUCTION rather
+// than merely discouraged.
+//
+// Plan 04's `StopControl.test.tsx` has the structural ancestor — two
+// `<StopControl>` instances under one provider. THIS is the real one, because it
+// uses the two mounts a user can genuinely have in front of them at once: the
+// composer at the bottom of the chat and the panel on the right.
+//
+// ⚠ IT LIVES IN THIS FILE RATHER THAN IN A FOURTH NEW ONE FOR A MEASURED REASON:
+// `WorkspacePanel.test.tsx` is one of only three named `panel/__tests__` files the
+// count gate actually executes (`194.1-BASELINE.md` §2), and this plan is already
+// bumping its pin. A fourth file would land UNGATED — `src/components/chat` has no
+// TARGETS entry at all — so the phase's single most important case would be the
+// one nothing runs in CI.
+//
+// ⚠ THE HONEST SCOPE, stated rather than overclaimed. `vi.mock` is FILE-GLOBAL, so
+// this file cannot mount the REAL `StreamsProvider` beside its mocked data hooks.
+// What is real here is the READ topology and the SHARED SOURCE: both mounts read
+// the genuine zustand store through the production selector bodies, and the press
+// writes to that same store. What is this suite's own is the WRITE. The real
+// resolver — its 8s window, its no-re-arm rule, its `clearTimeout` — is driven by
+// `StopControl.test.tsx` and `StreamsProvider.stopping.test.ts`, and this case
+// claims none of it.
+describe("194.1-05 — composer + panel, ONE thread: pressing either retires BOTH", () => {
+  const THREAD = "thread-1"
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({ lock: HARNESS_LOCK })
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
+    // The press writes the real store, exactly as `recordStopPress` does. This is
+    // the suite's own write — see the block above for why, and for what it does
+    // and does not claim.
+    useStreamActions.mockReturnValue({
+      stopThread: (id: string) => {
+        stopThread(id)
+        useStreamsStore.setState((s) => {
+          const stopping = new Set(s.stoppingThreads)
+          stopping.add(id)
+          return { stoppingThreads: stopping }
+        })
+      },
+    })
+  })
+
+  /** BOTH mounts, for ONE thread, in ONE tree — the composition a user really has
+   *  on screen during a workflow run. */
+  function renderBothMounts() {
+    return render(
+      <>
+        <MessageInput onSend={vi.fn()} disabled threadId={THREAD} />
+        <WorkspacePanel
+          selectedThread={thread}
+          state="open"
+          onToggle={vi.fn()}
+          onExpand={vi.fn()}
+        />
+      </>,
+    )
+  }
+
+  it("both Stops are on screen for the same thread before anything is pressed", () => {
+    renderBothMounts()
+    // The PRECONDITION, asserted rather than assumed. Without it the absence
+    // assertions below are equally consistent with neither mount ever rendering.
+    expect(screen.getByTestId("composer-stop")).toBeInTheDocument()
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+  })
+
+  it("pressing the PANEL's Stop removes the COMPOSER's control too, and both slots read stopping", async () => {
+    const user = userEvent.setup()
+    renderBothMounts()
+
+    await user.click(screen.getByTestId("panel-stop-run"))
+
+    // ⚠ THE COMPOSER'S CONTROL — a mount this press never touched. This is the
+    // assertion P6 reds against, and no single-mount case in the phase can make it.
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+    // …and the mount that WAS pressed is gone too: no disabled button, because no
+    // button (sketch 168-B). A second press is impossible by construction.
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+
+    // Both slots carry the reading, so neither surface goes silent.
+    expect(screen.getByTestId("composer-stopping")).toBeInTheDocument()
+    expect(screen.getByTestId("panel-stopping")).toBeInTheDocument()
+    expect(screen.getAllByText(COPY_STOPPING)).toHaveLength(2)
+
+    // The resolver was reached exactly once, with the THREAD id — never the lock's
+    // producer run id, which is the wrong type for a cancel.
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
+    expect(stopThread).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+  })
+
+  /** The symmetric direction. Without it, "pressing the panel retires both" is
+   *  equally consistent with the composer simply never rendering a control after
+   *  any press at all. */
+  it("pressing the COMPOSER's Stop removes the PANEL's control too", async () => {
+    const user = userEvent.setup()
+    renderBothMounts()
+
+    await user.click(screen.getByTestId("composer-stop"))
+
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
+  })
+
+  /** ⚠ THE SCOPE CLAUSE. A flag that retired every Stop everywhere would pass both
+   *  cases above and be a worse bug than the one they defend against. The store
+   *  slice is a Set keyed BY THREAD, and this is what says so. */
+  it("a DIFFERENT thread's Stop is untouched — the slice is keyed by thread, not global", async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <MessageInput onSend={vi.fn()} disabled threadId={THREAD} />
+        <MessageInput onSend={vi.fn()} disabled threadId="thread-OTHER" />
+      </>,
+    )
+    const stops = screen.getAllByTestId("composer-stop")
+    expect(stops).toHaveLength(2)
+
+    await user.click(stops[0])
+
+    // One retired, one still pressable.
+    expect(screen.getAllByTestId("composer-stop")).toHaveLength(1)
+    expect(screen.getAllByTestId("composer-stopping")).toHaveLength(1)
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
+  })
+})
+
+// ── Phase 194 Plan 03 Task 2 (validation row V-05, fence F-1) — NO MOUNT RESOLVES A
+//    CANCEL THROUGH THE WORKFLOW LOCK'S ID.
+//
+// THE DEFECT THIS FENCE EXISTS FOR, stated as a measurement rather than a worry:
+//   · `WorkflowLock.runId` has FOUR write sites and carries TWO id types — two store a
+//     `workflow_runs.id` (the mount reconcile, the banner path), two store a producer
+//     `runs.run_id` (the kickoff seed, the Continue re-subscribe). Its JSDoc
+//     (`streamsStore.ts:51-59`) asserts only the first.
+//   · `DELETE /runs/{id}` accepts only the producer id.
+//   · `cancelRun` swallows 404 DELIBERATELY (`api.ts:1259-1269`).
+// Compose those and a Stop wired to the lock is a SILENT SUCCESS THAT DOES NOTHING,
+// roughly half the time — worse than a visible failure, in a phase about honesty.
+//
+// ⚠ THE SCOPE IS THE UNION OF THE MOUNT DIRECTORIES, NOT `panel/` ALONE, and that is
+// the single most important line in this fence. A fence that swept only this directory
+// would report green about a Stop that later lands in `chat/` or `workflows/` — the
+// exact failure mode of Phase 192.1, which shipped a fence that swept a RENAMED module
+// against the empty string and passed green. Each directory is globbed SEPARATELY and
+// each is proved non-empty by a NAMED file it must contain, so a wrong glob for one
+// directory cannot hide behind another directory's files.
+//
+// ⚠ THE SWEEP IS RAW, NOT COMMENT-STRIPPED. That is deliberate and it is the Phase 193
+// D-24(a) precedent: a docblock QUOTING a forbidden call is caught too. It is only
+// affordable because the union today contains ZERO occurrences of `cancelRun` in any
+// form — measured, not assumed, and asserted below. Anyone who needs to DISCUSS the
+// forbidden call in a union docblock writes it without its parenthesis.
+//
+// The carve-out is PROVED rather than assumed: `MessageItem.tsx` legitimately reads
+// `workflowLock.runId` and hands it to `continueRun`, which is correct because
+// `/continue` is the one route with the dual-id fallback. A fence that forbade the
+// identifier outright would red on shipped, correct code and would be rewritten to
+// uselessness on its first run.
+// ⚠ The options object MUST be an inline literal at each call — Vite's glob transform
+// is STATIC and rejects a shared `const` with "Expected the second argument to be an
+// object literal, but got Identifier". The repetition below is required, not sloppy.
+const PANEL_GLOB = import.meta.glob<string>("../**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const CHAT_GLOB = import.meta.glob<string>("../../chat/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const WORKFLOWS_GLOB = import.meta.glob<string>("../../workflows/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+
+/** Production source only — a fence that swept its own test files would red on itself. */
+function productionOnly(mod: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(mod).filter(
+      ([p]) => !p.includes("__tests__") && !/\.test\.tsx?$/.test(p),
+    ),
+  )
+}
+
+const PANEL_SRC = productionOnly(PANEL_GLOB)
+const CHAT_SRC = productionOnly(CHAT_GLOB)
+const WORKFLOWS_SRC = productionOnly(WORKFLOWS_GLOB)
+const UNION_SRC = { ...PANEL_SRC, ...CHAT_SRC, ...WORKFLOWS_SRC }
+
+/** Every spelling of "the workflow lock's run id" that a naive wiring would reach for. */
+const LOCK_RUN_ID = /(?:workflowLock|lock)\s*\??\.\s*runId/
+/** The DESTRUCTIVE calls. `continueRun` is deliberately absent — see the carve-out above. */
+const CANCEL_CALL = /\b(?:cancelRun|stopThread|stopStream)\s*\(/
+
+describe("F-1 / V-05 — no Stop mount resolves a cancel through the workflow lock's id", () => {
+  // ── The empty-sweep guard, MECHANISED rather than promised (the 192.1 lesson). An
+  //    absence assertion over zero files is vacuously true, so the sweep must first
+  //    prove it can SEE the files it claims to protect — by NAME, not by count alone.
+  it("sweeps a non-empty set of production files in EACH mount directory", () => {
+    expect(Object.keys(PANEL_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(CHAT_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(WORKFLOWS_SRC).length).toBeGreaterThan(0)
+    // A count can be non-zero and still miss the file that matters. Name one per
+    // directory — each is a real, currently-shipped module.
+    const named = (src: Record<string, string>, file: string) =>
+      Object.keys(src).some((p) => p.endsWith(file))
+    expect(named(PANEL_SRC, "/WorkspacePanel.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/MessageItem.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/ActiveRunsTray.tsx")).toBe(true)
+    expect(named(WORKFLOWS_SRC, "/WorkflowCanvas.tsx")).toBe(true)
+    // And the sweep must carry real CONTENT, not empty strings — the precise shape of
+    // the 192.1 failure, where a renamed module was swept against "" and passed green.
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      expect(src.length, `${path} swept as an empty string`).toBeGreaterThan(0)
+    }
+  })
+
+  it("(a) no module in the union calls cancelRun — every Stop routes through the ONE resolver", () => {
+    const offenders = Object.entries(UNION_SRC)
+      .filter(([, src]) => /\bcancelRun\s*\(/.test(src))
+      .map(([p]) => p)
+    expect(
+      offenders,
+      "cancelRun has exactly TWO production call sites, both inside StreamsProvider " +
+        "(stopStream and stopThread). A third one in a mount directory is a second " +
+        "cancel path, and it is the path that takes the WRONG id.",
+    ).toEqual([])
+  })
+
+  it("(b) no module in the union hands the lock's runId to a cancel call", () => {
+    const offenders: string[] = []
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      src.split("\n").forEach((line, i) => {
+        if (CANCEL_CALL.test(line) && LOCK_RUN_ID.test(line)) {
+          offenders.push(`${path}:${i + 1}  ${line.trim()}`)
+        }
+      })
+    }
+    expect(
+      offenders,
+      "A cancel keyed on the lock's runId 404s roughly half the time and cancelRun " +
+        "swallows 404 — so it reports success and stops nothing.",
+    ).toEqual([])
+  })
+
+  it("PERMITS the one legitimate shipped read — continueRun(workflowLock.runId)", () => {
+    const messageItem = Object.entries(UNION_SRC).find(([p]) =>
+      p.endsWith("/MessageItem.tsx"),
+    )
+    expect(messageItem, "MessageItem.tsx is not in the sweep").toBeDefined()
+    const src = messageItem![1]
+    // The carve-out is a MEASUREMENT: the shipped line exists, it names the lock's id,
+    // and the fence above is green with it in the tree. `/continue` is the one route
+    // with the dual-id fallback, which is why this read is correct and a cancel is not.
+    expect(src).toMatch(/continueRun\(workflowLock\.runId\)/)
+    expect(CANCEL_CALL.test("const res = await continueRun(workflowLock.runId)")).toBe(false)
+  })
+
+  it("the fence's own needles are live — each matches a planted string and not the tree", () => {
+    // Positive controls for the two regexes, so a typo that made either unmatchable
+    // could never read as "the tree is clean". Both spellings of the optional chain.
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock?.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(lock.runId)")).toBe(true)
+    expect(CANCEL_CALL.test("void cancelRun(x)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopThread(threadId)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopStream()")).toBe(true)
+    // …and the needles do NOT match the innocent neighbours they sit beside.
+    expect(LOCK_RUN_ID.test("msg.runId")).toBe(false)
+    expect(CANCEL_CALL.test("await continueRun(workflowLock.runId)")).toBe(false)
+  })
+})
+
 /** The panel source with its comments removed — see the G-5 fence above for why. */
 function codeOf(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PHASE 199 PLAN 07 TASK 1 — THE PANEL'S RESTING ATOMS, PINNED AS LITERALS.
+ *
+ * This block MEASURES before anything changes. Its whole purpose is to make "the
+ * panel renders no MORE at rest" a measurement rather than a claim, and to make a
+ * later REMOVAL provable by INVERTING an assertion here — never by deleting one.
+ * `git diff --numstat` on this file across the plan must read `+N / −0`, for the
+ * same reason plan `199-02` made that its machine-checkable proof.
+ *
+ * ⚠ THE PANEL IS A CROSS-SURFACE SHELL AND A CHANGE HERE LANDS IN **CHAT** FIRST.
+ *   `WorkspacePanel` is mounted by `components/layout/ChatLayout.tsx` and by NO
+ *   workflow page; `components/metadata/DocumentDetailPanel.tsx` reuses its sheet
+ *   shape. So sheet c8's own title — "the live run panel" — is wrong in a way that
+ *   matters, and any UAT that exercises only the workflow surface will miss this.
+ *
+ * ⚠ jsdom RUNS NO LAYOUT. `getBoundingClientRect()` returns zeroes here, so the
+ *   sheet's headline "380px discipline" CANNOT be measured in this environment. A
+ *   `width <= 380` assertion would read `0 <= 380` and pass against a panel that
+ *   overflowed catastrophically in a browser. The zero is therefore asserted ON THE
+ *   RECORD below, the width claim is discharged by a CLASS-LEVEL surrogate, and the
+ *   real check is an owed G-4 UAT row named in the SUMMARY.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("199-07 Task 1 — the panel's resting atoms (sheet c8 inventory)", () => {
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({ todos: [], files: [], asks: [], phases: [], tasks: [], derived: [] })
+    setRunSoulSource()
+  })
+
+  it("EMPTY PANEL — the three atoms it renders at rest, as literals", () => {
+    const { container } = renderPanel()
+
+    // Non-vacuity FIRST: the panel really mounted, so an assertion about its
+    // contents is an assertion about something. A green test against a tree that
+    // rendered nothing is the failure mode this ordering exists to prevent.
+    expect(container.querySelector("aside")).not.toBeNull()
+
+    // 1. the state heading (already asserted in three other cases in this file)
+    expect(screen.getByText("No workspace activity yet")).toBeInTheDocument()
+    // 2. the forward-looking hint — pinned here for the FIRST time. Sheet c8's own
+    //    empty panel is exactly ONE forward-looking sentence, so this is the atom
+    //    the sheet AGREES with and it must survive any subtraction.
+    expect(
+      screen.getByText(
+        /When the agent writes files, tracks todos, or needs your input, it'll show\s+up here\./,
+      ),
+    ).toBeInTheDocument()
+    // 3. ⚠ THE DECORATIVE GLYPH — Task 1 pinned this **PRESENT** (`toHaveLength(1)`)
+    //    and Task 2 INVERTED it. The line is edited, never deleted: `git diff
+    //    --numstat` against this plan's base still reads `+N / −0` on this file,
+    //    because the assertion Task 1 authored is the only one that moved. Sheet c8
+    //    draws BOTH of its empty states with zero marks — a dashed frame and a
+    //    sentence — and this was the one atom of the three the sheet does not draw.
+    expect(container.querySelectorAll("svg.lucide-inbox")).toHaveLength(0)
+    // …and the two atoms that survived the cut are asserted ABOVE, not implied.
+  })
+
+  it("EMPTY PANEL — nothing else: no section headers, no run chrome", () => {
+    const { container } = renderPanel()
+    // panel-shell.md's "What to Avoid": never four empty section headers.
+    expect(container.querySelectorAll("button[aria-expanded]")).toHaveLength(0)
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    expect(screen.queryByTestId("panel-run-receipt")).toBeNull()
+    expect(screen.queryByTestId("phase-timeline")).toBeNull()
+  })
+
+  it("POPULATED (Deep thread) — exactly three section titles, in order", () => {
+    setHooks({ asks: [], phases: [], tasks: [], derived: [] })
+    const { container } = renderPanel()
+    // Read off the DOM rather than asserted one-by-one, so an ADDED section reds
+    // this case instead of slipping past a list of individual `getByText` calls.
+    const titles = Array.from(container.querySelectorAll("button[aria-expanded]")).map(
+      (b) => b.querySelector("span")?.textContent ?? "",
+    )
+    expect(titles).toEqual(["Todos", "Files", "Versions"])
+  })
+
+  it("380px DISCIPLINE — the surrogate, and the jsdom zero asserted ON THE RECORD", () => {
+    const { container } = renderPanel()
+    const aside = container.querySelector("aside")
+    expect(aside).not.toBeNull()
+
+    // ⚠ THE HONEST HALF FIRST. This is what jsdom actually reports, recorded so no
+    // future reader mistakes the surrogate below for a measurement.
+    expect(aside!.getBoundingClientRect().width).toBe(0)
+
+    // THE SURROGATE: the shell declares NO width of its own — it fills the grid
+    // track `ChatLayout` sizes (panel-shell.md D1). So nothing inside this file can
+    // widen the panel, and the only way an element can overflow it is by refusing
+    // to shrink. Both halves are class-level and both are checkable here.
+    const cls = aside!.className
+    expect(cls).not.toMatch(/(^|\s)w-\[/)
+    expect(cls).not.toMatch(/(^|\s)min-w-\[/)
+    expect(cls).toMatch(/min-w-0/)
+    expect(cls).toMatch(/overflow-hidden/)
+  })
+})

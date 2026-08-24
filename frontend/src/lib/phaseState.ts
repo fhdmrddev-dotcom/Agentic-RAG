@@ -67,6 +67,17 @@ export const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
   // OWN client member rather than to any of the five above, because none of them is true
   // of it — see the `Phase["status"]` docblock in `@/types` for that argument in full.
   recorded_not_sent: "recorded-not-sent",
+  // Phase 194 Plan 04 (RUN-01 / D-04 / D-07) — the seventh literal, added by migration 119.
+  // The phase that was RUNNING when a person stopped the run: interrupted, not failed and
+  // not skipped. It maps to its OWN client member rather than to any of the six above,
+  // because none of them is true of it — see the `Phase["status"]` docblock in `@/types`.
+  //
+  // ⚠ THE PROPERTY THIS MAP DEFENDS IS UNCHANGED AND IS WHY THE ROW BELONGS HERE: the keys
+  // of this map are exactly `workflow_phases_status_check`'s literals, which is what makes
+  // the Req-4 subset property PROVABLE rather than merely asserted — the set of statuses a
+  // reconcile can produce stays closed and known. (The count is still not written down; a
+  // number in prose rots on every additive widening, and the rule does not.)
+  cancelled: "cancelled",
 }
 
 /**
@@ -119,6 +130,23 @@ export function phaseStatusFromDb(raw: string): Phase["status"] {
  * filled, each of their own-property-guarded readers falls back to the unknown row — so
  * the intermediate state is honest rather than wrong, which is the whole point of a
  * fail-CLOSED floor.
+ *
+ * Phase 194 Plan 04 (RUN-01 / D-04 / D-13) — `"cancelled"` is the 9th member, spelled
+ * identically to its `Phase["status"]` member for the same two reasons `recorded-not-sent`
+ * is: the switch arm below stays a one-line identity, and the one place the two unions
+ * could drift apart is removed.
+ *
+ * ⚠ WHY THIS IS A MEMBER RATHER THAN A COLLAPSE, because the collapse was the tempting
+ * option and it is WRONG. `canvasReading`'s fall-through arm would have silently resolved the
+ * new status to `unknown` and nothing would have gone red — no compiler error, no failing
+ * test, no visible loss. But `unknown`'s own documented meaning is "a row that EXISTS and
+ * carries a status this client does not recognise", and we DO recognise this one: the user
+ * pressed Stop and the engine wrote the outcome down. Claiming otherwise is the mirror image
+ * of the fail-open this module exists to refuse — a fallback that claims LESS than its input
+ * supports is still a fallback that lies, and it would have rendered "Unknown" on the panel
+ * spine for a state the database states exactly. Widening the union is also what ARMS the
+ * compiler at every exhaustive table downstream, which is the mechanism 188 and 189 both
+ * recorded and used.
  */
 export type CanvasReading =
   | "not-started"
@@ -129,6 +157,7 @@ export type CanvasReading =
   | "waiting-for-you"
   | "recorded-not-sent"
   | "unknown"
+  | "cancelled"
 
 /**
  * Derive one node's canvas reading from its run phase. The order of the arms is
@@ -178,6 +207,21 @@ export function canvasReading(phase: Phase | undefined): CanvasReading {
     // is the fail-open this whole module exists to refuse.
     case "recorded-not-sent":
       return "recorded-not-sent"
+    // Phase 194 Plan 04 (RUN-01 / D-04 / D-13) — a one-line identity, and it must NOT be
+    // folded into `failed` or `skipped`. A stopped step is neither: nothing went wrong, and
+    // it was not routed around — it started, it did work, and a person ended the run
+    // underneath it. Folding it into either would make that difference unrepresentable
+    // downstream, which is the fail-open this module exists to refuse. It is an EXPLICIT arm
+    // rather than a fall-through to arm 4 for the reason recorded on `CanvasReading` above:
+    // `unknown` would be a claim that we cannot tell, and we can.
+    //
+    // ⚠ THE PROSE HERE DELIBERATELY DOES NOT SPELL THE FALL-THROUGH KEYWORD WITH ITS COLON.
+    // The acceptance for this arm is a `grep -c` proving the module's fall-through-arm count
+    // is UNCHANGED by this plan, and a comment that spelled the needle would make that count
+    // unreadable — measured, not guessed: the first draft of these two comments moved the
+    // count from 1 to 3 with no code change at all (the 187-24 lesson, met again).
+    case "cancelled":
+      return "cancelled"
     default:
       return "unknown"
   }

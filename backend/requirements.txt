@@ -66,3 +66,7 @@ PyYAML>=6.0.3               # skill manifest parsing (app/api/skills.py)
 # present transitively in the venv (46.0.7); this promotes it to a declared
 # direct dep. Wheels available — no build toolchain needed on a fresh Coolify build.
 cryptography>=44.0.0
+
+# Phase 203 (EML-01/02) — Outlook compound binary (.msg) message & attachment extraction.
+extract-msg>=0.48.0
+

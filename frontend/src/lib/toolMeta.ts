@@ -1,4 +1,4 @@
-import type { ToolCall } from "@/types"
+import type { Phase, ToolCall } from "@/types"
 
 /**
  * Shared tool metadata helpers — used by ToolCallPanel and MessageItem.
@@ -54,6 +54,69 @@ export function taskPhaseLabel(toolName: string): string {
 }
 
 /**
+ * Phase 194 Plan 07 (RUN-01 / BUG-260815-04 / D-18) — the harness banner's
+ * progress input, derived from the phase slice the panel already renders.
+ *
+ * ⚠ WHY THIS EXISTS, because the instinct on reading `outerBannerLabel` below is
+ * that its harness pre-tools string is a copy bug. It is not. `hasAnyTools` is
+ * `(message.tool_calls?.length ?? 0) > 0` and **a harness run writes NO
+ * `tool_calls`** — its progress lives in `workflow_phases` rows and in
+ * `phase_started` / `phase_completed` SSE. So the pre-tools branch below held
+ * from kickoff to terminal and the banner was STRUCTURALLY INCAPABLE of
+ * advancing. The fix is this advancing input; the string is untouched.
+ *
+ * TWO HONESTY RULES ARE BAKED INTO THE SHAPE, not left to the caller:
+ *
+ *  1. **No total is claimed, deliberately** (T-194-07-01). It is tempting to say
+ *     "Phase 2 of 5" — the panel does, and the sketch approves that vocabulary
+ *     (`workflow-run-surface.md` D2 line 2). The panel may: it holds the
+ *     RECONCILE FLOOR, `getThreadWorkflow`'s authoritative `total_phases`
+ *     (`StreamsProvider.tsx:3382-3388`). But `appendPhaseForThread`
+ *     (`StreamsProvider.tsx:2779`) GROWS the slice as phases start, so a
+ *     length-derived total is understated in any window where the floor has not
+ *     landed — "Phase 2 of 2" on a five-phase run. Rather than race the fetch,
+ *     the chat banner claims no total. That is also the 094/103 split: the panel
+ *     owns the meaningful spine, chat carries a THIN run receipt
+ *     (`workflow-run-surface.md` D1). Re-open trigger: if a later phase gives
+ *     the chat surface a corroborated total (a wire field, or a slice flag that
+ *     says "this is the seeded plan"), the "of N" is honest and worth adding.
+ *  2. **No workflow-author content** (T-194-07-02). The interface carries two
+ *     NUMBERS. No slug, no phase output, no run error text and no user content
+ *     can reach the sentence without changing this type — which is the point of
+ *     it being a type rather than a formatted string.
+ */
+export interface HarnessBannerProgress {
+  /** Phases the slice reports as genuinely finished (`done` ONLY — a `skipped`,
+   *  `failed`, `cancelled` or `recorded-not-sent` phase is not a phase that
+   *  finished, and the banner says "done"). */
+  phasesDone: number
+  /** 1-based ordinal of the phase currently working, or null when none is. */
+  runningPhase: number | null
+}
+
+/**
+ * Derive the banner's progress from `phasesByThread`'s rows. Returns null for an
+ * empty slice (pre-kickoff, or a Deep thread, which carries no phases at all) so
+ * the caller's default and this return value are the same "no progress" value.
+ */
+export function harnessBannerProgress(phases: readonly Phase[]): HarnessBannerProgress | null {
+  if (phases.length === 0) return null
+  let phasesDone = 0
+  let runningPhase: number | null = null
+  phases.forEach((p, i) => {
+    if (p.status === "done") phasesDone += 1
+    // `retrying` is the same phase still working — a retry has not advanced past it.
+    if (runningPhase === null && (p.status === "running" || p.status === "retrying")) {
+      // phaseIndex is server-supplied; fall back to the array position rather
+      // than render "Working on phase 0…" or "…phase NaN…" if it is unusable.
+      runningPhase =
+        Number.isInteger(p.phaseIndex) && p.phaseIndex >= 0 ? p.phaseIndex + 1 : i + 1
+    }
+  })
+  return { phasesDone, runningPhase }
+}
+
+/**
  * Phase 067.1 Plan 02: derive outer-banner placeholder copy from in-flight state.
  * Used by MessageItem outer placeholder to replace generic "Thinking" / "Working".
  * Pure frontend logic — no new backend events; derives from already-emitted SSE state
@@ -86,9 +149,36 @@ export function outerBannerLabel(
   // byte-identical (D-14). Anthropic/Google never emit reasoning_delta, so they
   // keep the calm fallback by design (not a bug).
   reasoningActive = false,
+  // Phase 194 Plan 07 (BUG-260815-04 / D-18): the harness run's phase progress,
+  // from `harnessBannerProgress()` over the `phasesByThread` slice. Mirrors the
+  // isHarness / reasoningActive additive-default shape above — default null
+  // keeps every existing caller + the whole Deep path byte-identical (D-14).
+  harnessProgress: HarnessBannerProgress | null = null,
 ): string {
   if (!hasAnyTools && !isPlanning) {
     if (reasoningActive) return "Reasoning…"
+    // ⚠⚠ THE HARNESS STRING ON THE `return` LINE BELOW IS THE PRE-PHASE-1
+    // VALUE, NOT THE ONLY VALUE, and it is byte-pinned by
+    // `__tests__/toolMeta.test.ts` as a D-14 decision. (It is not quoted
+    // anywhere in this comment ON PURPOSE: this file's prose already spells it
+    // once at the isHarness parameter above, and every further prose copy both
+    // moves the acceptance grep and makes a future copy fence over this module
+    // vacuous — the 187-24 / 193.2-F-3 lesson, and the same trap 194-04's own
+    // `default:` grep fell into.) The next reader's instinct will be to delete or reword it —
+    // don't. BUG-260815-04 was never that the string is wrong; it was that the
+    // banner never LEFT it, because a harness run writes no `tool_calls` (see
+    // `harnessBannerProgress` above). This arm is what advances it, and it
+    // deliberately falls THROUGH to the pinned string whenever the run has not
+    // actually got past phase 1 — an absent or empty slice degrades to the
+    // shipped truth rather than to an invented one (T-194-07-01).
+    if (isHarness && harnessProgress) {
+      const { phasesDone, runningPhase } = harnessProgress
+      const advanced = phasesDone > 0 || (runningPhase !== null && runningPhase > 1)
+      if (advanced) {
+        if (runningPhase !== null) return `Working on phase ${runningPhase}…`
+        return phasesDone === 1 ? "1 phase done…" : `${phasesDone} phases done…`
+      }
+    }
     return isHarness ? "Starting workflow…" : "Setting up agent…"
   }
   if (isPlanning) return "Thinking…"

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Build Workflow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        aether: {
+                            bg: "#060A0F",
+                            surface: "#0D1117",
+                            "surface-raised": "#0F141B",
+                            "surface-elevated": "#080B11",
+                            muted: "#151B24",
+                            border: "#212631",
+                            "text-primary": "#F4F6FE",
+                            "text-secondary": "#9AA3B5",
+                            "text-dim": "#6B7383",
+                            primary: "#A3A5FF",
+                            "primary-strong": "#635BFF",
+                            violet: "#895AF6",
+                            success: "#21C45D",
+                            warning: "#F5A524",
+                            danger: "#DC2626"
+                        }
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        headline: ["Manrope", "sans-serif"],
+                        display: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                        label: ["Inter", "sans-serif"],
+                        mono: ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for textarea */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #212631;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #6B7383;
+        }
+    </style>
+</head>
+<body class="bg-[#060A0F] text-[#F4F6FE] font-body min-h-screen flex flex-col antialiased selection:bg-[#A3A5FF]/30 selection:text-[#F4F6FE]">
+<!-- TopNavBar: Anchored to Shared Components JSON -->
+<nav class="bg-[#060A0F] font-headline text-[#F4F6FE] tracking-tight w-full top-0 border-b border-[#212631]/50 flex justify-between items-center px-6 h-14 w-full">
+<div class="text-lg font-headline font-bold text-[#F4F6FE]">Aether Intelligence</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<!-- Inactive states as this is a specific flow outside standard nav tabs -->
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors duration-200 ease-out flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors duration-200 ease-out flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">help</span>
+</button>
+</div>
+<div class="h-5 w-px bg-[#212631]/50"></div>
+<img alt="User avatar" class="w-7 h-7 rounded-full border border-[#212631]/50 shadow-sm cursor-pointer hover:border-[#9AA3B5] transition-colors duration-200 ease-out" data-alt="A minimalist, professional user avatar portrait in deep midnight tones, soft lighting, suitable for a dark mode enterprise platform interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiLxQRw2a4dg3LpkqLindWrCaK_yR7oA7sF7d112-3P-DCT0-57OKEiK7DCFTGbjVWmCfR-IKpstd7unh5a8H5Yj1D_ZQ0CScmCEFByKajHwKcJM0RwrAq8YdPOWKJTLGFB60pk0L9xsVN78IX4bELvn5qieExO9WX-hRbezrg7J6a5Oy0gjIideUWIn6KRXwVcVc_40LgSf3d2cKEBY3k3yc_xIWb2-8Y-vlKU2RVXFWV1hE_XxbLJtWGQ7WAyqx0ov9bQpvctJ_U"/>
+</div>
+</nav>
+<!-- Canvas -->
+<main class="flex-1 w-full max-w-[880px] mx-auto px-6 py-16 md:py-24 flex flex-col items-center justify-center">
+<!-- Door One - Describe It (AI Path) -->
+<div class="w-full flex flex-col gap-6 animate-[fadeIn_0.4s_ease-out]">
+<div class="flex flex-col gap-2 pl-2">
+<h1 class="font-headline text-3xl font-medium tracking-tight text-aether-text-primary">What do you want to achieve?</h1>
+<p class="font-body text-[15px] text-aether-text-secondary max-w-xl">Describe your outcome in plain English, and Aether will architect the sequence.</p>
+</div>
+<!-- The Composer Surface -->
+<div class="relative bg-aether-surface border border-aether-border rounded-[14px] p-1 flex flex-col shadow-lg shadow-black/20 focus-within:border-aether-border/80 transition-colors duration-200">
+<div class="bg-aether-bg/50 rounded-[10px] p-5 pb-4 h-full flex flex-col gap-4 border border-transparent">
+<textarea class="w-full bg-transparent border-none outline-none resize-none text-aether-text-primary font-body text-[16px] leading-relaxed placeholder:text-aether-text-dim min-h-[160px] focus:ring-0 p-0" placeholder="Every Monday, pull new vendor contracts from the Legal knowledge base, extract renewal dates and liability caps, flag anything above £2m, and draft a summary memo for the risk committee."></textarea>
+<div class="flex items-center justify-between mt-auto pt-2">
+<!-- Knowledge Base Selector -->
+<button class="group flex items-center gap-2.5 px-3 py-1.5 rounded-[8px] bg-aether-muted/50 border border-aether-border/50 hover:bg-aether-muted hover:border-aether-border transition-all duration-200 ease-out">
+<span class="material-symbols-outlined text-[16px] text-aether-text-secondary group-hover:text-aether-text-primary">database</span>
+<span class="font-body text-[13px] text-aether-text-secondary group-hover:text-aether-text-primary font-medium tracking-wide">Legal</span>
+<span class="text-aether-border/60 mx-0.5">—</span>
+<span class="font-mono text-[12px] text-aether-text-dim group-hover:text-aether-text-secondary">1,284 docs</span>
+<span class="material-symbols-outlined text-[18px] text-aether-text-dim ml-1">expand_more</span>
+</button>
+<!-- Primary Compose Action -->
+<button class="bg-[#A3A5FF] hover:bg-[#635BFF] text-[#060A0F] font-label text-[14px] font-semibold px-6 py-2.5 rounded-[8px] transition-all duration-200 ease-out flex items-center gap-2 shadow-[0_0_15px_rgba(163,165,255,0.15)] hover:shadow-[0_0_20px_rgba(99,91,255,0.25)] hover:-translate-y-[1px]">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">magic_button</span>
+                            Compose
+                        </button>
+</div>
+</div>
+</div>
+<!-- Templates Row (Quiet Entry) -->
+<div class="flex items-center gap-3 pl-2 opacity-80 hover:opacity-100 transition-opacity duration-200">
+<span class="font-label text-[11px] font-semibold uppercase tracking-[0.15em] text-aether-text-dim mr-3">Templates</span>
+<button class="group flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-transparent bg-aether-surface-raised hover:bg-aether-muted hover:border-aether-border/50 transition-all duration-200 text-left">
+<span class="font-body text-[13px] text-aether-text-secondary group-hover:text-aether-text-primary">Invoice Audit</span>
+<span class="w-1 h-1 rounded-full bg-aether-border group-hover:bg-aether-text-dim"></span>
+<span class="font-mono text-[11px] text-aether-text-dim">4 phases</span>
+</button>
+<button class="group flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-transparent bg-aether-surface-raised hover:bg-aether-muted hover:border-aether-border/50 transition-all duration-200 text-left">
+<span class="font-body text-[13px] text-aether-text-secondary group-hover:text-aether-text-primary">Compliance Sync</span>
+<span class="w-1 h-1 rounded-full bg-aether-border group-hover:bg-aether-text-dim"></span>
+<span class="font-mono text-[11px] text-aether-text-dim">2 phases</span>
+</button>
+<button class="group flex items-center gap-2 px-3 py-1.5 rounded-[6px] border border-transparent bg-aether-surface-raised hover:bg-aether-muted hover:border-aether-border/50 transition-all duration-200 text-left">
+<span class="font-body text-[13px] text-aether-text-secondary group-hover:text-aether-text-primary">Security Triage</span>
+<span class="w-1 h-1 rounded-full bg-aether-border group-hover:bg-aether-text-dim"></span>
+<span class="font-mono text-[11px] text-aether-text-dim">6 phases</span>
+</button>
+</div>
+</div>
+<!-- Structural Spacer -->
+<div class="w-full max-w-sm h-px bg-gradient-to-r from-transparent via-aether-border/40 to-transparent my-16"></div>
+<!-- Door Two - Build It Yourself (Manual Path) -->
+<div class="w-full max-w-[640px] animate-[fadeIn_0.6s_ease-out]">
+<button class="w-full group text-left flex items-start justify-between p-6 rounded-[14px] border border-dashed border-aether-border/60 bg-transparent hover:bg-aether-surface/40 hover:border-aether-text-dim/40 transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-aether-border">
+<div class="flex gap-5">
+<div class="w-12 h-12 rounded-[10px] bg-aether-bg border border-aether-border/50 flex items-center justify-center shadow-inner group-hover:bg-aether-muted/30 group-hover:border-aether-border transition-colors duration-200">
+<span class="material-symbols-outlined text-[24px] text-aether-text-secondary group-hover:text-aether-text-primary transition-colors">account_tree</span>
+</div>
+<div class="flex flex-col justify-center gap-1.5">
+<h3 class="font-headline text-[16px] font-medium text-aether-text-primary tracking-tight">Build from Scratch</h3>
+<p class="font-body text-[14px] text-aether-text-dim leading-snug">For architects who prefer to place every phase by hand. No AI, full control over exact node definitions and routing logic.</p>
+</div>
+</div>
+<div class="h-12 flex items-center pr-2">
+<span class="material-symbols-outlined text-[20px] text-aether-text-dim group-hover:text-aether-text-primary group-hover:translate-x-1 transition-all duration-200">arrow_forward</span>
+</div>
+</button>
+</div>
+</main>
+<style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body></html>

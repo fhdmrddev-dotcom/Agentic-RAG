@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Composing Moment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            background: "#060A0F",
+            elevated: "#080B11",
+            surface: "#0D1117",
+            raised: "#0F141B",
+            muted: "#151B24",
+            border: "#212631",
+            primaryText: "#F4F6FE",
+            secondaryText: "#9AA3B5",
+            dimText: "#6B7383",
+            primary: "#A3A5FF",
+            violet: "#895AF6",
+            success: "#21C45D",
+            warning: "#F5A524",
+            danger: "#DC2626",
+          },
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Manrope", "sans-serif"],
+            display: ["Manrope", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-primaryText font-body h-screen w-screen overflow-hidden flex flex-col relative">
+<!-- Atmospheric Background -->
+<!-- STITCH_SHADER_START:ANIMATION_2 class="absolute inset-0 w-full h-full -z-10 opacity-60" -->
+<div class="absolute inset-0 w-full h-full -z-10 opacity-60" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
+
+  // Sync the WebGL drawing-buffer size with the CSS-driven layout size.
+  // This fires on initial layout and whenever the element is resized.
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+  const fs = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+varying vec2 v_texCoord;
+
+void main() {
+    vec2 uv = v_texCoord;
+    
+    // Centering and aspect ratio correction
+    vec2 p = (uv * 2.0 - 1.0);
+    p.x *= u_resolution.x / u_resolution.y;
+    
+    // Slow, breathing indigo pulse (#A3A5FF)
+    float d = length(p);
+    float pulse = 0.5 + 0.5 * sin(u_time * 0.4);
+    
+    // Organic, soft gradient glow
+    float strength = 0.15 / (d * (1.2 + 0.2 * pulse));
+    strength *= (0.4 + 0.1 * sin(u_time * 0.8));
+    
+    // Indigo color: #A3A5FF -> vec3(0.639, 0.647, 1.0)
+    vec3 indigo = vec3(0.639, 0.647, 1.0);
+    vec3 color = indigo * strength;
+    
+    // Soft vignette and depth
+    color *= smoothstep(1.5, 0.2, d);
+    
+    // Subtle noise for texture
+    float n = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
+    color += n * 0.01;
+
+    gl_FragColor = vec4(color, 1.0);
+}`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  // u_mouse is in pixel coordinates matching u_resolution (ShaderToy convention).
+  // Shaders that need normalized coords should use: u_mouse / u_resolution.
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+</script>
+</div>
+<!-- STITCH_SHADER_END:ANIMATION_2 -->
+<!-- Top Navigation (Shell logic: Supressed because this is a transactional/loading state. The canvas priority is paramount. However, the user specifically requested the TopNavBar from the shared components, so we will render it but keep it subtle.) -->
+<nav class="flex justify-between items-center px-6 h-14 w-full border-b border-[#212631]/50 bg-[#060A0F] z-10 shrink-0">
+<div class="flex items-center gap-4">
+<span class="text-lg font-headline font-bold text-[#F4F6FE] tracking-tight">Aether Intelligence</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden"></div> <!-- Search Bar hidden per JSON -->
+<div class="flex items-center gap-4 text-[#9AA3B5]">
+<button aria-label="Settings" class="hover:text-[#F4F6FE] transition-colors duration-200 ease-out flex items-center justify-center p-2 rounded-lg hover:bg-muted">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+</button>
+<button aria-label="Help" class="hover:text-[#F4F6FE] transition-colors duration-200 ease-out flex items-center justify-center p-2 rounded-lg hover:bg-muted">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+</button>
+</div>
+<!-- Profile Image -->
+<button class="h-8 w-8 rounded-full bg-surface border border-border/50 overflow-hidden relative focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="A subtle, minimalist abstract geometric pattern representing a digital avatar. The image features soft intersecting shapes in deep midnight blues and muted indigo tones (#060A0F, #151B24, #A3A5FF), evoking a calm, professional, and slightly mysterious corporate intelligence identity. The lighting is low and sophisticated." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiMNLEOWwWCsaEi5MkqgjsTvB_3QYgtMFHkZrCSdxbyq_8ilxF9xGkyv9ZL_eUgvVe3mm6RLdfXrExaElSxNg05To7HmH2dA3HCkXXnTufK5cEp3dZtxdTxJrnq1YalYHcCyygvEiW6NqnAyuT4UWBp76ALMAV18hOxsrDIwyk3V6njiOSaFrC9MHZmutlWdvE0pTViq0StJksv2H112I1yEFOX5H7owndvcUmfCt4jyX8qV9S6Kgo4pQa1-qnrlKj9y6iGLdEiFpY"/>
+</button>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col items-center justify-center relative z-10 px-8 lg:px-24 w-full max-w-7xl mx-auto pb-24">
+<div class="max-w-4xl w-full flex flex-col items-center text-center space-y-12 animate-fade-in-up">
+<!-- The Prompt Centerpiece -->
+<h1 class="font-headline font-medium text-3xl md:text-4xl lg:text-5xl leading-tight text-primaryText tracking-tight balance-text text-balance">
+        "Every Monday, pull the new vendor contracts from the Legal knowledge base, extract renewal dates and liability caps, flag anything above £2m, and draft a summary memo for the risk committee."
+      </h1>
+<!-- Status and Timer -->
+<div class="flex flex-col items-center gap-4 mt-16">
+<div class="flex items-center gap-3">
+<!-- Calm pulsing indicator -->
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<p class="font-body text-secondaryText text-sm tracking-wide uppercase">
+            Assembling workflow from Legal — 1,284 documents
+          </p>
+</div>
+<!-- Honest Timer -->
+<div class="font-mono text-2xl text-primaryText opacity-80" id="elapsed-timer">
+          00:00
+        </div>
+</div>
+</div>
+<!-- Quiet Cancel Action -->
+<div class="absolute bottom-12 w-full flex justify-center">
+<button class="font-label text-dimText text-sm tracking-wide uppercase hover:text-primaryText transition-colors duration-200 border border-transparent hover:border-border/50 bg-transparent hover:bg-surface px-6 py-2 rounded-lg ease-out flex items-center gap-2 group">
+<span class="material-symbols-outlined text-[16px] group-hover:text-primaryText transition-colors" data-icon="close">close</span>
+        Cancel Composition
+      </button>
+</div>
+</main>
+<style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-fade-in-up {
+      animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+<script>
+    // Honest Timer Logic
+    document.addEventListener('DOMContentLoaded', () => {
+      const timerElement = document.getElementById('elapsed-timer');
+      let seconds = 0;
+      
+      // Start at a random offset to simulate time passed if desired, or 0.
+      // The prompt asks for "e.g., '00:14', counting up", implying it's already been running slightly.
+      // Let's start at 00:12 to match the vibe.
+      seconds = 12;
+      
+      const updateTimer = () => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        timerElement.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        seconds++;
+      };
+      
+      // Initial call
+      updateTimer();
+      
+      // Tick every second
+      setInterval(updateTimer, 1000);
+    });
+  </script>
+</body></html>

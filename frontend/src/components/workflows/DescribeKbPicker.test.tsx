@@ -29,9 +29,13 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import describeKbPickerSource from "./DescribeKbPicker?raw"
 import {
   DescribeKbPicker,
+  DESCRIBE_KB_CHOOSE,
+  DESCRIBE_KB_EMPTY,
   DESCRIBE_KB_LABEL,
   DESCRIBE_KB_NONE,
   DESCRIBE_KB_NOTE,
+  DESCRIBE_KB_UNAVAILABLE,
+  DESCRIBE_KB_UPLOAD,
 } from "./DescribeKbPicker"
 
 // ── The api seam. ONE symbol may be called; the rest exist so "it called nothing else"
@@ -104,12 +108,40 @@ const renderPicker = (props: Partial<{ value: string; onChange: (id: string) => 
 const picker = () => screen.queryByTestId("project-folder-picker")
 const stateOf = () => screen.getByTestId("describe-kb-state").getAttribute("data-state")
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════════════════
+ * ⚠ SKETCH 200 (`doors.html`) — THE SELECT IS DISCLOSED, NOT ALWAYS-ON, AND THE CHOSEN
+ *   STATE IS A ROW RATHER THAN A SELECT. THAT IS WHY THIS HELPER EXISTS.
+ * ══════════════════════════════════════════════════════════════════════════════════════
+ *
+ * The sheet draws THREE arms where the shipped control drew one always-open `select`:
+ * nothing chosen (a dashed add control), one chosen (a row naming it, with a remove
+ * control), and no folders at all. So a case that wants the `select` must now OPEN it, and
+ * a case about the chosen state must read the ROW instead.
+ *
+ * ⚠ NOT ONE ASSERTION BELOW WAS WEAKENED TO ABSORB THAT. Every case still asserts the same
+ * PROPERTY it always did — the option order, the id-not-name write, the totality of the
+ * label fallback, the surrender of a dangling id — and only the ROUTE to the control moved.
+ * Where a property genuinely could not survive the new shape (the chosen state no longer
+ * has a `select` to read a `value` off), the assertion was rewritten to read the same fact
+ * off the row, never deleted.
+ */
+async function openChooser(): Promise<HTMLSelectElement> {
+  const already = picker()
+  if (already) return already as HTMLSelectElement
+  fireEvent.click(await screen.findByTestId("describe-kb-choose"))
+  return (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+}
+
+
 // ── 1. The happy path: one select, "none" first, value reflects the prop ──────
 
 describe("DescribeKbPicker — it offers the knowledge bases the server returned", () => {
   it("renders the select under the SHIPPED test id once folders resolve", async () => {
     renderPicker()
-    const select = await screen.findByTestId("project-folder-picker")
+    // The dashed add control is the resting arm; the select is one press away.
+    expect(await screen.findByTestId("describe-kb-choose")).toHaveTextContent(DESCRIBE_KB_CHOOSE)
+    const select = await openChooser()
     expect(select.tagName).toBe("SELECT")
     expect(stateOf()).toBe("ready")
     expect(api.listFolders).toHaveBeenCalledTimes(1)
@@ -118,7 +150,7 @@ describe("DescribeKbPicker — it offers the knowledge bases the server returned
 
   it("puts the 'no knowledge base' option FIRST, then one option per folder", async () => {
     renderPicker()
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    const select = await openChooser()
     const options = Array.from(select.querySelectorAll("option"))
     expect(options).toHaveLength(TWO_FOLDERS.length + 1)
     expect(options[0].value).toBe("")
@@ -130,14 +162,21 @@ describe("DescribeKbPicker — it offers the knowledge bases the server returned
   })
 
   it("reflects the value PROP — the parent owns the choice, not this component", async () => {
+    // SAME PROPERTY, READ OFF THE SHEET'S ARM 2. The chosen state is now a row naming the
+    // folder rather than a `select` holding it, so the fact is read from what a person sees
+    // instead of from a DOM property. It is still the PROP that decides it — this component
+    // holds no copy — which is what the case is about.
     renderPicker({ value: CONTRACTS.id })
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
-    expect(select.value).toBe(CONTRACTS.id)
+    const row = await screen.findByTestId("describe-kb-chosen")
+    expect(row).toHaveTextContent(CONTRACTS.name)
+    // …and the OTHER folder is not named, so this is the prop's answer and not a list.
+    expect(row).not.toHaveTextContent(POLICIES.name)
+    expect(picker()).toBeNull()
   })
 
   it("carries the label and the quiet note, character-identical to the exports", async () => {
     renderPicker()
-    const select = await screen.findByTestId("project-folder-picker")
+    const select = await openChooser()
     expect(select).toHaveAccessibleName(DESCRIBE_KB_LABEL)
     expect(screen.getByTestId("describe-kb-note").textContent).toBe(DESCRIBE_KB_NOTE)
   })
@@ -148,7 +187,7 @@ describe("DescribeKbPicker — it offers the knowledge bases the server returned
 describe("DescribeKbPicker — choosing writes an id and nothing else", () => {
   it("choosing a folder calls onChange with that folder's ID", async () => {
     const { onChange } = renderPicker()
-    const select = await screen.findByTestId("project-folder-picker")
+    const select = await openChooser()
 
     fireEvent.change(select, { target: { value: CONTRACTS.id } })
 
@@ -163,9 +202,9 @@ describe("DescribeKbPicker — choosing writes an id and nothing else", () => {
     // `.mock` read below is a typed observation rather than a cast.
     const onChange = vi.fn()
     renderPicker({ value: POLICIES.id, onChange })
-    const select = await screen.findByTestId("project-folder-picker")
-
-    fireEvent.change(select, { target: { value: "" } })
+    // SAME PROPERTY, NEW ROUTE. With one chosen, the sheet's arm 2 offers a REMOVE control
+    // rather than a `none` option — and it must write exactly what the option wrote.
+    fireEvent.click(await screen.findByTestId("describe-kb-clear"))
 
     expect(onChange).toHaveBeenCalledTimes(1)
     const arg = onChange.mock.calls[0][0]
@@ -176,7 +215,7 @@ describe("DescribeKbPicker — choosing writes an id and nothing else", () => {
 
   it("calls onChange ZERO times on its own — mounting is not a choice", async () => {
     const { onChange } = renderPicker()
-    await screen.findByTestId("project-folder-picker")
+    await openChooser()
     expect(onChange).toHaveBeenCalledTimes(0)
   })
 })
@@ -191,7 +230,7 @@ describe("DescribeKbPicker — TOTALITY over server-shaped rows", () => {
       { ...folder("f-spaces", "   ") },
     ])
     renderPicker()
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    const select = await openChooser()
     const options = Array.from(select.querySelectorAll("option")).slice(1)
 
     expect(options.map((o) => o.value)).toEqual(["f-blank", "f-missing", "f-spaces"])
@@ -204,7 +243,7 @@ describe("DescribeKbPicker — TOTALITY over server-shaped rows", () => {
   it("a row with no usable id is dropped rather than rendered as an unpickable blank", async () => {
     api.listFolders.mockResolvedValue([{ ...folder("", "Nameless"), id: "" }, POLICIES])
     renderPicker()
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    const select = await openChooser()
     const options = Array.from(select.querySelectorAll("option")).slice(1)
     expect(options).toHaveLength(1)
     expect(options[0].value).toBe(POLICIES.id)
@@ -214,7 +253,25 @@ describe("DescribeKbPicker — TOTALITY over server-shaped rows", () => {
 // ── 4. The two zero-row causes: NOTHING rendered, and held APART ──────────────
 
 describe("DescribeKbPicker — zero rows invents nothing, twice over", () => {
-  it("ZERO FOLDERS renders no picker, no option and no copy at all", async () => {
+  /**
+   * ⚠ THE TITLES AND THE FINAL ASSERTION OF THE NEXT TWO CASES MOVED, AND THE ORIGINALS ARE
+   * KEPT HERE RATHER THAN OVERWRITTEN, because what changed is a DECISION and not a detail.
+   *
+   *   was: "ZERO FOLDERS renders no picker, no option and no copy at all"
+   *        …ending `expect(container.textContent).toBe("")`
+   *   was: "A FAILED FETCH renders no picker and specifically NO <option> at all"
+   *        …ending `expect(container.textContent).toBe("")`
+   *
+   * Sketch 200's third arm is *"You have no folders yet"* — a state the shipped control could
+   * not express, because BOTH zero-row causes rendered the empty string. The operator has named
+   * the sketch as the absolute reference, so the surface now speaks in each case.
+   *
+   * ⚠ WHAT IS UNCHANGED, AND IT IS THE PART THAT MATTERED: NOTHING IS INVENTED. There is still
+   * no `select`, still no `option`, still no fabricated folder — asserted below exactly as
+   * before. `T-187-R5-03` is untouched. What is retired is only the *silence*, which was never
+   * a requirement in its own right; it was the consequence of having nowhere to put the fact.
+   */
+  it("ZERO FOLDERS says so, and still invents no option and no folder", async () => {
     api.listFolders.mockResolvedValue([])
     const { container } = renderPicker()
 
@@ -222,18 +279,44 @@ describe("DescribeKbPicker — zero rows invents nothing, twice over", () => {
     expect(picker()).toBeNull()
     expect(container.querySelectorAll("select")).toHaveLength(0)
     expect(container.querySelectorAll("option")).toHaveLength(0)
-    expect(container.textContent).toBe("")
     expect(screen.queryByTestId("describe-kb-note")).toBeNull()
+    // The sheet's arm 3, and it names no count and no folder.
+    expect(screen.getByTestId("describe-kb-empty")).toHaveTextContent(DESCRIBE_KB_EMPTY)
+    expect(container.textContent).not.toContain(POLICIES.name)
+    // ⚠ AND NO WAY OUT IS OFFERED WITHOUT A DESTINATION. The sheet draws an upload control
+    // unconditionally; with no handler supplied there is nowhere for it to go, so it does not
+    // render at all rather than render inert.
+    expect(screen.queryByTestId("describe-kb-upload")).toBeNull()
   })
 
-  it("A FAILED FETCH renders no picker and specifically NO <option> at all", async () => {
+  it("ZERO FOLDERS offers the way out ONLY when a caller supplies a destination", async () => {
+    const onUploadDocuments = vi.fn()
+    api.listFolders.mockResolvedValue([])
+    render(
+      <DescribeKbPicker value="" onChange={vi.fn()} onUploadDocuments={onUploadDocuments} />,
+    )
+
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    const upload = screen.getByTestId("describe-kb-upload")
+    expect(upload).toHaveTextContent(DESCRIBE_KB_UPLOAD)
+    fireEvent.click(upload)
+    expect(onUploadDocuments).toHaveBeenCalledTimes(1)
+  })
+
+  it("A FAILED FETCH says something DIFFERENT, and still emits NO <option> at all", async () => {
     api.listFolders.mockRejectedValue(new Error("network is down"))
     const { container } = renderPicker()
 
     await waitFor(() => expect(stateOf()).toBe("unavailable"))
     expect(picker()).toBeNull()
     expect(container.querySelectorAll("option")).toHaveLength(0)
-    expect(container.textContent).toBe("")
+    expect(screen.getByTestId("describe-kb-unavailable")).toHaveTextContent(
+      DESCRIBE_KB_UNAVAILABLE,
+    )
+    // ⚠ AND IT MAY NOT BORROW ARM 3'S CLAIM. A failed read knows nothing about how many
+    // folders exist, so the count-bearing sentence must be absent here specifically.
+    expect(container.textContent).not.toContain(DESCRIBE_KB_EMPTY)
+    expect(screen.queryByTestId("describe-kb-empty")).toBeNull()
   })
 
   it("the two causes are DISTINCT STATES, not one merged emptiness", async () => {
@@ -266,7 +349,7 @@ describe("DescribeKbPicker — zero rows invents nothing, twice over", () => {
 
   it("does NOT fall back to a remembered list from an earlier successful mount", async () => {
     const first = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
-    await waitFor(() => expect(first.getByTestId("project-folder-picker")).toBeInTheDocument())
+    await waitFor(() => expect(first.getByTestId("describe-kb-choose")).toBeInTheDocument())
     first.unmount()
 
     api.listFolders.mockRejectedValue(new Error("network is down"))
@@ -290,7 +373,7 @@ describe("DescribeKbPicker — zero rows invents nothing, twice over", () => {
     expect(container.textContent).toBe("")
 
     release(TWO_FOLDERS)
-    await screen.findByTestId("project-folder-picker")
+    await screen.findByTestId("describe-kb-choose")
     expect(stateOf()).toBe("ready")
   })
 })
@@ -300,7 +383,7 @@ describe("DescribeKbPicker — zero rows invents nothing, twice over", () => {
 describe("DescribeKbPicker — it is a control, never a gate", () => {
   it("renders no `required`, no `disabled` and no invalid marking anywhere", async () => {
     const { container } = renderPicker()
-    await screen.findByTestId("project-folder-picker")
+    await openChooser()
 
     expect(container.querySelectorAll("[required]")).toHaveLength(0)
     expect(container.querySelectorAll("[disabled]")).toHaveLength(0)
@@ -310,13 +393,25 @@ describe("DescribeKbPicker — it is a control, never a gate", () => {
 
   it("renders exactly ONE interactive element — it adds no second control to the door", async () => {
     const { container } = renderPicker()
-    await screen.findByTestId("project-folder-picker")
+    await screen.findByTestId("describe-kb-choose")
 
+    // ⚠ STILL EXACTLY ONE, AND THAT IS THE POINT OF READING IT AT REST. The sheet's arm 1
+    // replaces the always-open `select` with a dashed add control — one control either way,
+    // so the door gains no second thing to tab through. Asserted in BOTH arms below rather
+    // than in the one that happens to be showing.
     const interactive = container.querySelectorAll(
       "button, a[href], input, textarea, select, [role='menuitem'], [tabindex]",
     )
     expect(interactive).toHaveLength(1)
-    expect(interactive[0]).toBe(screen.getByTestId("project-folder-picker"))
+    expect(interactive[0]).toBe(screen.getByTestId("describe-kb-choose"))
+
+    // …and once the chooser is open it is the select, still alone.
+    await openChooser()
+    const opened = container.querySelectorAll(
+      "button, a[href], input, textarea, select, [role='menuitem'], [tabindex]",
+    )
+    expect(opened).toHaveLength(1)
+    expect(opened[0]).toBe(screen.getByTestId("project-folder-picker"))
   })
 
   it("an unmount mid-flight lands no state and throws nothing (the `cancelled` idiom)", async () => {
@@ -372,7 +467,7 @@ describe("DescribeKbPicker — the quiet line is an invitation, never a verdict"
 
   it("the rendered line IS that constant — the fence guards what ships", async () => {
     renderPicker()
-    await screen.findByTestId("project-folder-picker")
+    await screen.findByTestId("describe-kb-choose")
     const rendered = screen.getByTestId("describe-kb-note").textContent ?? ""
     expect(rendered).toBe(DESCRIBE_KB_NOTE)
     expect(rendered).not.toMatch(SEVERITY_WORDS)
@@ -450,22 +545,23 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
     // This is the defect's shape, asserted directly rather than described in a comment:
     // an id with no matching <option> gives selectedIndex -1. Everything below exists so
     // that state can never be reached with the id still live in the parent.
-    renderPicker({ value: CONTRACTS.id })
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    // Read off the OFFERED arm (nothing chosen), which is where the option list lives now.
+    renderPicker()
+    const select = await openChooser()
     const offered = Array.from(select.querySelectorAll("option")).map((o) => o.value)
     expect(offered).not.toContain(DANGLING)
+    expect(offered).toContain(CONTRACTS.id)
   })
 
   it("a held id the server does NOT offer is handed back as '' once the request settles", async () => {
     const { onChange } = renderPicker({ value: DANGLING })
-    await screen.findByTestId("project-folder-picker")
+    await waitFor(() => expect(stateOf()).toBe("ready"))
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
   })
 
   it("ANTI-CASE — a held id the server DOES offer is left completely alone", async () => {
     const { onChange } = renderPicker({ value: POLICIES.id })
-    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
-    expect(select.value).toBe(POLICIES.id)
+    expect(await screen.findByTestId("describe-kb-chosen")).toHaveTextContent(POLICIES.name)
     await waitFor(() => expect(stateOf()).toBe("ready"))
     expect(onChange).not.toHaveBeenCalled()
   })
@@ -506,6 +602,198 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
       expect(onChange).not.toHaveBeenCalled()
       unmount()
     }
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 3 (DES-01 · sheet `c9-doors-describe` §4) — THE KNOWLEDGE PICKER'S
+// THREE READINGS, AND THE ONE THE SHEET ASKS FOR THAT THIS COMPONENT MAY NOT GIVE.
+//
+// APPENDED, never interleaved, and BEFORE the whole-suite network tripwire so that section
+// still runs last. Not one assertion above this line moves, and NO byte of
+// `DescribeKbPicker.tsx` is modified by this plan.
+//
+// ⚠ THE SHEET'S THIRD READING IS **REFUSED**, ON THREE INDEPENDENT GROUNDS, and this block
+// pins the shipped behaviour so the refusal is a recorded decision rather than an omission:
+//
+//   1. **A RECORDED RULING ALREADY GOVERNS IT.** Phase 187 (D-187-14 / SC#4) settled that
+//      the fast door gains a MOUNT and not a SURFACE: with nothing to offer this control
+//      renders nothing at all, and ignoring it gives today's behaviour exactly. Where the
+//      sheet and a shipped locked decision disagree, the shipped one wins.
+//   2. **THE RESTING DOM IS PINNED BYTE FOR BYTE.** The zero-folder arm is inside all six
+//      `WorkflowDoorSwitch.baseline.test.tsx` captures. A visible row here reds a
+//      characterization pin, and re-baselining one to make a red go green is forbidden.
+//   3. **THE SHEET'S CHIP CARRIES AN ACTION, NOT A SENTENCE.** Its third state ends in an
+//      upload control — a navigation capability, which is outside a presentation phase.
+//
+// ⚠ AND THE HONEST COST IS PINNED TOO: "there are none" and "we could not ask" are held
+// apart ONLY by a machine-readable marker. To a MACHINE they are two states; to a PERSON
+// they are one silence. That is the gap, and it is asserted rather than described.
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ⚠⚠ THE REFUSAL ABOVE IS RETIRED — SKETCH 200, 2026-08-20. THE ORIGINAL WORDING IS KEPT
+//    VERBATIM RATHER THAN DELETED, BECAUSE A REFUSAL THAT VANISHES READS AS AN OVERSIGHT.
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// **THE OPERATOR HAS NAMED THE SKETCH AS THE ABSOLUTE REFERENCE**, and sketch 200's
+// `doors.html` draws the knowledge picker in THREE arms — nothing chosen, one chosen, and no
+// folders at all. So the third reading is BUILT. Each of the three grounds above is answered
+// on its own terms rather than waved past:
+//
+//   1. **THE 187 RULING IS NARROWER THAN IT WAS READ AS BEING.** D-187-14's property is that
+//      an author who IGNORES this control gets today's behaviour exactly, and that still
+//      holds: the picker touches no enablement rule, holds no `required`/`disabled`, and the
+//      door's CTA is unchanged. What 187 never ruled was that a zero-folder author must be
+//      told NOTHING — that was a consequence of having nowhere to put the fact, not a
+//      decision to withhold it.
+//   2. **THE BASELINE CAPTURES ARE RE-BASELINED, DECLARED, AND FOR A NAMED REASON.** See the
+//      re-capture note in `WorkflowDoorSwitch.baseline.test.tsx`. Ground 2 was correct that
+//      this reds a characterization pin; what it could not know is that the operator would
+//      overrule the pin. The rule it cites — *never re-baseline to make a red go green* —
+//      still stands and is not what happened: the pin moved because a DECLARED change moved
+//      it, and the diff is stated rather than absorbed.
+//   3. **THE UPLOAD CONTROL RENDERS ONLY WHERE A DESTINATION EXISTS.** Ground 3 was right
+//      that a navigation capability is not this component's to invent — the app has no url
+//      router (`SEED-185`). So the control is a PROP (`onUploadDocuments`), absent by
+//      default, and the sentence stands alone without it. The capability is not smuggled in;
+//      the seam for it is.
+//
+// ⚠ AND THE THIRD REFUSAL BELOW STANDS ENTIRELY UNCHANGED: **the sheet's document count is
+// STILL not rendered**, because `Folder` still carries no count and no amount of operator
+// authority makes a number exist on a wire that does not send one. That case is left exactly
+// as `199-08` wrote it, and it is the difference between porting a design and inventing data.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * What a PERSON reads, with every `class` attribute out of the picture: the words, which row
+ * is selected, and how many controls there are. Deliberately not an HTML comparison — a
+ * `<select>`'s chosen row lives in a DOM property and never reaches the serialised markup, so
+ * an innerHTML diff would report readings 1 and 2 as identical when they plainly are not.
+ */
+function classFreeReading() {
+  const select = picker() as HTMLSelectElement | null
+  return {
+    text: (document.body.textContent ?? "").replace(/\s+/g, " ").trim(),
+    chosen: select ? (select.selectedOptions[0]?.textContent ?? null) : null,
+    controls: document.body.querySelectorAll("select, button, input, a[href], textarea").length,
+  }
+}
+
+describe("199-08 — sheet c9 §4: the three readings are distinct WITHOUT any class", () => {
+  it("READING 1 (none chosen) · READING 2 (one chosen) · READING 3 (none available) are pairwise distinct", async () => {
+    const readings: Record<string, ReturnType<typeof classFreeReading>> = {}
+
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    const first = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await screen.findByTestId("describe-kb-choose")
+    readings.noneChosen = classFreeReading()
+    first.unmount()
+
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    const second = render(<DescribeKbPicker value={CONTRACTS.id} onChange={vi.fn()} />)
+    await screen.findByTestId("describe-kb-chosen")
+    readings.oneChosen = classFreeReading()
+    second.unmount()
+
+    api.listFolders.mockResolvedValue([])
+    const third = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    readings.noneAvailable = classFreeReading()
+    third.unmount()
+
+    // ⚠ NON-VACUITY FIRST, AND IT IS STRONGER THAN IT WAS. Sketch 200 gives each arm its own
+    // WORDS, so every reading is now distinguishable by text alone — where the shipped
+    // control needed `chosen` (a DOM property that never reaches the markup) to tell arms 1
+    // and 2 apart, and had nothing at all for arm 3.
+    expect(readings.noneChosen.controls).toBe(1)
+    expect(readings.noneChosen.text).toContain(DESCRIBE_KB_CHOOSE)
+    expect(readings.oneChosen.text).toContain(CONTRACTS.name)
+    expect(readings.noneAvailable.text).toContain(DESCRIBE_KB_EMPTY)
+    // …and arm 3 still offers no control, because none was supplied a destination.
+    expect(readings.noneAvailable.controls).toBe(0)
+
+    // …and PAIRWISE DISTINCT, serialised so a failure names which pair collapsed.
+    const keys = Object.keys(readings)
+    const collisions: string[] = []
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        if (JSON.stringify(readings[keys[i]]) === JSON.stringify(readings[keys[j]])) {
+          collisions.push(`${keys[i]} === ${keys[j]}`)
+        }
+      }
+    }
+    expect(collisions).toEqual([])
+  })
+
+  it("⚠ THE GAP: the FOURTH state is distinct to a MACHINE and identical to a PERSON", async () => {
+    api.listFolders.mockResolvedValue([])
+    const none = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    const noneReading = classFreeReading()
+    none.unmount()
+
+    api.listFolders.mockRejectedValue(new Error("offline"))
+    const unavailable = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("unavailable"))
+    const unavailableReading = classFreeReading()
+
+    // TO A MACHINE — two states, which is the shipped Phase 187 property and stays true.
+    expect(stateOf()).toBe("unavailable")
+
+    /**
+     * ⚠ THE GAP IS CLOSED, AND THIS ASSERTION IS FLIPPED EXACTLY AS `199-08` DEMANDED IT
+     * WOULD HAVE TO BE. Its own words: *"Recorded as a MEASUREMENT, so a later plan that
+     * closes this gap has to flip this assertion rather than discover the problem again."*
+     * This is that plan. The two originals are kept verbatim so the flip is legible:
+     *
+     *     expect(unavailableReading).toEqual(noneReading)
+     *     expect(noneReading.text).toBe("")
+     *
+     * TO A PERSON — two sentences now, and they are not each other's.
+     */
+    expect(unavailableReading).not.toEqual(noneReading)
+    expect(noneReading.text).toContain(DESCRIBE_KB_EMPTY)
+    expect(unavailableReading.text).toContain(DESCRIBE_KB_UNAVAILABLE)
+    // ⚠ AND NEITHER MAY BORROW THE OTHER'S CLAIM — the whole reason the two states are held
+    // apart. A single shared sentence would satisfy "not equal" above via the controls count
+    // alone, so both directions are asserted.
+    expect(unavailableReading.text).not.toContain(DESCRIBE_KB_EMPTY)
+    expect(noneReading.text).not.toContain(DESCRIBE_KB_UNAVAILABLE)
+    unavailable.unmount()
+  })
+
+  it("⚠ CANNOT-EXPRESS: the sheet's chosen chip states a DOCUMENT COUNT the wire never carries", async () => {
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    render(<DescribeKbPicker value={CONTRACTS.id} onChange={vi.fn()} />)
+    // ⚠ THIS CASE IS UNCHANGED IN SUBSTANCE AND STANDS AFTER THE PORT. Only the handle moved,
+    // because the chosen state is now the sheet's row rather than a `select`. The refusal it
+    // records is the one the sketch CANNOT overrule: no operator instruction makes a number
+    // exist on a wire that does not send one.
+    await screen.findByTestId("describe-kb-chosen")
+
+    // The live `Folder` row is id / user_id / name / parent_id / is_org_shared / timestamps.
+    // There is no count on it, so the sheet's `1,284 docs` could only be fabricated — and a
+    // fabricated precision beside a real name is the defect this project refuses everywhere.
+    for (const key of Object.keys(CONTRACTS)) {
+      expect(/count|docs|documents|size/i.test(key), `${key} looks like a count`).toBe(false)
+    }
+    // …and nothing on screen states one either.
+    expect(/\b\d[\d,]*\s*(docs|documents|files)\b/i.test(document.body.textContent ?? "")).toBe(
+      false,
+    )
+  })
+
+  it("the component still reaches exactly ONE api symbol — the port added no network", () => {
+    // ⚠ THE TITLE AND FIRST ASSERTION MOVED. `199-08` asserted it had modified no byte of the
+    // component (`expect(describeKbPickerSource).not.toContain("199-08")`), which was true of
+    // THAT plan and is a claim only that plan could make. Sketch 200's port DOES modify the
+    // component, so the vacated half is dropped and the half that guards a real property —
+    // one api symbol, nothing else called — is kept and still runs.
+    expect(describeKbPickerSource.length).toBeGreaterThan(1000)
+    // …and no network symbol was added: still exactly the one shipped api import.
+    expect(describeKbPickerSource.match(/from "@\/lib\/api"/g) ?? []).toHaveLength(1)
+    expectNothingElseCalled()
   })
 })
 

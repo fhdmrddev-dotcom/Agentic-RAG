@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>177 — Stitch regeneration of the whole workflow surface</title>
+<link rel="stylesheet" href="../themes/default.css"/>
+<style>
+  .wrap { max-width: 1180px; margin: 0 auto; padding: var(--space-12) var(--space-8) var(--space-16); }
+  h1 { font-family: var(--font-headline); font-size: var(--text-3xl); margin: 0 0 var(--space-3); letter-spacing: -0.02em; }
+  .lede { color: var(--color-text-muted); max-width: 68ch; margin: 0 0 var(--space-8); font-size: var(--text-md); }
+  .banner { border: 1px solid hsl(38 92% 60% / 0.35); background: var(--color-warning-dim);
+            border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); margin: 0 0 var(--space-10); }
+  .banner b { color: var(--color-warning); }
+  .banner p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; }
+  .banner p + p { margin-top: var(--space-2); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-6); }
+  .card { border: 1px solid var(--color-border); background: var(--color-surface);
+          border-radius: var(--radius-lg); overflow: hidden; text-decoration: none; color: inherit;
+          display: flex; flex-direction: column; transition: border-color var(--dur-base) var(--ease-out),
+          transform var(--dur-base) var(--ease-out); }
+  .card:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+  .shot { display: block; width: 100%; aspect-ratio: 512/410; object-fit: cover; object-position: top center;
+          background: var(--color-bg); border-bottom: 1px solid var(--color-border); }
+  .meta { padding: var(--space-4) var(--space-5) var(--space-5); }
+  .n { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim);
+       letter-spacing: 0.08em; text-transform: uppercase; }
+  .t { font-family: var(--font-headline); font-size: var(--text-lg); margin: var(--space-1) 0 var(--space-2); }
+  .d { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; line-height: 1.55; }
+  .verdict { margin-top: var(--space-3); font-size: var(--text-sm); display: flex; gap: var(--space-2); align-items: baseline; }
+  .dot { width: 7px; height: 7px; border-radius: 99px; flex: none; transform: translateY(-1px); }
+  .ok   .dot { background: var(--color-success); } .ok   { color: var(--color-success); }
+  .warn .dot { background: var(--color-warning); } .warn { color: var(--color-warning); }
+  .verdict span:last-child { color: var(--color-text-muted); }
+  footer { margin-top: var(--space-16); padding-top: var(--space-6); border-top: 1px solid var(--color-border);
+           color: var(--color-text-dim); font-size: var(--text-sm); }
+  code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-text-muted); }
+</style></head>
+<body><div class="wrap">
+<div class="n">Sketch 177 · Google Stitch (Gemini 3.1 Pro) · 2026-08-18</div>
+<h1>The whole workflow surface, regenerated</h1>
+<p class="lede">Six surfaces, generated breadth-first by Google Stitch against the Deep Midnight tokens
+and the measured constraints from the standing brief. The operator asked to see the range before
+choosing anything — so nothing here asks for a decision.</p>
+
+<div class="banner">
+  <p><b>⚠ This is DIRECTION, not an acceptance bar.</b> None of these pages render a single shipped
+  component — every one is redrawn from scratch by a generative tool. That is exactly the failure mode
+  that cost this project <code>SEED-155</code>: an approved sketch drew a card the components
+  structurally could not render.</p>
+  <p>Nothing here authorises a source edit. A chosen direction must be re-expressed in a normal sketch
+  that <em>renders</em> the real components before it can become a bar.</p>
+</div>
+
+<div class="grid">
+  <a class="card" href="screens/1-workflows-home.html">
+    <img class="shot" src="thumbs/1.png" alt=""/>
+    <div class="meta"><div class="n">Surface 1</div><div class="t">The Workflows home</div>
+    <p class="d">Cards lead with lifecycle state, not the name. Three cards titled identically, adjacent — the 93%-repeated-name case, drawn honestly.</p>
+    <div class="verdict warn"><span class="dot"></span><span>Answers the card question; the control row aligns — but Stitch <b>duplicated the shell</b> above it.</span></div></div>
+  </a>
+  <a class="card" href="screens/2-the-composing-moment.html">
+    <img class="shot" src="thumbs/2.png" alt=""/>
+    <div class="meta"><div class="n">Surface 2</div><div class="t">The composing moment</div>
+    <p class="d">Your own sentence becomes the headline. A counting timer, one honest status line, a quiet cancel, and a WebGL breathing pulse behind it all.</p>
+    <div class="verdict ok"><span class="dot"></span><span>The strongest idea of the six. No fabricated progress anywhere.</span></div></div>
+  </a>
+  <a class="card" href="screens/3-draft-configuration.html">
+    <img class="shot" src="thumbs/3.png" alt=""/>
+    <div class="meta"><div class="n">Surface 3</div><div class="t">The draft configuration</div>
+    <p class="d">Five decision rows, each in one of three states — and a real <em>Unknown / not reported</em> row. The name is editable in place at the top.</p>
+    <div class="verdict ok"><span class="dot"></span><span>Matches the shipped decisions vocabulary almost exactly.</span></div></div>
+  </a>
+  <a class="card" href="screens/4-the-two-doors.html">
+    <img class="shot" src="thumbs/4.png" alt=""/>
+    <div class="meta"><div class="n">Surface 4</div><div class="t">The two doors</div>
+    <p class="d">Describe-it is the hero; build-it-yourself is a different shape with its own honest sentence; templates sit as a quiet row that feeds the describe box.</p>
+    <div class="verdict ok"><span class="dot"></span><span>The doors read as different kinds of act, not big-button/small-button.</span></div></div>
+  </a>
+  <a class="card" href="screens/5-builder-canvas-and-spine.html">
+    <img class="shot" src="thumbs/5.png" alt=""/>
+    <div class="meta"><div class="n">Surface 5</div><div class="t">The Builder canvas + spine</div>
+    <p class="d">A vertical spine that survives a branch and rejoin. Grounding marks only where a phase is bound. Publish disabled <em>with its reason in words</em>.</p>
+    <div class="verdict warn"><span class="dot"></span><span>Node-name ladder is drawn over-literally — it labels the ladder instead of using it.</span></div></div>
+  </a>
+  <a class="card" href="screens/6-the-run-surface.html">
+    <img class="shot" src="thumbs/6.png" alt=""/>
+    <div class="meta"><div class="n">Surface 6</div><div class="t">The run surface</div>
+    <p class="d">Finished phases collapse to one line and the one fact worth keeping. The approval checkpoint lives <em>inside</em> the spine. A Stop control that never scrolls away.</p>
+    <div class="verdict ok"><span class="dot"></span><span>Indeterminate motion + elapsed only — no percentage anywhere.</span></div></div>
+  </a>
+</div>
+
+<footer>Stitch project <code>10710316306258284608</code> · design system <code>assets/12493500246735489470</code>.
+Full read, including what is unbuildable against our components, is in <code>README.md</code>.</footer>
+</div></body></html>

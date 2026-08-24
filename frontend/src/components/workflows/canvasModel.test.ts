@@ -1,4 +1,26 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — the Phase 200 canvas port re-baselined the
+ * captures in this file, and the port is reverted.
+ *
+ * WHAT MOVED AND WHY IT MOVED BACK. The port replaced the node card's 137-B face (248px,
+ * centre-aligned, a 62px 3D mark floating above its top edge) with sketch 200's compact
+ * 240x72 row, and `CANVAS_LAYOUT.NODE_MIN_HEIGHT` (104 -> 72) and `EDGE_ANCHOR_Y` (28 -> 36)
+ * moved with it. **The operator has since seen both faces rendered and chosen the 137-B
+ * one**, so both constants go back and so do the captures derived from them.
+ *
+ * ⚠ THE CAPTURES HERE ARE THE PRE-PORT ONES, RE-INSTATED UNEDITED RATHER THAN RE-CAPTURED,
+ * and they PASS. That is the strongest statement available: a pin nobody re-typed still
+ * holds, so the revert reproduces the pre-port tree rather than merely satisfying a fresh
+ * reading of itself.
+ *
+ * ⚠ THE PORT'S OWN RE-BASELINE WAS CAREFUL AND ITS RECORD IS AT `c4463d92`, not lost. Its
+ * headline finding is worth carrying forward for whoever moves these constants next: the
+ * delta across the twelve editing affordances was NOT uniform — the seven insert marks sit
+ * on the connector and moved with `EDGE_ANCHOR_Y`, while the five remove marks hang off the
+ * card's bottom and moved with `NODE_MIN_HEIGHT`. A blanket single-term edit made half the
+ * rows right and half wrong by 40, and the suite said so immediately.
+ */
+/**
  * Phase 183-05 Task 1 (CANVAS-01, D-183-10 / D-183-11 / D-183-12, correction C-2) —
  * canvasModel behaviour spec.
  *

@@ -100,6 +100,9 @@ ALLOWED_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
+    "message/rfc822",
+    "application/vnd.ms-outlook",
+    "application/x-msg",
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -109,7 +112,55 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".epub": "application/epub+zip",
+    ".eml":  "message/rfc822",
+    ".msg":  "application/vnd.ms-outlook",
 }
+
+
+#: Formats whose "no text" case has a CONCRETE cause a person can act on. Anything not
+#: listed here falls through to the generic sentence, which is deliberately vague because
+#: for those formats we genuinely do not know why the extractor came back empty.
+_EMPTY_TEXT_MESSAGES: dict[str, str] = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        "This spreadsheet is empty — none of its sheets contain any data. "
+        "Add rows and upload it again.",
+    "application/vnd.ms-excel":
+        "This spreadsheet is empty — none of its sheets contain any data. "
+        "Add rows and upload it again.",
+    "text/csv":
+        "This CSV has no rows — only a header, or nothing at all. "
+        "Add rows and upload it again.",
+    "application/pdf":
+        "No text could be read from this PDF. It is most likely a scan or a set of "
+        "images, which needs OCR before it can be searched.",
+    "message/rfc822":
+        "This email has no readable message body.",
+    "application/vnd.ms-outlook":
+        "This email has no readable message body.",
+    "application/x-msg":
+        "This email has no readable message body.",
+}
+
+#: The fallback. Kept WORD-FOR-WORD as it shipped, so the generic case is unchanged.
+_EMPTY_TEXT_DEFAULT = "No text content could be extracted from the file."
+
+
+def empty_text_message(mime_type: str | None) -> str:
+    """The sentence shown when extraction succeeded but produced nothing to chunk.
+
+    ⚠ WRITTEN BECAUSE THE GENERIC SENTENCE WAS TRUE AND USELESS. An operator uploaded an
+    `.xlsx`, saw "No text content could be extracted from the file", and reasonably read it
+    as a broken importer. It was not: the workbook was genuinely empty (`<sheetData/>`,
+    self-closed, no sharedStrings.xml). Two hours of the release went into proving the app
+    was right, which is the cost of a message that describes the CODE'S experience instead
+    of the FILE'S state.
+
+    ⚠ ONLY formats whose empty case has ONE plausible cause get a specific sentence. A DOCX
+    that extracts to nothing could be a dozen things, so it keeps the vague wording rather
+    than being handed a confident guess — a wrong specific message is worse than a right
+    vague one.
+    """
+    return _EMPTY_TEXT_MESSAGES.get(mime_type or "", _EMPTY_TEXT_DEFAULT)
 
 
 def _write_extraction_run_row(
@@ -268,6 +319,45 @@ def _upload_pipeline(
     )
 
 
+# Number of data rows per header-anchored chunk block (Phase 201 SEED-060).
+# Blocks are \n\n-separated → chunk_text treats each block as a paragraph unit,
+# keeping the [Columns: ...] prefix with its data rows on every split.
+_TABLE_ROWS_PER_CHUNK = 50
+
+
+def _tabular_text_blocks(
+    headers: list[str],
+    rows: list[list[str]],
+    prefix: str = "",
+) -> str:
+    """Produce header-anchored text blocks for CSV/Excel data (Phase 201 SEED-060).
+
+    Each block of _TABLE_ROWS_PER_CHUNK data rows is prefixed with:
+      [Columns: Header1 | Header2 | ...]
+    Blocks are separated by \\n\\n so chunk_text treats them as paragraph-level
+    units and will not split a data row away from its column context.
+
+    Args:
+        headers: Column names for this table.
+        rows:    Data rows (list of string lists).
+        prefix:  Optional text prepended inside the [Columns: ...] bracket
+                 (e.g. "Sheet: Revenue | ").
+    """
+    if not headers:
+        return ""
+    col_label = " | ".join(headers)
+    if prefix:
+        col_line = f"[{prefix}Columns: {col_label}]"
+    else:
+        col_line = f"[Columns: {col_label}]"
+    blocks: list[str] = []
+    for i in range(0, max(len(rows), 1), _TABLE_ROWS_PER_CHUNK):
+        batch = rows[i : i + _TABLE_ROWS_PER_CHUNK]
+        row_text = "\n".join("\t".join(str(c) for c in row) for row in batch)
+        blocks.append(f"{col_line}\n{row_text}" if row_text else col_line)
+    return "\n\n".join(blocks)
+
+
 def extract_text(raw: bytes, mime_type: str) -> str:
     """Extract text from non-PDF/non-DOCX MIME types.
 
@@ -298,21 +388,49 @@ def extract_text(raw: bytes, mime_type: str) -> str:
     ):
         from openpyxl import load_workbook  # noqa: PLC0415
         wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        sheets: list[str] = []
-        for sheet in wb.worksheets:
-            rows: list[str] = [f"## Sheet: {sheet.title}"]
-            for row in sheet.iter_rows(values_only=True):
-                cells = [str(c) if c is not None else "" for c in row]
-                if any(cells):
-                    rows.append("\t".join(cells))
-            if len(rows) > 1:
-                sheets.append("\n".join(rows))
-        return "\n\n".join(sheets)
+        sheet_blocks: list[str] = []
+        for ws in wb.worksheets:
+            all_ws_rows = [
+                [str(c.value) if c.value is not None else "" for c in row]
+                for row in ws.iter_rows()
+            ]
+            non_empty = [r for r in all_ws_rows if any(cell.strip() for cell in r)]
+            if len(non_empty) < 2:
+                continue
+            ws_headers = [
+                cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+                else f"Column {i + 1}"
+                for i, cell in enumerate(non_empty[0])
+            ]
+            ws_data_rows = non_empty[1:]
+            prefix = f"Sheet: {ws.title} | "
+            body = _tabular_text_blocks(ws_headers, ws_data_rows, prefix=prefix)
+            sheet_blocks.append(f"## Sheet: {ws.title}\n{body}")
+        return "\n\n".join(sheet_blocks)
 
     if mime_type in ("text/csv", "application/csv"):
-        text = raw.decode("utf-8-sig")  # strip BOM if present
-        reader = csv.reader(io.StringIO(text))
-        return "\n".join("\t".join(row) for row in reader)
+        try:
+            decoded_csv = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded_csv = raw.decode("latin-1")
+        try:
+            csv_dialect = csv.Sniffer().sniff(decoded_csv[:2048], delimiters=",;\t|")
+        except csv.Error:
+            csv_dialect = None
+        csv_kwargs: dict = {"dialect": csv_dialect} if csv_dialect else {}
+        csv_all_rows = [
+            r for r in csv.reader(io.StringIO(decoded_csv), **csv_kwargs)
+            if any(cell.strip() for cell in r)
+        ]
+        if not csv_all_rows:
+            return ""
+        csv_headers = [
+            cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+            else f"Column {i + 1}"
+            for i, cell in enumerate(csv_all_rows[0])
+        ]
+        csv_data_rows = csv_all_rows[1:]
+        return _tabular_text_blocks(csv_headers, csv_data_rows)
 
     if mime_type == "application/epub+zip":
         import ebooklib  # noqa: PLC0415
@@ -346,6 +464,18 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             if text:
                 chapters.append(text)
         return "\n\n".join(chapters)
+
+    if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+        from app.services.email_extraction_service import (  # noqa: PLC0415
+            parse_eml_bytes,
+            parse_msg_bytes,
+            format_email_text_for_retrieval,
+        )
+        if mime_type == "message/rfc822":
+            parsed_email = parse_eml_bytes(raw)
+        else:
+            parsed_email = parse_msg_bytes(raw)
+        return format_email_text_for_retrieval(parsed_email)
 
     # plain text, markdown, html — decode as UTF-8
     return raw.decode("utf-8")
@@ -1739,6 +1869,36 @@ def ingest_document(
         else:
             metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
             metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+
+        # Phase 203 (EML-01): Merge deterministic email header metadata
+        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+            try:
+                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
+                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+                metadata_dict = metadata_dict or {}
+                if parsed_email.subject and not metadata_dict.get("title"):
+                    metadata_dict["title"] = parsed_email.subject
+                if parsed_email.sender and not metadata_dict.get("author"):
+                    metadata_dict["author"] = parsed_email.sender
+                if parsed_email.date and not metadata_dict.get("date"):
+                    metadata_dict["date"] = parsed_email.date
+                if not metadata_dict.get("document_type"):
+                    metadata_dict["document_type"] = "email"
+                if parsed_email.sender:
+                    metadata_dict["email_from"] = parsed_email.sender
+                if parsed_email.to:
+                    metadata_dict["email_to"] = parsed_email.to
+                if parsed_email.cc:
+                    metadata_dict["email_cc"] = parsed_email.cc
+                if parsed_email.message_id:
+                    metadata_dict["email_message_id"] = parsed_email.message_id
+                if parsed_email.in_reply_to:
+                    metadata_dict["email_in_reply_to"] = parsed_email.in_reply_to
+                if parsed_email.references:
+                    metadata_dict["email_references"] = parsed_email.references
+            except Exception as em_exc:
+                log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
+
         # Normalize case-sensitive filter fields for consistent retrieval.
         # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
         # is NEVER touched here, and is NEVER promoted to a flat filter field.
@@ -1795,7 +1955,8 @@ def ingest_document(
         if not chunks:
             supabase.table("documents").update({
                 "status": "failed",
-                "error_message": "No text content could be extracted from the file.",
+                # 203 follow-up — say what is true of the FILE, not of the extractor.
+                "error_message": empty_text_message(mime_type),
             }).eq("id", document_id).execute()
             return
 
@@ -1874,6 +2035,84 @@ def ingest_document(
                 raw, mime_type, document_id, user_id, supabase, app_settings,
                 extracted_doc=extracted_doc,
             )
+
+        # Phase 203 (EML-02): Email attachment extraction & document relationships linking
+        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+            try:
+                import hashlib  # noqa: PLC0415
+                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
+                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+                # 203 HARDENING — the parser now bounds the LIST (count + per-part size) and returns
+                # names already reduced to a safe leaf, so this loop inherits both guarantees rather
+                # than re-deriving them. See `email_extraction_service.sanitize_attachment_filename`.
+                for att in parsed_email.attachments:
+                    if not att.raw or not att.filename:
+                        continue
+                    att_doc_id = str(uuid4())
+                    att_ext = "." + att.filename.rsplit(".", 1)[-1].lower() if "." in att.filename else ""
+                    att_mime = att.content_type
+                    if att_mime in ("application/octet-stream", "text/plain") and att_ext in _EXT_MIME_OVERRIDES:
+                        att_mime = _EXT_MIME_OVERRIDES[att_ext]
+
+                    if att_mime in ALLOWED_MIME_TYPES:
+                        att_storage_path = f"{user_id}/{att_doc_id}/{att.filename}"
+                        # ⚠ A FAILED UPLOAD MUST NOT LEAVE A ROW. This was `except Exception: pass`,
+                        #   which inserted the `documents` row anyway — a record whose `file_path`
+                        #   points at an object that was never written, indistinguishable from a real
+                        #   one until something tries to read it.
+                        try:
+                            supabase.storage.from_("documents").upload(
+                                path=att_storage_path,
+                                file=att.raw,
+                                file_options={"content-type": att_mime},
+                            )
+                        except Exception as up_exc:
+                            log.warning(
+                                "Attachment upload failed for %s (parent %s): %s — no document row written",
+                                att_storage_path, document_id, up_exc,
+                            )
+                            continue
+
+                        att_doc_data = {
+                            "id": att_doc_id,
+                            "user_id": user_id,
+                            "filename": att.filename,
+                            "file_path": att_storage_path,
+                            "file_size": len(att.raw),
+                            "mime_type": att_mime,
+                            "status": "pending",
+                            "content_hash": hashlib.sha256(att.raw).hexdigest(),
+                            "version_number": 1,
+                            "is_latest": True,
+                        }
+                        supabase.table("documents").insert(att_doc_data).execute()
+
+                        try:
+                            supabase.table("document_relationships").insert({
+                                "user_id": user_id,
+                                "source_doc_id": att_doc_id,
+                                "target_doc_id": document_id,
+                                "rel_type": "attached_to",
+                            }).execute()
+                        except Exception as rel_err:
+                            log.warning("Failed to link attachment %s -> %s: %s", att_doc_id, document_id, rel_err)
+
+                        try:
+                            att_text = extract_text(att.raw, att_mime)
+                            ingest_document(
+                                document_id=att_doc_id,
+                                text=att_text,
+                                user_id=user_id,
+                                supabase=supabase,
+                                raw=att.raw,
+                                mime_type=att_mime,
+                                filename=att.filename,
+                                engine_override="legacy",
+                            )
+                        except Exception as att_ing_err:
+                            log.warning("Failed to ingest attachment document %s: %s", att_doc_id, att_ing_err)
+            except Exception as att_exc:
+                log.warning("Email attachment extraction loop warning for %s: %s", document_id, att_exc)
 
         # Phase 071 D-071-08 — telemetry write (happy path).
         # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).

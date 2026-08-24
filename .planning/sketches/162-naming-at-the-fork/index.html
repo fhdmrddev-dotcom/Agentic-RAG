@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 162 — Naming at the fork</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+.wrap { max-width:1200px; margin:0 auto; padding:var(--space-6) var(--space-5) 120px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-5); max-width:90ch; }
+.lede b { color:var(--color-text); } .lede i { color:var(--color-text-muted); }
+.lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+.seclabel { font-size:10px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); margin:var(--space-6) 0 var(--space-3); display:flex; align-items:center; gap:10px; }
+.seclabel .rule { flex:1; height:1px; background:var(--color-border); }
+
+/* two-column: the fork moment | the library it produces */
+.split { display:grid; grid-template-columns:minmax(0,420px) minmax(0,1fr); gap:var(--space-6); align-items:start; }
+@media (max-width:900px) { .split { grid-template-columns:1fr; } }
+
+.panel { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:var(--space-4); }
+.panel h3 { font-size:13px; margin-bottom:var(--space-3); }
+
+/* the source card being forked */
+.card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:9px; }
+.card.mini { padding:11px var(--space-3); gap:6px; }
+.card.is-draft { border-style:dashed; }
+.cname { display:flex; align-items:center; gap:7px; }
+.cname .t { font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cname .ver { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex:none; }
+.purpose { font-size:12px; color:var(--color-text-muted); line-height:1.45; }
+.consequence { font-size:11.5px; color:var(--color-text-dim); line-height:1.5; }
+.pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; padding:2px 7px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+.btn-primary { font-size:13px; font-weight:600; padding:7px 14px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-primary:hover { filter:brightness(1.08); }
+.btn-primary:disabled { opacity:.45; cursor:not-allowed; }
+.btn-sec { font-size:12.5px; padding:6px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; }
+.btn-sec:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.btn-fork { font-size:12.5px; padding:6px 12px; border-radius:var(--radius-md); background:var(--color-muted);
+  color:var(--color-text); border:1px solid var(--color-border); cursor:pointer; }
+.btn-fork:hover { border-color:var(--color-primary-glow); }
+
+/* the name field / preview */
+.field { margin-top:var(--space-3); }
+.field label { display:block; font-size:11px; color:var(--color-text-dim); margin-bottom:5px;
+  font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; }
+.field input { width:100%; background:var(--color-bg); color:var(--color-text); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:8px 11px; font-family:inherit; font-size:13px; outline:none; }
+.field input:focus { border-color:var(--color-primary-glow); }
+.hint { font-size:11px; color:var(--color-text-dim); margin-top:5px; line-height:1.45; }
+.hint.warn { color:var(--color-warning); }
+.hint.good { color:var(--color-success); }
+
+.preview { margin-top:var(--space-3); padding:10px var(--space-3); border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); }
+.preview .pk { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--color-text-dim); }
+.preview .pv { font-size:13px; font-weight:600; margin-top:3px; }
+.preview .ps { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); margin-top:3px;
+  word-break:break-all; }
+
+/* the resulting library */
+.libgrid { display:flex; flex-direction:column; gap:7px; max-height:560px; overflow-y:auto; padding-right:4px; }
+.lrow { display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:var(--radius-sm);
+  border:1px solid var(--color-border-soft); background:var(--color-surface); font-size:12.5px; }
+.lrow.is-new { border-color:var(--color-primary-glow); background:hsl(239 100% 82% / .07);
+  animation:fadeSlideUp .3s var(--ease-out); }
+.lrow .ln { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lrow .lv { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); flex:none; }
+.lrow.dup .ln { color:var(--color-warning); }
+.lrow .badge { font-family:var(--font-mono); font-size:8.5px; text-transform:uppercase; padding:1px 5px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); flex:none; }
+
+.scoreboard { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-bottom:var(--space-4); }
+.sc { flex:1 1 190px; border:1px solid var(--color-border); border-radius:var(--radius-md);
+  background:var(--color-surface); padding:11px var(--space-4); }
+.sc .k { font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); }
+.sc .v { font-size:var(--text-lg); font-weight:700; font-family:var(--font-headline); margin-top:3px; }
+.sc .n { font-size:11px; color:var(--color-text-muted); margin-top:3px; line-height:1.45; }
+.sc.bad { border-color:hsl(0 72% 51% / .4); background:hsl(0 72% 51% / .05); } .sc.bad .v { color:hsl(0 80% 72%); }
+.sc.warn { border-color:hsl(38 92% 60% / .45); background:hsl(38 92% 60% / .06); } .sc.warn .v { color:var(--color-warning); }
+.sc.good { border-color:hsl(142 71% 45% / .4); background:hsl(142 71% 45% / .05); } .sc.good .v { color:var(--color-success); }
+
+.note { font-size:12px; color:var(--color-text-muted); background:var(--color-muted);
+  border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary);
+  padding:11px var(--space-4); border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin:var(--space-4) 0;
+  line-height:1.62; max-width:96ch; }
+.note b { color:var(--color-text); }
+.note code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+.note.warn { border-left-color:var(--color-warning); } .note.warn b { color:hsl(38 92% 78%); }
+.note.stop { border-left-color:var(--color-danger); } .note.stop b { color:hsl(0 80% 82%); }
+
+.decision { border:1px solid hsl(0 72% 51% / .4); background:hsl(0 72% 51% / .06); border-radius:var(--radius-md);
+  padding:var(--space-4); margin:var(--space-4) 0; font-size:12.5px; line-height:1.6; }
+.decision .dh { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+  color:hsl(0 80% 78%); margin-bottom:6px; }
+.strike { text-decoration:line-through; opacity:.6; }
+
+.netnew { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:8.5px;
+  text-transform:uppercase; letter-spacing:.05em; padding:1px 5px; border-radius:var(--radius-full);
+  background:hsl(258 90% 66% / .16); border:1px solid hsl(258 90% 66% / .45); color:hsl(258 90% 80%); }
+
+.toast { position:fixed; bottom:64px; left:50%; transform:translateX(-50%) translateY(14px); z-index:9997;
+  background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); color:var(--color-text);
+  padding:9px 16px; border-radius:var(--radius-full); font-size:12.5px; box-shadow:var(--shadow-lg);
+  opacity:0; pointer-events:none; transition:all var(--dur-base) var(--ease-out); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.viewport-host { transition:max-width var(--dur-slow) var(--ease-out); margin:0 auto; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 162</span>
+  <button class="variant-tab today active" data-v="today" type="button">Today (shipped)</button>
+  <button class="variant-tab" data-v="a" type="button">A: The fork names it</button>
+  <button class="variant-tab" data-v="b" type="button">B: The fork asks <span class="star">★</span></button>
+  <button class="variant-tab" data-v="c" type="button">C: Read-side only</button>
+</div>
+
+<div class="viewport-host" id="vp">
+<div class="wrap">
+  <h1 style="font-size:var(--text-xl);margin-bottom:6px">Naming at the fork</h1>
+  <p class="lede" id="lede"></p>
+
+  <div class="scoreboard" id="scoreboard"></div>
+
+  <div class="split">
+    <div>
+      <div class="seclabel"><span>The fork moment</span><span class="rule"></span></div>
+      <div class="panel" id="forkpanel"></div>
+      <div class="note" id="mechnote" style="margin-top:var(--space-4)"></div>
+    </div>
+    <div>
+      <div class="seclabel"><span>The library it produces</span><span class="rule"></span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)" id="libcount"></span></div>
+      <div class="panel"><div class="libgrid" id="libgrid"></div></div>
+    </div>
+  </div>
+
+  <div id="extras"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <button type="button" id="fork5">fork ×5</button>
+  <button type="button" id="resetBtn">reset</button>
+  <span style="opacity:.6">vp</span>
+  <button type="button" data-vp="375">375</button>
+  <button type="button" data-vp="768">768</button>
+  <button type="button" data-vp="0">full</button>
+  <span style="opacity:.6">theme</span>
+  <select id="themeSel">
+    <option value="default">default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+
+  /* The source everyone forks: the real starter behind the 43. */
+  var SOURCE = null;
+  L.rows.forEach(function (r) {
+    if (!SOURCE && r.slug === "compliance-gap-report") SOURCE = r;
+  });
+
+  var state = { variant: "today", forks: [], typed: "", newestId: null };
+
+  function reset() { state.forks = []; state.typed = ""; state.newestId = null; }
+
+  /* ── the naming rules, one per variant ─────────────────────────────────────
+     Today + C: name copied verbatim (WorkflowsPage.tsx:656-661 — `...def` spread).
+     A:         the fork differentiates the name itself.
+     B:         the person names it; the field is pre-filled with A's suggestion. */
+  function suggestedName(n) {
+    var mine = state.forks.length + 1;
+    return SOURCE.name + " — my copy" + (mine > 1 ? " " + mine : "");
+  }
+  function nameFor() {
+    if (state.variant === "a") return suggestedName();
+    if (state.variant === "b") return state.typed.trim() || suggestedName();
+    return SOURCE.name;                    /* verbatim copy — today's behaviour */
+  }
+
+  function doFork() {
+    var nm = nameFor();
+    if (state.variant === "b" && !state.typed.trim()) { toast("Give it a name first"); return; }
+    var id = "new-" + (state.forks.length + 1);
+    state.forks.push({
+      id: id, name: nm, slug: SOURCE.slug + "-" + L.hash6(), version: 1,
+      provenance: "draft", isMine: true, parentSlug: SOURCE.slug,
+      forkKind: "copy", projectName: SOURCE.projectName, updatedAt: L.NOW,
+      purpose: SOURCE.purpose, tierId: SOURCE.tierId, deliverable: SOURCE.deliverable,
+      chain: SOURCE.chain
+    });
+    state.newestId = id;
+    state.typed = "";
+    render();
+    toast(state.variant === "c" || state.variant === "today"
+      ? "Forked — and it is named exactly like the other " + (existingFamily().length - 1)
+      : "Forked as “" + nm + "”");
+  }
+
+  /* The 43 that already exist, plus whatever this session forked. */
+  function existingFamily() {
+    var base = L.rows.filter(function (r) { return r.name === SOURCE.name; });
+    return base.concat(state.forks);
+  }
+
+  /* ── copy ────────────────────────────────────────────────────────────────── */
+  var LEDE = {
+    today: "<b>The ROADMAP calls this “the first scope question, not an assumption”:</b> is Phase 192.1 allowed to touch " +
+      "the write path? Today both fork handlers spread <code>...def</code> and <b>copy the name verbatim</b> " +
+      "(<code>WorkflowsPage.tsx:600-608</code> and <code>:656-661</code>). Click <b>Make my own copy</b> a few times and " +
+      "watch the family grow. Nothing here is a bug — <b>this is 42 correct forks</b>, and it is exactly how a real " +
+      "customer reaches 43 identical names by using the product properly.",
+    a: "<b>A: the fork differentiates the name when it copies.</b> No new surface, no extra click — the fork stays the " +
+      "<i>direct flip</i> D-15 made it. The name simply arrives distinguishable. Fork a few and watch the library " +
+      "stay readable without the library doing any work at all.",
+    b: "<b>B: the fork asks you.</b> The most control and the best names — a human names it after the thing they are " +
+      "actually doing. But it <b>puts a surface in front of a non-destructive action</b>, which is precisely what " +
+      "D-15 decided against. This variant is the honest foil, not a free option — read the red box.",
+    c: "<b>C: the write path is never touched.</b> Identity is 100% derived at render (sketches 160 and 161). Cheapest, " +
+      "zero migration, no new failure surface — and duplicates keep being minted forever, so every future surface that " +
+      "lists workflows inherits the problem. Fork a few and watch the library fill with identical names that only the " +
+      "<i>reader</i> can untangle."
+  };
+
+  var MECH = {
+    today: "<b>The mechanism, measured.</b> <code>onUseStarter</code> mints <code>&lt;slug&gt;-[a-z0-9]{6}</code> at " +
+      "v1; <code>onTweak</code> mints the <i>same</i> slug at v(N+1). Both spread <code>...def</code>, and neither " +
+      "touches <code>name</code>. The DB agrees: all 42 duplicates measured on 2026-08-12 are " +
+      "<code>jsonb_typeof = string</code> seeded rows — but the app's own write paths bind <code>name: str</code> as " +
+      "<b>REQUIRED</b> through Pydantic (<code>harness.py:519-522</code>), so a row the app writes always has a name. " +
+      "It just has the <i>parent's</i> name.",
+    a: "<b>Where A would live.</b> One line in each of the two handlers, before the POST — the name is composed from " +
+      "the source name plus a differentiator. It must be composed <b>client-side from data the page already holds</b>, " +
+      "because the server takes the name from the definition it is given. Two open questions the mockup cannot settle: " +
+      "what the differentiator should be (a counter? the project? the date?), and whether the <i>starter</i> fork and " +
+      "the <i>version</i> fork should word it the same way — they are siblings, not twins (D-12).",
+    b: "<b>Where B would live.</b> A small prompt between click and POST. That is a new surface on the fork path, so it " +
+      "needs a decision on the shipped guard grading, not just a design. Note it also gives the 409 a natural home: a " +
+      "name field could surface the collision before the request instead of after it (WR-08).",
+    c: "<b>Where C lives: nowhere new.</b> That is the whole appeal. No handler changes, no name composition, no " +
+      "migration, and the two shipped fork handlers keep their measured behaviour byte-for-byte. Everything identity " +
+      "needs is derived from the slug rules — which is what makes 160-A and 161-C cost nothing on the wire."
+  };
+
+  function scoreboard() {
+    var fam = existingFamily();
+    var names = {};
+    fam.forEach(function (r) { names[r.name] = (names[r.name] || 0) + 1; });
+    var biggest = Object.keys(names).sort(function (a, b) { return names[b] - names[a]; })[0];
+    var dupRows = Object.keys(names).filter(function (n) { return names[n] > 1; })
+      .reduce(function (a, n) { return a + names[n]; }, 0);
+    var writes = (state.variant === "a" || state.variant === "b");
+    var clicks = state.variant === "b" ? "2 + typing" : "1";
+
+    return [
+      ["rows under one name", names[biggest],
+       names[biggest] > 20 ? "bad" : names[biggest] > 4 ? "warn" : "good",
+       '"' + biggest + '"'],
+      ["distinct names in this family", Object.keys(names).length,
+       Object.keys(names).length === 1 ? "bad" : Object.keys(names).length > 3 ? "good" : "warn",
+       dupRows + " rows still share a name"],
+      ["clicks to fork", clicks, state.variant === "b" ? "warn" : "good",
+       state.variant === "b" ? "a surface on a non-destructive action" : "direct flip, as D-15 decided"],
+      ["write path touched", writes ? "yes" : "no", writes ? "warn" : "good",
+       writes ? "both fork handlers + the name composer" : "nothing outside the render layer"]
+    ];
+  }
+
+  function render() {
+    document.getElementById("lede").innerHTML = LEDE[state.variant];
+    document.getElementById("mechnote").innerHTML = MECH[state.variant];
+
+    var sb = document.getElementById("scoreboard"); sb.innerHTML = "";
+    scoreboard().forEach(function (r) {
+      var c = document.createElement("div");
+      c.className = "sc " + r[2];
+      c.innerHTML = '<div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div><div class="n">' + esc(r[3]) + '</div>';
+      sb.appendChild(c);
+    });
+
+    /* ── the fork moment ── */
+    var fp = document.getElementById("forkpanel"); fp.innerHTML = "";
+    var src = document.createElement("div"); src.className = "card";
+    src.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+        '<div class="cname"><span aria-hidden="true">✨</span><span class="t">' + esc(SOURCE.name) + '</span>' +
+        '<span class="ver">v' + SOURCE.version + '</span></div>' +
+        '<span class="pill starter">Starter</span></div>' +
+      '<p class="purpose">' + esc(SOURCE.purpose) + '</p>' +
+      '<p class="consequence">' + L.FORK_CONSEQUENCE + '</p>';
+    fp.appendChild(src);
+
+    if (state.variant === "b") {
+      var f = document.createElement("div"); f.className = "field";
+      f.innerHTML = '<label for="nmf">Name your copy</label>';
+      var inp = document.createElement("input");
+      inp.type = "text"; inp.id = "nmf"; inp.value = state.typed;
+      inp.placeholder = suggestedName();
+      inp.addEventListener("input", function () {
+        state.typed = inp.value;
+        var btn = document.getElementById("forkBtn");
+        if (btn) btn.disabled = !inp.value.trim();
+        var h = document.getElementById("nmHint");
+        if (h) {
+          var clash = existingFamily().some(function (r) { return r.name === inp.value.trim(); });
+          h.className = "hint " + (inp.value.trim() ? (clash ? "warn" : "good") : "");
+          h.textContent = !inp.value.trim() ? "A name is required — this is the whole point of B."
+            : clash ? "You already have one with this name. Allowed, but it will be indistinguishable."
+            : "No other workflow of yours has this name.";
+        }
+      });
+      f.appendChild(inp);
+      var hint = document.createElement("p"); hint.className = "hint"; hint.id = "nmHint";
+      hint.textContent = "A name is required — this is the whole point of B.";
+      f.appendChild(hint);
+      fp.appendChild(f);
+    }
+
+    if (state.variant === "a") {
+      var pv = document.createElement("div"); pv.className = "preview";
+      pv.innerHTML = '<div class="pk">it will be called</div><div class="pv">' + esc(suggestedName()) + '</div>' +
+        '<div class="ps">' + esc(SOURCE.slug) + '-xxxxxx · v1 · draft</div>';
+      fp.appendChild(pv);
+      var h2 = document.createElement("p"); h2.className = "hint";
+      h2.innerHTML = 'Composed at fork time, client-side. You can rename it in the Builder afterwards. ' +
+        '<span class="netnew">write path</span>';
+      fp.appendChild(h2);
+    }
+
+    var actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:var(--space-4);flex-wrap:wrap";
+    var fb = document.createElement("button");
+    fb.type = "button"; fb.className = "btn-primary"; fb.id = "forkBtn"; fb.textContent = L.FORK_VERB;
+    if (state.variant === "b") fb.disabled = !state.typed.trim();
+    fb.addEventListener("click", doFork);
+    actions.appendChild(fb);
+    if (state.variant === "b") {
+      actions.appendChild(mkBtn("btn-sec", "Cancel", function () { state.typed = ""; render(); }));
+    }
+    fp.appendChild(actions);
+
+    /* ── the resulting library ── */
+    var fam = existingFamily();
+    var lg = document.getElementById("libgrid"); lg.innerHTML = "";
+    document.getElementById("libcount").textContent =
+      fam.length + " rows in the “" + SOURCE.name + "” family" +
+      (state.forks.length ? "  ·  " + state.forks.length + " forked in this session" : "");
+
+    /* newest first so a fresh fork is visible without scrolling */
+    var ordered = state.forks.slice().reverse().concat(fam.filter(function (r) {
+      return state.forks.indexOf(r) === -1;
+    }));
+    var nameSeen = {};
+    fam.forEach(function (r) { nameSeen[r.name] = (nameSeen[r.name] || 0) + 1; });
+
+    ordered.forEach(function (r) {
+      var row = document.createElement("div");
+      var dup = nameSeen[r.name] > 1;
+      row.className = "lrow" + (r.id === state.newestId ? " is-new" : "") + (dup ? " dup" : "");
+      row.innerHTML =
+        '<span class="ln">' + esc(r.name) + '</span>' +
+        (dup ? '<span class="badge">1 of ' + nameSeen[r.name] + '</span>' : '<span class="badge">unique</span>') +
+        '<span class="lv">v' + r.version + '</span>' +
+        '<span class="pill ' + r.provenance + '">' +
+          (r.provenance === "starter" ? "Starter" : r.provenance) + '</span>';
+      lg.appendChild(row);
+    });
+
+    /* ── extras: the decision boxes ── */
+    var ex = document.getElementById("extras");
+    ex.innerHTML = EXTRAS[state.variant];
+  }
+
+  var EXTRAS = {
+    today: '<div class="note warn"><b>⚠ The severity on this machine is inflated, and the disease is not.</b> ' +
+      'The ROADMAP records both halves: the 42 duplicates in the dev database were <b>seeded, not created</b> — all 42 ' +
+      'are <code>jsonb_typeof = string</code>, a shape the app\'s own write paths cannot produce. <b>That does not ' +
+      'dissolve LIB-05.</b> <code>onTweak</code> mints <code>&lt;same name&gt; v(N+1)</code> by design, so a real ' +
+      'customer generates genuine duplicates by using the product normally. Judge these variants against the ' +
+      'generated fixture, not against the operator\'s dev rows.</div>' +
+      '<div class="note stop"><div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;' +
+      'letter-spacing:.08em;color:hsl(0 80% 78%);margin-bottom:6px">a retraction, kept visible</div>' +
+      'A <b>“two names” propagation defect</b> was claimed here on 2026-08-12 and is <b>RETRACTED</b>: that a row ' +
+      'carries a <code>name</code> column and a conflicting <code>definition-&gt;&gt;\'name\'</code> disagreeing on 85 ' +
+      'of 104 rows. It was generalised from <b>n=1</b> before the population was measured. The truth: ' +
+      '<code>definition-&gt;&gt;\'name\'</code> returns NULL on a <b>string scalar</b>, and 83 rows are ' +
+      'double-encoded — so "85 divergent" was 83 encoding artifacts plus <b>2 genuine conflicts</b>, both test ' +
+      'fixtures. It is left visible because promoting one observation to a mechanism is the same failure this phase ' +
+      'exists to correct.</div>',
+
+    a: '<div class="note"><b>What A is worth.</b> It is the only variant that fixes the problem <i>at the source</i> ' +
+      'while keeping the fork a one-click direct flip. Every future surface that lists workflows — the composer picker, ' +
+      'the run history, a mobile view nobody has designed yet — inherits the fix for free, because the data itself is ' +
+      'distinguishable.</div>' +
+      '<div class="note warn"><b>⚠ What A cannot do, and must not pretend to.</b> It fixes <b>new</b> forks only. Every ' +
+      'row already in the library keeps its copied name, so <b>A does not remove the need for 160/161</b> — a read-side ' +
+      'treatment is still required for the existing 43. Anyone reading A as "so we do not need the library work" has ' +
+      'read it wrong. A and C are <b>not rivals</b>: A governs what the fork WRITES, 160/161 govern what the library ' +
+      'SHOWS, and SC#1 is a statement about rows that already exist.</div>',
+
+    b: '<div class="decision"><div class="dh">⚠ B reopens a shipped decision — do not pick it by accident</div>' +
+      '<b>D-15 decided the fork is a DIRECT FLIP</b>, and the argument was not taste. The shipped card\'s docblock ' +
+      '(<code>WorkflowCard.tsx:84-87</code>) records it: the fork is non-destructive and reversible — the live version ' +
+      'stays live and unchanged — so a confirm on it would <i>spend the guard vocabulary the delete relies on to mean ' +
+      'anything</i>. The sketch that shipped 159-C attached a confirm to the fork and it was <b>deliberately not ' +
+      'shipped</b>: <span class="strike">fork → confirm sheet</span>.<br><br>' +
+      'So B is a real option only with a real answer to: <b>what makes a name prompt different from a confirm?</b> ' +
+      'One available answer — a prompt that <i>collects something the system cannot know</i> is not a guard, it is an ' +
+      'input, and inputs do not spend guard vocabulary. Whether that distinction holds is the operator\'s call, and it ' +
+      'belongs here rather than in review.</div>' +
+      '<div class="note"><b>The consolation prize, if B loses.</b> B is the only variant with a natural home for the ' +
+      '<b>409</b>: a name field can surface a collision <i>before</i> the request. WR-08 currently classifies that ' +
+      'failure by substring-matching error prose (<code>WorkflowsPage.tsx:165-167</code>) — the fragility is recorded ' +
+      'with a re-open trigger. Worth noting even if B is rejected.</div>',
+
+    c: '<div class="note"><b>What C is worth.</b> Cheapest by a wide margin, and it keeps this phase honestly ' +
+      'frontend-shaped apart from the one <code>updated_at</code> projection. The two fork handlers keep their measured ' +
+      'behaviour byte-for-byte — and those handlers have been the source of two blockers in two weeks (the U5 409, ' +
+      'twice), so "do not touch them" is an argument with evidence behind it, not timidity.</div>' +
+      '<div class="note warn"><b>⚠ What C accepts, stated so it is a decision and not a default.</b> Scroll the library ' +
+      'after forking five times: every new row is named exactly like the other 43, and the reader untangles it every ' +
+      'single time, forever. <b>The library carries the cost permanently, and so does every future list surface.</b> ' +
+      'C is the right answer if you believe the read-side treatment is genuinely good enough — 160 and 161 exist to let ' +
+      'you decide that by looking rather than by guessing.</div>'
+  };
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function mkBtn(cls, txt, fn) { var b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = txt; b.addEventListener("click", fn); return b; }
+  var tt; function toast(m) { var t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove("show"); }, 2100); }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (t) {
+    t.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+      state.variant = t.getAttribute("data-v");
+      reset(); render();
+    });
+  });
+  document.getElementById("fork5").addEventListener("click", function () {
+    for (var i = 0; i < 5; i++) {
+      if (state.variant === "b") state.typed = "Q3 " + ["EU", "US", "APAC", "UK", "LATAM"][i] + " gap review";
+      doFork();
+    }
+  });
+  document.getElementById("resetBtn").addEventListener("click", function () { reset(); render(); });
+  document.getElementById("themeSel").addEventListener("change", function () {
+    document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css";
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-vp]"), function (bt) {
+    bt.addEventListener("click", function () {
+      var w = parseInt(bt.getAttribute("data-vp"), 10);
+      document.getElementById("vp").style.maxWidth = w ? w + "px" : "";
+    });
+  });
+  render();
+})();
+</script>
+</body>
+</html>

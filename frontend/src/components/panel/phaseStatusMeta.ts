@@ -27,6 +27,36 @@
  * DOM is unmoved (`panel/__tests__/PhaseTimeline.test.tsx`, 21 cases, green across the
  * move).
  *
+ * ── Phase 200-07 (DES-02 · `200-CHECKLIST.md` §4) — THIS MODULE FINALLY HAS ITS OWN SUITE ──
+ *
+ * ⚠ IT WAS UNPINNED FOR ITS ENTIRE LIFE, while being D-06's natural home. Every guarantee
+ * below was exercised only TRANSITIVELY, through `PhaseCard` / `PhaseTimeline` renders —
+ * and the count gate's own §187-29 correction says exactly why that is not enough:
+ * *"a pinned TOTAL rising proves nothing about the NEW cases, because slack inside an
+ * already-listed file absorbs them."* `phaseStatusMeta.test.ts` is the direct guard, pinned
+ * in the commit that created it (the 196-05 / 196-07 rule: *"an unpinned file is not a
+ * lightly-guarded one, it is an UNGUARDED one"*).
+ *
+ * ⚠ THE TWO INVARIANTS THAT SUITE EXISTS TO HOLD, stated once here so a later editor meets
+ * them before the diff rather than after it:
+ *
+ *  1. **`statusMeta()` MUST STAY TOTAL over the nine declared members, and must NEVER become
+ *     a coalesced bracket read.** `Record<Phase["status"], StatusMeta>` makes the compiler
+ *     the parity guarantee for every DECLARED member and says nothing whatever about an
+ *     INHERITED one — so an own-property guard with an explicit `unknown` row is the shape,
+ *     and the tempting one-liner returns a FUNCTION for a prototype key rather than firing
+ *     its fallback. (The forbidden expression is deliberately not spelled anywhere in this
+ *     file: this plan's acceptance greps this source for it and a docblock quoting the
+ *     needle would make its own guard read `1` instead of `0` — the 187-24 trap, which has
+ *     now fired on five separate files in this phase.)
+ *  2. **No word a person reads may be interpolated from a raw status member** (WR-05). The
+ *     table holds the words; `statusWord` is the only door to them.
+ *
+ * ⚠ THIS MODULE HOLDS WORDS AND NO DERIVATION, and that split is deliberate rather than
+ * incidental. D-06's nine timing arms live in `components/workflows/phaseDuration.ts` —
+ * shared with the run page, so the panel half and the page half provably cannot disagree
+ * about a duration. A second arm added here would be that disagreement's first day.
+ *
  * ⚠ THE GLYPH-COUNT EVIDENCE MOVED WITH THE TABLE. `STATUS_META["recorded-not-sent"]`'s
  * comment argues its mark was chosen because a rejected alternative already means CANCELLED
  * elsewhere, and rests that claim on the rejected mark's occurrence COUNT *in the file the
@@ -102,6 +132,54 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   // `pending`/`skipped` already use; `--panel-*` is correct HERE because this is a
   // panel-scoped surface (it is the RUN surface, on `--background`, where it is forbidden).
   unknown: { glyph: "?", text: "Unknown", textClass: "text-panel-muted-foreground" },
+  // Phase 194 Plan 04 (RUN-01 / D-04 / D-07 / D-13 / D-17) — ADDED, nothing above changed.
+  // This row exists because the compiler demanded it: `Phase["status"]` gained `"cancelled"`
+  // so the phase that was RUNNING when a person stopped the run could stop being absorbed by
+  // `unknown`, and `Record<Phase["status"], …>` then forced the developer panel to state it.
+  // That forcing is the mechanism, not collateral damage — it was observed as a real TS2741
+  // on this table (one of ELEVEN the widening armed) before this row was written.
+  //
+  // WHY NOT REUSE A SHIPPED WORD: none of the eight above is true of this state. `Complete`
+  // claims the step finished, `Failed` claims something went wrong, `Skipped` claims it never
+  // ran — it DID run, and a person ended the run underneath it — `Not sent` is 189's governed
+  // external-action terminal and has nothing to do with a stop, and `Unknown` claims we cannot
+  // tell. We can: the database states it exactly. ⚠ AND `Unknown` IS WHAT SHIPPED HERE UNTIL
+  // THIS ROW, measured on the unwidened tree rather than assumed — fail-CLOSED and therefore
+  // not a lie, but not D-13's "the interrupted phase reads stopped, not failed" either.
+  //
+  // ⚠ THE SUBJECT IS THE STEP, NOT THE RUN, and the two words differ because the two subjects
+  // do. The RUN-level word stays `cancelled` everywhere it already ships (`chat/RunCard.tsx`
+  // and `pages/WorkflowRunPage.tsx` both render it, unchanged by this plan). A run is
+  // cancelled; the step that was mid-flight when it happened was STOPPED. These are two words
+  // for two different subjects, never two words for one concept.
+  //
+  // THE MARK WAS CHOSEN BY MEASUREMENT, and the measurement is in `194-04-SUMMARY.md` in full.
+  // In short: it appears exactly ONCE in a render across `frontend/src` — `chat/RunCard.tsx`'s
+  // glyph for the cancelled run state — and it carries NO second meaning anywhere, so this
+  // panel becomes the second occurrence of one mark for one concept and 194 spends zero
+  // net-new glyphs, which is `icon-convention.md` §4's actual requirement. The circled-slash
+  // alternative was REJECTED although it reads well: it renders for cancelled on the run band
+  // AND for "no longer offered" in the admin model-discovery panel, and one glyph carrying two
+  // meanings is what the convention forbids. (That rejected mark is NOT spelled in this
+  // comment, on purpose — the `recorded-not-sent` row above rests a shipped claim on its
+  // occurrence COUNT in this file, and prose that spelled it would make the count unreadable.
+  // Measured: that count is 0 before this row and 0 after it, so the shipped claim is
+  // UNDISTURBED and owes no rewrite.) The sketch's `⏹` is refused outright — net-new, absent
+  // from §4's table, and it owes a flagged proposal this plan is not the place to make.
+  //
+  // ⚠ ONE INHERITED FACT, RECORDED RATHER THAN FIXED HERE: the same square also ships as the
+  // lucide `Square` STOP CONTROL at three sites (the composer, the active-runs tray, and the
+  // panel's own Stop button added by 194-03). That is a control and this is a state, which is
+  // exactly the distinction 194-03 drew when it refused this character for its BUTTON — so the
+  // two decisions agree by construction rather than by luck. If a later phase decides a
+  // control and a state may not share a shape, that is a convention change for the icon
+  // convention to make across all five sites at once, not a thing to settle in one table.
+  //
+  // `text-panel-muted-foreground` is the same AA-cleared muted token
+  // `pending`/`skipped`/`recorded-not-sent`/`unknown` already share: this is a quiet terminal,
+  // not an alarm. Spending a warning colour on a step that did nothing wrong would read as a
+  // fault the run never raised — the person stopped it on purpose and already knows.
+  cancelled: { glyph: "■", text: "Stopped", textClass: "text-panel-muted-foreground" },
 }
 
 /**

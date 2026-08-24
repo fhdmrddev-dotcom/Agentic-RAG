@@ -76,6 +76,112 @@ _TRIM_MARKER = (
 PIN_BUDGET_FRACTION = 1.0 / 3
 
 
+# Share of a model's REAL context window reserved for the system prompt, the skill
+# catalog and general slack. This one IS proportional — a bigger window generally
+# carries a bigger system prompt — unlike the tool schemas, which are a FIXED cost
+# and are therefore measured rather than estimated (see _tool_schema_tokens).
+_PROMPT_OVERHEAD_FRACTION: float = 0.10
+
+# Measured token cost of the advertised tool payload, cached per process.
+_TOOL_SCHEMA_TOKENS: int | None = None
+
+
+def _tool_schema_tokens() -> int:
+    """Approximate token cost of the tool schemas sent on EVERY request.
+
+    ``trim_messages_to_fit`` counts only the messages list, so this payload is
+    invisible to it — yet it rides the same wire request and counts against the same
+    window. Measured 2026-08-18: the default 28-tool Deep toolbox is ~6.9k tokens,
+    i.e. 21% of a 32k local model's entire window before a single message.
+
+    MEASURED, never hardcoded: an operator who disables web search / sandbox /
+    self-improve ships a smaller toolbox, and a future phase that adds tools ships a
+    bigger one. Both are reflected automatically. Cached per process because the
+    toolbox only changes with capability flags, and this is called once per agent
+    iteration. Returns 0 on any failure, which degrades to the pre-existing
+    (unreserved) behaviour rather than raising on the hot path.
+    """
+    global _TOOL_SCHEMA_TOKENS
+    if _TOOL_SCHEMA_TOKENS is None:
+        try:
+            # Lazy import — openai_service imports this module at module scope, so a
+            # top-level import here would be a cycle.
+            from app.services.openai_service import get_tools
+            _TOOL_SCHEMA_TOKENS = estimate_tokens(json.dumps(get_tools()))
+        except Exception:
+            logger.warning("_tool_schema_tokens: could not size the toolbox", exc_info=True)
+            _TOOL_SCHEMA_TOKENS = 0
+    return _TOOL_SCHEMA_TOKENS
+
+
+def _output_reserve(model: str | None, max_out: int | None) -> int:
+    """Tokens to hold back for the model's own reply.
+
+    ⚠ NOT ``max_out``. The registry's ``max_output_tokens`` is a CEILING that
+    ``openai_service._resolve_max_tokens`` clamps DOWN to — it is not what the app
+    asks for. Many catalog rows set it equal to the context window (measured
+    2026-08-18: ``moonshotai/kimi-k2.5`` 262,144 / 262,144, ``minimax/minimax-01``
+    1,000,192 / 1,000,192), so subtracting it wholesale reserved the entire window and
+    collapsed five OpenRouter models to the floor — a cross-provider regression from a
+    change whose whole purpose was local models.
+
+    So reserve what the request will ACTUALLY carry, by asking the same resolver the
+    request path uses. Falls back to ``max_out`` only if that resolver is unreachable;
+    the self-consistency guard in ``resolve_context_budget`` then catches a pathological
+    row rather than letting it through.
+    """
+    try:
+        # Lazy import — openai_service imports this module at module scope.
+        from app.services.openai_service import _resolve_max_tokens
+        return int(_resolve_max_tokens(None, None, effective_model=model, db_max_output_cap=max_out))
+    except Exception:
+        logger.warning(
+            "_output_reserve: could not resolve the real output size for model=%s; "
+            "falling back to the registry ceiling", model, exc_info=True,
+        )
+        return int(max_out or 0)
+
+
+def _resolve_registry_window(model: str | None) -> tuple[int | None, int | None]:
+    """Best-effort SYNC read of the operator-set ``context_window_tokens`` /
+    ``max_output_tokens`` for ``model`` from the model registry.
+
+    Mirrors ``openai_service._resolve_db_native_tools`` in structure and for the same
+    reason: ``resolve_context_budget`` is SYNC (both call sites in ``agent_loop.py``
+    call it without an ``await``), so we cannot reach the async DB overlay here.
+    Instead we read the SAME 30s-TTL ``_model_overrides_cache`` the async request path
+    warms — ``agent_loop.py`` calls ``get_model_capability_async(effective_model)``
+    immediately before opening the stream, and ``_load_model_overrides`` loads every
+    enabled override row with all its columns.
+
+    Returns ``(None, None)`` on a cold cache, an absent row, or null columns — never
+    raises. That is the default-inert path: ``resolve_context_budget`` then behaves
+    byte-identically to before this function existed.
+    """
+    if not model:
+        return None, None
+    try:
+        # Lazy import breaks the context_window <-> user_settings import cycle,
+        # mirroring _resolve_db_native_tools' own lazy import.
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model)
+        if row is not None:
+            window = row.get("context_window_tokens")
+            max_out = row.get("max_output_tokens")
+            return (
+                int(window) if window else None,
+                int(max_out) if max_out else None,
+            )
+    except Exception:
+        logger.warning(
+            "_resolve_registry_window: sync cache read failed for model=%s; "
+            "falling back to the static context chain",
+            model,
+            exc_info=True,
+        )
+    return None, None
+
+
 def resolve_context_budget(active_provider: str, model: str = "") -> int:
     """Return context budget for main agent based on active model and provider.
 
@@ -85,18 +191,76 @@ def resolve_context_budget(active_provider: str, model: str = "") -> int:
     3. MODEL_CONTEXT_DEFAULTS — hardcoded per-model practical limits
     4. PROVIDER_CONTEXT_DEFAULTS — per-provider fallback
     5. 100,000 absolute fallback
+
+    The result is then CLAMPED to what the model can physically accept, whenever the
+    operator has declared ``context_window_tokens`` on its registry row.
+
+    Why a clamp rather than another priority rung: every entry in the chain above is a
+    *policy* choice (cost control, a conservative cap), whereas the registry value is a
+    *physical* fact about the model. A policy may ask for less than the hardware allows;
+    it may never ask for more, because exceeding the real window is not a degraded
+    answer — it is a hard provider error. Measured 2026-08-18 against a local
+    32,768-token model: the chain handed the trimmer 80,000 (the ``ollama`` provider
+    default), so it never trimmed, and runs died with
+    ``400: request (41206 tokens) exceeds the available context size (32768)`` — and,
+    worse, with ``finish_reason=length`` mid-tool-call after the agent had gathered all
+    its data, losing the deliverable on the final step.
+
+    A clamp can only ever LOWER a budget toward a true limit, so no model gains context
+    it did not have before. Models with no registry row, or a null
+    ``context_window_tokens``, are byte-identical to the pre-clamp behaviour.
+
+    Nothing here is hardcoded per model or per provider: the window and the output
+    reserve both come from the registry row, which is operator-editable in the Model
+    Registry UI (``_MODEL_CAP_COLUMNS`` allows PATCH on both columns). A deployment
+    running a 200k local model just sets 200000 there.
     """
     if settings.context_window_max_tokens > 0:
-        return settings.context_window_max_tokens
+        budget = settings.context_window_max_tokens
+    elif model and model in (env_overrides := _parse_model_limits(settings.model_context_limits)):
+        budget = env_overrides[model]
+    elif model and model in MODEL_CONTEXT_DEFAULTS:
+        budget = MODEL_CONTEXT_DEFAULTS[model]
+    else:
+        budget = PROVIDER_CONTEXT_DEFAULTS.get(active_provider, 100_000)
 
-    if model:
-        env_overrides = _parse_model_limits(settings.model_context_limits)
-        if model in env_overrides:
-            return env_overrides[model]
-        if model in MODEL_CONTEXT_DEFAULTS:
-            return MODEL_CONTEXT_DEFAULTS[model]
+    window, max_out = _resolve_registry_window(model)
+    if not window:
+        return budget
 
-    return PROVIDER_CONTEXT_DEFAULTS.get(active_provider, 100_000)
+    # Leave room for what trim_messages_to_fit cannot count: the model's own output
+    # (per-model, from the registry), the tool schemas (measured — a fixed cost, so
+    # NOT scaled by window size) and the system prompt (proportional).
+    reserve = (
+        _output_reserve(model, max_out)
+        + _tool_schema_tokens()
+        + int(window * _PROMPT_OVERHEAD_FRACTION)
+    )
+
+    # A row whose own reserve exceeds its own window is INTERNALLY INCONSISTENT — an
+    # operator typo, or a catalog value copied into the wrong column. Clamping to a
+    # floor there would hand the trimmer a catastrophic budget (measured 2026-08-18:
+    # rows carrying max_output_tokens == context_window_tokens drove five OpenRouter
+    # models to a 1,000-token budget). A bad row must be INERT, never destructive, so
+    # we log it and hand back the chain budget untouched.
+    if reserve >= window:
+        logger.warning(
+            "context_budget: registry row for model=%s is self-inconsistent "
+            "(window=%d <= reserve=%d); ignoring the clamp and using chain_budget=%d",
+            model, window, reserve, budget,
+        )
+        return budget
+
+    ceiling = window - reserve
+    if budget <= ceiling:
+        return budget
+
+    logger.info(
+        "context_budget_clamped model=%s chain_budget=%d registry_window=%d "
+        "max_output=%s -> %d",
+        model, budget, window, max_out, ceiling,
+    )
+    return ceiling
 
 
 def estimate_tokens(text: str | None, model: str = "") -> int:

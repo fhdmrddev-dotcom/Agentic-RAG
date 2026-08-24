@@ -95,7 +95,11 @@ from app.services.workflow_kickoff import (
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
 # the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
 from app.db.workflows import create_workflow_run, list_published_workflows
-from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
+from app.models.thread import (
+    ThreadWorkflowState,
+    WorkflowPhaseState,
+    declared_phase_measure,
+)
 from app.models.user_settings import (
     load_all_model_overrides,
     load_user_settings,
@@ -150,87 +154,38 @@ router = APIRouter(prefix="/threads", tags=["threads"])
 logger = logging.getLogger(__name__)
 
 
-# WR-05: retain strong references to fire-and-forget background tasks so the
-# event loop does not garbage-collect them mid-execution (Python docs:
-# asyncio.create_task only weakly references the returned task). Without a
-# strong reference, audit-log and memory writes can be silently dropped with
-# the warning "Task was destroyed but it is pending!". Tasks self-evict from
-# the set via the done-callback so it never grows unbounded.
-_BACKGROUND_TASKS: set[asyncio.Task] = set()
+# ── SSE transport primitives — MOVED to app.services.run_transport (G-5, 2026-08-17) ──
+# _BACKGROUND_TASKS / _spawn / RUN_TASKS / TERMINAL_TYPES / _RUN_STATUS_TO_TERMINAL_TYPE /
+# _emit / _emit_terminal moved VERBATIM to a leaf module and re-imported here — one
+# definition, no duplicate — following the same pattern this file already uses for
+# agent_loop, thread_title, run_model_resolution, workflow_kickoff and run_producer.
+#
+# WHY THEY MOVED, measured rather than asserted: FOUR of the seven symbols (_spawn,
+# _BACKGROUND_TASKS, TERMINAL_TYPES, _RUN_STATUS_TO_TERMINAL_TYPE) had ZERO uses in this
+# module outside their own definitions — they lived here only so OTHER modules could
+# import them. RUN_TASKS alone has ELEVEN production import sites across SEVEN modules
+# (admin, evals, runs, main, run_lifecycle, run_producer, task_service), most of them
+# LATE function-local imports written to dodge a circular import.
+#
+# ⚠ THIS RE-IMPORT IS LOAD-BEARING AND MUST NOT BE "TIDIED" AWAY. Every consumer still
+# says `from app.api.threads import RUN_TASKS/_emit/_emit_terminal/_spawn`, and the tests
+# that patch("app.api.threads.RUN_TASKS") still intercept, because those late-importing
+# consumers read the attribute off THIS module at CALL time. Deleting the re-import — or
+# repointing a consumer at run_transport directly without moving its patch sites in the
+# same commit — silently breaks that surface. One object:
+#   app.api.threads.RUN_TASKS is app.services.run_transport.RUN_TASKS
+from app.services.run_transport import (  # noqa: F401 — re-exported for consumers + patch surface
+    _BACKGROUND_TASKS,
+    _spawn,
+    RUN_TASKS,
+    TERMINAL_TYPES,
+    _RUN_STATUS_TO_TERMINAL_TYPE,
+    _emit,
+    _emit_terminal,
+)
 
-
-def _spawn(coro) -> asyncio.Task:
-    """Schedule a fire-and-forget coroutine and retain a strong reference."""
-    t = asyncio.create_task(coro)
-    _BACKGROUND_TASKS.add(t)
-    t.add_done_callback(_BACKGROUND_TASKS.discard)
-    return t
-
-
-# ── Phase 061: per-run producer-task registry (D-061-11, D-v2.5-08) ──────
-# Module-level dict keyed by run_id. The route handler registers new
-# producer tasks; the producer's finally pops itself; the lifespan close
-# in main.py cancels all entries (Plan 01 — late-bound import). 062's
-# DELETE /runs/{id} will look up the run_id here and call task.cancel().
-# Single uvicorn worker (D-v2.5-02) means one registry per process — no
-# cross-process coordination needed.
 import uuid as _uuid_mod
 from uuid import UUID  # Phase 062 D-062-04: typed path param for list_active_runs
-RUN_TASKS: dict[_uuid_mod.UUID, asyncio.Task] = {}
-
-# Terminal sentinel discriminator types (D-061-12). Consumer breaks when
-# it XREADs an entry whose data.type is in this set.
-# Phase 066 D-066-06: 5th SSE terminal type 'timed_out' — distinct wire-format
-# value from 'error' so the frontend's onTerminal callback can route to a
-# dedicated "Agent reached time limit" banner (D-066-10) and the Resume
-# button gating extends to runStatus === 'timed_out' (D-066-09).
-TERMINAL_TYPES = frozenset({"done", "error", "cancelled", "timed_out"})
-
-# D-061-09 runs.status enum → SSE TERMINAL_TYPES mapping. The runs table
-# uses {"streaming","completed","failed","cancelled","timed_out"} per the
-# migration CHECK constraint (035 + 038); the SSE wire uses TERMINAL_TYPES.
-# The producer's finally must translate runs.status → wire type before
-# calling _emit_terminal.
-_RUN_STATUS_TO_TERMINAL_TYPE: dict[str, str] = {
-    "completed": "done",
-    "failed": "error",
-    "cancelled": "cancelled",
-    "timed_out": "timed_out",  # Phase 066 D-066-06 — system-timeout sentinel
-}
-
-
-async def _emit(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> None:
-    """One canonical XADD shape for all producer-side events (D-061-10).
-
-    Wire format byte-identical to 059's queue payload: single-field
-    `data` containing JSON-encoded {type, **fields}. MAXLEN ~ 10000 caps
-    per-run buffer at ~2MB (typical run emits <500 events). The terminal
-    sentinel XADD goes through _emit_terminal() instead so it's exempt
-    from MAXLEN trimming (Pitfall 5).
-    """
-    await redis.xadd(
-        f"run:{run_id}",
-        {"data": json.dumps({"type": type, **fields})},
-        maxlen=10000,
-        approximate=True,
-    )
-
-
-async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> None:
-    """Terminal sentinel XADD — exempt from MAXLEN trimming (Pitfall 5).
-
-    type MUST be in TERMINAL_TYPES. Called inside the producer's shielded
-    finalizer BEFORE EXPIRE — Pitfall 2 ordering rule.
-    """
-    # WR-03: explicit raise (not assert) — assertions are stripped under `python -O`.
-    if type not in TERMINAL_TYPES:
-        raise ValueError(
-            f"_emit_terminal type must be in TERMINAL_TYPES, got {type!r}"
-        )
-    await redis.xadd(
-        f"run:{run_id}",
-        {"data": json.dumps({"type": type, **fields})},
-    )
 
 
 # Phase 162.5 Plan 01 (G-5 leaf extraction): the disabled-model fallback + provider-resolution
@@ -406,6 +361,18 @@ async def list_active_runs(
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
         .eq("status", "streaming")
+        # ⚠ A-1 (2026-08-16) — a SUB-AGENT is never a producer. Sub-agent runs live
+        # on the SAME thread with the SAME 'streaming' status (task_service.py's
+        # insert_run writes parent_run_id=parent_ctx.run_id), so without this clause
+        # a sub-agent's run_id reaches the client: the reconcile loop stamps a
+        # runStatus:"streaming" placeholder per row returned here, and stopThread
+        # picks by bucket order — so DELETE /runs/{id} could be handed a sub-agent id
+        # through the PRIMARY path, which CR-01's narrowing (api/runs.py, the cancel
+        # FALLBACK) never touches. Ordering-dependent, which is why it was recorded
+        # as UNCERTAIN rather than reproduced.
+        # ⚠ This NARROWS what the query can reach and widens nothing. Both selects in
+        # this module carry it — they are documented as mirrors and must not drift.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     return runs_resp.data or []
@@ -478,6 +445,18 @@ async def get_snapshot(
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
         .eq("status", "streaming")
+        # ⚠ A-1 (2026-08-16) — a SUB-AGENT is never a producer. Sub-agent runs live
+        # on the SAME thread with the SAME 'streaming' status (task_service.py's
+        # insert_run writes parent_run_id=parent_ctx.run_id), so without this clause
+        # a sub-agent's run_id reaches the client: the reconcile loop stamps a
+        # runStatus:"streaming" placeholder per row returned here, and stopThread
+        # picks by bucket order — so DELETE /runs/{id} could be handed a sub-agent id
+        # through the PRIMARY path, which CR-01's narrowing (api/runs.py, the cancel
+        # FALLBACK) never touches. Ordering-dependent, which is why it was recorded
+        # as UNCERTAIN rather than reproduced.
+        # ⚠ This NARROWS what the query can reach and widens nothing. Both selects in
+        # this module carry it — they are documented as mirrors and must not drift.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     active_runs = runs_resp.data or []
@@ -1088,10 +1067,19 @@ async def get_thread_workflow(
     total_phases = None
     wf_continues_used = 0
     phases_list: list[WorkflowPhaseState] | None = None
+    # Phase 194.1 (D-09 AMENDED) — the LAST run's status + its two timestamps, keyed to the
+    # already-resolved `phases_source_run_id` below. Initialized beside `run_status = None`
+    # above so a pure-Deep thread (no workflow_run ever) yields three Nones, the same shape
+    # `phases_list = None` already has.
+    last_run_status = None
+    last_run_created_at = None
+    last_run_updated_at = None
     if active_workflow_run_id is not None:
         wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
+                   wr.created_at,
+                   wr.updated_at,
                    wr.continues_used,
                    wd.slug  AS definition_slug,
                    wd.name  AS definition_name,
@@ -1114,6 +1102,10 @@ async def get_thread_workflow(
             current_phase_slug = wf_row["current_phase_slug"]
             current_phase_index = wf_row["current_phase_index"]
             total_phases = wf_row["total_phases"]
+            # ARM A (live anchor). Same row, widened SELECT — no extra round trip.
+            last_run_status = wf_row["status"]
+            last_run_created_at = wf_row["created_at"]
+            last_run_updated_at = wf_row["updated_at"]
 
     # mode / locked / lock_is_stale derive from the anchor + run terminality.
     mode = "harness" if active_workflow_run_id is not None else "deep"
@@ -1187,16 +1179,31 @@ async def get_thread_workflow(
     # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
     phases_source_run_id = active_workflow_run_id
     if phases_source_run_id is None:
+        # D-09 (AMENDED): this widening is what makes the stopped receipt possible on an UNGATED route — the workflow_runs router that D-09 originally chose is canvas_gate'd (middleware/canvas_gate.py:85-93 + workflow_runs.py:169) and visual_workflow_canvas ships OFF (models/user_settings.py:1197-1203), so a chat receipt fed from it would be invisible at the shipped default.
         latest_wf = await _rls_fetchrow(
-            "SELECT id FROM workflow_runs WHERE thread_id = $1 "
+            "SELECT id, status, created_at, updated_at FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
         if latest_wf is not None:
             phases_source_run_id = latest_wf["id"]
+            # ARM B (latest, after the anchor is NULLed). Same row, widened SELECT.
+            last_run_status = latest_wf["status"]
+            last_run_created_at = latest_wf["created_at"]
+            last_run_updated_at = latest_wf["updated_at"]
     if phases_source_run_id is not None:
+        # 200 (DES-02 / D-05 / D-07) — widened in LOCKSTEP with `WorkflowPhaseState` and
+        # with `api/workflow_runs.py`'s projection: the chat panel and the run page read
+        # the SAME rows and must not disagree about them.
+        # ⚠ `output` is SELECTED but NEVER put on the wire — `_persist_output` stores each
+        # executor's dict full and inline (prompts, citations, field_map). The serializer
+        # below extracts ONLY `_measure.count` / `_measure.noun`, and `WorkflowPhaseState`
+        # declares no `output` field, so `response_model` drops anything undeclared.
+        # ⚠ This read goes through `_rls_fetch` (the user-JWT path), so RLS is the access
+        # boundary here; adding columns to the SELECT widens no scope.
         phase_rows = await _rls_fetch(
-            "SELECT slug, phase_index, status FROM workflow_phases "
+            "SELECT slug, phase_index, status, started_at, completed_at, output "
+            "FROM workflow_phases "
             "WHERE workflow_run_id = $1 ORDER BY phase_index",
             UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
         )
@@ -1224,15 +1231,21 @@ async def get_thread_workflow(
                             slug_to_type[slug] = ptype
                 except Exception:
                     pass
-            phases_list = [
-                WorkflowPhaseState(
-                    slug=r["slug"],
-                    phase_index=r["phase_index"],
-                    status=r["status"],
-                    phase_type=slug_to_type.get(r["slug"]),
+            phases_list = []
+            for r in phase_rows:
+                _count, _noun = declared_phase_measure(r["output"])
+                phases_list.append(
+                    WorkflowPhaseState(
+                        slug=r["slug"],
+                        phase_index=r["phase_index"],
+                        status=r["status"],
+                        phase_type=slug_to_type.get(r["slug"]),
+                        started_at=r["started_at"],
+                        completed_at=r["completed_at"],
+                        step_count=_count,
+                        step_noun=_noun,
+                    )
                 )
-                for r in phase_rows
-            ]
 
     return ThreadWorkflowState(
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
@@ -1269,5 +1282,12 @@ async def get_thread_workflow(
             if isinstance(phases_source_run_id, str)
             else phases_source_run_id
         ),
+        # Phase 194.1 (D-09 AMENDED) — keyed to the SAME already-resolved id directly above,
+        # read off whichever of the two arms produced it. `run_status` above is UNCHANGED and
+        # remains the LIVE anchor's status; these three are the LAST run's and survive the
+        # anchor NULL that `finish_run` writes on every terminal run.
+        last_run_status=last_run_status,
+        last_run_created_at=last_run_created_at,
+        last_run_updated_at=last_run_updated_at,
         phases=phases_list,
     )

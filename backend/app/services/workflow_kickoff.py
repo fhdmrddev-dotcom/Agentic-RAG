@@ -219,10 +219,16 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Workflow not found",
             )
-        if _def_row.get("status") != "published":
+        _status = _def_row.get("status")
+        if _status not in ("published", "draft"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Workflow is not published",
+                detail="Workflow is not runnable",
+            )
+        if _status == "draft" and _def_row.get("created_by") != current_user["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Draft workflows can only be run by their author",
             )
         from app.models.harness import WorkflowDefinition
         _raw_def = _def_row["definition"]

@@ -29,6 +29,15 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: mockUpdate,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections too,
+  // so an `external_action` step's face can name where it sends. DECLARED HERE rather than
+  // left undefined, for the reason `196-08` measured the hard way: a whole-module factory mock
+  // that omits a symbol the composed tree can reach fails far from its cause. An empty list is
+  // the SHIPPED absence — every external face renders its destination-free sentence.
+  listConnectorConnections: () => Promise.resolve([]),
+  // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
+  // reads the author model registry at mount and this factory must declare it.
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
 }))
 
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
@@ -73,7 +82,12 @@ describe("WorkflowBuilderPage — describe-first empty Builder", () => {
     expect(screen.queryByTestId("strictness-dial")).not.toBeInTheDocument()
     expect(screen.queryByTestId("phase-form-rail")).not.toBeInTheDocument()
     // No spine node (the graph only appears post-draft).
-    expect(screen.queryByText(/READ-ONLY GRAPH/i)).not.toBeInTheDocument()
+    // ⚠ RE-POINTED BY 200-05 (BS-MNR-01). This probed `queryByText(/READ-ONLY GRAPH/i)` — the
+    // legend, which that plan SUBTRACTS as *"the noisiest string in the product"*. A negative
+    // probe against a string that no longer exists anywhere would have kept passing while
+    // measuring nothing, which is the worst outcome available here. The graph's presence is
+    // now detected by its own landmark `aria-label`, which is stabler than a body of copy.
+    expect(screen.queryByRole("region", { name: /workflow phase spine/i })).not.toBeInTheDocument()
     // No left nav rail inside the page.
     expect(screen.queryByTestId("builder-left-rail")).not.toBeInTheDocument()
   })
@@ -119,8 +133,11 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     expect(gather).toBeInTheDocument()
     expect(screen.getByTestId("spine-node-review")).toBeInTheDocument()
     expect(screen.getByTestId("spine-node-emit")).toBeInTheDocument()
-    // The graph (read-only legend) is present — the draft rendered as a whole.
-    expect(screen.getByText(/READ-ONLY GRAPH/i)).toBeInTheDocument()
+    // The graph is present — the draft rendered as a whole.
+    // ⚠ RE-POINTED BY 200-05 (BS-MNR-01): this read `getByText(/READ-ONLY GRAPH/i)`, and the
+    // legend is subtracted. This is the POSITIVE half of the pair above, so it is the probe
+    // that proves the new landmark needle can actually find a mounted spine.
+    expect(screen.getByRole("region", { name: /workflow phase spine/i })).toBeInTheDocument()
     expect(mockGenerate).toHaveBeenCalledTimes(1)
   })
 
@@ -179,7 +196,8 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     expect(within(err).getByText(/could not generate/i)).toBeInTheDocument()
     // And NO phase nodes / graph render (never a partial draft).
     expect(screen.queryByTestId("spine-node-gather")).not.toBeInTheDocument()
-    expect(screen.queryByText(/READ-ONLY GRAPH/i)).not.toBeInTheDocument()
+    // ⚠ RE-POINTED BY 200-05 (BS-MNR-01) — same reason as the two probes above.
+    expect(screen.queryByRole("region", { name: /workflow phase spine/i })).not.toBeInTheDocument()
   })
 
   it("a thrown generate error also surfaces the honest failure, no nodes", async () => {
