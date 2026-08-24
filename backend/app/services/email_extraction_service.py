@@ -80,6 +80,35 @@ def html_to_plain_text(html_content: str) -> str:
     return html.unescape(parser.get_text())
 
 
+def scrub_text(value: str | None) -> str:
+    """Strip characters Postgres `text` cannot store, and normalise to a real string.
+
+    ⚠ THIS EXISTS BECAUSE A REAL `.msg` FAILED INGESTION AT THE EMBEDDING STEP WITH
+    ``22P05: unsupported Unicode escape sequence — \\u0000 cannot be converted to text``.
+    Measured on the offending file: the NUL was in the **SUBJECT** (1 occurrence), not in
+    the body and not in any of the 19 headers. `extract-msg` reads MAPI properties out of an
+    OLE compound file, and those are frequently NUL-terminated; the terminator rides along in
+    the decoded string.
+
+    ⚠ POSTGRES REFUSES NUL IN `text` AT ANY DEPTH — there is no encoding that stores it, so
+    this cannot be pushed down to the driver or fixed with a cast. It has to be removed at the
+    boundary where the value is produced.
+
+    Removes NUL and the other C0/C1 control characters, KEEPING the three whitespace controls
+    that carry meaning in an email body (\\t, \\n, \\r). Never returns None.
+    """
+    if not value:
+        return ""
+    return "".join(
+
+        ch for ch in str(value)
+
+        if ch in "\t\n\r" or (ch >= " " and ch != "\x7f")
+
+    )
+
+
+
 def sanitize_attachment_filename(name: str | None) -> str:
     """Reduce an attachment name to a leaf filename that is safe to use as a storage key.
 
@@ -329,20 +358,22 @@ def parse_eml_bytes(raw: bytes) -> ParsedEmail:
     # All headers dict
     headers_dict = {k: _decode_header_str(str(v)) for k, v in msg.items()}
 
+    # 203 FIX — scrub at the ONE exit point rather than per field: a new field added later
+    # is covered by construction instead of by remembering.
     return ParsedEmail(
-        subject=subject,
-        sender=sender,
-        to=to_addrs,
-        cc=cc_addrs,
-        bcc=bcc_addrs,
+        subject=scrub_text(subject),
+        sender=scrub_text(sender),
+        to=[scrub_text(a) for a in to_addrs],
+        cc=[scrub_text(a) for a in cc_addrs],
+        bcc=[scrub_text(a) for a in bcc_addrs],
         date=date_str,
         message_id=message_id,
         in_reply_to=in_reply_to,
         references=references,
-        body=body_text,
-        clean_body=clean_body,
+        body=scrub_text(body_text),
+        clean_body=scrub_text(clean_body),
         attachments=attachments,
-        headers=headers_dict,
+        headers={k: scrub_text(v) for k, v in headers_dict.items()},
     )
 
 
@@ -389,20 +420,21 @@ def parse_msg_bytes(raw: bytes) -> ParsedEmail:
         if hasattr(msg, "headerDict") and msg.headerDict:
             headers_dict = {k: str(v) for k, v in msg.headerDict.items()}
 
+        # 203 FIX — see `scrub_text`. THIS is the parser whose real output carried the NUL.
         return ParsedEmail(
-            subject=subject,
-            sender=sender,
-            to=to_addrs,
-            cc=cc_addrs,
-            bcc=bcc_addrs,
+            subject=scrub_text(subject),
+            sender=scrub_text(sender),
+            to=[scrub_text(a) for a in to_addrs],
+            cc=[scrub_text(a) for a in cc_addrs],
+            bcc=[scrub_text(a) for a in bcc_addrs],
             date=date_str,
             message_id=message_id,
             in_reply_to=in_reply_to,
             references=[],
-            body=body_text,
-            clean_body=clean_body,
+            body=scrub_text(body_text),
+            clean_body=scrub_text(clean_body),
             attachments=attachments,
-            headers=headers_dict,
+            headers={k: scrub_text(v) for k, v in headers_dict.items()},
         )
     finally:
         msg.close()

@@ -117,6 +117,52 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
 }
 
 
+#: Formats whose "no text" case has a CONCRETE cause a person can act on. Anything not
+#: listed here falls through to the generic sentence, which is deliberately vague because
+#: for those formats we genuinely do not know why the extractor came back empty.
+_EMPTY_TEXT_MESSAGES: dict[str, str] = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        "This spreadsheet is empty — none of its sheets contain any data. "
+        "Add rows and upload it again.",
+    "application/vnd.ms-excel":
+        "This spreadsheet is empty — none of its sheets contain any data. "
+        "Add rows and upload it again.",
+    "text/csv":
+        "This CSV has no rows — only a header, or nothing at all. "
+        "Add rows and upload it again.",
+    "application/pdf":
+        "No text could be read from this PDF. It is most likely a scan or a set of "
+        "images, which needs OCR before it can be searched.",
+    "message/rfc822":
+        "This email has no readable message body.",
+    "application/vnd.ms-outlook":
+        "This email has no readable message body.",
+    "application/x-msg":
+        "This email has no readable message body.",
+}
+
+#: The fallback. Kept WORD-FOR-WORD as it shipped, so the generic case is unchanged.
+_EMPTY_TEXT_DEFAULT = "No text content could be extracted from the file."
+
+
+def empty_text_message(mime_type: str | None) -> str:
+    """The sentence shown when extraction succeeded but produced nothing to chunk.
+
+    ⚠ WRITTEN BECAUSE THE GENERIC SENTENCE WAS TRUE AND USELESS. An operator uploaded an
+    `.xlsx`, saw "No text content could be extracted from the file", and reasonably read it
+    as a broken importer. It was not: the workbook was genuinely empty (`<sheetData/>`,
+    self-closed, no sharedStrings.xml). Two hours of the release went into proving the app
+    was right, which is the cost of a message that describes the CODE'S experience instead
+    of the FILE'S state.
+
+    ⚠ ONLY formats whose empty case has ONE plausible cause get a specific sentence. A DOCX
+    that extracts to nothing could be a dozen things, so it keeps the vague wording rather
+    than being handed a confident guess — a wrong specific message is worse than a right
+    vague one.
+    """
+    return _EMPTY_TEXT_MESSAGES.get(mime_type or "", _EMPTY_TEXT_DEFAULT)
+
+
 def _write_extraction_run_row(
     supabase: Client,
     document_id: str,
@@ -1909,7 +1955,8 @@ def ingest_document(
         if not chunks:
             supabase.table("documents").update({
                 "status": "failed",
-                "error_message": "No text content could be extracted from the file.",
+                # 203 follow-up — say what is true of the FILE, not of the extractor.
+                "error_message": empty_text_message(mime_type),
             }).eq("id", document_id).execute()
             return
 
