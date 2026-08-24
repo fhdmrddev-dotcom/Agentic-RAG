@@ -75,6 +75,11 @@ from app.services.ask_user_service import resume_pending_prompt
 # come from ``run_lifecycle``, which is the cancel OWNER; this module gains a CALL,
 # never a second home for the mechanism (G-5: no second concern lands here).
 from app.services.run_lifecycle import cancellation_watch, is_run_cancelled
+# Phase 204 (SCHED-02 / D-204-06) -- the spend-cap + wall-clock breaker. Same discipline
+# as the line above: this module gains CALLS, never a second home for the mechanism. The
+# breaker owns its own arithmetic, its own trip record and its own composition of the
+# cancel path, so nothing about enforcement is re-derived here.
+from app.services.circuit_breaker import CircuitBreaker, CircuitBreakerTrippedError
 
 logger = logging.getLogger(__name__)
 
@@ -1615,6 +1620,99 @@ async def run_workflow(
         _accumulate_phase_grounding(
             _resumed_output, run_source_refs, run_citations, run_similarity_scores
         )
+    # ── Phase 204 (SCHED-02 / D-204-05 / D-204-06) — THE CIRCUIT BREAKER ───────────
+    #
+    # ⚠ IT IS DISARMED FOR EVERY RUN THAT EXISTS TODAY, AND THAT IS THE POINT OF SITING
+    # IT HERE. ``load_run_budget`` reads ``workflow_runs.metadata`` — a column only
+    # 204-03's scheduler writes — so an interactive run resolves both limits to ``None``,
+    # ``check_limits`` returns ``(False, None)`` forever and ``duration_watch`` creates no
+    # task. The engine's shipped behaviour is byte-identical on the path everything takes
+    # today; the ceilings exist for the runs nobody is watching.
+    #
+    # ⚠ THE ANCHOR IS THE RUN'S SERVER TIMESTAMP, NOT NOW(). ``load_run_budget`` returns
+    # ``claimed_at ?? created_at``. A resumed run that re-anchored on the current instant
+    # would grant itself a whole fresh wall-clock budget on every restart — which is
+    # exactly how a duration cap becomes decorative, and it is the same defect Phase 200's
+    # elapsed timer was fixed for (BUG-260610-01).
+    #
+    # ⚠ ``ctx`` WINS OVER THE DATABASE WHEN IT CARRIES LIMITS. The plan allows either
+    # source; a caller that passes them explicitly (a test, a future direct invocation)
+    # must not be silently overridden by a row it did not write.
+    #
+    # ⚠ THE READ FAILS OPEN. See ``load_run_budget``'s docstring: a database blip must not
+    # kill every in-flight run on every worker at once. The named cost is that an
+    # unapplied migration 125 silently disarms the cap.
+    from app.db.workflows import load_run_budget  # noqa: PLC0415 — module load-path rule
+
+    _budget = await load_run_budget(pool, run_id)
+    breaker = CircuitBreaker(
+        max_tokens=getattr(ctx, "max_tokens_per_run", None)
+        or _budget["max_tokens_per_run"],
+        max_duration_seconds=getattr(ctx, "max_duration_seconds", None)
+        or _budget["max_duration_seconds"],
+        started_at=_budget["started_at"],
+    )
+    # THE TOKEN SOURCE, AND IT IS THE HALF THAT DID NOT EXIST BEFORE THIS PHASE. The
+    # harness had NO per-call token counts at all: ``harness/`` contained two ``usage``
+    # references in total, both ``input_tokens=None``. The counts were being measured the
+    # whole time one layer down — ``task_service._stream_one_iteration`` has SUMMED every
+    # turn's usage into a caller-supplied box since Phase 093 (D-17) — but nothing handed
+    # a box to the harness and ``run_task_sub_agent`` did not return its total. Setting
+    # ONE box here, which the executors thread into the substrate that already fills it,
+    # is what makes ``max_tokens_per_run`` a ceiling that can actually trip rather than a
+    # setting that is read and never reached (the Phase-200 SC#3 shape).
+    #
+    # ⚠ THE BOX IS CUMULATIVE AND ``record_tokens`` IS ADDITIVE — the breaker's
+    # ``absorb_usage_box`` owns the subtraction so this file carries no delta bookkeeping.
+    #
+    # ⚠ ``llm_emit`` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER THAN HIDDEN.
+    # ``forced_emit`` measures no usage anywhere in its own module, so its spend is
+    # invisible to any box. Wiring it means instrumenting the forcing seam, which is a
+    # different file and a different plan. The three counted types are the three that
+    # loop (``llm_agent``, ``llm_batch_agents``) or stream (``llm_single``); a sealed
+    # single shot is the one that cannot run away.
+    try:
+        ctx.run_usage_box = {}
+    except (AttributeError, TypeError):
+        pass  # immutable stub ctx in some unit tests — the breaker simply sees no tokens
+
+    async def _enforce_budget(where: str) -> None:
+        """Absorb the run's spend, and raise if either ceiling is now breached.
+
+        ⚠ IT RAISES ``CircuitBreakerTrippedError`` AND **NOT** ``asyncio.CancelledError``,
+        AND IT IS CALLED FROM OUTSIDE THE PHASE ``try``. Both halves are load-bearing. A
+        ``CancelledError`` would take the escape arm below, which calls ``cancel_phase`` —
+        and a shipped Phase-194 fence AST-counts ``cancel_phase`` call sites in this module
+        at EXACTLY ONE (204-01 hit that fence and answered by removing a write, not by
+        re-baselining the count). Calling from outside the ``try`` keeps this exception out
+        of that arm entirely, so the count is untouched.
+
+        ⚠ IT RAISES AND DOES NOT ``break``. 204-01 measured what ``break`` costs here: the
+        statements after this ``while`` loop are ``finish_run(pool, run_id, "completed")``,
+        a ``run_completed`` audit row, ``_surface_final_answer`` and a ``run_completed``
+        SSE frame. Breaking out of a TRIPPED run therefore overwrites the breaker's
+        ``cancelled`` with ``completed``, persists a partial answer as the deliverable and
+        tells the browser the run finished — a run killed for overspending, reporting
+        success. ``return`` would be honest but silent; ``raise`` is honest AND tells the
+        producer, whose F2 arm (204-01) consults the cancel registry and writes
+        ``cancelled`` rather than ``failed``.
+
+        ⚠ THE TRIP RECORD AND THE CANCEL HAPPEN BEFORE THE RAISE, inside ``trip_breaker``.
+        By the time this propagates the run is already durably ``cancelled`` with its
+        audit row written, so no handler upstream has to know what a breaker is.
+        """
+        if not breaker.armed:
+            return
+        breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
+        _tripped, _reason = breaker.check_limits()
+        if not _tripped:
+            return
+        await breaker.trip_breaker(
+            pool, redis, run_id, _reason, {"observed_by": where},
+            user_id=_audit_user_id,
+        )
+        raise CircuitBreakerTrippedError(_reason, breaker.measurements())
+
     # Index-driven loop (not a for-each) so skip_to_phase can jump the cursor (D-09).
     i = 0
     while i < len(ordered):
@@ -1695,6 +1793,21 @@ async def run_workflow(
             )
             return
 
+        # ── 0b. Phase 204 (SCHED-02) — THE BUDGET FLOOR, SAME BOUNDARY, SAME REASON ──
+        #
+        # Sited immediately after the cancel brake and for the identical argument: below
+        # this line the engine writes a durable ``active`` row, emits to the browser and
+        # hands control to an executor that calls a provider. A run that has already spent
+        # its budget is entitled to none of them. This is the check that satisfies "once
+        # the breaker trips, zero further LLM provider calls or phase executions are
+        # permitted" — it is a HARD FLOOR before the work, not a report after it.
+        #
+        # ⚠ IT ALSO COVERS THE TWO CASES A POST-PHASE CHECK CANNOT SEE: a RESUMED run
+        # whose budget was already blown before the restart (the loop's first iteration
+        # reaches here before anything executes), and a ``skip_to_phase`` cycle, which
+        # ``continue``s past the end of the body without ever completing a phase.
+        await _enforce_budget("phase_boundary")
+
         # 1. DURABLE active BEFORE any work (Pitfall 1).
         # 200 (DES-02 / D-05): the write RETURNS the timestamp it stored, so the frame
         # below carries the value the ROW carries — never a Python-side now() computed
@@ -1757,7 +1870,33 @@ async def run_workflow(
             # accumulate one Redis subscription per phase (threat: stranded
             # channels). Re-subscribing per phase costs one round trip against a
             # body measured in seconds to minutes.
-            async with cancellation_watch(redis, run_id):
+            # ── Phase 204 (SCHED-02) — THE WALL-CLOCK SENTINEL, ON THE SAME LINE ──
+            #
+            # ⚠ THIS IS THE ONLY THING THAT CAN KILL A *HUNG* PHASE ON A DEADLINE. The
+            # duration threat is named as "hanging network requests or third-party
+            # deadlocks"; a boundary check cannot see one, because a hung phase never
+            # reaches the next boundary. A duration cap enforced only at boundaries
+            # would be built, gated, green and structurally unable to do its job.
+            #
+            # ⚠ IT CANCELS NOTHING ITSELF — IT TRIPS, AND ITS SIBLING ON THIS LINE DOES
+            # THE KILLING. ``trip_breaker`` composes ``cancel_workflow_run_internals``,
+            # which broadcasts on Redis; the ``cancellation_watch`` entered immediately
+            # to its left then cancels this task, through the identical path a human
+            # Stop takes. That is D-204-03's one unified stop path — a second killer
+            # would be a second thing that can drift.
+            #
+            # ⚠ ORDER ON THIS LINE IS LOAD-BEARING: ``cancellation_watch`` is entered
+            # FIRST, so it is already listening when the sentinel starts. Reversed, a
+            # deadline that had already elapsed could trip before anything was
+            # subscribed, and the run would brake one boundary later instead of now.
+            #
+            # ⚠ THE SENTINEL IS SCOPED TO ONE PHASE, exactly like its sibling — torn
+            # down on every exit path so a long run accumulates no tasks. The deadline
+            # is ABSOLUTE, so re-entering per phase re-computes the remaining time; a
+            # per-phase TIMER would let an N-phase run outlive an N-times deadline.
+            async with cancellation_watch(redis, run_id), breaker.duration_watch(
+                pool, redis, run_id, user_id=_audit_user_id
+            ):
                 outcome = await _run_phase_with_gates(
                     phase,
                     accumulated_outputs,
@@ -2222,6 +2361,21 @@ async def run_workflow(
                 from_phase=phase.slug,
                 to_phase=ordered[i + 1]["slug"],
             )
+        # ── Phase 204 (SCHED-02) — "IMMEDIATELY", THE SECOND HALF ─────────────
+        #
+        # ⚠ THE BOUNDARY CHECK ALONE WOULD LET THE *LAST* PHASE'S BREACH GO UNRECORDED.
+        # A run whose final phase blows the budget never reaches another boundary — it
+        # falls out of the loop into the success terminal and reports ``completed``. No
+        # further money is at risk there, but the run still overspent, and a breach with
+        # no trip record is precisely the *audit evasion* threat: the ledger would show a
+        # clean completion for a run that exceeded its cap. must_have truth 2 says
+        # "immediately", and this is the site that makes that word true.
+        #
+        # ⚠ SITED AFTER THE TRANSITION WRITES, NOT BEFORE. The phase genuinely completed
+        # and its durable output, audit row and SSE frame are facts; the trip must not
+        # retro-actively suppress them. What it stops is the NEXT phase — and, on the last
+        # iteration, the false ``completed``.
+        await _enforce_budget("phase_completed")
         i += 1
 
     # ── Completion (D-10 / D-11): final phase output IS the chat message ──────

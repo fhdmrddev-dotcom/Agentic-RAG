@@ -586,6 +586,46 @@ async def _exec_programmatic(phase, accumulated_outputs: dict, ctx) -> dict:
     return await fn(fn_input, ctx)
 
 
+def _run_usage_box(ctx) -> dict | None:
+    """The RUN-level cumulative token accumulator the engine put on ``ctx``, if any.
+
+    Phase 204 (SCHED-02). ``harness_engine.run_workflow`` sets ``ctx.run_usage_box = {}``
+    once per run and the circuit breaker reads it after every phase. Executors below
+    thread it into the substrate that already knows how to fill it.
+
+    ⚠ ``getattr`` WITH A SAFE DEFAULT, LIKE EVERY OTHER FIELD THIS MODULE READS OFF THE
+    CTX BAG. A Deep run, a unit stub and a publish golden run all reach these executors
+    with a ctx that has no box — they get ``None`` and every call below is byte-identical
+    to what shipped. The box's ABSENCE is the disarmed case, and it is the common one.
+    """
+    box = getattr(ctx, "run_usage_box", None)
+    return box if isinstance(box, dict) else None
+
+
+def _record_run_usage(ctx, input_tokens, output_tokens) -> None:
+    """SUM one completed sub-agent's usage into the run-level box.
+
+    ⚠ THE SUM HAPPENS HERE AND NOT IN THE SUB-AGENT, AND THAT IS NOT AN ACCIDENT.
+    ``run_task_sub_agent`` keeps its OWN ``_sub_usage`` box because it persists that total
+    to its own ``runs`` row on finalize; handing it the run-level box instead would make
+    sub-run N record the cumulative spend of sub-runs 1..N — a silent, plausible,
+    permanently wrong number in a column the Deep drill-down renders. So the sub-agent
+    keeps its local box, RETURNS the total (204-02 widened its return dict), and the
+    addition lands here where the scope is the run.
+
+    ⚠ ``None`` ADDS NOTHING. A provider that emitted no usage must not be read as zero;
+    the two are different facts and only the first is worth a warning (which
+    ``run_task_sub_agent`` already logs).
+    """
+    box = _run_usage_box(ctx)
+    if box is None:
+        return
+    if input_tokens:
+        box["input_tokens"] = (box.get("input_tokens") or 0) + int(input_tokens)
+    if output_tokens:
+        box["output_tokens"] = (box.get("output_tokens") or 0) + int(output_tokens)
+
+
 async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     """One bounded LLM call — no tools. The phase prompt is the system framing.
 
@@ -608,6 +648,14 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
         tools=[],
         model=await _effective_model_checked(phase, ctx),
         user_settings=getattr(ctx, "user_settings", None),
+        # Phase 204 (SCHED-02) — THE RUN-LEVEL BOX, PASSED STRAIGHT THROUGH. This is the
+        # one executor that reaches a provider directly rather than through a sub-agent,
+        # and `_stream_one_iteration` has SUMMED each turn's usage into whatever box it is
+        # handed since Phase 093 (D-17). Nothing new accumulates anything: the box that
+        # was already being filled is now the run's, so an llm_single phase's spend
+        # reaches the circuit breaker. `None` when no breaker is armed — the shipped
+        # `usage_box is None` branch then allocates a throwaway local, exactly as before.
+        usage_box=_run_usage_box(ctx),
     )
     return {"text": content or ""}
 
@@ -687,6 +735,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         system_prompt_override=system_prompt,
         tools_override=tools_override,
     )
+    # Phase 204 (SCHED-02): fold this sub-agent's token spend into the run-level box the
+    # circuit breaker reads. Same shape as the F7 hand-off directly below — a fact the
+    # sub-agent already produced, threaded up to the one scope that can act on it.
+    _record_run_usage(ctx, result.get("input_tokens"), result.get("output_tokens"))
     # F7 (092-07): thread the grounding the sub-agent gathered (search_documents'
     # source_refs/citations/similarity) up to the phase output. The engine unions
     # it across ALL phases and attaches the accumulated set to the final answer —
@@ -783,6 +835,12 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
             )
 
     results = await asyncio.gather(*[_one(q) for q in sub_questions])
+    # Phase 204 (SCHED-02): EVERY branch's spend counts, and this is the phase type where
+    # a runaway is most expensive — N parallel sub-agents, each with its own step budget.
+    # Folded after the gather rather than inside `_one` so the addition is not racing
+    # itself across N concurrent coroutines on a plain dict.
+    for _r in results:
+        _record_run_usage(ctx, _r.get("input_tokens"), _r.get("output_tokens"))
     summaries = [r["summary"] for r in results]
     sub_run_ids = [str(r["sub_run_id"]) for r in results]
 
