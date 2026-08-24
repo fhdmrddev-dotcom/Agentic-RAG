@@ -569,3 +569,59 @@ async def check_connection(
         provider_message=provider_message,
         reason_code=reason_code,
     )
+
+
+@router.post(
+    "/connections/{connection_id}/discover",
+    response_model=list[dict],
+    dependencies=[Depends(require_org_manage)],
+    summary="Discover available tools from a remote MCP server",
+)
+async def discover_tools(
+    connection_id: str,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> list[dict]:
+    """Phase 206 (D-206-05) — Discover available tools from the connection's MCP server."""
+    try:
+        return await connector_service.discover_connection_tools(
+            str(connection_id), org_id=str(active_org), supabase=supabase
+        )
+    except connector_service.ConnectorNotFound:
+        raise _NOT_FOUND
+    except connector_service.ConnectorCipherUnavailable:
+        raise _CIPHER_UNAVAILABLE
+    except connector_service.ConnectorSecretNotEncrypted:
+        raise _CREDENTIAL_UNREADABLE
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"MCP tool discovery failed: {exc}",
+        ) from exc
+
+
+@router.patch(
+    "/connections/{connection_id}/grants",
+    response_model=ConnectorConnectionResponse,
+    dependencies=[Depends(require_org_manage)],
+    summary="Update per-tool permission grants for an MCP connection",
+)
+async def update_grants(
+    connection_id: str,
+    tool_grants: dict[str, bool],
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> ConnectorConnectionResponse:
+    """Phase 206 (F-1 / D-206-06) — Update boolean tool permission grants."""
+    try:
+        return await connector_service.update_connection_grants(
+            str(connection_id),
+            org_id=str(active_org),
+            tool_grants=tool_grants,
+            supabase=supabase,
+        )
+    except connector_service.ConnectorNotFound:
+        raise _NOT_FOUND
+

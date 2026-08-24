@@ -113,6 +113,8 @@ vi.mock("@/lib/api", () => {
     // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
     // absence — every external face renders its destination-free sentence.
     listConnectorConnections: () => Promise.resolve([]),
+    discoverConnectorTools: () => Promise.resolve([]),
+    updateConnectorGrants: () => Promise.resolve({}),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
     // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page

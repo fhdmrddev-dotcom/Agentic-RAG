@@ -243,32 +243,19 @@ def test_the_mcp_matcher_actually_matches():
         )
 
 
-# Phase 190 / D-01 — UNTOUCHED AND STILL GREEN ON PURPOSE: 190 builds no MCP client, so this
-# fence's continued passing is part of the ROADMAP amendment's evidence rather than a leftover.
+# Phase 206 (CONN-02 / CONN-03 / D-206-07) — Consciously retired with the introduction of
+# the official backend MCP connector client (`app.services.mcp_client`). Egress is guarded
+# by `app.security.egress.validate_mcp_destination` and per-tool grant enforcement.
 def test_no_mcp_identifiers_in_backend_app():
-    """V11 / SC#4 — ZERO `mcp` identifiers exist anywhere under `backend/app`.
+    """Phase 206 / D-206-07: Retired gate.
 
-    D-11 records an MCP-first VERDICT; CONTEXT's landmine list states the corollary:
-    *there is ZERO MCP code in backend/app*. This is that landmine expressed as a gate, so
-    189 cannot quietly grow a client while claiming to be the no-egress phase.
+    The original 189 gate ensured zero MCP code existed in backend/app during Phase 189/190.
+    Phase 206 officially introduced the MCP client with strict SSRF destination validation.
+    This test remains as a documented milestone record.
     """
-    files = _app_python_files()
-    assert len(files) > 100, (
-        f"the fence walked only {len(files)} python files under {_APP_ROOT} - the walk is "
-        "broken and the fence proves nothing (measured at plan time: 160)"
-    )
+    from app.services import mcp_client
+    assert mcp_client is not None
 
-    offenders: list[str] = []
-    for path in files:
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            if _MCP_TOKEN.search(line):
-                offenders.append(f"{path.relative_to(_BACKEND_ROOT).as_posix()}:{lineno}: {line.strip()}")
-
-    assert offenders == [], (
-        "SC#4: backend/app must contain ZERO `mcp` identifiers in Phase 189 - live "
-        "connectors are Phase 190. Found:\n" + "\n".join(offenders)
-    )
 
 
 # ── Case B — the patched-transport falsification (V10) ────────────────────────

@@ -6348,10 +6348,26 @@ export interface PostMessageConnectionConfig {
   default_channel: string
 }
 
+/** An MCP connection's config. Phase 206 — the server models this as `McpConfig`, a member
+ *  of the same union rather than a free-form dict: the permissive shape is a MODEL, because
+ *  the one time it was a bare `dict[str, Any]` it disabled WR-05's per-field constraints for
+ *  every OTHER member of the union too (driven 2026-08-25 — an empty `send_email` connection
+ *  with no secret was accepted). Keep this a declared shape here for the same reason. */
+export interface McpConnectionConfig {
+  headers?: Record<string, string>
+}
+
 export type ConnectorConnectionConfig =
   | SendEmailConnectionConfig
   | CreateTicketConnectionConfig
   | PostMessageConnectionConfig
+  | McpConnectionConfig
+
+export interface McpDiscoveredTool {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
 
 /** What a client is allowed to learn about a connection.
  *
@@ -6369,10 +6385,13 @@ export type ConnectorConnectionConfig =
 export interface ConnectorConnection {
   id: string
   org_id: string
-  capability: ConnectorCapability
+  capability?: ConnectorCapability | null
   name: string
   config: ConnectorConnectionConfig
   is_enabled: boolean
+  mcp_server_url?: string | null
+  tool_grants?: Record<string, boolean>
+  discovered_tools?: McpDiscoveredTool[]
   last_checked_at?: string | null
   last_check_verdict?: "not_checked" | "ok" | "failed" | null
   created_at?: string | null
@@ -6383,12 +6402,14 @@ export interface ConnectorConnection {
  *  both from the authenticated caller, and a body field for either would be a
  *  tenant-selection parameter (the D-14 leak with a friendlier name). */
 export interface ConnectorConnectionCreate {
-  capability: ConnectorCapability
+  capability?: ConnectorCapability | null
   name: string
-  config: ConnectorConnectionConfig
+  config?: ConnectorConnectionConfig
+  mcp_server_url?: string | null
+  tool_grants?: Record<string, boolean>
   /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
    *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
-  secret: string
+  secret?: string
 }
 
 /** All-optional. A present `secret` is a REPLACE, never a merge — and it resets the stored
@@ -6399,6 +6420,9 @@ export interface ConnectorConnectionUpdate {
   config?: ConnectorConnectionConfig
   secret?: string
   is_enabled?: boolean
+  mcp_server_url?: string | null
+  tool_grants?: Record<string, boolean>
+  discovered_tools?: McpDiscoveredTool[]
 }
 
 /** An `ApiError` that also carries the server's machine-readable refusal code.
@@ -6609,6 +6633,44 @@ export async function checkConnectorConnection(id: string): Promise<ConnectorChe
     )
   }
   return res.json() as Promise<ConnectorCheckResult>
+}
+
+/** Phase 206 (D-206-05) — Discover tools from a remote MCP server connection. */
+export async function discoverConnectorTools(id: string): Promise<McpDiscoveredTool[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}/discover`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to discover tools",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<McpDiscoveredTool[]>
+}
+
+/** Phase 206 (F-1 / D-206-06) — Update boolean per-tool grants on an MCP connection. */
+export async function updateConnectorGrants(
+  id: string,
+  grants: Record<string, boolean>,
+): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}/grants`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(grants),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to update tool grants",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
 }
 
 // ── Phase 204 (SCHED-01 / D-204-11) — the workflow-schedule client ────────────────────────

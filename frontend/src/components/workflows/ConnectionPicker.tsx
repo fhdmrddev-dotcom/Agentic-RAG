@@ -51,13 +51,14 @@
  * 184-07 lesson). The `ProviderPicker.tsx:202-222` footer is the structural analog and its
  * truncation attribute is the ONE thing deliberately not copied.
  */
-import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from "react"
 
 import { Label } from "@/components/ui/label"
 import { useBuilderStoreOptional } from "@/components/workflows/BuilderStoreProvider"
 import { useSelectedPhaseSlug } from "@/components/workflows/SelectedPhaseSlugContext"
 import { listConnectorConnections } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api"
+import { McpToolPicker } from "./McpToolPicker"
 
 // ── THE COPY ─────────────────────────────────────────────────────────────────────────
 // Exported identifiers, asserted by character-identity in `ConnectionPicker.test.tsx`.
@@ -110,6 +111,8 @@ export const CONNECTION_CAPABILITY_WORDS: Record<string, string> = {
  *  way to switch `ActiveView`. Naming the destination is honest; a dead link is not. */
 export const noConnectionYetNote = (capability: string): string =>
   `No ${CONNECTION_CAPABILITY_WORDS[capability] ?? "external"} connection yet — add one in Settings → Connections.`
+
+const EMPTY_RECORD: Record<string, unknown> = Object.freeze({})
 
 /** Slack's API host is a module constant in `backend/app/security/egress.py` (D-02) — one
  *  of the three destinations that is unforgeable by construction, which is why a Slack
@@ -218,6 +221,47 @@ export function ConnectionPicker({ capability }: ConnectionPickerProps) {
     return typeof value === "string" && value !== "" ? value : null
   }, [store, slug])
   const boundId = useSyncExternalStore(subscribe, boundIdSnapshot, boundIdSnapshot)
+
+  const toolNameSnapshot = useCallback((): string => {
+    if (store === null || slug === null) return ""
+    const phase = store.getState().phases.find((p) => p.slug === slug)
+    const val = (phase?.config as Record<string, unknown> | undefined)?.tool_name
+    return typeof val === "string" ? val : ""
+  }, [store, slug])
+  const toolName = useSyncExternalStore(subscribe, toolNameSnapshot, toolNameSnapshot)
+
+  const toolArgsSnapshot = useCallback((): string => {
+    if (store === null || slug === null) return "{}"
+    const phase = store.getState().phases.find((p) => p.slug === slug)
+    const val = (phase?.config as Record<string, unknown> | undefined)?.tool_args
+    return typeof val === "object" && val !== null ? JSON.stringify(val) : "{}"
+  }, [store, slug])
+  const toolArgsJson = useSyncExternalStore(subscribe, toolArgsSnapshot, toolArgsSnapshot)
+  const toolArgs = useMemo(() => {
+    try {
+      return JSON.parse(toolArgsJson) as Record<string, unknown>
+    } catch {
+      return EMPTY_RECORD
+    }
+  }, [toolArgsJson])
+
+  const handleSelectTool = useCallback(
+    (tool: string) => {
+      if (store === null || slug === null) return
+      store.getState().patchConfig(slug, { tool_name: tool })
+      store.getState().flushHistory()
+    },
+    [store, slug],
+  )
+
+  const handleChangeArgs = useCallback(
+    (args: Record<string, unknown>) => {
+      if (store === null || slug === null) return
+      store.getState().patchConfig(slug, { tool_args: args })
+      store.getState().flushHistory()
+    },
+    [store, slug],
+  )
 
   // THE READ. Gated on the same two nulls the write is, so a provider-less render opens no
   // request at all — see the docblock: this is what keeps two shipped suites unaffected.
@@ -377,8 +421,19 @@ export function ConnectionPicker({ capability }: ConnectionPickerProps) {
       <p data-testid="connection-picker-footer" className={FOOTER_CLASSES}>
         {footer}
       </p>
+
+      {bound?.mcp_server_url && (
+        <McpToolPicker
+          connection={bound}
+          toolName={toolName}
+          toolArgs={toolArgs}
+          onSelectTool={handleSelectTool}
+          onChangeArgs={handleChangeArgs}
+        />
+      )}
     </div>
   )
 }
 
 export default ConnectionPicker
+

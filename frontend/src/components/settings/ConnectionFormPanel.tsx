@@ -709,8 +709,10 @@ export function ConnectionFormPanel({
 
   if (!open) return null
 
+  // `connection.capability` is optional since 206 (an MCP row has none). The draft's own
+  // value is the fallback, not a cast: this panel edits capability connections.
   const capability: ConnectorCapability = mode === "edit" && connection
-    ? connection.capability
+    ? connection.capability ?? draft.capability
     : draft.capability
 
   /**

@@ -76,6 +76,9 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: vi.fn(),
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  listConnectorConnections: () => Promise.resolve([]),
+  discoverConnectorTools: () => Promise.resolve([]),
+  updateConnectorGrants: () => Promise.resolve({}),
   readTemplatePlaceholdersFromFile: mockReadPlaceholders,
   uploadWorkflowTemplate: mockUploadTemplate,
   // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the hosted

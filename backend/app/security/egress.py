@@ -424,6 +424,60 @@ def validate_destination(
     return PinnedDestination(ip=answers[0], hostname=host, port=resolved_port, scheme=scheme)
 
 
+def validate_mcp_destination(
+    url: str,
+    *,
+    resolver: Callable[[str, int], list[str]] | None = None,
+) -> PinnedDestination:
+    """Phase 206 (D-206-04 / T-206-01) — Validate remote MCP server destination against SSRF.
+
+    Enforces HTTPS (rejecting insecure cleartext protocols unless explicit in testing), resolves all
+    destination addresses, checks every address against the public address predicate (blocking loopback,
+    RFC1918 private subnets, cloud metadata 169.254.169.254, and IPv6 site-local ranges), and returns
+    a PinnedDestination triple or raises EgressRefused.
+    """
+    try:
+        parsed = httpx.URL(url)
+    except Exception:
+        raise _refuse("mcp", "", "host_not_allowed", detail="unparseable destination") from None
+
+    scheme = parsed.scheme.lower()
+    # WARNING - THIS READ `("https", "http")` UNTIL 2026-08-25 WHILE THE DOCSTRING ABOVE SAID
+    # "Enforces HTTPS", AND THE DOCSTRING WAS THE ONE TELLING THE TRUTH ABOUT THE INTENT.
+    # Driven: `validate_mcp_destination("http://example.com/mcp")` returned ALLOWED. The MCP
+    # credential rides an Authorization header on every single call, so a cleartext scheme
+    # puts a live token on the wire at a public host that the SSRF predicate happily permits
+    # BECAUSE it is public. Plan criterion 4 (D-206-04) says HTTPS; this is that criterion.
+    if scheme != "https":
+        raise _refuse("mcp", "", "scheme_not_tls", detail=f"scheme {scheme!r} must be https")
+
+    host = _normalise_host(parsed.host)
+    if not host:
+        raise _refuse("mcp", "", "host_not_allowed", detail="no host in the destination")
+
+    if not host.isascii():
+        raise _refuse("mcp", host, "host_not_ascii", detail="non-ASCII (IDNA) host")
+
+    resolved_port = parsed.port or 443
+    resolve = resolver or _default_resolver
+    answers = resolve(host, resolved_port)
+    if not answers:
+        raise _refuse("mcp", host, "unresolvable", detail="host did not resolve")
+
+    for address in answers:
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            raise _refuse("mcp", host, "address_not_public", ip=str(address), detail="unparseable address") from None
+
+        reason = refuse_reason(ip)
+        if reason is not None:
+            raise _refuse("mcp", host, "address_not_public", ip=str(ip), detail=reason)
+
+    return PinnedDestination(ip=answers[0], hostname=host, port=resolved_port, scheme=scheme)
+
+
+
 # ══ THE TWO TRANSPORT BINDERS (plan 190-07) ═══════════════════════════════════
 #
 # D-05: these are the ONLY two places a connector socket is opened. Everything above decides

@@ -72,7 +72,7 @@ on the event loop). No function in this module performs I/O outside `aexec`.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
@@ -210,11 +210,14 @@ class ResolvedConnection:
 
     connection_id: str
     org_id: str
-    capability: str
+    capability: str | None
     name: str
     config: dict
     # The envelope, exactly as stored. Never logged, never returned, never in the repr.
     secret_ciphertext: str
+    mcp_server_url: str | None = None
+    tool_grants: dict[str, bool] = field(default_factory=dict)
+    discovered_tools: list[dict] = field(default_factory=list)
 
     @property
     def secret(self) -> str:
@@ -278,9 +281,14 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
     The projection is a whitelist derived from the model's own fields, so `secret_ciphertext`
     is dropped here AND would be rejected by `extra='forbid'` if it somehow got through.
     """
-    return ConnectorConnectionResponse.model_validate(
-        {key: row.get(key) for key in _RESPONSE_KEYS}
-    )
+    d = {key: row.get(key) for key in _RESPONSE_KEYS}
+    if d.get("tool_grants") is None:
+        d["tool_grants"] = {}
+    if d.get("discovered_tools") is None:
+        d["discovered_tools"] = []
+    if d.get("config") is None:
+        d["config"] = {}
+    return ConnectorConnectionResponse.model_validate(d)
 
 
 FetchRow = Callable[[str, str], Awaitable[dict | None]]
@@ -448,10 +456,13 @@ async def resolve_connection(
     return ResolvedConnection(
         connection_id=str(row["id"]),
         org_id=str(row["org_id"]),
-        capability=str(row["capability"]),
+        capability=row.get("capability"),
         name=str(row.get("name") or ""),
         config=dict(row.get("config") or {}),
         secret_ciphertext=raw,
+        mcp_server_url=row.get("mcp_server_url"),
+        tool_grants=dict(row.get("tool_grants") or {}),
+        discovered_tools=list(row.get("discovered_tools") or []),
     )
 
 
@@ -476,26 +487,33 @@ async def create_connection(
     not, so the refusal happens BEFORE the row is built — there is no code path here that
     can persist a connector secret in the clear.
     """
-    cipher = get_cipher()
-    if cipher is None:
-        logger.error(
-            "connector_service: refusing to store a connector secret for capability %s — "
-            "no SECRETS_ENCRYPTION_KEY is configured (fail closed, D-11). Nothing written.",
-            payload.capability,
-        )
-        raise ConnectorCipherUnavailable(
-            "a connector secret cannot be stored while no encryption key is configured"
-        )
+    ciphertext: str | None = None
+    if payload.secret:
+        cipher = get_cipher()
+        if cipher is None:
+            logger.error(
+                "connector_service: refusing to store a connector secret for capability %s — "
+                "no SECRETS_ENCRYPTION_KEY is configured (fail closed, D-11). Nothing written.",
+                payload.capability,
+            )
+            raise ConnectorCipherUnavailable(
+                "a connector secret cannot be stored while no encryption key is configured"
+            )
+        ciphertext = encrypt_secret(payload.secret, cipher)
+
+    config_data = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else (payload.config or {})
 
     row = {
         "org_id": str(org_id),  # HARD-SET — never from the body (D-14)
         "created_by": str(created_by),  # HARD-SET — never from the body
         "capability": payload.capability,
         "name": payload.name,
-        "config": payload.config.model_dump(mode="json", exclude_none=True),
-        "secret_ciphertext": encrypt_secret(payload.secret, cipher),
+        "config": config_data,
+        "secret_ciphertext": ciphertext,
         "is_enabled": True,
         "last_check_verdict": "not_checked",
+        "mcp_server_url": payload.mcp_server_url,
+        "tool_grants": payload.tool_grants,
     }
     result = await aexec(_project(_client(supabase).table(_TABLE).insert(row)))
     created = (result.data or [None])[0]
@@ -616,79 +634,110 @@ async def update_connection(
         #
         # The `ValueError` becomes a 422 in the router, deliberately NOT a 404: ownership was
         # already settled above, so there is no oracle to protect here.
-        _reject_config_capability_mismatch(str(current["capability"]), payload.config)
-        changes["config"] = payload.config.model_dump(mode="json", exclude_none=True)
+        if current.get("capability"):
+            _reject_config_capability_mismatch(str(current["capability"]), payload.config)
+        changes["config"] = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else payload.config
 
     if "is_enabled" in submitted and payload.is_enabled is not None:
-
         changes["is_enabled"] = payload.is_enabled
 
+    if "mcp_server_url" in submitted and payload.mcp_server_url is not None:
+        changes["mcp_server_url"] = payload.mcp_server_url
+
+    if "tool_grants" in submitted and payload.tool_grants is not None:
+        changes["tool_grants"] = {str(k): bool(v) for k, v in payload.tool_grants.items()}
+
+    if "discovered_tools" in submitted and payload.discovered_tools is not None:
+        changes["discovered_tools"] = payload.discovered_tools
+
     if "secret" in submitted and payload.secret is not None:
-
         cipher = get_cipher()
-
         if cipher is None:
-
             logger.error(
-
                 "connector_service: refusing to replace the secret on connection %s — no "
-
                 "SECRETS_ENCRYPTION_KEY is configured (fail closed, D-11). Nothing written.",
-
                 connection_id,
-
             )
-
             raise ConnectorCipherUnavailable(
-
                 "a connector secret cannot be stored while no encryption key is configured"
-
             )
-
         changes["secret_ciphertext"] = encrypt_secret(payload.secret, cipher)
-
         changes["last_check_verdict"] = "not_checked"  # OQ#4 — same UPDATE, never a second
-
         changes["last_checked_at"] = None
 
-
-
     if not changes:
-
         return _to_response(current)
 
-
-
     result = await aexec(
-
         _project(
-
             client.table(_TABLE)
-
             .update(changes)
-
             .eq("id", str(connection_id))
-
             .eq("org_id", str(org_id))  # scoped on the write too — the read gate is not enough
-
         )
-
     )
-
     updated = (result.data or [None])[0]
-
     if updated is None:
-
         raise ConnectorNotFound(f"no connection {connection_id}")
-
     logger.info(
-
         "connector_service: updated connection %s (columns changed=%s)",
-
         connection_id, sorted(changes),
-
     )
+    return _to_response(updated)
 
+
+async def discover_connection_tools(
+    connection_id: str,
+    org_id: str,
+    supabase: Client | None = None,
+) -> list[dict]:
+    """Phase 206 (D-206-05) — Discover tools from a remote MCP server and cache them on the row."""
+    resolved = await resolve_connection(connection_id, org_id=org_id)
+    if not resolved.mcp_server_url:
+        raise ConnectorError(f"connection {connection_id} is not configured with an mcp_server_url")
+
+    from app.services import mcp_client
+    tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
+
+    client = _client(supabase)
+    await aexec(
+        client.table(_TABLE)
+        .update({"discovered_tools": tools})
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))
+    )
+    logger.info(
+        "connector_service: discovered and cached %d tool(s) for connection %s",
+        len(tools), connection_id,
+    )
+    return tools
+
+
+async def update_connection_grants(
+    connection_id: str,
+    org_id: str,
+    tool_grants: dict[str, bool],
+    supabase: Client | None = None,
+) -> ConnectorConnectionResponse:
+    """Phase 206 (F-1 / D-206-06) — Update per-tool boolean grants on an MCP connection."""
+    client = _client(supabase)
+    # F-1: strictly enforce boolean map { [tool_name]: boolean }
+    sanitized_grants = {str(k): bool(v) for k, v in tool_grants.items()}
+    result = await aexec(
+        _project(
+            client.table(_TABLE)
+            .update({"tool_grants": sanitized_grants})
+            .eq("id", str(connection_id))
+            .eq("org_id", str(org_id))
+        )
+    )
+    updated = (result.data or [None])[0]
+    if updated is None:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+    logger.info(
+        "connector_service: updated tool_grants for connection %s (%d grants)",
+        connection_id, len(sanitized_grants),
+    )
     return _to_response(updated)
 
 

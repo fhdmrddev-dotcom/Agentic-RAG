@@ -211,7 +211,10 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     typeof config[key] === "string" ? (config[key] as string) : ""
   return {
     ...EMPTY_DRAFT,
-    capability: connection.capability,
+    // An MCP connection carries no capability (206), and this draft describes the
+    // CAPABILITY form. Falling back to the empty draft's own default keeps the form
+    // constructable rather than inventing a capability the row does not have.
+    capability: connection.capability ?? EMPTY_DRAFT.capability,
     name: connection.name,
     host: text("host"),
     port: typeof config.port === "number" ? String(config.port) : "",

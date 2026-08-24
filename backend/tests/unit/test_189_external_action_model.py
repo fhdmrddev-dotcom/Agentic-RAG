@@ -136,6 +136,45 @@ def _llm_single_phase(*, slug: str = "write", phase_index: int = 0, **spec_overr
 # ── D-01 — the 7th union member ───────────────────────────────────────────────
 
 
+
+def _capability_literal_members(cls) -> set[str]:
+    """The `capability` Literal's members, read THROUGH the optional wrapper Phase 206 added.
+
+    Both D-15 fences below used to call ``typing.get_args(field.annotation)`` directly, which
+    was exactly right while the annotation WAS a bare ``Literal``. Phase 206 made an MCP step
+    legitimate — such a step names a ``tool_name`` and has no capability at all — so the
+    annotation is now ``Literal[...] | None`` and ``get_args`` returns
+    ``(Literal[...], NoneType)``: two class objects, which is why both fences died with
+    ``TypeError: '<' not supported between instances of 'type' and '_LiteralGenericAlias'``.
+
+    WARNING - THIS HELPER IS DELIBERATELY STRICTER THAN A `get_args` CALL, BECAUSE THE
+    REGRESSION IT IS UNWRAPPING WAS SHIPPED BESIDE A WORSE ONE. The same commit wrote
+    ``Literal[...] | str | None``, and that ``| str`` made the Literal INERT - every string
+    admitted, the closed set reduced to a comment. So this refuses any union arm that is
+    neither the Literal nor ``None``: a future ``| str`` fails HERE, by name, instead of
+    quietly widening the set the two fences below then agree about.
+    """
+    annotation = cls.model_fields["capability"].annotation
+    args = typing.get_args(annotation)
+
+    if typing.get_origin(annotation) is typing.Literal:
+        return set(args)
+
+    literal_arms = [a for a in args if typing.get_origin(a) is typing.Literal]
+    other_arms = [a for a in args if typing.get_origin(a) is not typing.Literal]
+
+    assert len(literal_arms) == 1, (
+        f"`capability` must carry EXACTLY ONE Literal arm, got {literal_arms!r} from "
+        f"{annotation!r} — D-15's closed set cannot be spread across two spellings"
+    )
+    assert all(a is type(None) for a in other_arms), (
+        f"`capability` may be optional but must stay CLOSED: the non-Literal union arms are "
+        f"{other_arms!r}. A `| str` arm admits every capability name and reduces D-15 to a "
+        "comment (it shipped that way once — see the model's own header block)."
+    )
+    return set(typing.get_args(literal_arms[0]))
+
+
 def test_external_action_is_a_seventh_union_member():
     """V01 precursor / D-01 — the 7th discriminated member parses and exposes `capability`.
 
@@ -317,7 +356,7 @@ def test_the_capability_set_is_exactly_three_and_disjoint_from_kb_tools():
         "ExternalActionPhaseConfig has no `capability` field — D-02 requires the author to "
         "pick a NAMED capability from a closed set"
     )
-    capabilities = set(typing.get_args(field.annotation))
+    capabilities = _capability_literal_members(cls)
     assert capabilities, (
         "`capability` is not a Literal — D-02's closed set must be expressed in the "
         f"schema, got annotation {field.annotation!r}"
@@ -357,7 +396,7 @@ def test_the_literal_and_the_runtime_frozenset_are_the_same_closed_set():
     from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 
     cls = _external_action_config_cls()
-    literal_members = set(typing.get_args(cls.model_fields["capability"].annotation))
+    literal_members = _capability_literal_members(cls)
 
     assert literal_members == set(EXTERNAL_ACTION_CAPABILITIES), (
         "the `capability` Literal and grounding.EXTERNAL_ACTION_CAPABILITIES have "

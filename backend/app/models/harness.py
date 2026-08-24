@@ -27,7 +27,7 @@ engine is the consumer and these are the fields it reads.
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -248,7 +248,19 @@ class ExternalActionPhaseConfig(_StrictBase):
     # ``PROGRAMMATIC_PHASE_REGISTRY`` and ``EMITTER_REGISTRY`` all share. The executor
     # (189-09) re-resolves the name against ``EXTERNAL_ACTION_CAPABILITIES`` and raises;
     # that is the second line of defence for a row that reached the engine another way.
-    capability: Literal["send_email", "create_ticket", "post_message"]
+    # WARNING - THIS READ ``Literal[...] | str | None = "send_email"`` FOR THE LENGTH OF ONE
+    # PHASE, AND ``| str`` MADE THE LITERAL COMPLETELY INERT. Any string was accepted, so the
+    # D-15 closed set - the thing SC#2's "cannot be wired around a gate" means AT THE MODEL
+    # LAYER - existed only as documentation. Driven 2026-08-25:
+    # ``test_a_capability_outside_the_closed_set_is_refused`` DID NOT RAISE. Grounding
+    # detection and the publish fidelity gate both read ``EXTERNAL_ACTION_CAPABILITIES``, so
+    # an admitted-but-unknown capability is an UNENFORCED step, not merely an odd one.
+    #
+    # It is now OPTIONAL but still CLOSED, and the two properties are independent: an MCP
+    # step names a ``tool_name`` and has no capability at all, which is a legitimate absence.
+    # The default is gone with the ``| str``: defaulting to ``"send_email"`` meant an MCP step
+    # that forgot its tool name silently became an EMAIL step.
+    capability: Literal["send_email", "create_ticket", "post_message"] | None = None
     # DERIVED, never authored — see the D-03 block above. Defaulted rather than required
     # so a client that does not send it cannot 422 a whole definition; the validator
     # supplies the only admissible value either way.
@@ -294,6 +306,18 @@ class ExternalActionPhaseConfig(_StrictBase):
     # at run time?" — and a future author who wants a sixth field must answer it the same
     # way rather than citing this one as precedent for symmetry.
 
+    # Phase 206 (D-206-06) — MCP tool invocation attributes.
+    #
+    # These ARE answerable under the "no shape-symmetry optionals" test stated above: each
+    # DOES something on this step at run time. ``tool_name`` selects which tool on the bound
+    # MCP connection to invoke, and it is the whitelist that ``available_tools`` derives from
+    # for an MCP step exactly as ``capability`` is for a native one. ``tool_args`` is the
+    # argument object handed to that tool. Neither is a credential, a host or a destination —
+    # the SC#4 refusal above is unchanged and these do not cite ``connection_id`` as
+    # precedent for symmetry.
+    tool_name: str | None = None
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+
     @model_validator(mode="after")
     def _available_tools_is_the_capability(self) -> "ExternalActionPhaseConfig":
         # D-03 — ONE fact, ONE derivation. The capability is the whitelist, so the two can
@@ -302,7 +326,18 @@ class ExternalActionPhaseConfig(_StrictBase):
         # wired around a gate" means at the model layer. COERCES rather than raises, for
         # the same fail-closed reason the D-04 pin does (see ``PhaseSpec`` below): a stale
         # client that sends an empty list must not brick the definition it is saving.
-        derived = [self.capability]
+        #
+        # Phase 206: an MCP step derives from ``tool_name`` instead, for the identical
+        # reason — it is that step's one whitelist. A step naming NEITHER derives the EMPTY
+        # list, which is the fail-closed answer: it whitelists nothing rather than
+        # whitelisting a default.
+        if self.tool_name:
+            derived = [self.tool_name]
+        elif self.capability:
+            derived = [self.capability]
+        else:
+            derived = []
+
         if self.available_tools != derived:
             if self.available_tools:
                 logger.info(

@@ -469,7 +469,12 @@ def test_the_router_is_registered_on_the_real_app():
     Asserted against the real `app.main.app` route table (and by path template, not by a
     response), so a registration deleted in a later merge fails here rather than in UAT.
     """
-    paths = {getattr(r, "path", None) for r in real_app.routes}
+    paths = {getattr(r, "path", None) for r in real_app.routes} | {
+        getattr(sub, "path", None)
+        for r in real_app.routes
+        if hasattr(r, "original_router")
+        for sub in getattr(r.original_router, "routes", [])
+    }
     assert "/connectors/connections" in paths, (
         "connectors.router is not included in app.main — every case above would keep passing "
         "on the probe app while the real surface 404s"

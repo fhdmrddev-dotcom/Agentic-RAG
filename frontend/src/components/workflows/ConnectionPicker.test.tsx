@@ -25,8 +25,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 // HOISTED — `vi.mock` is lifted above the imports, so a `const` declared below it would be
 // in its temporal dead zone at factory time. Only ONE symbol is faked: the read this
 // component owns. Nothing else in `@/lib/api` is replaced, because nothing else is used.
-const { listMock } = vi.hoisted(() => ({ listMock: vi.fn() }))
-vi.mock("@/lib/api", () => ({ listConnectorConnections: listMock }))
+const { listMock, discoverMock, grantsMock } = vi.hoisted(() => ({
+  listMock: vi.fn(),
+  discoverMock: vi.fn().mockResolvedValue([]),
+  grantsMock: vi.fn().mockResolvedValue({}),
+}))
+vi.mock("@/lib/api", () => ({
+  listConnectorConnections: listMock,
+  discoverConnectorTools: discoverMock,
+  updateConnectorGrants: grantsMock,
+}))
 
 import connectionPickerSource from "./ConnectionPicker?raw"
 import {

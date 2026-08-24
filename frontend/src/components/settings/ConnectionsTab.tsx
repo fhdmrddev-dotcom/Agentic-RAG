@@ -523,7 +523,7 @@ function ConnectionRow({
   const [receipt, setReceipt] = useState<string | null>(null)
 
   const state = connectionStateOf(connection)
-  const Mark = capabilityMark(connection.capability)
+  const Mark = capabilityMark(connection.capability ?? undefined)
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
 
