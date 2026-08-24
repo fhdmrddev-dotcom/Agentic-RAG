@@ -200,3 +200,16 @@ and what Phase 190 must NOT change because of it: **`SEED-142-two-way-connectors
 ⚠ Note for whoever scopes this: auto-ingest contradicts the standing `CLAUDE.md` rule *"Ingestion is
 manual file upload only — no connectors or automated pipelines."* That rule is dated, not permanent —
 change it in the same commit as the first sync connector, never leave it standing against shipped code.
+
+
+---
+
+## ROUTED 2026-08-24 — Connections & Open Platform milestone
+
+Operator decision: *"open a connections milestone from SEED-146 instead of 206."* Phase 206
+(Outbound Action Connectors) is RETIRED from the v3.8 roadmap; this seed is a source for the
+milestone instead. Scope, the binding one-provider-many-capabilities constraint, and the open
+questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
+
+Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
+v3.8 closes (204 running, 205 planned).

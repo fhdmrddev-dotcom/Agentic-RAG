@@ -94,3 +94,18 @@ eventually the branch/compare "data thread" — is a second entry in the same re
 ⚠ Do not bundle the interaction model (branching, comparing) into that first slice. Data
 Formulator's data threads are the *ambitious* half and they overlap with the workflow-run model
 in ways nobody has thought through yet. Ship the artifact rail first; earn the thread.
+
+
+---
+
+## CONSIDERED AND DEFERRED 2026-08-24 — kept OUT of the Connections milestone, on purpose
+
+The operator named A2UI, image generation and data-formulator in the SAME conversation that opened
+the Connections milestone. They were considered together and separated: connections are about
+REACHING other systems, artifacts are about what the agent PRODUCES. An image the model generates
+is not a connector, and folding them makes one unshippable milestone.
+
+This seed is the seed of the NEXT milestone after Connections. The one genuine seam — *"call an
+external API in chat, the model decides, it generates an image and puts it in the artifact"* — is an
+ARTIFACT concern that needs a connection, so Connections ships first (the call) and Artifacts second
+(the render). See `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md` -> "Deliberately NOT in this milestone".
