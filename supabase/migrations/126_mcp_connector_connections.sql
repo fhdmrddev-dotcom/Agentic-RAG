@@ -56,3 +56,33 @@ ALTER TABLE public.connector_connections
 ALTER TABLE public.connector_connections
     ADD CONSTRAINT connector_connections_mcp_url_is_https
     CHECK (mcp_server_url IS NULL OR mcp_server_url LIKE 'https://%');
+
+-- ================================================================================================
+-- §3 — the column-level SELECT grant, WIDENED. Without this the whole page is 503.
+-- ================================================================================================
+-- ⚠ MIGRATION 118 RE-GRANTED `SELECT` ON THIS TABLE **COLUMN BY COLUMN** TO `authenticated`,
+-- so that `secret_ciphertext` could be excluded by omission. That design has one consequence
+-- nothing else in the schema has: **A NEW COLUMN IS UNREADABLE BY DEFAULT**, and the read that
+-- breaks is not the new feature's — it is EVERY read of this table.
+--
+-- Measured 2026-08-25 in live UAT: `GET /connectors/connections` returned **503** and the
+-- Settings → Connections page rendered "Could not load connections" for a pre-existing Slack
+-- connection that has nothing to do with MCP. `connector_service` projects
+-- `_SELECTABLE_COLUMNS` (= the response model's keys, CR-01 — never `SELECT *`) on the
+-- user-JWT client, so the moment the response model gained these three fields the projection
+-- named three columns `authenticated` had no grant on, and PostgREST answered `42501
+-- permission denied for table connector_connections`.
+--
+-- ⚠ THE FAILURE IS TOTAL AND IT LOOKS LIKE AN OUTAGE, NOT LIKE A MISSING COLUMN. This is the
+-- known lockstep 118 already carries in the other direction (a grant shipped without the code
+-- ⇒ every connector read 42501); this is the same coupling read backwards. **A column added
+-- to `connector_connections` and to `ConnectorConnectionResponse` owes a grant HERE, in the
+-- same migration.**
+--
+-- One column per line, deliberately, so the omission of `secret_ciphertext` stays VISIBLE in
+-- a diff rather than inferred from a comma-separated blob — 118's own convention, kept.
+GRANT SELECT (
+    mcp_server_url,
+    tool_grants,
+    discovered_tools
+) ON public.connector_connections TO authenticated;

@@ -190,10 +190,35 @@ export function destinationFactsOf(connection: ConnectorConnection): string[] {
   if (connection.capability === "create_ticket") {
     return [text("base_url"), text("project_key")].filter(Boolean)
   }
-  const channel = text("default_channel")
-  return [SLACK_FIXED_HOST, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
-    Boolean,
-  )
+  // ⚠ AN MCP CONNECTION HAS NO CAPABILITY, AND ITS DESTINATION IS ITS OWN URL. Before this
+  // arm existed the ladder below was POSITIONAL — a trailing `return` rather than a branch —
+  // so every row that was not `send_email` or `create_ticket` was described as sending to
+  // Slack. Seen on screen in live UAT (2026-08-25): a connection pointed at
+  // `https://mcp.deepwiki.com/mcp` rendered its destination as `slack.com/api`.
+  //
+  // That is not a cosmetic slip on this surface. This column is the ONE place a person is
+  // told where their organisation's data is about to go, and a governed send is approved on
+  // the strength of it. A row naming the wrong host is worse than a row naming none.
+  if (connection.mcp_server_url) {
+    const url = connection.mcp_server_url
+    // Host only — the path is the server's business and the host is the fact being approved.
+    // No URL parser: a malformed value must still render SOMETHING true rather than throw,
+    // and the raw string is the truest thing available when it cannot be split.
+    const host = url.replace(/^https?:\/\//, "").split("/")[0]
+    return [host || url].filter(Boolean)
+  }
+
+  // ⚠ EXPLICIT, NOT POSITIONAL. The Slack arm now names the capability it serves, so the next
+  // capability added to the closed set gets an EMPTY destination list — which renders as
+  // "none you can see" — instead of silently inheriting Slack's host.
+  if (connection.capability === "post_message") {
+    const channel = text("default_channel")
+    return [SLACK_FIXED_HOST, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
+      Boolean,
+    )
+  }
+
+  return []
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════

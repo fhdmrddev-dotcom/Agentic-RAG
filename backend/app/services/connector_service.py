@@ -214,14 +214,28 @@ class ResolvedConnection:
     name: str
     config: dict
     # The envelope, exactly as stored. Never logged, never returned, never in the repr.
-    secret_ciphertext: str
+    #
+    # ⚠ `None` MEANS "THERE IS NO CREDENTIAL", AND IT IS REACHABLE FROM EXACTLY ONE SHAPE:
+    # an MCP connection to an unauthenticated server (206). Every capability connection is
+    # still refused by the resolver before this object exists, so a `None` here can never be
+    # a native send with a missing credential — see the resolver's own block.
+    secret_ciphertext: str | None
     mcp_server_url: str | None = None
     tool_grants: dict[str, bool] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
 
     @property
-    def secret(self) -> str:
-        """Decrypt and return the credential. Raises rather than degrading (D-11)."""
+    def secret(self) -> str | None:
+        """Decrypt and return the credential. Raises rather than degrading (D-11).
+
+        ⚠ Returns `None` for the one shape that legitimately has no credential — an MCP
+        connection to an unauthenticated server. It is a `None` rather than an empty string
+        deliberately: `mcp_client._build_auth_headers` branches on falsiness and sends NO
+        `Authorization` header, and an empty string would be indistinguishable from a
+        credential that decrypted to nothing.
+        """
+        if self.secret_ciphertext is None:
+            return None
         cipher = get_cipher()
         if cipher is None:
             # Reachable only if the key was removed between resolve and use; the resolver
@@ -414,11 +428,45 @@ async def resolve_connection(
 
     raw = row.get("secret_ciphertext")
     if not isinstance(raw, str) or not raw:
-        # No credential stored at all — absent for the purpose of sending.
+        # ⚠ AN MCP CONNECTION TO AN UNAUTHENTICATED SERVER LEGITIMATELY HAS NO CREDENTIAL,
+        # and this refusal predates that shape. For the three native capabilities the
+        # reasoning below is exactly right — an SMTP host, a Jira instance and a Slack
+        # workspace each REQUIRE a credential, so a row without one is absent for the purpose
+        # of sending, and saying "not found" is the honest answer.
+        #
+        # ⚠ MEASURED IN LIVE UAT (2026-08-25): an MCP connection to a public server was
+        # refused HERE and surfaced as **404 "no connection"** — a sentence that is not true
+        # about a row sitting in the table, on a code path the client already supports
+        # (`mcp_client._build_auth_headers(None)` deliberately returns headers with no
+        # `Authorization`). The model agrees with the client and not with this line:
+        # `ConnectorConnectionCreate.secret` is `NonEmpty | None` precisely so an MCP row may
+        # omit it. Two places describing one row, disagreeing — the shape this repo keeps
+        # finding.
+        #
+        # ⚠ THE RELAXATION IS SCOPED TO THE MCP SHAPE AND NOWHERE ELSE. A capability
+        # connection with no secret is still `ConnectorNotFound`, unchanged, because that is
+        # still true of it.
+        if not row.get("mcp_server_url"):
+            logger.info(
+                "connector_service: connection %s has no stored secret_ciphertext", connection_id
+            )
+            raise ConnectorNotFound(f"no connection {connection_id}")
+
         logger.info(
-            "connector_service: connection %s has no stored secret_ciphertext", connection_id
+            "connector_service: resolved MCP connection %s with NO credential — the remote "
+            "server is unauthenticated (no Authorization header will be sent)", connection_id,
         )
-        raise ConnectorNotFound(f"no connection {connection_id}")
+        return ResolvedConnection(
+            connection_id=str(row["id"]),
+            org_id=str(row["org_id"]),
+            capability=row.get("capability"),
+            name=str(row.get("name") or ""),
+            config=dict(row.get("config") or {}),
+            secret_ciphertext=None,
+            mcp_server_url=row.get("mcp_server_url"),
+            tool_grants=dict(row.get("tool_grants") or {}),
+            discovered_tools=list(row.get("discovered_tools") or []),
+        )
 
     # ── D-11, READ INVERSION, HALF ONE ────────────────────────────────────────────────────
     # A stored value with no envelope is PLAINTEXT AT REST. `sso_provider_service` returns
@@ -700,11 +748,25 @@ async def discover_connection_tools(
     tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
 
     client = _client(supabase)
+    # ⚠ `_project` IS NOT OPTIONAL ON A WRITE THAT RUNS ON THE USER-JWT CLIENT, and this call
+    # shipped without it. postgrest-py sends `return=representation` by default, which is
+    # `RETURNING *`; migration 118 grants `authenticated` SELECT column by column and
+    # deliberately omits `secret_ciphertext`, so the star is refused outright.
+    #
+    # ⚠ MEASURED IN LIVE UAT (2026-08-25) — the caching write failed with
+    # `42501 permission denied for table connector_connections` and the route's generic
+    # handler turned it into a **502 "MCP tool discovery failed"**, after the remote server
+    # had already answered correctly. The helper's own docstring predicts this failure in
+    # exactly these words; the sibling `update_connection_grants` uses it, and this one did
+    # not. A write here that omits it is refused, not silently wrong — which is the good
+    # half — but it is refused every single time.
     await aexec(
-        client.table(_TABLE)
-        .update({"discovered_tools": tools})
-        .eq("id", str(connection_id))
-        .eq("org_id", str(org_id))
+        _project(
+            client.table(_TABLE)
+            .update({"discovered_tools": tools})
+            .eq("id", str(connection_id))
+            .eq("org_id", str(org_id))
+        )
     )
     logger.info(
         "connector_service: discovered and cached %d tool(s) for connection %s",
