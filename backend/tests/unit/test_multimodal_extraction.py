@@ -37,8 +37,8 @@ def test_pdf_tables_inserted():
             supabase=mock_supabase,
         )
 
-    mock_supabase.table.assert_called_with("document_tables")
-    insert_call_args = mock_builder.insert.call_args[0][0]
+    mock_supabase.table.assert_any_call("document_tables")
+    insert_call_args = mock_builder.insert.call_args_list[0][0][0]
     assert isinstance(insert_call_args, list)
     assert len(insert_call_args) == 1
     row = insert_call_args[0]
@@ -72,7 +72,8 @@ def test_docx_tables_inserted():
             supabase=mock_supabase,
         )
 
-    insert_call_args = mock_builder.insert.call_args[0][0]
+    mock_supabase.table.assert_any_call("document_tables")
+    insert_call_args = mock_builder.insert.call_args_list[0][0][0]
     assert insert_call_args[0]["page"] is None
 
 
@@ -477,8 +478,8 @@ def test_extract_and_store_tables_uses_extracted_doc():
         )
 
     # Verify document_tables INSERT was called with the Docling-supplied row.
-    mock_supabase.table.assert_called_with("document_tables")
-    insert_call_args = mock_builder.insert.call_args[0][0]
+    mock_supabase.table.assert_any_call("document_tables")
+    insert_call_args = mock_builder.insert.call_args_list[0][0][0]
     assert isinstance(insert_call_args, list)
     assert len(insert_call_args) == 1
     row = insert_call_args[0]
@@ -697,7 +698,7 @@ def test_extract_and_store_tables_fallback_when_extracted_doc_none():
 
     # Legacy pdfplumber pass ran exactly once (proves fallback path).
     mock_extract.assert_called_once()
-    mock_supabase.table.assert_called_with("document_tables")
+    mock_supabase.table.assert_any_call("document_tables")
 
 
 # ---------------------------------------------------------------------------
@@ -869,7 +870,8 @@ def test_extract_and_store_tables_csv():
         )
 
     mock_extract.assert_called_once()
-    insert_call = mock_supabase.table.return_value.insert.call_args[0][0]
+    mock_supabase.table.assert_any_call("document_tables")
+    insert_call = mock_builder.insert.call_args_list[0][0][0]
     assert insert_call[0]["extractor"] == "csv-reader"
 
 
@@ -898,7 +900,8 @@ def test_extract_and_store_tables_excel():
         )
 
     mock_extract.assert_called_once()
-    insert_call = mock_supabase.table.return_value.insert.call_args[0][0]
+    mock_supabase.table.assert_any_call("document_tables")
+    insert_call = mock_builder.insert.call_args_list[0][0][0]
     assert insert_call[0]["extractor"] == "openpyxl"
 
 
