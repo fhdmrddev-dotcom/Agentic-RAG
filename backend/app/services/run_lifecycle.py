@@ -41,6 +41,9 @@ running app is byte-identical — this module is dead code until wired.
 """
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -55,6 +58,201 @@ logger = logging.getLogger(__name__)
 # The derived liveness mirror (CLAUDE.md run-buffer key conventions). Same constant
 # name as run_reconciler.py:61 so the owner and the sweep speak of the same set.
 _ACTIVE_SET_KEY = "runs:active"
+
+# -- Phase 204 (L-01 / D-204-01) -- the cross-worker cancellation brake --------
+# Two NEW Redis keys, deliberately distinct from the three shipped run-buffer keys
+# (``run:{id}``, ``runs_by_thread:{tid}``, ``runs:active`` -- CLAUDE.md's conventions),
+# so nothing here can collide with the SSE transport or with the liveness mirror above:
+#
+#   PUBLISH channel  ``run_cancel:{run_id}``     -- the EDGE. Wakes a worker that is
+#                                                  ALREADY blocked inside a phase.
+#   registry key     ``run_cancelled:{run_id}``  -- the LEVEL (TTL 24h). Answers
+#                                                  "was this run cancelled?" for a
+#                                                  worker that was not subscribed at
+#                                                  the instant the edge fired.
+#
+# BOTH ARE REQUIRED AND NEITHER IS SUFFICIENT. Redis PUBLISH is fire-and-forget, not a
+# queue: a message with no subscriber is DROPPED, so a producer that subscribes a
+# millisecond late would never learn of the cancel -- the level closes that. And a level
+# alone is only read at a poll boundary, so a producer blocked inside a 900-second
+# provider call would keep spending money until that call returned -- the edge closes
+# that. L-01 is the CONJUNCTION of the two, not either one.
+#
+# THE WRITE ORDER IS LOAD-BEARING: SET THE LEVEL, *THEN* PUBLISH THE EDGE. A subscriber
+# woken by the edge re-reads the level; a producer starting its next phase reads the
+# level directly. Publishing first opens a window in which both readers can miss a
+# cancellation that has already been decided.
+_CANCEL_CHANNEL_PREFIX = "run_cancel:"
+_CANCEL_FLAG_PREFIX = "run_cancelled:"
+# 24h -- long enough that no realistic run outlives its own cancel record, short enough
+# that the registry cannot grow without bound. The DURABLE cancel record is Postgres
+# (``workflow_runs.status`` / ``runs.status``); this key is a fast brake, never truth.
+_CANCEL_FLAG_TTL_SECONDS = 86400
+
+
+def cancel_channel(run_id) -> str:
+    """The PUBLISH channel a running producer subscribes to for ``run_id``."""
+    return f"{_CANCEL_CHANNEL_PREFIX}{run_id}"
+
+
+def cancel_flag_key(run_id) -> str:
+    """The registry key that records ``run_id`` as cancelled (TTL 24h)."""
+    return f"{_CANCEL_FLAG_PREFIX}{run_id}"
+
+
+async def broadcast_run_cancellation(redis, run_id, reason: str = "cancelled") -> bool:
+    """Announce a cancellation to every worker -- level first, then edge (D-204-01).
+
+    Returns ``True`` iff the LEVEL landed. The edge is advisory (a run with no live
+    subscriber is cancelled just as effectively by the level at its next check), so a
+    failed PUBLISH is logged and does not flip the return value; a failed SET does,
+    because that is the half a late or restarted worker depends on.
+
+    BEST-EFFORT BY CONTRACT -- IT NEVER RAISES, matching every other Redis op in this
+    module (D-062-13). Postgres is the durable cancel record; a Redis outage must never
+    turn a successful Stop into a 500.
+    """
+    _flag = cancel_flag_key(run_id)
+    _level = False
+    try:
+        await redis.set(_flag, reason, ex=_CANCEL_FLAG_TTL_SECONDS)
+        _level = True
+    except Exception:
+        logger.exception("broadcast_run_cancellation: level SET failed for %s", _flag)
+    try:
+        await redis.publish(
+            cancel_channel(run_id),
+            json.dumps(
+                {
+                    "run_id": str(run_id),
+                    "reason": reason,
+                    "at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "broadcast_run_cancellation: edge PUBLISH failed for run %s "
+            "(level=%s; a subscribed worker will still brake at its next check)",
+            run_id,
+            _level,
+        )
+    return _level
+
+
+async def is_run_cancelled(redis, run_id) -> bool:
+    """Has ``run_id`` been cancelled? Reads the LEVEL, never the edge.
+
+    FAILS **OPEN** (returns ``False``) ON A REDIS ERROR, AND THAT DIRECTION IS A
+    DECISION. Returning ``True`` on a transient blip would abort healthy runs across
+    every worker at once -- a Redis hiccup would become a fleet-wide outage. The cost of
+    failing open is bounded and already covered: the producer's own local
+    ``task.cancel()`` path is untouched, and ``workflow_runs.status`` remains the durable
+    record a sweep can act on.
+    """
+    try:
+        return bool(await redis.exists(cancel_flag_key(run_id)))
+    except Exception:
+        logger.exception("is_run_cancelled: registry read failed for run %s", run_id)
+        return False
+
+
+@contextlib.asynccontextmanager
+async def cancellation_watch(redis, run_id, *, poll_seconds: float = 1.0):
+    """Cancel the CURRENT asyncio task the moment ``run_id`` is cancelled (D-204-02).
+
+    Subscribes to ``run_cancel:{run_id}`` for the duration of the ``async with`` body and
+    calls ``.cancel()`` on the task that entered it. That is what turns a cross-worker
+    Stop into an immediate halt of an in-flight provider call rather than a status column
+    nobody is reading -- the whole of L-01's "zero further provider calls".
+
+    IT ALSO RE-READS THE LEVEL ON EVERY POLL TICK, not only on a message. The subscribe
+    cannot be atomic with the caller's decision to start work, so a cancel published in
+    that gap reaches NO subscriber and is dropped by Redis forever; the level is what
+    makes such a cancel still land -- one tick late instead of never.
+
+    THE LISTENER IS TORN DOWN ON *EVERY* EXIT PATH -- normal completion, exception and
+    cancellation alike (threat: stranded channels). ``unsubscribe`` + a timeout-bounded
+    ``aclose`` mirror ``ask_user_service._subscribe_and_block``'s shipped Pitfall-3
+    discipline, and the watcher task is cancelled AND awaited so it cannot outlive the
+    phase that created it.
+
+    THE WATCHER NEVER RAISES INTO THE BODY. A Redis outage degrades this to "no edge" --
+    the caller's own per-iteration ``is_run_cancelled`` check still brakes the run at the
+    next phase boundary -- rather than killing a healthy run.
+    """
+    target = asyncio.current_task()
+    channel = cancel_channel(run_id)
+    pubsub = None
+    watcher = None
+
+    async def _watch() -> None:
+        try:
+            while True:
+                _hit = False
+                try:
+                    msg = await pubsub.get_message(
+                        ignore_subscribe_messages=True,
+                        timeout=poll_seconds,   # never 0 -- ask_user Pitfall 1
+                    )
+                    _hit = msg is not None and msg.get("type") == "message"
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # A dead socket must not spin this loop at full speed.
+                    logger.exception(
+                        "cancellation_watch: poll failed on %s (falling back to the "
+                        "level)",
+                        channel,
+                    )
+                    await asyncio.sleep(poll_seconds)
+                if not _hit:
+                    # The level covers a cancel published before the SUBSCRIBE landed.
+                    _hit = await is_run_cancelled(redis, run_id)
+                if _hit:
+                    logger.info(
+                        "cancellation_watch: cancel signal for run %s -- aborting the "
+                        "in-flight task (L-01)",
+                        run_id,
+                    )
+                    if target is not None and not target.done():
+                        target.cancel()
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("cancellation_watch: listener died for run %s", run_id)
+
+    try:
+        try:
+            pubsub = redis.pubsub()
+            await pubsub.subscribe(channel)
+            watcher = asyncio.create_task(_watch())
+        except Exception:
+            logger.exception(
+                "cancellation_watch: SUBSCRIBE failed for %s -- the run continues with "
+                "the per-phase level check only",
+                channel,
+            )
+            pubsub = None
+            watcher = None
+        yield
+    finally:
+        if watcher is not None:
+            watcher.cancel()
+            with contextlib.suppress(BaseException):
+                await watcher
+        if pubsub is not None:
+            try:
+                await pubsub.unsubscribe(channel)
+            except Exception:
+                logger.exception(
+                    "cancellation_watch: unsubscribe failed for %s", channel
+                )
+            try:
+                await asyncio.wait_for(pubsub.aclose(), timeout=2.0)
+            except Exception:
+                logger.exception("cancellation_watch: aclose failed for %s", channel)
 
 
 async def register_run_start(
@@ -155,7 +353,7 @@ async def finalize_run_terminal(
     await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
 
 
-async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
+async def cancel_workflow_run_internals(*, pool, workflow_run_id, redis=None) -> bool:
     """The ONE workflow-side cancel composition — status + the interrupted phase (194).
 
     ``db.workflows.finish_run`` with the status ``'cancelled'`` (the
@@ -227,6 +425,26 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
     clause is the access boundary — but this takes no user-supplied filter, only a key.
     Ownership is the CALLER's (T-147-06): plan 194-10 adds the owner-scoped,
     anchor-confirmed gate for the new id shape.
+
+    PHASE 204 (L-01 / D-204-01 / D-204-03) -- THE CANCEL IS NOW BROADCAST, AND THIS IS
+    THE ONE SITE THAT DOES IT. Every path that stops a workflow run already funnels
+    through this composition (Step 3b below, and ``api/runs.py``'s no-producer arm),
+    which is exactly why the Redis announcement belongs HERE rather than in each caller:
+    a second broadcast site is a second thing that can be forgotten. ``redis`` is
+    OPTIONAL AND DEFAULTS TO THE APP SINGLETON ON PURPOSE -- ``get_redis()`` performs no
+    I/O at call time, so resolving it here means the shipped caller in ``api/runs.py``
+    broadcasts WITHOUT being edited. Making the parameter mandatory would have turned a
+    fail-safe into a caller obligation, and this project has measured what happens to
+    obligations nothing enforces.
+
+    THE BROADCAST RUNS *BEFORE* THE TWO WRITES, DELIBERATELY. The point of L-01 is to
+    stop a producer on ANOTHER worker from spending money; every millisecond spent in
+    ``finish_run`` first is a millisecond that producer is still calling a provider. The
+    broadcast never raises and never blocks on failure, so it cannot cost the writes
+    anything. And the RACE it opens is benign by value-identity, the same argument the
+    cross-worker interleave paragraph above makes: the far worker's escape handler writes
+    ``cancelled``, this composition writes ``cancelled``, ``finish_run`` is idempotent.
+    THE ONE THING THAT WOULD BREAK IT IS THE TWO SIDES DISAGREEING ON THE VALUE.
     """
     try:
         # Late import (S3 / the module's shipped discipline) — this file already
@@ -240,6 +458,22 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
         # The anchor comes back from supabase as a STRING; asyncpg binds a uuid column
         # from a UUID. Same coercion the shipped Step 3b already applies to thread_id.
         _wf = UUID(workflow_run_id) if isinstance(workflow_run_id, str) else workflow_run_id
+
+        # Phase 204 (L-01) -- the brake, BEFORE the bookkeeping. Its own try/except so a
+        # Redis fault can never cost the two durable writes below, which are what the
+        # return value reports on.
+        try:
+            if redis is None:
+                from app.dependencies import get_redis  # noqa: PLC0415
+                redis = get_redis()
+            await broadcast_run_cancellation(redis, _wf)
+        except Exception:
+            logger.exception(
+                "Cancel broadcast could not be issued for workflow run %s "
+                "(the durable cancel writes below still run)",
+                workflow_run_id,
+            )
+
         await finish_run(pool, _wf, "cancelled")
         await cancel_active_phases(pool, _wf)
         return True
@@ -391,8 +625,12 @@ async def _cancel_run_internals(
     if wf_id:
         try:
             from app.dependencies import get_pg_pool  # noqa: PLC0415
+            # Phase 204 (L-01): pass the redis client this helper ALREADY holds rather
+            # than letting the composition resolve the singleton -- this is the
+            # cross-worker arm (RUN_TASKS missed, so the producer is on the OTHER
+            # worker), i.e. the exact path L-01 exists for.
             await cancel_workflow_run_internals(
-                pool=await get_pg_pool(), workflow_run_id=wf_id
+                pool=await get_pg_pool(), workflow_run_id=wf_id, redis=redis
             )
         except Exception:
             logger.exception(
@@ -456,4 +694,10 @@ __all__ = [
     # composition rather than re-composing finish_run + cancel_active_phases itself.
     "cancel_workflow_run_internals",
     "_cancel_run_internals",
+    # Phase 204 (L-01) -- the cross-worker cancellation brake.
+    "broadcast_run_cancellation",
+    "is_run_cancelled",
+    "cancellation_watch",
+    "cancel_channel",
+    "cancel_flag_key",
 ]
