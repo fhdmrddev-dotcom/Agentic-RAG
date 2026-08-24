@@ -1126,6 +1126,26 @@ class Settings(BaseSettings):
     # stale window can never be stale). Config field → tunable without a deploy.
     run_start_grace_seconds: int = 60
 
+    # ── Phase 204 (SCHED-01 / D-204-09) — the background workflow scheduler ──────────
+    # OFF BY DEFAULT, and that is a decision rather than caution: this loop starts REAL
+    # workflow runs with NOBODY WATCHING, so an install that has never been told to
+    # schedule anything must behave byte-identically to before the feature existed. An
+    # operator turns it on once, deliberately.
+    #
+    # ⚠ IT RUNS IN EVERY WORKER AND NEEDS NO LEADER. The exactly-once property lives in
+    # `db/schedules.claim_due_schedules` (FOR UPDATE SKIP LOCKED + the in-transaction
+    # next_run_at advance), never in this flag and never in a lock held here — see that
+    # function's docstring for why the advance is the load-bearing half.
+    scheduler_process_enabled: bool = False
+    # The tick. 60s means a schedule fires within a minute of its due instant, which is
+    # the finest granularity a cron expression can even express. A shorter interval buys
+    # nothing and hammers the claim query; a much longer one makes an hourly schedule
+    # visibly late.
+    scheduler_poll_interval_seconds: int = 60
+    # Per-tick claim ceiling — the backpressure knob. Without it, an install that was
+    # offline over a weekend wakes up and launches every overdue schedule at once.
+    scheduler_max_claims_per_tick: int = 10
+
     @model_validator(mode="after")
     def _validate_run_stale_sweep_bounds(self) -> "Settings":
         """WR-02 (Phase 145 review) — defense-in-depth bounds on the two stale-sweep

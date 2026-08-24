@@ -498,7 +498,57 @@ async def lifespan(app_instance):
     if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no runs to reconcile
         asyncio.create_task(_reconcile_orphans_periodic())
 
+    # Phase 204 (SCHED-01 / D-204-09 / D-204-11) — the background workflow scheduler.
+    # ADDITIVE and OFF BY DEFAULT (`scheduler_process_enabled`): a box that has never
+    # been told to schedule anything boots byte-identically to before this phase.
+    #
+    # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, with no leader election and no lock held
+    # here. Exactly-once is owned by `db/schedules.claim_due_schedules` — FOR UPDATE
+    # SKIP LOCKED plus the next_run_at advance INSIDE the claiming transaction — which
+    # is a property of the database rather than of whichever worker happened to win an
+    # election. A leader scheme's failure mode is that the leader dies and NOTHING
+    # fires, silently; this one has no such state.
+    #
+    # Same shape as the three sweeps above (background task, best-effort, never blocks
+    # startup) and, like them, skipped in setup mode — a fresh box has no schedules.
+    # The service is parked on `app_instance.state` so shutdown can stop it and so a
+    # test can reach it without importing module globals.
+    _scheduler = None
+    if not _setup_mode and settings.scheduler_process_enabled:
+        try:
+            from app.services.scheduler_service import SchedulerService
+            from app.dependencies import get_redis
+
+            _scheduler = SchedulerService(
+                pool=await get_pg_pool(),
+                redis=get_redis(),
+                poll_interval_seconds=settings.scheduler_poll_interval_seconds,
+                max_claims_per_tick=settings.scheduler_max_claims_per_tick,
+            )
+            _scheduler.start()
+            logger.info(
+                "Workflow scheduler started (poll every %ds, max %d claims/tick)",
+                settings.scheduler_poll_interval_seconds,
+                settings.scheduler_max_claims_per_tick,
+            )
+        except Exception:
+            logger.exception("Workflow scheduler failed to start (app continues)")
+            _scheduler = None
+    app_instance.state.workflow_scheduler = _scheduler
+
     yield
+
+    # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
+    # touch runs. It is the only component that STARTS new work; leaving it ticking
+    # while the producer-cancel loop below tears down live runs would race a fresh
+    # launch against a shutting-down pool. Best-effort — a failed stop never blocks
+    # shutdown.
+    try:
+        _sched = getattr(app_instance.state, "workflow_scheduler", None)
+        if _sched is not None:
+            await _sched.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Workflow scheduler stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
