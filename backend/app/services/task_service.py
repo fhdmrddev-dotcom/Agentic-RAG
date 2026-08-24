@@ -927,6 +927,21 @@ async def run_task_sub_agent(
     # task() / analyze_document) ignore these extra keys — additive, no behavior
     # change. similarity_scores stays a raw per-call list; the engine computes the
     # avg → confidence using the SAME _compute_confidence the Deep path uses.
+    # Phase 204 (SCHED-02): the token counts, HANDED BACK — additive, same mechanism and
+    # same argument as F7 one line up.
+    #
+    # ⚠ THE COUNTS WERE ALREADY BEING MEASURED; ONLY THE RETURN WAS MISSING. `_sub_usage`
+    # has SUMMED every turn's usage across every iteration since Phase 093 (D-17) and
+    # `finalize_run` above persists the total to `runs.input_tokens / output_tokens`. What
+    # did NOT exist was any way for a CALLER to see it — so the harness phase executors,
+    # which reach every provider through this function, could not tell a circuit breaker
+    # what a phase had cost. A spend cap with no reading is a ceiling that can never trip
+    # (the Phase-200 SC#3 shape: built, gated, green, structurally unreachable).
+    #
+    # ⚠ `None` IS PRESERVED AND NOT COALESCED TO 0. A provider that emitted no usage at
+    # all is a DIFFERENT fact from one that used zero tokens, and only the first deserves
+    # the `runs.usage missing` warning logged above. The breaker's `record_tokens` treats
+    # `None` as "add nothing", so the honest value costs nothing downstream.
     return {
         "sub_run_id": sub_run_id,
         "summary": summary,
@@ -934,4 +949,6 @@ async def run_task_sub_agent(
         "source_refs": sub_source_refs,
         "citations": sub_citations,
         "similarity_scores": sub_similarity_scores,
+        "input_tokens": _sub_in,
+        "output_tokens": _sub_out,
     }

@@ -613,9 +613,15 @@ class TestPhaseExecutors:
 
         captured = {}
 
-        async def _fake_stream(*, messages, tools, model, user_settings):
+        # 204-02: `usage_box` is a SHIPPED parameter of `_stream_one_iteration` (Phase
+        # 093 D-17) that these fakes never modelled. The circuit breaker now passes the
+        # run-level box through it, so an under-specified fake raises TypeError at the
+        # call — the 196-08 mock-completeness shape. Accepting it here models the real
+        # signature; it does not widen any contract.
+        async def _fake_stream(*, messages, tools, model, user_settings, usage_box=None):
             captured["messages"] = messages
             captured["tools"] = tools
+            captured["usage_box"] = usage_box
             return ("the summary", [])
 
         phase = _phase({"phase_type": "llm_single", "prompt": "Summarize."})
@@ -635,7 +641,7 @@ class TestPhaseExecutors:
 
         captured = {}
 
-        async def _fake_stream(*, messages, tools, model, user_settings):
+        async def _fake_stream(*, messages, tools, model, user_settings, usage_box=None):
             captured["sys"] = messages[0]["content"]
             return ("x", [])
 

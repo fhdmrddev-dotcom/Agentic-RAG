@@ -64,4 +64,6 @@ def test_audit_accepts_102_kinds():
     # lockstep with the _AUDIT_EVENT_TYPES extension; the drift guard that keeps the
     # Python set equal to the SQL CHECK lives in
     # tests/unit/test_audit_event_registration.py.
-    assert len(_AUDIT_EVENT_TYPES) == 24
+    # Phase 204 / migration 125 (SCHED-02, plan 204-02) adds the spend-cap / wall-clock
+    # trip receipt `circuit_breaker_tripped` -> 25.
+    assert len(_AUDIT_EVENT_TYPES) == 25

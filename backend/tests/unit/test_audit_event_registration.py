@@ -276,8 +276,20 @@ def test_g2_positive_control_detects_a_missing_literal():
     # CHECK as migration 114 left it (measured at full-schema.sql:1124 before 117).
     assert len(parsed) == 23, parsed
 
+    # ⚠ THIS EXPECTATION GAINS A MEMBER EVERY TIME A KIND IS ADDED, BY DESIGN — the
+    # fixture above is a FROZEN historical snapshot (the CHECK exactly as migration 114
+    # left it), so every kind registered after 114 is legitimately "missing from SQL"
+    # here. Updating it is the established discipline, not a re-baseline: 190-03 did
+    # exactly this when `external_action_sent` landed, and 204-02 does it for
+    # `circuit_breaker_tripped` (migration 125). The PROPERTY under test — that the
+    # parser detects a kind registered in Python and absent from a CHECK — is preserved
+    # and is now exercised on two detections rather than one.
+    # ⚠ DO NOT "FIX" THE STALENESS BY LOOSENING THIS TO A MEMBERSHIP TEST. `==` is what
+    # makes the control fail when the parser OVER-reports; `in` would pass on a parser
+    # that returned the empty CHECK set, which is the exact false green the whole file
+    # exists to prevent.
     missing_from_sql = set(_AUDIT_EVENT_TYPES) - set(parsed)
-    assert missing_from_sql == {"external_action_sent"}, (
+    assert missing_from_sql == {"external_action_sent", "circuit_breaker_tripped"}, (
         "G2's parser failed to detect the BUG-260731-02 shape (a kind registered in "
         "Python but absent from the CHECK) — the real G2 above is therefore not "
         "evidence of anything."
