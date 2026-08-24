@@ -3580,3 +3580,61 @@ scripted pass over eight paths.
 - **G-5 Status:** No hot files modified.
 
 
+
+
+---
+
+### `frontend/src/lib/api.ts` — ⚠ CORRECTION 2026-08-24: the 197 decline's trigger FIRED at 200.2
+
+Measured `179 / 102 / 6580`. **The three sections above say the decline holds and its trigger did not
+fire. That was true when each was written and it is no longer true.** The trigger, verbatim:
+*“the next phase adding a RUNTIME export or a second concern here”*.
+
+Phase 200.2 added **`getWorkflowRunPhaseCitations`** — a runtime export, not a type. Its whole change
+here is `+33 / −0`, and unlike 192.2's `+53 / −0` and 200.1's `+26 / −0` it is NOT type-only: the diff
+matches `^\+export (const|function|class|let|var) `.
+
+⚠ **`196-08`'s mock-factory failure mode did not fire, and that is LUCK rather than evidence.** The
+count gate stayed `OK` (110/110, 0 failing) because no suite that whole-module-mocks `@/lib/api`
+happens to mount the new symbol. The next runtime export may not be so lucky — which is exactly what
+the decline was deferring.
+
+⚠ **The row's phase figure was also wrong, in the direction that under-states heat**: it read `103`,
+measures `102`. This row has now mis-counted the six-digit quick-task subtraction TWICE. **Re-derive
+with the recipe; do not increment the cell by hand.**
+
+**The decline is therefore OWED AN ANSWER at the next phase that touches this file** — either take the
+extraction, or re-decline in writing with a fresh trigger. Carrying the old *“it did not fire”*
+sentence forward is no longer available.
+
+---
+
+### `frontend/src/pages/WorkflowBuilderPage.tsx` — 200.3, and the defect a green audit scored as satisfied
+
+Measured `51 / 17 / 2867` (the row read `49 / 15 / 2762`). Honoured by construction at 200.3: one
+optional prop (`onTestRun`), one handler, one canvas-gated draft-only button. No seam taken.
+
+⚠ **THIS FILE HELD THE ONE DEFECT v3.7 SHIPPED, AND `200.3-VERIFICATION.md` SCORED IT ✓ VERIFIED /
+✓ WIRED.** `handleTestRun` flushed behind `if (persistence.dirty)`. `DraftPersistence`
+(`useDraftPersistence.ts:345`) has **no `dirty` member** — the flag lives on the STORE
+(`store.getState().dirty`). So the read was `undefined`, the guard was permanently false, and the
+flush **never ran**: ▶ Test Run launched the last SAVED definition while the canvas showed newer work.
+
+**What could and could not see it, because that is the transferable part:**
+
+| | verdict |
+|---|---|
+| The phase's two behavioural tests | GREEN — **neither asserts the flush** |
+| `200.3-VERIFICATION.md` truth #6 + its wiring row | ✓ VERIFIED / ✓ WIRED — **both wrong** |
+| `npx tsc --noEmit` (what the audit ran) | 0 errors — **it checks ZERO files** |
+| `npx tsc --noEmit -p tsconfig.app.json` | **TS2339, named immediately** |
+
+⚠ **A page this hot must carry the PROJECT-SCOPED typecheck in its acceptance criteria.** The bare
+command is not a weaker version of the right one; it is a command that measures nothing and reports
+success.
+
+Fixed by DROPPING the guard rather than repointing it at the store — `saveNow` is the user-initiated
+write and is safe unconditionally (D-186-03). The regression pin sweeps **stripped** code, not raw
+source: the fix's own docblock spells `persistence.dirty` by name so the next reader knows why the
+guard is gone, and a raw-source grep expecting zero would red on that prose (187-24). **The
+counterfactual was DRIVEN** — replanting the guard turns the pin RED, restoring it passes.
