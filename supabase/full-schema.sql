@@ -1164,7 +1164,7 @@ CREATE TABLE public.harness_audit (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text, 'external_action_sent'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text, 'external_action_sent'::text, 'circuit_breaker_tripped'::text])))
 );
 
 
@@ -2028,6 +2028,7 @@ CREATE TABLE public.workflow_runs (
     user_id uuid,
     is_golden_run boolean DEFAULT false,
     definition_snapshot jsonb,
+    metadata jsonb,
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -2087,6 +2088,70 @@ COMMENT ON COLUMN public.workflow_runs.is_golden_run IS 'Phase 102 QUAL-01 (D-05
 --
 
 COMMENT ON COLUMN public.workflow_runs.definition_snapshot IS 'Phase 200 follow-on: the WorkflowDefinition this run actually executed, serialized from the same in-memory object that produced this run''s workflow_phases rows, in the same transaction (backend/app/db/workflows.py:create_workflow_run). It exists because workflow_definitions.definition is MUTABLE while status = ''draft'': measured 2026-08-20, 21 of 228 runs point at a draft, 14 of those drafts were edited after their run, and on 2 the phase ORDER changed so the run page''s phase_index join reported each step''s state as its neighbour''s. NULLABLE and NOT BACKFILLED: a pre-122 run keeps NULL and the read path falls back to the live definition row, which is the current behaviour including its crossing risk. A backfill would store a document the run never executed for exactly the rows that motivated the column. Stored as a jsonb OBJECT, never a JSON string scalar - the shape workflow_definitions.definition has, which makes ->''phases'' return NULL instead of erroring.';
+
+
+--
+-- Name: COLUMN workflow_runs.metadata; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.metadata IS 'Phase 204 (SCHED-02): run-level operational metadata. Today it carries exactly one key, "circuit_breaker", written by CircuitBreaker.trip_breaker with the trip reason and the exact token/timing measurements. Merged with ||, never replaced.';
+
+
+--
+-- Name: workflow_schedules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_schedules (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    workflow_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    name text NOT NULL,
+    cron_expression text,
+    interval_seconds integer,
+    timezone text DEFAULT 'UTC'::text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    max_tokens_per_run integer DEFAULT 50000 NOT NULL,
+    max_duration_seconds integer DEFAULT 600 NOT NULL,
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    last_run_at timestamp with time zone,
+    next_run_at timestamp with time zone,
+    last_status text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT schedule_cadence_exactly_one CHECK ((((cron_expression IS NOT NULL) AND (interval_seconds IS NULL)) OR ((cron_expression IS NULL) AND (interval_seconds IS NOT NULL)))),
+    CONSTRAINT schedule_duration_cap_positive CHECK ((max_duration_seconds > 0)),
+    CONSTRAINT schedule_interval_floor CHECK (((interval_seconds IS NULL) OR (interval_seconds >= 60))),
+    CONSTRAINT schedule_token_cap_positive CHECK ((max_tokens_per_run > 0))
+);
+
+
+--
+-- Name: COLUMN workflow_schedules.timezone; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_schedules.timezone IS 'The IANA zone the cron expression is READ IN (D-204-10). Interval schedules ignore it entirely — an interval is a duration, and a duration has no timezone. Defaults to UTC; an unrecognised zone is rejected at the API boundary, because the run must fire where the author expects rather than where the server happens to sit.';
+
+
+--
+-- Name: COLUMN workflow_schedules.inputs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_schedules.inputs IS 'The kickoff inputs each unattended run is launched with (the same shape workflow_runs.inputs carries, e.g. a kickoff_prompt key). Written as a jsonb OBJECT, never a JSON string scalar: the asyncpg pool registers a jsonb codec (dependencies.py _init_pg_connection), so a call site that pre-encodes with json.dumps stores a STRING and every arrow read then returns NULL. That defect shipped on 484 of 484 workflow_phases.output rows and was repaired by migration 123 — do not reintroduce it here.';
+
+
+--
+-- Name: COLUMN workflow_schedules.next_run_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_schedules.next_run_at IS 'The claim key. The poller reads WHERE is_active AND next_run_at <= now() FOR UPDATE SKIP LOCKED and ADVANCES this column inside the SAME transaction that claims the row — which is what makes a duplicate firing impossible across uvicorn workers (D-204-09). NULL means never computed: such a row is invisible to the poller and will never fire, so every writer must set it.';
+
+
+--
+-- Name: COLUMN workflow_schedules.last_status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_schedules.last_status IS 'A HINT for the schedule list, never an authorization or control input: the terminal status of the most recent run this schedule launched, or launch_failed when the launch itself raised. NULL = has never run.';
 
 
 --
@@ -2636,6 +2701,14 @@ ALTER TABLE ONLY public.workflow_phases
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_schedules workflow_schedules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_schedules
+    ADD CONSTRAINT workflow_schedules_pkey PRIMARY KEY (id);
 
 
 --
@@ -3357,6 +3430,27 @@ CREATE INDEX idx_workflow_runs_user_id ON public.workflow_runs USING btree (user
 
 
 --
+-- Name: idx_workflow_schedules_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_schedules_due ON public.workflow_schedules USING btree (next_run_at) WHERE is_active;
+
+
+--
+-- Name: idx_workflow_schedules_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_schedules_org_user ON public.workflow_schedules USING btree (org_id, user_id);
+
+
+--
+-- Name: idx_workflow_schedules_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_schedules_workflow_id ON public.workflow_schedules USING btree (workflow_id);
+
+
+--
 -- Name: idx_workspace_file_versions_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3830,6 +3924,20 @@ CREATE TRIGGER workflow_runs_autofill_org_id BEFORE INSERT ON public.workflow_ru
 --
 
 CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workflow_schedules workflow_schedules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_schedules_autofill_org_id BEFORE INSERT ON public.workflow_schedules FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: workflow_schedules workflow_schedules_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_schedules_set_updated_at BEFORE UPDATE ON public.workflow_schedules FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -4540,6 +4648,30 @@ ALTER TABLE ONLY public.workflow_runs
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_schedules workflow_schedules_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_schedules
+    ADD CONSTRAINT workflow_schedules_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_schedules workflow_schedules_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_schedules
+    ADD CONSTRAINT workflow_schedules_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_schedules workflow_schedules_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_schedules
+    ADD CONSTRAINT workflow_schedules_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflow_definitions(id) ON DELETE CASCADE;
 
 
 --
@@ -5728,6 +5860,40 @@ CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO aut
   WHERE (threads.id = workflow_runs.thread_id))))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
   WHERE (threads.id = workflow_runs.thread_id)))));
+
+
+--
+-- Name: workflow_schedules; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workflow_schedules ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workflow_schedules workflow_schedules_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_schedules_delete ON public.workflow_schedules FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: workflow_schedules workflow_schedules_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_schedules_insert ON public.workflow_schedules FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: workflow_schedules workflow_schedules_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_schedules_select ON public.workflow_schedules FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: workflow_schedules workflow_schedules_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_schedules_update ON public.workflow_schedules FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
