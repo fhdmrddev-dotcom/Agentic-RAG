@@ -96,6 +96,16 @@ verdict this repo recorded a month ago and never implemented.
 - `backend/tests/test_189_no_egress.py` **fails on any MCP identifier in `backend/app`** — that
   fence must be consciously retired in the same commit that adds the client, never worked around.
 
+### 4b. ⭐ THE CANVAS SURFACE — a connector is a NODE YOU DROP, not a form field
+
+Operator, 2026-08-24, on the xyOps editor: *"the visual representation of this workflow is exactly
+how I imagined it… this is exactly what I am concerned about especially with the connectors."*
+
+xyOps puts ,  and  on the canvas as **glyph nodes**
+hanging off edge outcomes — a second, smaller node class beside the big work-step cards. That is the
+shape Phase 206 should target, and it is captured in full with its two binding constraints (the D-14
+no-new-executors red line, and our card's full badge budget) in ****.
+
 ### 5. Surfaces — connections are platform assets
 The same connection usable from **chat**, **workflows**, and **ingestion**. Chat is the one that
 does not come for free: Phase 189/190's outbound governance lives on the workflow canvas and does
