@@ -21,7 +21,7 @@
 - ✅ **v3.5 UX Consolidation & Chat Polish** — Phases 174-177 CORE (shipped 2026-07-23); STRETCH 178-180 deferred → carry-forward guide `.planning/v3.5-STRETCH-CARRYFORWARD.md`. Cleared the load-bearing chat-surface bug backlog + consolidated the accumulated UI/UX (incl. the new v3.4 org surfaces) into one coherent, honest experience: run-state & lifecycle honesty (174) · cross-provider streaming fidelity (175) · chat render correctness + exec reliability (176) · v3.4 org-surface family-cohesion polish (177). 14/14 CORE requirements delivered; no migration. Full detail archived: `.planning/milestones/v3.5-ROADMAP.md`.
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
-- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`).
+- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** + insert 204.1 (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`).
 
 ---
 
@@ -35,7 +35,8 @@
 | 202 | Table Chunks Retrieval Injection & Semantic Search | Extracted tables are injected as structured markdown representations and summaries into `document_chunks` so semantic search finds cell facts | TAB-02 | ✅ Complete (2026-08-24) |
 | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Parse `.msg` and `.eml` files with header metadata extracted, thread deduplication, and attachment relationship links | EML-01, EML-02 | ✅ Complete (2026-08-24) |
 | 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | ✅ Complete + verified live (2026-08-24) — 2 seam defects found by UAT, both fixed |
-| 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | Planned |
+| 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
+| 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | Planned — ⚠ **REWRITTEN 2026-08-24**, see detail |
 
 ### Phase Checklist
@@ -49,7 +50,16 @@
   2. `c62f745e` — **a scheduled run was invisible to the Control Room.** `register_run_start` (the only writer of Redis `runs:active`) is called from exactly one place: `threads.py`, the CHAT path. The worst case to miss — a chat run has a person watching; an unattended run is the one an operator most needs to see and kill. Fixed with `mirror_run_active` + `finalize_run_terminal` (bare `finalize_run` would have left a permanent ghost with a live Kill button).
   ⚠ **THE LESSON FOR PARALLEL WAVES:** both executors correctly reported zero new failures. Neither suite crossed the seam because each mocked the other's side. **A phase whose waves run in parallel owes an integration test that mocks neither** — `test_scheduler_breaker_seam.py` is that test, and its own first draft had the 187-24 trap (a source scan reading an import as a use), caught only by driving the counterfactual.
   ⚠ **Owed:** the schedule **dialog** has had no live UAT; the concurrency proof is 3 pooled connections in one process, not 2 uvicorn workers.
-- [ ] **Phase 205: Stateful & Incremental Workflows**
+- [x] **Phase 204.1 (INSERT): The Library Says What Runs Itself** — `7c3377ed` + `d04fe2a4` — ✅ **COMPLETE, AND CONFIRMED BY EYE 2026-08-25.** 204 shipped scheduling and the library said nothing about it: a workflow firing every Monday read identically to one never automated, and the only way to find out was to open the ⋯ menu on 122 cards in turn. `204-03` had recorded it as **deviation 4** rather than building it, because the projection lives in `db/workflows.py` — its parallel sibling's file during that wave, and reaching across was the seam that produced 204's two defects.
+  Card now reads `● Worked 4 days ago │ Ready to run │ 🗓 runs every Monday  +1 more`.
+  ⚠ **THE FIRST VERSION WAS INVISIBLE, AND THAT IS THE FINDING.** It shipped on the 11px uppercase identity line, honouring that line's no-colour/no-glyph rule exactly — and the operator scanned the card and asked where it was. **A fact that satisfies the style guide and fails the glance has not indicated anything.** Moved to the 12px status line, which is where a reader already looks to answer *does this one work*; that line already spends a coloured dot and a `Wrench`, so no new vocabulary was introduced. The **placement is now PINNED** and the counterfactual drives it — moving it back reds two tests.
+  ⚠ **Three-place lockstep in one commit** (projection · `response_model` · serializer) because an undeclared key is dropped **silently**. Owner-scoped lateral (this feed bypasses RLS), projection-only so the `$2` filter is not renumbered, and an `is_active` predicate so a **PAUSED** schedule stays silent rather than contradicting the Pause button.
+  ⚠ **A badge was impossible, not merely undesirable:** the card's badge budget is a max-2 tuple enforced as a **typecheck error** (189 spent the second slot). The decision lives in `automationFacts.ts`, not the card — `WorkflowCard.tsx`'s G-5 was discharged by extracting exactly this shape once (`cardFace.ts`), and a second wire-reading ternary inline would undo that. `WorkflowCard.test.tsx` passes **UNEDITED**: silent rows compose byte-identically. 697 library tests · tsc 34 = baseline · 1 of 111 cards speaks.
+- [x] **Phase 205: Stateful & Incremental Workflows** — `1370943e` + `cf16539e` — ✅ **COMPLETE 2026-08-25.** ONE plan (204's lesson applied). A stateful workflow resolves its own previous completed run and interpolates `{{prior_run.output}}` / `.id` / `.created_at` into phase prompts; living-register framing emits `[NEW]` / `[UPDATED]` / `[RESOLVED]`. **9 new cases; 68 = 68 failing-set diff, zero new; tsc 34 = baseline; count gate `5444 · failed 0 · 110/110`.**
+  ⚠ **PLANNED BY GEMINI, PRE-FLIGHTED HERE — and the pre-flight caught two blockers BEFORE a line was written** (`205-PREFLIGHT.md`): (1) scoping the prior run on `definition_id` would have **reset the living register on every republish** — measured, `pm-weekly-status-report` carries 4 definition ids for one slug; scoping moved to the stable slug. (2) "the last phase of the prior run" is the rule **Phase 200.2 rejected by name** — a `confirm` step's `text` is a QUESTION, so that version would have fed the machine's own question into next week's run as its baseline.
+  ⚠ **THE JSONB UNWRAP IS THE FEATURE, NOT A PRECAUTION.** Measured live: string-scalar `workflow_phases.output` rows decode to `text` on **367/400**, object-typed rows on **14**. Without it the read finds nothing and renders `"[Initial Run - No Prior State]"` forever — a silent failure that looks like a correct cold start. Migration 123 repaired `definition_snapshot` only and never touched this column.
+  ⚠ **An authoring fence fired and was answered as a DECISION, not re-baselined:** adding `is_stateful` put it in the schema the authoring model sees while the prompt never asks for it. It is now an allowlisted *advertised-but-not-asked* field, because the flag is **half of a pair** — it does nothing unless the prompts also reference `{{prior_run.output}}`, and a model flipping it true without writing those prompts yields a workflow that resolves last week's deliverable and ignores it. Re-open trigger recorded.
+  ⚠ **OWED:** no live two-run stateful UAT — every gate here is static or unit-level, and both 204 defects were invisible to 106 passing tests until a real run was driven.
 - [ ] **Phase 206: MCP Connector Client — workflow-scoped** — ⚠ **REWRITTEN 2026-08-24** (was *Outbound Action Connectors*). The rest of the connector story moved to the **Connections & Open Platform** milestone: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
 
 ---
@@ -60,7 +70,7 @@
 STYLE CHOICE.** *"Phase NNN not found"* has two causes, and the second is that phase details must be
 `#### Phase NNN:` **headings** — a bold label is silently skipped. That failure mode broke the whole of
 v3.7's roadmap once. Phases 201-203 shipped without one and were fine, so this is a latent trap rather
-than a live break. ⚠ **BOTH 205 AND 206 WERE GIVEN HEADINGS ON 2026-08-24, BEFORE ANY PHASE-OP RAN AGAINST EITHER.** 205 had none and the first `/gsd:*-phase 205` would have returned *"Phase 205 not found"*; it was caught by checking rather than by hitting it. Every future phase owes its heading at the moment it enters the table.
+than a live break. ⚠ **204.1, 205 AND 206 ALL CARRY HEADINGS AS OF 2026-08-25; 205 AND 206 GOT THEIRS ON 2026-08-24, BEFORE ANY PHASE-OP RAN AGAINST EITHER.** 205 had none and the first `/gsd:*-phase 205` would have returned *"Phase 205 not found"*; it was caught by checking rather than by hitting it. Every future phase owes its heading at the moment it enters the table.
 
 #### Phase 204: Scheduled & Recurring Unattended Runs
 
@@ -110,6 +120,75 @@ a stop the reader did not make — is a **vocabulary** defect on a surface a sch
 It stays open against the next workflow-surface phase. **Re-open trigger: a scheduled run's cancel path
 becoming a fourth non-owner caller**, which would make the wrong sentence reachable from this phase's own
 feature and turn a cosmetic bug into a misleading one.
+
+---
+
+#### Phase 204.1: The Library Says What Runs Itself (INSERT)
+
+**Goal**: A scheduled workflow says so **on its card**, on the line a reader already scans —
+instead of the fact being reachable only by opening the ⋯ menu on every card in turn.
+**Requirements**: SCHED-01 (follow-up) · **Depends on**: Phase 204.
+**Shipped**: `7c3377ed` (the projection + the card) · `d04fe2a4` (the move to the status line).
+
+**Why it is a phase rather than a tidy-up.** 204 shipped scheduling and the library said nothing
+about it. A workflow firing every Monday at 08:00 rendered **identically** to one that had never
+been automated. For a feature whose entire point is running while nobody watches, invisible is the
+wrong default — and `204-03` had already recorded it as **deviation 4** rather than building it,
+correctly, because the projection lives in `backend/app/db/workflows.py`, its parallel sibling's
+file during that wave. Reaching across was the exact seam that produced 204's two defects.
+
+##### ⚠ THE FINDING: THE FIRST VERSION HONOURED THE STYLE GUIDE AND WAS NOT SEEN
+
+It first shipped as a segment on the **11px uppercase identity line** —
+`YOURS • CHANGED LAST WEEK • RUNS EVERY MONDAY • +1 MORE`. That line's rule is *no colour, no
+glyph*, which is what demotes it below the 14px name, and the implementation obeyed it exactly.
+
+**The operator scanned the card and asked where the indicator was.**
+
+> **A fact that satisfies the design rules and fails the glance has not indicated anything.**
+
+It moved to the **12px status line**, after `Ready to run`, with the accent tone and a
+`CalendarClock`. Three reasons that line was the right home and the meta line was not:
+
+1. It is where a reader already looks — it answers *does this one work?*, and *"it also runs itself
+   on Mondays"* is the same **kind** of fact at the same weight.
+2. It **already spends colour and glyphs** (the status dot, the `Wrench` for drafts), so the accent
+   tone and the calendar mark introduce no new vocabulary. The identity line structurally could not.
+3. `CalendarClock` is the **same glyph the ⋯ menu's `Schedules…` item uses**, so "automated" is one
+   mark in two places rather than two spellings of one idea.
+
+⚠ **THE PLACEMENT IS PINNED, AND THE COUNTERFACTUAL DRIVES IT.** `automationFacts.test.ts` asserts
+the atom sits *between* the status-line dot and the identity line in source order — not merely that
+the string exists on the card. Moving it back reds **two** tests. A tidy-up that returned it to the
+meta line would otherwise pass every other assertion and silently recreate the invisible version.
+
+##### The binding constraints, all measured
+
+- ⚠ **A BADGE WAS IMPOSSIBLE, NOT MERELY UNDESIRABLE.** The card's badge budget is a **max-2 tuple
+  enforced as a TYPECHECK ERROR**; 189 spent the second slot, so a third badge does not compile.
+- ⚠ **THREE-PLACE LOCKSTEP IN ONE COMMIT** — `.select()` projection · `response_model` · serializer.
+  An undeclared key is dropped **silently**, which is a green db test beside an unchanged UI
+  (T-192.2-11, measured on this very model).
+- ⚠ **OWNER-SCOPED ON `s.user_id = $1`, AND THAT IS SECURITY-BEARING.** This feed runs on a
+  service-role pool that BYPASSES RLS, so the predicate is the only boundary — the same distinction
+  `_LAST_RUN_LATERAL_SQL` and `_HAS_ANY_RUN_SQL` already encode, and CR-01 is what happens when it
+  is got wrong.
+- ⚠ **PROJECTION-ONLY**: binds no placeholder, touches no `WHERE`/`ORDER BY`, so the `$2`
+  project-folder filter appended after it is **not renumbered**.
+- ⚠ **`is_active` IS THE PREDICATE.** A **PAUSED** schedule renders nothing — the modal's Pause
+  exists to stop a schedule without deleting it, and a card still claiming "runs every Monday" would
+  contradict the button its author just pressed.
+- ⚠ **THE DECISION LIVES IN `automationFacts.ts`, NOT THE CARD.** `WorkflowCard.tsx`'s G-5 was
+  DISCHARGED by extracting exactly this shape once (`cardFace.ts`); a second wire-reading ternary
+  inline would undo that discharge one commit later.
+- ⚠ **PUBLISHED FEED ONLY.** Starters and drafts are deliberately not widened — the schedules API
+  refuses a draft, so the field would be structurally always null. *(This cost two false alarms
+  during UAT: the first two seeds landed on a starter and on an unrendered row, and both looked
+  exactly like a defect.)*
+
+**Gates**: 697 library tests · `WorkflowCard.test.tsx` passes **UNEDITED** (silent rows compose
+byte-identically, so the by-child-order pins hold) · `tsc -p tsconfig.app.json` **34 = baseline** ·
+count gate `5444 · failed 0 · 110/110` · **1 of 111 cards speaks**, confirmed in the browser.
 
 ---
 
