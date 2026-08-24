@@ -97,6 +97,11 @@ CANVAS_GATED_PATHS: frozenset[str] = frozenset(
         # `/workflow-runs` and NOT `/workflow-runs/<uuid>`, which the member above already
         # owns. Two members, two shapes, neither shadowing the other.
         "/workflow-runs",
+        # Phase 200.2 (RUN-05 / D-09) — the lazy per-step citation read.
+        # TEMPLATE form: OpenAPI-half only (see the asymmetry note above); its request-path 404
+        # comes from require_canvas. The existing /workflow-runs/{workflow_run_id} template is
+        # segment-anchored and does NOT match this deeper path, so the new member is required.
+        "/workflow-runs/{workflow_run_id}/phases/{phase_slug}/citations",
     }
 )
 

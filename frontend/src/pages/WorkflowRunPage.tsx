@@ -57,11 +57,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-// Phase 195 Plan 06 (RUN-03) — the ONE shared file row and the pure helpers behind it.
-// The eight lucide file-glyph imports that used to sit above are GONE with the local
-// mapping they fed; the glyph now resolves once, inside the shared row.
-import { FileRow } from "@/components/files/FileRow"
-import { baseName, byNewestFirst, fileAgeLabel, formatBytes } from "@/components/files/fileRowUtils"
+import { baseName, byNewestFirst } from "@/components/files/fileRowUtils"
 // Phase 194.1 Plan 06 — the elapsed formatter, hoisted out of this file VERBATIM so the
 // chat run line consumes the shipped one instead of becoming a fourth copy. See the
 // docblock where it used to live (search `fmtElapsed NO LONGER LIVES HERE`).
@@ -89,15 +85,9 @@ import { RunReceipt } from "@/components/workflows/RunReceipt"
 // exactly one home (`phaseDuration.runSpan`) and exactly one call site (the receipt), so
 // there is no second place for the product's first honest total runtime to drift.
 import { type PhaseTimingRow } from "@/components/workflows/phaseDuration"
-// ── Phase 200 · THE CENTRE OF THIS PAGE IS THE RUN LOG, NOT THE CANVAS ───────────────
-//    `WorkflowCanvas` is no longer mounted here. The four measured reasons live in
-//    `RunTranscript.tsx`'s own docblock rather than being restated here, because that is
-//    the file a reader arrives at when they ask what replaced it. In one line: the
-//    definition is a flat `list[PhaseSpec]` with no branch construct, so a graph of a run
-//    was the spine drawn expensively — and this page was rendering {step → status} three
-//    times over. The canvas port itself lost nothing; it edited the SHARED component the
-//    builder renders, which is the surface its sheet actually draws.
-import { RunTranscript } from "@/components/workflows/RunTranscript"
+// Phase 200.2 (RUN-05 / D-01 / D-02 / D-04) — The deliverable hero and process trace components
+import { RunHero } from "@/components/workflows/RunHero"
+import { RunStepList } from "@/components/workflows/RunStepList"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
@@ -134,7 +124,6 @@ import {
   useStreamActions,
   useWorkspaceFiles,
 } from "@/providers/StreamsProvider"
-import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import type { Phase, WorkspaceFile } from "@/types"
@@ -193,68 +182,20 @@ const WAITING_TO_START = "Waiting to start"
 /** The deliverable region's identity. Not a claim about contents — the two empty
  *  states below carry that, and they differ because the truth differs.
  *
- *  ── ⚠ PHASE 195 (D-02) — THE STRING CHANGED, AND THE OLD ONE IS QUOTED HERE RATHER
- *     THAN ERASED, because the reason it was wrong is the interesting part. ─────────
+/**
+ * ⚠ PHASE 200.2 (RUN-05) — DELIVERABLE COPY RETIRED / SUPERSEDED.
  *
- *  It read, verbatim:  "What this run produced"
+ *  · `COPY_DELIVERABLE_HEADING` ("Files in this run's workspace") and
+ *    `COPY_ANSWER_HEADING` ("The answer this run wrote") are retired from the page;
+ *    the deliverable card now leads the centre column via `RunHero` with typed headings.
+ *  · `COPY_NO_FILES_LIVE` ("No files yet — this run hasn't written anything.") is retired
+ *    because the live arm renders nothing at the hero slot (D-03).
+ *  · `COPY_NO_FILES_TERMINAL` ("This run produced no file and no written answer.") is
+ *    superseded by the D-13/D-16 split empty-headline family in `runColumnVocabulary.ts`.
  *
- *  That is an authorship claim, and this region cannot support one. The list is read
- *  THREAD-scoped (D-01: no run attribution column exists, and none was added — the
- *  candidate field that looks like one is null on every row and belongs to a different
- *  feature). A thread can legitimately hold files this run did not write: the template
- *  a user uploaded before launching, and anything an earlier run or a chat turn on the
- *  same thread left behind. Measured at planning time, thread-scope is exact for 60 of
- *  the 61 file-bearing runs and visibly wrong for one — so the old label was a lie with
- *  a small blast radius rather than a rare one, which is exactly the kind that survives
- *  review. The new label names WHERE the files are, which is the thing the read can
- *  actually prove, and leaves WHO WROTE THEM unclaimed.
- *
- *  ⚠ THE TWO EMPTY STRINGS BELOW ARE DELIBERATELY UNCHANGED and must stay that way.
- *  "This run produced no files." looks like the same overclaim and is not: a run is a
- *  subset of its thread, so an EMPTY thread-scoped list entails the run produced
- *  nothing. The overclaim only bites in the NON-empty direction. D-15 ships both
- *  strings byte-identical, and a source fence pins each at exactly one occurrence.
- *
- *  ── ⚠ PHASE 200.1 (RUN-04) — ONE OF THOSE TWO STRINGS IS SUPERSEDED, AND THE
- *     PARAGRAPH ABOVE IS KEPT VERBATIM BECAUSE ITS ARGUMENT STILL STANDS. ───────────
- *
- *  It read, verbatim:  "This run produced no files."
- *
- *  Nothing about the overclaim reasoning changed — that sentence was and is honest
- *  about FILES. What changed is that files stopped being the only thing a run can
- *  produce on this surface. **479 phase rows carry `output.text` against 60 carrying a
- *  file — eight to one** — so on the common case the old sentence was TRUE and USELESS:
- *  it reported the absence of the rarer deliverable while saying nothing about the one
- *  the run actually made. It now reads "This run produced no file and no written
- *  answer.", which is the SAME claim widened to cover both, and it renders ONLY when
- *  both are genuinely absent.
- *
- *  ⚠ IT IS SUPERSEDED, NOT DELETED. `git log -S "This run produced no files."` still
- *  finds the thread through this quotation and through the `SUPERSEDED` block in
- *  `WorkflowRunPage.test.tsx`. */
-const COPY_DELIVERABLE_HEADING = "Files in this run's workspace"
-/** The ANSWER region's identity — the run's written deliverable.
- *
- *  ⚠ **THIS ONE MAY CLAIM AUTHORSHIP AND THE FILE HEADING MAY NOT, AND THE ASYMMETRY IS
- *  THE INTERESTING PART.** D-02 (above) removed "What this run produced" from the file
- *  heading because the file list is read THREAD-scoped: a thread can hold files this run
- *  did not write, so the read cannot prove authorship. The answer is different in kind —
- *  it comes from this run's OWN `workflow_phases` rows, on the run read, joined by
- *  `workflow_run_id`. Nothing else can put a row there. So "this run wrote" is a claim
- *  the read actually supports, and declining to make it would be a different kind of
- *  dishonesty: vagueness about a fact we hold.
- *
- *  ⚠ IT IS THE RUN'S ANSWER AND NEVER A STEP'S. This region has always refused to say
- *  WHICH step made what (it passes no `deliverableOf`), and that refusal is unchanged —
- *  the answer is presented as the run's, with no step named beside it. */
-const COPY_ANSWER_HEADING = "The answer this run wrote"
-/** ⚠ DELIBERATELY UNCHANGED BY 200.1, and the reason is recorded so the next reader does
- *  not "finish the job". The ROADMAP names only the TERMINAL arm, and this is the live
- *  one: a run that is still going may yet write a file OR an answer, so "nothing has been
- *  written YET" is already true of both and re-wording it would be a change nobody asked
- *  for on a sentence that is not wrong. */
-const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
-const COPY_NO_FILES_TERMINAL = "This run produced no file and no written answer."
+ * Quoted here per the superseded-not-deleted convention so git history and grep threads
+ * remain intact.
+ */
 const COPY_DOWNLOAD_FAILED = "Download failed — try again."
 /* ⚠ `COPY_RECEIPT_HEADING` LIVED HERE AND IS GONE WITH THE REGION IT NAMED. It read:
  *
@@ -600,20 +541,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    */
   const orderedFiles = useMemo(() => [...files].sort(byNewestFirst), [files])
 
-  /**
-   * ⚠ Phase 200 — ONE INSTANT FOR THE WHOLE DELIVERABLE LIST, hoisted here rather than
-   * taken per row from `fileAgeLabel`'s `Date.now()` default. Two rows stamped a
-   * millisecond apart can otherwise land either side of a band boundary and read a band
-   * apart, which is a difference a person notices and cannot explain. It is deliberately
-   * NOT memoised: the value must be re-read on every render, or the list would keep
-   * reporting the age it had when the page first painted.
-   *
-   * ⚠ NO LIVE TICK, and that is inherited rather than decided here — `relativeBand`'s own
-   * docblock accepts it: a row reading `just now` can still read `just now` a while later,
-   * and the value refreshes when something else re-renders. This surface re-renders on
-   * every poll and on every stream frame, so in practice it moves.
-   */
-  const filesNow = Date.now()
+
 
   /**
    * ⚠ F5 (UAT 2026-08-05) — THE RUN-TIME WAITING READING WAS UNREACHABLE ON THIS SURFACE.
@@ -1531,15 +1459,31 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         <section
           aria-busy={!isTerminal}
           data-testid="run-transcript-region"
-          className="flex min-h-0 min-h-[320px] flex-1 flex-col overflow-hidden px-6"
+          className="flex min-h-0 min-h-[320px] flex-1 flex-col overflow-y-auto px-6"
         >
-          {/* ⚠ THE RUN'S TOTAL SITS ABOVE THE LOG IT SUMMARISES, AS A STRIP.
-              It used to be the header of a separate region below, whose ROWS repeated the log's
-              five steps and five durations verbatim — the duplication an operator caught on
-              screen. The rows are gone (`variant="summary"`); the strip stays, because
-              `Ran 57s · 5 steps · finished 19:55` is the page's ONLY statement about the run as
-              a whole derived from the steps that really ran. The page header's figure measures
-              something else (`created → updated`) and says so in words. */}
+          {/* Phase 200.2 (D-01 / D-02 / D-03 / D-04) — The deliverable hero leads at the
+              top of the centre column, above the switch, so it renders in both views. */}
+          {run && (
+            <div className="mx-auto mb-6 w-full max-w-3xl">
+              <RunHero
+                run={run}
+                answer={runAnswer}
+                files={orderedFiles}
+                filesLoading={filesLoading}
+                isTerminal={isTerminal}
+                failedStepTitle={failedStepTitle}
+                onDownload={onDownload}
+                titleOf={titleOf}
+                now={nowMs}
+              />
+              {downloadError ? (
+                <p className="mt-2 text-xs text-[hsl(0_80%_80%)]" data-testid="run-download-error">
+                  {downloadError}
+                </p>
+              ) : null}
+            </div>
+          )}
+
           {centreView === "canvas" ? (
             /* ⚠ THE SUMMARY STRIP DOES NOT COME WITH IT. It is the LOG's header — the sentence
                that summarises the column beneath it — and the canvas is not that column. A strip
@@ -1565,13 +1509,16 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                   variant="summary"
                 />
               </div>
-              <RunTranscript
-                phases={wireRows}
-                titleOf={titleOf}
-                liveOf={runState}
-                runStatus={runStatus}
-                now={nowMs}
-              />
+              <div className="mx-auto w-full max-w-3xl">
+                <RunStepList
+                  phases={run?.phases ?? []}
+                  titleOf={titleOf}
+                  runId={runId ?? ""}
+                  runStatus={runStatus}
+                  liveOf={runState}
+                  now={nowMs}
+                />
+              </div>
             </>
           )}
         </section>
@@ -1630,233 +1577,6 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           />
         </aside>
       </div>
-
-      {/* 4. RUN RECEIPT — the same spine above, re-read in the PAST TENSE (D-09 ·
-             `RS-MR-02` / `RS-MR-03` / `RS-MR-04` / `RS-MR-05`).
-             ────────────────────────────────────────────────────────────────────────────
-             ⚠ THIS IS `RunReceipt`'s FIRST AND ONLY MOUNT IN THE PRODUCT. `200-05` built it
-             and deliberately mounted it nowhere; until this line it had never rendered
-             outside a suite. Siting it HERE and only here is what keeps `199-02`'s refusal
-             intact BY CONSTRUCTION — the builder's spine reads a DRAFT and has no run, so a
-             component it cannot reach cannot fabricate a run-tense claim there. That absence
-             is asserted by grep over `WorkflowBuilderPage.tsx`, not left to care.
-
-             ⚠ THE TOTAL RUNTIME AT ITS TOP IS THE PRODUCT'S FIRST HONEST ONE, and it is
-             DELIBERATELY NOT ALSO PRINTED IN THE PAGE HEADER. The header's figure measures
-             `created_at → updated_at` and says so in words (*from when it was queued*); this
-             one measures the steps that really ran. Two labelled measurements of two
-             different things are honest; two unlabelled clocks one under the other are the
-             duplicate-status defect an operator reported on this exact surface on
-             2026-08-06, which is why the band above is `sr-only` today. So the phase-derived
-             total is rendered ONCE, at the top of the region it belongs to.
-
-             ⚠ NO `deliverableOf` IS PASSED, and the omission is a decision. Nothing on
-             `workflow_phases` says which file a step produced — the run's file list is
-             thread-scoped, not step-scoped — so joining one here would be a fabricated
-             claim about WHICH step made WHAT. The deliverables region below lists them
-             honestly, as the run's output rather than any step's.
-
-             `now` is the page's ONE hoisted instant, so a still-running row on the receipt
-             and the header's clock cannot straddle a second boundary and disagree. */}
-      {/* ⚠ THE SEPARATE RECEIPT REGION IS GONE, AND ITS HEADING WITH IT. Its rows repeated the
-             run log's five steps and five durations verbatim, seven hundred pixels below them —
-             caught on screen, not by a test, because every test asserted the region's CONTENTS
-             were correct and none asked whether the page said the same thing twice. The strip
-             that carried the run's total moved to the TOP of the log column, where it reads as
-             that column's summary; see the mount above.
-
-             ⚠ `COPY_RECEIPT_HEADING` ("What this run did, step by step") went with the rows,
-             deliberately: it describes a step-by-step list, and the strip is not one. The log
-             beneath it IS the step-by-step, and it does not need to be announced. */}
-
-      {/* 5. DELIVERABLE REGION — the thing the run made, listed and downloadable. The
-             region caps its height on desktop and flows on mobile (<768px), where a
-             fixed cap would hide the very rows the surface exists to hand over. It is
-             the only new focus-stop GROUP on this page (§ Focus order): one stop per
-             downloadable row, and nothing else here is focusable. */}
-      <section
-        data-testid="run-deliverables"
-        className="shrink-0 overflow-auto border-t border-border/10 px-6 py-4 md:max-h-[220px]"
-      >
-        {/* ── 200.1 (RUN-04) — FOUR RENDERS, AND NONE MAY BE FOLDED INTO ANOTHER ──────
-              The gate below is the whole design, so it is stated plainly:
-
-                files present, no answer  → TODAY'S RENDER, byte-identical (the `<h2>`
-                                            plus the `<ul>` below, untouched)
-                no files, an answer       → the ANSWER block ALONE. ⚠ The file heading and
-                                            the "produced no…" sentence must NOT render
-                                            here — that sentence is true and useless beside
-                                            an answer, and printing it is exactly the fold
-                                            this design forbids
-                files AND an answer       → both, FILE LIST FIRST (it is the artefact)
-                terminal, neither         → the file block's empty paragraph, now worded
-                                            about BOTH kinds of deliverable
-
-              ⚠ THE FILE BLOCK RENDERS WHENEVER THERE IS NO ANSWER — that single condition
-              is what keeps the file-only and the live-and-empty arms character-identical to
-              what shipped, rather than reimplementing them under a new gate. Folding "no
-              files" into "nothing at all" would print *"nothing happened"* about a run that
-              produced an answer: the `runFacts` / `DecisionsList` / `phaseDuration` /
-              `transcriptVocabulary` finding, for the FIFTH time in this tree. */}
-        {runAnswer === null ? (
-          <>
-            <h2 className="text-xs font-semibold text-foreground">{COPY_DELIVERABLE_HEADING}</h2>
-            {files.length === 0 ? (
-              // No heading on the empty state, and the two copies differ because the truths
-              // differ: a live run may still write something; a terminal one never will.
-              // While the very first read is still in flight we claim NEITHER — asserting
-              // an absence before the answer arrives is a lie with a short lifetime.
-              filesLoading ? null : (
-                <p
-                  className="mt-2 text-sm text-muted-foreground"
-                  data-testid="run-deliverables-empty"
-                >
-                  {isTerminal ? COPY_NO_FILES_TERMINAL : COPY_NO_FILES_LIVE}
-                </p>
-              )
-            ) : null}
-          </>
-        ) : null}
-        {files.length > 0 ? (
-          <>
-            {runAnswer !== null ? (
-              // The BOTH arm: the file list needs its own heading back, because the
-              // fragment above did not render one. Same constant, same element, same
-              // classes — one heading string with one home.
-              <h2 className="text-xs font-semibold text-foreground">
-                {COPY_DELIVERABLE_HEADING}
-              </h2>
-            ) : null}
-          <ul role="list" className="mt-2 flex flex-col gap-0.5">
-            {orderedFiles.map((file) => {
-              // The VISIBLE label is the basename; the full path lives in `title=`. Both
-              // come from the shared helper now, and so does the size — the accessible
-              // name below is assembled from that same output, so the words a screen
-              // reader hears and the words on screen cannot drift apart.
-              const name = baseName(file.path)
-              const size = formatBytes(file.size_bytes)
-              const fileId = file.id
-              return (
-                <li key={fileId ?? file.path}>
-                  {fileId ? (
-                    // Phase 195-06: the PRESENTATION is the shared row; the control, the
-                    // activation and the skin stay here. `asChild` means the button below
-                    // IS the rendered element — the shared row does not wrap it, so the
-                    // "exactly one control per row" contract is untouched.
-                    // ⚠ The shared row's `run` density carries LAYOUT ONLY
-                    // (`flex items-center gap-2`), because Radix joins `className` rather
-                    // than twMerging it. Every class below is padding, radius, width,
-                    // alignment, hover or ring — none competes with it.
-                    <FileRow
-                      asChild
-                      density="run"
-                      name={name}
-                      // ⚠ Load-bearing: without it a file that arrives with a meaningful
-                      // mime type and NO extension falls to the default glyph.
-                      mimeType={file.mime_type}
-                      sizeBytes={file.size_bytes}
-                      age={fileAgeLabel(file.created_at, filesNow)}
-                      trailing="download"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onDownload(file)}
-                        title={file.path}
-                        aria-label={`Download ${name} (${size})`}
-                        className="w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      />
-                    </FileRow>
-                  ) : (
-                    // A row the listing gave us with no id cannot be fetched — the raw
-                    // route would be built with an empty segment and 404. It is shown as
-                    // a fact rather than as a control that does nothing when clicked.
-                    //
-                    // ⚠ `trailing="dead"` is what changed in Phase 195-06: the row used
-                    // to say NOTHING about why the filename could not be acted on. It now
-                    // carries the shared "no link" affordance — and that affordance is a
-                    // non-focusable `span` marked `aria-disabled`, never a control. This
-                    // region's shipped fence asserts an id-less row leaves ZERO `button`
-                    // elements here, and the ONLY reason that survives is the element
-                    // choice. Turning the affordance into a control would red it, and the
-                    // gate on a download is the early return inside `onDownload` — the
-                    // code — never the visual state.
-                    <FileRow asChild density="run" name={name} mimeType={file.mime_type} sizeBytes={file.size_bytes} age={fileAgeLabel(file.created_at, filesNow)} trailing="dead">
-                      <div title={file.path} className="w-full rounded-md px-2 py-2 text-left" />
-                    </FileRow>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-          </>
-        ) : null}
-        {/* ── THE ANSWER, when the run wrote one. LAST in DOM order on purpose: in the
-               BOTH arm the file is the artefact and leads, and that ordering is asserted
-               by DOM position rather than read off this source.
-
-               ⚠ **A REACT TEXT NODE.** This is MODEL-AUTHORED CONTENT, so it is handed to
-               React as a child and never through React's raw-HTML escape hatch — that prop
-               appears nowhere on this page and a shipped fence sweeps this file's RAW source
-               for it at zero occurrences. ⚠ **THE PROP IS THEREFORE NOT SPELLED IN THIS
-               COMMENT, DELIBERATELY**: the fence reads unstripped source, so naming the thing
-               being refused turns the guard red — a whole-file grep cannot tell a refusal from
-               an adoption. Observed RED while writing this block; the 187-24 trap, and the
-               SIXTH recorded firing in this tree.
-               `whitespace-pre-wrap` keeps the run's own line breaks, `break-words` stops a
-               long unbroken token from widening the column, and the region's existing
-               `md:max-h-[220px] overflow-auto` already scrolls a long answer. Measured max
-               is 38,935 characters, so scrolling is the common case, not the edge. */}
-        {runAnswer !== null ? (
-          <div data-testid="run-deliverable-answer">
-            <h2
-              className={`text-xs font-semibold text-foreground${files.length > 0 ? " mt-4" : ""}`}
-            >
-              {COPY_ANSWER_HEADING}
-            </h2>
-            {/* ⚠ THIS RENDERS MODEL-AUTHORED MARKDOWN, REVERSING A REFUSAL THIS FILE SHIPPED
-                ONE DAY EARLIER (200.1-02), and the reversal is deliberate rather than a drift.
-
-                What shipped: `{runAnswer}` inside a `<p>`, pinned at `querySelectorAll("*")
-                === 0` so a `<b>` in the answer arrived as literal text. That was SAFE and it
-                was also UNREADABLE — measured on a real run, the answer rendered at ~208
-                characters per line (1454px at 14px) against the 45–75 that prose wants, with
-                its `**bold**` and `>` markers printed raw. The operator read that measure as
-                the region being cramped; both halves are fixed here.
-
-                Why reversing it is correct rather than a loosening: CHAT ALREADY RENDERS THIS
-                EXACT CLASS OF CONTENT THE SAME WAY. `MarkdownRenderer` is the shipped path
-                behind seven call sites across the chat surface and the workspace panel, and it
-                pipes `marked.parse` through `DOMPurify.sanitize` on every content change. The
-                run page being stricter than chat about the same model output was an
-                inconsistency, not a considered stance.
-
-                ⚠ The call sites are described rather than NAMED on purpose: this file carries
-                a `?raw` source fence forbidding one of those component names, and spelling it
-                here turns that fence red. Naming a forbidden token inside your own prose is
-                the 187-24 trap, and it fired on the first draft of this very comment.
-
-                ⚠ THE REFUSAL'S INTENT IS PRESERVED AND RE-ASSERTED, only its mechanism moved:
-                hostile markup still cannot execute. The two shipped tests were REWRITTEN to
-                assert the sanitised property (`onerror` stripped, no `<script>`, no handler
-                attribute) rather than deleted — a guard that changes shape must still be a
-                guard. See `WorkflowRunPage.test.tsx` § "the answer renders as sanitised
-                markdown".
-
-                `max-w-[72ch]` is the measure, not a width: it caps the LINE at roughly 72
-                characters and lets the column stay as wide as it likes. `break-words` still
-                stops one long unbroken token from blowing the cap. */}
-            <MarkdownRenderer
-              content={runAnswer}
-              className="mt-2 max-w-[72ch] break-words"
-            />
-          </div>
-        ) : null}
-        {downloadError ? (
-          <p className="mt-2 text-xs text-[hsl(0_80%_80%)]" data-testid="run-download-error">
-            {downloadError}
-          </p>
-        ) : null}
-      </section>
     </div>
   )
 }

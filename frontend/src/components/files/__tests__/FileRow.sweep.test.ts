@@ -90,7 +90,7 @@
  */
 import { describe, expect, it } from "vitest"
 
-import pageSource from "@/pages/WorkflowRunPage.tsx?raw"
+import heroSource from "@/components/workflows/RunHero.tsx?raw"
 import panelSource from "@/components/panel/FilesSection.tsx?raw"
 import chatSource from "@/components/chat/OutputFileCard.tsx?raw"
 import iconSource from "@/lib/fileIcon.tsx?raw"
@@ -105,7 +105,7 @@ function codeOf(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 }
 
-const pageCode = codeOf(pageSource)
+const heroCode = codeOf(heroSource)
 const panelCode = codeOf(panelSource)
 const chatCode = codeOf(chatSource)
 const iconCode = codeOf(iconSource)
@@ -120,16 +120,16 @@ const iconCode = codeOf(iconSource)
  */
 const SWEPT = [
   {
-    key: "run page",
-    path: "frontend/src/pages/WorkflowRunPage.tsx",
-    source: pageSource,
-    code: pageCode,
-    minSource: 20000,
-    minCode: 8000,
-    /** The deliverable region's testid — unique to this page. */
-    identity: "run-deliverables",
-    /** Prose only: the 195-06 conversion notes at `:1094` and `:1125`. */
-    proseToken: "Phase 195-06",
+    key: "run hero",
+    path: "frontend/src/components/workflows/RunHero.tsx",
+    source: heroSource,
+    code: heroCode,
+    minSource: 5000,
+    minCode: 2000,
+    /** The hero deliverable landmark — unique to RunHero. */
+    identity: "HERO_LANDMARK",
+    /** Prose only: the D-03 note. */
+    proseToken: "D-03",
   },
   {
     key: "panel file list",
@@ -243,14 +243,14 @@ describe("SC#2 — exactly ONE byte formatter in the tree", () => {
     expect("if (bytes < 1024 * 1024) return x").toMatch(KIB_ARITHMETIC)
   })
 
-  it("ARM 1 — the run page declares no formatBytes, no baseName and no iconFor", () => {
-    // It IMPORTS all three from the shared module (`WorkflowRunPage.tsx:64`); what it
+  it("ARM 1 — the run hero declares no formatBytes, no baseName and no iconFor", () => {
+    // It IMPORTS all three from the shared module (`RunHero.tsx`); what it
     // must never do again is declare its own.
-    expect(pageCode).not.toMatch(DECL_FORMAT_BYTES)
-    expect(pageCode).not.toMatch(DECL_BASE_NAME)
-    expect(pageCode).not.toMatch(DECL_ICON_FOR)
+    expect(heroCode).not.toMatch(DECL_FORMAT_BYTES)
+    expect(heroCode).not.toMatch(DECL_BASE_NAME)
+    expect(heroCode).not.toMatch(DECL_ICON_FOR)
     // …and the import edge is still there, so "no declaration" is not "no size cell".
-    expect(pageCode).toMatch(/from "@\/components\/files\/fileRowUtils"/)
+    expect(heroCode).toMatch(/from "@\/components\/files\/fileRowUtils"/)
   })
 
   it("ARM 2 — the panel file list declares no formatBytes and no iconFor", () => {
@@ -266,12 +266,6 @@ describe("SC#2 — exactly ONE byte formatter in the tree", () => {
   })
 
   it("the KiB arithmetic itself lives in NONE of the four swept files", () => {
-    // Stronger than the declaration needles: it catches a formatter re-derived inline
-    // under any name at all. ⚠ It is also the sharpest 187-24 demonstration in this
-    // corpus — `WorkflowRunPage.tsx` contains the literal `1024` in the prose
-    // `types/index.ts:1024`, so this arm reds on the RAW page source and passes on the
-    // stripped one.
-    expect(pageSource).toContain("1024")
     for (const f of SWEPT) expect(f.code).not.toMatch(KIB_ARITHMETIC)
   })
 })
@@ -282,21 +276,6 @@ describe("SC#2 — exactly ONE byte formatter in the tree", () => {
 
 describe("SC#2 — exactly ONE row markup in the tree", () => {
   it("ARM 3b — chat renders exactly TWO shared rows and no hand-written row root", () => {
-    /**
-     * ⚠ WHICH MEASUREMENT WAS CHOSEN, AND WHY — the plan offered two.
-     *
-     * Counting the row's own LAYOUT CLASS SIGNATURE inside `OutputFileCard.tsx` measures
-     * nothing, because that signature is legitimately ABSENT: the density owns it inside
-     * `FileRow.tsx` (`DENSITY.chat.rowClass = "flex items-center gap-2.5"`). An assertion
-     * that a never-present string is absent cannot fail for the right reason.
-     *
-     * So the DIRECT measurement is the count of `<FileRow` delegations — exactly 2, one
-     * per branch (live at `:191`, dead at `:146`) — which says every row this file can
-     * render comes from the one shared row. The class-signature check is kept as the
-     * COMPLEMENT: it reds if someone re-declares the row's layout here, i.e. hand-writes
-     * a second row root instead of adding a third delegation. Both clauses are needed;
-     * 195-07 task 2 plants against each separately, because `expect` short-circuits.
-     */
     expect(chatCode.match(/<FileRow/g) ?? []).toHaveLength(2)
     // POSITIVE CONTROL — the needle really counts what it claims to count.
     expect(('<FileRow asChild/><FileRow/>'.match(/<FileRow/g) ?? []).length).toBe(2)
@@ -306,17 +285,12 @@ describe("SC#2 — exactly ONE row markup in the tree", () => {
     expect(chatSource).toContain("flex items-center gap-2.5")
   })
 
-  it("the panel and the run page delegate too — no surface hand-rolls a row", () => {
+  it("the panel and the run hero delegate too — no surface hand-rolls a row", () => {
     expect(panelCode.match(/<FileRow/g) ?? []).toHaveLength(1)
-    expect(pageCode.match(/<FileRow/g) ?? []).toHaveLength(2)
+    expect(heroCode.match(/<FileRow/g) ?? []).toHaveLength(4)
     // The panel's density signature is likewise not re-declared (prose only, `:232`).
     expect(panelCode).not.toContain("flex items-center gap-2")
     expect(panelSource).toContain("flex items-center gap-2")
-    // ⚠ NO EQUIVALENT CLAUSE FOR THE RUN PAGE, stated rather than silently omitted:
-    // `WorkflowRunPage.tsx:896` uses the same three utility classes for its HEADER row,
-    // which is not a file row. A signature sweep there would red on unrelated layout, so
-    // the page is measured by its delegation count alone.
-    expect(pageCode).toContain("flex items-center gap-2")
   })
 })
 
@@ -450,7 +424,7 @@ describe("chat capability — the output card's public surface has not widened (
 describe("the recorded boundary — what this sweep deliberately does NOT read", () => {
   it("sweeps exactly the four in-scope sources, and names the two it excludes", () => {
     expect(SWEPT.map((f) => f.path)).toEqual([
-      "frontend/src/pages/WorkflowRunPage.tsx",
+      "frontend/src/components/workflows/RunHero.tsx",
       "frontend/src/components/panel/FilesSection.tsx",
       "frontend/src/components/chat/OutputFileCard.tsx",
       "frontend/src/lib/fileIcon.tsx",

@@ -35,9 +35,13 @@
  *
  * ⚠ **A STEP THAT DECLARED NO COUNT GETS NO SUB-LINE AT ALL** — never `0`, never a dash, never
  * prose. The sheet puts the SENTENCE *"Summarized meeting notes"* in that slot for a step with
- * no number, and that sentence is authored narration this product does not have. Drawing
- * something there would be the fabricated-figure defect told in prose, which `199-05` called
- * the highest-consequence lie this work could ship. The slot stays empty and the row closes up.
+ * no number, and that sentence is authored narration this product does not have.
+ *
+ * ⚠ **Phase 200.2 (D-05 / A-02) — THE COUNT SUB-LINE IS REMOVED FROM THE SPINE ENTIRELY.**
+ * The centre says WHAT each step yielded (RunStepList); the spine says WHEN and HOW LONG.
+ * Removing the spine count is load-bearing: shipping the centre yield without this removal
+ * would leave the centre a strict subset of the spine, recreating the duplicate-information
+ * defect in a new form.
  *
  * ⚠ **THE DURATION OF A FINISHED STEP IS NOT SHOWN HERE, AND THAT IS THE SHEET'S OWN CHOICE.**
  * Its spine prints a time on exactly one row — the step in progress. Durations belong to the
@@ -64,12 +68,11 @@ import { cn } from "@/lib/utils"
 import { fmtElapsed } from "@/lib/fmtElapsed"
 import { own } from "@/components/workflows/ownProperty"
 import {
-  declaredCount,
   phaseTiming,
   readInstant,
   type PhaseTimingRow,
 } from "@/components/workflows/phaseDuration"
-import { countDeclared, timeRunning } from "@/components/workflows/receiptVocabulary"
+import { timeRunning } from "@/components/workflows/receiptVocabulary"
 
 /**
  * The page's live reading for one step, structurally declared.
@@ -268,7 +271,6 @@ export function RunSpine({
               const isRunning =
                 live?.reading === "running" && TIME_SHAPED_KINDS.has(timing.kind) === false
               const waiting = live?.reading === "waiting-for-you"
-              const count = declaredCount(row)
               const startedAt = readInstant(row.started_at)
               // The settled duration, or null when the row does not hold both anchors. ⚠ It is
               // NOT re-derived: `phaseTiming`'s `ran` arm is the ONE place a pair of instants
@@ -351,16 +353,6 @@ export function RunSpine({
                         </span>
                       )}
                     </span>
-                    {/* ⚠ THE DECLARED COUNT, OR NOTHING AT ALL. See the file docblock: the
-                        sheet's prose sub-line is narration this product does not hold. */}
-                    {count && (
-                      <span
-                        data-testid="spine-count"
-                        className="truncate text-[11px] text-muted-foreground"
-                      >
-                        {countDeclared(count.count, count.noun)}
-                      </span>
-                    )}
                     {ask ? (
                       <span data-testid="spine-ask" className="mt-1 block">
                         {ask}

@@ -98,11 +98,14 @@ describe("the sketch surface is throwaway, and its teardown is executable", () =
       expect(nodeFs.existsSync(SKETCH_DIR)).toBe(true)
       return
     }
-    throw new Error(
-      `Phase ${RETIRING_PHASE} has executed, so sketch ${OWNING_SKETCH}'s surface is overdue.\n` +
-        `Delete frontend/sketch/ AND frontend/tsconfig.sketch.json IN ONE COMMIT.\n` +
-        `See .planning/sketches/${OWNING_SKETCH}-the-run-column-rendered/README.md.`,
-    )
+    if (nodeFs.existsSync(SKETCH_DIR)) {
+      throw new Error(
+        `Phase ${RETIRING_PHASE} has executed, so sketch ${OWNING_SKETCH}'s surface is overdue.\n` +
+          `Delete frontend/sketch/ AND frontend/tsconfig.sketch.json IN ONE COMMIT.\n` +
+          `See .planning/sketches/${OWNING_SKETCH}-the-run-column-rendered/README.md.`,
+      )
+    }
+    expect(nodeFs.existsSync(SKETCH_DIR)).toBe(false)
   })
 
   // ── 2. THE PAIRING — the sketch dir and its tsconfig live and die together ───────────

@@ -70,25 +70,23 @@ describe("RunSpine — it speaks the author's language, never the schema's", () 
   })
 })
 
-describe("RunSpine — D-07's count rule, at the surface that now carries it", () => {
-  it("renders the wire's pair VERBATIM", () => {
+describe("RunSpine — Phase 200.2 (D-05 / A-02) count sub-line removed", () => {
+  it("renders NO count sub-line even when step_count is declared (yield moved to centre column)", () => {
     render(<RunSpine phases={ROWS} titleOf={titleOf} now={T0} />)
-    expect(within(row("gather")).getByTestId("spine-count").textContent).toBe("312 sources")
+    expect(within(row("gather")).queryByTestId("spine-count")).toBeNull()
   })
 
-  it("a step that declared NO count renders NO element — never `0`, never a dash", () => {
-    render(<RunSpine phases={ROWS} titleOf={titleOf} now={T0} />)
-    expect(within(row("draft")).queryByTestId("spine-count")).toBeNull()
-    // NON-VACUITY: a row in the same render DOES carry one.
-    expect(within(row("gather")).getByTestId("spine-count")).toBeInTheDocument()
-  })
-
-  it("a declared `0` renders, because the step searched and found nothing", () => {
+  it("renders NO count sub-line for 0-count row", () => {
     const zero: PhaseTimingRow[] = [
       { slug: "gather", status: "completed", started_at: s(0), completed_at: s(12), step_count: 0, step_noun: "sources" },
     ]
     render(<RunSpine phases={zero} titleOf={titleOf} now={T0} />)
-    expect(within(row("gather")).getByTestId("spine-count").textContent).toBe("0 sources")
+    expect(within(row("gather")).queryByTestId("spine-count")).toBeNull()
+  })
+
+  it("renders NO count sub-line when step_count is absent", () => {
+    render(<RunSpine phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(within(row("draft")).queryByTestId("spine-count")).toBeNull()
   })
 })
 

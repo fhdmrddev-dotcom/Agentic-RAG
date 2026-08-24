@@ -3509,26 +3509,15 @@ by *honoured by construction* — the file grew 147 lines and is now **1,830**, 
 the tree. The region itself is the obvious candidate at ~150 lines with its own copy block; its re-open
 trigger is unchanged. It inherits `24 / 7 / 1830`.
 
-### `frontend/src/components/workflows/RunTranscript.tsx` — `6 / 2 / 644`, one phase below the threshold
+### `frontend/src/components/workflows/RunTranscript.tsx` — `6 / 2 / 652`, unmounted in Phase 200.2, retained-as-tested
 
-Wave 1's plan `200.1-03` deliberately left `CLAUDE.md` and this file's row byte-unchanged (two concurrent
-worktrees editing the 150,000-character gate file is a race on the one file whose silent breakage
-disables every project rule at once), and named wave 2 as the owner of this obligation. Discharged here.
+The obligation carried from Phase 200.1 is DISCHARGED here. In Phase 200.2, `RunTranscript.tsx` was unmounted from `WorkflowRunPage.tsx` and replaced by `RunStepList.tsx` (the step-card process trace) and `RunHero.tsx` (the top deliverable card).
 
-`4 / 1 / 514` → **`6 / 2 / 644`**, `+132 / −2`. **G-5 does NOT fire at 2 phases** — it is one phase below
-the threshold, which is the `FlowEdge.tsx` / `phaseStatusMeta.ts` state one wave earlier in this same
-phase, where a file crossed in the very commit that gave it a row. **It owes a `docs/` section of its own
-on the NEXT phase that touches it**, and this paragraph is the placeholder that makes that owed rather
-than forgotten.
-
-What wave 1 added: the sheet's gutter and its live treatment, ported. **Both shipped refusals were
-asserted as STILL HOLDING — one against a test that passed UNEDITED**, which is the only kind of pin
-evidence this ledger treats as strong. Two findings were recorded in the file rather than smoothed over:
-its docblock's claim *"the sheet marks the attention line and the active line with two icons; this
-surface renders neither"* became false, and the original is **kept and amended beside it** (only one
-clause moved — the mark is a CSS ring, not an import, so the glyph BUDGET really is unchanged); and **the
-187-24 trap fired there too**, when the spinner's docblock QUOTED the sheet's glyph class while
-explaining the refusal, turning its own zero-expecting whole-file guard red. Fixed in the prose.
+**Binding Invariants & History:**
+1. **Retained-as-tested for A-variant control:** The component is unmounted in production, with its test suite (`RunTranscript.test.tsx`, 44 tests) maintained as a regression baseline.
+2. **The Tense Rule:** The state word comes from the phase stream and duration from the durable fetch.
+3. **Zero Glyphs & Zero Hardcoded Spelled Strings:** Uses shared vocabularies and respects color token isolation (inherits `--background`).
+4. **Docblock Correction beside Original:** The original docblock's claim that the canvas was removed permanently is corrected beside the original to note its return as a dual-view radiogroup switch ("What happened" vs "Shape") in commit `c5e3a352`.
 
 ### The two rows that were stale before the phase began — `transcriptVocabulary.ts` and `phaseDuration.ts`
 
@@ -3561,3 +3550,33 @@ scripted pass over eight paths.
   which point CLAUDE.md's own rule says the split is *scheduled, not scrambled*. Narrative already goes
   here by convention; what remains in the table is the scan list and the verdicts, which must stay
   complete. Re-derive with `node scripts/check-claude-md-size.cjs`.
+
+### Phase 200.2 — The Run Column Stops Repeating Itself (G-5 Verdicts & Ledger Record)
+
+- **`frontend/src/pages/WorkflowRunPage.tsx` (`25 / 8 / 1601`, down from 1830 lines):**
+  - **G-5 FIRES — Honoured by construction (Phase 200.2).** The bloated Region 5 footer (`run-deliverables`, ~180 lines) was retired. The centre column was re-composed into a clean top-to-bottom hierarchy: `RunHero` (mounted above the radiogroup switch so deliverables lead in both views), `RunReceipt` (summary strip), and `RunStepList` (step-card process trace).
+  - All four retired copy constants (`COPY_NO_FILES_LIVE`, `COPY_DELIVERABLE_HEADING`, `COPY_ANSWER_HEADING`, `COPY_NO_FILES_TERMINAL`) were superseded-not-deleted with docblock trails.
+  - Page line count dropped from 1,830 to 1,601 lines.
+
+- **`frontend/src/components/workflows/RunSpine.tsx` (`3 / 2 / 372`):**
+  - Count sub-line removed (`D-05 / A-02` load-bearing). Spine now strictly renders name + status ring + duration (+ pending ask card when active). The centre column handles what was yielded; the spine handles when and how long.
+
+- **`backend/app/api/workflow_runs.py` (`7 / 5 / 878`):**
+  - Added lazy-loading citation endpoint `GET /workflow-runs/{run_id}/phases/{phase_slug}/citations`.
+  - Added unit test suite `test_200_2_citations.py` covering citation extraction and fallbacks across `raw_citations`, `citations`, `context_sources`, and raw string citations.
+
+- **`frontend/src/lib/api.ts` (`178 / 103 / 6580`):**
+  - G-5 FIRES HARDEST. Added typed client helper `getWorkflowRunPhaseCitations` and interface `RunStepCitation`.
+
+- **New Leaves Added (listed below threshold on purpose):**
+  - `frontend/src/components/workflows/RunHero.tsx` (`1 / 1 / 242`): 4 deliverable states (file only, answer only, both, none/empty completed) + failed step banner.
+  - `frontend/src/components/workflows/RunStepList.tsx` (`1 / 1 / 298`): Step-card list with count chips, "wrote an answer", and expandable lazy citations.
+  - `frontend/src/components/workflows/runColumnVocabulary.ts` (`1 / 1 / 70`): Centre column landmark and heading vocabulary leaf.
+
+### Phase 198 — Node Vocabulary (Research-First Disposition)
+
+- **NODE-01 (Deterministic Primitives):** Measured 0 of 264 phases across 119 workflows acting as data reshape plumbing. Authors use `execute_code`. Ships nothing.
+- **NODE-02 (Mid-Run Human Input):** Verified `human_input.py` executor timeout pause transition (`BUG-260816-06` guard) and authored choices rendering in `RunSpine.tsx`. Automated regression test added in `backend/tests/unit/test_198_node_vocabulary.py`.
+- **G-5 Status:** No hot files modified.
+
+

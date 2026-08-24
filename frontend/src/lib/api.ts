@@ -4378,6 +4378,39 @@ export async function getWorkflowRun(
   return (await res.json()) as WorkflowRunRead
 }
 
+/** One citation passage retrieved for a specific step in a workflow run. */
+export interface RunStepCitation {
+  document_id: string
+  filename: string
+  chunk_index: number | null
+  passage: string | null
+}
+
+/**
+ * GET /workflow-runs/{run_id}/phases/{phase_slug}/citations — lazy citation passages (Phase 200.2).
+ *
+ * Owner-scoped and run+step-scoped on the backend (D-09). Returns allow-listed citation objects
+ * stripped of similarity scores and internal metadata (D-10 / A-05).
+ */
+export async function getWorkflowRunPhaseCitations(
+  runId: string,
+  phaseSlug: string,
+  signal?: AbortSignal,
+): Promise<RunStepCitation[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/workflow-runs/${encodeURIComponent(runId)}/phases/${encodeURIComponent(phaseSlug)}/citations`,
+    {
+      headers,
+      signal,
+    },
+  )
+  if (!res.ok) {
+    throw new ApiError(`Failed to load step citations (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as RunStepCitation[]
+}
+
 // ── SEED-190 — THE RUN LOG ──────────────────────────────────────────────────────────
 //
 // ⚠ THIS FIRES THE 197 DECLINE'S OWN RE-OPEN TRIGGER AND THE TRIGGER IS BEING HONOURED

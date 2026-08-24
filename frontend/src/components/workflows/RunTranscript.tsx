@@ -38,6 +38,14 @@
  * which is the surface `builder-canvas.html` actually draws. Removing this page's mount
  * removed a mount, not the port.
  *
+ * ⚠ CORRECTION BESIDE ORIGINAL (Phase 200.2 / commit c5e3a352):
+ * The canvas came back to `WorkflowRunPage.tsx` as a dual-view radiogroup switch ("What happened" vs "Shape"),
+ * keeping the log as the default view while making the canvas reachable.
+ * In Phase 200.2, the centre column was re-composed: `RunHero` leads at the top in both views,
+ * `RunStepList` replaced `RunTranscript` as the log list with step-level yield/counts and lazy citations.
+ * `RunTranscript` is unmounted in production, retained-as-tested for A-variant regression control.
+ *
+ *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * ONE LINE PER STEP, PLACED AT THE INSTANT IT LAST BECAME TRUE
  * ─────────────────────────────────────────────────────────────────────────────────────────

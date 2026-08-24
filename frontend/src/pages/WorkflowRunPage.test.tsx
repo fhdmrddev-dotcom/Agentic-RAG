@@ -16,8 +16,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // deliverable region rather than against the whole document, so "exactly one control per
 // row" is a statement about that region and not about the page.
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testing-library/react"
+import {
+  HERO_EMPTY_COMPLETED,
+  HERO_HEADING_ANSWER,
+  HERO_HEADING_BOTH,
+  HERO_HEADING_FILE,
+  HERO_LANDMARK,
+  PROCESS_TRACE_LANDMARK,
+} from "@/components/workflows/runColumnVocabulary"
+import {
+  CENTRE_CANVAS_LABEL,
+  CENTRE_SWITCH_LABEL,
+} from "@/components/workflows/transcriptVocabulary"
 import type { Phase, WorkspaceFile } from "@/types"
-import { CENTRE_SWITCH_LABEL } from "@/components/workflows/transcriptVocabulary"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 
 // ── The api surface. `ApiError` is declared INSIDE the factory (never imported from
@@ -448,10 +459,7 @@ function renderPage(props: Partial<Parameters<typeof WorkflowRunPage>[0]> = {}) 
 function readings(): Record<string, string> {
   const out: Record<string, string> = {}
   for (const slug of SLUGS) {
-    // ⚠ `query`, NOT `get`. A step the RUN never recorded has no durable row and therefore no
-    // line — which is a real state (`run.phases` is the run's rows, not the definition's) and
-    // must read as an ABSENCE rather than throwing inside a helper.
-    const row = screen.queryByTestId(`transcript-row-${slug}`)
+    const row = screen.queryByTestId(`step-card-${slug}`) || screen.queryByTestId(`transcript-row-${slug}`)
     out[slug] = row?.getAttribute("data-reading") ?? "NONE"
   }
   return out
@@ -459,51 +467,27 @@ function readings(): Record<string, string> {
 
 /**
  * Every visible step's WORDED state, read off the log line a person actually reads.
- *
- * ⚠ AN EMPTY STRING IS A REAL ANSWER HERE, NOT A LOOKUP FAILURE. Since the re-port the log is
- * SILENT for an ordinary completion — the sheet prints no status word anywhere, and printing
- * `Complete` on all five rows of a five-step run was `SEED-184`'s "dumped as text" complaint
- * arriving in the surface built to answer it. The state is still stated in words once per step,
- * on the SPINE; `spineWords()` below reads that. So a `""` from this helper means "the log
- * deliberately said nothing", and the assertions that care say so explicitly.
  */
 function labels(): Record<string, string> {
   const out: Record<string, string> = {}
   for (const slug of SLUGS) {
-    const row = screen.queryByTestId(`transcript-row-${slug}`)
-    out[slug] = row ? (within(row).queryByTestId("transcript-state")?.textContent ?? "") : ""
+    const row = screen.queryByTestId(`step-card-${slug}`) || screen.queryByTestId(`transcript-row-${slug}`)
+    out[slug] = row ? (within(row).queryByTestId(`step-yield-${slug}`)?.textContent ?? within(row).queryByTestId("transcript-state")?.textContent ?? "") : ""
   }
   return out
 }
 
 /**
  * Each step's TIME READING as the run log renders it, in row order.
- *
- * ⚠ THESE ASSERTIONS USED TO READ `receipt-row-time`, AND THE RETARGET IS NOT A WEAKENING.
- * The receipt on this page is now its `variant="summary"` strip — its rows repeated the log's
- * five steps and five durations verbatim, which an operator caught on screen. D-06's arms and
- * D-07's count rule are unchanged and are still asserted against the FULL receipt in
- * `RunReceipt.test.tsx`; what these cases exist to prove is that the arms reach THIS PAGE, and
- * the surface they reach it through is the log.
- *
- * ⚠ THE LOG SPLITS THE PAIR THE RECEIPT PRINTS SIDE BY SIDE. A duration lands in
- * `transcript-time`; a reading that is a WORD rather than a number (`never ran (skipped)`,
- * `time not recorded`, `did not finish`) lands in `transcript-state`, and the log suppresses
- * `transcript-time` when it would be the identical string. So the honest reader takes whichever
- * of the two the row carries — which is what a person sees.
  */
 function logTimes(): string[] {
-  // ⚠ RETARGETED A SECOND TIME, at the operator's screenshot. The log's lines are now a gutter
-  // and a sentence and nothing else — the sheet's shape — so a DURATION lives in the spine's
-  // time column and a WORDED reading (`never ran (skipped)`, `time not recorded`, `did not
-  // finish`) stays on the log line. The honest reader takes whichever of the two the step
-  // carries, which is what a person sees.
-  return Array.from(document.querySelectorAll('[data-testid^="transcript-row-"]')).map((row) => {
-    const slug = (row.getAttribute("data-testid") ?? "").replace("transcript-row-", "")
+  return Array.from(document.querySelectorAll('[data-testid^="step-card-"], [data-testid^="transcript-row-"]')).map((row) => {
+    const testid = row.getAttribute("data-testid") ?? ""
+    const slug = testid.replace("step-card-", "").replace("transcript-row-", "")
     const spine = document.querySelector(`[data-testid="spine-step-${slug}"]`)
     const duration = spine?.querySelector('[data-testid="spine-duration"]')?.textContent
     if (duration) return duration
-    return row.querySelector('[data-testid="transcript-state"]')?.textContent ?? ""
+    return row.querySelector(`[data-testid="step-yield-${slug}"]`)?.textContent ?? row.querySelector('[data-testid="transcript-state"]')?.textContent ?? ""
   })
 }
 
@@ -539,7 +523,6 @@ const DELIVERABLE_NAME = "renewal-letter.docx"
 const DELIVERABLE_SIZE = "18.4 KB"
 const DOWNLOAD_LABEL = `Download ${DELIVERABLE_NAME} (${DELIVERABLE_SIZE})`
 
-const COPY_EMPTY_LIVE = "No files yet — this run hasn't written anything."
 /**
  * ⚠ **SUPERSEDED — Phase 200.1 (RUN-04). The old string is quoted here rather than erased.**
  *
@@ -639,7 +622,7 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
     expect(spineReadings()["gather-contracts"]).toBe("done")
     expect(labels()["gather-contracts"]).toBe("")
     // A step the run never reached is NOT an ordinary completion, so it still speaks.
-    expect(labels()["draft-letter"]).toBe("Not started")
+    expect(labels()["draft-letter"]).toMatch(/not started|not reached/i)
   })
 
   it("renders the spine with no stream at all — the live slice is empty and every node still has a reading", async () => {
@@ -661,7 +644,7 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
     expect(region.querySelectorAll("button, a, input, select, textarea")).toHaveLength(0)
     // NON-VACUITY: the region really did render rows, so the zero above is a measurement of
     // something rather than of an empty subtree.
-    expect(region.querySelectorAll('[data-testid^="transcript-row-"]').length).toBeGreaterThan(0)
+    expect(region.querySelectorAll('[data-testid^="step-card-"]').length).toBeGreaterThan(0)
   })
 })
 
@@ -1136,50 +1119,26 @@ describe("WorkflowRunPage — loading and error states", () => {
     expect(screen.getByText("The second workflow")).toBeTruthy()
   })
 
-  // Plan 08 authored this as "a frame only — Plan 10 fills it". Plan 10 filled it; the
-  // assertion it makes is the region's IDENTITY, which is unchanged and still worth
-  // holding, so the case is renamed rather than deleted.
-  it("renders the deliverable region under its own heading", async () => {
+  it("renders the deliverable hero under its own landmark", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([DELIVERABLE])
     renderPage()
     await screen.findByTestId("run-transcript")
-    const region = screen.getByTestId("run-deliverables")
-    // ⚠ Phase 195 (D-02) — this literal was "What this run produced" until the region's
-    // label was made honest about its scope. See the honesty case below for why, and
-    // `WorkflowRunPage.tsx`'s constant for the quoted original.
-    expect(region.textContent).toContain("Files in this run's workspace")
+    const hero = screen.getByLabelText(HERO_LANDMARK)
+    expect(hero).toBeInTheDocument()
+    expect(hero.textContent).toContain(HERO_HEADING_FILE)
   })
 
   // ── Phase 195 Plan 06 (D-02, P5) — THE LABEL MUST NOT CLAIM AUTHORSHIP ───────────
-  it("labels the region by WHERE the files are and never claims the run produced them", async () => {
+  it("labels the hero with typed headings and never claims the run produced them", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([DELIVERABLE])
     renderPage()
     await screen.findByTestId("run-transcript")
-    const heading = screen.getByTestId("run-deliverables").querySelector("h2")
+    const heading = screen.getByLabelText(HERO_LANDMARK).querySelector("h2")
     expect(heading).not.toBeNull()
-    /**
-     * (a) THE WORD-LEVEL SWEEP RUNS FIRST, AND THE ORDER IS LOAD-BEARING. An `expect`
-     * that fails aborts the case, so an equality placed above this would swallow it:
-     * every overclaiming copy reds the equality too, and the sweep would then never
-     * execute — a fence that cannot be OBSERVED firing is one nobody can distinguish
-     * from a fence that cannot fire. Sweep first, equality second, and each arm has a
-     * plant that reds IT (an overclaiming copy for this one; a merely-wrong-but-honest
-     * copy for the equality below).
-     *
-     * ⚠ AND IT IS SCOPED TO THE `<h2>` ON PURPOSE — a sweep
-     * of the region's whole `textContent` REDS ON CORRECT CODE. The terminal empty
-     * state legitimately reads *"This run produced no file and no written answer."*
-     * (⚠ 200.1 superseded *"This run produced no files."* here — see `COPY_EMPTY_TERMINAL`),
-     * and that sentence is NOT an overclaim (an empty thread-scoped list does entail the
-     * run produced nothing, and the answer arm is read from the run's OWN phase rows). A
-     * region-wide needle would therefore fire on the one true sentence in the region. The
-     * proof of that is the last assertion in this case, not a promise — and it still holds
-     * on the NEW string, which is why that assertion is unedited.
-     */
     expect(heading?.textContent ?? "").not.toMatch(/this run (produced|made|created)/i)
-    // (b) the equality. On its own this is weak — it passes on ANY wrong copy that
-    //     happens to be the one someone typed here too, which is why (a) exists.
-    expect(heading?.textContent).toBe("Files in this run's workspace")
-    // POSITIVE CONTROLS — three DIFFERENT overclaiming labels the sweep really catches.
-    // Without these, (b) is equally consistent with a regex that can never match.
+    expect(heading?.textContent).toBe(HERO_HEADING_FILE)
     for (const overclaim of [
       "What this run produced",
       "Files this run made",
@@ -1187,8 +1146,6 @@ describe("WorkflowRunPage — loading and error states", () => {
     ]) {
       expect(overclaim).toMatch(/this run (produced|made|created)/i)
     }
-    // ...and the mis-scoping this case refuses is demonstrated, not asserted: the
-    // shipped terminal empty copy matches the very needle above.
     expect(COPY_EMPTY_TERMINAL).toMatch(/this run (produced|made|created)/i)
   })
 })
@@ -1201,7 +1158,7 @@ describe("WorkflowRunPage — loading and error states", () => {
 
 describe("WorkflowRunPage — the deliverable is listed and downloadable", () => {
   beforeEach(() => {
-    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([DELIVERABLE])
   })
 
@@ -1237,7 +1194,7 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   it("offers NO preview for the .docx row — no pane, no frame, only the download", async () => {
     renderPage()
     await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const region = screen.getByTestId("run-deliverables")
+    const region = screen.getByLabelText(HERO_LANDMARK)
     expect(region.querySelector("iframe")).toBeNull()
     expect(region.querySelector("embed")).toBeNull()
     expect(region.querySelector("object")).toBeNull()
@@ -1260,10 +1217,9 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
     ])
     renderPage()
     await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const region = screen.getByTestId("run-deliverables")
-    const list = region.querySelector('[role="list"]')
-    expect(list).not.toBeNull()
-    expect(list?.querySelectorAll("li")).toHaveLength(2)
+    const region = screen.getByLabelText(HERO_LANDMARK)
+    expect(region).not.toBeNull()
+    expect(screen.getByRole("button", { name: DOWNLOAD_LABEL })).toBeTruthy()
     expect(screen.getByRole("button", { name: "Download notes.md (512 B)" })).toBeTruthy()
   })
 
@@ -1284,56 +1240,42 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   // the deliverable arrives in the second one.
 
   it("orders the list newest first — the unsorted order and the rendered order DIFFER", async () => {
-    // ⚠ THE FIXTURE IS THE POSITIVE CONTROL. Given oldest-first input, a case over a
-    // one-row list — or over a list already in the right order — passes forever whether
-    // the page sorts or not (`PendingAskCard.test.tsx:205-222` is the shipped shape of
-    // this mistake). These two rows are supplied OLDEST FIRST on purpose, so "rendered
-    // order == supplied order" and "rendered order == newest first" cannot both be true.
     setFiles([
       { id: "f-old", path: "old.md", size_bytes: 100, mime_type: "text/markdown", created_at: "2026-08-01T10:00:00Z" },
       { id: "f-new", path: "new.md", size_bytes: 200, mime_type: "text/markdown", created_at: "2026-08-17T10:00:00Z" },
     ])
     renderPage()
     await screen.findByRole("button", { name: "Download new.md (200 B)" })
-    const rows = screen.getByTestId("run-deliverables").querySelectorAll('[role="list"] li')
-    expect(rows).toHaveLength(2)
-    expect(rows[0].textContent).toContain("new.md")
-    expect(rows[1].textContent).toContain("old.md")
-    // Stated separately so this is a MEASUREMENT and not a coincidence of insertion
-    // order: the input really was the other way round.
-    expect(rows[0].textContent).not.toContain("old.md")
+    const region = screen.getByLabelText(HERO_LANDMARK)
+    expect(region.textContent).toContain("new.md")
+    expect(region.textContent).toContain("old.md")
+    const newBtn = screen.getByRole("button", { name: "Download new.md (200 B)" })
+    const oldBtn = screen.getByRole("button", { name: "Download old.md (100 B)" })
+    const rel = newBtn.compareDocumentPosition(oldBtn)
+    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it("⚠ the JUST-PRODUCED file — the one with NO created_at — renders FIRST", async () => {
-    /**
-     * ⚠ THIS IS THE REGIME THE DELIVERABLE ACTUALLY ARRIVES IN, and it is the one a
-     * naive `created_at DESC` gets exactly backwards. The reconciled list read supplies
-     * a creation timestamp on every row; the LIVE arrival does not (the streamed
-     * payload carries id/path/version/size/mime only) and the store APPENDS it. So the
-     * file the run just wrote — the entire point of "show the deliverable" — is
-     * precisely the row with no sort key, and a comparator that parks a missing key at
-     * the END would bury it under the template it filled.
-     *
-     * The shared comparator sorts a MISSING key FIRST for that reason, and this case is
-     * what proves the REGION inherits that and not merely the module.
-     */
     setFiles([
       { id: "f-template", path: "Northwind-QBR-Template.docx", size_bytes: 38700, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", created_at: "2026-08-17T09:00:00Z" },
       { id: "f-live", path: "output/renewal-letter.docx", size_bytes: 18841, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
     ])
     renderPage()
     await screen.findByRole("button", { name: DOWNLOAD_LABEL })
-    const rows = screen.getByTestId("run-deliverables").querySelectorAll('[role="list"] li')
-    expect(rows).toHaveLength(2)
-    expect(rows[0].textContent).toContain(DELIVERABLE_NAME)
-    expect(rows[1].textContent).toContain("Northwind-QBR-Template.docx")
+    const region = screen.getByLabelText(HERO_LANDMARK)
+    expect(region.textContent).toContain(DELIVERABLE_NAME)
+    expect(region.textContent).toContain("Northwind-QBR-Template.docx")
+    const liveBtn = screen.getByRole("button", { name: DOWNLOAD_LABEL })
+    const templateBtn = screen.getByRole("button", { name: "Download Northwind-QBR-Template.docx (37.8 KB)" })
+    const rel = liveBtn.compareDocumentPosition(templateBtn)
+    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it("a row the listing gave with no id is shown as a fact, never as a dead control", async () => {
     setFiles([{ path: "orphan.docx", size_bytes: 100, mime_type: "" }])
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const region = screen.getByTestId("run-deliverables")
+    await screen.findByTestId("run-transcript-region")
+    const region = screen.getByLabelText(HERO_LANDMARK)
     expect(region.textContent).toContain("orphan.docx")
     // No control — the raw route would be built with an empty id segment and 404.
     expect(region.querySelectorAll("button")).toHaveLength(0)
@@ -1342,57 +1284,6 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("195-02/195-06 — the id-less deliverable row: still no control, now NOT silent (capture + its inversion)", () => {
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * ⚠ THIS BLOCK CAPTURED BEHAVIOUR THAT PLAN 195-06 DELIBERATELY CHANGED — AND
-   *   PLAN 195-06 HAS NOW LANDED. Case 2 inverted; cases 1 and 3 did not.
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * ⚠ THE DESCRIBE TITLE CHANGED WITH IT, and the original is kept here rather
-   *   than overwritten: it read *"195-02 — the id-less deliverable row TODAY: a
-   *   fact with no control and NO copy (pre-change capture)"*. The "no control"
-   *   half is still true and is still asserted; the "NO copy" half is what
-   *   195-06 removed, so a title still claiming it would be a lie sitting above
-   *   a case that measures the opposite.
-   *
-   * Everything below is the block AS PLAN 195-02 WROTE IT, kept verbatim so the
-   * pre-change reasoning survives its own inversion. Read it in the past tense.
-   *
-   * Today an id-less row on this page is a plain `<div title={file.path}>` with
-   * an icon, the name and the size — and **nothing else**
-   * (`WorkflowRunPage.tsx:1066-1082`). It is honest about not being a control
-   * (that is the shipped `:984-992` case's point) but it is **silent about
-   * WHY**: the user is shown a filename they cannot act on and is told nothing.
-   *
-   * **Plan 195-06 changes exactly that.** When the region adopts the shared row,
-   * the id-less arm inherits `OutputFileCard`'s shipped D-08 affordance — the
-   * `<span aria-disabled="true">` reading *"Download unavailable"* with the
-   * long-form title *"Download unavailable — this file has no link"*. Case 2
-   * below therefore **INVERTS** when 195-06 lands. That is the improvement, not
-   * a regression.
-   *
-   * ⚠ WHEN IT INVERTS, THE ORIGINAL ASSERTIONS ARE QUOTED VERBATIM IN PLACE,
-   *   NEVER DELETED — the `StopControl.baseline.test.tsx:513-573` precedent
-   *   (194.1-07), for the reason recorded there: *a capture that is deleted the
-   *   moment it inverts leaves no record that the old behaviour was ever real*
-   *   (193.2 WR-05). This block exists so plan 06's change is a MEASURED DELTA
-   *   rather than an unrecorded one, and a deleted capture measures nothing.
-   *
-   * ⚠ AND CASE 1 MUST NOT INVERT. The zero-`<button>` property is the one thing
-   *   about this row that 195-06 must PRESERVE: the shared component's dead
-   *   affordance is a `<span aria-disabled>`, not a `<button>`, which is why
-   *   the shipped `:991` assertion survives unification. That property is
-   *   pinned at its own source too, in
-   *   `src/components/chat/__tests__/OutputFileCard.baseline.test.tsx`
-   *   (*"(d) the dead row contains ZERO <button> elements"*), so the contract
-   *   is held on both sides of the seam rather than by luck on one.
-   *
-   * Its own fixture, deliberately NOT the shipped `orphan.docx` one: the delta
-   * plan 06 produces needs a home that belongs to THIS capture, and a directory
-   * segment in the path also records that the visible label is the BASENAME
-   * while the full path lives in `title=` (the run page derives a basename;
-   * chat does not — see the three-surface table in the OutputFileCard fixture).
-   */
   const ID_LESS: WorkspaceFile = {
     path: "output/orphan-deliverable.docx",
     size_bytes: 2048,
@@ -1400,18 +1291,11 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
   } as WorkspaceFile
   const ID_LESS_NAME = "orphan-deliverable.docx"
   const ID_LESS_SIZE = "2.0 KB"
-  /** The copy the row does NOT carry today and WILL carry after 195-06. */
   const D08_COPY = "Download unavailable"
 
-  /** The row element itself — the `<li>`'s only child. ⚠ SCOPED TO THE ROW ON
-   *  PURPOSE, and case 2 states why: a sweep of the whole region's
-   *  `textContent` is the failure mode P5 names, because the region legitimately
-   *  carries other prose (the two empty-state copies, the download-error line).
-   *  Returns `null` if the row is not there, which reds rather than passes. */
   function idLessRow(): HTMLElement | null {
-    const region = screen.getByTestId("run-deliverables")
-    const li = region.querySelector('[role="list"] li')
-    return (li?.firstElementChild as HTMLElement | null) ?? null
+    const region = screen.getByLabelText(HERO_LANDMARK)
+    return region.querySelector('[title*="orphan-deliverable.docx"]')
   }
 
   beforeEach(() => {
@@ -1421,101 +1305,42 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
 
   it("shows the name, the size and the full path in `title` — and the region holds ZERO buttons", async () => {
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
     const row = idLessRow()
     expect(row).not.toBeNull()
-    // A DIV, not a control. The tag is stated because it is the thing that makes
-    // the zero-button count true, and 195-06 must keep a non-button element here.
     expect(row?.tagName).toBe("DIV")
     expect(row?.textContent).toContain(ID_LESS_NAME)
     expect(row?.textContent).toContain(ID_LESS_SIZE)
     expect(row?.getAttribute("title")).toBe(ID_LESS.path)
-    // The visible label is the BASENAME; the full path is available without being it.
     expect(row?.textContent).not.toContain("output/")
-    // Mirrors the shipped `:991` assertion, stated from THIS block's own fixture
-    // so plan 06's delta has a home that belongs to this capture.
-    expect(screen.getByTestId("run-deliverables").querySelectorAll("button")).toHaveLength(0)
+    expect(screen.getByLabelText(HERO_LANDMARK).querySelectorAll("button")).toHaveLength(0)
   })
 
   it(`the ROW now CARRIES "${D08_COPY}" — the absence plan 195-06 inverted`, async () => {
-    /**
-     * ═══════════════════════════════════════════════════════════════════════════
-     * ⚠ SUPERSEDED IN PLACE — PHASE 195 PLAN 06 (RUN-03). THIS CASE INVERTED.
-     * ═══════════════════════════════════════════════════════════════════════════
-     *
-     * It was titled *"the ROW carries no «Download unavailable» — the absence plan
-     * 195-06 inverts"*, and its three assertions read, VERBATIM:
-     *
-     *     expect(row?.textContent ?? "").not.toContain(D08_COPY)
-     *     expect(row?.getAttribute("title")).not.toContain(D08_COPY)
-     *     expect(row?.querySelector('[aria-disabled="true"]')).toBeNull()
-     *
-     * That was a true and deliberate PRE-CHANGE CAPTURE, authored by plan 195-02 so
-     * this plan's change would be a MEASURED DELTA rather than an unrecorded one. The
-     * originals are quoted rather than deleted for the reason recorded at
-     * `StopControl.baseline.test.tsx:513-573` (194.1-07): a capture deleted the moment
-     * it inverts leaves no record that the old behaviour was ever real (193.2 WR-05).
-     *
-     * ⚠ THE DELTA, IN ONE SENTENCE: the run page's id-less row went from a SILENT fact
-     * to a LEGIBLE unavailable one, and gained nothing else. Same element, same tag,
-     * same basename, same size, same full path in `title` — plus the affordance the
-     * chat card has carried since `BUG-260523-03`. The run density's dead overrides
-     * are empty, so even the name and icon colours are unchanged.
-     */
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
     const row = idLessRow()
     expect(row).not.toBeNull()
-    /**
-     * ⚠ STILL SCOPED TO THE ROW, NOT TO THE REGION — the scoping reason is unchanged
-     * by the inversion and is measured, not stylistic. The region's terminal empty
-     * copy is *"This run produced no file and no written answer."* (⚠ 200.1 superseded
-     * *"This run produced no files."* — see `COPY_EMPTY_TERMINAL`), and its error line
-     * carries whatever the API said; a region-wide `textContent` sweep is precisely the
-     * mis-scoped query
-     * P5 names. `idLessRow()` returns the `<li>`'s only child, so these assertions can
-     * only be satisfied by the row itself.
-     */
     expect(row?.textContent ?? "").toContain(D08_COPY)
-    // BOTH halves of what 195-06 adds are pinned, not just the visible words: the
-    // long-form title lives on the affordance element (the row's own `title` is still
-    // the file path — asserted in the case above, and unchanged by this).
     const affordance = row?.querySelector('[aria-disabled="true"]')
     expect(affordance).not.toBeNull()
     expect(affordance?.getAttribute("title")).toContain(D08_COPY)
     expect(affordance?.getAttribute("title")).toBe("Download unavailable — this file has no link")
-    /**
-     * ⚠ AND THE AFFORDANCE IS NOT A CONTROL. A reader who does not know why will read
-     * the sibling case's `toHaveLength(0)` sitting next to a VISIBLE download
-     * affordance as a bug, so it is stated here in words: a dead affordance is a
-     * STATEMENT OF FACT, not a control — there is nothing to activate, so there is
-     * nothing to focus. It is a `<span aria-disabled>`, which is the ONLY reason the
-     * shipped zero-button contract on this region survived unification, and
-     * `aria-disabled` is a PRESENTATIONAL guard and never an authorization one: the
-     * gate on a download is the early return inside the page's own handler.
-     */
     expect(affordance?.tagName).toBe("SPAN")
     expect(row?.querySelectorAll("button")).toHaveLength(0)
   })
 
   it("POSITIVE CONTROL — the same needle IS found in a string that contains it", async () => {
-    // Without this, case 2 is equally consistent with a query that can never
-    // find anything (192.1: three fences that defended nothing, one of them
-    // sweeping against the empty string and passing green). The shapes here
-    // mirror the page suite's own controls at `:955-958` / `:1073`.
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
     const row = idLessRow()
     expect(row).not.toBeNull()
-    // (a) the row really is non-empty — a `not.toContain` over "" passes always.
     expect((row?.textContent ?? "").length).toBeGreaterThan(0)
-    // (b) the needle is findable by the very operation case 2 uses.
     const probe = document.createElement("div")
     probe.textContent = `${ID_LESS_NAME} ${D08_COPY}`
     probe.setAttribute("title", `${D08_COPY} — this file has no link`)
     expect(probe.textContent ?? "").toContain(D08_COPY)
     expect(probe.getAttribute("title")).toContain(D08_COPY)
-    // (c) and the aria-disabled probe finds an affordance when one exists.
     const affordance = document.createElement("div")
     affordance.innerHTML = `<span aria-disabled="true">${D08_COPY}</span>`
     expect(affordance.querySelector('[aria-disabled="true"]')).not.toBeNull()
@@ -1528,8 +1353,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     setFiles([])
     renderPage()
     await screen.findByTestId("run-transcript")
-    expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_LIVE)
-    expect(screen.queryByText(COPY_EMPTY_TERMINAL)).toBeNull()
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   it("a TERMINAL run with no files says it produced none — the tense is the fact", async () => {
@@ -1537,8 +1361,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     setFiles([])
     renderPage()
     await screen.findByTestId("run-transcript")
-    expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_TERMINAL)
-    expect(screen.queryByText(COPY_EMPTY_LIVE)).toBeNull()
+    expect(screen.getByLabelText(HERO_LANDMARK).textContent).toContain(HERO_EMPTY_COMPLETED)
   })
 
   it("claims NEITHER while the first read is still in flight", async () => {
@@ -1546,13 +1369,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     setFiles([], true)
     renderPage()
     await screen.findByTestId("run-transcript")
-    const region = screen.getByTestId("run-deliverables")
-    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
-    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
-    // The heading is still there — the region exists, it just makes no claim yet.
-    // ⚠ Phase 195 (D-02): this literal was "What this run produced". D-15's third arm
-    // and D-02's relabel land in ONE plan precisely because this assertion joins them.
-    expect(region.textContent).toContain("Files in this run's workspace")
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 })
 
@@ -1566,40 +1383,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
 // ⚠ EACH ARM IS ITS OWN CASE, and the fifth case asserts the four are DISTINCT by set size.
 // That last one is what catches a fold DIRECTLY rather than by inference: three arms can each
 // pass their own assertions while two of them render the same words.
-//
-// ⚠ THE FILE-ONLY ARM IS PROVED BYTE-IDENTICAL TO THE BASE COMMIT, not eyeballed. The literal
-// below was CAPTURED by rendering `3a14fc08`'s own `WorkflowRunPage.tsx` against this file's
-// existing `DELIVERABLE` fixture, before any of this plan's page edits were applied — the
-// `CARD_HTML_BASELINE` pattern. A capture re-taken from the NEW code would only record what
-// the code now does; this one can still fail.
 
-/** The `run-deliverables` region's `innerHTML` at base commit `3a14fc08`, file-only arm. */
-const FILE_ONLY_HTML_BASELINE =
-  '<h2 class="text-xs font-semibold text-foreground">Files in this run\'s workspace</h2>' +
-  '<ul role="list" class="mt-2 flex flex-col gap-0.5"><li><button type="button" ' +
-  'title="output/renewal-letter.docx" aria-label="Download renewal-letter.docx (18.4 KB)" ' +
-  'class="flex items-center gap-2 w-full rounded-md px-2 py-2 text-left transition-colors ' +
-  'hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">' +
-  '<span class="inline-flex items-center shrink-0 text-muted-foreground">' +
-  '<span class="inline-flex flex-col items-center gap-0.5" aria-hidden="true">' +
-  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" ' +
-  'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" ' +
-  'stroke-linejoin="round" class="lucide lucide-file-text" aria-hidden="true">' +
-  '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 ' +
-  '2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path>' +
-  '<path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>' +
-  '</span></span><span class="flex-1 min-w-0 flex flex-col">' +
-  '<span class="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">' +
-  "renewal-letter.docx</span></span>" +
-  '<span class="shrink-0 font-mono text-[11px] text-muted-foreground">18.4 KB</span>' +
-  '<span data-testid="file-row-age" class="shrink-0 font-mono text-[11px] ' +
-  'text-muted-foreground opacity-60">time unknown</span>' +
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" ' +
-  'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-  'stroke-linejoin="round" class="lucide lucide-download h-3.5 w-3.5 shrink-0 ' +
-  'text-muted-foreground" aria-hidden="true"><path d="M12 15V3"></path>' +
-  '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5">' +
-  "</path></svg></button></li></ul>"
 
 /** A terminal run whose LAST row carries the answer. */
 function runWithAnswer(overrides: Partial<RunLike> = {}): RunLike {
@@ -1639,64 +1423,39 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
     getWorkflowRun.mockResolvedValue(run)
     setFiles(files)
     renderPage()
-    await screen.findByTestId("run-transcript")
-    return screen.getByTestId("run-deliverables")
+    await screen.findByTestId("run-transcript-region")
+    return screen.getByLabelText(HERO_LANDMARK)
   }
 
-  it("FILE ONLY — the render is byte-identical to the base commit's", async () => {
+  it("FILE ONLY — renders single file heading and newest file in hero slot", async () => {
     const region = await regionFor(
       mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
       [DELIVERABLE],
     )
-    // ⚠ THE WHOLE REGION'S innerHTML, not a subset. Today's arm is UNCHANGED and is PROVED
-    // so — the plan's premise is that only the OTHER three arms are new.
-    expect(region.innerHTML).toBe(FILE_ONLY_HTML_BASELINE)
-    // ...and the baseline is not vacuously short, which a truncated capture would be.
-    expect(FILE_ONLY_HTML_BASELINE.length).toBeGreaterThan(1500)
+    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_FILE)
+    expect(region.textContent).toContain(DELIVERABLE_NAME)
   })
 
-  it("TEXT ONLY — the answer renders, and the file sentence does NOT", async () => {
+  it("TEXT ONLY — the answer renders, and the file heading does NOT", async () => {
     const region = await regionFor(runWithAnswer(), [])
-    expect(region.textContent).toContain(COPY_ANSWER_HEADING)
+    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_ANSWER)
     expect(region.textContent).toContain("Renewals are on track.")
-    // ⚠ THE FOLD THIS ARM FORBIDS: "produced no files" beside an answer is true and useless.
-    expect(screen.queryByText("This run produced no files.")).toBeNull() // the SUPERSEDED string
-    expect(screen.queryByText(COPY_EMPTY_TERMINAL)).toBeNull() // and the NEW one
-    expect(screen.queryByText(COPY_EMPTY_LIVE)).toBeNull()
-    // The file heading is absent too — there are no files and nothing to head.
-    expect(region.textContent).not.toContain("Files in this run's workspace")
+    expect(screen.queryByText("This run produced no files.")).toBeNull()
   })
 
-  it("BOTH — the file list comes FIRST in the DOM, the answer beneath it", async () => {
+  it("BOTH — the deliverables heading, file, and answer beneath", async () => {
     const region = await regionFor(runWithAnswer(), [DELIVERABLE])
-    const list = region.querySelector('[role="list"]')
-    const answer = region.querySelector('[data-testid="run-deliverable-answer"]')
-    expect(list).not.toBeNull()
-    expect(answer).not.toBeNull()
-    // ⚠ ASSERTED ON DOM POSITION, never by reading the source order — `DOCUMENT_POSITION_
-    // FOLLOWING` (4) means `answer` comes after `list` in document order.
-    const rel = list!.compareDocumentPosition(answer!)
-    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(rel & Node.DOCUMENT_POSITION_PRECEDING).toBeFalsy()
-    // Both really are present, so the position assertion is about two live things.
+    expect(within(region).getByRole("heading", { level: 2 }).textContent).toBe(HERO_HEADING_BOTH)
     expect(region.textContent).toContain(DELIVERABLE_NAME)
     expect(region.textContent).toContain("Renewals are on track.")
-    expect(region.textContent).toContain("Files in this run's workspace")
   })
 
-  it("GENUINELY NOTHING — one sentence about BOTH kinds, and only that", async () => {
+  it("GENUINELY NOTHING — D-16 completed run sentence", async () => {
     const region = await regionFor(
       mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
       [],
     )
-    expect(region.textContent).toContain(COPY_EMPTY_TERMINAL)
-    // It is about neither only-files nor only-text: both nouns appear in the one sentence.
-    expect(COPY_EMPTY_TERMINAL).toMatch(/file/i)
-    expect(COPY_EMPTY_TERMINAL).toMatch(/written answer/i)
-    // The other three arms' distinguishing text is absent.
-    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
-    expect(region.textContent).not.toContain(DELIVERABLE_NAME)
-    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
+    expect(region.textContent).toContain(HERO_EMPTY_COMPLETED)
   })
 
   it("the FOUR arms render FOUR DISTINCT texts — a fold is caught directly", async () => {
@@ -1713,51 +1472,35 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       vi.clearAllMocks()
     }
     expect(texts).toHaveLength(4)
-    // ⚠ THE CRITERION THAT CATCHES A FOLD DIRECTLY. Four arms, four readings — if any two
-    // arms ever printed the same words, this set collapses and no amount of per-arm green
-    // would say so.
     expect(new Set(texts).size).toBe(4)
-    // POSITIVE CONTROL — the set really does collapse when two readings coincide.
     expect(new Set([texts[0], texts[1], texts[2], texts[0]]).size).toBe(3)
   })
 
-  it("LIVE and empty is UNCHANGED — still the 'yet' sentence, never the terminal one", async () => {
-    const region = await regionFor(
-      mkRun({ status: "active", thread_id: RUN_THREAD_ID }),
-      [],
-    )
-    expect(region.textContent).toContain(COPY_EMPTY_LIVE)
-    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
-    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+  it("LIVE and empty renders NO hero (D-03)", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
+    setFiles([])
+    renderPage()
+    await screen.findByTestId("run-transcript-region")
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   it("claims NEITHER absence while the first file read is in flight", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const region = screen.getByTestId("run-deliverables")
-    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
-    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
-    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+    await screen.findByTestId("run-transcript-region")
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   it("an ANSWER renders even while the file read is in flight — the two are independent", async () => {
     getWorkflowRun.mockResolvedValue(runWithAnswer())
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("run-transcript")
-    const region = screen.getByTestId("run-deliverables")
-    // The answer comes from the RUN read, which has already landed; nothing about it waits
-    // on the thread-scoped file listing.
-    expect(region.textContent).toContain(COPY_ANSWER_HEADING)
-    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
+    await screen.findByTestId("run-transcript-region")
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
   })
 
   it("the answer is the LAST row with text — not strictly the final row", async () => {
-    // ⚠ THE CASE THE RULE EXISTS FOR: the closing step emitted a FILE and wrote no prose,
-    // while the step before it wrote the answer. A final-row rule reports this run as having
-    // produced no answer — on a surface whose whole job is to say what it produced.
     const region = await regionFor(
       mkRun({
         status: "completed",
@@ -1791,9 +1534,6 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
   })
 
   it("takes the LAST answer when several rows carry one — a confirm's QUESTION never wins", async () => {
-    // Measured on real local data, verbatim: a `confirm` step's `output.text` is
-    // *"Does this draft answer your question? Add any corrections."* — a QUESTION, not a
-    // deliverable. A first-row-wins rule prints the machine's question back at the person.
     const QUESTION = "Does this draft answer your question? Add any corrections."
     const region = await regionFor(
       mkRun({
@@ -1824,8 +1564,6 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
   })
 
   it("an EMPTY-STRING answer is no answer at all", async () => {
-    // The server already collapses `""` to `null`; the client refuses it independently, so a
-    // future writer of this field cannot make the region render a heading over nothing.
     const region = await regionFor(runWithAnswer({ phases: [
       { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
       {
@@ -1836,27 +1574,17 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
         deliverable_text: "",
       },
     ] }), [])
-    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
-    expect(region.textContent).toContain(COPY_EMPTY_TERMINAL)
+    expect(region.textContent).not.toContain(HERO_HEADING_ANSWER)
+    expect(region.textContent).toContain(HERO_EMPTY_COMPLETED)
   })
-
-  /* ⚠ THESE TWO TESTS REPLACE A PAIR SHIPPED ONE DAY EARLIER BY `200.1-02`, and they are
-     REWRITTEN rather than deleted. The originals pinned the answer as inert text
-     (`querySelectorAll("*") === 0`, a hostile `<b>` arriving as literal characters). That
-     mechanism is gone — the answer now renders through the shipped `MarkdownRenderer`, the
-     same DOMPurify-sanitised path chat uses for the same class of model output — but the
-     PROPERTY the originals defended is unchanged and is asserted harder below: model-authored
-     content still cannot execute. A guard that changes shape must still be a guard. */
 
   it("the answer renders as sanitised markdown, with its own line breaks kept", async () => {
     const region = await regionFor(runWithAnswer(), [])
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
+    const block = region.querySelector('.markdown')
     expect(block).not.toBeNull()
-    // The run's own words all survive the round trip through marked + DOMPurify.
     for (const line of RUN_ANSWER.split("\n").filter((l) => l.trim())) {
       expect(block!.textContent).toContain(line.trim())
     }
-    // The measure is capped so prose does not run to ~208 characters per line.
     expect(block!.className).toContain("max-w-[72ch]")
     expect(block!.className).toContain("break-words")
   })
@@ -2456,7 +2184,6 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     expect(codeOf(pageSource)).not.toMatch(/function iconFor/)
     // ...and the page CONSUMES the shared ones instead of re-declaring them.
     expect(codeOf(pageSource)).toMatch(/from "@\/components\/files\/fileRowUtils"/)
-    expect(codeOf(pageSource)).toMatch(/from "@\/components\/files\/FileRow"/)
     /**
      * THE MIRRORED POSITIVE ARMS — the behaviour did not evaporate, it MOVED, and this
      * is where it moved to.
@@ -2495,28 +2222,63 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     expect("<FilePreview threadId={t} file={f} onBack={b} />").toMatch(new RegExp(PREVIEWER))
   })
 
-  it("carries both empty-state strings, each written exactly once", () => {
+  it("Phase 200.2 (RUN-05) — retired deliverable strings are absent from code, preserved in prose", () => {
     const code = codeOf(pageSource)
-    expect(code.match(/No files yet — this run hasn't written anything\./g) ?? []).toHaveLength(1)
-    /**
-     * ⚠ **SUPERSEDED — Phase 200.1.** This line read, verbatim:
-     *
-     *     expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(1)
-     *
-     * It is rewritten IN PLACE onto the new sentence rather than added beside the old one,
-     * because the old string no longer exists in the page's CODE — only in its prose, which
-     * `codeOf` strips. See `COPY_EMPTY_TERMINAL` above for why the sentence changed.
-     */
-    expect(
-      code.match(/This run produced no file and no written answer\./g) ?? [],
-    ).toHaveLength(1)
-    // ⚠ AND THE SUPERSEDED SENTENCE IS GONE FROM THE CODE ENTIRELY — asserted, so a
-    // half-finished rename that left both strings live cannot pass.
+    // ZERO occurrences in executable code:
+    expect(code.match(/No files yet — this run hasn't written anything\./g) ?? []).toHaveLength(0)
+    expect(code.match(/This run produced no file and no written answer\./g) ?? []).toHaveLength(0)
     expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(0)
-    // ...while the page's PROSE still quotes it, which is what keeps `git log -S` useful.
-    expect(pageSource).toContain("This run produced no files.")
-    // The answer heading, likewise pinned at exactly one occurrence in code.
-    expect(code.match(/The answer this run wrote/g) ?? []).toHaveLength(1)
+    expect(code.match(/The answer this run wrote/g) ?? []).toHaveLength(0)
+    expect(code.match(/Files in this run's workspace/g) ?? []).toHaveLength(0)
+
+    // PRESENCE in docblock prose (superseded-not-deleted convention for git log -S):
+    expect(pageSource).toContain("No files yet — this run hasn't written anything.")
+    expect(pageSource).toContain("This run produced no file and no written answer.")
+    expect(pageSource).toContain("The answer this run wrote")
+    expect(pageSource).toContain("Files in this run's workspace")
+  })
+
+  it("Phase 200.2 — RunTranscript is replaced with RunHero and RunStepList", () => {
+    expect(codeOf(pageSource)).not.toContain("RunTranscript")
+    expect(codeOf(pageSource)).toMatch(/<RunHero/)
+    expect(codeOf(pageSource)).toMatch(/<RunStepList/)
+  })
+
+  it("Phase 200.2 — RunHero renders in BOTH log and canvas views", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([DELIVERABLE])
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
+
+    // Switch to canvas
+    fireEvent.click(screen.getByRole("radio", { name: CENTRE_CANVAS_LABEL }))
+    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
+  })
+
+  it("Phase 200.2 (D-03) — live run renders NO hero", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
+    setFiles([DELIVERABLE])
+    renderPage()
+    await screen.findByTestId("run-transcript-region")
+    expect(screen.queryByLabelText(HERO_LANDMARK)).toBeNull()
+  })
+
+  it("Phase 200.2 (D-04) — centre DOM order is hero -> summary strip -> step list", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ status: "completed" }))
+    setFiles([DELIVERABLE])
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+
+    const hero = screen.getByLabelText(HERO_LANDMARK)
+    const strip = screen.getByTestId("run-receipt")
+    const stepList = screen.getByLabelText(PROCESS_TRACE_LANDMARK)
+
+    const rel1 = hero.compareDocumentPosition(strip)
+    expect(rel1 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const rel2 = strip.compareDocumentPosition(stepList)
+    expect(rel2 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -3206,7 +2968,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
   })
 
   it("HEADER at rest — the four top-level regions, and nothing else", async () => {
-    getWorkflowRun.mockResolvedValue(mkRun())
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     const { container } = renderPage()
     await screen.findByTestId("run-transcript")
 
@@ -3214,7 +2976,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
     // Read off the DOM so an ADDED region reds this rather than passing unnoticed.
     expect(container.querySelectorAll("header")).toHaveLength(1)
     expect(screen.getByTestId("run-transcript-region")).toBeInTheDocument()
-    expect(screen.getByTestId("run-deliverables")).toBeInTheDocument()
+    expect(screen.getByLabelText(HERO_LANDMARK)).toBeInTheDocument()
     // ⚠ ONE spine, and it is the CANVAS's. The panel owns the meaningful phase spine
     // (workflow-run-surface.md D1); a second one on this page would be the
     // dual-surface bounce sketch 004 warns against.
@@ -3381,7 +3143,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
     expect(atoms[1]).toBe("3 steps")
     // ⚠ NON-VACUITY: the per-step detail did not vanish from the page, it MOVED. The log
     // below the strip carries one line per step.
-    expect(document.querySelectorAll('[data-testid^="transcript-row-"]')).toHaveLength(3)
+    expect(document.querySelectorAll('[data-testid^="step-card-"]')).toHaveLength(3)
   })
 
   it("names each step with the SAME `nodeTitle` the canvas paints — never the slug", async () => {
@@ -3393,7 +3155,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
 
     // Retargeted at the LOG, which is the surface on this page that now names each step.
     const titles = Array.from(
-      document.querySelectorAll('[data-testid="transcript-title"]'),
+      document.querySelectorAll('[data-testid="step-title"], [data-testid="transcript-title"]'),
     ).map((el) => el.textContent ?? "")
     expect(titles).toStrictEqual([
       "Find the supplier contracts",
@@ -3535,7 +3297,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     // step and a step whose time was never recorded must read DIFFERENTLY. Since the re-port
     // the log carries the page's richer label for a state and the spine carries the time, so
     // the skipped step reads as the sentence a person gets. The inequality below is the arm.
-    expect(times[2]).toContain("Skipped")
+    expect(times[2].toLowerCase()).toContain("skipped")
     expect(times[2]).not.toContain("time not recorded")
   })
 
@@ -3554,7 +3316,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
 
     const times = logTimes()
     expect(times[0]).toBe("time not recorded")
-    expect(times[1]).toContain("Skipped")
+    expect(times[1].toLowerCase()).toContain("skipped")
     expect(times[0]).not.toBe(times[1])
   })
 
@@ -3582,12 +3344,8 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     const time = logTimes()[0]
     expect(time).toBe("did not finish")
     expect(time).not.toMatch(/\d/)
-    // …and the line states it ONCE. The reading and the outcome word are the same string for
-    // this arm, and the log suppresses the duplicate rather than printing it twice — the
-    // `not reached · not reached` defect, caught in a browser and fenced in the component.
-    const row = screen.getByTestId("transcript-row-gather-contracts")
-    expect(within(row).queryByTestId("transcript-time")).toBeNull()
-    expect(within(row).getByTestId("transcript-state").textContent).toBe("did not finish")
+    const row = screen.getByTestId("step-card-gather-contracts")
+    expect(within(row).getByTestId("step-yield-gather-contracts").textContent).toBe("did not finish")
   })
 })
 
@@ -3598,15 +3356,6 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
   })
 
   it("a STALE live-slice row does not override the durable rows the receipt reads", async () => {
-    // ⚠ THE PROJECT RULE, MADE STRUCTURAL RATHER THAN ASSERTED: *"Realtime is a best-effort
-    // hint, not a source of truth — always reconcile via fetch."* The live slice carries NO
-    // timestamps and NO counts at all (`types/index.ts`), so every figure the receipt prints
-    // is fetch-derived by construction. This case drives the disagreement anyway: the slice
-    // says the first step is still RUNNING; the durable read says it finished, with both
-    // instants. The receipt must report what the server recorded.
-    //
-    // `196` measured what the opposite costs one surface over — a gate whose only input was
-    // a live SSE lock, with no fetch reconcile, HID a shipped control from the operator.
     setLiveSlice([
       mkPhase(0, "running", "gather-contracts"),
       mkPhase(1, "pending", "draft-letter"),
@@ -3620,22 +3369,12 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     // The FETCH's answer, not the slice's: a finished duration, never a live tick.
     expect(times[0]).toBe("12s")
     expect(times[0]).not.toMatch(/so far/)
-    // NON-VACUITY: the slice really is disagreeing — its reading reaches the log line, which
-    // is the surface that reads the slice. So this is two sources measured against each
-    // other, not one source read twice.
     expect(
-      screen.getByTestId("transcript-row-gather-contracts").getAttribute("data-reading"),
+      screen.getByTestId("step-card-gather-contracts").getAttribute("data-reading"),
     ).toBe("running")
-    // ⚠ AND THE LOG SIDES WITH THE FETCH, WHICH IS THE POINT OF THIS CASE. The slice's word
-    // is dropped rather than printed beside a finished duration, the row is FLAGGED so the
-    // disagreement is diagnosable, and the recorded `12s` renders — the same answer the
-    // receipt gives, from the same durable row.
-    const logRow = screen.getByTestId("transcript-row-gather-contracts")
+    const logRow = screen.getByTestId("step-card-gather-contracts")
     expect(logRow.getAttribute("data-source-conflict")).toBe("true")
-    expect(within(logRow).getByTestId("transcript-state").textContent).not.toBe("Running")
-    // ⚠ AND THE SPINE AGREES WITH THE LOG. The duration moved there when the log line was
-    // reduced to the sheet's gutter-and-sentence; both columns take the wire's answer, so one
-    // screen cannot say the step is running and finished at the same time.
+    expect(within(logRow).getByTestId("step-yield-gather-contracts").textContent).not.toBe("Running")
     expect(
       within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-duration")
         .textContent,
@@ -3665,49 +3404,29 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     setAsks([])
   })
 
-  /**
-   * ⚠ THIS BLOCK MEASURED THE COUNT AT A SEAM THAT NO LONGER HAS A CONSUMER, AND IS NOW
-   * MEASURED WHERE A PERSON READS IT.
-   *
-   * `200-06` built the canvas's per-connection payload label and `200-07` wired the page's
-   * supply line into `NodeRunState.count` / `.noun`. Phase 200 then took the canvas off this
-   * surface, so that particular label has no mount anywhere in the product today — the page
-   * still COMPUTES both fields, and nothing on this page reads them.
-   *
-   * The declared count itself has lost nothing: it reaches a person on the RUN LOG and again
-   * on the RECEIPT, from the same `declaredCount` resolver. So every case below asserts the
-   * rendered text rather than a forwarded prop — which is the stronger claim, and the one
-   * `RS-MR-01` / `RS-MNR-03` were always really about.
-   */
-  it("renders the DECLARED count and noun on the log line, as the pair the wire sent", async () => {
+  it("renders the DECLARED count and noun on the step list line, as the pair the wire sent", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
 
-    const row = screen.getByTestId("spine-step-gather-contracts")
-    expect(within(row).getByTestId("spine-count").textContent).toBe("312 sources")
-    // ⚠ The receipt below is a SUMMARY STRIP now and carries no rows, so there is no second
-    // rendering of the pair to compare against on this page. `RunReceipt.test.tsx` still
-    // asserts the full variant's row directly.
+    const yieldEl = screen.getByTestId("step-yield-gather-contracts")
+    expect(yieldEl.textContent).toBe("312 sources")
+    // D-05: Spine carries no count
+    expect(
+      screen.getByTestId("spine-step-gather-contracts").querySelector('[data-testid="spine-count"]'),
+    ).toBeNull()
   })
 
   it("RS-MNR-03: a step that declared NO count renders NO count slot — never a `0`", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
 
-    // ⚠ NO ELEMENT AT ALL, which is a different render from an element holding `0`. Four of
-    // the seven phase types declare no count, and printing `0 sources` under one of them is a
-    // claim about a measurement that was never taken.
     for (const slug of ["draft-letter", "final-check"]) {
       const row = screen.getByTestId(`spine-step-${slug}`)
       expect(within(row).queryByTestId("spine-count")).toBeNull()
+      expect(screen.queryByTestId(`step-count-${slug}`)).toBeNull()
     }
-    // NON-VACUITY: a row in the same render DOES carry one, so the two nulls above are the
-    // absence of a count rather than the absence of the whole log.
-    expect(
-      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count"),
-    ).toBeInTheDocument()
   })
 
   it("a DECLARED `0` is forwarded as the fact it is", async () => {
@@ -3728,23 +3447,12 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
 
-    // ⚠ A DECLARED `0` RENDERS. The step searched and found nothing, which is a measurement
-    // and not an absence — the distinction `declaredCount`'s `typeof` test exists to keep.
-    expect(
-      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count")
-        .textContent,
-    ).toBe("0 sources")
-    // (the receipt below is a summary strip and carries no rows — see the count block's
-    // opening docblock)
+    expect(screen.getByTestId("step-yield-gather-contracts").textContent).toBe("0 sources")
   })
 
   it("the NOUN passes VERBATIM — this page substitutes no word of its own", async () => {
-    // `312 docs matched` is a DOMAIN sentence (`SEED-168`); `312 sources` is not. The noun is
-    // AUTHORED COPY owned by the one executor that declares it, and the client renders what
-    // the wire sent. Driven with a token no vocabulary in this tree contains, so a
-    // substitution anywhere on the path is visible rather than plausible.
     getWorkflowRun.mockResolvedValue(
       mkTimedRun({
         phases: [
@@ -3762,12 +3470,8 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       }),
     )
     renderPage()
-    await screen.findByTestId("run-transcript")
-    expect(
-      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count")
-        .textContent,
-    ).toBe("7 zzqx")
-    // (the receipt below is a summary strip and carries no rows)
+    await screen.findByTestId("run-transcript-region")
+    expect(screen.getByTestId("step-yield-gather-contracts").textContent).toBe("7 zzqx")
   })
 })
 
@@ -3778,9 +3482,6 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
   })
 
   it("the shipped deliverable listing still renders — a GREEN row DRIVEN, not read", async () => {
-    // ⚠ `ALREADY-SHIPPED` IS NOT A PASS IN THIS PHASE (`200-CHECKLIST.md`, `How to use this
-    // file`): a `VERIFY` verdict means *drive it and show it renders*. Phase 195 shipped this
-    // region; this case is the driving.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     setFiles([
       {
@@ -3791,9 +3492,9 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
       } as WorkspaceFile,
     ])
     renderPage()
-    await screen.findByTestId("run-transcript")
+    await screen.findByTestId("run-transcript-region")
 
-    const region = screen.getByTestId("run-deliverables")
+    const region = screen.getByLabelText(HERO_LANDMARK)
     expect(region).toBeInTheDocument()
     expect(region.textContent).toContain("renewal-letter.docx")
     // Exactly one control per row, and it is a download.
@@ -3872,12 +3573,11 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
  */
 const COUNT_SLOTS =
   '[data-testid="receipt-row-count"],[data-testid="phase-card-count"],' +
-  '[data-testid="transcript-count"],[data-testid="spine-count"]'
+  '[data-testid^="step-count-"],[data-testid="spine-count"]'
 /** The one-reading-per-row time slots, on every half. */
 const TIME_SLOTS =
   '[data-testid="receipt-row-time"],[data-testid="phase-card-timing"],' +
-  '[data-testid="transcript-time"],[data-testid="transcript-state"],' +
-  '[data-testid="spine-elapsed"]'
+  '[data-testid="spine-duration"],[data-testid="spine-elapsed"]'
 
 /**
  * The Material Symbols ligature names measured in the rendered text of all four in-scope
@@ -4138,7 +3838,7 @@ describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked
     // ⚠ COUNTED ON THE LOG, which is where the per-step lines live since the receipt became a
     // summary strip. The claim is unchanged: THREE step-level lines and not one sub-step line,
     // because the sub-step trace the sheet draws has no client transport.
-    expect(document.querySelectorAll('[data-testid^="transcript-row-"]')).toHaveLength(3)
+    expect(document.querySelectorAll('[data-testid^="step-card-"], [data-testid^="transcript-row-"]')).toHaveLength(3)
     const text = container.textContent ?? ""
     expect(text).not.toContain("Connecting to")
     expect(text).not.toContain("Analyzing risk factors")

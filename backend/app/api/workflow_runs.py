@@ -3,8 +3,10 @@
 There was no ``GET`` for a ``workflow_runs`` row anywhere in the tree before this: a run
 could be watched while it streamed, and its phase spine could be reconciled *through its
 thread* (``GET /threads/{id}/workflow``), but the run itself had no id-addressable read. So
-a finished run could not be re-opened — only re-found. This module adds exactly ONE read
-and nothing else.
+a finished run could not be re-opened — only re-found. This module originally added exactly
+ONE read (read_workflow_run). SEED-190 (the run log / list_workflow_runs) and Phase 200.2
+(D-09 / read_workflow_run_phase_citations) joined it as read-only siblings behind the same
+access posture.
 
 **Why ``/workflow-runs/{id}`` and not ``/runs/{id}`` (D-188-15).** ``/runs/{run_id}`` is
 already taken, and it means something DIFFERENT: the producer ``runs`` row (``runs.py``
@@ -249,6 +251,26 @@ class WorkflowRunRead(BaseModel):
     updated_at: datetime | None = None
     definition: dict[str, Any] | None = None
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
+
+
+class WorkflowRunCitationRead(BaseModel):
+    """One citation passage read lazily for a single phase of a workflow run.
+
+    (a) ALLOW-LIST read: The serializer builds new dicts carrying only these four named keys
+    and never copies `similarity` (D-10), which is a design decision per A-05 (a bare score
+    is a figure nobody can act on).
+    (b) The existing run serializer and its written only-text comment stay byte-unchanged (D-09) —
+    this route is a new door, not a widened one.
+    """
+
+    document_id: str = Field(description="The UUID of the document that was cited.")
+    filename: str = Field(description="The display filename of the cited document.")
+    chunk_index: int | None = Field(
+        default=None, description="0-indexed chunk index within the document, if recorded."
+    )
+    passage: str | None = Field(
+        default=None, description="The textual passage retrieved during this step."
+    )
 
 
 def _coerce_definition(raw: object) -> dict[str, Any] | None:
@@ -774,3 +796,83 @@ async def read_workflow_run(
         definition=definition,
         phases=phases,
     )
+
+
+@router.get(
+    "/{workflow_run_id}/phases/{phase_slug}/citations",
+    response_model=list[WorkflowRunCitationRead],
+    # D-182-05 / D-188-16 — this list holds require_canvas ALONE. The 403-raising visibility
+    # gate must never join it (a 403 leaks the route's existence); see the module docblock.
+    dependencies=[Depends(require_canvas())],
+)
+async def read_workflow_run_phase_citations(
+    workflow_run_id: UUID,
+    phase_slug: str,
+    # WR-08: consume identity from canvas_caller rather than re-resolving GoTrue
+    current_user: dict = Depends(canvas_caller),
+    # user-JWT client backing the ownership check with v3.4 membership RLS
+    supabase: Client = Depends(get_user_supabase_client),
+) -> list[WorkflowRunCitationRead]:
+    """PURE READ — lazy citation passages for a single step of a workflow run.
+
+    Ownership-gated FIRST (T-200.2-01 — 404, never leak existence; matches read_workflow_run access posture),
+    then the specific phase by workflow_run_id and slug. NEVER writes. Lazily fetched by design
+    (D-09 — the run read is polled while live, so passages must not ride it).
+    """
+    # ── Step 1: ownership SELECT -> 404 (never leak existence; runs.py:700-750 idiom) ──
+    run_resp = await aexec(
+        supabase.table("workflow_runs")
+        .select("id")
+        .eq("user_id", current_user["id"])
+        .eq("id", str(workflow_run_id))
+        .maybe_single()
+    )
+    run = run_resp.data if run_resp is not None else None
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found",
+        )
+
+    # ── Step 2: phase SELECT -> 404 (nonexistent step is not an empty step) ──
+    phase_resp = await aexec(
+        supabase.table("workflow_phases")
+        .select("output")
+        .eq("workflow_run_id", str(run["id"]))
+        .eq("slug", phase_slug)
+        .maybe_single()
+    )
+    phase_row = phase_resp.data if phase_resp is not None else None
+    if not phase_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Phase not found",
+        )
+
+    # ── Step 3: unwrap output via phase_output_object ──
+    obj = phase_output_object(phase_row.get("output"))
+
+    # ── Step 4: build allow-list citation reads ──
+    raw_citations = obj.get("citations") if isinstance(obj, dict) else None
+    citations: list[WorkflowRunCitationRead] = []
+    if isinstance(raw_citations, list):
+        for entry in raw_citations:
+            if not isinstance(entry, dict):
+                continue
+            doc_id = entry.get("document_id")
+            filename = entry.get("filename")
+            if not isinstance(doc_id, str) or not isinstance(filename, str):
+                continue
+            chunk_idx = entry.get("chunk_index")
+            passage = entry.get("passage")
+            citations.append(
+                WorkflowRunCitationRead(
+                    document_id=doc_id,
+                    filename=filename,
+                    chunk_index=chunk_idx if isinstance(chunk_idx, int) else None,
+                    passage=passage if isinstance(passage, str) else None,
+                )
+            )
+
+    return citations
+
