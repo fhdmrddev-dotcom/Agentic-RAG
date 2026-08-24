@@ -60,7 +60,7 @@
 STYLE CHOICE.** *"Phase NNN not found"* has two causes, and the second is that phase details must be
 `#### Phase NNN:` **headings** — a bold label is silently skipped. That failure mode broke the whole of
 v3.7's roadmap once. Phases 201-203 shipped without one and were fine, so this is a latent trap rather
-than a live break. ⚠ **206 was GIVEN its heading on 2026-08-24 when it was rewritten — see below. 205 still owes one.**
+than a live break. ⚠ **BOTH 205 AND 206 WERE GIVEN HEADINGS ON 2026-08-24, BEFORE ANY PHASE-OP RAN AGAINST EITHER.** 205 had none and the first `/gsd:*-phase 205` would have returned *"Phase 205 not found"*; it was caught by checking rather than by hitting it. Every future phase owes its heading at the moment it enters the table.
 
 #### Phase 204: Scheduled & Recurring Unattended Runs
 
@@ -110,6 +110,76 @@ a stop the reader did not make — is a **vocabulary** defect on a surface a sch
 It stays open against the next workflow-surface phase. **Re-open trigger: a scheduled run's cancel path
 becoming a fourth non-owner caller**, which would make the wrong sentence reachable from this phase's own
 feature and turn a cosmetic bug into a misleading one.
+
+---
+
+#### Phase 205: Stateful & Incremental Workflows
+
+**Goal**: A workflow can read the state/output of its own PREVIOUS run, so a scheduled run produces
+a living register or a weekly delta rather than starting from zero and re-reporting the same things
+every time.
+
+**Requirements**: STATE-01, STATE-02
+**Depends on**: Phase 204 (the scheduler — a stateful workflow with no cadence has little to be
+incremental *about*), `workflow_runs`, `workflow_phases`, `db/workflows.py`.
+
+⚠ **THIS HEADING WAS ADDED 2026-08-24, BEFORE ANY PHASE-OP RAN AGAINST 205, AND ITS ABSENCE WAS THE
+POINT.** The roadmap's own warning above says phase details must be `#### Phase NNN:` **headings** —
+a bold label is silently skipped, and that failure mode broke the whole of v3.7's roadmap once.
+Phases 204 and 206 had headings; 205 did not, so the first `/gsd:*-phase 205` would have returned
+*"Phase 205 not found"*. Recorded rather than quietly fixed, because the trap is latent for 206's
+successors too.
+
+**Why this pairs with 204 rather than standing alone.** Phase 204 makes a workflow run unattended on
+a cadence. Without STATE-01 every one of those runs starts from zero — the Monday run cannot know
+what the previous Monday found, so a "weekly risk report" re-reports the whole register every week
+and a human has to diff it by eye. STATE-01 is what turns a repeating run into a *watching* one.
+
+##### What the phase must establish
+
+1. **A run can read its own workflow's prior run.** Not any run — the same `workflow_id`, owner-scoped,
+   most recent terminal one. The read must be explicit and bounded, never "load all history".
+2. **What it reads is the prior run's OUTPUT**, not its internal phase rows. `workflow_runs.output`
+   / the deliverable is the contract; reaching into `workflow_phases` would couple a workflow to the
+   engine's internals.
+3. **STATE-02: the deliverable can render a DELTA** — added / updated / closed, relative to that
+   prior run.
+
+##### ⚠ Known traps in this blast radius, named so they are not rediscovered
+
+- ⚠ **THE JSONB STRING-SCALAR TRAP, AND THIS PHASE WALKS STRAIGHT INTO IT.** The asyncpg pool
+  registers a jsonb codec, so any call site that pre-encodes with `json.dumps` stores a STRING
+  SCALAR and every later arrow read returns NULL. This shipped on **484 of 484** `workflow_phases.output`
+  rows and needed migration 123 to repair; `workflow_definitions.definition` is a string scalar on
+  live rows *today* (measured 2026-08-24 — `jsonb_typeof` returns `string`, so `->'phases'` returns
+  NULL). **A phase whose whole premise is reading a prior run's jsonb output must defend the read at
+  the point of read**, exactly as `load_run_budget` does, and must never pre-encode on the write side.
+- ⚠ **`declared_phase_measure`'s `isinstance(raw, dict)` guard already kills a Phase-200 feature
+  silently** because of that same trap — and the absent-arm renders honestly, so no test and no eye
+  caught it. Assume the prior run's output may not be the shape it claims.
+- ⚠ **Owner scoping is security-bearing.** `db/workflows.py` writes through a service-role pool that
+  BYPASSES RLS, so the `WHERE` predicate is the only access boundary. A "read my previous run" query
+  that forgets `user_id`/`org_id` reads another tenant's deliverable.
+- ⚠ **`backend/app/db/workflows.py` fires G-5** (43 commits / 21 phases / 2194 lines) and is tied
+  with `api/workflows.py` as the hottest backend module by phase count. Read its section in
+  `docs/HOT-FILE-LEDGER.md` before editing; honour by construction.
+- ⚠ **`backend/app/services/task_service.py` fires G-5 at NINE phases and has NO ledger row** —
+  invisible to its own guardrail for its entire life. It is the sole home of `_stream_one_iteration`
+  and `run_task_sub_agent`, so a change there lands in **chat** as well as workflows. If this phase
+  touches it, it owes the row in the same commit.
+
+##### ⚠ The process lesson Phase 204 paid for, which applies directly here
+
+Phase 204 ran two plans in **parallel waves**. Both passed their own gates, both executors correctly
+reported zero new failures, and **106 tests were green** — while two real defects sat at the seam
+between them, because each wave mocked the other's side:
+
+- the spend cap never armed (`inputs` written, `metadata` read, fails open ⇒ silently disarmed);
+- a scheduled run was invisible to the Control Room (nothing asserted it appeared on any surface).
+
+**So this phase should be ONE plan unless a genuine `depends_on` chain forces otherwise**, and if it
+is ever split, it owes an integration test that **mocks neither side**. See
+`backend/tests/unit/test_scheduler_breaker_seam.py` for the shape.
 
 ---
 
