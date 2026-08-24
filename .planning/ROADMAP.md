@@ -22,7 +22,6 @@
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
 - 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** + insert 204.1 (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
-- [ ] **Phase 207: `api.ts` split — the hottest file in the repository** — ⚠ **CREATED 2026-08-25 BY THE ONLY MECHANISM ITS OWN TRIGGER PERMITS.** `docs/HOT-FILE-LEDGER.md`'s trigger for `frontend/src/lib/api.ts` reads verbatim: *"The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or escalates it to the operator as a phase of its own. It may NOT re-decline."* Phase 206 is that phase — `discoverConnectorTools` and `updateConnectorGrants` are functions, so the type-only defence that carried 197 and 192.2 is gone. **The operator chose escalation on 2026-08-25, and escalation means THIS ROW.** ⚠ The trigger was strengthened precisely because *"another entry in this file"* is the outcome it forbids: a paragraph in the ledger would have been a third decline wearing an escalation's clothes.).
 
 ---
 
@@ -38,7 +37,8 @@
 | 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | ✅ Complete + verified live (2026-08-24) — 2 seam defects found by UAT, both fixed |
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
-| 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | Planned — ⚠ **REWRITTEN 2026-08-24**, see detail |
+| 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
+| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | Planned — **3 items, all found by live UAT + the operator's eye 2026-08-25** |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -86,7 +86,12 @@
   ⚠ Incidental finding: **published definitions are immutable at the DATABASE level** — reassigning
   one raises `workflow_definitions row … is published and immutable; create a new version instead`
   from a PL/pgSQL guard. A real protection, met while setting the UAT up.
-- [ ] **Phase 206: MCP Connector Client — workflow-scoped** — ⚠ **REWRITTEN 2026-08-24** (was *Outbound Action Connectors*). The rest of the connector story moved to the **Connections & Open Platform** milestone: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
+- [x] **Phase 206: MCP Connector Client — workflow-scoped** — ✅ **COMPLETE 2026-08-25.** Migration 126 (`126_mcp_connector_connections.sql`). Delivered provider-shaped MCP connector model (`mcp_server_url`, `tool_grants`, `discovered_tools`), Async JSON-RPC 2.0 client with SSRF egress defense (`validate_mcp_destination`), `/discover` and `/grants` endpoints, external-action MCP tool dispatch with per-tool grant enforcement (`tool_grants.get(tool_name) is True`) and `tool_refused` audit event logging (`write_audit`), frontend API methods, 7 mock budgets spent in same commit, `McpToolPicker.tsx` leaf component maintaining zero-hook pin in `PhaseFormPanel.tsx`, and full unit/integration test suite (`test_mcp_connector_client.py`). All 59 backend tests and 651 frontend tests pass green.
+- [ ] **Phase 206.1 (INSERT): Settings → Connections finishes the MCP story** — ⚠ **206 SHIPPED A FEATURE WITH NO DOOR, AND THE UAT THAT FOUND IT ALSO FOUND TWO DEFECTS ON THE SAME SURFACE.** All three live in `ConnectionsTab.tsx` / `ConnectionFormPanel.tsx`, and they are ONE phase rather than three inserts on one hot file (G-1).
+  1. **The creation door (capability).** `Add a connection` offers `send_email` / `create_ticket` / `post_message` and nothing else — no MCP option, no `mcp_server_url` field. Measured in the browser: `mentionsMcp: false`. Every part of 206 downstream of the row WORKS (discover → grant → executor, all driven live against `mcp.deepwiki.com`), so the only thing standing between the operator and the feature is a form. 206's plan never listed either Settings file, so this is scope, not a slip — but it is the Phase-118 *built-and-unreachable* shape and it must not stay that way.
+  2. **The row collapses into itself when the panel opens (defect).** The list sits in a `minmax(0,1fr) 400px` grid (D-27, sketch 156-A); opening a connection takes 400px from the list column and the row's `flex-[2] min-w-0 truncate` cells are squeezed. **Measured at 1536px viewport:** list column `717px → ~317px`, and two destination cells truncate at `clientW 93` and `clientW 47` against `scrollW 272` and `169` — `https://fhdmrdautomation.a…`, `slack.com/api · #C0BNK1QCF…`. ⚠ **This needs a row SHAPE for the narrow column, not a nudge**: the honest fix is a dense/stacked variant driven by the column's own width (a container query, or a `dense` prop threaded from the same `panel && !isMobile` condition that opens the track) — which is why it is not a `/gsd:fast`.
+  3. **Invented marks where real logos exist (defect).** `CAPABILITY_MARKS` maps `send_email → Envelope`, `create_ticket → Ticket`, `post_message → SpeechBalloon` — generic fluent-emoji glyphs. The **icon convention** (`references/icon-convention.md` §1, Running Design Decision 43, operator 2026-06-27) says a service shows its OWN mark, from one source, byte-identical everywhere. A Slack connection must wear the Slack logo and a Jira connection the Jira logo. ⚠ **THERE IS A REAL DEPENDENCY DECISION HERE AND THE PHASE MUST TAKE IT, not assume it away:** `@lobehub/icons` is AI-provider-shaped — measured, it ships `Github` and `Google` but **no Slack and no Jira/Atlassian** — and the only Iconify set installed is `@iconify-json/fluent-emoji`. So this needs `@iconify-json/logos` (which carries `logos:slack-icon` / `logos:jira`) or bundled SVGs, plus §3's rule: **verify every slug resolves or bundle the asset**, because `fluent-emoji:direct-hit` once rendered EMPTY in production. An MCP connection has no capability at all, so it also needs an honest mark of its own.
+- [ ] **Phase 207: `api.ts` split — the hottest file in the repository** — ⚠ **CREATED 2026-08-25 BY THE ONLY MECHANISM ITS OWN TRIGGER PERMITS.** `docs/HOT-FILE-LEDGER.md`'s trigger for `frontend/src/lib/api.ts` reads verbatim: *"The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or escalates it to the operator as a phase of its own. It may NOT re-decline."* Phase 206 is that phase — `discoverConnectorTools` and `updateConnectorGrants` are functions, so the type-only defence that carried 197 and 192.2 is gone. **The operator chose escalation on 2026-08-25, and escalation means THIS ROW.** ⚠ The trigger was strengthened precisely because *"another entry in this file"* is the outcome it forbids: a paragraph in the ledger would have been a third decline wearing an escalation's clothes.).
 
 ---
 
@@ -395,6 +400,49 @@ would be the migration that seed warns about.
 - **CONN-03** — the credential-as-platform-asset half is satisfied here (org-level, encrypted,
   cross-tenant isolated). **OAuth is NOT** — MCP server auth is not OAuth, and Google/Microsoft OAuth
   is milestone work.
+
+---
+
+#### Phase 206.1: Settings → Connections finishes the MCP story (INSERT)
+
+**Goal**: A person can create, see and understand an MCP connection entirely in the UI — the
+form accepts one, the row stays readable beside the open panel, and every connection wears its
+own service's real logo.
+
+**Requirements**: CONN-02 (follow-up)
+**Depends on**: Phase 206 (shipped; migration 126 applied locally).
+
+##### Why one phase and not three
+
+All three items land in `ConnectionsTab.tsx` and `ConnectionFormPanel.tsx`. G-1 caps repeated
+inserts on one hot file, so they ship together. They are still three distinct pieces of work and
+the plan must keep them separable: **one is a new capability and two are defects on shipped code**
+— a closure round may not smuggle in a feature (G-7), and the reverse holds too, so the form must
+not be the reason the two defects go unreviewed.
+
+##### How we'd know this failed
+
+- The form accepts an MCP connection but the row it creates is one the picker cannot bind.
+- The dense row is achieved by DELETING a column rather than reflowing it — the destination is
+  the one column a person reads to approve a send, and hiding it is worse than truncating it.
+- A logo is approximated, per-surface, or resolves EMPTY in production (§3's measured trap).
+- The MCP row borrows another service's mark because it has no capability — the exact defect
+  `destinationFactsOf` shipped, where a positional fallback made every MCP connection claim it
+  sends to `slack.com`.
+
+##### Success criteria
+
+1. An MCP connection is creatable from `Add a connection` — server URL, optional credential — and
+   the round trip is driven: create → discover → grant → a workflow step calls a granted tool.
+   **No direct database insert anywhere in the evidence.**
+2. With the panel open at 1280px and 1536px, no cell in a connection row truncates a value a
+   person needs to read: asserted as `scrollWidth <= clientWidth` on the destination cell, not by
+   eye. Both the wide and dense shapes are pinned.
+3. Every capability renders its own service's logo from ONE shared map, and an MCP connection
+   renders a mark that is neither Slack's nor Jira's. Every slug is verified to resolve (or the
+   SVG is bundled), with a fallback that is not blank.
+4. `connectionsCopy.ts`'s destination arms stay explicit — no new positional fallback.
+5. Backend baseline unchanged, tsc baseline unchanged, count gate green with no per-file decrease.
 
 ---
 
