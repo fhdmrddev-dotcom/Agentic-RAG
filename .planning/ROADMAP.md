@@ -32,7 +32,7 @@
 | # | Phase | Goal | Requirements | Status |
 |---|-------|------|--------------|--------|
 | 201 | CSV & Structured Tabular Ingestion | CSV and spreadsheet files automatically extract structured tables into `document_tables`, enabling `query_table` on CSV documents | TAB-01 | ✅ Complete (2026-08-24) |
-| 202 | Table Chunks Retrieval Injection & Semantic Search | Extracted tables are injected as structured markdown representations and summaries into `document_chunks` so semantic search finds cell facts | TAB-02 | Planned |
+| 202 | Table Chunks Retrieval Injection & Semantic Search | Extracted tables are injected as structured markdown representations and summaries into `document_chunks` so semantic search finds cell facts | TAB-02 | ✅ Complete (2026-08-24) |
 | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Parse `.msg` and `.eml` files with header metadata extracted, thread deduplication, and attachment relationship links | EML-01, EML-02 | Planned |
 | 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers | SCHED-01, SCHED-02 | Planned |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | Planned |
@@ -41,7 +41,7 @@
 ### Phase Checklist
 
 - [x] **Phase 201: CSV & Structured Tabular Ingestion** — `555432c4` — 39 tests passing
-- [ ] **Phase 202: Table Chunks Retrieval Injection & Semantic Search**
+- [x] **Phase 202: Table Chunks Retrieval Injection & Semantic Search** — `bbe73a91` — 46 tests passing
 - [ ] **Phase 203: Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline**
 - [ ] **Phase 204: Scheduled & Recurring Unattended Runs**
 - [ ] **Phase 205: Stateful & Incremental Workflows**
