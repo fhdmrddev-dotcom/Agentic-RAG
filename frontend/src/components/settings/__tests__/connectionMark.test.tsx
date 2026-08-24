@@ -61,6 +61,25 @@ function glyphClass(shape: Shape, size: "row" | "chip"): string {
   return svg!.getAttribute("class") ?? ""
 }
 
+/**
+ * ⚠ A COMPONENT HERE IS NOT ALWAYS A FUNCTION, and the obvious guard is wrong.
+ *
+ * Measured while making this suite green: `lucide-react` ships `forwardRef` components,
+ * whose `typeof` is **`"object"`** — so `typeof Mark === "function"` FAILS on the SMTP and
+ * neutral entries. It would have looked correct only because the fluent-emoji map this
+ * module replaces used plain function components throughout, which is precisely the kind of
+ * accident that makes a guard read as passing while asserting the wrong property.
+ *
+ * What WR-04 actually needs is: the value is a renderable element type, and it is NOT the
+ * `Object` constructor a coalesced bracket read would have handed back.
+ */
+function isRenderableComponent(mark: unknown): boolean {
+  return (
+    typeof mark === "function" ||
+    (typeof mark === "object" && mark !== null && "$$typeof" in mark)
+  )
+}
+
 const SLACK = { capability: "post_message" }
 const JIRA = { capability: "create_ticket" }
 const SMTP = { capability: "send_email" }
@@ -182,7 +201,8 @@ describe("the fallback is a NAMED neutral and it is not blank", () => {
   ])("%s resolves the named neutral", (_label, shape) => {
     const entry = connectionMark(shape as Shape)
     expect(entry.key).toBe("unknown")
-    expect(typeof entry.Mark).toBe("function")
+    expect(isRenderableComponent(entry.Mark)).toBe(true)
+    expect(entry.Mark).not.toBe(Object)
   })
 
   it("⚠ BOTH halves — it is the neutral AND it is not blank, and not Slack's or Jira's", () => {
@@ -211,8 +231,11 @@ describe("WR-04 — an INHERITED key never becomes a mark", () => {
       // child, rendering NOTHING AT ALL rather than a wrong icon.
       const entry = connectionMark({ capability })
       expect(entry.key).toBe("unknown")
-      expect(typeof entry.Mark).toBe("function")
+      expect(isRenderableComponent(entry.Mark)).toBe(true)
       expect(entry.Mark).not.toBe(Object)
+      // …and it really renders. The `Object` function would throw here, so this is the
+      // assertion that would have caught the shipped defect rather than described it.
+      expect(bodyOf({ capability }).length).toBeGreaterThan(0)
     },
   )
 
