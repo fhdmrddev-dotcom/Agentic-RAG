@@ -24,6 +24,7 @@
 
 - [ ] **SCHED-01**: An author or admin can configure a cron or interval schedule for published workflows to execute unattended in the background. *(SEED-014)*
 - [ ] **SCHED-02**: Unattended scheduled runs enforce hard spend-cap and execution limits (token budget & duration circuit breaker) to prevent runaway costs. *(SEED-014)*
+- [ ] **L-01**: Cancelling a run — by a person, or by SCHED-02's circuit breaker — **stops the work**, not just the record. The producer issues no further provider calls after cancellation, at `WORKER_COUNT=2`, through the SAME path the manual Stop uses. *(Folded from Phase 194's recorded residual, 2026-08-24 — see ROADMAP → Phase 204. Acceptance is behavioural: measured provider requests, never inferred from the status column.)*
 
 ### Stateful Workflows & Living Registers (STATE)
 
@@ -47,6 +48,7 @@
 | **EML-02** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Complete (2026-08-24) |
 | **SCHED-01** | 204 | Scheduled & Recurring Unattended Runs | Planned |
 | **SCHED-02** | 204 | Scheduled & Recurring Unattended Runs | Planned |
+| **L-01** | 204 | Scheduled & Recurring Unattended Runs — cancellation reaches the PRODUCER | Planned (folded from Phase 194, 2026-08-24) |
 | **STATE-01** | 205 | Stateful & Incremental Workflows | Planned |
 | **STATE-02** | 205 | Stateful & Incremental Workflows | Planned |
 | **CONN-02** | 206 | Outbound Action Connectors (Jira, Email, Slack) | Planned |

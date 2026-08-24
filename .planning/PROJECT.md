@@ -8,7 +8,17 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Last Shipped: v3.0 Document Management
+## Active Milestone: v3.8 Document Intelligence, Automations & Connectors
+
+**Opened:** 2026-08-24 (Phases 201–206)
+**Goal:** Elevate document ingestion to first-class structured table and email parsing, deliver unattended recurring workflow execution with strict spend caps, provide stateful multi-run memory, and wire governed outbound action connectors.
+
+## Last Shipped: v3.7 Workflow Product Completion
+
+**Shipped:** 2026-08-24 (17 phases [192, 192.1, 192.2, 193, 193.1, 193.2, 194, 194.1, 195, 196, 197, 198, 199, 200, 200.1, 200.2, 200.3], 147 plans, 20/20 requirements satisfied).
+**Goal:** Made the workflow product built across v2.8→v3.6 usable end to end — find it, understand the door, build it with the right vocabulary, stop it, test run it, and see what it produced.
+
+## Previously Shipped: v3.0 Document Management
 
 **Shipped:** 2026-06-21 (7 days, 11 phases [110, 111, 111.1, 112–119], 46 plans, 410 commits, +99,800 / −627 LOC; git tag v3.0).
 

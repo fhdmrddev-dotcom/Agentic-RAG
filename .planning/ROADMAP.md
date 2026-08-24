@@ -34,7 +34,7 @@
 | 201 | CSV & Structured Tabular Ingestion | CSV and spreadsheet files automatically extract structured tables into `document_tables`, enabling `query_table` on CSV documents | TAB-01 | ✅ Complete (2026-08-24) |
 | 202 | Table Chunks Retrieval Injection & Semantic Search | Extracted tables are injected as structured markdown representations and summaries into `document_chunks` so semantic search finds cell facts | TAB-02 | ✅ Complete (2026-08-24) |
 | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Parse `.msg` and `.eml` files with header metadata extracted, thread deduplication, and attachment relationship links | EML-01, EML-02 | ✅ Complete (2026-08-24) |
-| 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers | SCHED-01, SCHED-02 | Planned |
+| 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | Planned |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | Planned |
 | 206 | Outbound Action Connectors | Governed first-party outbound connectors for Jira, Email/SMTP, and Slack with platform-level credential management | CONN-02, CONN-03 | Planned |
 
@@ -43,9 +43,59 @@
 - [x] **Phase 201: CSV & Structured Tabular Ingestion** — `555432c4` — 39 tests passing
 - [x] **Phase 202: Table Chunks Retrieval Injection & Semantic Search** — `bbe73a91` — 46 tests passing
 - [x] **Phase 203: Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline** — `725a2b5c` — 56 tests passing
-- [ ] **Phase 204: Scheduled & Recurring Unattended Runs**
+- [ ] **Phase 204: Scheduled & Recurring Unattended Runs** — ⚠ carries **L-01**, folded in from Phase 194 (see the detail section below)
 - [ ] **Phase 205: Stateful & Incremental Workflows**
 - [ ] **Phase 206: Outbound Action Connectors**
+
+---
+
+### v3.8 Phase Details
+
+⚠ **THE OTHER v3.8 PHASES HAVE NO `#### Phase NNN:` DETAIL HEADING AND THAT IS A KNOWN TRAP, NOT A
+STYLE CHOICE.** *"Phase NNN not found"* has two causes, and the second is that phase details must be
+`#### Phase NNN:` **headings** — a bold label is silently skipped. That failure mode broke the whole of
+v3.7's roadmap once. Phases 201-203 shipped without one and were fine, so this is a latent trap rather
+than a live break; **205 and 206 owe themselves a heading before anyone runs a phase-op against them.**
+
+#### Phase 204: Scheduled & Recurring Unattended Runs
+
+**Goal**: A published workflow runs on a cron or interval schedule with nobody watching, under a hard
+spend and duration ceiling — **and hitting that ceiling actually stops the work, rather than only
+recording that it stopped.**
+**Requirements**: SCHED-01, SCHED-02, **L-01** (folded 2026-08-24, operator instruction: *"fold L-01 into 204 scope"*)
+**Depends on**: Phase 194 / 194.1 (the Stop path this extends), `run_lifecycle.py`, `finish_run`.
+
+**Why L-01 belongs HERE and is not separate v3.7 debt.** Phase 194 shipped an honest Stop: `finish_run`
+carries a terminal-status guard and `complete_phase` an `IS DISTINCT FROM 'cancelled'` fence, so a run
+that was cancelled can no longer be overwritten as `completed` at either grain. **What it did not do is
+stop the work.** 194's own verification recorded the residual verbatim — *the far-worker producer KEEPS
+RUNNING; the run now REPORTS honestly, the work does not STOP* — and `finish_run`'s own comment names the
+two candidate fixes: a Redis cancel channel, or an in-loop status re-read.
+
+⚠ **THAT RESIDUAL IS SURVIVABLE WITH A HUMAN WATCHING AND IS NOT SURVIVABLE WITHOUT ONE, WHICH IS WHY
+THIS PHASE INHERITS IT.** Today a person presses Stop, sees `cancelled`, and — if tokens keep burning —
+notices. SCHED-02 asks for a *"hard spend-cap and duration circuit breaker"* on runs that by definition
+have nobody watching. **A breaker that marks a run stopped while its producer keeps calling a provider is
+not a spend cap; it is a spend cap-shaped record.** Shipping SCHED-02 on top of the current Stop path
+would give the milestone a control that reports the property it does not have — the same shape as Phase
+200's SC#3 (built, gated, green, structurally unreachable) and Phase 118 before it.
+
+**The scope this adds, stated so it cannot be quietly dropped:**
+
+1. **Cancellation must reach the producer**, not just the row. Whichever mechanism is chosen, the
+   acceptance is behavioural: *a scheduled run that trips its cap issues no further provider calls*,
+   measured against real request counts, never inferred from the status column.
+2. **It must work at `WORKER_COUNT=2`.** L-01 exists precisely because the producer can be on a
+   different worker from the request that cancels it — the single-worker case was never the broken one.
+3. **The existing Stop path is the same path.** A scheduler-only cancel channel would leave the manual
+   Stop still lying, and put the two on separate mechanisms that drift.
+
+⚠ **WR-04 IS EXPLICITLY *NOT* FOLDED IN, and that is a decision rather than an oversight.** 194's other
+residual — three non-owner callers drive `_cancel_run_internals`, so the UI says *"Stopped by you"* about
+a stop the reader did not make — is a **vocabulary** defect on a surface a scheduled run barely touches.
+It stays open against the next workflow-surface phase. **Re-open trigger: a scheduled run's cancel path
+becoming a fourth non-owner caller**, which would make the wrong sentence reachable from this phase's own
+feature and turn a cosmetic bug into a misleading one.
 
 ---
 
