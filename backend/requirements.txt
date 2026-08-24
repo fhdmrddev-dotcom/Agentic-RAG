@@ -70,3 +70,7 @@ cryptography>=44.0.0
 # Phase 203 (EML-01/02) — Outlook compound binary (.msg) message & attachment extraction.
 extract-msg>=0.48.0
 
+
+# Phase 204 (SCHED-01) — cron expression parsing + next-fire calculation for the
+# background workflow scheduler. Pure Python, no build toolchain.
+croniter>=3.0.0
