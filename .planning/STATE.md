@@ -8,13 +8,13 @@ last_activity: 2026-08-24
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 3
+  total_plans: 6
   completed_plans: 3
   percent: 50
 stopped_at: >
-  Phase 203 COMPLETE (commit 725a2b5c). 56/56 tests passing.
-  EML-01/02 satisfied: Outlook (.msg) & Email (.eml) Ingestion Pipeline.
-  Next: Phase 204 (Scheduled & Recurring Unattended Runs - SCHED-01, SCHED-02).
+  Phase 204 PLANNED (3 plans: 204-01, 204-02, 204-03).
+  L-01, SCHED-01, SCHED-02 scoped across 2 waves.
+  Next: /gsd:execute-phase 204
 ---
 
 # Project State

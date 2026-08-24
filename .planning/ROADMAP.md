@@ -90,6 +90,14 @@ would give the milestone a control that reports the property it does not have �
 3. **The existing Stop path is the same path.** A scheduler-only cancel channel would leave the manual
    Stop still lying, and put the two on separate mechanisms that drift.
 
+##### Plans
+
+- **Wave 1**
+  - `204-01-PLAN.md` — Redis-Backed Cross-Worker Run Cancellation & Immediate Producer Brake (`L-01`)
+- **Wave 2** *(blocked on Wave 1)*
+  - `204-02-PLAN.md` — Hard Spend-Cap & Token/Duration Circuit Breaker (`SCHED-02`)
+  - `204-03-PLAN.md` — Background Workflow Scheduler Service, Database Schema & API/UI Controls (`SCHED-01`)
+
 ⚠ **WR-04 IS EXPLICITLY *NOT* FOLDED IN, and that is a decision rather than an oversight.** 194's other
 residual — three non-owner callers drive `_cancel_run_internals`, so the UI says *"Stopped by you"* about
 a stop the reader did not make — is a **vocabulary** defect on a surface a scheduled run barely touches.
