@@ -247,3 +247,96 @@ def test_ingest_email_populates_metadata_and_attachments():
 
     # Check document_relationships was called for contract.csv attachment
     mock_supabase.table.assert_any_call("document_relationships")
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────
+# 203 HARDENING — the mitigations Phase 203's own <threat_model> NAMED and the first
+# pass did not implement. Each test below fails against the shipped code at 725a2b5c.
+#
+# ⚠ WHY THESE EXIST AT ALL, because it is the transferable part: the plan wrote
+#   "sanitize attachment filenames, and enforce max size constraints" into its threat
+#   model, every task passed, 56 tests were green, and NOTHING checked that the stated
+#   mitigation was discharged. A threat model is a claim, and a claim needs a test.
+# ─────────────────────────────────────────────────────────────────────────────────────
+import pytest
+
+from app.services.email_extraction_service import (
+    MAX_ATTACHMENTS_PER_EMAIL,
+    MAX_ATTACHMENT_BYTES,
+    EmailAttachment,
+    _accept_attachment,
+    sanitize_attachment_filename,
+    strip_quoted_replies,
+)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("../../evil.pdf", "evil.pdf"),
+        ("..\\..\\evil.pdf", "evil.pdf"),
+        ("/etc/passwd", "passwd"),
+        ("C:\\Windows\\system32\\cmd.exe", "cmd.exe"),
+        ("report.pdf", "report.pdf"),
+        ("", "attachment"),
+        (None, "attachment"),
+        ("...", "attachment"),
+        ("   ", "attachment"),
+    ],
+)
+def test_sanitize_attachment_filename_never_emits_a_path(raw, expected):
+    """The name is attacker-controlled and was interpolated straight into the storage key
+    ``f"{user_id}/{doc_id}/{filename}"``. It must reduce to a leaf, on BOTH separators."""
+    out = sanitize_attachment_filename(raw)
+    assert out == expected
+    assert "/" not in out and "\\" not in out
+    assert out != ""
+
+
+def test_sanitize_attachment_filename_bounds_length_but_keeps_the_extension():
+    """⚠ The extension is what `_EXT_MIME_OVERRIDES` routes on downstream, so a truncation
+    that ate it would silently change the attachment's MIME verdict."""
+    out = sanitize_attachment_filename("a" * 300 + ".pdf")
+    assert len(out) <= 120
+    assert out.endswith(".pdf"), out
+
+
+def test_sanitize_attachment_filename_drops_control_characters():
+    assert "\0" not in sanitize_attachment_filename("x\0y.txt")
+
+
+def test_attachment_count_is_capped():
+    """THE COUNT IS THE REAL AMPLIFICATION, not the per-part size: one 50 MB email can carry
+    tens of thousands of 1 KB parts, and each became a documents row + a storage object +
+    an ingestion job."""
+    full = [EmailAttachment("a.txt", "text/plain", b"x", 1)] * MAX_ATTACHMENTS_PER_EMAIL
+    assert _accept_attachment(full, b"x") is False
+    assert _accept_attachment(full[:-1], b"x") is True
+
+
+def test_oversized_attachment_is_refused():
+    assert _accept_attachment([], b"x" * (MAX_ATTACHMENT_BYTES + 1)) is False
+    assert _accept_attachment([], b"x" * 16) is True
+
+
+def test_a_quote_in_the_middle_of_live_prose_does_not_truncate_the_email():
+    """⚠ THE REGRESSION THIS PINS: the rule was `break`, so ONE quoted line anywhere — a
+    markdown blockquote, a pasted diff, a single quoted sentence — discarded EVERYTHING
+    after it."""
+    out = strip_quoted_replies("Hello\n> quoted mid-body\nStill mine.")
+    assert "Still mine." in out, out
+    assert "quoted mid-body" not in out
+
+
+def test_a_leading_quote_no_longer_returns_the_whole_unstripped_body():
+    """The same `break` interacted with the empty-result fallback: when the FIRST line was
+    quoted, nothing was collected and the function returned the ENTIRE original text. So
+    one rule both over-stripped and under-stripped, depending only on where the quote sat."""
+    out = strip_quoted_replies("> leading quote\nreal content")
+    assert out == "real content", out
+
+
+def test_the_reply_trail_is_still_stripped():
+    """POSITIVE CONTROL — the fix above must not have turned the de-poisoning off."""
+    assert strip_quoted_replies("Body here\n-----Original Message-----\nold stuff") == "Body here"
+    assert strip_quoted_replies("Mine\n> old line one\n> old line two") == "Mine"

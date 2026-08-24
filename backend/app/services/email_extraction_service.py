@@ -20,6 +20,21 @@ from datetime import datetime
 
 log = logging.getLogger(__name__)
 
+# ── 203 HARDENING — the bounds the plan's own <threat_model> named and the first pass did not
+#    implement. They live HERE, not at the call site, because `documents.py` parses the raw bytes
+#    a SECOND time for the attachment cascade: a cap enforced at one call site would be absent at
+#    the other, and the two would disagree about what a safe email is.
+#
+# ⚠ THE SIZE CAP IS THE WEAKER OF THE TWO AND THAT IS STATED RATHER THAN IMPLIED. An attachment
+#   cannot exceed its parent email, and `upload_document` already refuses a body over 50 MB, so the
+#   per-attachment ceiling was never unbounded. THE COUNT IS THE REAL AMPLIFICATION: one 50 MB
+#   email can carry tens of thousands of 1 KB parts, and each one became a `documents` row, a
+#   storage object and an ingestion job.
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+MAX_ATTACHMENTS_PER_EMAIL = 50
+#: Longest attachment filename kept, before the extension is re-appended.
+_MAX_ATTACHMENT_NAME_LEN = 120
+
 EML_MIME = "message/rfc822"
 MSG_MIMES: frozenset[str] = frozenset({
     "application/vnd.ms-outlook",
@@ -63,6 +78,54 @@ def html_to_plain_text(html_content: str) -> str:
     parser = _HTMLToPlainText()
     parser.feed(html_content)
     return html.unescape(parser.get_text())
+
+
+def sanitize_attachment_filename(name: str | None) -> str:
+    """Reduce an attachment name to a leaf filename that is safe to use as a storage key.
+
+    ⚠ THE NAME ARRIVES FROM THE EMAIL AND IS ATTACKER-CONTROLLED. It was previously interpolated
+    straight into ``f"{user_id}/{doc_id}/{filename}"``, so a part named ``../../x`` produced a key
+    outside the caller's own prefix. Whether the object store normalises that is not ours to rely
+    on — the fix is to never emit the separator.
+
+    Keeps ONLY the basename, drops path separators, drops NUL and control characters, refuses the
+    pure-dot names, and bounds the length while preserving the extension (the extension is what
+    ``_EXT_MIME_OVERRIDES`` routes on downstream, so truncating it would change the MIME verdict).
+    Never returns the empty string.
+    """
+    if not name:
+        return "attachment"
+    # Both separators, whatever the producing platform used.
+    leaf = str(name).replace("\\", "/").rsplit("/", 1)[-1]
+    leaf = "".join(ch for ch in leaf if ch.isprintable() and ch not in '\0')
+    leaf = leaf.strip().strip(".").strip()
+    if not leaf:
+        return "attachment"
+    if len(leaf) > _MAX_ATTACHMENT_NAME_LEN:
+        if "." in leaf:
+            stem, _, ext = leaf.rpartition(".")
+            ext = ext[:16]
+            leaf = stem[: _MAX_ATTACHMENT_NAME_LEN - len(ext) - 1] + "." + ext
+        else:
+            leaf = leaf[:_MAX_ATTACHMENT_NAME_LEN]
+    return leaf or "attachment"
+
+
+def _accept_attachment(collected: list, raw: bytes) -> bool:
+    """Whether one more part fits under both bounds. Logs the refusal — a silently dropped
+    attachment and an email that genuinely had none must not look the same in the log."""
+    if len(collected) >= MAX_ATTACHMENTS_PER_EMAIL:
+        log.warning(
+            "email attachment cap reached (%d) — remaining parts skipped", MAX_ATTACHMENTS_PER_EMAIL
+        )
+        return False
+    if len(raw) > MAX_ATTACHMENT_BYTES:
+        log.warning(
+            "email attachment of %d bytes exceeds the %d-byte cap — skipped",
+            len(raw), MAX_ATTACHMENT_BYTES,
+        )
+        return False
+    return True
 
 
 @dataclass
@@ -157,10 +220,20 @@ def strip_quoted_replies(text: str) -> str:
             if REPLY_HEADER_PATTERNS[3].match(two_lines) or REPLY_HEADER_PATTERNS[4].match(two_lines):
                 break
 
-        # 3. Check for leading quote prefix '>'
+        # 3. Leading quote prefix '>' — DROP the line, never BREAK on it.
+        #
+        # ⚠ THIS WAS A `break`, AND A `break` HERE LOSES ORIGINAL CONTENT. One quoted line
+        #   anywhere in the body — a markdown blockquote, a pasted diff, a single quoted sentence
+        #   in the opening paragraph — discarded EVERYTHING after it. Worse in combination with the
+        #   empty-result fallback below: when the FIRST line was quoted, `cleaned_lines` came out
+        #   empty and the function returned the entire UNSTRIPPED body, so the same rule both
+        #   over-stripped and under-stripped depending only on where the quote sat.
+        #
+        # Dropping instead still removes the reply trail — a real trail is quoted to the END of the
+        # message, so filtering and truncating remove the same lines — while a quote in the middle
+        # of live prose now costs one line rather than the remainder of the email.
         if line.strip().startswith(">"):
-            # If line starts with >, stop collecting reply trail
-            break
+            continue
 
         cleaned_lines.append(line)
 
@@ -245,9 +318,9 @@ def parse_eml_bytes(raw: bytes) -> ParsedEmail:
         except Exception:
             att_bytes = att.get_payload(decode=True) or b""
 
-        if att_bytes:
+        if att_bytes and _accept_attachment(attachments, att_bytes):
             attachments.append(EmailAttachment(
-                filename=att_filename,
+                filename=sanitize_attachment_filename(att_filename),
                 content_type=att_content_type,
                 raw=att_bytes,
                 size=len(att_bytes),
@@ -304,9 +377,9 @@ def parse_msg_bytes(raw: bytes) -> ParsedEmail:
             att_name = att.longFilename or att.shortFilename or "attachment"
             att_data = getattr(att, "data", None) or b""
             att_mime = getattr(att, "mimetype", "application/octet-stream") or "application/octet-stream"
-            if att_data:
+            if att_data and _accept_attachment(attachments, att_data):
                 attachments.append(EmailAttachment(
-                    filename=att_name,
+                    filename=sanitize_attachment_filename(att_name),
                     content_type=att_mime,
                     raw=att_data,
                     size=len(att_data),

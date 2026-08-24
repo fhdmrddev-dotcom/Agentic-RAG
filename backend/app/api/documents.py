@@ -1995,6 +1995,9 @@ def ingest_document(
                 import hashlib  # noqa: PLC0415
                 from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
                 parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+                # 203 HARDENING — the parser now bounds the LIST (count + per-part size) and returns
+                # names already reduced to a safe leaf, so this loop inherits both guarantees rather
+                # than re-deriving them. See `email_extraction_service.sanitize_attachment_filename`.
                 for att in parsed_email.attachments:
                     if not att.raw or not att.filename:
                         continue
@@ -2006,14 +2009,22 @@ def ingest_document(
 
                     if att_mime in ALLOWED_MIME_TYPES:
                         att_storage_path = f"{user_id}/{att_doc_id}/{att.filename}"
+                        # ⚠ A FAILED UPLOAD MUST NOT LEAVE A ROW. This was `except Exception: pass`,
+                        #   which inserted the `documents` row anyway — a record whose `file_path`
+                        #   points at an object that was never written, indistinguishable from a real
+                        #   one until something tries to read it.
                         try:
                             supabase.storage.from_("documents").upload(
                                 path=att_storage_path,
                                 file=att.raw,
                                 file_options={"content-type": att_mime},
                             )
-                        except Exception:
-                            pass
+                        except Exception as up_exc:
+                            log.warning(
+                                "Attachment upload failed for %s (parent %s): %s — no document row written",
+                                att_storage_path, document_id, up_exc,
+                            )
+                            continue
 
                         att_doc_data = {
                             "id": att_doc_id,
