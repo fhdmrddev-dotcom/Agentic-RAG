@@ -131,6 +131,24 @@ derivation and everything deliberately left out: **`.planning/CONNECTIONS-MILEST
 | Per-vendor adapter code | 2 | **none** |
 | Validates the MCP-first verdict | no | yes — the first implementation of a decision recorded 2026-07-24 |
 
+⚠ **"WORKFLOW-SCOPED" IS A SEQUENCING WORD, NOT AN ARCHITECTURAL BOUNDARY — and this paragraph exists
+because the phrase invites exactly the wrong reading.** Operator, 2026-08-24: *"that does not mean
+those connectors should be anywhere in the application where possible — like chat, I can add any
+connector to the chat to enhance the capability."* **Confirmed: that IS the end state**, and it is
+already the recorded requirement — **SEED-145** is titled *"Connections are PLATFORM assets, not
+workflow assets — the agent should be able to call Slack / email / Jira from inside a chat thread."*
+
+So a connection built here is a **platform asset from day one** and must be modelled as one. What
+this phase defers is the chat **surface**, for one reason only: **in a workflow the author chose the
+action at authoring time and the canvas governs it; in chat the MODEL chooses mid-conversation**, so
+a confirm has to exist before it sends an email or files a ticket. That is the approval model, it is
+real work, and it is the milestone's.
+
+**Binding consequence for this phase:** nothing here may assume a workflow context. No
+workflow-shaped foreign key on the connection, no run-scoped credential resolution, no permission
+check that reads a `workflow_id`. A connection that cannot be resolved outside a workflow run is a
+defect this phase shipped, not a limitation the milestone inherits.
+
 **Why it does NOT need the Connections milestone first:**
 
 1. **Workflow-scoped, so the approval model is not a blocker.** Phase 189/190's outbound governance
