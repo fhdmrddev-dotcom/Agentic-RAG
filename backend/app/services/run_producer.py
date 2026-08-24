@@ -259,6 +259,35 @@ async def _finalize_producer_run(
     ):
         try:
             from app.db.workflows import finish_run as _finish_wf  # noqa: PLC0415
+
+            # ── Phase 204 (L-01 / D-204-01) — DO NOT WRITE 'failed' OVER A CANCEL ──
+            #
+            # The v2.8 rule below reads the LOCAL classifier, which only knows what
+            # happened inside THIS worker's producer. A cross-worker Stop is decided
+            # elsewhere: worker A runs `cancel_workflow_run_internals` (writing
+            # `cancelled`) and broadcasts; worker B's engine aborts. If B's escape
+            # arrives as anything other than a bare CancelledError — the wall-clock
+            # `wait_for` firing in the same window, or an executor turning the abort
+            # into an exception on its way out — B's classifier says `failed` and this
+            # write lands `failed` ON TOP OF A's `cancelled`. The row then tells the
+            # owner their run broke when in fact they stopped it.
+            #
+            # Consulting the cancel registry is what closes that race, and it closes it
+            # in the ONE safe direction: it can only ever turn `failed` into
+            # `cancelled` for a run somebody really did cancel. It never invents a
+            # cancel (the key is written only by `broadcast_run_cancellation`) and it
+            # never touches the `completed` path (gated out above).
+            _cancel_known = False
+            try:
+                from app.services.run_lifecycle import is_run_cancelled  # noqa: PLC0415
+                _cancel_known = await is_run_cancelled(redis, active_workflow_run_id)
+            except Exception:
+                logger.exception(
+                    "F2: cancel-registry read failed for workflow run %s "
+                    "(falling back to the local classifier)",
+                    active_workflow_run_id,
+                )
+
             await _finish_wf(
                 await get_pg_pool(),
                 active_workflow_run_id,
@@ -267,8 +296,10 @@ async def _finalize_producer_run(
                 # terminal-status consumer already handle 'cancelled' — record the
                 # true intent. Every OTHER non-completed escape (timed_out is NOT in
                 # the workflow_runs CHECK, failed, crash) keeps writing 'failed'.
+                # 204: ...UNLESS the cancel registry says this run was cancelled, in
+                # which case the far worker's intent wins over the local guess.
                 "cancelled"
-                if terminal_status == "cancelled"
+                if (terminal_status == "cancelled" or _cancel_known)
                 else "failed",
             )
         except BaseException:

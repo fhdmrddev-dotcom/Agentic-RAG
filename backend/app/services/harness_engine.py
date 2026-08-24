@@ -71,6 +71,10 @@ from app.models.harness import WorkflowDefinition
 # models for these same rows. The SSE frame and the two fetches must agree.
 from app.models.thread import declared_phase_measure
 from app.services.ask_user_service import resume_pending_prompt
+# Phase 204 (L-01 / D-204-02) -- the cross-worker cancellation brake. The two names
+# come from ``run_lifecycle``, which is the cancel OWNER; this module gains a CALL,
+# never a second home for the mechanism (G-5: no second concern lands here).
+from app.services.run_lifecycle import cancellation_watch, is_run_cancelled
 
 logger = logging.getLogger(__name__)
 
@@ -1629,6 +1633,57 @@ async def run_workflow(
             getattr(phase.config, "wall_clock_seconds", None) or _DEFAULT_PHASE_WALL_CLOCK
         )
 
+        # ── 0. Phase 204 (L-01 / D-204-02) — THE CROSS-WORKER BRAKE, LEVEL HALF ──
+        #
+        # ⚠ WHY THIS SITS *BEFORE* ``mark_phase_active`` AND NOT ANYWHERE ELSE. Below
+        # this line the engine writes a durable `active` row, emits `phase_started` to
+        # the browser and hands control to an executor that calls a provider. Every one
+        # of those is a cost or a claim, and a run whose owner has already pressed Stop
+        # is entitled to none of them. Checking here is what makes the phase boundary a
+        # hard floor: at worst ONE phase runs after a Stop, never two.
+        #
+        # ⚠ THIS IS THE HALF THAT SURVIVES A MISSED MESSAGE. Its partner is the
+        # ``cancellation_watch`` below, which brakes DURING a phase; this one brakes
+        # BETWEEN phases and needs no subscriber to have existed at the moment the
+        # cancel was decided. Redis PUBLISH is fire-and-forget, so on a restarted or
+        # slow-to-subscribe worker the edge is simply gone — and this check still fires.
+        # Neither half is redundant; see ``run_lifecycle``'s key block for the argument.
+        #
+        # ⚠ IT WRITES NOTHING, AND THAT IS A CORRECTION TO THE PLAN RATHER THAN AN
+        # OMISSION. 204-01 task 2 says to "invoke ``cancel_phase``" here. A shipped 194
+        # fence forbids it —
+        # ``test_the_cancel_arm_is_the_harness_engines_alone_and_deep_never_enters_it``
+        # AST-counts ``cancel_phase`` calls in this module and asserts EXACTLY ONE, the
+        # interrupted-phase terminalize on the escape arm below. A second call site
+        # turns it red (measured: it read 2). The fence is RIGHT and was answered by
+        # removing the write, not by re-baselining the count.
+        #
+        # ⚠ AND THE WRITE WOULD HAVE BEEN WRONG TWICE OVER. (a) ``cancel_phase`` is
+        # ``WHERE id = $1`` with NO status predicate (``db/workflows.py:1770``), so
+        # calling it here would flip a `pending` row — a step that never ran — to
+        # `cancelled`, which the client's vocabulary renders as "Stopped by you". That
+        # is verbatim the 194 CR-02 defect this file already carries the correction for
+        # three screens down. (b) The row is ALREADY terminalized by the time anything
+        # gets here: ``broadcast_run_cancellation`` is called from inside
+        # ``cancel_workflow_run_internals``, whose very next statements are
+        # ``finish_run`` + ``cancel_active_phases`` — the RUN-KEYED, ``AND status =
+        # 'active'`` set-predicate that owns exactly this write. There is no path that
+        # publishes the signal without also running it. So this brake reads state and
+        # stops; the durable writes belong to the worker that decided the cancel.
+        #
+        # ⚠ ``break``, NOT ``raise``, for the same reason. The run has already been
+        # terminalized on the cancelling worker, so raising would only route a second,
+        # redundant terminalize through the escape handler. Breaking leaves the loop by
+        # its normal door with the durable state already correct.
+        if await is_run_cancelled(redis, run_id):
+            logger.info(
+                "run %s: cancel signal observed at the phase boundary before %s — "
+                "stopping the engine (L-01)",
+                run_id,
+                phase.slug,
+            )
+            break
+
         # 1. DURABLE active BEFORE any work (Pitfall 1).
         # 200 (DES-02 / D-05): the write RETURNS the timestamp it stored, so the frame
         # below carries the value the ROW carries — never a Python-side now() computed
@@ -1663,21 +1718,50 @@ async def run_workflow(
         #    on_failure routing live inside). The step cap is enforced INSIDE the
         #    executor (run_task_sub_agent max_steps, Plan 03) — both caps present.
         try:
-            outcome = await _run_phase_with_gates(
-                phase,
-                accumulated_outputs,
-                ctx,
-                run_id=run_id,
-                pool=pool,
-                redis=redis,
-                wall_clock=wall_clock,
-                _audit_user_id=_audit_user_id,
-                stream_run_id=stream_run_id,
-                # D-187-01 — the armed checkpoint's sentence needs the run's phase count
-                # (``_approval_sentence`` says "Step N of TOTAL"). This is the SAME
-                # ``len(definition.phases)`` ``effective_phase`` already receives above.
-                total_phases=_total,
-            )
+            # ── Phase 204 (L-01 / D-204-02) — THE BRAKE'S *EDGE* HALF ──────────
+            #
+            # ⚠ THIS IS THE LINE THAT MAKES L-01 ABOUT MONEY RATHER THAN ABOUT A
+            # STATUS COLUMN. The boundary check above cannot help a run that is
+            # already inside a 900-second provider call; this listener cancels the
+            # task the instant the signal lands, so the CancelledError surfaces at
+            # the provider await and the executor issues no further request.
+            #
+            # ⚠ IT ADDS NO NEW HANDLING, AND THAT IS DELIBERATE (G-5 — honoured by
+            # construction). The cancellation it raises is caught by the SAME
+            # ``except BaseException as _escape`` arm below that a user Stop has
+            # always taken, takes the SAME ``isinstance(_escape, CancelledError)``
+            # branch, writes the SAME phase-keyed ``cancel_phase``, and re-raises
+            # through the SAME bare ``raise``. A cross-worker Stop is therefore
+            # indistinguishable from a local one by the time it reaches any writer
+            # — which is D-204-03's "one unified stop path" enforced by shape
+            # rather than by a rule someone has to remember.
+            #
+            # ⚠ THE ``async with`` IS *INSIDE* THE ``try`` ON PURPOSE. Outside it,
+            # the CancelledError raised by the watcher would escape this handler
+            # entirely and the interrupted phase row would never be terminalized.
+            #
+            # ⚠ THE LISTENER IS SCOPED TO ONE PHASE, NOT TO THE RUN. It is torn
+            # down by the context manager on every exit path — completion,
+            # failure, pause and cancellation alike — so a long run cannot
+            # accumulate one Redis subscription per phase (threat: stranded
+            # channels). Re-subscribing per phase costs one round trip against a
+            # body measured in seconds to minutes.
+            async with cancellation_watch(redis, run_id):
+                outcome = await _run_phase_with_gates(
+                    phase,
+                    accumulated_outputs,
+                    ctx,
+                    run_id=run_id,
+                    pool=pool,
+                    redis=redis,
+                    wall_clock=wall_clock,
+                    _audit_user_id=_audit_user_id,
+                    stream_run_id=stream_run_id,
+                    # D-187-01 — the armed checkpoint's sentence needs the run's phase
+                    # count (``_approval_sentence`` says "Step N of TOTAL"). This is the
+                    # SAME ``len(definition.phases)`` ``effective_phase`` receives above.
+                    total_phases=_total,
+                )
         except BaseException as _escape:
             # ── cancel/escape path (D-06 / BUG-260605-01) ─────────────────────
             # A user Stop cancels the producer task while the phase await blocks
