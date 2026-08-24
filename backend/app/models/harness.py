@@ -537,6 +537,10 @@ class WorkflowDefinition(_StrictBase):
     # the publish ENDPOINT (Plan 05), NOT this schema, enforces "required at publish".
     business_requirement: str | None = None
 
+    # ── Phase 205 (STATE-01 / D-07) — Living register / incremental stateful mode
+    # Additive-optional, ZERO-MIGRATION: JSONB column defaults to False for old rows.
+    is_stateful: bool = False
+
     # ── 193.2 (AUTH-03 / D-06, `SEED-163`) — PROVENANCE for the field directly above.
     #
     # Additive-optional, ZERO-MIGRATION: the column is JSONB, so old rows

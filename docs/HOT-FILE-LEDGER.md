@@ -3811,3 +3811,17 @@ one-box preset.
 `services/model_registry.py`, with a same-commit re-export in `config.py` because
 `from app.config import settings` is everywhere. Per G-5 the next phase touching this file owes a
 refactor recommendation FIRST.
+
+---
+
+### `backend/app/db/workflows.py` — Phase 205, honoured by construction
+
+**Measured 2026-08-24: `44 commits / 22 phases / 2514 L`** — **G-5 FIRES**.
+Hot service-role database module shared across routes and background engines.
+
+**Phase 205 adds `get_latest_completed_workflow_run`**:
+- Implements owner-scoped query on `workflow_runs.user_id = $2 AND ($3::uuid IS NULL OR workflow_runs.org_id = $3)` joined on `workflow_definitions.slug = $1` (G-1, N-1).
+- Delivers Phase 200.2 resolution rule (G-4): selects the last completed phase row with a non-empty `deliverable_text` (skipping confirm/question and file-only steps).
+- Implements defensive JSONB string-scalar unwrap (G-3 / N-3) to safely decode the 87% live DB format.
+- Zero mutation of existing query shapes or security predicates. Preserves all immutability triggers and draft concurrency guards.
+

@@ -79,6 +79,7 @@ import { GovernanceSection } from "./GovernanceSection"
 // 200 (the step-panel port) — the own-property reader, imported to close the ONE remaining
 // live WR-04 prototype-key sink in this file (`CITATION_CAPTIONS`). See its use site.
 import { own } from "./ownProperty"
+import { PromptVariableChips } from "./PromptVariableChips"
 // 200-04 (DES-02, §1 `SP-MR-02`/`SP-MR-03`/`SP-MR-04`) — sheet c4's card shell and the words
 // it wears, split across a component and a leaf for the reason `FieldGuidance` is: a component
 // file may not export shared non-component values (`react-refresh/only-export-components`;
@@ -356,6 +357,8 @@ export interface PhaseFormPanelProps {
    * still reads four.
    */
   modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical" | "noAnswer">
+  /** Phase 205 (STATE-01 / D-08) — whether the workflow is in stateful / living register mode. */
+  isStateful?: boolean
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -474,6 +477,7 @@ function TextField(props: {
   textarea?: boolean
   type?: string
   full?: boolean
+  chips?: React.ReactNode
 }) {
   const id = useId()
   const cls =
@@ -482,14 +486,17 @@ function TextField(props: {
     <div className={props.full ? "col-span-2" : ""}>
       <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} help={props.help} />
       {props.textarea ? (
-        <textarea
-          id={id}
-          value={props.value}
-          rows={3}
-          onChange={(e) => props.onChange(e.target.value)}
-          onBlur={props.onPersist}
-          className={`${cls} resize-none`}
-        />
+        <>
+          <textarea
+            id={id}
+            value={props.value}
+            rows={3}
+            onChange={(e) => props.onChange(e.target.value)}
+            onBlur={props.onPersist}
+            className={`${cls} resize-none`}
+          />
+          {props.chips}
+        </>
       ) : (
         <input
           id={id}
@@ -978,6 +985,7 @@ export function PhaseFormPanel({
   template,
   nameCheck,
   modelPicker,
+  isStateful,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -1121,6 +1129,17 @@ export function PhaseFormPanel({
                   value={asStr(cfg.prompt)}
                   onChange={set("prompt")}
                   onPersist={onPersist}
+                  chips={
+                    <PromptVariableChips
+                      isStateful={isStateful}
+                      onInsert={(token) => {
+                        const current = asStr(cfg.prompt)
+                        const next = current ? `${current} ${token}` : token
+                        onChange({ prompt: next })
+                        onPersist()
+                      }}
+                    />
+                  }
                   textarea
                   full
                 />
@@ -1168,6 +1187,17 @@ export function PhaseFormPanel({
                   value={asStr(cfg.prompt)}
                   onChange={set("prompt")}
                   onPersist={onPersist}
+                  chips={
+                    <PromptVariableChips
+                      isStateful={isStateful}
+                      onInsert={(token) => {
+                        const current = asStr(cfg.prompt)
+                        const next = current ? `${current} ${token}` : token
+                        onChange({ prompt: next })
+                        onPersist()
+                      }}
+                    />
+                  }
                   textarea
                   full
                 />
@@ -1232,6 +1262,17 @@ export function PhaseFormPanel({
                   value={asStr(cfg.prompt)}
                   onChange={set("prompt")}
                   onPersist={onPersist}
+                  chips={
+                    <PromptVariableChips
+                      isStateful={isStateful}
+                      onInsert={(token) => {
+                        const current = asStr(cfg.prompt)
+                        const next = current ? `${current} ${token}` : token
+                        onChange({ prompt: next })
+                        onPersist()
+                      }}
+                    />
+                  }
                   textarea
                   full
                 />

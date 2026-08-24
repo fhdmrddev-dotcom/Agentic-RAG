@@ -2548,6 +2548,33 @@ export function WorkflowBuilderPage({
   ) : null
 
   /**
+   * Phase 205 (STATE-01 / D-07) — Stateful / Living Register mode toggle in builder header.
+   */
+  const isStateful = meta.is_stateful === true
+  const statefulAffordance = canvasEnabled ? (
+    <button
+      type="button"
+      data-testid="builder-stateful-toggle"
+      aria-label="Toggle stateful / living register mode"
+      title="Stateful mode allows recurring runs to read prior deliverable output and produce incremental deltas"
+      onClick={() => {
+        store.getState().setIsStateful(!isStateful)
+        setHasEdited(true)
+      }}
+      className={`flex shrink-0 items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+        isStateful
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-card text-muted-foreground hover:bg-accent/40"
+      }`}
+    >
+      <span aria-hidden="true" className={isStateful ? "text-primary" : "text-muted-foreground"}>
+        {isStateful ? "●" : "○"}
+      </span>
+      <span>Living Register</span>
+    </button>
+  ) : null
+
+  /**
    * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
    * the slug when it does not, the shipped fallback when it has neither.
    *
@@ -2611,6 +2638,7 @@ export function WorkflowBuilderPage({
       </span>
       {kbAffordance}
       {requirementAffordance}
+      {statefulAffordance}
     </>
   )
 
@@ -2856,6 +2884,7 @@ export function WorkflowBuilderPage({
                 },
               })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
+          isStateful={meta.is_stateful === true}
         />
       </div>
     </div>

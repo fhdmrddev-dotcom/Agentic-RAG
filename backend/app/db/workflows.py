@@ -1335,6 +1335,120 @@ async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_latest_completed_workflow_run(
+    pool: asyncpg.Pool,
+    slug: str,
+    *,
+    user_id: UUID,
+    org_id: UUID | None = None,
+) -> dict | None:
+    """Resolve the previous completed run's deliverable for a stateful workflow (Phase 205 / STATE-01).
+
+    Scopes on stable workflow identity (``workflow_definitions.slug``) and owner (``workflow_runs.user_id``)
+    so living registers survive version bumps and republishes (G-1, N-1).
+
+    Applies Phase 200.2's shipped deliverable-resolution rule (G-4):
+    selects the last completed phase row with a NON-EMPTY deliverable text (skipping confirm/question
+    steps and empty file steps).
+
+    Defends against the JSONB string-scalar trap (G-3 / N-3) by safely deserializing string scalars
+    (the 87% live DB format) into parsed dicts, distinguishing genuine cold starts (``None``) from
+    decoding failures (logged warning + empty dict fallback).
+    """
+    # 1. Query the most recent completed run for this slug + user_id (+ org_id)
+    run_row = await pool.fetchrow(
+        """
+        SELECT wr.id AS run_id, wr.created_at, wr.user_id, wr.org_id
+        FROM workflow_runs wr
+        JOIN workflow_definitions wd ON wd.id = wr.definition_id
+        WHERE wd.slug = $1
+          AND wr.user_id = $2
+          AND ($3::uuid IS NULL OR wr.org_id = $3)
+          AND wr.status = 'completed'
+          AND wr.is_golden_run = false
+        ORDER BY wr.created_at DESC
+        LIMIT 1
+        """,
+        slug,
+        user_id,
+        org_id,
+    )
+    if run_row is None:
+        return None
+
+    run_id: UUID = run_row["run_id"]
+
+    # 2. Query completed phases for this run in reverse execution order (phase_index DESC)
+    phase_rows = await pool.fetch(
+        """
+        SELECT id, slug, phase_index, status, output, created_at
+        FROM workflow_phases
+        WHERE workflow_run_id = $1
+          AND status = 'completed'
+        ORDER BY phase_index DESC, created_at DESC
+        """,
+        run_id,
+    )
+
+    # 3. Apply Phase 200.2 resolution rule: find the last phase with non-empty deliverable text,
+    #    skipping question/confirm steps (where output represents an ask-user prompt or question).
+    selected_output: dict = {}
+    deliverable_text: str = ""
+
+    for prow in phase_rows:
+        raw_output = prow["output"]
+        output_dict: dict = {}
+        if isinstance(raw_output, str):
+            try:
+                output_dict = json.loads(raw_output)
+                if not isinstance(output_dict, dict):
+                    output_dict = {"text": str(output_dict)}
+            except Exception as exc:
+                logger.warning(
+                    "get_latest_completed_workflow_run: failed to decode string-scalar output on phase %s (run %s): %s",
+                    prow["id"], run_id, exc,
+                )
+                output_dict = {"text": raw_output}
+        elif isinstance(raw_output, dict):
+            output_dict = raw_output
+
+        text = output_dict.get("text")
+        if text and isinstance(text, str) and text.strip():
+            # A confirm/ask_user prompt is not a deliverable answer
+            if (
+                output_dict.get("ask_user")
+                or output_dict.get("options")
+                or output_dict.get("prompt_type") == "confirm"
+                or output_dict.get("question") is True
+            ):
+                continue
+            deliverable_text = text.strip()
+            selected_output = output_dict
+            break
+
+    # If no phase had non-empty text, fall back to the last completed phase's output dict
+    if not deliverable_text and phase_rows:
+        raw_output = phase_rows[0]["output"]
+        if isinstance(raw_output, str):
+            try:
+                selected_output = json.loads(raw_output)
+                if not isinstance(selected_output, dict):
+                    selected_output = {"text": str(selected_output)}
+            except Exception:
+                selected_output = {"text": raw_output}
+        elif isinstance(raw_output, dict):
+            selected_output = raw_output
+        deliverable_text = selected_output.get("text") or ""
+
+    return {
+        "id": str(run_id),
+        "run_id": str(run_id),
+        "created_at": run_row["created_at"].isoformat() if run_row["created_at"] else None,
+        "deliverable_text": deliverable_text,
+        "output": selected_output,
+    }
+
+
 # ── resume sweep reads (HARNESS-03 / Plan 04) ────────────────────────────────
 async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     """Stranded runs to re-run on startup (HARNESS-03 startup sweep).

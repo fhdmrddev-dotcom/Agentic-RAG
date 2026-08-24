@@ -1315,13 +1315,15 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
       "net-new",
       "vendor-brief",
       "draft",
-      // ⚠ The merged row says MORE than the flag-off one, and the two extra readings are
-      // both INSIDE `identityGroup` (D-186-15's KB chip and 197's requirement field), not
-      // extra bands — `headerBandsAbove` still returns exactly one. That distinction is
+      // ⚠ The merged row says MORE than the flag-off one, and the extra readings are
+      // all INSIDE `identityGroup` (D-186-15's KB chip, 197's requirement field, and 205's Living Register toggle),
+      // not extra bands — `headerBandsAbove` still returns exactly one. That distinction is
       // the whole of D-184.1-01 and is asserted separately above.
       "📁",
       "No knowledge base · searches everything",
       "✎",
+      "○",
+      "Living Register",
       STRIP_BACK,
       STRIP_LABEL_GOVERN,
       "🔒",

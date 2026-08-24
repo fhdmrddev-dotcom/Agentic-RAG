@@ -201,6 +201,69 @@ def _first_phase_user_turn(accumulated_outputs: dict, ctx) -> str:
     return prior or _kickoff_prompt(ctx)
 
 
+# ── Phase 205 (STATE-01 / STATE-02 / D-03 / D-05) ───────────────────────────
+# Living register / incremental stateful execution variable interpolation
+def _interpolate_prior_run_variables(text: str, prior_run: dict | None) -> str:
+    """Interpolate {{prior_run.*}} template variables into prompt text (Phase 205 / STATE-01).
+
+    Replaces:
+      - ``{{prior_run.output}}`` -> prior deliverable text (or baseline notice on cold start)
+      - ``{{prior_run.id}}`` -> prior run ID
+      - ``{{prior_run.created_at}}`` -> prior run timestamp
+    """
+    if not text:
+        return ""
+
+    if prior_run:
+        output_text = prior_run.get("deliverable_text")
+        if output_text is None:
+            raw_out = prior_run.get("output")
+            if isinstance(raw_out, dict):
+                output_text = raw_out.get("text") or ""
+            elif isinstance(raw_out, str):
+                output_text = raw_out
+            else:
+                output_text = ""
+
+        run_id = str(prior_run.get("id") or prior_run.get("run_id") or "")
+        created_at = str(prior_run.get("created_at") or "")
+    else:
+        output_text = "[Initial Run - No Prior State]"
+        run_id = ""
+        created_at = ""
+
+    interpolated = text.replace("{{prior_run.output}}", output_text)
+    interpolated = interpolated.replace("{{prior_run.id}}", run_id)
+    interpolated = interpolated.replace("{{prior_run.created_at}}", created_at)
+    return interpolated
+
+
+def _stateful_framing_block(ctx) -> str:
+    """Phase 205 (STATE-02 / D-05) — Living register prompt framing for stateful workflows.
+
+    Instructs the model on change badge conventions ([NEW], [UPDATED], [RESOLVED]) when prior
+    run output is present or when running in stateful mode.
+
+    NOTE (N-4): STATE-02 is satisfied via prompt-framing and markdown badges in deliverable text.
+    Structured JSON deltas payload is deferred with a re-open trigger (when automated downstream
+    aggregators require structured diff APIs).
+    """
+    prior_run = getattr(ctx, "prior_run", None)
+    definition = getattr(ctx, "definition", None)
+    if prior_run is None and not (getattr(definition, "is_stateful", False)):
+        return ""
+
+    return (
+        "\n\n## Living Register & Incremental Updates (Stateful Execution)\n"
+        "This workflow maintains an ongoing register across recurring runs.\n"
+        "When comparing current findings with the previous run, format state changes clearly using markdown badges:\n"
+        "- `[NEW]` for items, findings, or tasks discovered in this run that were not in the prior state.\n"
+        "- `[UPDATED]` for items from the prior state whose status, details, or severity have changed.\n"
+        "- `[RESOLVED]` or `[CLOSED]` for items from the prior state that are now resolved, completed, or no longer active.\n"
+        "Preserve existing unchanged items to maintain continuity in the register."
+    )
+
+
 async def _surface_failure_message(ctx, run_id, reason, pool):
     """101.1 (D-08 layer 6 / RC-4) — persist a real failure reason before an emit
     failure return, via the engine's owner-scoped honest-fail surface.
@@ -635,8 +698,13 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 WFSKILL-01 (D-05/D-07): compose the skill framing BEFORE the retry suffix.
     # llm_single runs tools=[], so read_skill_file is inert and the file manifest would
     # be dead weight — pass no-files so only the instructions compose ('' when no snapshot).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     system_prompt = (
-        phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+        _raw_prompt
+        + _skill_block(phase, ctx, with_files=False)
+        + _stateful_framing_block(ctx)
+        + _retry_suffix(ctx)
     )
     # F8 (092-07): first phase → the user's kickoff question; later phases → prior
     # output (chaining unchanged). Without this the first phase saw an empty user turn.
@@ -706,9 +774,12 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # the requirement invisible again. Placed BEFORE the retry suffix so feedback about a
     # failed attempt stays last, closest to the model's next turn. '' for every phase with
     # no such gate => byte-identical (D-14).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     system_prompt = (
-        phase.config.prompt
+        _raw_prompt
         + _skill_block(phase, ctx)
+        + _stateful_framing_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -799,9 +870,12 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # DETECTABLE — a fix on the single-agent path alone would leave every batch step
     # failing a gate nothing told it about. Do not "simplify" it away. Before the retry
     # suffix; '' when this phase has no such gate => byte-identical (D-14).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     base_prompt = (
-        phase.config.prompt
+        _raw_prompt
         + _skill_block(phase, ctx)
+        + _stateful_framing_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )

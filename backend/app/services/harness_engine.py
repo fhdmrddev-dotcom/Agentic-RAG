@@ -58,6 +58,7 @@ from app.db.workflows import (
     find_resumable_runs,
     finish_run,
     get_active_phase,
+    get_latest_completed_workflow_run,
     get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
@@ -1547,6 +1548,30 @@ async def run_workflow(
         ctx.definition = definition
     except (AttributeError, TypeError):
         pass
+
+    # Phase 205 (STATE-01 / D-01..D-04): Living register / incremental stateful mode
+    # Resolve the previous completed run's deliverable for the stable workflow slug + owner.
+    if getattr(definition, "is_stateful", False) and _audit_user_id:
+        try:
+            _user_uuid = UUID(str(_audit_user_id)) if not isinstance(_audit_user_id, UUID) else _audit_user_id
+            _org_uuid = None
+            if getattr(ctx, "org_id", None):
+                _raw_org = getattr(ctx, "org_id")
+                _org_uuid = UUID(str(_raw_org)) if not isinstance(_raw_org, UUID) else _raw_org
+            ctx.prior_run = await get_latest_completed_workflow_run(
+                pool, definition.slug, user_id=_user_uuid, org_id=_org_uuid
+            )
+        except Exception as exc:
+            logger.warning("run_workflow: failed to resolve prior run for stateful workflow %r: %s", definition.slug, exc)
+            try:
+                ctx.prior_run = None
+            except (AttributeError, TypeError):
+                pass
+    else:
+        try:
+            ctx.prior_run = None
+        except (AttributeError, TypeError):
+            pass
 
     # Facet B (092-07): every engine SSE event must reach the PRODUCER stream the
     # frontend watches (run:{producer_run_id}), NOT run:{workflow_run_id} (a stream
