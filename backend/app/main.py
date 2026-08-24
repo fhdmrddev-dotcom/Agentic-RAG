@@ -748,7 +748,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -782,6 +782,8 @@ app.include_router(org.router)  # Phase 166 ADMIN-01/02/04 — org-admin surface
 app.include_router(connectors.router)  # Phase 190 CONN-02/CONN-03 — connector-connection CRUD (Settings → Connections, D-25). Org-WIDE reads (U-02: read + bind), org-admin writes API-ENFORCED via require_org_manage, per-endpoint require_visible("live_connectors") on the writes ONLY (never router-level), 404-not-403 on every cross-org miss
 app.include_router(me_preferences.router)  # Phase 167 VIS-02 — per-user model-default preference (SEED-116 two-layer: operator allowed-set + lock; per-user RLS write, NOT the service-role settings writer)
 app.include_router(model_registry.router)  # Phase 196 AUTH-04/D-01 — the non-operator model-registry union GET /models/registry (NOT operator-gated and NOT under /admin: an author must reach it to pick a model, and /admin/models stays default-deny with no RLS backstop). Six-field ALLOWLIST projection (to_author_row), never a drop-list
+app.include_router(schedules.router)  # Phase 204 SCHED-01 — the schedule's own address space (/schedules): list, patch, delete, trigger. Owner-scoped on every route, 404-not-403 on every miss. `claim_due_schedules` is deliberately unrouted and unimported there (it is owner-AGNOSTIC by construction)
+app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the workflow-anchored half (/workflows/{id}/schedules: create + list). Shares the /workflows prefix with api/workflows.py; no path collides. Registered AFTER workflows.router so the older, more specific routes keep their precedence
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the
