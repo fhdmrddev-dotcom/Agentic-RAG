@@ -17,8 +17,8 @@
 
 ### Email Ingestion Pipeline (EML)
 
-- [ ] **EML-01**: Outlook compound binary (`.msg`) and RFC-822 (`.eml`) email files are parsed on upload with headers (From, To, Cc, Date, Subject) extracted into first-class metadata. *(SEED-150)*
-- [ ] **EML-02**: Email thread deduplication and quoted-reply stripping prevent duplicate retrieval poisoning, and email attachments are extracted and linked via document relationships. *(SEED-150)*
+- [x] **EML-01**: Outlook compound binary (`.msg`) and RFC-822 (`.eml`) email files are parsed on upload with headers (From, To, Cc, Date, Subject) extracted into first-class metadata. *(SEED-150)*
+- [x] **EML-02**: Email thread deduplication and quoted-reply stripping prevent duplicate retrieval poisoning, and email attachments are extracted and linked via document relationships. *(SEED-150)*
 
 ### Automations & Scheduled Runs (SCHED)
 
@@ -43,8 +43,8 @@
 |---|---|---|---|
 | **TAB-01** | 201 | CSV & Structured Tabular Ingestion | Complete (2026-08-24) |
 | **TAB-02** | 202 | Table Chunks Retrieval Injection & Semantic Search | Complete (2026-08-24) |
-| **EML-01** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Planned |
-| **EML-02** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Planned |
+| **EML-01** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Complete (2026-08-24) |
+| **EML-02** | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Complete (2026-08-24) |
 | **SCHED-01** | 204 | Scheduled & Recurring Unattended Runs | Planned |
 | **SCHED-02** | 204 | Scheduled & Recurring Unattended Runs | Planned |
 | **STATE-01** | 205 | Stateful & Incremental Workflows | Planned |
