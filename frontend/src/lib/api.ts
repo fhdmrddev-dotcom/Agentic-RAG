@@ -10,6 +10,13 @@ export interface SkillImportResult {
   notes?: Array<{ skill: string; note: string }>
 }
 
+import type {
+  ScheduleTriggerResult,
+  WorkflowSchedule,
+  WorkflowScheduleCreate,
+  WorkflowScheduleUpdate,
+} from "@/types/schedule"
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
 /** Phase 148 (VIS-01 / D-04) — the mid-session feature-flip bounce signal. When a
@@ -6577,4 +6584,145 @@ export async function checkConnectorConnection(id: string): Promise<ConnectorChe
     )
   }
   return res.json() as Promise<ConnectorCheckResult>
+}
+
+// ── Phase 204 (SCHED-01 / D-204-11) — the workflow-schedule client ────────────────────────
+//
+// ⚠ THE 197 G-5 DECLINE ON THIS FILE IS RE-DECLINED HERE, IN WRITING, WITH A FRESH TRIGGER.
+// The old trigger — *"the next phase that adds a RUNTIME export to this file, or a second
+// concern to it"* — FIRED at Phase 200.2 (`getWorkflowRunPhaseCitations`) and was never
+// answered; these six functions are its SECOND firing. Carrying the old "it did not fire"
+// sentence forward was not available, so:
+//
+//   RE-DECLINED. The named seam (a per-domain split under `lib/api/` behind a re-exporting
+//   barrel) is NOT taken by 204-03, because this plan's frontend share is six additive
+//   functions and a modal, and a 6,600-line module split is a phase rather than a task —
+//   taking it here would put a refactor of the app's single hottest file into the same commit
+//   as a net-new feature, which is the shape that makes a bisect useless.
+//
+//   FRESH TRIGGER, deliberately stronger than the one it replaces because the old one fired
+//   twice without consequence: **the NEXT phase that adds a runtime export here takes the
+//   split, or escalates it to the operator as a phase of its own. It may not re-decline.**
+//
+// ⚠ AND THE MEASURED BUDGET IS SPENT IN THIS SAME COMMIT. A new RUNTIME export throws at
+// MOUNT — not at call — in every suite that stubs `@/lib/api` with an explicit whole-module
+// factory. `196-08` cost 249 red tests that way. Twelve suites mount `WorkflowsPage` and mock
+// this module; all twelve gained the six names alongside this change.
+//
+// The six share `getAuthHeaders` + `ApiError` with every other call here; none invents a
+// transport of its own.
+
+/** Every schedule the caller owns, across every workflow (carries `workflow_name`). */
+export async function listSchedules(signal?: AbortSignal): Promise<WorkflowSchedule[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/schedules`, { headers, signal })
+  if (!res.ok) {
+    throw new ApiError(`Failed to load schedules (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as WorkflowSchedule[]
+}
+
+/** Every schedule the caller owns on ONE workflow. An unknown id returns `[]`, never a 404 —
+ *  the route refuses to be an existence oracle for workflow ids. */
+export async function listWorkflowSchedules(
+  workflowId: string,
+  signal?: AbortSignal,
+): Promise<WorkflowSchedule[]> {
+  const headers = await getAuthHeaders()
+  // `encodeURIComponent` on a path segment for the same reason `getWorkflowRun` does it: the id
+  // is server-supplied today but arrives here as a plain string, and `/` `?` `#` are STRUCTURAL.
+  const res = await fetch(
+    `${API_BASE}/workflows/${encodeURIComponent(workflowId)}/schedules`,
+    { headers, signal },
+  )
+  if (!res.ok) {
+    throw new ApiError(`Failed to load schedules (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as WorkflowSchedule[]
+}
+
+/** Create a schedule on a PUBLISHED workflow.
+ *
+ *  ⚠ The server's refusals are worth surfacing verbatim rather than folding into one message:
+ *  a 422 means the cadence itself is wrong (a malformed cron, an unknown zone, both or neither
+ *  cadence) and a 400 means the workflow is still a draft. They ask the person for two
+ *  completely different actions. */
+export async function createWorkflowSchedule(
+  workflowId: string,
+  body: WorkflowScheduleCreate,
+): Promise<WorkflowSchedule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/workflows/${encodeURIComponent(workflowId)}/schedules`,
+    { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  )
+  if (!res.ok) {
+    throw new ApiError(await readScheduleFailure(res), res.status)
+  }
+  return (await res.json()) as WorkflowSchedule
+}
+
+/** Patch or toggle a schedule. An absent key means "leave it alone". */
+export async function updateSchedule(
+  scheduleId: string,
+  patch: WorkflowScheduleUpdate,
+): Promise<WorkflowSchedule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/schedules/${encodeURIComponent(scheduleId)}`, {
+    method: "PATCH",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    throw new ApiError(await readScheduleFailure(res), res.status)
+  }
+  return (await res.json()) as WorkflowSchedule
+}
+
+/** Delete a schedule. Does NOT cancel runs it already launched — those are ordinary runs with
+ *  their own Stop control, and killing live work because its trigger was removed is a surprise. */
+export async function deleteSchedule(scheduleId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/schedules/${encodeURIComponent(scheduleId)}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ApiError(`Failed to delete the schedule (status ${res.status})`, res.status)
+  }
+}
+
+/** Run a schedule NOW. ⚠ This does NOT advance its cadence — "show me what this does" is not
+ *  "consider this cadence satisfied", and advancing would silently skip the next real firing. */
+export async function triggerSchedule(scheduleId: string): Promise<ScheduleTriggerResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/schedules/${encodeURIComponent(scheduleId)}/trigger`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) {
+    throw new ApiError(await readScheduleFailure(res), res.status)
+  }
+  return (await res.json()) as ScheduleTriggerResult
+}
+
+/** Pull the server's own sentence out of a refusal, falling back to a status line.
+ *
+ *  ⚠ NOT exported. It is a private helper of the six above, and a seventh runtime export would
+ *  cost twelve more mock-factory lines for something no component calls. */
+async function readScheduleFailure(res: Response): Promise<string> {
+  try {
+    const body = await res.json()
+    const detail = (body as { detail?: unknown }).detail
+    if (typeof detail === "string") return detail
+    // FastAPI's 422 detail is an ARRAY of per-field errors; the first one's `msg` is the
+    // sentence a person can act on ("Value error, a schedule needs exactly one cadence...").
+    if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0] as { msg?: unknown }
+      if (typeof first?.msg === "string") return first.msg
+    }
+  } catch {
+    // fall through — a non-JSON body is not worth a second failure mode
+  }
+  return `The request was refused (status ${res.status})`
 }

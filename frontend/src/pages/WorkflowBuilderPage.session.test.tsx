@@ -114,6 +114,14 @@ vi.mock("@/lib/api", () => {
     }
   }
   return {
+    // 204-03 (SCHED-01) — the measured mock budget (see `WorkflowsPage.test.tsx`'s copy of
+    // this note): a whole-module factory missing a new RUNTIME export throws AT MOUNT.
+    listSchedules: () => Promise.resolve([]),
+    listWorkflowSchedules: () => Promise.resolve([]),
+    createWorkflowSchedule: () => Promise.resolve({}),
+    updateSchedule: () => Promise.resolve({}),
+    deleteSchedule: () => Promise.resolve(undefined),
+    triggerSchedule: () => Promise.resolve({ launched: false }),
     generateWorkflow: mockGenerate,
     createWorkflowDraft: mockCreate,
     updateWorkflowDraft: mockUpdate,

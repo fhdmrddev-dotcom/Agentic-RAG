@@ -262,6 +262,9 @@ import { Fragment, useRef, useState } from "react"
 // the footer verbs as ICON + WORD (`play_arrow` / `open_in_new`) rather than as a glyph baked
 // into the label string, and it leads the `not-by-you` status line with `person`.
 import {
+  // 204 (SCHED-01) — the schedules door's mark, from the SAME house chrome set as `History`
+  // beside it. Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
+  CalendarClock,
   ExternalLink,
   FileText,
   Folder,
@@ -349,6 +352,9 @@ const DELETE_WORKFLOW_LABEL = "Delete workflow…"
  * clicking it lands on a screen whose heading is the word you clicked.
  */
 const RUN_LOG_LABEL = "Run log"
+// Phase 204 (SCHED-01). Sited beside RUN_LOG_LABEL and following its precedent exactly: a
+// card-local constant, because that is where this card already keeps its own menu words.
+const SCHEDULE_LABEL = "Schedules…"
 
 /**
  * D-18's word for a draft. NO ellipsis, and the asymmetry is the point: this guard is one
@@ -758,6 +764,23 @@ export interface WorkflowCardProps {
    * has to SAY what it is filtered to and a slug is a machine name.
    */
   onRunLog?: (scope: { slug: string; name: string }) => void
+  /**
+   * Phase 204 (SCHED-01) — open this workflow's SCHEDULES. Absent = the door is not offered,
+   * exactly like `onRunLog` above, which is how this card behaves anywhere schedules have no
+   * host.
+   *
+   * ⚠ IT HANDS UP THE ROW'S `id` AND NOT ITS SLUG, and that is the OPPOSITE of `onRunLog` for
+   * a reason worth stating rather than looking like an inconsistency. A run LOG spans a
+   * workflow's published versions, so it is slug-scoped. A SCHEDULE is a foreign key to ONE
+   * `workflow_definitions` row — the exact version that will execute unattended — so it is id-
+   * scoped. Handing up a slug here would leave the server to pick a version, and "which
+   * version does the 3am run use" is not a question a caller should answer by omission.
+   *
+   * ⚠ OFFERED ON PUBLISHED ROWS ONLY. The API refuses a draft with a 400 (a draft is mutable,
+   * and an unattended run of a mutable workflow is one nobody agreed to), so offering it on a
+   * draft would be an affordance that exists only to be refused.
+   */
+  onSchedule?: (scope: { id: string; name: string }) => void
   /** Launch a runnable row (the Phase-121 one-click launch, unchanged). */
   onRun: (row: LibraryRow) => void
   /** Open a draft in the Builder (edit-in-place; saves PATCH the same row). */
@@ -872,6 +895,7 @@ export function WorkflowCard({
   folderName = null,
   onRun,
   onRunLog,
+  onSchedule,
   onOpen,
   onForkNewVersion,
   onForkStarter,
@@ -1339,6 +1363,28 @@ export function WorkflowCard({
                   >
                     <History className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
                     {RUN_LOG_LABEL}
+                  </DropdownMenuItem>
+                )}
+
+                {/* ── Phase 204 (SCHED-01) — THE DOOR TO THIS WORKFLOW'S SCHEDULES ──
+                    Second, directly under the run log, because those two are the menu's
+                    only non-destructive items and they belong together above the forks
+                    and the deletes.
+
+                    ⚠ PUBLISHED ROWS ONLY (see the prop's docblock): the API refuses a
+                    draft, so offering it on one would be an affordance that exists only
+                    to be refused.
+
+                    ⚠ IT IS A `DropdownMenuItem`, WHICH IS WHAT KEEPS WR-03 GREEN — the
+                    suite sweeps the five `aria-required-children` roles over this menu's
+                    element children, and anything else here turns that green red. */}
+                {onSchedule && row.provenance === "published" && (
+                  <DropdownMenuItem
+                    data-testid="workflow-schedules"
+                    onClick={() => onSchedule({ id: row.id, name: row.name })}
+                  >
+                    <CalendarClock className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                    {SCHEDULE_LABEL}
                   </DropdownMenuItem>
                 )}
 
