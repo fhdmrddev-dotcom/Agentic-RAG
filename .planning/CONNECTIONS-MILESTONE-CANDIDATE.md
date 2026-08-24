@@ -168,9 +168,48 @@ scope + prompt suggestions. It needs the connection model to exist first, or it 
 Two things it shares with this milestone, so they are built once and not twice: the **per-tool
 permission grain** (§6) and the **prompt-suggestion chips** (§6b).
 
+## ⭐ AMENDED 2026-08-24 — ONE PHASE FOLDS BACK INTO v3.8. Phase 206 is REWRITTEN, not dropped.
+
+Operator direction: *"assess what we can fold into this milestone rather than waiting for the next
+milestone and going back and forth."* Assessed — **exactly one thing folds cleanly**, and it is the
+highest-leverage item in this whole document.
+
+### Phase 206 (rewritten): **MCP Connector Client — workflow-scoped**
+
+| | Phase 206 as planned | Phase 206 rewritten |
+|---|---|---|
+| Capabilities | 2 write verbs (Jira, SMTP) | **every tool the connected MCP server exposes** |
+| Reads | zero | **JQL search, CQL search, get issue, PR + code search** |
+| Per-vendor adapter code | 2 | **none** |
+| Validates the MCP-first verdict | no | yes — first implementation of a month-old decision |
+
+**Why it does not need to wait for this milestone:**
+
+- **Workflow-scoped, so the approval model is not a blocker.** Phase 189/190's outbound governance
+  already lives on the canvas. **Chat** is what needs the approval model — and chat stays here.
+- **No OAuth needed.** MCP servers carry their own auth; the OAuth work is for Google/Microsoft
+  first-party APIs, which stay here.
+- **Atlassian and GitHub already ship official MCP servers.** The proof costs no adapter.
+
+**Scope:**
+1. Provider-shaped connection row holding an **MCP server URL** + **per-tool grants** (§6 grain,
+   committed once — this is the table-shape decision SEED-146 warns not to make twice)
+2. **MCP client** in the backend; consciously retire `test_189_no_egress.py`'s fence in the same commit
+3. **Tool discovery** from the server → the per-tool permission list
+4. Drivable from the existing external-action workflow node
+5. **Atlassian + GitHub** as the proof; no further breadth
+
+**Explicitly NOT in the fold — these stay in this milestone:** chat surface + approval model · OAuth ·
+Google / Microsoft first-party · drive auto-ingest · inbound API + MCP server · the Popular catalog IA.
+
+⚠ **The fold's one real risk:** it commits the connection table shape. That is acceptable *only*
+because it commits it to the **per-tool, provider-shaped** design this document already settled — the
+shape the milestone wanted anyway. Committing the OLD action-shaped design would have been the
+migration SEED-146 warns about.
+
 ## Sequencing
 
-1. Close v3.8 — **204** (running) and **205**. Drop 206.
+1. Close v3.8 — **204** (running), **205**, and **206 rewritten** (see the amendment above).
 2. Open **Connections & Open Platform**: connection model + OAuth → reads → breadth by auth family →
    MCP client → chat surface behind the approval model.
 3. Then **Artifacts** (SEED-193 + 194 + data-formulator). SEED-193 notes an artifact worth building
