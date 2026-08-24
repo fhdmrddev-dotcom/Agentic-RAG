@@ -181,3 +181,93 @@ component**, or it will be discovered mid-execution.
   `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` from the repo root.
 - **Verify by DRIVING a real run**, not by reading code. Both 204 defects were found that way and
   neither was visible to 106 passing tests.
+
+---
+---
+
+# ADDENDUM — plan-level pass over `205-01-PLAN.md` (commit `36a79c07`)
+
+**Verdict: EXECUTE, after two edits. G-1 and G-4 survived the plan unchanged and are still blockers.**
+One plan, correct call. Threat model present with three named threats and matching tests — that is
+the standing criterion met, and Phase 203 failed it.
+
+## What the plan FIXED from the review above
+
+| | |
+|---|---|
+| **G-5** ✅ | `components/workflows/builder/` is gone; it names the real flat files (`definitionOps.ts`, `PhaseFormPanel.tsx`) |
+| **G-2** ⚠ half | Task 1's SQL correctly avoids `created_by`… but **T-205-01 still says `created_by = $2`**. The threat text and the query now disagree; fix the text so nobody implements from it |
+| **G-3** ⚠ named | `T-205-02` names the trap and Task 4 tests it. See N-3 — it is more load-bearing than the plan realises |
+
+## ⛔ STILL BLOCKING
+
+### G-1 (unchanged) — `definition_id` scoping still resets the register on every republish
+
+`must_haves.truths[0]` still reads *"the same definition_id"*; Task 1 still binds
+`wr.definition_id = $1`. **Measured again: `pm-weekly-status-report` has 4 distinct definition ids
+for one slug.** A living register that forgets itself whenever its author edits a prompt is not a
+living register. This must be resolved before task 1 is written, not during it.
+
+### G-4 (unchanged) — the deliverable resolution contradicts Phase 200.2, which rejected this rule BY NAME
+
+Task 1: `wp.status = 'completed' ORDER BY wp.created_at DESC LIMIT 1` — *the last completed phase
+row*. 200.2's shipped rule is **the last server-ordered row with a NON-EMPTY `deliverable_text`**,
+and it names both alternatives as wrong: the final row fails when the closing step emits a FILE, and
+any-row-with-text fails because **a `confirm` step's `text` is a QUESTION** (measured verbatim:
+*"Does this draft answer your question? Add any corrections."*).
+
+**Under the plan as written, a workflow ending in a confirm step feeds the machine's own question
+into next week's run as its baseline.** Reuse the shipped resolution; do not re-derive it.
+
+## ⚠ NEW findings from the plan itself
+
+### N-1 · The `threads` join is unnecessary and scopes the WRONG owner
+Task 1 joins `threads t` on `t.user_id = $2`. **`workflow_runs.user_id` is populated on 238 of 238
+rows** — measured. Joining `threads` scopes on the THREAD's owner rather than the RUN's. They
+coincide today (the scheduler mints a thread owned by the schedule owner), so this will pass every
+test and is a latent divergence, not a live bug. Scope on `wr.user_id` directly.
+
+### N-2 · `PhaseFormPanel.tsx` CANNOT hold the toggle or the chips — its test pins hooks at ABSOLUTE ZERO
+`PhaseFormPanel.test.tsx:668` — *"`useMemo` / `useState` / `useEffect` are at an ABSOLUTE ZERO in
+this file's source."* Task 3 adds a stateful-mode toggle **and** a variable-chip inserter there. Both
+carry state. Two prior phases hit this pin and answered it with **extractions** (`FieldGuidance.tsx`
+199-06, `StepCardSection.tsx` 200-04) rather than re-baselining. **Budget a new leaf component**, or
+this is discovered mid-execution with the pin red.
+
+### N-3 · The jsonb unwrap IS the feature — measured, and stronger than the plan states
+Decoded the live rows:
+
+```
+string-scalar outputs, decoded -> text 367/400 · source_refs 228 · citations 228
+object-typed outputs           -> text  14
+```
+
+So **without the unwrap, `output.get("text")` finds content on ~14 rows out of 610** and the feature
+renders `"[Initial Run - No Prior State]"` forever — a silent failure that LOOKS like a correct cold
+start. That is exactly how Phase 200's per-step count shipped dead on 484 of 484 rows.
+**`test_safe_jsonb_output_hydration` must assert against a REAL string-scalar row shape**, not a
+synthetic one, and the cold-start test must prove it can tell "no prior run" from "prior run I failed
+to decode" — those two are indistinguishable in the plan's current design.
+
+### N-4 · STATE-02 quietly became prompt-framing only — say so as a decision
+CONTEXT D-06 specified a machine-readable `deltas` block (`{"added": [...], "modified": [...]}`).
+**The plan drops it**: Task 2 delivers `[NEW]`/`[UPDATED]`/`[RESOLVED]` by asking the model to emit
+them. That may be the right call for a first slice, but it changes what STATE-02 means — *"deliverable
+outputs can render state deltas"* becomes a model-behaviour hope rather than a structural guarantee,
+and **a unit test cannot verify it**. Record it as a decision with a re-open trigger; do not let the
+requirement read as fully satisfied by a prompt string.
+
+### N-5 · `is_stateful` persistence is asserted but not traced
+Task 3's criterion is *"persists across draft saves and publishes"*. The plan does not name the
+publish path. `publish_workflow` re-serialises the definition — if it round-trips through a model
+that does not carry the new field, the flag is silently dropped on publish and every published
+stateful workflow behaves as stateless. **Trace it or test it end to end**; an author toggling a
+switch that publish discards is the Phase-118 shape.
+
+## Two edits before execution
+
+1. **Change the scoping key** (G-1) — stable workflow identity, not `definition_id`; state what
+   happens when the shape changes across versions.
+2. **Reuse 200.2's deliverable resolution** (G-4) — last row with non-empty deliverable text.
+
+Everything else can be closed inside the existing tasks.
