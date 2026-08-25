@@ -48,10 +48,12 @@ import connectionsTabSource from "../ConnectionsTab?raw"
 import {
   CONNECTIONS_ADD_CTA,
   CONNECTIONS_BANNER_HEADING,
+  CONNECTIONS_COLUMNS,
   CONNECTIONS_EMPTY_BODY,
   CONNECTIONS_EMPTY_HEADING,
   CONNECTIONS_FILTERED_TO_ZERO,
   CONNECTIONS_NON_ADMIN_NOTE,
+  CONNECTION_FIXED_TAG,
   CONNECTION_STATE_WORDS,
   LIVE_CONNECTORS_FEATURE_KEY,
   RECEIPT_DELETED,
@@ -776,5 +778,255 @@ describe("SC#3 — the marks reach the row, and they are each their own", () => 
     // package. A future edit that re-adds a `~icons/...` import here fails this case.
     expect(connectionsTabSource).not.toContain("~icons/")
     expect(connectionsTabSource).toContain("ConnectionMarkGlyph")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 14 · Phase 206.1-02 Task 1 — THE WIDE RENDER, PINNED BYTE-FOR-BYTE
+//
+// ⚠ CAPTURED AND COMMITTED BEFORE ONE LINE OF DENSE CODE EXISTS. A baseline only proves
+// something if it PREDATES the change — the `cardFace.ts` precedent, where the
+// characterization pin was committed ONE COMMIT BEFORE the seam existed and then passed
+// with an empty `numstat`. Item 2 of this phase adds a SECOND row shape behind a `dense`
+// prop; the only thing that can prove the FIRST shape did not move while that happened is
+// a record taken while it was the only shape there was.
+//
+// PROVENANCE OF THE IDIOM: there is NO `outerHTML` capture anywhere in the settings suites
+// today (measured — the only `innerHTML` uses here are needle scans), so this is IMPORTED
+// from `frontend/src/components/workflows/PhaseNodeCard.test.tsx:2640-2647` (the capture
+// helper), `:2649-2673` (the capture-rule docblock whose wording is copied below) and
+// `:2792-2825` (the marker rows). It is not extended from a local example, and saying so
+// is what stops a later reader treating it as this file's house style.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => {
+  /** ⚠ A FIXED CLOCK, not a reading of one. `ConnectionRow` renders
+   *  `credentialLabel(connection.last_checked_at, now)`, so a capture taken against
+   *  `Date.now()` is a record of the afternoon it was taken and differs tomorrow.
+   *  `PhaseNodeCard`'s captures are safe only because a subtree fence forbids `Date.now`
+   *  and `Math.random` across that whole tree; THIS file has no such fence, so the
+   *  discipline has to live in the fixture. Both constants below are literals. */
+  const CAPTURE_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+  const CAPTURE_CHECKED_AT = "2026-08-22T12:00:00.000Z"
+
+  /**
+   * Three shapes, each distinct so the baseline says something: a long SMTP destination, a
+   * Slack row (the only shape that carries the `fixed` tag), and a Jira row.
+   *
+   * ⚠ THE CAPTURE SET DELIBERATELY CONTAINS NO MCP-SHAPED ROW, AND THAT ABSENCE IS A
+   * DECISION — this sentence exists so a later phase does not "fix" it. Plan 03 of this
+   * phase introduces `credentialReadingOf`, whose MCP arm returns
+   * `CREDENTIAL_NO_CHECK_FOR_KIND` **unconditionally**: it ignores `last_checked_at`
+   * entirely, by design, because an MCP row can never be checked. So an MCP-shaped
+   * fixture's credential cell renders DIFFERENT TEXT once wave 3 lands, and no choice of
+   * `last_checked_at` avoids it — the arm does not read that field. Pinning that cell here
+   * would make this baseline booby-trapped by its own phase, and the philosophy below (a
+   * diff against this record is a BEHAVIOUR CHANGE, not a test to update) only holds if the
+   * record itself is not. A `create_ticket` row exercises the same five cells, the same
+   * mark slot and the same ⋯, so the pin loses nothing it was measuring: its job is to
+   * prove the WIDE row's shipped markup did not move when the dense branch arrived, not to
+   * enumerate shapes. An MCP row's wide render is pinned by plan 03's own tests instead,
+   * where the change to that cell is the thing under test rather than a collision.
+   */
+  const CAPTURE_ROWS: Record<string, ConnectorConnection> = {
+    SEND_EMAIL: makeConnection({
+      id: "cap-1",
+      name: "Ops mailbox",
+      capability: "send_email",
+      config: {
+        host: "smtp.eu-west.fastmail-business.example.com",
+        port: 465,
+        from_address: "ops@northwind.co",
+        tls: "implicit",
+      },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+    POST_MESSAGE: makeConnection({
+      id: "cap-2",
+      name: "#ops-alerts",
+      capability: "post_message",
+      config: { default_channel: "#ops-alerts" },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+    CREATE_TICKET: makeConnection({
+      id: "cap-3",
+      name: "Northwind Jira",
+      capability: "create_ticket",
+      config: {
+        base_url: "northwind.atlassian.net",
+        project_key: "NW",
+        account_email: "ops@northwind.co",
+      },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+  }
+
+  /**
+   * ⚠ THE ONE DECLARED NORMALIZATION — declared, and COUNTED, rather than done quietly.
+   *
+   * Radix's `DropdownMenuTrigger` sets `id={useId()}` on the ⋯ button, and React's `useId`
+   * value is a function of HOW MANY components have rendered before it, not of the row's
+   * own markup. Measured while taking these captures: the three rows below printed
+   * `id="radix-_r_p3_"`, `id="radix-_r_pc_"` and `id="radix-_r_pl_"` for markup that is
+   * otherwise character-identical, and that number MOVES when any case is added anywhere
+   * above this block. A case added above is not a behaviour change in the wide row and must
+   * not be able to redden this pin — so the id VALUE is normalized away.
+   *
+   * ⚠ AND THE NORMALIZATION IS ITSELF NON-VACUOUS: the substitution count is returned and
+   * asserted at exactly ONE per row. A ⋯ trigger that stopped rendering yields ZERO
+   * replacements and the case goes red, rather than quietly passing against a shorter
+   * string. Normalizing without counting is how a pin stops watching the thing it names.
+   */
+  const RADIX_ID = /id="radix-[^"]*"/g
+  const RADIX_ID_NORMALIZED = 'id="radix-NORMALIZED"'
+
+  function normalizeRadixIds(html: string): { html: string; replaced: number } {
+    let replaced = 0
+    const out = html.replace(RADIX_ID, () => {
+      replaced += 1
+      return RADIX_ID_NORMALIZED
+    })
+    return { html: out, replaced }
+  }
+
+  /** One render, the row's and the header's `outerHTML`, unmounted — shared by the capture
+   *  and the assertion so both read the DOM the same way
+   *  (`PhaseNodeCard.test.tsx:2640-2647`). */
+  function wideCapture(connection: ConnectorConnection): {
+    row: string
+    header: string
+    rowRadixIds: number
+  } {
+    const rendered = render(
+      <ConnectionsTabView
+        connections={[connection]}
+        usageCounts={{ [connection.id]: 2 }}
+        isOrgAdmin
+        liveConnectorsOn
+        now={CAPTURE_NOW}
+        onOpen={() => {}}
+        {...handlers}
+      />,
+    )
+    const row = normalizeRadixIds(
+      rendered.container.querySelector('[data-testid="connections-row"]')!.outerHTML,
+    )
+    const header = normalizeRadixIds(
+      rendered.container.querySelector('[data-testid="connections-header"]')!.outerHTML,
+    )
+    rendered.unmount()
+    // The header holds no Radix control, so its own replacement count is expected to be 0
+    // and is asserted here rather than carried: an id appearing there would be new surface.
+    expect(header.replaced).toBe(0)
+    return { row: row.html, header: header.html, rowRadixIds: row.replaced }
+  }
+
+  /**
+   * ⚠ THESE LITERALS ARE A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT
+   * of the rendered DOM of the tree as it stands at this commit — `ConnectionsTab.tsx`
+   * unmoved, no `dense` prop in existence — by running `wideCapture` above and pasting what
+   * it printed. Not one attribute here was typed from the source, computed by hand, or
+   * reasoned about. That is the whole point: an expectation records what its author
+   * BELIEVED the geometry to be, and a move that changed the geometry to match that belief
+   * would pass it.
+   *
+   * OBSERVED TWICE on the unchanged tree before it was committed, and the two runs agreed
+   * byte for byte — so it is a baseline rather than one sample of something that might vary.
+   * The clock is a literal (see `CAPTURE_NOW`), which is what makes that stability a
+   * property of the markup rather than of the hour.
+   *
+   * NOT ONE STRING BELOW WAS HAND-EDITED. Hand editing turns a capture back into an
+   * expectation recording what its author believed the change did, and silently masks any
+   * other attribute the edit disturbed.
+   *
+   * A DIFF AGAINST THIS RECORD IS A BEHAVIOUR CHANGE IN THE WIDE ROW — and NOT A TEST TO
+   * UPDATE. Adding the dense shape is supposed to add a second branch, not move the first
+   * one. If this goes red while the dense branch lands, the dense branch is wrong;
+   * re-capturing it to make it green would delete the only evidence anybody has that the
+   * wide row still renders what it rendered.
+   */
+  const WIDE_HTML_BASELINE: Record<string, { row: string; header: string }> = {
+    SEND_EMAIL: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-mail h-4 w-4 flex-none text-muted-foreground\" aria-hidden=\"true\"><path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"></path><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"></rect></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Ops mailbox</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">smtp.eu-west.fastmail-business.example.com:465</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Ops mailbox\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+    POST_MESSAGE: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><path fill=\"#e01e5a\" d=\"M53.841 161.32c0 14.832-11.987 26.82-26.819 26.82S.203 176.152.203 161.32c0-14.831 11.987-26.818 26.82-26.818H53.84zm13.41 0c0-14.831 11.987-26.818 26.819-26.818s26.819 11.987 26.819 26.819v67.047c0 14.832-11.987 26.82-26.82 26.82c-14.83 0-26.818-11.988-26.818-26.82z\"></path><path fill=\"#36c5f0\" d=\"M94.07 53.638c-14.832 0-26.82-11.987-26.82-26.819S79.239 0 94.07 0s26.819 11.987 26.819 26.819v26.82zm0 13.613c14.832 0 26.819 11.987 26.819 26.819s-11.987 26.819-26.82 26.819H26.82C11.987 120.889 0 108.902 0 94.069c0-14.83 11.987-26.818 26.819-26.818z\"></path><path fill=\"#2eb67d\" d=\"M201.55 94.07c0-14.832 11.987-26.82 26.818-26.82s26.82 11.988 26.82 26.82s-11.988 26.819-26.82 26.819H201.55zm-13.41 0c0 14.832-11.988 26.819-26.82 26.819c-14.831 0-26.818-11.987-26.818-26.82V26.82C134.502 11.987 146.489 0 161.32 0s26.819 11.987 26.819 26.819z\"></path><path fill=\"#ecb22e\" d=\"M161.32 201.55c14.832 0 26.82 11.987 26.82 26.818s-11.988 26.82-26.82 26.82c-14.831 0-26.818-11.988-26.818-26.82V201.55zm0-13.41c-14.831 0-26.818-11.988-26.818-26.82c0-14.831 11.987-26.818 26.819-26.818h67.25c14.832 0 26.82 11.987 26.82 26.819s-11.988 26.819-26.82 26.819z\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">#ops-alerts</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">slack.com/api · #ops-alerts</span><span class=\"flex-none rounded border border-border px-1 text-[11px] text-muted-foreground\">fixed</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for #ops-alerts\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+    CREATE_TICKET: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><defs><linearGradient id=\"SVGSBI7obaC\" x1=\"98.031%\" x2=\"58.888%\" y1=\".161%\" y2=\"40.766%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient><linearGradient id=\"SVGHifZlbzE\" x1=\"100.665%\" x2=\"55.402%\" y1=\".455%\" y2=\"44.727%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient></defs><path fill=\"#2684ff\" d=\"M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0\"></path><path fill=\"url(#SVGSBI7obaC)\" d=\"M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667\"></path><path fill=\"url(#SVGHifZlbzE)\" d=\"M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Northwind Jira</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">northwind.atlassian.net · NW</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Northwind Jira\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+  }
+
+  for (const key of Object.keys(CAPTURE_ROWS)) {
+    it(`the wide ${key} row renders byte-for-byte what it rendered at 206.1-02's base`, () => {
+      // ── NON-VACUITY FIRST. Byte-identity against an empty capture passes forever. ──
+      expect(WIDE_HTML_BASELINE[key].row.length).toBeGreaterThan(0)
+      expect(WIDE_HTML_BASELINE[key].header.length).toBeGreaterThan(0)
+
+      const actual = wideCapture(CAPTURE_ROWS[key])
+      // The normalization above is non-vacuous: exactly one ⋯ trigger id was replaced.
+      expect(actual.rowRadixIds).toBe(1)
+      expect(actual.row).toBe(WIDE_HTML_BASELINE[key].row)
+      expect(actual.header).toBe(WIDE_HTML_BASELINE[key].header)
+    })
+  }
+
+  // ── THE MARKER ROWS ──────────────────────────────────────────────────────────────────
+  // Byte-identity alone is compatible with a row that quietly rendered nothing: an empty
+  // capture equals an empty render forever, and the non-vacuity lines above only prove the
+  // string is non-empty, not that it holds the cells. These say WHAT each capture contains,
+  // so a row that stopped painting a cell is a failure rather than a pass. They read the
+  // COMMITTED baseline strings, never a fresh render — the claim being pinned is about what
+  // was captured. (`PhaseNodeCard.test.tsx:2792-2825`.)
+
+  it("every capture holds all five cells and the ⋯ — D-206.1-13 stated at the baseline", () => {
+    for (const key of Object.keys(WIDE_HTML_BASELINE)) {
+      const html = WIDE_HTML_BASELINE[key].row
+      for (const testId of [
+        "connections-row-name",
+        "connections-row-destination",
+        "connections-row-usedby",
+        "connections-row-credential",
+        "connections-row-state",
+        "connections-row-more",
+      ]) {
+        expect(html).toContain(`data-testid="${testId}"`)
+      }
+    }
+  })
+
+  it("SEND_EMAIL captured the 🔒 destination and NOT the Slack-only `fixed` tag", () => {
+    const html = WIDE_HTML_BASELINE.SEND_EMAIL.row
+    expect(html).toContain("connections-row-destination")
+    expect(html).toContain("🔒")
+    expect(html).not.toContain(CONNECTION_FIXED_TAG)
+  })
+
+  it("POST_MESSAGE captured the `fixed` tag — the one shape that carries it", () => {
+    expect(WIDE_HTML_BASELINE.POST_MESSAGE.row).toContain(CONNECTION_FIXED_TAG)
+  })
+
+  it("CREATE_TICKET captured the author's own word in the name cell", () => {
+    const html = WIDE_HTML_BASELINE.CREATE_TICKET.row
+    expect(html).toContain("connections-row-name")
+    expect(html).toContain("Northwind Jira")
+  })
+
+  it("every captured header holds the five locked column words, in order", () => {
+    for (const key of Object.keys(WIDE_HTML_BASELINE)) {
+      const header = WIDE_HTML_BASELINE[key].header
+      let cursor = -1
+      for (const column of CONNECTIONS_COLUMNS) {
+        const at = header.indexOf(`data-column="${column}"`)
+        expect(at).toBeGreaterThan(cursor)
+        cursor = at
+      }
+    }
   })
 })
