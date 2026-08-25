@@ -464,3 +464,463 @@ describe("ExternalActionSection — the client mirror agrees with the backend Li
     }
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⚠ ADDED, NEVER RE-BASELINED — every case above this banner is untouched by 206.2.
+//
+// 206.2-03 — THE SHAPE AXIS. What the cases below are for, in one sentence each:
+//
+//  · the shape control exists, is its OWN radiogroup with its OWN name and its OWN testid,
+//    and holds exactly TWO buttons — so the five `=== 3` assertions above stay true for a
+//    STRUCTURAL reason rather than by luck. That they pass with a ZERO-DELETION diff is the
+//    assertion, and it is checked as a diff rather than merely by re-running them.
+//  · `data-shape` derives from two props plus one session fact, and `unset` leaves BOTH
+//    segments unchecked — the plausible wrong answer being a default-checked segment A.
+//  · the two patches clear the OTHER shape's keys, asserted by SET EQUALITY over
+//    `Object.keys` rather than by `toMatchObject`, because a superset passes a PARTIAL clear
+//    and a partial clear is the defect.
+//  · RESEARCH assumption A1 — `{k: undefined}` is dropped by serialization — is FALSIFIED
+//    against a real store here, not deferred.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+import { createBuilderStore } from "./builderStore"
+import {
+  EXTERNAL_SHAPE_CAPABILITY_LABEL,
+  EXTERNAL_SHAPE_GROUP_LABEL,
+  EXTERNAL_SHAPE_MCP_LABEL,
+} from "./externalShapeVocabulary"
+
+const shapeOptions = () => screen.getAllByTestId("external-action-shape-option")
+
+const shapeOf = () => screen.getByTestId("external-action-section").getAttribute("data-shape")
+
+const checkedShapes = () =>
+  shapeOptions()
+    .filter((el) => el.getAttribute("aria-checked") === "true")
+    .map((el) => el.textContent ?? "")
+
+// ── 7. THE SHAPE GROUP IS A SECOND AXIS, NOT A FOURTH ROW ────────────────────────────
+
+describe("ExternalActionSection — the shape control (206.2 / D-206.2-01)", () => {
+  it("is its OWN radiogroup, with its OWN accessible name and exactly TWO positions", () => {
+    renderSection()
+    const group = screen.getByRole("radiogroup", { name: EXTERNAL_SHAPE_GROUP_LABEL })
+    expect(group).toBeInTheDocument()
+    expect(group.querySelectorAll('[role="radio"]')).toHaveLength(2)
+    expect(shapeOptions().map((el) => el.textContent)).toEqual([
+      EXTERNAL_SHAPE_CAPABILITY_LABEL,
+      EXTERNAL_SHAPE_MCP_LABEL,
+    ])
+  })
+
+  it("⚠ THE TWO GROUPS ARE DISJOINT — neither segment is a member of the capability one", () => {
+    // D-206.2-21's whole subject. If a segment ever carried the capability testid or became
+    // a `role="radio"` child of that group, the five shipped `=== 3` assertions would go red
+    // — and this case names WHY before they do.
+    renderSection()
+    const capabilityGroup = screen.getByRole("radiogroup", { name: EXTERNAL_ACTION_HEADING })
+    const shapeGroup = screen.getByRole("radiogroup", { name: EXTERNAL_SHAPE_GROUP_LABEL })
+    expect(capabilityGroup).not.toBe(shapeGroup)
+    expect(capabilityGroup.querySelectorAll('[role="radio"]')).toHaveLength(3)
+    for (const segment of shapeOptions()) {
+      expect(capabilityGroup.contains(segment)).toBe(false)
+      expect(segment.getAttribute("data-testid")).toBe("external-action-shape-option")
+    }
+    // POSITIVE CONTROL — the two names really are different strings, which is what keeps
+    // the shipped EXACT accessible-name query unambiguous.
+    expect(EXTERNAL_SHAPE_GROUP_LABEL).not.toBe(EXTERNAL_ACTION_HEADING)
+  })
+
+  it("ONE tab stop for the shape group, and with NEITHER checked the first holds it", () => {
+    renderSection()
+    const stops = shapeOptions().filter((el) => el.getAttribute("tabindex") === "0")
+    expect(stops).toHaveLength(1)
+    expect(stops[0].textContent).toBe(EXTERNAL_SHAPE_CAPABILITY_LABEL)
+  })
+
+  it("arrow keys wrap on both axes, Home/End jump, and an unhandled key is not swallowed", () => {
+    const onChangeShape = vi.fn()
+    const first = renderSection({ onChangeShape })
+    fireEvent.keyDown(shapeOptions()[0], { key: "ArrowRight" })
+    expect(onChangeShape).toHaveBeenCalledTimes(1)
+    first.unmount()
+
+    const up = vi.fn()
+    const second = renderSection({ onChangeShape: up })
+    fireEvent.keyDown(shapeOptions()[0], { key: "ArrowUp" })
+    expect(up, "ArrowUp from the first position WRAPS to the last").toHaveBeenCalledTimes(1)
+    second.unmount()
+
+    const end = vi.fn()
+    const third = renderSection({ onChangeShape: end })
+    fireEvent.keyDown(shapeOptions()[0], { key: "End" })
+    expect(end).toHaveBeenCalledTimes(1)
+    third.unmount()
+
+    // NEGATIVE CONTROL — Tab must reach the browser, and a printable key is not a choice.
+    const quiet = vi.fn()
+    renderSection({ onChangeShape: quiet })
+    const tab = fireEvent.keyDown(shapeOptions()[0], { key: "Tab" })
+    fireEvent.keyDown(shapeOptions()[0], { key: "x" })
+    expect(quiet).not.toHaveBeenCalled()
+    expect(tab, "Tab must not be preventDefault()ed — it is how the group is exited").toBe(true)
+  })
+})
+
+// ── 8. THE THREE STATES ──────────────────────────────────────────────────────────────
+
+describe("ExternalActionSection — the three derived states", () => {
+  it("⚠ UNSET leaves BOTH segments unchecked — a default is not a way through a gate", () => {
+    // The plausible wrong answer is a default-checked segment A, and it would make a
+    // brand-new step assert that it does one of three actions before anyone said so.
+    renderSection({ capability: "", toolName: "" })
+    expect(shapeOf()).toBe("unset")
+    expect(checkedShapes()).toEqual([])
+    for (const segment of shapeOptions()) {
+      expect(segment.getAttribute("aria-checked")).toBe("false")
+    }
+  })
+
+  it("a recognised stored capability derives the capability shape", () => {
+    for (const name of EXTERNAL_ACTION_CAPABILITIES) {
+      const { unmount } = renderSection({ capability: name })
+      expect(shapeOf()).toBe("capability")
+      expect(checkedShapes()).toEqual([EXTERNAL_SHAPE_CAPABILITY_LABEL])
+      unmount()
+    }
+  })
+
+  it("an UNRECOGNISED stored capability derives NOTHING — it is still unset", () => {
+    renderSection({ capability: "wire_transfer" })
+    expect(shapeOf()).toBe("unset")
+    expect(checkedShapes()).toEqual([])
+  })
+
+  it("a non-empty tool_name derives the mcp shape and OUTRANKS a stored capability", () => {
+    // The executor branches on `tool_name` FIRST, so a step carrying both really runs as
+    // MCP. The surface must say what the run will do, not what the config wishes.
+    renderSection({ capability: "send_email", toolName: "ask_question" })
+    expect(shapeOf()).toBe("mcp")
+    expect(checkedShapes()).toEqual([EXTERNAL_SHAPE_MCP_LABEL])
+  })
+
+  it("a WHITESPACE-ONLY tool_name is not an answer", () => {
+    renderSection({ capability: "", toolName: "   " })
+    expect(shapeOf()).toBe("unset")
+  })
+
+  it("under MCP the capability radiogroup is ABSENT and the picker is mounted", () => {
+    renderSection({ toolName: "ask_question" })
+    expect(screen.queryAllByTestId("external-action-option")).toHaveLength(0)
+    expect(screen.queryByTestId("external-action-options")).toBeNull()
+    expect(screen.queryByTestId("external-action-nothing-chosen")).toBeNull()
+    expect(screen.getByTestId("connection-picker")).toBeInTheDocument()
+  })
+
+  it("under UNSET and CAPABILITY the capability radiogroup is PRESENT — the five pins' reason", () => {
+    for (const props of [{ capability: "" }, { capability: "send_email" }]) {
+      const { unmount } = renderSection(props)
+      expect(screen.getAllByTestId("external-action-option")).toHaveLength(3)
+      unmount()
+    }
+  })
+
+  it("pressing a segment follows through to the derived shape", () => {
+    renderSection()
+    fireEvent.click(shapeOptions()[1])
+    expect(shapeOf()).toBe("mcp")
+    fireEvent.click(shapeOptions()[0])
+    expect(shapeOf()).toBe("capability")
+  })
+
+  it("a session press does NOT leak across steps — the caller's per-step key is the reset", () => {
+    // No lifecycle hook is available on this leaf (its own source fence forbids the four
+    // names), so the ONLY mechanism is a remount, and the panel spends one JSX attribute on
+    // it. A `key` change is exactly what a remount looks like from here.
+    const { unmount } = renderSection({ capability: "", toolName: "" })
+    fireEvent.click(shapeOptions()[1])
+    expect(shapeOf()).toBe("mcp")
+    unmount()
+
+    renderSection({ capability: "", toolName: "" })
+    expect(shapeOf(), "a fresh mount reads only what the props say").toBe("unset")
+  })
+
+  it("⚠ UNSET renders BYTE-IDENTICALLY to today's empty-capability render, below the control", () => {
+    // ⚠ THE FIRST DRAFT OF THIS CASE CLAIMED IN WRITING THAT NO ID NORMALIZATION WAS NEEDED
+    // — "both sides are produced by the SAME component in the SAME run, so the generated ids
+    // cannot differ" — AND IT WAS OBSERVED RED. The claim is kept here rather than deleted,
+    // because the correction is the useful part: React's `useId` counter advances per MOUNT,
+    // not per commit, so two SEQUENTIAL mounts in one run carry DIFFERENT ids. Wave 2 needed
+    // a counted normalization for a reason it stated (its two sides are separated by a
+    // commit); this case needs one for a different reason, and needing one either way is
+    // what makes the counted form the house idiom rather than a wave-2 detail.
+    //
+    // The needle is READ OFF A REAL RENDER, never assumed: the emitted form on this tree is
+    // `_r_0_` — underscores, no guillemets — because React changed the format so the value
+    // is a valid CSS selector. A regex written against the guillemet form would replace
+    // NOTHING, the count below would read 0, and the case would go red for a reason that has
+    // nothing to do with this component.
+    const REACT_ID = /_r_[0-9a-z]+_/g
+    const normalize = (html: string) => {
+      let replaced = 0
+      const out = html.replace(REACT_ID, () => {
+        replaced += 1
+        return "«id»"
+      })
+      return { out, replaced }
+    }
+
+    const first = renderSection({ capability: "", toolName: "" })
+    const unsetHtml = screen.getByTestId("external-action-options").outerHTML
+    const unsetNote = screen.getByTestId("external-action-nothing-chosen").outerHTML
+    first.unmount()
+
+    // The state the shipped suite drives everywhere — `capability: ""`, no tool.
+    renderSection({ capability: "" })
+    const shippedHtml = screen.getByTestId("external-action-options").outerHTML
+    const shippedNote = screen.getByTestId("external-action-nothing-chosen").outerHTML
+
+    // NON-VACUITY FIRST — two empty strings compare equal, and would prove nothing.
+    expect(unsetHtml.length).toBeGreaterThan(200)
+    expect(shippedHtml.length).toBeGreaterThan(200)
+    expect(unsetNote.length).toBeGreaterThan(20)
+
+    const a = normalize(unsetHtml)
+    const b = normalize(shippedHtml)
+    // COUNTED — the capability group reaches the DOM with exactly ONE generated id
+    // (`aria-labelledby` on the group; the heading carries the same value on `id`, which is
+    // outside this subtree). A count of 0 here would mean the needle stopped matching.
+    expect(a.replaced, "the options subtree carries exactly one generated id").toBe(1)
+    expect(b.replaced).toBe(1)
+    expect(a.out).toBe(b.out)
+
+    // The note carries NO generated id at all, so it compares raw — and that asymmetry is
+    // asserted rather than assumed.
+    expect(normalize(unsetNote).replaced).toBe(0)
+    expect(unsetNote).toBe(shippedNote)
+  })
+})
+
+// ── 9. THE PATCHES, EXACTLY ──────────────────────────────────────────────────────────
+
+describe("ExternalActionSection — the multi-key clear (D-206.2-17 / AR-05)", () => {
+  it("press A emits ONE patch clearing tool_name, tool_args and connection_id", () => {
+    // ⚠ THE ASYMMETRY: a stranded `capability` on an MCP step is INERT, but a stranded
+    // `tool_name` on a capability step SILENTLY turns an email step into an MCP step. This
+    // is the direction that must not be skipped.
+    const onChangeShape = vi.fn()
+    const onPersist = vi.fn()
+    renderSection({ toolName: "ask_question", onChangeShape, onPersist })
+
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_SHAPE_CAPABILITY_LABEL }))
+
+    expect(onChangeShape).toHaveBeenCalledTimes(1)
+    const patch = onChangeShape.mock.calls[0][0] as Record<string, unknown>
+    // SET EQUALITY, never `toMatchObject` — a superset passes a PARTIAL clear, and a
+    // partial clear is the whole defect (arguments for a tool that no longer exists).
+    expect(Object.keys(patch).sort()).toEqual(["connection_id", "tool_args", "tool_name"])
+    expect(patch.tool_name).toBeUndefined()
+    expect(patch.tool_args).toBeUndefined()
+    // `null`, NOT `undefined` — it is what the shipped unbind writes, and two spellings of
+    // "unbound" is how two readers come to disagree.
+    expect(patch.connection_id).toBeNull()
+    expect(onPersist).toHaveBeenCalledTimes(1)
+  })
+
+  it("press B emits ONE patch clearing capability and connection_id", () => {
+    const onChangeShape = vi.fn()
+    const onPersist = vi.fn()
+    renderSection({ capability: "send_email", onChangeShape, onPersist })
+
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_SHAPE_MCP_LABEL }))
+
+    expect(onChangeShape).toHaveBeenCalledTimes(1)
+    const patch = onChangeShape.mock.calls[0][0] as Record<string, unknown>
+    expect(Object.keys(patch).sort()).toEqual(["capability", "connection_id"])
+    expect(patch.capability).toBeUndefined()
+    expect(patch.connection_id).toBeNull()
+    expect(onPersist).toHaveBeenCalledTimes(1)
+  })
+
+  it("⚠ AR-05 — BOTH directions clear connection_id, and no upstream document named it", () => {
+    // A left-behind id points at a row of the OTHER shape. The picker shows its unbound
+    // reading (the id is not in the newly-filtered list) while the SAVED definition still
+    // carries it, and the executor really resolves a connection of the wrong kind.
+    for (const props of [
+      { toolName: "ask_question", index: 0 },
+      { capability: "send_email", index: 1 },
+    ]) {
+      const onChangeShape = vi.fn()
+      const { unmount } = renderSection({ ...props, onChangeShape })
+      fireEvent.click(shapeOptions()[props.index])
+      const patch = onChangeShape.mock.calls[0][0] as Record<string, unknown>
+      expect(Object.keys(patch)).toContain("connection_id")
+      expect(patch.connection_id).toBeNull()
+      unmount()
+    }
+  })
+
+  it("pressing the ALREADY-chosen segment writes nothing — the capability row's rule", () => {
+    const onChangeShape = vi.fn()
+    const onPersist = vi.fn()
+    renderSection({ capability: "send_email", onChangeShape, onPersist })
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_SHAPE_CAPABILITY_LABEL }))
+    expect(onChangeShape).not.toHaveBeenCalled()
+    expect(onPersist).not.toHaveBeenCalled()
+  })
+
+  it("⚠ THE WIRES ARE NOT CROSSED — both directions, because either alone would miss it", () => {
+    const onChange = vi.fn()
+    const onChangeShape = vi.fn()
+    const { unmount } = renderSection({ capability: "", onChange, onChangeShape })
+    fireEvent.click(shapeOptions()[1])
+    expect(onChange, "a shape press must not reach the single-key writer").not.toHaveBeenCalled()
+    expect(onChangeShape).toHaveBeenCalledTimes(1)
+    unmount()
+
+    const rowChange = vi.fn()
+    const rowShape = vi.fn()
+    renderSection({ capability: "", onChange: rowChange, onChangeShape: rowShape })
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_CAPABILITY_SENTENCES.create_ticket }))
+    expect(rowChange).toHaveBeenCalledWith("create_ticket")
+    expect(rowShape, "a capability row must not reach the multi-key writer").not.toHaveBeenCalled()
+  })
+})
+
+// ── 10. RESEARCH ASSUMPTION A1 — FALSIFIED HERE, NOT DEFERRED ────────────────────────
+
+describe("ExternalActionSection — the clear survives SERIALIZATION (A1)", () => {
+  /** A store already in the DRAFTED view — the shipped `patchConfig` bails otherwise, so a
+   *  store built from `null` could never record the write these cases are about. */
+  const draftedStore = (config: Record<string, unknown>) =>
+    createBuilderStore({
+      slug: "vendor-brief",
+      version: 1,
+      phases: [
+        {
+          slug: "reach-out",
+          phase_index: 0,
+          config: { phase_type: "external_action", ...config },
+        },
+      ],
+    } as Parameters<typeof createBuilderStore>[0])
+
+  it("A1 — an undefined value leaves the key in MEMORY and is DROPPED on the wire", () => {
+    // RESEARCH logs this as assumption A1, UNFALSIFIED, with its falsification step named.
+    // It moves to FALSIFIED-AT-T1 here; the T4 browser confirmation is still owed to 206.2-04.
+    //
+    // ⚠ BOTH HALVES ARE ASSERTED, because the difference between them IS the assumption.
+    // If only the serialized half were checked, a merge that had started deleting keys
+    // would pass identically and nobody would learn which mechanism is load-bearing.
+    const store = draftedStore({
+      capability: "send_email",
+      tool_name: "ask_question",
+      tool_args: '{"q":"x"}',
+      connection_id: "conn-mcp",
+    })
+
+    renderSection({
+      capability: "send_email",
+      toolName: "ask_question",
+      onChangeShape: (patch) => store.getState().patchConfig("reach-out", patch),
+    })
+
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_SHAPE_CAPABILITY_LABEL }))
+
+    const inMemory = store.getState().phases[0].config as unknown as Record<string, unknown>
+    // HALF ONE — the merge is a pure spread, so the KEYS are still present in memory.
+    expect(Object.keys(inMemory)).toContain("tool_name")
+    expect(Object.keys(inMemory)).toContain("tool_args")
+    expect(inMemory.tool_name).toBeUndefined()
+    expect(inMemory.tool_args).toBeUndefined()
+
+    // HALF TWO — and serialization, which is what the server is handed, drops them.
+    const onTheWire = JSON.parse(JSON.stringify(store.getState().phases)) as Array<{
+      config: Record<string, unknown>
+    }>
+    expect(Object.keys(onTheWire[0].config)).not.toContain("tool_name")
+    expect(Object.keys(onTheWire[0].config)).not.toContain("tool_args")
+    // NON-VACUITY — the serialized config is not simply empty, and `connection_id` really
+    // survives as an explicit null rather than being dropped alongside them.
+    expect(onTheWire[0].config.phase_type).toBe("external_action")
+    expect(onTheWire[0].config).toHaveProperty("connection_id", null)
+  })
+
+  it("the OTHER direction lands the same way — a stranded capability is dropped too", () => {
+    const store = draftedStore({ capability: "send_email", connection_id: "conn-mail" })
+
+    renderSection({
+      capability: "send_email",
+      onChangeShape: (patch) => store.getState().patchConfig("reach-out", patch),
+    })
+
+    fireEvent.click(screen.getByRole("radio", { name: EXTERNAL_SHAPE_MCP_LABEL }))
+
+    const onTheWire = JSON.parse(JSON.stringify(store.getState().phases)) as Array<{
+      config: Record<string, unknown>
+    }>
+    expect(Object.keys(onTheWire[0].config)).not.toContain("capability")
+    expect(onTheWire[0].config).toHaveProperty("connection_id", null)
+  })
+})
+
+// ── 11. THE SHAPE CONTROL'S OWN FENCES ───────────────────────────────────────────────
+
+describe("ExternalActionSection — the shape control spends nothing it may not", () => {
+  it("AR-07 — no mark span and no accent ink on the segments", () => {
+    renderSection()
+    for (const segment of shapeOptions()) {
+      expect(segment.querySelector('[aria-hidden="true"]'), "no second dot mark").toBeNull()
+      const cls = segment.getAttribute("class") ?? ""
+      expect(cls).not.toMatch(/\b(bg|text|border)-primary\b/)
+    }
+    // POSITIVE CONTROL — the capability rows DO carry the mark, so the absence above is a
+    // scope decision rather than a selector that matches nothing.
+    expect(options()[0].querySelector('[aria-hidden="true"]')).not.toBeNull()
+  })
+
+  it("no forbidden spacing value, weight or dead colour utility enters this file", () => {
+    for (const needle of [
+      "p-0.5",
+      "gap-0.5",
+      "py-2.5",
+      "space-y-",
+      "font-semibold",
+      "font-bold",
+      "text-panel-",
+      "text-muted-foreground-dim",
+    ]) {
+      expect(externalActionSectionSource, needle).not.toContain(needle)
+    }
+    // POSITIVE CONTROL — a needle really can match.
+    expect('class="p-0.5 font-semibold"').toContain("p-0.5")
+  })
+
+  it("the shape vocabulary is a TRUE LEAF and spells no capability id", () => {
+    const modules = import.meta.glob("/src/**/*.{ts,tsx}", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>
+    const source = modules["/src/components/workflows/externalShapeVocabulary.ts"]
+    expect(typeof source, "the glob really resolved this module").toBe("string")
+    expect(source.length).toBeGreaterThan(500)
+    expect(source).not.toMatch(/^import\s/m)
+    for (const name of EXTERNAL_ACTION_CAPABILITIES) {
+      expect(source, name).not.toContain(`"${name}"`)
+    }
+    // POSITIVE CONTROL — both patterns really match.
+    expect('import { x } from "y"').toMatch(/^import\s/m)
+    expect('const a = "send_email"').toContain('"send_email"')
+  })
+
+  it("the group label is NOT the section heading — the shipped exact-name query stays sharp", () => {
+    expect(EXTERNAL_SHAPE_GROUP_LABEL).not.toBe(EXTERNAL_ACTION_HEADING)
+    // …and no segment label names a capability id.
+    for (const name of EXTERNAL_ACTION_CAPABILITIES) {
+      expect(EXTERNAL_SHAPE_CAPABILITY_LABEL).not.toContain(name)
+      expect(EXTERNAL_SHAPE_MCP_LABEL).not.toContain(name)
+    }
+  })
+})
