@@ -80,33 +80,13 @@ def html_to_plain_text(html_content: str) -> str:
     return html.unescape(parser.get_text())
 
 
-def scrub_text(value: str | None) -> str:
-    """Strip characters Postgres `text` cannot store, and normalise to a real string.
-
-    ⚠ THIS EXISTS BECAUSE A REAL `.msg` FAILED INGESTION AT THE EMBEDDING STEP WITH
-    ``22P05: unsupported Unicode escape sequence — \\u0000 cannot be converted to text``.
-    Measured on the offending file: the NUL was in the **SUBJECT** (1 occurrence), not in
-    the body and not in any of the 19 headers. `extract-msg` reads MAPI properties out of an
-    OLE compound file, and those are frequently NUL-terminated; the terminator rides along in
-    the decoded string.
-
-    ⚠ POSTGRES REFUSES NUL IN `text` AT ANY DEPTH — there is no encoding that stores it, so
-    this cannot be pushed down to the driver or fixed with a cast. It has to be removed at the
-    boundary where the value is produced.
-
-    Removes NUL and the other C0/C1 control characters, KEEPING the three whitespace controls
-    that carry meaning in an email body (\\t, \\n, \\r). Never returns None.
-    """
-    if not value:
-        return ""
-    return "".join(
-
-        ch for ch in str(value)
-
-        if ch in "\t\n\r" or (ch >= " " and ch != "\x7f")
-
-    )
-
+# ── 260825 — `scrub_text` MOVED to `app.services.text_sanitize`, NOT deleted.
+#    BUG-260825-01 proved the document ingestion path had NO NUL strip at all while this
+#    module had one, so the fix needed ONE shared home rather than a fourth private copy.
+#    The re-export below keeps the Phase 203 import path live: `from
+#    app.services.email_extraction_service import scrub_text` still resolves, this module's
+#    own 15 call sites below are untouched, and the moved body is byte-identical.
+from app.services.text_sanitize import scrub_text  # noqa: F401  (re-export — see above)
 
 
 def sanitize_attachment_filename(name: str | None) -> str:
