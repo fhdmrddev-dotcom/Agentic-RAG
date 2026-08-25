@@ -6,36 +6,16 @@ status: executing
 last_updated: 2026-08-25
 last_activity: 2026-08-25
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 15
-  completed_plans: 14
-  percent: 93
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 16
+  completed_plans: 16
+  percent: 100
 stopped_at: >
-  Phase 206.2 (An MCP connection has somewhere to go) EXECUTED + VERIFIED 2026-08-25 - 4 plans,
-  4 serial waves. ALL SIX ROADMAP success criteria MET, each re-derived independently at
-  verification rather than quoted: the picker lists MCP rows, a grant was flipped through the UI
-  (updateConnectorGrants census 0 -> 1 production caller), the DENY case wrote its tool_refused
-  receipt, and a real run called DeepWiki and returned a real answer
-  (external_action_sent, capability="mcp", raw_status=200). Phase 206.1's owed SC#1b is CLOSED.
-  The two-legged reachability guard's vacuity is MEASURED: against the pre-phase tree leg (b)
-  went 5-of-11 RED while all three leg-(a) cases were GREEN in the same run.
-  Gates at close: count gate total 5700 / failed 0 / pinned 5125 / OK 113/113; tsc 34 with zero
-  in any touched file; backend 68 failed / 2613 passed. api.ts untouched across all four waves
-  (Phase 207 still owns it). Six hot-file rows + six sections landed in one commit (cdd31e4f).
-  ONE criterion NOT met and it is a DISCOVERY, not a regression: SC#3b - an MCP-shaped workflow
-  still cannot PUBLISH. Wave 1's validator fix is PROVED end to end (stage 2.6 passed with the
-  MCP step present); the block moved one stage later, to golden_run_error. Root cause is an
-  exception-swallowing handler in publish_service.py that dates to Phase 102-09 (78aad9ee /
-  18eff014), long before this feature existed. Per G-7 and the evidence this is a phase in a
-  different subsystem, NOT a gap-closure round on 206.2.
-  ⚠ SEED-201's CAUSAL DIAGNOSIS WAS REFUTED AT VERIFICATION and the seed is corrected:
-  test_v20_an_external_action_workflow_publishes drives a real armed checkpoint through a real
-  golden run for a CAPABILITY-shaped step and PASSES, so "every external_action workflow hangs"
-  is false - only the MCP shape was ever driven. Re-diagnose with an MCP-shaped mirror of that
-  test before scoping any fix, and do NOT weaken the D-04 approval checkpoint.
-  Still owed: CLAUDE.md is 133,006 chars, past the 120,000 warn band; the split-by-FUNCTION is
-  escalated as ROADMAP row 208 rather than shaved with thinner rows.
+  Phase 206.3 (A workflow that reaches outside can be published) COMPLETE. 1 plan executed.
+  Root cause fixed (_external_action_mcp_body with zero capability lookups, exception type
+  name preservation, golden_run_id preservation, 5 new unit tests, Playwright Chromium browser
+  drive verified green). Next: Phase 208 (CLAUDE.md split) & Phase 207 (api.ts split).
 ---
 
 # Project State
@@ -56,7 +36,20 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 206.2 executing — waves 1 and 2 done, wave 3 (the shape choice) next; then Phase 207 (`api.ts` split)
+**Current focus:** Phase 206.3 COMPLETE. Next: Phase 208 (CLAUDE.md split) & Phase 207 (api.ts split)
+
+## Current Position
+
+### 2026-08-25 — Phase 206.3 EXECUTED (1 of 1 plan, FINAL) — a workflow that reaches outside can be published
+
+Main working tree, plan `206.3-01-PLAN.md`, summary `.planning/phases/206.3-a-workflow-that-reaches-outside-can-be-published-insert/206.3-01-SUMMARY.md`.
+
+1. ✅ **ROOT CAUSE CLOSED (G-1)**: Created `_external_action_mcp_body(tool_name, resolved)` in `backend/app/services/harness/phase_types.py:1935-1957` with zero `[capability]` dictionary lookups. Updated `_record` in `_exec_external_action` to branch on `if mcp_tool_name:` and return `_external_action_mcp_body`.
+2. ✅ **EXCEPTION TRANSPARENCY & RUN ID PRESERVATION**: Updated `publish_service.py:312-324` and `1069-1075` to preserve `golden_run_id` across trial run exceptions and format exception type names (`f"{type(e).__name__}: {e}"`), preventing `KeyError(None)` collapsing to bare `"None"`.
+3. ✅ **UNIT SUITE GREEN**: Added 5 unit tests in `backend/tests/unit/test_publish_service.py` (83/83 passed in `test_publish_service.py`, 2678 passed across backend). Verified SC#5 / R-1 (live MCP run stops at D-04 checkpoint), R-2 (exception type preservation), R-3 (golden_run_id preservation in `_block`), and R-4 (version increment).
+4. ✅ **REAL BROWSER DRIVE (G-2)**: Executed `scripts/drive_phase_206_3_publish.py` using Chromium + Playwright with Supabase token auth against live backend. Published MCP draft `v1`, verified verdict modal, CTA (`Published MCP Publish Drive ... v1. Ready to run it.`), and database audit events (`publish_attempted`, `judge_verdict`, `publish_succeeded`).
+5. ✅ **HOT-FILE LEDGER & CLAUDE.md (R-5)**: Added hot-file ledger rows and detail sections for `backend/app/services/harness/phase_types.py` (`44 / 22 / 2621 L`) and `backend/app/services/harness/publish_service.py` (`21 / 11 / 1223 L`). Verified `check-claude-md-size.cjs`.
+6. ✅ **SEED-201 RESOLVED**: A workflow that reaches outside can be published.
 
 ## Current Position
 

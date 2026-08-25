@@ -4461,3 +4461,32 @@ because it reads as coverage.*
   on the server's `?capability=` query for the rest, so feeding an MCP row into the response and
   asserting it is not listed would be measuring a filter that does not exist. What is asserted instead
   is the ARGUMENT that makes the server exclude it.
+
+---
+
+## `backend/app/services/harness/phase_types.py`
+
+**Measured at `206.3-01`'s commit (2026-08-25): `44 commits / 22 phases / 2621 L` · G-5 FIRES (22 phases vs threshold 3).**
+
+⚠ **WAS ABSENT FROM BOTH DOCUMENTS AT TWENTY-TWO PHASES.** Added in Phase 206.3 to document MCP external action execution and golden run suppression mechanics.
+
+### Invariants a future editor is bound by
+
+- ⚠ **MCP EXTERNAL ACTIONS MUST NEVER INDEX CAPABILITY DICTIONARIES.** `_external_action_body` indexes `_EXTERNAL_ACTION_PHRASE[capability]` and `_EXTERNAL_ACTION_NEGATION[capability]`. For MCP external actions, `capability` is `None` / omitted. `_external_action_mcp_body(tool_name, resolved)` is a dedicated, leaf helper with ZERO `[capability]` indexing, preventing `KeyError: None` crashes in golden runs.
+- ⚠ **GOLDEN RUN EXTERNAL ACTIONS RECORD INTENTION WITHOUT OUTBOUND EGRESS.** D-16 / D-17 rule: during a golden run (trial run), external action steps return `status = "recorded_not_sent"` and output text acknowledging the intended action without executing network I/O or modifying external systems.
+- ⚠ **EXECUTION HONOURS TOOL GRANTS.** For MCP external action phases in live execution, the connector's `tool_grants` dictionary must explicitly grant the tool (`tool_grants.get(tool_name) is True`). Absent or falsy grants raise authorization refusal before any tool invocation.
+
+---
+
+## `backend/app/services/harness/publish_service.py`
+
+**Measured at `206.3-01`'s commit (2026-08-25): `21 commits / 11 phases / 1223 L` · G-5 FIRES (11 phases vs threshold 3).**
+
+⚠ **WAS ABSENT FROM BOTH DOCUMENTS AT ELEVEN PHASES.** Added in Phase 206.3 to document publish gauntlet failure reporting and run id preservation.
+
+### Invariants a future editor is bound by
+
+- ⚠ **GOLDEN RUN FAILURES MUST PRESERVE `golden_run_id`.** If a golden run raises an exception or fails, `_drive_golden_run` and `publish_workflow` stage 3 must capture and attach `golden_run_id` to the blocked verdict return and `harness_audit` event. An author reviewing a blocked publish needs the golden run id to inspect what happened.
+- ⚠ **EXCEPTION MESSAGES MUST INCLUDE EXCEPTION TYPE NAME.** `f"{type(e).__name__}: {e}" if str(e).strip() else type(e).__name__` prevents empty or bare string exception representations (such as `str(KeyError(None))` yielding `"None"` without context).
+- ⚠ **ALL AUDIT METADATA MUST USE STRING SCALARS CONSISTENTLY.** Querying `harness_audit.metadata` requires `(metadata #>> '{}')::jsonb ->> 'key'` syntax across Postgres queries.
+

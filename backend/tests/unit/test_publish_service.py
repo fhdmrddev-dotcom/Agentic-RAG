@@ -2017,3 +2017,243 @@ def test_v20_an_external_action_workflow_publishes(mock_asyncpg_pool):
     assert "NOT SENT" in persisted["text"], (
         f"the recorded body must read as NOT SENT, never as a receipt: {persisted['text']!r}"
     )
+
+
+_MCP_V20_SLUG = "lookup-deepwiki"
+
+
+def _mcp_external_action_definition_dict() -> dict:
+    return {
+        "slug": "mcp-external-action",
+        "version": 1,
+        "name": "MCP External Action Workflow",
+        "status": "draft",
+        "phases": [
+            {
+                "slug": _MCP_V20_SLUG,
+                "phase_index": 0,
+                "name": "Lookup DeepWiki",
+                "config": {
+                    "phase_type": "external_action",
+                    "tool_name": "read_wiki_structure",
+                    "tool_args": {"repo": "facebook/react"},
+                },
+                "validators": [],
+            }
+        ],
+        "business_requirement": "Inspect the repository structure via MCP DeepWiki tool.",
+    }
+
+
+def _mcp_v20_row() -> dict:
+    definition = _mcp_external_action_definition_dict()
+    return {
+        "id": _DEF_ID,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": "draft",
+        "definition": definition,
+        "created_by": UUID(_USER["id"]),
+    }
+
+
+def _drive_mcp_v20_publish(pool, *, extra_patches=None):
+    import asyncio
+    from app.services.harness import grounding as g
+    from app.services.harness import publish_service
+
+    supabase = _V20Supabase()
+    redis = _V20Redis()
+    recorder = _SubscribeRecorder()
+    run_id = uuid4()
+    phase_id = uuid4()
+
+    pool.set_fetch_result(
+        [{"id": phase_id, "slug": _MCP_V20_SLUG, "phase_index": 0,
+          "status": "pending", "output": {}}]
+    )
+
+    judge = AsyncMock(
+        return_value={
+            "overall_passed": True,
+            "overall_score": 94,
+            "summary": "Records the intended MCP tool call; nothing was sent.",
+            "criteria": [],
+        }
+    )
+
+    patches = [
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=_mcp_v20_row())),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+        patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=run_id)),
+        patch("app.db.runs.insert_run", AsyncMock()),
+        patch("app.db.runs.finalize_run", AsyncMock()),
+        patch("app.models.user_settings.load_user_settings", lambda _uid: None),
+        patch.object(
+            publish_service,
+            "_resolve_publish_supabase",
+            AsyncMock(return_value=(supabase, str(uuid4()))),
+        ),
+        patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=[])),
+        patch("app.utils.folder_utils._resolve_caller_org_ids", AsyncMock(return_value=set())),
+        patch.object(g, "_skill_registry", lambda *a, **k: []),
+        patch.object(publish_service, "_judge_golden_output", judge),
+        patch("app.services.ask_user_service.subscribe_for_response", recorder),
+    ]
+    if extra_patches:
+        patches.extend(extra_patches)
+
+    import contextlib
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+
+        result = asyncio.run(
+            publish_service.publish(
+                definition_id=_DEF_ID,
+                golden_input="inspect facebook/react structure",
+                user=_USER,
+                pool=pool,
+                redis=redis,
+            )
+        )
+
+    return SimpleNamespace(
+        result=result, subscribe_timeouts=recorder.timeouts, supabase=supabase, redis=redis,
+        phase_id=phase_id, run_id=run_id, recorder=recorder,
+    )
+
+
+def test_an_mcp_external_action_workflow_publishes(mock_asyncpg_pool):
+    """Phase 206.3 (CONN-02 / CONN-03 / D-206.3-01) — MCP-shaped external_action step PUBLISHES.
+
+    Mirrors `test_v20_an_external_action_workflow_publishes` for the MCP shape (`tool_name`
+    set, `capability=None`). Asserts:
+    1. `published is True` and `blocked_stage is None` (never golden_run_error).
+    2. Golden run records `recorded_not_sent` with `tool_name` in recorded_intent.
+    3. No approval wait or ask-channel subscribe.
+    """
+    run = _drive_mcp_v20_publish(mock_asyncpg_pool)
+
+    assert run.result["published"] is True, (
+        f"D-206.3-01: an MCP external_action workflow did NOT publish. "
+        f"blocked_stage={run.result.get('blocked_stage')!r} "
+        f"named_failures={run.result.get('named_failures')!r}"
+    )
+    assert run.result.get("blocked_stage") is None, (
+        f"the publish carried a blocked_stage: {run.result.get('blocked_stage')!r}"
+    )
+    assert run.result["version"] == 2
+
+    assert run.subscribe_timeouts == [], (
+        f"the golden run subscribed to the ask channel ({run.subscribe_timeouts!r})"
+    )
+
+    recorded = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls
+        if "SET status='recorded_not_sent'" in sql
+    ]
+    assert len(recorded) == 1, (
+        f"the golden run's external-action phase never reached recorded_not_sent. "
+        f"workflow_phases writes: "
+        f"{[s for s, _ in mock_asyncpg_pool.calls if 'UPDATE workflow_phases' in s]!r}"
+    )
+
+    from app.models.thread import phase_output_object
+
+    persisted = phase_output_object(recorded[0][1][1])
+    assert persisted is not None, (
+        f"the recorded_not_sent payload was neither a dict nor JSON text: "
+        f"{recorded[0][1][1]!r}"
+    )
+    assert persisted["recorded_intent"]["tool_name"] == "read_wiki_structure"
+    assert "NOT SENT" in persisted["text"], (
+        f"the recorded body must read as NOT SENT: {persisted['text']!r}"
+    )
+
+
+def test_live_mcp_run_still_stops_at_approval_checkpoint(mock_asyncpg_pool):
+    """Phase 206.3 (R-1 / SC#5) — Positive control: live (non-golden) MCP run STOPS at D-04 checkpoint.
+
+    Asserts that when `is_golden_run=False`, the action-risk approval checkpoint is NOT bypassed.
+    """
+    import asyncio
+    from app.models.harness import WorkflowDefinition
+    from app.services import harness_engine
+
+    definition = WorkflowDefinition.model_validate(_mcp_external_action_definition_dict())
+    recorder = _SubscribeRecorder()
+
+    ctx = SimpleNamespace(
+        run_id=uuid4(),
+        producer_run_id=uuid4(),
+        thread_id=str(uuid4()),
+        current_user={"id": str(uuid4())},
+        user_settings=None,
+        model="gpt-test",
+        inputs={},
+        redis=_V20Redis(),
+        pool=mock_asyncpg_pool,
+        emit=AsyncMock(),
+        retry_feedback=None,
+        supabase=None,
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        spawn=lambda coro: asyncio.create_task(coro),
+        per_run_task_semaphore=asyncio.Semaphore(1),
+        is_golden_run=False,  # LIVE RUN
+    )
+
+    mock_asyncpg_pool.set_fetch_result(
+        [{"id": uuid4(), "slug": _MCP_V20_SLUG, "phase_index": 0, "status": "pending", "output": {}}]
+    )
+
+    with patch("app.services.ask_user_service.subscribe_for_response", recorder):
+        try:
+            asyncio.run(
+                harness_engine.run_workflow(
+                    ctx.run_id, definition, ctx, pool=mock_asyncpg_pool, redis=ctx.redis
+                )
+            )
+        except Exception:
+            pass  # The recorder raises TimeoutError intentionally
+
+    assert len(recorder.timeouts) == 1, (
+        f"Live MCP run did not subscribe to the ask channel for approval! timeouts={recorder.timeouts!r}"
+    )
+
+
+def test_golden_run_named_failure_preserves_exception_type(mock_asyncpg_pool):
+    """Phase 206.3 (R-2 / SC#1) — Negative control: exception during golden run names its type.
+
+    Asserts that an unhandled error during golden run (e.g. ValueError) is formatted as
+    'ValueError: ...' and never collapses to the bare string 'None'.
+    """
+    with patch("app.services.harness_engine.run_workflow", AsyncMock(side_effect=ValueError("Simulated custom engine failure"))):
+        run = _drive_mcp_v20_publish(mock_asyncpg_pool)
+
+    assert run.result["published"] is False
+    assert run.result["blocked_stage"] == "golden_run_error"
+    failures = run.result["named_failures"]
+    assert len(failures) == 1
+    assert "ValueError: Simulated custom engine failure" in failures[0]
+    assert "None" not in failures[0]
+
+
+def test_golden_run_failure_preserves_golden_run_id(mock_asyncpg_pool):
+    """Phase 206.3 (R-3 / SC#4) — Failure path seam: run_id is preserved when golden run raises.
+
+    Asserts that when run_workflow raises after create_workflow_run created the row,
+    golden_run_id in the _block verdict is the real run UUID (not None).
+    """
+    with patch("app.services.harness_engine.run_workflow", AsyncMock(side_effect=RuntimeError("Late crash"))):
+        run = _drive_mcp_v20_publish(mock_asyncpg_pool)
+
+    assert run.result["published"] is False
+    assert run.result["blocked_stage"] == "golden_run_error"
+    assert run.result["golden_run_id"] == run.run_id, (
+        f"golden_run_id was lost on failure! Expected {run.run_id}, got {run.result.get('golden_run_id')!r}"
+    )
+

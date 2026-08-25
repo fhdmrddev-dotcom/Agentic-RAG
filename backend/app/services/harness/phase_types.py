@@ -1932,6 +1932,30 @@ def _external_action_body(capability: str, resolved: dict) -> str:
     return "\n".join(lines)
 
 
+def _external_action_mcp_body(tool_name: str, resolved: dict) -> str:
+    """Compose the NOT-SENT body for an MCP external action step.
+
+    ⚠ Phase 206.3 / G-1 / D-206.3-05: `_external_action_body` indexes `capability` in TWO places
+    (_EXTERNAL_ACTION_PHRASE and _EXTERNAL_ACTION_NEGATION). For an MCP step, `capability` is None.
+    This composer is separate by design and MUST contain ZERO `[capability]` indexes.
+    """
+    labels = ["Action", *(str(k) for k in resolved)]
+    width = max(len(lbl) for lbl in labels)
+    lines = [
+        "NOT SENT — recorded only.",
+        "",
+        "What this step would have done",
+        f"  {'Action'.ljust(width)}: Call MCP tool '{tool_name}'",
+    ]
+    lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
+    lines += [
+        "",
+        "No external MCP tool was invoked. Nothing left this workflow. "
+        "This is a record of an intention, not a receipt.",
+    ]
+    return "\n".join(lines)
+
+
 def _external_action_sent_body(capability: str, resolved: dict, result, host: str) -> str:
     """Compose the SENT body — the ONLY body in this file that may describe something that
     actually happened, and it is reached only from the adapter's own ``ok`` verdict.
@@ -2302,10 +2326,20 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
 
     def _record(reason: str) -> dict:
         """The 189 terminal, unchanged: ONE composer for the one sentence."""
+        target_name = mcp_tool_name or capability
         logger.info(
             "190 D-17: external_action phase %r RECORDED the intended %r and sent nothing "
-            "(%s)", slug, capability, reason,
+            "(%s)", slug, target_name, reason,
         )
+        if mcp_tool_name:
+            return {
+                "text": _external_action_mcp_body(mcp_tool_name, resolved),
+                RECORDED_INTENT_KEY: {
+                    "tool_name": mcp_tool_name,
+                    "capability": "mcp",
+                    "inputs": resolved,
+                },
+            }
         return {
             "text": _external_action_body(capability, resolved),
             RECORDED_INTENT_KEY: {"capability": capability, "inputs": resolved},
