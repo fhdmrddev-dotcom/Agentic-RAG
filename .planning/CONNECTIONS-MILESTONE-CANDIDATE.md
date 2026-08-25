@@ -298,3 +298,29 @@ Nothing currently on the ROADMAP addresses any of this. The remaining registered
 (a publish bug), **207** (`api.ts` split) and **208** (CLAUDE.md split) — one fix and two debts.
 **The honest answer to "when do we reach it" is: not on the current plan.** It needs the operator to
 either register Phase 209, open this milestone, or both.
+
+
+---
+
+## ⚠ 2026-08-25 — `SEED-202` IS THE REQUIREMENT THIS MILESTONE SHOULD BE SCOPED AGAINST
+
+The operator described the outcome they want, in their own words, and it exposes a structural gap
+none of this document previously named:
+
+**`external_action` is WRITE-ONLY, and half the vision is READS.** *"Go to Slack and read whatever
+other information, and add that up to what we saw in the knowledge base"* has **no shape in this
+product at all** — the three capabilities are three verbs that all push, and the whole vocabulary
+(*reaches outside*, *changes something outside*, *stops and asks you first*) assumes a write.
+
+⚠ **MCP already broke that assumption unnoticed:** `read_wiki_structure`, driven live on 2026-08-25,
+**is a read** — it took the write path, stopped for an approval it did not need, and the canvas told
+the operator it changes something outside.
+
+⚠ **AND THE RESEARCH THE OPERATOR ASKED FOR IS OWED AND UNDONE.** *"Leverage others' experience on
+how they do it and how it should fit in our application."* The three `screenshots/` are reference
+**designs**, not a study. `SEED-202` lists the four questions that must be answered — how the
+leaders model a read, how they present a large catalog without a capability taxonomy, how
+describe-to-build stays honest at that scale, and what OAuth costs — **before this milestone is
+scoped.** Scoping it now would be scoping from three screenshots and one example.
+
+Full statement, verbatim: `.planning/seeds/SEED-202-the-operators-vision-read-and-write-across-systems.md`

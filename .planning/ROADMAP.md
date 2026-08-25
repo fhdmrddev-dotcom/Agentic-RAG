@@ -43,6 +43,7 @@
 | 208 | **CLAUDE.md split by FUNCTION — the context-budget gate is in its warn band and climbing** | `CLAUDE.md` measures **133,006 chars (88.7% of the 150,000 hard limit, 16,994 of headroom)** after `206.2-04`'s six rows, up from `124,357` at this phase's base. At 150,000 Claude Code **refuses to load the file at all**, and every instruction in it silently stops applying to every agent, everywhere — a state this repository has already been in, unnoticed, for three commits. The gate names its own target: **`Workflow guardrails (MANDATORY)` is 76,531 chars, 62% of the file.** The split keeps the verdict / index / **complete audit scan list** in `CLAUDE.md` and moves the NARRATIVE to `docs/` under the same-commit sync rule — the `docs/HOT-FILE-LEDGER.md` and `docs/SANDBOX-PACKAGES.md` precedents. ⚠ **THE FIX IS NEVER A THINNER ROW.** A hot file missing from the table is permanently invisible to its own guardrail, so only prose may leave | (guardrail debt — context-budget trigger) | Planned — **ESCALATED by `206.2-04` 2026-08-25.** The split is a PHASE, not a task: `206.2-04` deliberately did not shave a cell to make the number smaller |
 | 206.3 | **(INSERT)** A workflow that reaches outside can be published | The publish gauntlet's golden run stops swallowing its own exception, names what actually failed, and a workflow carrying an external_action step reaches `published: true` | CONN-02 (follow-up), CONN-03 (follow-up) | ✅ Complete (2026-08-25) — 1 plan; _external_action_mcp_body with zero capability lookups; golden_run_id preserved; browser drive verified green |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
+| 209 | **A step says what it actually does** | The canvas node names the real service and action instead of "Reach outside", a read-only tool stops claiming it changes something outside, and the Connections filter stops being three hard-coded verbs | CONN-02 (follow-up), CONN-03 (follow-up) | Planned — **registered 2026-08-25 from live UAT**; the re-open plan `206.2-03` flagged in advance |
 
 ### Phase Checklist
 
@@ -103,6 +104,7 @@
 - [x] ✅ **Phase 206.2 (INSERT): An MCP connection has somewhere to go — 4 of 4 plans executed 2026-08-25.** The second door is open and was walked through in a browser: bind → discover → grant → refuse → send, with every reading taken from the source of truth rather than from the UI agreeing with itself. **SEED-146's standing rule is ANSWERED IN WRITING at the control's own site** (`McpToolPicker.tsx`): the per-tool grant IS the approval model for this surface, and this phase adds no new outbound capability. ⚠ **ONE CRITERION IS NOT MET AND IT IS NAMED RATHER THAN ABSORBED: SC#3b (publish).** Stage 2.6 passed; stage 3's golden run cannot complete for ANY `external_action` workflow, because the step's mandatory approval checkpoint has nobody to answer it. That is a pre-existing product gap, seeded, not a regression. Originally: ⚠ **REGISTERED 2026-08-25 FROM `SEED-200`, BY OPERATOR DECISION.** Phase 206 shipped the MCP client, SSRF defence, discovery, per-tool grants, executor dispatch and audit; Phase 206.1 shipped the door that CREATES a connection. **This is the second door: the one that USES it.** Measured over the wire with the org admin's own JWT — unfiltered `GET /connectors/connections` returns the MCP row, all three capability-filtered reads do not, and `POST /connectors/connections/{id}/discover` on that row returns **3 tools**. The backend has been ready throughout (`harness.py:260`'s own comment: *"an MCP step names a `tool_name` and has no capability at all, which is a legitimate absence"*). ⚠ **THIS IS THE PHASE-118 BUILT-BUT-UNREACHABLE SHAPE, AND EVERY GATE WAS GREEN WHILE IT SHIPPED** — `McpToolPicker.test.tsx` is green and in the count gate, because it mounts the component directly with a connection prop **that no production code path can produce**. A component test that constructs its own props cannot see that nothing constructs them in production; that is the whole finding. ⚠ **DO NOT "FIX" THIS BY GIVING MCP ROWS A FAKE CAPABILITY** — `capability` is a CHECK-constrained closed set at migration 116, `"mcp"` is not a member, and D-206.1-04's whole point is that the wire distinguishes the two shapes by `mcp_server_url`, never by a capability value. ⚠ **THE GRANT CONTROL IS A WRITE THAT WIDENS WHAT A WORKFLOW MAY DO** — and it is not optional here, because Phase 206's enforcement denies a missing key, so a bound step with no grant control can call nothing at all. SEED-146's standing rule (*never add an outbound capability before the approval model exists*) must be answered in writing at discuss-time rather than assumed either way.
 - [x] ✅ **Phase 206.3 (INSERT): A workflow that reaches outside can be published — COMPLETE 2026-08-25.** 1 plan executed. Root cause confirmed and fixed: `_external_action_mcp_body` separated in `phase_types.py` (zero `[capability]` indexes), dodging `KeyError: None` on Stage 3 golden runs. `publish_service.py` updated to format exception type names (`f"{type(e).__name__}: {e}"`) and preserve `golden_run_id` on failure paths and `harness_audit` events. 5 unit tests added in `test_publish_service.py` (83/83 passing). Playwright Chromium browser drive (`scripts/drive_phase_206_3_publish.py`) executed against live backend, published MCP draft `v1`, verified verdict modal, CTA, and database audit logs (`publish_attempted`, `judge_verdict`, `publish_succeeded`). Hot-file ledger updated for `phase_types.py` and `publish_service.py`.
 - [ ] **Phase 207: `api.ts` split — the hottest file in the repository** — ⚠ **CREATED 2026-08-25 BY THE ONLY MECHANISM ITS OWN TRIGGER PERMITS.** `docs/HOT-FILE-LEDGER.md`'s trigger for `frontend/src/lib/api.ts` reads verbatim: *"The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or escalates it to the operator as a phase of its own. It may NOT re-decline."* Phase 206 is that phase — `discoverConnectorTools` and `updateConnectorGrants` are functions, so the type-only defence that carried 197 and 192.2 is gone. **The operator chose escalation on 2026-08-25, and escalation means THIS ROW.** ⚠ The trigger was strengthened precisely because *"another entry in this file"* is the outcome it forbids: a paragraph in the ledger would have been a third decline wearing an escalation's clothes.).
+- [ ] **Phase 209: A step says what it actually does** — ⚠ **REGISTERED 2026-08-25 AFTER THE OPERATOR WAS SHOWN THE MCP ROUND TRIP WORKING.** Nothing was broken; the reaction was about the shape of the product: *"the step logo and the step label is still saying send an email… I did not see the real action… the filter is meaningless like Message or Ticket."* Measured at HEAD: `nodeEffectBanner.ts:40` states in its own docblock that the banner *"keys on `external_action`, the phase TYPE, and not on the resolved capability"*, and a grep for `tool_name` across `nodeVocabulary.ts` + `canvasModel.ts` returns **ZERO** — the node face **structurally cannot** name the tool it runs. The Connections chips are hard-bound to `send_email`/`create_ticket`/`post_message` (`connectionsCopy.ts:154-156`), so an MCP row — which has **no capability** — matches none of them and disappears when any chip is clicked. ⚠ **TWO OF THE THREE WERE FLAGGED BEFORE THE OPERATOR SAW THEM**, by plan `206.2-03`: *"Without this flag the first UAT round reports them as bugs."* This phase is that re-open, not a new defect. ⚠ **DO NOT FIX THE FILTER BY ADDING A FOURTH `MCP` CHIP** — that repeats the original mistake one row down and breaks again at the fifth connection kind; follow the Claude.ai reference in `screenshots/`, whose filter is about **state**, never about what a connector can do. ⚠ **THE EFFECT BANNER MUST GET MORE ACCURATE, NEVER SOFTER** — `CHANGES SOMETHING OUTSIDE` is Phase 185 governance vocabulary, and losing it on a step that really does change something outside would be a regression wearing a copy improvement's clothes. Full proposal, with the three reference designs: `.planning/PHASE-209-PROPOSAL-a-step-says-what-it-actually-does.md`.
 
 ---
 
@@ -772,6 +774,47 @@ approval mechanism, which the evidence says is innocent.
 5. The D-04 / Phase-185 approval checkpoint is intact — asserted, not assumed.
 6. Backend baseline unchanged, tsc baseline unchanged (`-p tsconfig.app.json`), count gate green with
    no per-file decrease.
+
+---
+
+#### Phase 209: A step says what it actually does
+
+**Goal**: A person reading the canvas can tell what a step will really do — which service, which
+action — and a person reading Settings → Connections can find every connection they have.
+
+**Requirements**: CONN-02 (follow-up), CONN-03 (follow-up)
+**Depends on**: Phase 206.2 (executed). Independent of 206.3 / 207 / 208.
+**Source**: live UAT 2026-08-25, plus the re-open triggers plan `206.2-03` planted in advance.
+**Reference designs**: `screenshots/` — Claude.ai Connectors, Claude.ai Plugins directory, and the
+xyOps workflow editor. Read them before planning; they are the acceptance bar.
+
+##### Scope — three items, all frontend
+
+1. The node face reads the **connection's service** and the step's `tool_name`, so an MCP step says
+   what it calls. Capability steps say their real action too.
+2. A **read-only** tool does not claim to change something outside. A writing tool still does.
+3. The Connections filter is about the connection, not about three verbs — an MCP connection is
+   findable.
+
+##### How we'd know this failed
+
+- The node face gains an MCP special-case instead of reading the connection — a fifth shape then
+  needs a fourth special-case.
+- The filter gains a fourth `MCP` chip: the same mistake, one row down.
+- The effect banner becomes vaguer to accommodate read tools. That is a governance regression.
+- ⚠ A service mark is drawn by hand or approximated. `connectionMark.tsx` and `fileTypeMark.tsx`
+  already exist as the one shared seam; the icon convention forbids re-drawing a trademark.
+
+##### Success criteria
+
+1. A canvas node for an MCP step names its service and its tool — driven in a real browser.
+2. A read-only tool does not claim to change something outside; a writing tool still does. Both
+   asserted, and the Phase 185 vocabulary is not weakened.
+3. An MCP connection is findable through the Connections filter.
+4. Marks resolve from the ONE shared map; every slug verified; no hand-drawn trademark.
+5. The three shipped capability shapes render byte-identically.
+6. Backend baseline unchanged, `tsc -p tsconfig.app.json` unchanged, count gate green with no
+   per-file decrease.
 
 ---
 
