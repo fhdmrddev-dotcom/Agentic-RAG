@@ -54,7 +54,7 @@ function bodyOf(shape: Shape): string {
   return svg!.innerHTML
 }
 
-function glyphClass(shape: Shape, size: "row" | "chip"): string {
+function glyphClass(shape: Shape, size: "row" | "chip" | "canvas"): string {
   const { container } = render(<ConnectionMarkGlyph shape={shape ?? {}} size={size} />)
   const svg = container.querySelector("svg")
   expect(svg).not.toBeNull()
@@ -152,6 +152,11 @@ describe("D-206.1-11 — MCP identifies itself, it does not fall off the end of 
 
   it("an EMPTY-STRING url is not a url — it resolves the named neutral", () => {
     expect(connectionMark({ capability: null, mcp_server_url: "" }).key).toBe("unknown")
+  })
+
+  it("Phase 209 (Item 1) — a non-empty tool_name resolves MCP even without mcp_server_url", () => {
+    expect(connectionMark({ tool_name: "read_wiki_structure" }).key).toBe("mcp")
+    expect(connectionMark({ tool_name: "search_docs", capability: null }).key).toBe("mcp")
   })
 
   it("the MCP mark is neither Slack's nor Jira's — asserted on the RENDERED BODY", () => {
@@ -314,6 +319,14 @@ describe("AR-02 — three inks, one per icon-body mechanic", () => {
           .sort()
           .join(" ")
       expect(inkOf(chip)).toBe(inkOf(row))
+    }
+  })
+
+  it("Phase 209 (Item 1) — at canvas size the SIZE tokens are h-8 w-8 and INK tokens match", () => {
+    for (const shape of [SLACK, JIRA, SMTP, MCP, UNMAPPED]) {
+      const canvas = glyphClass(shape, "canvas")
+      expect(canvas).toContain("h-8")
+      expect(canvas).toContain("w-8")
     }
   })
 })

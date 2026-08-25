@@ -293,6 +293,13 @@ class McpClient:
                 "name": name,
                 "description": description,
                 "inputSchema": input_schema,
+                # Phase 209 (SC#2 · D-209-02) — forward annotations so `readOnlyHint`
+                # reaches the frontend. The MCP spec places `readOnlyHint` inside the
+                # `annotations` object on a tool entry; dropping it here is what made the
+                # `ONLY READS` banner arm dead code. Only forwarded when present and a dict.
+                **({
+                    "annotations": item["annotations"]
+                } if isinstance(item.get("annotations"), dict) else {}),
             })
 
         return sanitized_tools

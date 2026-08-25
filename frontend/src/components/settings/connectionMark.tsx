@@ -118,6 +118,7 @@ export type ConnectionMarkInk = "self" | "fill" | "stroke"
 export interface ConnectionMarkShape {
   capability?: string | null
   mcp_server_url?: string | null
+  tool_name?: string | null
 }
 
 /** A resolved mark: which entry answered, what to render, and how to ink it. */
@@ -179,11 +180,9 @@ export const CONNECTION_MARK_KEYS: readonly string[] = Object.keys(MARKS)
  * inline, and it is the only spelling shipped anywhere in `frontend/src`.
  *
  * ── ARM ORDER, STATED AND ENFORCED ──
- *  1. MCP, by `mcp_server_url` being a non-empty string. It is FIRST because MCP is a
- *     SHAPE, not a capability. ⚠ It is never resolved by `capability === null` and never by
- *     falling off the end of a ladder — that positional fallback is the exact defect
- *     `destinationFactsOf` shipped, where every MCP connection claimed to send to
- *     `slack.com/api` until `147f3c57` repaired it (D-206.1-11).
+ *  1. MCP, by `mcp_server_url` or `tool_name` being a non-empty string. It is FIRST
+ *     because MCP is a SHAPE, not a capability. ⚠ It is never resolved by
+ *     `capability === null` and never by falling off the end of a ladder.
  *  2. the three capability arms, each by its own key, through the own-property guard.
  *  3. the NAMED neutral.
  */
@@ -191,16 +190,20 @@ export function connectionMark(shape: ConnectionMarkShape | null | undefined): C
   const url = shape?.mcp_server_url
   if (typeof url === "string" && url.trim().length > 0) return MCP_MARK
 
+  const tool = shape?.tool_name
+  if (typeof tool === "string" && tool.trim().length > 0) return MCP_MARK
+
   const capability = shape?.capability
   if (typeof capability !== "string") return NEUTRAL_MARK
   if (!Object.prototype.hasOwnProperty.call(MARKS, capability)) return NEUTRAL_MARK
   return MARKS[capability]
 }
 
-/** Size tokens. The ONLY thing the two call sites differ by. */
-const SIZE_CLASS: Record<"row" | "chip", string> = {
+/** Size tokens. The ONLY thing the consuming call sites differ by. */
+const SIZE_CLASS: Record<"row" | "chip" | "canvas", string> = {
   row: "h-4 w-4 flex-none",
   chip: "h-3 w-3 flex-none",
+  canvas: "h-8 w-8 flex-none",
 }
 
 /** Ink tokens, one per body mechanic. `self` adds nothing — see the header for why. */
@@ -211,21 +214,17 @@ const INK_CLASS: Record<ConnectionMarkInk, string> = {
 }
 
 /**
- * The ONE render path. Both consuming call sites use this, parameterised by size and never
- * branched on — the `FileRow.tsx:220-227` habit: exactly one call to the shared module in
- * each consuming file, so a per-surface vocabulary cannot start by accident.
+ * The ONE render path. Parameterised by size and never branched on.
  *
  * `aria-hidden` because a mark is never the accessible name of anything here: the row's name
- * is its own text, and the chip's label is its own text. ⚠ And no `title` attribute, ever —
- * `ConnectionsTab.test.tsx:505-515` asserts ZERO `[title]` nodes on this surface with a menu
- * and a sheet open.
+ * is its own text, and the chip's label is its own text.
  */
 export function ConnectionMarkGlyph({
   shape,
   size,
 }: {
   shape: ConnectionMarkShape
-  size: "row" | "chip"
+  size: "row" | "chip" | "canvas"
 }) {
   const { Mark, ink } = connectionMark(shape)
   return <Mark aria-hidden="true" className={cn(SIZE_CLASS[size], INK_CLASS[ink])} />

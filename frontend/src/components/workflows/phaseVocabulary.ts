@@ -661,6 +661,50 @@ export interface NameContext {
    * does not send to, on the one card whose whole job is to say where it sends.
    */
   connectionNames?: Readonly<Record<string, string>>
+  /**
+   * Phase 209 (Item 1 · D-209-01) — connection id → `mcp_server_url | null`.
+   *
+   * Needed so the canvas node mark resolver (`nodePresentation.ts` / `connectionMark.tsx`) can
+   * determine whether the bound connection is an MCP connection and render the MCP mark.
+   * `ExternalActionPhaseConfig` carries only `connection_id`; `mcp_server_url` lives on the
+   * `ConnectorConnection` row. Without this lookup, every MCP node falls through to the neutral
+   * Plug mark because `mcp_server_url` is never in the phase config.
+   *
+   * ⚠ ABSENT OR MISSING KEY ⇒ the mark resolver sees `undefined` and falls through to the
+   * Plug — the same shipped behaviour as before Phase 209. Connections without `mcp_server_url`
+   * store `null` in this map (explicitly non-MCP), not `undefined`; a missing key means the map
+   * has not yet resolved (the same PITFALL-1 accepted for all three name maps).
+   *
+   * ⚠ NOTHING FROM `ConnectorConnection.config` OR SECRETS reaches this map. Only the
+   * `mcp_server_url` column — which is already exposed in every `GET /connectors/connections`
+   * response to authenticated users — is read and stored here.
+   */
+  mcpServerUrls?: Readonly<Record<string, string | null>>
+  /**
+   * Phase 209 (Item 2 · SC#2) — connection id → tool name → the tool's own
+   * `annotations.readOnlyHint`, as the SERVER declared it.
+   *
+   * ⚠ WHY A THIRD MAP AND NOT A FIELD ON THE PHASE CONFIG. `readOnlyHint` is a property of a
+   * TOOL on a connection, not of the step that calls it: two steps binding the same connection
+   * and different tools have different answers, and the author never types it. It therefore
+   * lives where `mcp_server_url` lives — on the `ConnectorConnection` row, inside
+   * `discovered_tools[].annotations` — and reaches the face by lookup, exactly as the two maps
+   * above do. `ExternalActionPhaseConfig` declares `connection_id` + `tool_name` and nothing
+   * else, so a config-shaped read is structurally always `undefined`.
+   *
+   * ⚠ ABSENT, MISSING KEY, OR MISSING TOOL ⇒ `undefined` ⇒ the banner FAILS CLOSED to
+   * `CHANGES SOMETHING OUTSIDE`. That is the whole safety property and it is not an
+   * optimisation: the MCP specification states an UNANNOTATED tool is to be treated as
+   * destructive, so silence must never read as "only reads". Only an explicit `true` from the
+   * server earns the quiet banner.
+   *
+   * ⚠ AND NEVER INFERRED FROM THE TOOL'S NAME. A `get_`-prefixed tool that deletes is a
+   * legitimate MCP tool; a name-prefix guess would print ONLY READS over it in the most
+   * confident type on the card. Measured beside this: DeepWiki — the one server reachable
+   * without OAuth — ships NO annotations on any of its three tools, so it exercises the
+   * fail-closed arm only and cannot demonstrate the positive one.
+   */
+  toolReadOnly?: Readonly<Record<string, Readonly<Record<string, boolean>>>>
 }
 
 /** Module-scope so an omitted context hands the SAME reference on every call — the
@@ -698,6 +742,9 @@ export interface DerivedFaceInputs {
    *  `capability`, this is a resolved name and never an id: a miss yields `undefined` and the
    *  destination-free sentence renders. IGNORED outside `external_action`. */
   connectionName?: string
+  /** Phase 209 (Item 1 · D-209-01) — the MCP tool name, RAW as stored in `config.tool_name`.
+   *  Formatted as `<ConnectionName> · <toolName>` or `<toolName>` when unbound. */
+  toolName?: string
 }
 
 /**
@@ -818,24 +865,35 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
   //     a stored `"constructor"` returns the `Object` FUNCTION from either of them rather than
   //     firing a fallback — the measured hard render crash of 188.1-04, and it would now have
   //     two doors instead of one.
-  if (
-    inputs.phaseType === EXTERNAL_ACTION_PHASE_TYPE &&
-    typeof inputs.capability === "string" &&
-    Object.prototype.hasOwnProperty.call(EXTERNAL_CAPABILITY_SENTENCES, inputs.capability)
-  ) {
-    const verb = EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
-    const destination =
-      typeof inputs.connectionName === "string" ? inputs.connectionName.trim() : ""
-    if (
-      destination.length > 0 &&
-      Object.prototype.hasOwnProperty.call(
-        EXTERNAL_CAPABILITY_DESTINATION_JOINERS,
-        inputs.capability,
-      )
-    ) {
-      return `${verb} ${EXTERNAL_CAPABILITY_DESTINATION_JOINERS[inputs.capability]} ${destination}`
+  if (inputs.phaseType === EXTERNAL_ACTION_PHASE_TYPE) {
+    if (typeof inputs.toolName === "string" && inputs.toolName.trim().length > 0) {
+      const tool = inputs.toolName.trim()
+      const destination =
+        typeof inputs.connectionName === "string" ? inputs.connectionName.trim() : ""
+      if (destination.length > 0) {
+        return `${destination} · ${tool}`
+      }
+      return tool
     }
-    return verb
+
+    if (
+      typeof inputs.capability === "string" &&
+      Object.prototype.hasOwnProperty.call(EXTERNAL_CAPABILITY_SENTENCES, inputs.capability)
+    ) {
+      const verb = EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
+      const destination =
+        typeof inputs.connectionName === "string" ? inputs.connectionName.trim() : ""
+      if (
+        destination.length > 0 &&
+        Object.prototype.hasOwnProperty.call(
+          EXTERNAL_CAPABILITY_DESTINATION_JOINERS,
+          inputs.capability,
+        )
+      ) {
+        return `${verb} ${EXTERNAL_CAPABILITY_DESTINATION_JOINERS[inputs.capability]} ${destination}`
+      }
+      return verb
+    }
   }
 
   // (5) HUMAN INPUT — nothing is bound, but the type alone says what happens.
@@ -895,6 +953,12 @@ export function derivedFaceOf(
   const connectionName =
     typeof rawConnectionId === "string" ? ctx.connectionNames?.[rawConnectionId] : undefined
 
+  const rawToolName = config.tool_name
+  const toolName =
+    typeof rawToolName === "string" && rawToolName.trim().length > 0
+      ? rawToolName.trim()
+      : undefined
+
   return derivedFace({
     phaseType: typeof config.phase_type === "string" ? config.phase_type : "",
     skillName,
@@ -903,6 +967,7 @@ export function derivedFaceOf(
     folderName,
     capability,
     connectionName,
+    toolName,
   })
 }
 

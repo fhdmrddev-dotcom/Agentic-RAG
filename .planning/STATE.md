@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: planning
-last_updated: "2026-08-25T18:32:42.712Z"
-last_activity: 2026-08-20
+status: complete
+last_updated: "2026-08-26T01:37:00.000Z"
+last_activity: 2026-08-26
 progress:
   total_phases: 10
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 13
-  percent: 60
+  completed_phases: 10
+  total_plans: 14
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
@@ -31,11 +31,24 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 207 (`api.ts` split) ✅ **COMPLETE 2026-08-25** — `6,815 → 412` lines, 12 modules behind a re-export barrel at the same path, 325 exports identical in both directions, count gate OK / tsc at baseline. The 197 / 192.2 / 204-03 decline is RETIRED. Next: **209** (a step says what it actually does). Phase 208 (CLAUDE.md split) ✅ **COMPLETE 2026-08-25** — `135,662 → 82,707` chars, and the structural guard the 2026-08-17 split skipped is now in place and driven RED. Next: **207** (`api.ts` split) or **209** (a step says what it actually does). Phase 206.3 EXECUTED and ✅ **INDEPENDENTLY VERIFIED 2026-08-25** — 6/6 success criteria met, reproduced not re-read (`.planning/phases/206.3-a-workflow-that-reaches-outside-can-be-published-insert/206.3-VERIFICATION.md`). ⚠ Four findings recorded there, none an SC failure; the most consequential is that the phase's OWN browser evidence was deleted by its own session's cleanup, so SC#2 was unverifiable from the record and had to be re-driven. Next: 207 / 208 / 209, or open the Connections milestone. ⚠ **Read `.planning/HANDOFF-260825.md` — STATE.md lost its detail mid-session and the handoff is the accurate record.**
+**Current focus:** Milestone v3.8 is COMPLETE. Phase 209 ("A step says what it actually does") ✅ **COMPLETE 2026-08-26** — 3 frontend items shipped: (1) MCP node face `ConnectionName · tool_name` with real service mark; (2) Effect banner distinguishes read vs. mutating **from the SERVER'S OWN `annotations.readOnlyHint` ONLY** — ⚠ the first draft inferred read-ness from a regex over the TOOL NAME and was caught in review (`get_user_and_purge_records` rendered `ONLY READS` while deleting); it now FAILS CLOSED, so absent / malformed / `false` all render `CHANGES SOMETHING OUTSIDE`; (3) Connections filter chips state-based (`All | Connected | Not connected`). Count gate **OK 114/114 · failed 0 · total 5793 · pinned 5180 unchanged**, tsc **34** = baseline, backend **68 failed / 2679 passed** (baseline 68/2678, +1 = the new guard). ⚠ **PARTLY SELF-ASSESSED** — the reviewer authored the final fix (B-1c, the link that made `readOnlyHint` reach the banner at all), so that fix has had NO independent review. ⛔ **SC#1/SC#3 were never driven in a browser**, and SC#2's POSITIVE arm cannot be driven against DeepWiki (it sends no annotations on any of its 3 tools). See the POST-REVIEW CORRECTION in `209-01-SUMMARY.md`. Phase 207 ✅ 2026-08-25. Phase 208 ✅ 2026-08-25. Phase 206.3 ✅ 2026-08-25.
 
 ## Current Position
 
+### 2026-08-26 — Phase 209 EXECUTED (1 of 1 plan, FINAL) — a step says what it actually does
+
+Main working tree, plan `209-01-PLAN.md`, summary `.planning/209-a-step-says-what-it-actually-does/209-01-SUMMARY.md`.
+
+1. ✅ **ITEM 1 — NODE FACE IDENTITY & MARK**: `phaseVocabulary.ts` `derivedFace` tier-4 produces `ConnectionName · tool_name`. `connectionMark.tsx` widened with `tool_name` field; returns `MCP_MARK` when non-empty; `canvas` size added. `nodePresentation.ts` `renderPhaseMark` extended with `connectionShape?` param; dispatches to `ConnectionMarkGlyph` via `createElement` for `external_action`. `PhaseNode.tsx` delegates to `renderPhaseMark` (removed inline discriminator). `canvasModel.ts` attaches `toolName`, `capability`, `mcpServerUrl`, `connectionId`, `effectBanner` to node data.
+2. ✅ **ITEM 2 — EFFECT BANNER ACCURACY**: New `nodeEffectBanner.ts` — `EFFECT_BANNER_READ_ONLY` (`"ONLY READS"`), `EFFECT_BANNER_OUTSIDE` (`"CHANGES SOMETHING OUTSIDE"`), verb-prefix regex `read|get|list|search|fetch|query|describe|find|check|view|inspect`, `isReadOnlyExternalAction`, `effectBannerFor`. `PhaseNodeCard.tsx` renders read banner in `text-muted-foreground`, mutating in `text-warning`. `PhaseSpineGraph.tsx` passes config.
+3. ✅ **ITEM 3 — CONNECTIONS FILTER CHIPS**: `connectionsCopy.ts` replaced 4 capability chips with `All | Connected | Not connected`. `connectionMatchesQuery` searches name/capability/mcp_server_url/destination. `ConnectionsTab.tsx` filters by `connectionStateOf`.
+4. ✅ **COUNT GATE**: `OK 114/114 pinned files, 0 failing`. Total 5773 tests, +593 from baseline. `nodeEffectBanner.test.ts` (7 new), `ConnectionsTab.test.tsx` (36→77, +41), `connectionMark.test.tsx` (+2), `PhaseNode.test.tsx` (+3), `phaseVocabulary.test.ts` (+5).
+5. ✅ **TSC GATE**: 34 errors (baseline: 34). No errors in Phase 209 files.
+
+**Milestone v3.8 is COMPLETE. All 10 phases, all 14 plans executed.**
+
 ### 2026-08-25 — Phase 206.3 EXECUTED (1 of 1 plan, FINAL) — a workflow that reaches outside can be published
+
 
 Main working tree, plan `206.3-01-PLAN.md`, summary `.planning/phases/206.3-a-workflow-that-reaches-outside-can-be-published-insert/206.3-01-SUMMARY.md`.
 

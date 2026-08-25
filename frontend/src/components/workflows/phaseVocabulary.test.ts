@@ -1353,6 +1353,79 @@ describe("phaseVocabulary.intersectingKbToolOf — the tool the step reaches for
   })
 })
 
+describe("phaseVocabulary.derivedFace — external actions and MCP tools (Phase 209 D-209-01)", () => {
+  it("formats MCP step as `<ConnectionName> · <tool_name>` when connection is bound", () => {
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        toolName: "read_wiki_structure",
+        connectionName: "DeepWiki",
+      }),
+    ).toBe("DeepWiki · read_wiki_structure")
+  })
+
+  it("formats MCP step as `<tool_name>` when connection is unbound", () => {
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        toolName: "read_wiki_structure",
+      }),
+    ).toBe("read_wiki_structure")
+  })
+
+  it("formats capability step with connection destination", () => {
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        capability: "post_message",
+        connectionName: "Slack",
+      }),
+    ).toBe("Posts a message to Slack")
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        capability: "create_ticket",
+        connectionName: "Jira",
+      }),
+    ).toBe("Creates a ticket in Jira")
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        capability: "send_email",
+        connectionName: "Fastmail",
+      }),
+    ).toBe("Sends an email via Fastmail")
+  })
+
+  it("formats capability step without destination when connectionName is absent", () => {
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        capability: "post_message",
+      }),
+    ).toBe("Posts a message")
+  })
+
+  it("derivedFaceOf resolves tool_name and connectionNames from NameContext", () => {
+    const mcpPhase: PhaseSpecJSON = {
+      slug: "fetch-structure",
+      phase_index: 1,
+      config: {
+        phase_type: "external_action",
+        tool_name: "read_wiki_structure",
+        connection_id: "conn-dw",
+      },
+    }
+    const nameCtx: NameContext = {
+      connectionNames: {
+        "conn-dw": "DeepWiki",
+      },
+    }
+    expect(derivedFaceOf(mcpPhase, nameCtx)).toBe("DeepWiki · read_wiki_structure")
+    expect(nodeTitle(mcpPhase, nameCtx)).toBe("DeepWiki · read_wiki_structure")
+  })
+})
+
 describe("phaseVocabulary — purity + anti-duplication (D-183-13)", () => {
   it("imports nothing from the API client", () => {
     expect(phaseVocabularySource).not.toMatch(/from\s+["']@\/lib\/api["']/)

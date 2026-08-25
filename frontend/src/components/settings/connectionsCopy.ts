@@ -147,13 +147,17 @@ export function connectionStateOf(connection: ConnectorConnection): ConnectionSt
 export const CONNECTIONS_FILTER_PLACEHOLDER = "Filter connections…"
 export const CONNECTIONS_FILTER_LABEL = "Filter connections by name or destination"
 
-/** The chip rail. `null` is the All chip — every other member is a capability, so the rail
- *  can never drift from the closed capability set the backend and mig 116 both hold. */
-export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{ capability: string | null; label: string }> = [
-  { capability: null, label: "All" },
-  { capability: "send_email", label: "Email" },
-  { capability: "create_ticket", label: "Tickets" },
-  { capability: "post_message", label: "Messages" },
+export type ConnectionFilterState = "ready" | "not_connected" | null
+
+/** The chip rail — state-based filtering following Claude.ai Connectors reference.
+ *  `null` is the All chip. Every kind of connection (including MCP) is filterable by state. */
+export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{
+  state: ConnectionFilterState
+  label: string
+}> = [
+  { state: null, label: "All" },
+  { state: "ready", label: "Connected" },
+  { state: "not_connected", label: "Not connected" },
 ]
 
 /**
@@ -167,15 +171,21 @@ export function connectionsCountLabel(shown: number, total: number, filtered: bo
 }
 
 /**
- * Does this row match the typed text? Matches name, destination and detail (§2d) — never
- * the row id, which is a wire value no author ever types, and never any config key whose
- * value could be sensitive: the reader below is an explicit allow-list of destination
- * facts, not a walk of the whole config object.
+ * Does this row match the typed text? Matches name, destination, capability, and MCP URL (§2d) —
+ * never the row id, which is a wire value no author ever types, and never any config key whose
+ * value could be sensitive.
  */
 export function connectionMatchesQuery(connection: ConnectorConnection, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  const haystack = [connection.name, ...destinationFactsOf(connection)].join(" ").toLowerCase()
+  const mcpUrl = typeof connection.mcp_server_url === "string" ? connection.mcp_server_url : ""
+  const cap = typeof connection.capability === "string" ? connection.capability : ""
+  const haystack = [
+    connection.name,
+    cap,
+    mcpUrl,
+    ...destinationFactsOf(connection),
+  ].join(" ").toLowerCase()
   return haystack.includes(q)
 }
 

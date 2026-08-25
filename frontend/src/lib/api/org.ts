@@ -425,6 +425,20 @@ export interface McpDiscoveredTool {
   name: string
   description?: string
   inputSchema?: Record<string, unknown>
+  /**
+   * Phase 209 (SC#2) — the tool's own MCP `annotations` object, forwarded verbatim by
+   * `mcp_client.py`'s sanitizer when the server sends one.
+   *
+   * `readOnlyHint` is the only member the client reads today. It is OPTIONAL at every level
+   * because it is optional in the MCP specification, and its ABSENCE is meaningful: the spec
+   * says an unannotated tool is to be treated as DESTRUCTIVE, so a missing hint must fail
+   * closed rather than read as "safe". Measured 2026-08-25: DeepWiki sends no `annotations`
+   * on any of its three tools.
+   */
+  annotations?: {
+    readOnlyHint?: boolean
+    [key: string]: unknown
+  }
 }
 
 /** What a client is allowed to learn about a connection.

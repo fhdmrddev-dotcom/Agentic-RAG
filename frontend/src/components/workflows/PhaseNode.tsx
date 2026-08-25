@@ -313,11 +313,17 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // LEFT TO SPEND. Both are taken (slot 1 "Not connected", slot 2 "Waits for you") and a
   // third is a typecheck error against `BadgeSlots`. A face that wants to say more than
   // this now has to argue for a slot, not merely find one.
+  const icon = renderPhaseMark(data.phaseType, {
+    capability: typeof data.capability === "string" ? data.capability : null,
+    mcp_server_url: typeof data.mcpServerUrl === "string" ? data.mcpServerUrl : null,
+    tool_name: typeof data.toolName === "string" ? data.toolName : null,
+  })
+
   return (
     <PhaseNodeCard
       slug={data.slug}
       phaseType={data.phaseType}
-      icon={renderPhaseMark(data.phaseType)}
+      icon={icon}
       title={data.title}
       subtitle={technical ? data.technicalTitle : data.subtitle}
       // Phase 200 (canvas port) — the reveal's form is `${label} · ${slug}`, a MACHINE
@@ -354,6 +360,7 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       grounded={data.grounded}
       selected={selected}
       anchors={<EdgeAnchors />}
+      effectBanner={data.effectBanner as string | undefined}
     />
   )
 }

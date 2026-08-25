@@ -789,3 +789,95 @@ def test_grant_and_discover_are_org_admin_only_while_the_list_read_is_not():
         f"U-02 says read and bind are org-wide; gating the list would lock a plain member "
         f"out of BINDING a connection, which is the half of this surface they are allowed."
     )
+
+
+@pytest.mark.asyncio
+async def test_list_tools_forwards_annotations_and_omits_them_when_absent(monkeypatch):
+    """Phase 209 (SC#2) — the sanitizer FORWARDS `annotations` so `readOnlyHint` can reach
+    the client, and forwards NOTHING when the server sent nothing.
+
+    ⚠ This is the fix for a dead code path, not a feature. `nodeEffectBanner.effectBannerFor`
+    renders `ONLY READS` only on an explicit `readOnlyHint === true`; before this change the
+    sanitizer kept `name` / `description` / `inputSchema` ONLY, so that arm could never fire
+    from real data and the alternative on offer was guessing read-ness from the tool's NAME.
+
+    ⚠ The absent case is asserted as hard as the present one. The MCP specification states an
+    unannotated tool is to be treated as DESTRUCTIVE, so `annotations` must be ABSENT rather
+    than defaulted to `{}` or to `{"readOnlyHint": False}` — a fabricated `False` would claim
+    the server said "this writes" when it said nothing at all.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    mock_tools_response = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "tools": [
+                # Declares itself read-only — the only shape that may earn the quiet banner.
+                {
+                    "name": "read_wiki_structure",
+                    "description": "List the pages of a repo's wiki",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"readOnlyHint": True, "title": "Read wiki structure"},
+                },
+                # Declares itself NOT read-only — an explicit False must survive as False.
+                {
+                    "name": "create_issue",
+                    "description": "Open an issue",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"readOnlyHint": False},
+                },
+                # ⚠ THE DEEPWIKI SHAPE, measured live 2026-08-25: a tool whose NAME begins
+                # with a read verb and which ships NO annotations at all. It must arrive with
+                # no `annotations` key, so the client fails closed instead of reading the name.
+                {
+                    "name": "read_wiki_contents",
+                    "description": "Read the wiki",
+                    "inputSchema": {"type": "object", "properties": {}},
+                },
+                # A malformed `annotations` (not an object) is dropped, not forwarded.
+                {
+                    "name": "ask_question",
+                    "description": "Ask",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": "readOnlyHint",
+                },
+            ]
+        },
+    }
+
+    async def mock_post(url, json=None, headers=None):
+        if json["method"] == "initialize":
+            return httpx.Response(
+                200,
+                json={"jsonrpc": "2.0", "id": 0, "result": {"protocolVersion": "2025-06-18"}},
+                headers={"Mcp-Session-Id": "sess-209"},
+                request=httpx.Request("POST", url),
+            )
+        if json["method"].startswith("notifications/"):
+            return httpx.Response(202, request=httpx.Request("POST", url))
+        return httpx.Response(200, json=mock_tools_response, request=httpx.Request("POST", url))
+
+    client = McpClient()
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        tools = await client.list_tools("https://mcp.deepwiki.com/mcp")
+
+    by_name = {t["name"]: t for t in tools}
+    assert set(by_name) == {
+        "read_wiki_structure",
+        "create_issue",
+        "read_wiki_contents",
+        "ask_question",
+    }
+
+    assert by_name["read_wiki_structure"]["annotations"]["readOnlyHint"] is True
+    assert by_name["create_issue"]["annotations"]["readOnlyHint"] is False
+
+    # The two fail-closed arms — an absent object and a malformed one both yield NO key.
+    assert "annotations" not in by_name["read_wiki_contents"], (
+        "a tool that sent no annotations must arrive with no `annotations` key — an unannotated "
+        "tool is specified as destructive, and a fabricated default would say otherwise"
+    )
+    assert "annotations" not in by_name["ask_question"], (
+        "a non-dict `annotations` must be dropped, never forwarded for the client to index into"
+    )

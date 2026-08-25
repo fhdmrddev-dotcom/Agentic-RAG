@@ -170,6 +170,7 @@ import {
   moreActionsLabel,
   usageCountsFrom,
   usedByLabel,
+  type ConnectionFilterState,
   type ConnectionStateKind,
 } from "@/components/settings/connectionsCopy"
 
@@ -260,7 +261,7 @@ export function ConnectionsTabView({
   panel,
 }: ConnectionsTabViewProps) {
   const [query, setQuery] = useState("")
-  const [capability, setCapability] = useState<string | null>(null)
+  const [filterState, setFilterState] = useState<ConnectionFilterState>(null)
   const searchId = useId()
   const isMobile = useIsMobile()
 
@@ -271,14 +272,17 @@ export function ConnectionsTabView({
   const total = connections?.length ?? 0
   const filtered = useMemo(() => {
     if (connections === null) return null
-    return connections.filter(
-      (row) =>
-        (capability === null || row.capability === capability) &&
-        connectionMatchesQuery(row, query),
-    )
-  }, [connections, capability, query])
+    return connections.filter((row) => {
+      if (filterState === "ready") {
+        if (connectionStateOf(row) !== "ready") return false
+      } else if (filterState === "not_connected") {
+        if (connectionStateOf(row) === "ready") return false
+      }
+      return connectionMatchesQuery(row, query)
+    })
+  }, [connections, filterState, query])
 
-  const isFiltering = query.trim() !== "" || capability !== null
+  const isFiltering = query.trim() !== "" || filterState !== null
 
   /** ⚠ THE ONE CONDITION, ONE HOME, TWO CONSEQUENCES (D-206.1-12). This is the SAME
    *  expression that opens the 400px track below — assigned to a const rather than written
@@ -363,14 +367,15 @@ export function ConnectionsTabView({
         </label>
 
         {CONNECTIONS_FILTER_CHIPS.map((chip) => {
-          const on = capability === chip.capability
+          const on = filterState === chip.state
           return (
             <button
               key={chip.label}
               type="button"
               aria-pressed={on}
-              onClick={() => setCapability(chip.capability)}
+              onClick={() => setFilterState(chip.state)}
               data-testid="connections-filter-chip"
+              data-state-filter={chip.state ?? "all"}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
                 on
@@ -378,16 +383,6 @@ export function ConnectionsTabView({
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
-              {/* ⚠ THE `!== null` GUARD IS LOAD-BEARING, AND IT IS A CALLER FACT.
-                  The `All` chip is the ABSENCE OF A FILTER, not a connection whose service
-                  is unknown, so it wears no service mark at all. Handing it to the resolver
-                  would give it the named neutral `Plug` — correct behaviour for a
-                  connection, wrong MEANING for this chip. `connectionMark`'s totality
-                  contract is over CONNECTIONS; this distinction belongs here, at the call
-                  site that knows it, and not in the module. */}
-              {chip.capability !== null && (
-                <ConnectionMarkGlyph shape={{ capability: chip.capability }} size="chip" />
-              )}
               {chip.label}
             </button>
           )

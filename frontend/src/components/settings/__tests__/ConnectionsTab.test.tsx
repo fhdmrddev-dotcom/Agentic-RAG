@@ -755,15 +755,16 @@ describe("SC#3 — the marks reach the row, and they are each their own", () => 
     expect(mcp).not.toBe(smtp)
   })
 
-  it("the `All` chip wears NO mark; the three capability chips each wear exactly one", () => {
-    // `All` is the ABSENCE OF A FILTER, not a connection whose service is unknown. Handing
-    // it to the resolver would give it the named neutral — right for a row, wrong here.
+  it("the `All` chip wears NO mark; the three state chips (All, Connected, Not connected) render without service marks", () => {
+    // State chips filter by connection readiness rather than capability, so none wear service marks.
     renderTab({ connections: FOUR_SHAPES })
     const chips = screen.getAllByTestId("connections-filter-chip")
-    expect(chips).toHaveLength(4)
+    expect(chips).toHaveLength(3)
     expect(chips[0].querySelectorAll("svg")).toHaveLength(0)
     expect(chips[0].textContent).toContain("All")
-    chips.slice(1).forEach((chip) => expect(chip.querySelectorAll("svg")).toHaveLength(1))
+    expect(chips[1].textContent).toContain("Connected")
+    expect(chips[2].textContent).toContain("Not connected")
+    chips.forEach((chip) => expect(chip.querySelectorAll("svg")).toHaveLength(0))
   })
 
   it("no secret-shaped needle rides in on the newly inlined SVG bodies (T-190-16-T7)", () => {
@@ -1560,5 +1561,91 @@ describe("206.1 · an MCP row's affordances and credential reading, in BOTH shap
         makeConnection({ capability: null, config: { headers: {} }, mcp_server_url: MCP_URL }),
       ),
     ).toEqual(["mcp.deepwiki.com"])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 209 (Item 3) · State-based filter chips and search matching
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("Phase 209 (Item 3) — state-based filter chips and query matcher", () => {
+  const TEST_ROWS: ConnectorConnection[] = [
+    makeConnection({
+      id: "conn-ready-slack",
+      name: "Slack Alerts",
+      capability: "post_message",
+      is_enabled: true,
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "conn-ready-mcp",
+      name: "DeepWiki Search",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/mcp",
+      is_enabled: true,
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "conn-failed-jira",
+      name: "Jira Tracker",
+      capability: "create_ticket",
+      is_enabled: true,
+      last_check_verdict: "failed",
+    }),
+    makeConnection({
+      id: "conn-disabled-smtp",
+      name: "Old Mailer",
+      capability: "send_email",
+      is_enabled: false,
+      last_check_verdict: "ok",
+    }),
+  ]
+
+  it("renders state-based filter chips: All, Connected, Not connected", () => {
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    expect(chips).toHaveLength(3)
+    expect(chips[0]).toHaveTextContent("All")
+    expect(chips[1]).toHaveTextContent("Connected")
+    expect(chips[2]).toHaveTextContent("Not connected")
+  })
+
+  it("filtering by Connected shows only ready rows (including MCP)", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[1]) // Connected
+
+    expect(screen.getByText("Slack Alerts")).toBeInTheDocument()
+    expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
+    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
+    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
+  })
+
+  it("filtering by Not connected shows failing, disabled, and unchecked rows", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[2]) // Not connected
+
+    expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
+    expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
+  })
+
+  it("search input matches name, capability, and mcp_server_url without hiding MCP rows", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const input = screen.getByTestId("connections-filter-input")
+
+    await user.type(input, "deepwiki")
+    expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
+    expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, "create_ticket")
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
   })
 })
