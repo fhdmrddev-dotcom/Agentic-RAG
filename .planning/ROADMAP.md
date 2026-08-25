@@ -39,7 +39,7 @@
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
 | 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | ⚠ **3 of 3 plans executed — SC#1b BLOCKED, phase NOT closeable as-is** (plans 01/02/03 all executed 2026-08-25). SC#2 and SC#3 met; SC#1a met; **SC#1b is not met and the cause is a SECOND missing door**: an MCP connection cannot be bound to any workflow step, because `ConnectionPicker` reads capability-scoped and an MCP row has no capability. See 206.1-03-SUMMARY.md. **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
-| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | 🚧 **EXECUTING 2026-08-25 — 1 of 4 plans done (wave 1: the BACKEND publish fix, `7740e010`…`9e357dc0`).** ✅ The measured publish blocker is CLOSED: `_unregistered_tools` admits an `external_action` phase's own `tool_name`, proved not-a-loosening by three negative controls (control A is a SHIPPED case that passes UNEDITED). ✅ `PATCH /grants` has backend coverage for the first time (grep 0 → 12). Backend 68 failed / 2613 passed vs base 68 / 2605 — failed unchanged, passed +8. ⚠ No live publish driven yet (wave 4); nothing scored from ▶ Test Run. Originally: **PLANNED 2026-08-25 — 4 plans, 4 SERIAL waves** (`worktrees: forbidden`). Registered from `SEED-200` by operator decision. Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null`. ⚠ **Scope widened by research: an MCP workflow CANNOT PUBLISH today** (`_unregistered_tools` flags the tool name at severity `error`; stage 2.6 blocks) — the backend fix is plan 01. ⚠ **SC#4's guard as written is VACUOUS at its own base** (`McpToolPicker` already has one production importer), so it is TWO-LEGGED and leg (b) is the one that would have failed |
+| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | 🚧 **EXECUTING 2026-08-25 — 2 of 4 plans done (wave 2: the picker's MCP branch, `26904f79`…`de06ce3e`).** ✅ The picker has a SECOND SHAPE: the MCP read calls `listConnectorConnections()` with ZERO arguments (the line SEED-200 is about), filters by `mcp_server_url` then `is_enabled` in that order, and renders three absences as three sentences. ✅ `destinationPartsOf`'s positional tail is REPAIRED — an MCP row's footer read `🔒 slack.com/api` at base, driven RED verbatim — with a synthetic-fifth-shape control. ✅ The capability branch is proved byte-identical against 12 base-commit captures, the pin DRIVEN RED by a plant. Gate `5605 → 5643 · failed 0 · OK 111/111`; pin `20 → 58`. ⚠ `api.ts` NOT edited (0 files), and nothing is reachable in PRODUCTION until wave 3 mounts the shape control — the suite says so at the site. ⚠ D-206.2-18's predicted `useId` form is wrong: React emits `_r_0_` here. Previously: **1 of 4 plans done (wave 1: the BACKEND publish fix, `7740e010`…`9e357dc0`).** ✅ The measured publish blocker is CLOSED: `_unregistered_tools` admits an `external_action` phase's own `tool_name`, proved not-a-loosening by three negative controls (control A is a SHIPPED case that passes UNEDITED). ✅ `PATCH /grants` has backend coverage for the first time (grep 0 → 12). Backend 68 failed / 2613 passed vs base 68 / 2605 — failed unchanged, passed +8. ⚠ No live publish driven yet (wave 4); nothing scored from ▶ Test Run. Originally: **PLANNED 2026-08-25 — 4 plans, 4 SERIAL waves** (`worktrees: forbidden`). Registered from `SEED-200` by operator decision. Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null`. ⚠ **Scope widened by research: an MCP workflow CANNOT PUBLISH today** (`_unregistered_tools` flags the tool name at severity `error`; stage 2.6 blocks) — the backend fix is plan 01. ⚠ **SC#4's guard as written is VACUOUS at its own base** (`McpToolPicker` already has one production importer), so it is TWO-LEGGED and leg (b) is the one that would have failed |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -630,8 +630,32 @@ Plans:
       ⚠ `grounding.py`'s ledger row moves `18 / 5 / 1252` → `19 / 6 / 1311` — **plan 04 owns that
       commit** (D-206.2-11). ⚠ CONN-02 / CONN-03 deliberately NOT marked complete: one backend plan
       of four does not satisfy either.
-- [ ] 206.2-02-PLAN.md — the picker's MCP branch (unfiltered read, both filters, three absences) +
-      the `destinationPartsOf` footer repair, with the capability branch proved byte-identical
+- [x] 206.2-02-PLAN.md — ✅ **EXECUTED 2026-08-25** (3 commits, `26904f79`…`de06ce3e`). The picker's
+      MCP branch: `shape?: ExternalActionShape` defaulting to `"capability"` (which is why no shipped
+      call site or case moved), the read calling `listConnectorConnections()` with **ZERO arguments**
+      — asserted as `mock.calls[0] === []`, not as "some call happened" — both filters with the SHAPE
+      one FIRST so the count is about MCP-shaped rows (its own case: a disabled Slack row must not
+      make the MCP shape say `all-disabled`), and three absences as three sentences with
+      `data-empty-reason` on the MCP shape ONLY (AR-04, re-open trigger at the site).
+      ⚠ **THE FOOTER REPAIR WAS DRIVEN**: at this plan's base an MCP row read `🔒 slack.com/api` —
+      verbatim `expected [ 'slack.com/api' ] to deeply equal [ 'mcp.deepwiki.com' ]`. Explicit
+      `mcp_server_url` arm above the capability arms, explicit `post_message` arm, neutral
+      `return []`, and a synthetic-fifth-shape control asserting BOTH an empty list AND the absence
+      of `SLACK_FIXED_DESTINATION`. The two-spellings-of-one-rule note landed in BOTH files in one
+      commit (`connectionsCopy.ts` `+20/-0`). ⚠ **D-206.2-18's PREDICTED `useId` FORM IS WRONG** —
+      React emits `_r_0_` here, not the guillemet form; per-state counts MEASURED 2 / 2 / 4 / **1**.
+      ✅ The capability branch is proved byte-identical against 12 captures taken from the BASE
+      commit and never re-captured, and the pin was DRIVEN RED by a planted attribute (4 cases),
+      restored md5-identical. Gate `total 5605 → 5643 · failed 0 · OK 111/111`; pin `20 → 58` read
+      from the gate's own `actual` column. `tsc` 34 → 34, zero in any touched file. `api.ts`,
+      `backend`, `supabase/migrations`, `ExternalActionSection.tsx` and both package manifests: **0
+      files each**. ⚠ ONE DECLARED DEVIATION — the plan's SC#1b reading asserted a CLIENT filter the
+      capability shape does not have (its exclusion is the SERVER's `?capability=`), so the case uses
+      a server-shaped fake and names which half is enforced where. ⚠ `ConnectionPicker.tsx` measures
+      `4 / 3 / 616` and **has no ledger row at all** — it crossed the G-5 threshold in this plan;
+      `vitest-count-gate.cjs` reads `114/19/3797` and measures `116/21/3865`. **Plan 04 owns the
+      ledger commit** (D-206.2-11). ⚠ CONN-02 / CONN-03 still NOT complete: nothing is reachable in
+      production until wave 3 mounts the shape control.
 - [ ] 206.2-03-PLAN.md — the shape choice: `externalShapeVocabulary.ts`, the segmented control beside
       the capability radiogroup, the multi-key patch seam and the key-clearing
 - [ ] 206.2-04-PLAN.md — the grant control + the two-legged reachability guard + the driven round trip

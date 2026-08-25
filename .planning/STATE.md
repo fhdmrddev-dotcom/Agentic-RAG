@@ -9,9 +9,51 @@ progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 87
 stopped_at: >
+  Phase 206.2 plan 02 EXECUTED 2026-08-25 (wave 2 of 4, FRONTEND-ONLY, main working tree -
+  worktrees forbidden). 3 commits 26904f79 / b2309e6e / de06ce3e; summary at
+  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-02-SUMMARY.md.
+  THE CONSUMED CONTRACT WAVE 3 MOUNTS IS BUILT: ConnectionPicker takes a `shape` prop
+  (defaulting to "capability", which is why no shipped call site or test moved), and the MCP
+  shape calls listConnectorConnections() with ZERO arguments - the one line SEED-200 is about.
+  It filters client-side by mcp_server_url FIRST, counts, and only then by is_enabled; the
+  order is load-bearing and has its own case, because counting first would report "every MCP
+  connection is switched off" whenever the one disabled row in the org was a Slack connection.
+  Three absences render three sentences. api.ts is NOT edited (git diff --numstat = 0 lines);
+  backend 0, migrations 0, ExternalActionSection.tsx 0, package manifests 0.
+  ⚠ destinationPartsOf's POSITIONAL TAIL IS REPAIRED, and it was DRIVEN: at this plan's base
+  an MCP row's footer read "slack.com/api" - verbatim RED, expected [ 'slack.com/api' ] to
+  deeply equal [ 'mcp.deepwiki.com' ]. Explicit mcp_server_url arm above the capability arms,
+  explicit post_message arm, neutral return [], synthetic-fifth-shape control asserting BOTH an
+  empty list AND the absence of SLACK_FIXED_DESTINATION. The two-spellings-of-one-rule drift
+  note landed in BOTH ConnectionPicker.tsx and settings/connectionsCopy.ts in ONE commit; the
+  settings twin gained prose and lost nothing (0 deletions).
+  ⚠ D-206.2-18's PREDICTED useId FORM IS WRONG AND THE MEASUREMENT STANDS: React emits `_r_0_`
+  here, not the guillemet form and not radix-. A regex written against the prediction would
+  have replaced NOTHING and the count assertion would have read 0. Per-state replacement counts
+  MEASURED: unbound 2, bound 2, bound-failing 4, empty 1 (the empty state renders no control).
+  The 12 byte-identity captures were taken from the BASE commit's own component, observed twice
+  in agreement, and NEVER re-captured; the pin was DRIVEN RED by a planted attribute on the
+  capability empty node (4 cases red) and the plant restored md5-identical.
+  Count gate: base "total 5605 · failed 0 · pinned total 5043 / OK - 111/111", close
+  "total 5643 · failed 0 · pinned total 5081 / OK - 111/111". ConnectionPicker.test.tsx pin
+  raised 20 -> 58, read from the gate's own actual column, in the same commit as its cases.
+  tsc -p tsconfig.app.json = 34 at base and 34 at close, zero in any touched file.
+  ⚠ ONE DECLARED DEVIATION: the plan's SC#1b reading asserted a CLIENT filter the capability
+  shape does not have - its exclusion is the SERVER's ?capability= predicate. The case now uses
+  a server-shaped fake and says in the source which half is enforced where, rather than adding
+  a redundant client copy of a server rule to make a sentence literally true.
+  ⚠ HOT-FILE LEDGER - ConnectionPicker.tsx measures 4/3/616 and HAS NO ROW AT ALL; it crossed
+  the G-5 threshold in this very plan (the FlowEdge.tsx state). connectionsCopy.ts 4/3/541 ->
+  5/4/561. scripts/vitest-count-gate.cjs reads 114/19/3797 and measures 116/21/3865 - STALE
+  BEFORE THIS PLAN RAN, on the file that enforces the guardrails. PLAN 04 OWNS THE LEDGER
+  COMMIT (D-206.2-11) - re-derive there, do not copy.
+  ⚠ CONN-02 / CONN-03 still NOT marked complete: two of four plans, and nothing is reachable in
+  production until wave 3 mounts the shape control.
+  NEXT: 206.2-03 (the shape choice in ExternalActionSection), which consumes this contract.
+  --- prior entry, kept ---
   Phase 206.2 plan 01 EXECUTED 2026-08-25 (wave 1 of 4, BACKEND-ONLY, main working tree -
   worktrees forbidden). 3 commits 7740e010 / 5ebd40bd / 9e357dc0; summary at
   .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-01-SUMMARY.md.
@@ -72,9 +114,63 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 206.1 executing — plans 01 and 02 done, plan 03 next; then Phase 207 (`api.ts` split)
+**Current focus:** Phase 206.2 executing — waves 1 and 2 done, wave 3 (the shape choice) next; then Phase 207 (`api.ts` split)
 
 ## Current Position
+
+### 2026-08-25 — Phase 206.2 plan 02 EXECUTED (wave 2/4) — the picker has a second shape
+
+Frontend-only, main working tree, three commits `26904f79` / `b2309e6e` / `de06ce3e`. Summary:
+`.planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-02-SUMMARY.md`.
+
+1. ✅ **THE CONSUMED CONTRACT WAVE 3 MOUNTS EXISTS AND BEHAVES.** `ConnectionPicker` takes
+   `shape?: ExternalActionShape`, defaulting to `"capability"` — which is exactly why no shipped
+   call site and no shipped case moved. The union lives in a NEW true leaf,
+   `externalShapeVocabulary.ts` (zero imports, zero capability ids in its prose), because a
+   fourth key in the capability table would be four separate failures in three languages: a
+   server `Literal`, a migration-116 `CHECK`, and two module-scope asserts that fail at IMPORT.
+2. ✅ **THE MCP READ CALLS `listConnectorConnections()` WITH ZERO ARGUMENTS** — the one line
+   SEED-200 is about, asserted as `mock.calls[0]` being `[]` rather than as "some call happened",
+   with a positive control that the capability shape still passes its capability.
+   **`api.ts` is NOT edited** (`git diff --numstat` = 0 lines); so are `backend`,
+   `supabase/migrations`, `ExternalActionSection.tsx` and both package manifests.
+3. ⚠ **THE FILTER ORDER IS LOAD-BEARING AND HAS ITS OWN CASE.** Shape filter FIRST, count, THEN
+   `is_enabled` — counting first would say *"every MCP server connection is switched off"*
+   whenever the one disabled row in the org was a Slack connection. Three absences stay three
+   sentences; `data-empty-reason` is MCP-shape only (AR-04), with its re-open trigger at the site.
+4. ⚠ **THE FOOTER NAMED THE WRONG HOST, AND IT WAS DRIVEN.** At this plan's base an MCP row read
+   `🔒 slack.com/api` — RED verbatim: `expected [ 'slack.com/api' ] to deeply equal
+   [ 'mcp.deepwiki.com' ]`. Repaired with an explicit `mcp_server_url` arm above the capability
+   arms, an explicit `post_message` arm, a neutral `return []`, and a **synthetic-fifth-shape
+   control asserting BOTH an empty list AND the absence of `SLACK_FIXED_DESTINATION`** — "not
+   Slack" alone would pass on some other wrong host. The two-spellings-of-one-rule note landed in
+   **both** files in one commit; the settings twin gained prose and lost nothing.
+5. ⚠ **D-206.2-18's PREDICTED `useId` FORM IS WRONG, AND THE RULE THAT SAVED IT WAS *read the
+   needle off a real render*.** React emits **`_r_0_`** here — not the guillemet form, not
+   `radix-…`. A regex written against the prediction would have replaced NOTHING and the count
+   would have read 0. Per-state counts MEASURED: `unbound` 2, `bound` 2, `bound-failing` 4,
+   `empty` **1** (that state renders no control, so it emits one id).
+6. ✅ **THE CAPABILITY BRANCH IS PROVED BYTE-IDENTICAL.** Twelve captures taken from the BASE
+   commit's own component, observed twice in agreement, **never re-captured** — and the pin was
+   DRIVEN: a planted `data-empty-reason` on the capability empty node turned **4 cases RED**, and
+   the plant was restored md5-identical.
+7. ✅ Count gate base `total 5605 · failed 0 · pinned total 5043 · OK 111/111`; close
+   `total 5643 · failed 0 · pinned total 5081 · OK 111/111`. The pin rose **20 → 58**, read from
+   the gate's own `actual` column, in the same commit as its cases. `tsc -p tsconfig.app.json`
+   **34 → 34**, zero in any touched file. The gate was never red, so SEED-171 was never entered.
+8. ⚠ **ONE DECLARED DEVIATION.** The plan's SC#1b reading asserted a CLIENT filter the capability
+   shape does not have — its exclusion is the SERVER's `?capability=` predicate. Rather than add a
+   redundant client copy of a server rule to make a sentence literally true, the case uses a
+   server-shaped fake and says in its own source which half is enforced where.
+9. ⚠ **HOT-FILE LEDGER.** `ConnectionPicker.tsx` measures **`4 / 3 / 616`** and **has no row at
+   all** — it crossed the G-5 threshold in this very plan, the `FlowEdge.tsx` state.
+   `connectionsCopy.ts` `4/3/541` → **`5/4/561`**. `scripts/vitest-count-gate.cjs` reads
+   `114/19/3797` and measures **`116/21/3865`** — stale BEFORE this plan ran, on the file that
+   enforces the guardrails. **Plan 04 owns the ledger commit** (D-206.2-11); re-derive there.
+
+**Next:** `206.2-03` — the shape choice in `ExternalActionSection`, which mounts
+`<ConnectionPicker shape="mcp" />`. Nothing this plan built is reachable in production until it
+lands, and the suite says so at the site rather than letting a hand-constructed prop imply it.
 
 ### 2026-08-25 — Phase 206.2 plan 01 EXECUTED (wave 1/4) — the publish blocker is CLOSED
 
