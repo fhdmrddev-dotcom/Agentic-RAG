@@ -133,6 +133,8 @@ import {
   CONNECTIONS_BANNER_OPERATOR_PREFIX,
   CONNECTIONS_BANNER_OPERATOR_SUFFIX,
   CONNECTIONS_COLUMNS,
+  CONNECTIONS_DENSE_LABEL_CREDENTIAL,
+  CONNECTIONS_DENSE_LABEL_USED_BY,
   CONNECTIONS_EMPTY_BODY,
   CONNECTIONS_EMPTY_GLYPH,
   CONNECTIONS_EMPTY_HEADING,
@@ -278,6 +280,24 @@ export function ConnectionsTabView({
 
   const isFiltering = query.trim() !== "" || capability !== null
 
+  /** ⚠ THE ONE CONDITION, ONE HOME, TWO CONSEQUENCES (D-206.1-12). This is the SAME
+   *  expression that opens the 400px track below — assigned to a const rather than written
+   *  twice, because the whole point is that the row cannot reflow at a different moment
+   *  from the track that squeezes it. When it is true the list column drops from ~718px to
+   *  ~302px, and the wide five-column row does not fit in 302px by any budgeting: four of
+   *  its cells are constitutionally unable to shrink (`w-24` + `w-32` + `w-36` + `w-8` =
+   *  400px) and the row's structural overhead claims another 88px.
+   *
+   *  ⚠ THE CSS CONTAINER-QUERY ROUTE IS REFUSED AND NOT REVISITED (D-206.1-12). Tailwind's
+   *  plugin for it is not installed (it would be a second new dependency in a phase that
+   *  already carries one), and jsdom evaluates no layout at all — so a shape driven by the
+   *  element's own measured width would be untestable by the very suite that has to pin it.
+   *  ⚠ The plugin name and the at-rule are DESCRIBED here and deliberately not SPELLED: the
+   *  acceptance sweep greps this file's own source for both and expects zero, so naming
+   *  them in the comment that forbids them turns the guard red on itself. That is the
+   *  187-24 trap, which fired three times inside plan 01 of this phase alone. */
+  const dense = Boolean(panel) && !isMobile
+
   return (
     // ── The 400px right-side PUSH/SPLIT track (D-27, sketch 156-A — locked; the shipped
     //    shape is `WorkflowBuilderPage.tsx:1833-1836` and `ClassificationRulesPage:139-144`).
@@ -289,7 +309,7 @@ export function ConnectionsTabView({
       data-testid="connections-split"
       className="grid min-h-0 min-w-0 gap-4 motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
       style={{
-        gridTemplateColumns: panel && !isMobile ? "minmax(0,1fr) 400px" : "minmax(0,1fr)",
+        gridTemplateColumns: dense ? "minmax(0,1fr) 400px" : "minmax(0,1fr)",
       }}
     >
     <section aria-label="Connections" data-testid="connections-tab" className="min-w-0">
@@ -465,7 +485,17 @@ export function ConnectionsTabView({
       ) : (
         <div className="overflow-hidden rounded-[10px] border border-border">
           {/* The five columns ARE the contract (155-C, locked). Rendered by mapping the
-              tuple so the header can never drift from the order the suite asserts. */}
+              tuple so the header can never drift from the order the suite asserts.
+
+              ⚠ AND IT IS THE ONE THING THE DENSE SHAPE DROPS — D-206.1-20, which is the
+              deliberate counterpart to D-206.1-13's "no cell is ever dropped". In the dense
+              shape the cells no longer form five aligned columns, so a five-word header
+              would be labelling a grid that is not there. `CONNECTIONS_COLUMNS` stays
+              exported and stays rendered HERE with its character identity intact; the two
+              cells that lose their heading (`Used by`, `Credential`) get a visible inline
+              label instead, DERIVED from this same tuple so the two shapes are structurally
+              unable to disagree about the word. */}
+          {!dense && (
           <div
             data-testid="connections-header"
             className="flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2"
@@ -488,6 +518,7 @@ export function ConnectionsTabView({
             ))}
             <div className="w-8 flex-none" aria-hidden="true" />
           </div>
+          )}
 
           <div className="divide-y divide-border/60">
             {(filtered ?? []).map((row) => (
@@ -501,6 +532,7 @@ export function ConnectionsTabView({
                 onCheck={onCheck}
                 onOpen={onOpen}
                 now={now}
+                dense={dense}
               />
             ))}
           </div>
@@ -533,6 +565,7 @@ function ConnectionRow({
   onCheck,
   onOpen,
   now,
+  dense = false,
 }: {
   connection: ConnectorConnection
   usedBy: number
@@ -542,6 +575,16 @@ function ConnectionRow({
   onCheck?: (connection: ConnectorConnection) => Promise<void>
   onOpen?: (connection: ConnectorConnection) => void
   now?: number
+  /** The three-line shape for the ~302px track the open panel leaves behind (D-206.1-12).
+   *  ⚠ ABSENT OR FALSE ⇒ THE SHIPPED WIDE FIVE-COLUMN ROW, BYTE-IDENTICAL — that is what
+   *  the `outerHTML` capture in this file's suite exists to prove, and it is why the wide
+   *  branch below is not restructured to share more with the dense one than it already
+   *  does. (Every prop on this surface states what its ABSENCE means; see
+   *  `ConnectionsTabViewProps.onCheck`.)
+   *  ⚠ It changes the SHAPE and never the CONTENT: all five cells and the action cell
+   *  render in both (D-206.1-13). The only thing dense drops is the column HEADER, which is
+   *  not a cell (D-206.1-20). */
+  dense?: boolean
 }) {
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
   const [busy, setBusy] = useState(false)
@@ -571,15 +614,244 @@ function ConnectionRow({
     }
   }
 
+  // ── THE CELLS ARE BUILT ONCE AND PLACED BY THE SHAPE (the `FileRow.tsx:156-176` habit) ──
+  //    Every cell renders in BOTH shapes; what a shape changes is the container structure
+  //    and the class strings. Omission is never a density decision here — D-206.1-13, and
+  //    the ROADMAP's named failure mode: "the destination is the one column a person reads
+  //    to approve a send, and HIDING it is worse than truncating it."
+  //    ⚠ `PhaseCard.tsx:445-456` is the stacked-identity analog whose MARKUP the dense
+  //    branch copies. Its other half — folding a fact away at higher density — is exactly
+  //    what D-206.1-13 forbids, and is deliberately NOT copied.
+
+  /** The author's own word. Identical in both shapes: a control when the panel can be
+   *  opened, plain text when it cannot. */
+  const nameNode = onOpen ? (
+    <button
+      type="button"
+      onClick={() => onOpen(connection)}
+      data-testid="connections-row-name"
+      className={cn(
+        "truncate text-left text-[13px] font-medium text-foreground hover:underline",
+        dense && "min-w-0 flex-1",
+      )}
+    >
+      {connection.name}
+    </button>
+  ) : (
+    <span
+      data-testid="connections-row-name"
+      className={cn(
+        "truncate text-[13px] font-medium text-foreground",
+        dense && "min-w-0 flex-1",
+      )}
+    >
+      {connection.name}
+    </span>
+  )
+
+  /** Actions + receipt — the shipped either/or, byte-identical in both shapes. At most
+   *  three primary actions at rest (§2f): Add is page-level, the name opens the panel, and
+   *  everything else lives in the ⋯. */
+  const actionContent = receipt ? (
+    <span
+      data-testid="connections-receipt"
+      role="status"
+      className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-foreground"
+    >
+      <Check className="h-3 w-3 flex-none text-success" aria-hidden="true" />
+      {receipt}
+    </span>
+  ) : (
+    canWrite && (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            // §12: an EXPLICIT accessible name carrying the row's own name. Radix
+            // supplies none for a glyph child, and 24 nodes announcing as "more" is
+            // the failure this rule exists to prevent.
+            aria-label={moreActionsLabel(connection.name)}
+            data-testid="connections-row-more"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {/* Check has a side effect (it writes `last_checked_at`), so it lives in
+              the overflow rather than as a visible per-row button. The handler
+              landed with the endpoint in plan 190-15, so this renders now — and the
+              `onCheck &&` guard STAYS: it is what keeps the removed-not-disabled
+              rule true for the view when it is rendered without one (the suite
+              drives both directions). */}
+          {onCheck && (
+            <DropdownMenuItem
+              data-testid="connections-action-check"
+              onSelect={() => void runWrite(() => onCheck(connection), RECEIPT_CHECKED)}
+            >
+              {CONNECTIONS_ACTION_CHECK}
+            </DropdownMenuItem>
+          )}
+
+          {connection.is_enabled ? (
+            <DropdownMenuItem
+              data-testid="connections-action-disable"
+              onSelect={() => {
+                // GRADED, honestly, by whether a victim exists (§2g). With no known
+                // victim the flip is DIRECT — and Disable is the reversible half of
+                // the pair, which is exactly why 068-A grades it below Delete.
+                if (usedBy > 0) setConfirm("disable")
+                else void runWrite(() => onSetEnabled(connection, false), RECEIPT_DISABLED)
+              }}
+            >
+              {CONNECTIONS_ACTION_DISABLE}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              data-testid="connections-action-enable"
+              // RESTORATIVE → direct flip. The deliberate asymmetry 068-A ships.
+              onSelect={() => void runWrite(() => onSetEnabled(connection, true), RECEIPT_ENABLED)}
+            >
+              {CONNECTIONS_ACTION_ENABLE}
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuItem
+            data-testid="connections-action-delete"
+            // ALWAYS the victim-naming sheet — irreversible, and the credential it
+            // destroys cannot be recovered whatever the count says.
+            onSelect={() => setConfirm("delete")}
+            className="text-destructive focus:text-destructive"
+          >
+            {CONNECTIONS_ACTION_DELETE}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  )
+
   return (
     <div
       data-testid="connections-row"
       data-state={state}
+      // ⚠ ALWAYS PRESENT, AND IT CARRIES BOTH VALUES. An attribute that were merely absent
+      // in the wide shape would read as falsy to every consumer and would make the suite's
+      // dense claim unfalsifiable — the "0 is a fact, absence is a different one" trap.
+      data-dense={dense ? "true" : "false"}
       className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3",
+        dense
+          ? // ⚠ `px-3.5 py-3` is REUSED UNCHANGED from the wide shape, so the two shapes
+            //   share one outer box and the row's edges do not move when the panel opens.
+            // ⚠ `gap-1.5` (6px) IS THE ONE SPACING DECISION THIS PHASE MAKES, and it is an
+            //   EXTENSION of a shipped exception rather than a new token (UI-SPEC § Spacing
+            //   exception 4). 6px ships today at exactly one kind of site — mark→text
+            //   INSIDE the destination cell — and here it spaces three stacked LINES. 8px
+            //   (`gap-2`) is this row's own inter-column gap, so reusing it would make the
+            //   three lines read as gapped siblings rather than as ONE row; 4px (`gap-1`)
+            //   is the label→value step and collides the 11px/13px baselines. It is bounded
+            //   to this container and the shipped destination cell, and to nowhere else.
+            "flex flex-col gap-1.5 px-3.5 py-3"
+          : "flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3",
         !connection.is_enabled && "bg-muted/20",
       )}
     >
+      {dense ? (
+        <>
+          {/* ── DENSE LINE 1 · mark · name · action ──────────────────────────────────────
+                 The NAME is the row's primary visual anchor in BOTH shapes (UI-SPEC
+                 § Surface 2), so it leads line 1 and takes the free width. RESEARCH's
+                 layout A was refused for putting the state word here too: at a 302px track
+                 the fixed costs (`✕ Credential failed` ≈105px, ⋯ 32px, gaps 16px, padding
+                 28px) leave the name ≈110px, and squeezing the author's own word to buy a
+                 line is the wrong trade on the one surface whose defect IS squeezing.
+                 The ⋯ stays on line 1 rather than moving to line 3 (RESEARCH B) or being
+                 `row-span`ed (C): it is a 28px hit target already, and neither refusal is
+                 worth moving it. */}
+          <div className="flex items-center gap-2">
+            <ConnectionMarkGlyph shape={connection} size="row" />
+            {nameNode}
+            <div className="flex min-w-[2rem] flex-none items-center justify-end">
+              {actionContent}
+            </div>
+          </div>
+
+          {/* ── DENSE LINE 2 · the destination, ON A LINE OF ITS OWN, AND IT WRAPS ───────
+                 ⚠ THIS LINE IS WHERE SC#2 IS WON OR LOST. The wide cell is `truncate`,
+                 which is `white-space: nowrap` — and under `nowrap` `scrollWidth` is the
+                 FULL UN-WRAPPED TEXT WIDTH, so `scrollWidth <= clientWidth` is
+                 UNSATISFIABLE BY WIDENING ALONE. A dense layout that merely handed this
+                 cell more room would fail SC#2 silently. Hence no `truncate` on the cell
+                 AND none on the value span (it ships on both today, and removing one leaves
+                 the other).
+                 ⚠ `break-all`, and NOT the word-boundary variant beside it in Tailwind's
+                 scale: a URL contains no spaces, so a break that only happens AT a word
+                 boundary never happens at all, and the cell overflows exactly as before
+                 while looking fixed. (That variant is described, not spelled — same
+                 187-24 trap as above; the suite asserts its absence from this file.)
+                 ⚠ A `title` tooltip is FORBIDDEN on this surface and the suite asserts zero
+                 `[title]` nodes with a menu and a sheet open — wrapping is the answer
+                 BECAUSE the cheap fix is not available.
+                 It needs no inline label: the 🔒 leads it and it is the only mono line. */}
+          <div
+            data-testid="connections-row-destination"
+            className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
+          >
+            <span aria-hidden="true" className="flex-none">🔒</span>
+            <span className="min-w-0 whitespace-normal break-all">{facts.join(" · ")}</span>
+            {isSlack && (
+              <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">
+                {CONNECTION_FIXED_TAG}
+              </span>
+            )}
+          </div>
+
+          {/* ── DENSE LINE 3 · state · Used by · Credential ──────────────────────────────
+                 ⚠ EACH LABEL IS A SIBLING OF THE TESTID'D VALUE NODE, NEVER INSIDE IT. The
+                 shipped suite asserts `connections-row-credential`'s textContent
+                 `.toBe("never checked")` by EXACT EQUALITY and anchors `/^checked /` at the
+                 start; keeping the label outside is what leaves the value node's textContent
+                 CHARACTER-IDENTICAL in both shapes, so that pin holds for dense too rather
+                 than being re-baselined — on the surface whose whole lesson is that a
+                 re-baselined pin is not evidence.
+                 ⚠ The labels are NOT `aria-hidden`: "Credential checked 3d ago" is the
+                 reading, and it is the reading for everyone. A decorative label would leave
+                 a screen reader with a bare relative time and no noun.
+                 ⚠ `text-muted-foreground`, and never the dimmed variant beside it in the
+                 CSS variables — that utility has no Tailwind key on this surface and
+                 compiles to NOTHING, shipping while looking intentional (the `bg-warning`
+                 defect Phase 192.2 found). The forbidden spelling is described here rather
+                 than written, because this file's own source is swept (the 187-24 trap,
+                 which fired three times inside plan 01 of this phase).
+                 The state cell needs no label — glyph AND word are self-describing, and
+                 both survive greyscale (WCAG 1.4.1). */}
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+            <span
+              data-testid="connections-row-state"
+              className={cn("inline-flex items-center text-[11px] font-medium", STATE_TONE[state])}
+            >
+              {CONNECTION_STATE_WORDS[state]}
+            </span>
+
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-muted-foreground">{CONNECTIONS_DENSE_LABEL_USED_BY}</span>
+              <span data-testid="connections-row-usedby" className="text-muted-foreground">
+                {usedByLabel(usedBy)}
+              </span>
+            </span>
+
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-muted-foreground">{CONNECTIONS_DENSE_LABEL_CREDENTIAL}</span>
+              <span
+                data-testid="connections-row-credential"
+                className="font-mono text-muted-foreground"
+              >
+                {credentialLabel(connection.last_checked_at, now)}
+              </span>
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
       {/* 1 · Connection — the service's OWN mark + the AUTHOR'S word. Never the row id.
           ⚠ THE WHOLE CONNECTION IS PASSED, not just its capability. That is what lets an
           MCP row — which has no capability at all — reach MCP's own mark by its own
@@ -592,23 +864,10 @@ function ConnectionRow({
           refactor to make it reachable again. ⚠ Its exact glyph is deliberately not spelled
           in this file: acceptance greps this source for it and expects ZERO, so naming it
           here would turn the guard red on the comment that forbids it (the 187-24 trap —
-          which fired THREE times inside this one plan). */}
+          which fired THREE times inside that plan). */}
       <div className="flex min-w-0 flex-[2] items-center gap-2">
         <ConnectionMarkGlyph shape={connection} size="row" />
-        {onOpen ? (
-          <button
-            type="button"
-            onClick={() => onOpen(connection)}
-            data-testid="connections-row-name"
-            className="truncate text-left text-[13px] font-medium text-foreground hover:underline"
-          >
-            {connection.name}
-          </button>
-        ) : (
-          <span data-testid="connections-row-name" className="truncate text-[13px] font-medium text-foreground">
-            {connection.name}
-          </span>
-        )}
+        {nameNode}
       </div>
 
       {/* 2 · Sends to — 024-A's always-on 🔒 endpoint footer, applied to a destination. */}
@@ -654,84 +913,10 @@ function ConnectionRow({
       {/* Actions + receipt. At most three primary actions at rest (§2f): Add is
           page-level, the name opens the panel, and everything else lives in the ⋯. */}
       <div className="flex w-8 flex-none items-center justify-end">
-        {receipt ? (
-          <span
-            data-testid="connections-receipt"
-            role="status"
-            className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-foreground"
-          >
-            <Check className="h-3 w-3 flex-none text-success" aria-hidden="true" />
-            {receipt}
-          </span>
-        ) : (
-          canWrite && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  // §12: an EXPLICIT accessible name carrying the row's own name. Radix
-                  // supplies none for a glyph child, and 24 nodes announcing as "more" is
-                  // the failure this rule exists to prevent.
-                  aria-label={moreActionsLabel(connection.name)}
-                  data-testid="connections-row-more"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* Check has a side effect (it writes `last_checked_at`), so it lives in
-                    the overflow rather than as a visible per-row button. The handler
-                    landed with the endpoint in plan 190-15, so this renders now — and the
-                    `onCheck &&` guard STAYS: it is what keeps the removed-not-disabled
-                    rule true for the view when it is rendered without one (the suite
-                    drives both directions). */}
-                {onCheck && (
-                  <DropdownMenuItem
-                    data-testid="connections-action-check"
-                    onSelect={() => void runWrite(() => onCheck(connection), RECEIPT_CHECKED)}
-                  >
-                    {CONNECTIONS_ACTION_CHECK}
-                  </DropdownMenuItem>
-                )}
-
-                {connection.is_enabled ? (
-                  <DropdownMenuItem
-                    data-testid="connections-action-disable"
-                    onSelect={() => {
-                      // GRADED, honestly, by whether a victim exists (§2g). With no known
-                      // victim the flip is DIRECT — and Disable is the reversible half of
-                      // the pair, which is exactly why 068-A grades it below Delete.
-                      if (usedBy > 0) setConfirm("disable")
-                      else void runWrite(() => onSetEnabled(connection, false), RECEIPT_DISABLED)
-                    }}
-                  >
-                    {CONNECTIONS_ACTION_DISABLE}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    data-testid="connections-action-enable"
-                    // RESTORATIVE → direct flip. The deliberate asymmetry 068-A ships.
-                    onSelect={() => void runWrite(() => onSetEnabled(connection, true), RECEIPT_ENABLED)}
-                  >
-                    {CONNECTIONS_ACTION_ENABLE}
-                  </DropdownMenuItem>
-                )}
-
-                <DropdownMenuItem
-                  data-testid="connections-action-delete"
-                  // ALWAYS the victim-naming sheet — irreversible, and the credential it
-                  // destroys cannot be recovered whatever the count says.
-                  onSelect={() => setConfirm("delete")}
-                  className="text-destructive focus:text-destructive"
-                >
-                  {CONNECTIONS_ACTION_DELETE}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        )}
+        {actionContent}
       </div>
+        </>
+      )}
 
       {failed && (
         <div className="w-full text-right text-[11px] text-destructive" role="status">

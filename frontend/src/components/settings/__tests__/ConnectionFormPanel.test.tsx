@@ -482,12 +482,26 @@ describe("the push/split container (§3a / D-27)", () => {
       />,
     )
 
-    const table = screen.getByTestId("connections-header")
-    expect(table).toBeInTheDocument()
-    expect(screen.getAllByTestId("connections-row")).toHaveLength(1)
-    // A dialog would have scrimmed it away. Walk UP from the table: nothing between it and
+    // ⚠ THE HANDLE MOVED IN 206.1-02, THE CLAIM DID NOT — and the difference matters.
+    // This case reads "the list is still there and was not scrimmed away" (D-27, the whole
+    // reason 156-A beat a dialog). It used to reach for `connections-header` as its handle
+    // on "the table". That header is now deliberately ABSENT whenever the panel is open:
+    // D-206.1-20 drops the five-word column header in the dense shape, because stacked
+    // cells form no columns for a header to head — and this is the ONLY shipped case in the
+    // settings suites that renders with `panel`, i.e. the only one that reaches the dense
+    // shape at all. So the handle is re-pointed to the ROW, which is present in BOTH shapes
+    // by D-206.1-13 and is a strictly better handle for a claim about "the list".
+    // ⚠ This is NOT a re-baselined pin: not one assertion below changed, and the header's
+    // absence is asserted POSITIVELY here rather than quietly lost, so this case now
+    // documents the interaction instead of stopping at a missing node.
+    expect(screen.queryByTestId("connections-header")).toBeNull()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toBeInTheDocument()
+    expect(rows[0].getAttribute("data-dense")).toBe("true")
+    // A dialog would have scrimmed it away. Walk UP from the list: nothing between it and
     // the document may be `aria-hidden`, which is what a portal-backed modal would set.
-    for (let node: HTMLElement | null = table; node; node = node.parentElement) {
+    for (let node: HTMLElement | null = rows[0]; node; node = node.parentElement) {
       expect(node.getAttribute("aria-hidden")).not.toBe("true")
     }
     // And the track really is the 400px split, not a full-width takeover.

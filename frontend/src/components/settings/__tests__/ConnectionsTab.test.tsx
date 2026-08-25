@@ -965,6 +965,47 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
     },
   }
 
+  /**
+   * ── ⚠ 206.1-02 TASK 2 — THE ONE DECLARED DELTA AGAINST THE THREE CAPTURES ABOVE ────────
+   *
+   * ⚠ NOT ONE CHARACTER OF THE THREE CAPTURE LITERALS IS EDITED, AND THAT IS THE WHOLE
+   * DESIGN OF THIS BLOCK. Their own docblock says a diff against them "IS A BEHAVIOUR
+   * CHANGE IN THE WIDE ROW — and NOT A TEST TO UPDATE", and re-capturing them would delete
+   * the only evidence anybody has that the wide row still renders what it rendered.
+   *
+   * ⚠ AND TASK 2 MAKES EXACTLY ONE DELIBERATE CHANGE TO THE WIDE ROW, WHICH IS A REAL
+   * CONFLICT THIS PLAN CONTAINED AND WHICH IS RESOLVED HERE RATHER THAN PAPERED OVER. The
+   * plan requires BOTH that `data-dense` be "always present, both values" on the row
+   * (D-206.1-12 — an absent attribute reads as falsy to every consumer, which is the
+   * "0 is a fact, absence is a different one" trap) AND that this capture "pass UNEDITED".
+   * Those two cannot both be literally true: adding an attribute to the wide row changes
+   * the wide row's DOM by definition.
+   *
+   * The house answer is neither to re-capture nor to abandon the attribute: it is to keep
+   * the captures VERBATIM and declare the delta as a NAMED, SINGULAR, MACHINE-CHECKED
+   * transformation of them. That precedent lives in `PhaseNodeCard.test.tsx` — the same
+   * file this whole capture idiom was imported from — under its own "199-01 Task 2 — THE
+   * ONE DECLARED DELTA" heading, for exactly this situation.
+   *
+   * THE ARITHMETIC CLOSES WITH NO RESIDUAL, which is what separates a declared change from
+   * drift: shipped == captured + exactly this term, at exactly one position, on exactly the
+   * `connections-row` element. All three conditions are ASSERTED below, not asserted in
+   * prose — and the delta is proved REAL (the capture predates the attribute) and SINGULAR
+   * (one anchor occurrence) before it is applied, so a second `data-dense` appearing
+   * anywhere, or the attribute silently vanishing, fails rather than passes.
+   *
+   * ⚠ THE HEADER CAPTURE TAKES NO DELTA AT ALL and is compared verbatim: `data-dense` is a
+   * ROW attribute. A header that acquired one would be new surface and must go red.
+   */
+  const WIDE_DELTA_ANCHOR = ' data-state="ready"'
+  const WIDE_DELTA_TERM = ' data-dense="false"'
+
+  function withDeclaredDelta(captured: string): string {
+    expect(captured).not.toContain("data-dense")
+    expect(captured.split(WIDE_DELTA_ANCHOR)).toHaveLength(2)
+    return captured.replace(WIDE_DELTA_ANCHOR, WIDE_DELTA_ANCHOR + WIDE_DELTA_TERM)
+  }
+
   for (const key of Object.keys(CAPTURE_ROWS)) {
     it(`the wide ${key} row renders byte-for-byte what it rendered at 206.1-02's base`, () => {
       // ── NON-VACUITY FIRST. Byte-identity against an empty capture passes forever. ──
@@ -974,7 +1015,8 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
       const actual = wideCapture(CAPTURE_ROWS[key])
       // The normalization above is non-vacuous: exactly one ⋯ trigger id was replaced.
       expect(actual.rowRadixIds).toBe(1)
-      expect(actual.row).toBe(WIDE_HTML_BASELINE[key].row)
+      expect(actual.row).toBe(withDeclaredDelta(WIDE_HTML_BASELINE[key].row))
+      // ⚠ verbatim — the header takes no delta.
       expect(actual.header).toBe(WIDE_HTML_BASELINE[key].header)
     })
   }
@@ -1068,7 +1110,11 @@ describe("SC#2a — the dense row shape, and the five columns that survive it", 
       id: "st-not-checked",
       name: "Northwind Jira",
       capability: "create_ticket",
-      config: { base_url: "northwind.atlassian.net", project_key: "NW" },
+      config: {
+        base_url: "northwind.atlassian.net",
+        project_key: "NW",
+        account_email: "ops@northwind.co",
+      },
       last_checked_at: null,
       last_check_verdict: "not_checked",
     }),
@@ -1320,6 +1366,35 @@ describe("SC#2a — the dense row shape, and the five columns that survive it", 
     cleanup()
     renderDense({ liveConnectorsOn: false })
     expect(screen.queryAllByTestId("connections-row-more")).toHaveLength(0)
+  })
+
+  it("the source names none of the three things the dense shape refuses (187-24-safe)", () => {
+    // ⚠ THREE SOURCE FENCES, and each is written so the SOURCE FILE never spells the token
+    // it forbids — which is the 187-24 trap, and it fired THREE times inside plan 01 of
+    // this phase and TWICE more inside this one. A fence that greps a file for a needle the
+    // file's own prose must name is a fence that can only go red.
+    //
+    // 1 · The CSS container-query route (D-206.1-12): refused because the Tailwind plugin
+    //     is not installed AND because jsdom evaluates no layout, so a width-driven shape
+    //     would be untestable by this very suite.
+    expect(connectionsTabSource).not.toContain("@container")
+    expect(connectionsTabSource).not.toContain("container-type")
+    expect(connectionsTabSource).not.toContain("tailwindcss/container-queries")
+
+    // 2 · The word-boundary break variant. A URL contains no spaces, so it would never
+    //     break and the cell would overflow exactly as before while looking fixed.
+    expect(connectionsTabSource).not.toContain(`break-${"words"}`)
+
+    // 3 · A `title` tooltip. The rendered-DOM fence above already asserts zero `[title]`
+    //     nodes; this catches an attribute added on a branch no fixture reaches.
+    expect(connectionsTabSource).not.toContain("title=")
+
+    // NON-VACUITY CONTROL — without it, a `?raw` import that silently resolved to the empty
+    // string would satisfy all six claims above forever. (Measured precedent:
+    // `gutterTokens.fences.test.ts` found exactly that failure mode for CSS under vitest.)
+    expect(connectionsTabSource.length).toBeGreaterThan(1000)
+    expect(connectionsTabSource).toContain("data-dense")
+    expect(connectionsTabSource).toContain(`break-${"all"}`)
   })
 
   it("no `<table>` primitive in EITHER shape (§15)", () => {
