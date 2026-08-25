@@ -4138,3 +4138,326 @@ character IS the blank mark D-206.1-10 forbids, wearing a disguise.
   readings together are what prove the measurement is a real computed style rather than a constant.
 - ⚠ **A `fill-*` UTILITY MUST NEVER TOUCH A LUCIDE GLYPH**, whose `fill="none"` presentation attribute a
   CSS rule overrides — the third arm of the three-ink contract (AR-02).
+
+---
+
+## `frontend/src/components/workflows/phaseVocabulary.ts`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `16 commits / 6 phases / 990 L` · G-5 **FIRES** (6
+phases: 183 · 185 · 187 · 189 · 190 · 200).** Created at Phase 183.
+
+⚠ **IT WAS ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE — invisible to its own guardrail at any
+count** — and it was **NAMED INSIDE `WorkflowCanvas.tsx`'s CELL WITH NO ROW OF ITS OWN**, which is
+exactly what the same-commit sync rule calls drift. This is the `backend/app/config.py` / D-22
+headline repeated: `config.py` fired G-5 at forty-two phases and was invisible for the project's
+entire life for the same reason — nobody had written it down.
+
+⚠ **PHASE 206.2 DID NOT EDIT IT.** The row exists because the file was NAMED in the phase's blast
+radius and MEASURED FIRING. That distinction matters: a `files_modified` scan would never have
+produced this row, because only a file's next EDITOR is ever prompted to look at it, and this file's
+next editor might be several phases away.
+
+**What it is.** The canvas and panel's ONE vocabulary home — the per-`phase_type` sentences, the node
+faces, and `EXTERNAL_CAPABILITY_SENTENCES`, the three-key map that BOTH LANGUAGES' fences compare
+against.
+
+**Honoured by construction (206.2).** The MCP option is a **SHAPE on a new type in a new leaf**
+(`externalShapeVocabulary.ts`), never a fourth member of the closed capability set, so this file did
+not move and every cross-language fence passed UNEDITED.
+
+**No seam proposed** — the `libraryVocabulary.ts` verdict: a vocabulary doing one thing many times is
+the right shape. The cost of the missing row was never that a seam went untaken; it was that the
+audit could not **ASK**.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`EXTERNAL_CAPABILITY_SENTENCES` HAS EXACTLY THREE KEYS, AND THE SET IS A CROSS-LANGUAGE FENCE.**
+  Six backend counterparts compare against it and **two of them are module-scope `assert`s that fail
+  at IMPORT**, so a fourth member takes the whole backend down at start-up rather than failing a test.
+  Migration 116 also CHECK-constrains the column. A fourth capability is a migration and a
+  cross-language change, never an edit here.
+- ⚠ **`derivedFace` READS THE MAP THROUGH `hasOwnProperty.call`, NEVER A COALESCED BRACKET READ.** An
+  inherited key is never an own property but IS truthy on a bracket read, so `MAP[key] ?? fallback`
+  hands back `constructor` — the WR-04 sink this tree has now found eight times, one of which
+  rendered a chip label as **nothing at all** because React refused a function child.
+- ⚠ **A STEP WHOSE CAPABILITY IS ABSENT GETS NO SENTENCE, NOT A BLANK ONE.** `OutsideChangeLine`
+  renders nothing rather than an empty consequence row, and its own docblock argues why: a blank
+  consequence row is byte-indistinguishable from one whose lookup FAILED, and on a governance surface
+  those two readings are opposite. That is why an MCP step deliberately shows no consequence sentence
+  (flagged for UAT by `206.2-03`, re-open trigger: *the wire gaining a read/write hint for a
+  discovered tool*).
+
+---
+
+## `frontend/src/components/workflows/ConnectionPicker.tsx`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `5 commits / 3 phases / 651 L` · G-5 **FIRES —
+EXACTLY AT THRESHOLD** (3 phases: 190 · 206 · 206.2).** Created at Phase 190-12.
+
+⚠ **IT WAS ABSENT FROM BOTH DOCUMENTS AND IT CROSSED THE THRESHOLD INSIDE THIS PHASE'S OWN COMMITS.**
+That is the `FlowEdge.tsx` / `phaseStatusMeta.ts` / `libraryRow.ts` state, and it is the one where a
+missing row costs most: at two phases the file was legitimately below threshold and nobody was
+obliged to write it down; at three it fires, and a file with no row is permanently invisible to its
+own guardrail **at any count**.
+
+**What it is.** The field that answers *where does this step send?* — the read, the four-state honesty
+ladder, Gate 1's client-side refusal of a failing credential, the footer, and the mount of
+`McpToolPicker`. It is a CHILD rather than three more props on `ExternalActionSection` because that
+file's six source-purity fences forbid `@/lib/api`, `fetch(`, `useEffect` and `useContext` — so the
+effect, the read AND the write all live here.
+
+**Honoured by construction (206.2).** Wave 2 gave it a SECOND SHAPE through one optional prop whose
+DEFAULT leaves every shipped call site and every shipped test unmoved; wave 4 added one callback that
+adopts a response row. The capability arm's `.then` body is asserted byte-identical.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`bind()` WRITES EXACTLY ONE KEY, `connection_id`.** The suite sweeps every patch the control
+  emits and asserts the key set by equality; it was observed RED against a planted
+  `config["smtp_password"]` write in real production source. A published definition is readable by
+  everyone in the org, so a destination fact copied into it is a disclosure with a friendly name.
+  **The multi-key shape clear lives at the SHAPE-CHOICE site, never here.**
+- ⚠ **THE GUARD IS ON THE EFFECT, NOT MERELY ON THE WRITE.** With no builder store or no selected
+  slug this component renders its disconnected state and **OPENS NO REQUEST**. Two shipped suites
+  render their subject standalone; a guard placed only on the write would leave them growing an
+  unmocked network call they never asked for.
+- ⚠ **THE MCP READ TAKES NO ARGUMENT, AND THAT ONE LINE IS SEED-200.** The shipped read passed a
+  capability; an MCP row's `capability` is **NULL**; so an MCP connection was filtered out of every
+  read this picker ever performed and the `bound?.mcp_server_url` mount below was **dead code behind a
+  filter**. Driven in a real browser 2026-08-25: `GET /connectors/connections` on the MCP shape,
+  beside `GET /connectors/connections?capability=send_email` on the capability shape, in one session.
+- ⚠ **THE TWO FILTER CHAINS ARE DELIBERATELY NOT UNIFIED.** Unifying them would rewrite the very line
+  the capability shape's byte-identity pin protects (D-206.2-08).
+- ⚠ **THE `is_enabled` FILTER APPLIES TO BOTH SHAPES.** A disabled connection is not a choice; the MCP
+  shape INHERITS that rule rather than renegotiating it. The shape filter runs FIRST so that *"every
+  one is switched off"* is a fact about MCP-shaped rows specifically.
+- ⚠ **EVERY ARM OF `destinationPartsOf` NAMES ITS OWN CONDITION AND THE TAIL IS NEUTRAL.** A
+  positional trailing `return` once made every MCP row claim it sends to Slack's API host — seen on
+  screen in live UAT (`147f3c57`). A synthetic fifth-shape negative control asserts the tail is EMPTY,
+  because *"not Slack"* alone would pass against a footer naming some other wrong host.
+- ⚠ **`onConnectionUpdated` IS NOT AN OPTIMISATION.** `PATCH /grants` is a whole-column REPLACE; if the
+  returned row is not written back into `read.connections`, this list and the server go out of sync
+  and the NEXT toggle merges from a stale map — a silent lost update on the column that decides
+  whether egress is permitted. The rejected alternative is a re-fetch nonce: it re-issues the whole
+  list on every toggle inside a 400px panel field, and **the response IS the row**.
+
+---
+
+## `frontend/src/components/workflows/ExternalActionSection.tsx`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `4 commits / 3 phases / 498 L` · G-5 **FIRES —
+EXACTLY AT THRESHOLD** (3 phases: 189 · 190 · 206.2).** Created at Phase 189.
+
+⚠ **IT WAS ABSENT FROM BOTH DOCUMENTS WITH ZERO MENTIONS ANYWHERE**, and it crossed the threshold in
+`206.2-03` — the same boundary state as `ConnectionPicker.tsx` one file over, found the same way: by
+re-deriving the triples of everything the phase NAMED rather than everything it EDITED.
+
+**What it is.** The step panel's *what this step does outside* section: the three-capability
+radiogroup, the shape segmented control beside it, and the two gated picker mounts.
+
+**Honoured by construction (206.2).** It gained a SECOND AXIS, in its own group, with its own words in
+a leaf module — no second copy of the capability mirror — and the shipped capability branch's DOM is
+asserted byte-identical below the new control.
+
+**Seam NAMED rather than left `satisfied` with no successor:** the shape derivation plus the two
+clearing patches (~40 L) are the only DECISION in the file; everything else is render.
+
+### Invariants a future editor is bound by
+
+- ⚠ **EXACTLY THREE `external-action-option` / `role="radio"` CHILDREN IN THE CAPABILITY GROUP, PINNED
+  AT FIVE SITES.** `206.2-03` PLANTED the capability testid onto a shape segment and watched **20+
+  cases go red, including all five pins**, then restored md5-identical. The shape control therefore
+  needs its OWN testid, its OWN group and its OWN accessible name — and that name must **NOT EQUAL**
+  `EXTERNAL_ACTION_HEADING`, because a shipped pin does an exact-string accessible-name match and a
+  second radiogroup with the same name makes it ambiguous.
+- ⚠ **THIS FILE AUTHORS NO SENTENCE.** Its suite asserts the source contains none of the copy and
+  names only imported identifiers, and a runtime `const` beside a component is a
+  `react-refresh/only-export-components` **error**. That is why every new string lives in a leaf.
+- ⚠ **NO `useContext` / `useStore` / `useEffect` / `zustand` AND NO `title=`**, asserted over the raw
+  source. `useOrgOptional` USES `useContext`, which is the mechanical reason the grant control's
+  permission read had to live in `McpToolPicker.tsx` and not here (D-206.2-22).
+- ⚠ **THIS IS THE ONE PLACE IN THE FRONTEND WHERE A CONFIG KEY IS CLEARED**, and it clears
+  `{tool_name, tool_args}` as a **SET** plus `connection_id`. A `toMatchObject` assertion passes a
+  PARTIAL clear, so the emitted patch's key set is asserted by equality. Both directions clear
+  `connection_id`, because a bound row belongs to the OTHER shape and leaving it strands a real
+  connection of the wrong kind behind a picker reading `— none —`.
+- ⚠ **`key={phase.slug}` ON THE MOUNT IS WHAT STOPS A PRESSED SEGMENT LEAKING ACROSS STEPS.** The
+  press is session state; without the remount, selecting a different step shows it the shape somebody
+  else chose.
+### A ROW DECLINED IN WRITING — `frontend/src/components/workflows/stepReadinessContext.ts`
+
+**Measured at `206.2-04`'s commit: `3 commits / 2 phases / 209 L` (200 · 206.2).** Below the G-5
+threshold, and young. **A row is DECLINED here rather than left silent, because silence is a deletion
+that looks like a decision.** It is recorded inside this section rather than as an orphan of its own,
+since a section without a row in `CLAUDE.md` is itself drift.
+
+⚠ **RE-OPEN TRIGGER: the first phase that takes it to THREE phases** — at which point it fires and
+owes a row and a section of its own, in that phase's commit.
+
+⚠ **The one invariant worth carrying forward if that happens:** `206.2-03` SUPPRESSED a readiness row
+on MCP steps and did not REPLACE it. The row was permanently unsatisfiable — `outsideSentence` is a
+lookup into the CLOSED capability table, so it is `undefined` for every MCP step forever, however
+completely configured — on a card whose whole premise is that a row is something you can go and fix.
+Its non-vacuity control (a step with NEITHER a capability NOR a tool still yields the row) was
+**already green before the fix**, and that is the half a careless suppression silently deletes.
+
+- ⚠ **THE CLEAR SURVIVES TO THE DATABASE AS A NORMALISED EMPTY VALUE, NOT AS AN ABSENT KEY — MEASURED
+  AT T4, AND IT CONTRADICTS THE T1 READING.** `206.2-03` proved at T1 that `{k: undefined}` leaves the
+  key in memory and `JSON.stringify` drops it from the wire. `206.2-04` read the SAVED row after
+  driving the switch in a real browser and found `tool_name: null`, `tool_args: {}`,
+  `available_tools: []` — **present, and emptied.** Something between the browser and the row
+  re-inflates the defaults. ⚠ **IT IS HARMLESS ONLY BECAUSE THE EXECUTOR BRANCHES ON TRUTHINESS**
+  (`if mcp_tool_name:`, `phase_types.py:2287`). A future refactor to `if "tool_name" in config:` would
+  silently resurrect the MCP branch on a capability-shaped step, and no test in either language
+  currently watches for that.
+
+---
+
+## `frontend/src/components/workflows/McpToolPicker.tsx`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `2 commits / 2 phases / 570 L` · G-5 does not fire
+(2 phases: 206 · 206.2).** Created at Phase 206.
+
+⚠ **THE ROW EXISTS TWO PHASES EARLY, AND FOR A NAMED REASON: THE FILE WAS ALREADY BEING DISCUSSED
+INSIDE PHASE 206's SECTION WITH NO ROW OF ITS OWN.** That is the `useTemplateFirstDraft.ts` drift the
+same-commit sync rule exists to forbid — a section without a row is exactly as invisible to the audit
+scan list as no section at all.
+
+**What it is.** The MCP branch of the connection field: tool discovery, tool selection, the argument
+editor, the grant BADGE, and — since `206.2-04` — the grant SWITCH. All of this card's state lives
+here because `PhaseFormPanel.tsx` holds an ABSOLUTE-ZERO hook pin and `ExternalActionSection.tsx`'s
+source fence forbids `useContext`.
+
+**D-206.2-05, answered at the control's own site.** SEED-146's standing rule is *never add an outbound
+capability before the approval model exists*. **The per-tool grant IS the approval model for this
+surface.** Phase 206 shipped the egress, the SSRF guard, the dispatch, the enforcement and the
+`tool_refused` receipt; the only missing piece was the human-facing switch the enforcement already
+read. **This phase adds no new outbound capability** — it makes an existing, already-fenced one
+approvable by a person instead of by a hand-edited database row.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`isToolGranted` IS THE ONE GRANT PREDICATE AND IT IS NOT FORKED.** It mirrors the server's
+  `grants.get(tool_name) is True` through `hasOwnProperty.call`; the badge and the switch read the
+  SAME value, so the control can never disagree with the reading printed beside it. ⚠ A residual
+  asymmetry is recorded rather than fixed: the client accepts any truthy value while the server
+  requires `is True`. It is reachable only through a hand-edited row, because the service sanitises on
+  write.
+- ⚠ **THE GRANT WRITE SENDS THE FULL MERGED MAP, DERIVED FROM THE SERVER-OWNED PROP.**
+  `connector_service.update_connection_grants` does `.update({"tool_grants": …})` — a **whole-column
+  REPLACE** — so `{[tool]: next}` alone wipes every other grant on the connection, silently, **and it
+  typechecks perfectly.** Asserted at T1 by SET EQUALITY (a superset check would pass the very payload
+  that drops one) and **proved at T4 on 2026-08-25**: granting a second tool put
+  `{"read_wiki_structure":true,"read_wiki_contents":true}` on the wire, and revoking one put
+  `{"read_wiki_contents":false,"read_wiki_structure":true}`. ⚠ **NEVER A `useState` COPY** — a local
+  copy is precisely how the merge base goes stale.
+- ⚠ **IT IS STILL A READ-MODIFY-WRITE OVER A CLIENT SNAPSHOT.** Two admins in two browsers can clobber
+  each other; `tool_grants` carries no version column and adding one is a migration. **The honest
+  mitigation is the SCOPE SENTENCE, not a lock.**
+- ⚠ **NO OPTIMISTIC FLIP.** The switch's position is the server's truth: it does not move on press, it
+  moves when the row it renders from changes. That is what makes the failure arm free — the switch
+  never moved, so there is nothing to roll back. ⚠ It is also why `MCP_GRANT_SAVING` is REQUIRED and
+  not decoration: a person presses a switch that does not move, and without that reading the control
+  looks broken. ⚠ **The property is asserted at T1 and was NOT observable at T4** — against a local
+  backend the write settled inside 120 ms, so the browser sampled `idle`.
+- ⚠ **FOUR AUDIENCE ARMS, NOT THREE, AND THE SPLIT OF *UNMEASURED* IS LOAD-BEARING IN BOTH
+  DIRECTIONS.** `admin` gets the Discover button and the switch; a MEASURED `member` gets **neither**,
+  REMOVED rather than `aria-disabled`, with one sentence carrying both facts; `probing` (a real caller
+  whose org probe is in flight) also loses the Discover button, because a non-admin must never see a
+  button that 403s and during the probe we do not yet know they are not one; `no-provider` (a null
+  context — tests and storybook only, since `OrgProvider` wraps the whole app) renders **exactly what
+  it rendered before this phase**, which is what makes *adds zero new nodes* an assertable property at
+  all. Folding the last two would either remove a shipped node from six provider-less suites or show a
+  403 button to a member.
+- ⚠ **THE SWITCH IS OUTSIDE THE BADGE.** The badge is a tinted box carrying STATE; nesting a control in
+  it makes a state reading look like a button, and would put a control inside the one region SC#2c
+  requires to pass unedited.
+- ⚠ **THE CONTROL SPENDS NO COLOUR.** A token-green switch (`--success`, hue 142) beside the shipped
+  emerald badge (hue 160) would put two different greens meaning the same thing two lines apart; a
+  raw-emerald one would extend a bounded palette exception. Track and thumb are greyscale and the
+  geometry is copied VERBATIM from this tree's one shipped switch
+  (`admin/ModelRegistryTab.tsx:823-854`), so no new spacing value and no new transform value enters
+  the surface.
+- ⚠ **`MCP_NO_TOOLS_DISCOVERED` MUST NOT REACH A MEMBER.** It tells the reader to click a button
+  AR-01 removes for them — a measured lie this phase would otherwise have shipped. Its replacement
+  names **no second location**, because nothing was measured that lets a member reach discovery
+  anywhere.
+
+---
+
+## `frontend/src/components/workflows/externalShapeVocabulary.ts`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `2 commits / 1 phase / 109 L` · G-5 does not fire
+(1 phase).** Created by `206.2-02`.
+
+⚠ **LISTED BELOW THE THRESHOLD ON PURPOSE** — the `fileIcon.tsx` / `connectionMark.tsx` /
+`libraryRow.ts` precedent. *A file escapes G-5 for years purely by not being written down:*
+`WorkflowsPage.tsx` for ten phases, `backend/app/config.py` for its entire life. Writing the row now
+costs four lines and removes that failure mode permanently.
+
+**What it is.** The shape control's ONE string home and the `ExternalActionShape` type. It exists
+because `ExternalActionSection.tsx` may not declare a string at all.
+
+### Invariants a future editor is bound by
+
+- ⚠ **A TRUE LEAF: IT IMPORTS NOTHING AND EXPORTS NO COMPONENT.** A runtime `const` beside a component
+  is a `react-refresh/only-export-components` **error**, which is the recorded reason
+  `EXTERNAL_ACTION_CAPABILITIES` is not exported from the section.
+- ⚠ **DECLARATION ORDER IS LOAD-BEARING.** 206.1 measured a temporal-dead-zone `ReferenceError` at
+  module load when an array literal read a `const` declared below it — **which no type checker
+  reports.** Declare every scalar ABOVE any array or object that reads it.
+- ⚠ **IT SPELLS NO CAPABILITY ID**, asserted by a sweep of the whole panel's HTML and of this module's
+  own source. `data-shape="capability"` is not a capability NAME.
+- ⚠ **THE MCP LABEL DOES NOT SAY WHAT THE TOOL DOES.** The wire carries no read/write hint — the live
+  DeepWiki `tools/list` payload has **no `annotations` key at all** — so any verb here would be
+  fabricated.
+- ⚠ **THE MODULE SPELLS NO FORBIDDEN TOKEN IN ITS OWN PROSE.** A docblock naming the thing its own
+  guard greps for makes the guard read `3` instead of `0` — the 187-24 trap, which fired twice inside
+  `206.2-03` alone and again in `206.2-04`'s first draft of the reachability suite.
+
+---
+
+## `frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`
+
+**Measured at `206.2-04`'s commit (2026-08-25): `1 commit / 1 phase / 316 L` · G-5 does not fire
+(1 phase).** Created by `206.2-04`.
+
+⚠ **LISTED BELOW THE THRESHOLD ON PURPOSE, AND IT IS A TEST FILE — WHICH THIS LEDGER OTHERWISE DOES
+NOT TRACK.** The exception is deliberate: what this file protects is a **TIER**, not a behaviour, and
+a tier is exactly the kind of property that is deleted by someone who thinks they are simplifying.
+
+**What it is.** SEED-200's guard, in two legs.
+
+- **Leg (a)** — an `import.meta.glob` sweep naming the single production importer by equality, with a
+  positive control and a non-vacuity check.
+- **Leg (b)** — a render through the REAL chain: the production parent inside a real
+  `BuilderStoreProvider` + `SelectedPhaseSlugProvider`, with only `@/lib/api` mocked, constructing
+  **no `McpToolPicker` prop at all**. Its headline is `expect(listMock).toHaveBeenCalledWith()` with
+  **zero arguments**, and it reaches `mcp-tool-picker` through the DOM.
+
+**The vacuity claim is MEASURED, not argued.** Run against the pre-phase tree (base `4c9b9a7f`'s
+`ConnectionPicker.tsx`, `ExternalActionSection.tsx` and `PhaseFormPanel.tsx` checked out over the
+working copy), the suite reported **5 failed | 6 passed** — and **all three leg-(a) cases were GREEN in
+that same run.** *A guard satisfied by the defect it was written to catch is worse than no guard,
+because it reads as coverage.*
+
+### Invariants a future editor is bound by
+
+- ⚠ **LEG (b) MAY NEVER CONSTRUCT A COMPONENT PROP.** Asserted mechanically over this file's own
+  `?raw` source, with the needle **ASSEMBLED AT RUNTIME** — spelling it whole would make the file
+  contain the token it counts, and the assertion would fail against itself. A positive control proves
+  the needle can match.
+- ⚠ **VITE EXCLUDES THE IMPORTING FILE FROM ITS OWN `import.meta.glob`.** Measured here: the glob
+  lookup returned `undefined` and the assertion read *expected undefined to be defined*. The
+  self-source read is therefore a **static `?raw` import**, not a glob entry.
+- ⚠ **NON-VACUITY IS ASSERTED BEFORE CONTENTS.** `import.meta.glob` contributes the EMPTY STRING for
+  an absent path and never throws, so a mis-typed pattern yields a green sweep over nothing.
+- ⚠ **LEG (a) USES `toStrictEqual`, NEVER `toContain`.** A `toContain` passes with a second mount
+  sitting silently beside the named one; the equality is what makes it a BUDGET rather than a hope.
+- ⚠ **THE SELF-EXCLUSION IS A PREDICATE, NOT A HAND-WRITTEN LIST.** This component has THREE files,
+  not two, and a hand-listed exclusion goes stale the next time a suite is added beside it.
+- ⚠ **THE OBVIOUS CROSS-SHAPE NEGATIVE ON THE CAPABILITY ARM IS UNSATISFIABLE, AND THE FILE SAYS SO
+  RATHER THAN FAKING IT.** That arm applies exactly ONE client-side filter (`is_enabled`) and relies
+  on the server's `?capability=` query for the rest, so feeding an MCP row into the response and
+  asserting it is not listed would be measuring a filter that does not exist. What is asserted instead
+  is the ARGUMENT that makes the server exclude it.

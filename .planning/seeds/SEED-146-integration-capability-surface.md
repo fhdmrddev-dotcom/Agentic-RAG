@@ -4,6 +4,14 @@ title: The FULL integration capability surface — reads as well as writes, trig
 created: 2026-08-10
 planted_during: Phase 190 live UAT (operator direction — "be comprehensive, don't cover one task per app and neglect every other capability")
 status: planted
+# ⚠ ONE CLAUSE OF THIS UMBRELLA IS ANSWERED — the approval-model rule, at the MCP surface.
+# See "⚠ ANSWERED CLAUSE — 2026-08-25" below. The umbrella itself stays PLANTED: the read
+# surface, the trigger surface, the payload/auth/ops/catalog dimensions are all untouched.
+answered_clauses:
+  - clause: "never add an outbound capability to the tool registry before the approval model exists"
+    answered_by: "Phase 206.2 (206.2-04) — D-206.2-05"
+    answered_on: 2026-08-25
+    written_in_source: "frontend/src/components/workflows/McpToolPicker.tsx (module docblock + the grant handler)"
 priority: high
 relates_to:
   - SEED-144 (provider-shaped connections + OAuth) — the SHAPE dimension of this umbrella
@@ -145,3 +153,42 @@ questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
 
 Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
 v3.8 closes (204 running, 205 planned).
+
+---
+
+## ⚠ ANSWERED CLAUSE — 2026-08-25 (Phase 206.2, plan `206.2-04`, decision `D-206.2-05`)
+
+**The clause answered, verbatim from this seed's own standing rule:** *never add an outbound
+capability to `_TOOL_REGISTRY` before the approval model exists.*
+
+**The answer, and it is written at the control's own site rather than only here** — because a seed
+answered only in a plan is invisible to the register scan, and `status:` frontmatter IS the index:
+
+> **The per-tool grant IS the approval model for this surface.** Phase 206 shipped the egress, the
+> SSRF guard, the dispatch, the enforcement (`tool_grants.get(tool_name) is True` — **a missing key
+> DENIES**) and the `tool_refused` receipt. The only missing piece was the human-facing switch the
+> enforcement already read. **Phase 206.2 therefore adds NO NEW OUTBOUND CAPABILITY** — it makes an
+> existing, already-fenced one approvable by a person instead of by a hand-edited database row.
+
+**Driven rather than asserted (2026-08-25, real Chromium + the live `mcp.deepwiki.com` server):**
+with the grant OFF the run was REFUSED and wrote `tool_refused` / `reason: permission_denied`; with
+the grant flipped ON through the new control the same run called the tool and wrote
+`external_action_sent` with `capability: "mcp"` and `raw_status: 200`. **The deny case was driven
+FIRST, on purpose** — a refusal observed after a success is a weaker reading than one observed
+before.
+
+⚠ **THE RULE'S SHARP EDGE IS UNCHANGED AND STILL BINDS.** Nothing here licenses adding a NEW capability
+to the registry. The narrower guarantee taken is: *a capability that already ships, already denies by
+default, and already writes a refusal receipt may be given its human-facing switch.* A capability with
+no run-time gate still needs the approval model built first.
+
+⚠ **AND ONE RESIDUAL IS RECORDED RATHER THAN GLOSSED:** the grant is CONNECTION-scoped and org-wide, not
+step-scoped, so granting a tool for one workflow grants it for every workflow in the organisation that
+uses that connection. That is stated to the person at the control (`MCP_GRANT_SCOPE_NOTE`) because it
+cannot be narrowed without a schema change. **Re-open trigger for THIS clause:** *the first request for
+a per-workflow or per-step grant, or the first grant of a tool that WRITES to a system of record with no
+run-time approval step.*
+
+**The umbrella stays PLANTED.** This phase answers one clause of one dimension (approval, for MCP
+writes). The READ surface, the TRIGGER surface, payloads, auth, ops and catalog are all still open, and
+every `trigger_when` above still fires.
