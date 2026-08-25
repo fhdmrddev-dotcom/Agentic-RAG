@@ -49,6 +49,8 @@ import {
   CONNECTIONS_ADD_CTA,
   CONNECTIONS_BANNER_HEADING,
   CONNECTIONS_COLUMNS,
+  CONNECTIONS_DENSE_LABEL_CREDENTIAL,
+  CONNECTIONS_DENSE_LABEL_USED_BY,
   CONNECTIONS_EMPTY_BODY,
   CONNECTIONS_EMPTY_HEADING,
   CONNECTIONS_FILTERED_TO_ZERO,
@@ -1028,5 +1030,304 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
         cursor = at
       }
     }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 15 · Phase 206.1-02 Task 2 — THE DENSE ROW SHAPE (SC#2a, the SHAPE half)
+//
+// ⚠ THIS BLOCK IS NOT SC#2's PROOF AND MUST NEVER BE RECORDED AS IT (D-206.1-14). Measured
+// in this repo: jsdom returns `scrollWidth 0 / clientWidth 0 / offsetWidth 0` and
+// `getBoundingClientRect().width 0` for every element, so
+// `expect(el.scrollWidth <= el.clientWidth).toBe(true)` PASSES VACUOUSLY on markup that
+// overflows by ~400px in a real browser. No alternative box metric rescues it. What this
+// block can prove is the SHAPE — that both variants exist, that no cell was deleted, that
+// the destination is no longer `nowrap`, and that the wide render did not move. The
+// GEOMETRY half is a real browser, at 1280 and 1536, with a `bodyClientW > 0` control, and
+// it lives in this plan's Task 3.
+//
+// ⚠ MEASURED BEFORE THIS BLOCK WAS WRITTEN: `renderTab` never passes `panel`, so NOT ONE of
+// the shipped cases exercised the dense shape — it had no coverage at all, which is why the
+// helper below drives the REAL condition (`panel && !isMobile`) rather than poking a prop.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("SC#2a — the dense row shape, and the five columns that survive it", () => {
+  /** A fixed clock so `credentialLabel` reads the same in both shapes within one case. */
+  const DENSE_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+
+  /** All four states, so the WCAG 1.4.1 glyph-and-word readings can be compared shape to
+   *  shape rather than sampled. `disabled` outranks the verdict, hence the fourth row. */
+  const FOUR_STATES: ConnectorConnection[] = [
+    makeConnection({
+      id: "st-ready",
+      name: "Ops mailbox",
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "st-not-checked",
+      name: "Northwind Jira",
+      capability: "create_ticket",
+      config: { base_url: "northwind.atlassian.net", project_key: "NW" },
+      last_checked_at: null,
+      last_check_verdict: "not_checked",
+    }),
+    makeConnection({
+      id: "st-failed",
+      name: "#ops-alerts",
+      capability: "post_message",
+      config: { default_channel: "#ops-alerts" },
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "failed",
+    }),
+    makeConnection({
+      id: "st-disabled",
+      name: "Retired mailbox",
+      is_enabled: false,
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "ok",
+    }),
+  ]
+
+  /** ⚠ DENSE IS DRIVEN THROUGH THE REAL CONDITION, never through a prop poke. `dense` is
+   *  the SAME expression that opens the 400px track (`panel && !isMobile`), so a helper
+   *  that set the flag directly could pass while the one condition had quietly forked into
+   *  two. jsdom's `window.innerWidth` is 1024 here, i.e. above the 768 mobile breakpoint,
+   *  which is what makes `panel` alone sufficient. */
+  function renderDense(
+    props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {},
+  ) {
+    return renderTab({
+      now: DENSE_NOW,
+      panel: <div data-testid="fake-panel" />,
+      ...props,
+    })
+  }
+
+  function renderWide(
+    props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {},
+  ) {
+    return renderTab({ now: DENSE_NOW, ...props })
+  }
+
+  /** The six things D-206.1-13 says survive the reflow. Named once so both renders are
+   *  swept by the SAME list — a hand-written second list is how one of them goes missing. */
+  const ROW_TESTIDS = [
+    "connections-row-name",
+    "connections-row-destination",
+    "connections-row-usedby",
+    "connections-row-credential",
+    "connections-row-state",
+    "connections-row-more",
+  ] as const
+
+  it("`data-dense` carries BOTH values — an absent attribute is a different fact from false", () => {
+    // ⚠ The "0 is a fact, absence is a different one" trap: an attribute that is simply
+    // missing in the wide shape would read as falsy to every consumer and would make this
+    // assertion unfalsifiable. Both renders must SPELL it.
+    renderDense()
+    const dense = screen.getAllByTestId("connections-row")
+    expect(dense.length).toBeGreaterThan(0)
+    dense.forEach((row) => expect(row.getAttribute("data-dense")).toBe("true"))
+
+    cleanup()
+    renderWide()
+    const wide = screen.getAllByTestId("connections-row")
+    expect(wide.length).toBeGreaterThan(0)
+    wide.forEach((row) => expect(row.getAttribute("data-dense")).toBe("false"))
+  })
+
+  it("⚠ D-206.1-13 — all five columns AND the ⋯ resolve in BOTH shapes", () => {
+    // Deleting a column is the ROADMAP's NAMED failure mode: "the destination is the one
+    // column a person reads to approve a send, and hiding it is worse than truncating it."
+    // So this is asserted by QUERYING every testid in both renders, never by inspection.
+    // ⚠ `PhaseCard.tsx` — the stacked-identity analog whose markup the dense row copies —
+    // FOLDS A FACT AWAY at higher density. The markup is copied; that decision is not.
+    renderDense({ usageCounts: { "st-ready": 2 } })
+    for (const testId of ROW_TESTIDS) {
+      expect(screen.getAllByTestId(testId).length).toBe(THREE_ROWS.length)
+    }
+
+    cleanup()
+    renderWide({ usageCounts: { "st-ready": 2 } })
+    for (const testId of ROW_TESTIDS) {
+      expect(screen.getAllByTestId(testId).length).toBe(THREE_ROWS.length)
+    }
+  })
+
+  it("⚠ the dense destination carries NO `truncate` — on the cell OR on the value span", () => {
+    // ⚠ THIS IS WHERE SC#2 IS WON OR LOST. `truncate` is `white-space: nowrap`, under which
+    // `scrollWidth` is the FULL un-wrapped text width — so `scrollWidth <= clientWidth` is
+    // UNSATISFIABLE BY WIDENING ALONE, and a dense layout that merely hands the cell more
+    // room fails SC#2 silently. `truncate` ships TWICE today (cell AND inner span), so
+    // removing one leaves the other and the geometry does not move at all.
+    renderDense()
+    const cells = screen.getAllByTestId("connections-row-destination")
+    expect(cells.length).toBeGreaterThan(0)
+    for (const cell of cells) {
+      expect(cell.className.split(/\s+/)).not.toContain("truncate")
+      const span = cell.querySelector("span:not([aria-hidden])")
+      expect(span).not.toBeNull()
+      const tokens = span!.className.split(/\s+/)
+      expect(tokens).not.toContain("truncate")
+      expect(tokens).toContain("whitespace-normal")
+      // ⚠ `break-all`, NOT `break-words`: a URL has no spaces, so `break-words` will not
+      // break it and the cell overflows exactly as before while looking fixed.
+      expect(tokens).toContain("break-all")
+      expect(tokens).not.toContain("break-words")
+    }
+  })
+
+  it("the WIDE destination still truncates — the dense change is ADDITIVE, not a swap", () => {
+    // The mirror of the case above. Without it, deleting `truncate` outright would pass
+    // that one and silently change the shipped wide row (which Task 1's capture also
+    // catches — two independent guards on the same claim, deliberately).
+    renderWide()
+    const cells = screen.getAllByTestId("connections-row-destination")
+    expect(cells.length).toBeGreaterThan(0)
+    for (const cell of cells) {
+      expect(cell.className.split(/\s+/)).toContain("truncate")
+    }
+  })
+
+  it("D-206.1-20 — the five-word HEADER is the ONE thing dense drops", () => {
+    // Stacked cells form no columns, so a five-word header would label a grid that is not
+    // there. `CONNECTIONS_COLUMNS` keeps its character identity in the wide shape.
+    renderDense()
+    expect(screen.queryByTestId("connections-header")).toBeNull()
+
+    cleanup()
+    renderWide()
+    const header = screen.getByTestId("connections-header")
+    expect(
+      Array.from(header.querySelectorAll("[data-column]")).map((el) => el.textContent),
+    ).toEqual([...CONNECTIONS_COLUMNS])
+  })
+
+  it("⚠ the credential cell's textContent is CHARACTER-IDENTICAL in both shapes", () => {
+    // This is what forces the new inline label to be a SIBLING node, outside the testid'd
+    // one: `:640` asserts `.toBe("never checked")` by EXACT EQUALITY and `:641` anchors
+    // `/^checked /` at the start. Putting the label inside would force a re-baseline — of a
+    // pin, on the surface whose whole lesson is that re-baselined pins are not evidence.
+    renderDense({ connections: FOUR_STATES })
+    const dense = screen
+      .getAllByTestId("connections-row-credential")
+      .map((c) => c.textContent)
+
+    cleanup()
+    renderWide({ connections: FOUR_STATES })
+    const wide = screen
+      .getAllByTestId("connections-row-credential")
+      .map((c) => c.textContent)
+
+    expect(dense.length).toBe(FOUR_STATES.length)
+    expect(dense).toEqual(wide)
+    expect(dense[1]).toBe("never checked")
+    expect(dense[0]).toMatch(/^checked /)
+  })
+
+  it("the four state readings are unchanged in dense — glyph AND word, in both shapes", () => {
+    renderDense({ connections: FOUR_STATES })
+    const dense = screen.getAllByTestId("connections-row-state").map((c) => c.textContent)
+
+    cleanup()
+    renderWide({ connections: FOUR_STATES })
+    const wide = screen.getAllByTestId("connections-row-state").map((c) => c.textContent)
+
+    expect(dense).toEqual(wide)
+    expect(dense).toEqual([
+      CONNECTION_STATE_WORDS.ready,
+      CONNECTION_STATE_WORDS.not_checked,
+      CONNECTION_STATE_WORDS.failed,
+      CONNECTION_STATE_WORDS.disabled,
+    ])
+  })
+
+  it("the two inline labels are DERIVED from the column tuple, never re-typed", () => {
+    // Asserted against the imported constants rather than against literals, and then a
+    // second time as an identity — so the header word and the inline label are
+    // STRUCTURALLY unable to disagree rather than merely equal today.
+    expect(CONNECTIONS_DENSE_LABEL_USED_BY).toBe(CONNECTIONS_COLUMNS[2])
+    expect(CONNECTIONS_DENSE_LABEL_CREDENTIAL).toBe(CONNECTIONS_COLUMNS[3])
+
+    // ⚠ SCOPED TO THE ROW, NOT THE CONTAINER — measured: a container-wide `toContain`
+    // passes VACUOUSLY today, because the five-word HEADER already spells both words. The
+    // claim is that the label reaches the ROW once that header is gone, so the row is where
+    // it has to be read.
+    renderDense()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.textContent).toContain(CONNECTIONS_DENSE_LABEL_USED_BY)
+      expect(row.textContent).toContain(CONNECTIONS_DENSE_LABEL_CREDENTIAL)
+    }
+  })
+
+  it("the inline labels are NOT aria-hidden — they read for AT exactly as for the eye", () => {
+    // "Credential checked 3d ago" is the reading, and it is the reading for everyone. A
+    // decorative label would leave a screen reader with a bare relative time and no noun.
+    renderDense()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      const hidden = Array.from(row.querySelectorAll('[aria-hidden="true"]')).map(
+        (el) => el.textContent ?? "",
+      )
+      for (const label of [CONNECTIONS_DENSE_LABEL_USED_BY, CONNECTIONS_DENSE_LABEL_CREDENTIAL]) {
+        for (const text of hidden) expect(text).not.toContain(label)
+      }
+    }
+  })
+
+  it("ZERO `[title]` nodes in the DENSE render, with a menu AND a sheet open", async () => {
+    // ⚠ The shipped fence (`:505-515`) extended to the new shape. A tooltip is FORBIDDEN
+    // here, and that prohibition is exactly WHY wrapping had to be the answer: the cheap
+    // fix was never available.
+    const user = userEvent.setup({ delay: null })
+    const { container } = renderDense({
+      usageCounts: { "conn-1": 2 },
+      onAdd: vi.fn(),
+      onOpen: vi.fn(),
+    })
+    expect(container.querySelectorAll("[title]")).toHaveLength(0)
+
+    await openRowMenu(user, "Ops mailbox")
+    await user.click(await screen.findByTestId("connections-action-delete"))
+    await screen.findByRole("dialog")
+    expect(document.querySelectorAll("[title]")).toHaveLength(0)
+  })
+
+  it("the ⋯ / receipt either-or survives in dense — one action cell, two occupants", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderDense({ usageCounts: {} })
+    expect(screen.getAllByTestId("connections-row-more").length).toBe(THREE_ROWS.length)
+
+    await openRowMenu(user, "Ops mailbox")
+    await user.click(await screen.findByTestId("connections-action-disable"))
+    const receipt = await screen.findByTestId("connections-receipt")
+    expect(receipt).toHaveTextContent(RECEIPT_DISABLED)
+    // The row that received the write no longer shows its ⋯ — the shipped either-or.
+    expect(screen.getAllByTestId("connections-row-more").length).toBe(THREE_ROWS.length - 1)
+  })
+
+  it("`canWrite` still REMOVES the ⋯ in dense — never renders it inert", () => {
+    // The shipped removed-not-disabled rule, asserted on the second render path. A
+    // `toBeDisabled()` assertion was measured unable to see plant C at 190-16, which is why
+    // this is an absence claim.
+    renderDense({ isOrgAdmin: false })
+    expect(screen.queryAllByTestId("connections-row-more")).toHaveLength(0)
+
+    cleanup()
+    renderDense({ liveConnectorsOn: false })
+    expect(screen.queryAllByTestId("connections-row-more")).toHaveLength(0)
+  })
+
+  it("no `<table>` primitive in EITHER shape (§15)", () => {
+    const denseRender = renderDense()
+    expect(denseRender.container.querySelector("table")).toBeNull()
+
+    cleanup()
+    const wideRender = renderWide()
+    expect(wideRender.container.querySelector("table")).toBeNull()
   })
 })

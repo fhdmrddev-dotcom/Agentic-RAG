@@ -79,6 +79,30 @@ export const CONNECTIONS_COLUMNS = [
   "State",
 ] as const
 
+/**
+ * ── THE TWO DENSE INLINE LABELS (206.1-02, item 2 · D-206.1-20) ─────────────────────────
+ *
+ * When the 400px panel opens, the list track drops to ~302px and the row reflows into three
+ * stacked lines. Stacked cells form no aligned columns, so the five-word HEADER above is not
+ * rendered in that shape — it would label a grid that is not there. `Used by` and
+ * `Credential` are the two cells whose reading depends on that header (`2 steps` and
+ * `3d ago` name nothing on their own), so each gains a visible inline label instead.
+ *
+ * ⚠ DERIVED, NEVER RE-TYPED. The dense inline label and the wide column header are THE SAME
+ * WORD, and deriving one from the other is what makes the two shapes structurally unable to
+ * disagree — a re-typed `"Used by"` is a second home for one string, and a later edit to the
+ * header would silently leave the dense label behind. `CONNECTIONS_COLUMNS` is `as const`,
+ * so each constant below carries the literal type rather than `string`.
+ *
+ * ⚠ AND THE LABEL IS RENDERED AS A SIBLING OF THE TESTID'D VALUE NODE, NEVER INSIDE IT.
+ * `ConnectionsTab.test.tsx` asserts `connections-row-credential`'s textContent
+ * `.toBe("never checked")` by EXACT EQUALITY and anchors `/^checked /` at the start. Keeping
+ * the label outside is what keeps the value node character-identical in BOTH shapes, so that
+ * shipped pin holds for dense too instead of being re-baselined.
+ */
+export const CONNECTIONS_DENSE_LABEL_USED_BY = CONNECTIONS_COLUMNS[2]
+export const CONNECTIONS_DENSE_LABEL_CREDENTIAL = CONNECTIONS_COLUMNS[3]
+
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 2 · THE FOUR STATE WORDS (155-C, locked — must read in greyscale)
 // ═══════════════════════════════════════════════════════════════════════════════════════
