@@ -185,7 +185,7 @@ the xyOps workflow editor. **They are the acceptance bar; read them before plann
 | # | Owed | Where it is recorded |
 |---|---|---|
 | 1 | **Phase 209** — the last v3.8 phase | ROADMAP row 209 + `PHASE-209-PROPOSAL-*.md` |
-| 2 | **A live smoke of the app after the 207 `api.ts` split** | `207-VERIFICATION.md` → Owed |
+| 2 | ~~A live smoke of the app after the 207 `api.ts` split~~ ✅ **DISCHARGED 2026-08-25** — 5 surfaces, 56 backend calls, 0 errors; the smoke was DRIVEN RED against two planted split failures first () | `207-VERIFICATION.md` |
 | 3 | **Independent verification of 207 and 208** | both VERIFICATION files |
 | 4 | **Cloud verification of two bugs closed on LOCAL-only evidence** — a `.docx` + `.pdf` upload, and the OpenRouter model that 404'd (**its id was never captured**) | `HANDOFF-260825.md` |
 | 5 | **`SEED-203`** — the judge passed a golden run whose deliverable refuses the work, at score 100 | `SEED-203-*.md` |
