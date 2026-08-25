@@ -4,6 +4,17 @@ Agentic RAG platform — AI agent that knows your knowledge base, runs code in a
 sandbox, and can be taught new skills that persist. Chat is the default
 interface; document ingestion is a manual file-upload flow.
 
+## More than one agent works this repo
+
+Gemini (Antigravity) and Claude (terminal) both work here, from processes that cannot call each
+other. Coordination is a durable mailbox: **`.agent-bus/OPEN.md`**, driven by
+`scripts/agent-bus.sh` (`list` / `open` / `answer` / `close`). Protocol + roles: **`AGENTS.md`**.
+
+A SessionStart hook (`.claude/hooks/agent-bus-check.sh`) prints every open `to:claude` item at
+every session and subagent start — silent when empty, loud at 3+ days. ⚠ **Whoever REVIEWS a
+phase must not have shaped the build**; design direction across the bus makes the review
+self-assessment. Decisions go `--to operator`, never settled agent-to-agent.
+
 ## Stack
 - Frontend: React + Vite + Tailwind + shadcn/ui (Aether Intelligence design system, Deep Midnight theme)
 - Backend: Python + FastAPI
