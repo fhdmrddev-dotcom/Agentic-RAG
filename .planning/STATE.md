@@ -187,6 +187,88 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
+### 2026-08-25 — Phase 206.2 plan 04 EXECUTED (wave 4/4, FINAL) — the grant control, the guard that would have failed, and the driven round trip
+
+Main working tree, three commits `58260911` / `c99dcc4a` / `cdd31e4f`. Summary:
+`.planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-04-SUMMARY.md`.
+**Phase 206.2 is 4 of 4 plans executed. 206.1's owed SC#1b is CLOSED, marked in the same commit
+as the browser evidence that closed it.**
+
+1. ✅ **`updateConnectorGrants` HAS ITS FIRST PRODUCTION CALLER** since Phase 206 shipped it
+   (`0` → `1` file, measured both ways). The write sends the FULL MERGED MAP from the
+   **server-owned prop** — and the merge is **PROVED AT T4, not just asserted at T1**: granting a
+   SECOND tool put `{"read_wiki_structure":true,"read_wiki_contents":true}` on the wire, and
+   revoking one put `{"read_wiki_contents":false,"read_wiki_structure":true}`. ⚠ The FIRST flip
+   could not have proved it — the column was `{}`, so its one-key body is byte-identical to what
+   the naive `{[tool]: next}` lost-update bug would have sent. **A second reading was driven for
+   exactly that reason.**
+2. ⚠ **FOUR AUDIENCE ARMS, NOT THREE — a DECLARED DEVIATION with a measured reason.** The plan's
+   `unknown` arm (hide everything when `org === null` OR `loading`) contradicts three of its own
+   acceptance criteria and two shipped cases: hiding the Discover button in a provider-less render
+   is a REMOVAL, so *"adds zero new nodes"* becomes unassertable. `no-provider` therefore renders
+   **byte-identically to the pre-phase component** (element count **33 = 33**, captured before any
+   source edit, with a non-vacuity control); `probing` — the only unmeasured state a real person
+   can be in, since `OrgProvider` wraps the app — **does** hide it, which is what actually honours
+   *a non-admin must never see a button that 403s*.
+3. ✅ **THE GUARD IS TWO-LEGGED AND ITS VACUITY CLAIM IS MEASURED, NOT ARGUED.** Run against the
+   pre-phase tree (base `4c9b9a7f`'s three files checked out over the working copy) leg (b) went
+   **5 of 11 RED** while **all three leg-(a) cases were GREEN in that same run**. Restored
+   md5-identical, `numstat` 0. ⚠ A narrower counterfactual exposed a second lesson: with only the
+   read argument re-planted, the **DOM-reaching case stayed green** — a mock that ignores the
+   read's argument cannot see this defect, and only the zero-argument call assertion can.
+4. ✅ **THE ROUND TRIP DRIVEN IN REAL CHROMIUM** (Playwright 1.60.0, `chromium-1223`; Chrome
+   DevTools MCP absent — a deviation in METHOD). Dev server **5180** (5173/5174 were IPv6-bound —
+   the 206.1 trap, reproduced); HEAD asserted by a marker string in the served module. Session
+   minted local-only behind a non-loopback guard. **NO DIRECT DATABASE WRITE APPEARS ANYWHERE IN
+   THE EVIDENCE.** MCP row listed, Slack and Jira rows NOT; footer `🔒 mcp.deepwiki.com`; discover
+   succeeded; **DENY DRIVEN FIRST** (`tool_refused` / `permission_denied`, step text *Tool
+   execution refused: …*); then the grant flipped and the same run returned DeepWiki's real page
+   list for `facebook/react` with `external_action_sent {capability:"mcp", raw_status:200}`.
+5. ⚠ **`harness_audit.metadata` IS A JSONB STRING SCALAR ON 2,906 OF 2,906 ROWS — the plan's own
+   prescribed audit query returns ZERO rows against a receipt that is there.** Use
+   `(metadata #>> '{}')::jsonb ->> 'connection_id'`. And the filter matters exactly as warned:
+   **8** `tool_refused` rows exist, only **1** carries a `connection_id`.
+6. ⚠ **RESEARCH A1 IS FALSIFIED AT T4 IN THE OPPOSITE DIRECTION FROM T1.** Wave 3 proved
+   `JSON.stringify` drops an `undefined` key; the SAVED row carries `tool_name: null`,
+   `tool_args: {}`, `available_tools: []` — the keys **survive, normalised**. Harmless ONLY
+   because `phase_types.py:2287` branches on truthiness; a refactor to `if "tool_name" in config:`
+   would silently resurrect the MCP branch, and nothing watches for that.
+7. ⛔ **SC#3b IS NOT MET AND IT IS NAMED RATHER THAN ABSORBED.** The gauntlet was DRIVEN:
+   `✓Owner ✓Valid ✓Goal ✓Structure ✓Pause ✓Grounding` — **stage 2.6 PASSED with the MCP step
+   present, which is wave 1's fix proved end to end** — then blocked at `golden_run_error`,
+   `published: false`. Cause: an `external_action` step ALWAYS stops for approval, so the
+   unattended golden run waits forever. **EVERY external-action workflow is unpublishable, not
+   just MCP ones.** Second defect from the same drive: the verdict says `golden_run_id: null` and
+   *"this blocked before stage 3"* — both false; run `5d67d004` exists. → **`SEED-201`**.
+8. ✅ **THE LEDGER DEBT PAID: six rows + six sections in ONE commit**, four cells corrected by
+   re-derivation (`PhaseFormPanel` `24/11/1375 → 29/13/1561`, its FIFTH consecutive staling;
+   `vitest-count-gate` `115/20/3845 → 118/21/3909`; `grounding.py` `18/5/1252 → 19/6/1311`), one
+   absence declined in writing (`stepReadinessContext.ts`, trigger named). ⚠ **`phaseVocabulary.ts`
+   fires at SIX phases and had NEVER been in the table** — and it was **not edited by this phase**;
+   the row exists only because the file was NAMED in the blast radius and MEASURED.
+9. ⚠ **CLAUDE.md is `124,357 → 133,006` chars (88.7%, 16,994 of headroom).** The split is
+   **ESCALATED as ROADMAP row 208**, not performed and **not shaved** — the table is the audit scan
+   list and only prose may leave. `Workflow guardrails (MANDATORY)` is now 85,180 chars.
+10. ✅ **SEED-146's approval-model clause ANSWERED in the register** (frontmatter + a dated
+    section), umbrella left PLANTED. Reported-bugs scan RUN: **no report carries
+    `folded_into: 206.2`**; `BUG-260810-01` noted as adjacent and explicitly NOT folded.
+
+**Baselines at this commit:** gate `total 5700 · failed 0 · pinned total 5125 · OK 113/113`
+(pinned FILES `+2`, and the `+28` grand-total move is fully attributed); tsc **34 → 34**, zero in
+any touched file; backend `68 failed, 2613 passed` — **unchanged**. `frontend/src/lib/api.ts`,
+`supabase/migrations` and both package manifests: **0 files**.
+
+**Teardown, recorded:** the grant reverted through the same switch, the added step removed through
+the canvas, both runs and the orphaned golden run cancelled through the UI. Deliberately left: the
+DeepWiki fixture row, three run rows, and `tool_grants` reading `{...: False}` rather than the
+original `{}` — semantically identical under `grants.get(t) is True`, **not byte-identical**, and
+said so rather than rounded off.
+
+**NEXT ACTION:** `/gsd:verify-work 206.2` — all four plans are executed and Phase 206.2's own
+SC#1/2/2b/4/5/6 are met; **SC#3 is met for the RUN path and SC#3b (publish) is BLOCKED by
+`SEED-201`, which is outside this phase's scope.** The verifier should score SC#3b against that
+seed rather than against this phase.
+
 ### 2026-08-25 — Phase 206.2 plan 02 EXECUTED (wave 2/4) — the picker has a second shape
 
 Frontend-only, main working tree, three commits `26904f79` / `b2309e6e` / `de06ce3e`. Summary:
