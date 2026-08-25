@@ -38,7 +38,7 @@
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
-| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | **In progress — 2 of 3 plans complete** (plan 01, item 3 / SC#3, and plan 02, item 2 / SC#2, both executed 2026-08-25). **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
+| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | ⚠ **3 of 3 plans executed — SC#1b BLOCKED, phase NOT closeable as-is** (plans 01/02/03 all executed 2026-08-25). SC#2 and SC#3 met; SC#1a met; **SC#1b is not met and the cause is a SECOND missing door**: an MCP connection cannot be bound to any workflow step, because `ConnectionPicker` reads capability-scoped and an MCP row has no capability. See 206.1-03-SUMMARY.md. **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -517,12 +517,33 @@ Plans:
   and Chrome DevTools MCP was unavailable, so §OQ#6's snippet was driven verbatim through real Chromium
   via Playwright instead — a deviation in method, not in evidence.
 
-- [ ] 206.1-03-PLAN.md — **item 1, the MCP creation door**, plus the live edit-mode defect it was
-  found beside. The fourth chooser option and its three fields, a create body with NO `capability`
-  key, a disabled Save with its OWN `aria-describedby` id, four positional ladders given named arms
-  against a synthetic FIFTH shape, the driven round trip with no direct DB insert, and the phase's
-  five-row/five-section hot-file ledger debt in its own commit
-  (D-206.1-03/04/05/06/07/18/19/22/24).
+- [x] 206.1-03-PLAN.md — ⚠ **EXECUTED 2026-08-25 WITH SC#1b BLOCKED** (5 commits,
+  `e155611c`…`5343b1e8`). **item 1, the MCP creation door**, plus the live edit-mode defect it was
+  found beside: the fourth chooser option and its three fields, a create body whose key set is
+  `{name, mcp_server_url, config}` with **NO `capability` key** and an empty credential OMITTED, a
+  disabled Save with its OWN `aria-describedby` id, D-206.1-22's edit-mode fix pinned with four
+  regressions, all four positional ladders given NAMED arms against a synthetic FIFTH shape plus the
+  prototype-key set, `Check credential` REMOVED for an MCP row, and the phase's **five-row /
+  five-section** hot-file ledger debt paid in one commit with RE-DERIVED triples
+  (D-206.1-03/04/05/06/07/18/19/22/24). Suites: `ConnectionFormPanel.test.tsx` 63 → **125**,
+  `ConnectionsTab.test.tsx` 63 → **73**; count gate `OK` at **5605**, `failed 0`; tsc **34**;
+  backend **68 failed**, unchanged.
+  - ⚠ **SC#1a IS MET AND SC#1b IS NOT.** Steps 1-4 and 8 of the driven round trip PASS with
+    recorded browser evidence — created entirely in the UI, `201`, `capability: null`,
+    `mcp_server_url` correct, the row reads `mcp.deepwiki.com` with a VISIBLE mark
+    (`fill: rgb(107,114,128)`, `innerHTML` 1066), no `Check credential` item, and the edit path
+    renders the MCP shape. **NO `INSERT INTO connector_connections` anywhere in the evidence.**
+  - ⛔ **Steps 5-7 are UNREACHABLE THROUGH ANY UI, and the cause is NOT this plan's output.**
+    `ConnectionPicker` only ever performs CAPABILITY-SCOPED reads
+    (`listConnectorConnections(capability)`), and an MCP row has `capability = null`, so it is
+    filtered out of every read the picker performs; `ExternalActionSection` offers only the three
+    capabilities. ⇒ **`McpToolPicker` / `mcp-discover-btn` has no reachable mount**, and
+    `updateConnectorGrants` has **no UI caller at all**. Measured over the wire: unfiltered list
+    returns the row, all three capability-filtered lists do not, and
+    `POST /connectors/connections/{id}/discover` on that row returns **3 tools**. The backend is
+    ready (`ExternalActionPhaseConfig.capability` is `| None` and its comment names the MCP shape);
+    **the AUTHORING surface cannot express it.** This is the ROADMAP's own first named failure mode
+    for SC#1, and it is a NEW CAPABILITY to fix — a phase, not a gap-closure round (G-7).
 
 ---
 

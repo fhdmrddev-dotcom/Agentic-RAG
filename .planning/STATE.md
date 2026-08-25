@@ -9,17 +9,33 @@ progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 stopped_at: >
-  Phase 206.1 plan 02 (item 2, the dense row shape / SC#2) EXECUTED - 3 commits,
-  ccb5b09c..8b6f2242. SC#2 met on BOTH tiers: the vitest SHAPE half, and a REAL-BROWSER
-  geometry half measured at 1280 and 1536 (cellFits/spanFits true everywhere,
-  whiteSpace "normal", bodyClientW 1280/1536 as the non-vacuity control, listW identical
-  at 302 as the expected max-w-3xl invariance). Next action: execute 206.1-03 (item 1,
-  the MCP creation door + the live edit-mode defect). Worktrees remain FORBIDDEN.
-  Baselines held: tsc 34 (zero in any Connection* file), backend 68 failed, count gate OK
-  111/111 (total 5533, pinned 5043 - +22, exactly ConnectionsTab.test.tsx 41 -> 63).
+  Phase 206.1 plan 03 (item 1, the MCP creation door) EXECUTED - 5 commits,
+  e155611c..5343b1e8 - but SC#1b is NOT MET and the phase is NOT closeable as-is.
+  BUILT AND PROVEN: a fourth chooser option, a three-field MCP block, a create body
+  {name, mcp_server_url, config} with NO capability key and an empty secret OMITTED, a
+  disabled Save with its OWN aria-describedby id, D-206.1-22's edit-mode fix pinned with
+  four regressions, all four positional ladders given NAMED arms against a synthetic FIFTH
+  shape, Check credential REMOVED for an MCP row, and five hot-file rows + five detail
+  sections in one commit with RE-DERIVED triples.
+  BLOCKED: an MCP connection CANNOT BE BOUND TO ANY WORKFLOW STEP. ConnectionPicker only
+  ever calls listConnectorConnections(capability) and an MCP row has capability=null, so it
+  is filtered out of every read the picker performs; ExternalActionSection offers only the
+  three capabilities; McpToolPicker/mcp-discover-btn therefore has no reachable mount, and
+  updateConnectorGrants has no UI caller at all. Measured with the org admin's own JWT: the
+  unfiltered list returns the row, all three capability-filtered lists do not, and
+  POST /connectors/connections/{id}/discover on that row returns 3 tools. The backend is
+  ready; the AUTHORING surface cannot express the MCP shape. This is the ROADMAP's own first
+  named failure mode for SC#1 and fixing it is a NEW CAPABILITY - a phase, not a
+  gap-closure round (G-7).
+  Next action: OPERATOR DECISION - (A) a follow-on phase for the builder seam, (B) close
+  206.1 on SC#1a with SC#1b owed and a planted re-open trigger, or (C) re-scope 206.1.
+  Baselines: tsc 34 (zero in any Connection*/connectionMark* file), backend 68 failed,
+  count gate OK 111/111 (total 5605, pinned 5043 - +72, exactly the two settings suites).
+  CLAUDE.md crossed the 120,000-char WARN band: 116,960 -> 124,357; gate exit 0;
+  split-by-FUNCTION is now DUE (Workflow guardrails is 76,531 chars = 62% of the file).
 ---
 
 # Project State
@@ -43,6 +59,65 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Current focus:** Phase 206.1 executing — plans 01 and 02 done, plan 03 next; then Phase 207 (`api.ts` split)
 
 ## Current Position
+
+### 2026-08-25 — Phase 206.1 plan 03 EXECUTED (item 1, the MCP creation door) — ⛔ SC#1b BLOCKED
+
+The creation door is built, tested and driven in a real browser; **the row it creates still cannot be
+bound to a workflow step.** 5 commits, `e155611c`…`5343b1e8`. Summary:
+`.planning/phases/206.1-settings-connections-finishes-the-mcp-story-insert/206.1-03-SUMMARY.md`.
+
+1. ⛔ **SC#1b IS NOT MET, AND THE CAUSE IS A SECOND MISSING DOOR.** `ConnectionPicker.tsx:271` calls
+   `listConnectorConnections(capability)` — always capability-scoped — and an MCP row has
+   `capability = null`, so it is filtered out of **every** read the picker performs.
+   `ExternalActionSection` offers only the three members of `EXTERNAL_ACTION_CAPABILITIES`. ⇒
+   **`McpToolPicker` and its `mcp-discover-btn` have no reachable mount in the shipped product**, and
+   `updateConnectorGrants` has **no UI caller anywhere**. Measured with the org admin's own JWT:
+   unfiltered list → the row IS there; `?capability=send_email|create_ticket|post_message` → absent
+   from all three; `POST …/discover` on the row → **`200` with 3 tools**. The backend is ready
+   (`ExternalActionPhaseConfig.capability` is `| None`, and its own comment says *"an MCP step names a
+   `tool_name` and has no capability at all"*). **The authoring surface cannot express it.** This is
+   the Phase-118 built-but-unreachable shape one layer below where 206.1 looked.
+2. ✅ **SC#1a IS MET, on both tiers.** Four chooser options; exactly three MCP fields; a create body
+   whose key set is `{config, mcp_server_url, name}` with `"capability" in body === false` and an
+   empty credential **omitted** rather than sent as `""`; a disabled Save with its **own**
+   `aria-describedby` id (both resolutions asserted in one run, because `querySelector` returns the
+   FIRST match); and D-206.1-22's edit-mode defect fixed and pinned with four regressions.
+3. ⚠ **SC#4 EXTENDED past its own wording.** All four positional ladders now have NAMED arms and
+   NEUTRAL tails, each armed against a synthetic FIFTH shape **plus** the prototype-key set, with a
+   POSITIVE CONTROL beside every negative. Before it, an unrecognised shape composed
+   `{ default_channel: "" }` — a 422 wearing the generic *"Couldn't save that"* sentence.
+4. ⚠ **THE 187-24 TRAP FIRED AGAIN — eleventh recorded firing — and it invalidated a PLAN CRITERION.**
+   `grep -c "PhaseFormPanel" ConnectionFormPanel.tsx` was required to read `0`; it reads **8 at base
+   and 8 after**, because that file's own header names the lineage eight times to explain what it does
+   not import. The fence must be **IMPORT-SCOPED**. A second criterion
+   (`grep -c "credentialLabel"` unchanged) is likewise unsatisfiable alongside the plan's own
+   instruction to *delegate to* it; what was asserted instead is that its body is **md5-identical**
+   and the file diffs `+40 / -0`.
+5. ⚠ **A VACUOUS-NEGATIVE TRAP, caught by its own positive control.** On EDIT the secret renders as a
+   `<span>` of dots with **no control**, so its `<label>` associates with nothing and
+   `queryByLabelText` returns `null` **whether or not the label is there**. Four edit-mode negatives
+   were vacuous until they were moved to `queryByText`.
+6. ⚠ **FIVE HOT-FILE ROWS AND FIVE SECTIONS LANDED IN ONE COMMIT, AND ALL FIVE FILES WERE ABSENT FROM
+   BOTH DOCUMENTS FOR THEIR ENTIRE LIVES.** Two crossed the G-5 threshold in that very commit.
+   Triples RE-DERIVED, not copied: `ConnectionsTab.tsx` **8/3/1223** · `ConnectionFormPanel.tsx`
+   **5/3/1758** · `connectionsCopy.ts` **4/3/541** · `connectionFormCopy.ts` **4/3/759** ·
+   `connectionMark.tsx` **1/1/232** (below threshold, listed on purpose).
+7. ⚠ **A STALE ROW CORRECTED, AND ITS ERROR IS THE LESSON.** `scripts/vitest-count-gate.cjs` read
+   `114 / 19 / 3797`, now **`115 / 20 / 3845`**. Plan 206.1-01 reported `22` and `23` phases — **both
+   wrong**: they did not subtract the three six-digit DATED QUICK-TASK buckets (`260807`, `260808`,
+   `260814`). The shipped `19` had subtracted them and was merely stale.
+8. ⚠ **CLAUDE.md CROSSED THE 120,000-CHAR WARN BAND: 116,960 → 124,357** (gate exit 0). Recorded, not
+   worked around — the plan explicitly forbade thinner rows. **Split-by-FUNCTION is now DUE**, and the
+   gate names its own target: *Workflow guardrails (MANDATORY)* is **76,531 chars, 62% of the file**.
+   The TABLE stays complete; only PROSE leaves.
+9. ⚠ **`stringsOfModule()` walks `connectionRefusalCopy` ONLY** — measured. The nine-banned-terms and
+   absolute-verb fences never covered `connectionFormCopy`. The sweep was **EXTENDED** with a
+   non-vacuity control naming its seven new strings by identity. **Not inherited coverage.**
+10. ⚠ **Chrome DevTools MCP was unavailable to this executor again** (the `tools:`-frontmatter bug), so
+    the round trip was driven in real Chromium via Playwright — a deviation in **method, not
+    evidence**. `BUG-260810-01` recorded as a deploy-parity note and left `open`: this plan adds a
+    FOURTH write affordance to the exact surface already invisible in cloud.
+
 
 ### 2026-08-25 — Phase 206.1 plan 02 EXECUTED (item 2, SC#2 — the dense row shape)
 
