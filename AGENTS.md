@@ -63,3 +63,55 @@ So the bus is enforced rather than trusted:
 `CLAUDE.md` at the repo root is the substantive project contract — stack, guardrails, the
 migration and deployment rules, the hot-file ledger. **It applies to every agent**, not only
 to Claude, despite the filename. Read it. This file is only about how the agents talk.
+
+---
+
+## 6 · The operator's playbook — what only the human can do
+
+Three things are structurally impossible for the agents, and they are exactly the operator's job.
+
+### 6.1 Start the agents — and **start the REVIEWER first**
+
+Neither agent can wake the other. Nothing on the bus moves until the addressee is running.
+
+⚠ **The reviewer must be started BEFORE the builder touches anything.** A baseline captured
+after the change proves nothing — it measures the change against itself. The reviewer's first
+act is to re-derive the gates on the untouched tree and write them down. Phase 209 got this
+right by luck; make it a rule:
+
+```
+1. start the reviewer   →  "capture baselines for phase N, then wait"
+2. start the builder    →  "you build phase N, read AGENTS.md"
+```
+
+### 6.2 Decide
+
+Every `--to operator` item, and every disagreement between the agents. Agents escalate rather
+than negotiate, so this queue is the product of the design, not a failure of it.
+
+```bash
+bash scripts/agent-bus.sh list --all          # everything, both directions
+bash scripts/agent-bus.sh open --to claude --from operator "..."   # queue work for later
+```
+
+That last one matters: the operator can post to an agent that is **not running** and it will be
+waiting at its next start.
+
+### 6.3 Assign the roles, per phase, out loud
+
+Who builds and who reviews changes phase to phase. What never changes:
+
+> **Whoever built it does not verify it.**
+
+This includes the reviewer's own fixes. If Claude fixes a defect it found, Claude is no longer
+an independent verifier of that fix — say so, and route the check elsewhere or accept it as
+self-assessed. A phase that closes on self-assessment should record that it did.
+
+### 6.4 The two briefing lines
+
+**To the builder:** *"You build Phase N. Read AGENTS.md — there is a coordination bus at
+`.agent-bus/OPEN.md`; check `agent-bus.sh list --to <you>` before each plan and after each.
+A reviewer is watching; it will not send you build direction. Design questions go to me."*
+
+**To the reviewer:** *"You review Phase N. Capture the gate baselines NOW, before the builder
+starts. Do not re-plan and do not execute."*
