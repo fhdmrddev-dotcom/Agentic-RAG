@@ -186,13 +186,54 @@ const isFailing = (connection: ConnectorConnection): boolean =>
 /** The row's `Sends to` facts, built from parts during render — the
  *  `ProviderPicker.tsx:159-165` derived-footer idiom. One mark, one shape, three surfaces:
  *  this is the same 🔒 destination form the Settings table column and the Settings panel
- *  render, so the seam invents no second vocabulary (UI-SPEC §6d). */
+ *  render, so the seam invents no second vocabulary (UI-SPEC §6d).
+ *
+ *  ── ⚠ REPAIRED 2026-08-25 (Phase 206.2 / D-206.2-20) — THE CORRECTION, BESIDE ITS ORIGINAL ──
+ *  The docblock above and the *"deliberately total over the union"* note below both stand as
+ *  written, because the reasoning they record is still the right reasoning. What was wrong was
+ *  the SHAPE OF THE LADDER, not its intent: the last arm was POSITIONAL — a trailing `return`
+ *  rather than a branch — so every row that was neither `send_email` nor `create_ticket` was
+ *  described as sending to Slack. An MCP row's `capability` is null, so an MCP row landed
+ *  there, and the footer on the one surface whose whole job is answering *where does this
+ *  send?* read `🔒 slack.com/api` for a connection pointed at `https://mcp.deepwiki.com/mcp`.
+ *  Driven at this plan's base, verbatim: `expected [ 'slack.com/api' ] to deeply equal
+ *  [ 'mcp.deepwiki.com' ]`.
+ *
+ *  This is BYTE-FOR-BYTE the defect `connectionsCopy.destinationFactsOf` shipped one file over
+ *  and Phase 206.1 repaired as its own verified SC#4 — the same ladder, the same trailing
+ *  return, the same wrong host. It survived HERE only because nothing in production could
+ *  produce an MCP row for this component: the picker's read was capability-scoped, so the arm
+ *  was unreachable. **This plan is what makes it reachable, which is why this plan repairs it.**
+ *  A row naming the WRONG host is worse than a row naming none — a governed send is approved
+ *  on the strength of this line.
+ *
+ *  ── ⚠ TWO SPELLINGS OF ONE RULE, AND THIS PHASE DOES NOT MERGE THEM ──
+ *  `destinationPartsOf` (workflows) and `connectionsCopy.destinationFactsOf` (settings) are two
+ *  spellings of ONE rule, living in two component subtrees. Recording the drift is the honest
+ *  first step; merging them is a refactor this phase was not scoped for, and doing it quietly
+ *  inside a repair would put an unreviewed cross-subtree dependency into a governance surface.
+ *  Both files carry this note, landed in the SAME COMMIT — a note in only one of them is the
+ *  drift the same-commit rule exists to forbid.
+ *  RE-OPEN TRIGGER: *the first phase whose `files_modified` names BOTH files, or a third
+ *  surface needing the same footer.* */
 export const destinationPartsOf = (connection: ConnectorConnection): string[] => {
   // Read defensively through `unknown`: `ConnectorConnectionConfig` is a three-member
   // union and this reader is deliberately total over it, so a fourth member added later
   // degrades to an empty footer rather than to a compile error in an unrelated file.
   const config = connection.config as unknown as Record<string, unknown>
   const text = (key: string): string => (typeof config[key] === "string" ? (config[key] as string) : "")
+  // ⚠ THE MCP ARM GOES ABOVE THE CAPABILITY ARMS, and above rather than below because an MCP
+  // row's shape is resolved by its URL — its `capability` is null, so an arm placed after the
+  // capability checks would be reached by falling through them rather than by matching.
+  if (connection.mcp_server_url) {
+    const url = connection.mcp_server_url
+    // HOST ONLY — the path is the server's business and the host is the fact being approved.
+    // No `URL` parser: a malformed value must still render SOMETHING true rather than throw,
+    // and the raw string is the truest thing available when it does not split. (Ported from
+    // the repaired twin at `settings/connectionsCopy.ts`, not reinvented beside it.)
+    const host = url.replace(/^https?:\/\//, "").split("/")[0]
+    return [host || url].filter(Boolean)
+  }
   if (connection.capability === "send_email") {
     const host = text("host")
     const port = typeof config.port === "number" ? String(config.port) : ""
@@ -202,10 +243,22 @@ export const destinationPartsOf = (connection: ConnectorConnection): string[] =>
   if (connection.capability === "create_ticket") {
     return [text("base_url"), text("project_key")].filter(Boolean)
   }
-  const channel = text("default_channel")
-  return [SLACK_FIXED_DESTINATION, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
-    Boolean,
-  )
+  // ⚠ EXPLICIT, NOT POSITIONAL. The Slack arm names the capability it serves. Its body is
+  // verbatim what the trailing return held; what changed is that it is now a branch.
+  if (connection.capability === "post_message") {
+    const channel = text("default_channel")
+    return [SLACK_FIXED_DESTINATION, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
+      Boolean,
+    )
+  }
+
+  // ⚠ THE NEUTRAL TAIL — this is the repair, and the arm above it is what it was repaired
+  // FROM. A fifth shape gets an EMPTY destination list, which renders as no facts at all,
+  // rather than silently inheriting the host of whichever arm happened to be written last.
+  // Proved by a synthetic-fifth-shape negative control in the suite, which asserts BOTH that
+  // the list is empty AND that it does not name Slack — "not Slack" alone would pass against
+  // a footer naming some other wrong host.
+  return []
 }
 
 /** `{name}` · `{name}  ✕ credential failed` · `{name}  ◌ not checked` — the state word

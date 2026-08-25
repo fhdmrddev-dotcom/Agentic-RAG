@@ -201,6 +201,26 @@ export const CONNECTION_FIXED_TAG = "fixed"
  * degrades to an empty cell rather than to a compile error in an unrelated file. This is
  * the same derivation `ConnectionPicker.destinationPartsOf` performs at the builder seam —
  * one mark, one shape, three surfaces (§6d).
+ *
+ * ── ⚠ TWO SPELLINGS OF ONE RULE, RECORDED 2026-08-25 (Phase 206.2 / D-206.2-20) ──
+ * That last sentence understates the situation, and the understatement is the finding. This
+ * function and `ConnectionPicker.destinationPartsOf` are not merely similar: they are TWO
+ * SPELLINGS OF ONE RULE, living in two different component subtrees. The proof is that they
+ * shipped the SAME defect and were repaired one phase apart — a trailing POSITIONAL return
+ * that described every MCP row as sending to Slack, fixed here as 206.1's own SC#4 and, in the
+ * workflows spelling, only when Phase 206.2 made that arm reachable for the first time. One
+ * rule in two places drifts by construction; the only question is which copy is found first.
+ *
+ * ⚠ THIS PHASE DELIBERATELY DOES NOT MERGE THEM, and that is a decision rather than an
+ * oversight. Merging crosses two component subtrees and is a refactor Phase 206.2 was not
+ * scoped for; doing it quietly inside a repair would put an unreviewed cross-subtree
+ * dependency into a governance surface. Recording the drift is the honest first step.
+ *
+ * ⚠ THE BODY BELOW IS UNTOUCHED BY 206.2 — this surface is 206.1's and is verified. Only the
+ * prose above is new, and its twin note landed in the SAME COMMIT: a note in only one of the
+ * two files is exactly the drift the same-commit rule exists to forbid.
+ * RE-OPEN TRIGGER: *the first phase whose `files_modified` names BOTH files, or a third
+ * surface needing the same footer.*
  */
 export function destinationFactsOf(connection: ConnectorConnection): string[] {
   const config = connection.config as unknown as Record<string, unknown>
