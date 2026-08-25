@@ -4,10 +4,10 @@ title: "text/html is ingested as RAW MARKUP — tags land in the chunk text and 
 reported: 2026-08-25
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/ingestion, RAG/retrieval-quality]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "260825 triage — fixed in 63735613, verified end to end through the real upload endpoint"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -57,3 +57,39 @@ Route `text/html` through the same HTML-to-text conversion `email_extraction_ser
 uses, rather than adding a second one. Cover it in the per-format ingestion test proposed in
 BUG-260825-01 — a test that asserts *"extraction returned text"* would pass against this defect, so
 the assertion has to be that **no markup survives**.
+
+---
+
+## RESOLUTION — 2026-08-25
+
+Commit `63735613`. `text/html` is routed through the email parser's existing
+`html_to_plain_text`, so there is still exactly one HTML-to-text converter in the codebase.
+
+Verified end to end through the real `POST /documents/upload`, reading the chunk back out of
+`document_chunks`:
+
+```
+in    <html><head><style>p{color:red}</style></head><body><h1>Quarterly Note …</h1>
+      <p>Revenue rose 12&nbsp;percent &amp; margin held.</p>
+      <script>var leak='do not embed me';</script></body></html>
+chunk 'Quarterly Note 1787666896\nRevenue rose 12\xa0percent & margin held.'
+```
+
+No tags, entities unescaped, and the `<script>` and `<style>` bodies are gone rather than
+merely un-tagged — they were reaching the embeddings as content.
+
+### ❌ REFUTED — the proposed route would have broken the cloud
+
+This report says *"`beautifulsoup4` is already installed in the backend venv (verified this
+session)"*, and that is true. **It is NOT declared in `backend/requirements.txt`**, and
+`backend/Dockerfile` installs from that file, so the deployed image does not have it.
+Reaching for bs4 here would have shipped an `ImportError` that reproduces only in cloud —
+this project's most expensive class of bug. `html_to_plain_text` needs no dependency at all:
+it is stdlib `html.parser`.
+
+### The assertion shape this report asked for
+
+`backend/tests/unit/test_html_extraction_no_markup.py` asserts **absence** — no `<h1>`,
+`<p>`, `<script`, `<style`, `<html`, `<body`, no script body, no CSS, and `&amp;` unescaped —
+plus an explicit *"extraction is not the identity function"* case, which is precisely the
+shape a passing `assert text` could not distinguish from the defect.
