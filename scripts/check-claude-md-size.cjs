@@ -43,6 +43,27 @@ const HARD_LIMIT = 150000;
 /** 80% of the ceiling — the band where a split is scheduled, not scrambled. */
 const WARN_LIMIT = 120000;
 
+// -- the STRUCTURAL guard (Phase 208) -------------------------------------------
+// Size alone is a LAGGING indicator. Twice now the fix has been a split, and both
+// times the file grew straight back: 194,908 -> 51,171 chars (2026-08-17) and then
+// back to 135,662 by 2026-08-25. The mechanism both times was the hot-file
+// ledger's DISPOSITION column becoming the place phases wrote their narrative --
+// at the Phase 208 split that ONE column measured 60,558 chars, 45% of the file.
+//
+// The table is the AUDIT SCAN LIST and must stay COMPLETE: a hot file missing from
+// it is permanently invisible to its own guardrail. What may not stay is the
+// prose. So the cell carries the VERDICT, and the narrative lives in that file's
+// own section in docs/HOT-FILE-LEDGER.md under the same-commit sync rule.
+//
+// This cap fires in the turn the prose is authored (PostToolUse on Write|Edit),
+// which is the half both previous splits skipped -- they bought headroom and
+// changed nothing structural, so the trip recurred unmeasured.
+//
+// 200 is deliberately generous: the longest LEGITIMATE verdict measured at the
+// Phase 208 split was 115 chars (`frontend/src/lib/api.ts`).
+const LEDGER_CELL_LIMIT = 200;
+
+
 const SKIP_DIRS = new Set(['node_modules', 'venv', '.venv', '.git', 'worktrees', 'dist', 'build', '__pycache__']);
 
 function repoRoot() {
@@ -128,6 +149,42 @@ function history(root) {
   return 0;
 }
 
+
+/**
+ * Parse the hot-file ledger table and return its rows. Returns [] when the file
+ * carries no such table, so this is a no-op for every other CLAUDE.md.
+ */
+function ledgerRows(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => l.startsWith('| File | commits'));
+  if (start === -1) return [];
+  const rows = [];
+  for (let i = start + 2; i < lines.length && lines[i].startsWith('|'); i++) {
+    // Split on UNESCAPED pipes -- cells legitimately contain an escaped one.
+    const cells = lines[i].replace(/\\\|/g, '\u0000').split('|').map((c) => c.trim());
+    const m = /`([^`]+)`/.exec(cells[1] || '');
+    if (!m) continue;
+    rows.push({ line: i + 1, path: m[1], cells: cells.length, disposition: cells[4] || '' });
+  }
+  return rows;
+}
+
+/** Over-long dispositions, duplicate rows, malformed rows. */
+function ledgerFindings(text) {
+  const rows = ledgerRows(text);
+  const long = rows
+    .filter((r) => r.disposition.length > LEDGER_CELL_LIMIT)
+    .map((r) => Object.assign({}, r, { len: r.disposition.length }));
+  const seen = new Map();
+  const dupes = [];
+  for (const r of rows) {
+    if (seen.has(r.path)) dupes.push({ path: r.path, lines: [seen.get(r.path), r.line] });
+    else seen.set(r.path, r.line);
+  }
+  const malformed = rows.filter((r) => r.cells !== 6);
+  return { rows: rows.length, long, dupes, malformed };
+}
+
 function main() {
   const args = process.argv.slice(2);
   const asJson = args.includes('--json');
@@ -164,6 +221,18 @@ function main() {
   const over = results.filter((r) => r.status === 'OVER');
   const warn = results.filter((r) => r.status === 'WARN');
 
+  // The structural guard runs over every CLAUDE.md; only one carries the ledger.
+  const structural = [];
+  for (const file of files) {
+    const rel = path.relative(root, file).split(path.sep).join('/');
+    const f = ledgerFindings(fs.readFileSync(file, 'utf8'));
+    if (f.rows === 0) continue;
+    if (f.long.length || f.dupes.length || f.malformed.length) {
+      structural.push(Object.assign({ rel }, f));
+    }
+  }
+
+
   if (asJson) {
     console.log(JSON.stringify({ hard_limit: HARD_LIMIT, warn_limit: WARN_LIMIT, results }, null, 2));
     return over.length ? 1 : 0;
@@ -180,7 +249,33 @@ function main() {
     );
   }
 
-  if (over.length === 0 && warn.length === 0) {
+
+  for (const s of structural) {
+    const n = s.long.length + s.dupes.length + s.malformed.length;
+    console.log('\nHOT-FILE LEDGER — %d structural problem(s) in %s', n, s.rel);
+    for (const r of s.long) {
+      console.log('  [disposition-too-long] line %d  %d chars (cap %d)  %s',
+        r.line, r.len, LEDGER_CELL_LIMIT, r.path);
+    }
+    for (const d of s.dupes) {
+      console.log('  [duplicate-row] lines %s  %s — one file, one row; merge them',
+        d.lines.join(' + '), d.path);
+    }
+    for (const m of s.malformed) {
+      console.log('  [malformed-row] line %d  %d cells, expected 6  %s', m.line, m.cells, m.path);
+    }
+    console.log('  The table is the AUDIT SCAN LIST: it keeps the VERDICT, nothing more.');
+    console.log('  The narrative belongs in that file\'s own section in docs/HOT-FILE-LEDGER.md,');
+    console.log('  written in the SAME COMMIT. A row without a section is drift — so is a paragraph here.');
+  }
+
+  if (structural.length && over.length === 0) {
+    console.log('\nclaude-md size gate FAILED — the ledger table is accumulating prose again.');
+    console.log('That is the mechanism behind BOTH previous 150k trips, caught early this time.');
+    return 1;
+  }
+
+  if (over.length === 0 && warn.length === 0 && structural.length === 0) {
     console.log('\nclaude-md size gate OK — every CLAUDE.md loads, all under %d chars.', WARN_LIMIT);
     return 0;
   }
