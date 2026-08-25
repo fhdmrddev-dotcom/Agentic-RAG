@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: executing
+status: gaps_found
 last_updated: 2026-08-25
 last_activity: 2026-08-25
 progress:
@@ -12,30 +12,22 @@ progress:
   completed_plans: 13
   percent: 93
 stopped_at: >
-  Phase 206.1 plan 03 (item 1, the MCP creation door) EXECUTED - 5 commits,
-  e155611c..5343b1e8 - but SC#1b is NOT MET and the phase is NOT closeable as-is.
-  BUILT AND PROVEN: a fourth chooser option, a three-field MCP block, a create body
-  {name, mcp_server_url, config} with NO capability key and an empty secret OMITTED, a
-  disabled Save with its OWN aria-describedby id, D-206.1-22's edit-mode fix pinned with
-  four regressions, all four positional ladders given NAMED arms against a synthetic FIFTH
-  shape, Check credential REMOVED for an MCP row, and five hot-file rows + five detail
-  sections in one commit with RE-DERIVED triples.
-  BLOCKED: an MCP connection CANNOT BE BOUND TO ANY WORKFLOW STEP. ConnectionPicker only
-  ever calls listConnectorConnections(capability) and an MCP row has capability=null, so it
-  is filtered out of every read the picker performs; ExternalActionSection offers only the
-  three capabilities; McpToolPicker/mcp-discover-btn therefore has no reachable mount, and
-  updateConnectorGrants has no UI caller at all. Measured with the org admin's own JWT: the
-  unfiltered list returns the row, all three capability-filtered lists do not, and
-  POST /connectors/connections/{id}/discover on that row returns 3 tools. The backend is
-  ready; the AUTHORING surface cannot express the MCP shape. This is the ROADMAP's own first
-  named failure mode for SC#1 and fixing it is a NEW CAPABILITY - a phase, not a
-  gap-closure round (G-7).
-  Next action: OPERATOR DECISION - (A) a follow-on phase for the builder seam, (B) close
-  206.1 on SC#1a with SC#1b owed and a planted re-open trigger, or (C) re-scope 206.1.
-  Baselines: tsc 34 (zero in any Connection*/connectionMark* file), backend 68 failed,
-  count gate OK 111/111 (total 5605, pinned 5043 - +72, exactly the two settings suites).
-  CLAUDE.md crossed the 120,000-char WARN band: 116,960 -> 124,357; gate exit 0;
-  split-by-FUNCTION is now DUE (Workflow guardrails is 76,531 chars = 62% of the file).
+  Phase 206.1 (Settings -> Connections finishes the MCP story) EXECUTED 2026-08-25 - 3 plans,
+  3 serial waves, 14 commits. Verified 4/5 success criteria MET (SC#2 dense row, SC#3 marks,
+  SC#4 explicit arms, SC#5 baselines). SC#1 SPLITS: SC#1a MET (an MCP connection is created,
+  seen and edited entirely in the UI - 201, body key set {config, mcp_server_url, name},
+  "capability" absent, no direct DB insert anywhere in the evidence). SC#1b NOT MET and OWED:
+  the created row cannot be bound to any workflow step because ConnectionPicker reads
+  capability-scoped and an MCP row has capability = null. Re-derived independently at
+  verification; neither ConnectionPicker.tsx nor McpToolPicker.tsx was touched by any 206.1
+  commit, so this is a pre-existing Phase 206 gap, not a regression. 206.1's own decision
+  D-206.1-18 was MISTAKEN - it measured that McpToolPicker exists and renders, not that any
+  data path could reach it - and that is why SC#1b was scoped as "drive it" rather than
+  "build it". Binding an MCP row is a NEW AUTHORING CAPABILITY, so G-7 forbids a gap-closure
+  round: it is a phase. Planted as SEED-200. AWAITING OPERATOR DECISION on registering it.
+  Also owed: CLAUDE.md crossed the 120,000-char WARN band during this phase (116,960 ->
+  124,357, gate exit 0 WITH WARNINGS). Recorded, not worked around; split-by-FUNCTION is due
+  and the gate names its own target - "Workflow guardrails" is 76,531 chars, 62% of the file.
 ---
 
 # Project State
