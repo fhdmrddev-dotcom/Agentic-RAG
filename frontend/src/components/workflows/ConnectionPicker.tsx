@@ -379,6 +379,40 @@ export function ConnectionPicker({ capability, shape = "capability" }: Connectio
     [store, slug],
   )
 
+  /**
+   * ── 206.2-04 · ADOPT THE RESPONSE ROW ────────────────────────────────────────────────
+   *
+   * `updateConnectorGrants` returns the full updated `ConnectorConnection`, so the grant
+   * switch hands it back up here and it REPLACES the matching entry in the settled read.
+   * `bound` then re-derives, the badge and the switch both move, and the NEXT toggle merges
+   * from a fresh map.
+   *
+   * ⚠ THIS CALLBACK IS NOT AN OPTIMISATION — IT IS WHAT MAKES THE ROUTE CORRECT. `PATCH
+   * /grants` is a whole-column REPLACE; if the returned row is not written back, this list
+   * and the server go out of sync and the next toggle merges from a stale map, which is a
+   * silent lost update on the column that decides whether egress is permitted.
+   *
+   * ⚠ THE REJECTED ALTERNATIVE IS A RE-FETCH NONCE, and it is rejected for a measured
+   * reason: it re-issues the WHOLE connection list on every toggle inside a 400px panel
+   * field, and the response IS the row. Re-open trigger: *a second writer of `tool_grants`
+   * appearing anywhere in the builder, or the first observed clobber.*
+   *
+   * The key check is deliberate: a response for a read that has since been superseded (a
+   * shape switch, another step) must not resurrect a stale settled answer.
+   */
+  const adoptConnection = useCallback((row: ConnectorConnection) => {
+    setSettled((prev) =>
+      prev.kind !== "ready"
+        ? prev
+        : {
+            ...prev,
+            connections: prev.connections.map((existing) =>
+              existing.id === row.id ? row : existing,
+            ),
+          },
+    )
+  }, [])
+
   // THE READ. Gated on the same two nulls the write is, so a provider-less render opens no
   // request at all — see the docblock: this is what keeps two shipped suites unaffected.
   // The guard is ahead of BOTH arms, so that property holds in either shape.
@@ -606,6 +640,7 @@ export function ConnectionPicker({ capability, shape = "capability" }: Connectio
           toolArgs={toolArgs}
           onSelectTool={handleSelectTool}
           onChangeArgs={handleChangeArgs}
+          onConnectionUpdated={adoptConnection}
         />
       )}
     </div>
