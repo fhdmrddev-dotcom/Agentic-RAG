@@ -1616,7 +1616,27 @@ const BASELINE = {
   // plants in production source, each restored with an empty `git diff`: the planted
   // `smtp_password` write, Gate 1 short-circuited off, the effect's disconnected guard
   // deleted, and the `aria-disabled` attribute removed. Recorded in `190-12-SUMMARY.md`.
-  "ConnectionPicker.test.tsx": 20,
+  //
+  // ⚠ RAISED 20 → 58 at 206.2-02, IN THE SAME COMMIT AS THE CASES IT COUNTS. The 38 added
+  // cases pin the picker's SECOND SHAPE: that the MCP read calls `listConnectorConnections()`
+  // with ZERO arguments (the one line SEED-200 is about, asserted as `mock.calls[0]` being
+  // `[]` and not merely as "some call happened"), that neither shape lists the other's rows
+  // from ONE org holding both, that a disabled MCP row is not a choice either, that the two
+  // MCP absences stay TWO SENTENCES with their own `data-empty-reason`, that the repaired
+  // destination ladder names an MCP row's OWN host — with a SYNTHETIC-FIFTH-SHAPE control
+  // asserting both an empty list and the absence of `SLACK_FIXED_DESTINATION`, because "not
+  // Slack" alone would pass on some other wrong host — and TWELVE byte-identity captures
+  // (3 capability fixtures × 4 states) taken from the BASE commit's own component and never
+  // re-captured, each behind a COUNTED `useId` normalization whose per-state replacement
+  // count is measured (2 / 2 / 4 / 1) rather than reasoned about.
+  // ⚠ AGAIN NO `TARGETS` EDIT, and again measured rather than assumed: this file is already
+  // pinned below, so it already RUNS via the `src/components/workflows` directory entry —
+  // the number 58 was read out of THIS SCRIPT'S OWN `actual` column on a full run before
+  // this line was written, never counted by hand off the source.
+  // ⚠ Raising a pin necessarily deletes one line, so a `grep -c '^-[^-]'` expecting 0 on
+  // this file is the wrong check here; exactly one deletion — this pin's old value — is
+  // correct, and more than one is not.
+  "ConnectionPicker.test.tsx": 58,
   // 190-16 (CONN-02 / D-25 / D-26 / D-27) — NET-NEW: the Settings → Connections suite,
   // pinned in THE COMMIT THAT CREATED IT, the rule `ExternalActionSection.test.tsx:12`
   // states verbatim and that `ConnectionPicker.test.tsx` above followed.
