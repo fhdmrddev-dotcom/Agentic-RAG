@@ -3861,3 +3861,280 @@ Hot service-role database module shared across routes and background engines.
 - Implements defensive JSONB string-scalar unwrap (G-3 / N-3) to safely decode the 87% live DB format.
 - Zero mutation of existing query shapes or security predicates. Preserves all immutability triggers and draft concurrency guards.
 
+---
+
+### `frontend/src/lib/api.ts` — Phase 206, ESCALATED DECISION (Operator Override)
+
+**Measured 2026-08-25: `172 commits / 98 phases / 6200+ L`** — **G-5 FIRES** (Operator Decision: Escalate & Defer).
+
+**ESCALATED DECISION (Phase 206 / Operator Mandate)**:
+- G-5 extraction trigger fired on adding two runtime exports: `discoverConnectorTools` and `updateConnectorGrants`.
+- Operator decision: **Escalate and defer extraction to its own dedicated phase.**
+- Additive exports added cleanly without refactoring the monolith.
+- Mock budget spent concurrently in the same commit across all 7 affected test suites:
+  1. `components/chat/__tests__/StopControl.test.tsx`
+  2. `components/workflows/ConnectionPicker.test.tsx`
+  3. `components/workflows/TemplateAttachSection.test.tsx`
+  4. `components/workflows/WorkflowDoorSwitch.test.tsx`
+  5. `hooks/useDraftPersistence.test.tsx`
+  6. `pages/WorkflowBuilderPage.canvas.test.tsx`
+  7. `pages/WorkflowBuilderPage.header.test.tsx`
+
+---
+
+### `backend/app/services/harness/phase_types.py` — Phase 206, honoured by construction
+
+**Measured 2026-08-25: `38 commits / 18 phases / 2500+ L`** — **G-5 FIRES**.
+
+**Phase 206 adds MCP Tool Dispatch**:
+- Extended `_exec_external_action` to support remote MCP provider connections via `mcp_server_url`.
+- Implements strict per-tool grant enforcement (F-1 / D-206-06): verifies `grants.get(tool_name) is True` (missing key or false value denies).
+- F-3: Outbound permission refusal emits `tool_refused` audit event and logs detailed security warning.
+- Preserves all 7 existing phase type invariants, golden-run suppression (D-16), operator kill-switch (D-26), and egress guard ordering (D-06).
+
+---
+
+### `backend/app/services/connector_service.py` — Phase 206, honoured by construction
+
+**Measured 2026-08-25: `15 commits / 6 phases / 1000+ L`**.
+
+**Phase 206 adds Provider-Shaped MCP Connections & Tool Discovery**:
+- Added `mcp_server_url`, `tool_grants`, and `discovered_tools` to `ResolvedConnection` and database projection.
+- Implemented `discover_connection_tools` (calling `mcp_client.list_tools` and caching schemas to `connector_connections.discovered_tools`).
+- Implemented `update_connection_grants` (sanitizing and persisting boolean grant mappings).
+- Maintained strict fail-closed tenant scoping on all operations (`org_id` filter mandatory).
+
+---
+
+### `frontend/src/components/workflows/PhaseFormPanel.tsx` — Phase 206, honoured by construction
+
+**Measured 2026-08-25: `42 commits / 20 phases / 700+ L`** — Zero-Hook Pin Enforced.
+
+**Phase 206 Leaf Delegation**:
+- Maintained strict 0 `useState` / 0 `useEffect` / 0 `useMemo` invariant in `PhaseFormPanel.tsx` (pinned by `PhaseFormPanel.test.tsx:668`).
+- Delegated MCP tool selection and discovery state entirely into `McpToolPicker.tsx` leaf component (F-7).
+
+
+
+---
+
+## `frontend/src/components/settings/ConnectionsTab.tsx`
+
+**Re-derived at `206.1-03`'s own commit (2026-08-25): `8 commits / 3 phases / 1223 L` · ⚠ G-5 FIRES,
+EXACTLY AT THRESHOLD.** Phases: `190` · `206` · `206.1`. No six-digit dated quick-task buckets, so
+nothing is subtracted.
+
+⚠ **THIS FILE WAS ABSENT FROM CLAUDE.md's TABLE AND FROM THIS DOCUMENT FOR ITS ENTIRE LIFE.** Measured
+before the row was written: `grep -c "components/settings/ConnectionsTab.tsx" CLAUDE.md` returned
+**0**, and so did the same grep for its four siblings. **G-5 could therefore never have fired on any of
+them, at any count** — the `backend/app/config.py` headline (invisible to its own guardrail for the
+project's entire life) repeated on the Settings surface, five files at once.
+
+⚠ **AND IT WAS ALREADY NAMED INSIDE ANOTHER FILE'S SECTION WITH NO ROW OF ITS OWN.**
+`backend/app/db/workflows.py`'s section in this document cites `ConnectionsTab.tsx:841` as a fourth
+consumer. That is the `useTemplateFirstDraft.ts` drift — a file named in someone else's narrative while
+carrying no row of its own — and it is exactly what the same-commit sync rule exists to forbid.
+**Adding this row does NOT license removing that mention, and `206.1-03` left `db/workflows.py`'s
+section untouched** (asserted: `git diff -- docs/HOT-FILE-LEDGER.md` shows no modification inside it).
+
+### Verdict — honoured by construction (206.1), and the NEXT SEAM IS NAMED
+
+`206.1-01` rewired two mark call sites; `206.1-02` added a second row interior; `206.1-03` gated one
+menu item and swapped one derivation at two call sites. None of the three took a seam.
+
+> **NEXT SEAM: `ConnectionRow` plus its two confirm sheets (`:495-775`, ~280 L) → `ConnectionRow.tsx`.**
+
+⚠ **The case is STRONGER than when the phase opened, and that is the reason to write it down rather
+than carry `honoured by construction` forward again.** `206.1-02` **doubled this component's render
+logic**: the row now has a WIDE branch and a DENSE branch, and the file grew `1176 → 1223 L` across the
+phase while the component itself gained an entire second interior.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE ⋯ MENU IS SHARED; THE CREDENTIAL CELL IS NOT.** `actionContent` is built **once** and placed
+  by both shapes, so `206.1-03`'s D-206.1-19 gate (`onCheck && !isMcp`) needed **one** edit. But
+  `credentialReadingOf` is called at **two** sites — the dense line-3 group and the wide column-4 cell —
+  and a change to one that is not made to the other **passes any test that renders only `renderTab`,
+  which still defaults to WIDE.** `206.1-02`'s summary flagged this in advance and it held: the swap
+  was made in both branches and asserted in both renders, with `it.each([wide, dense])`.
+- ⚠ **ZERO `[title]` NODES**, asserted with a menu AND a sheet open. A tooltip is therefore **not
+  available** as a truncation fix on this surface — which is why `206.1-02`'s answer to the truncated
+  destination cell was to reflow, not to annotate.
+- ⚠ **THE WIDE RENDER IS PINNED BYTE-FOR-BYTE** by an `outerHTML` capture committed by `206.1-02`
+  *before* the dense branch existed. **A diff there is a BEHAVIOUR CHANGE, not a test to update.** The
+  one delta that capture tolerates is DECLARED, SINGULAR and COUNTED (`withDeclaredDelta`).
+- ⚠ **`connections-row-credential`'s textContent is asserted by EXACT EQUALITY** (`.toBe("never
+  checked")`), which is why the dense inline label is a **SIBLING** node rather than a child. Putting
+  the label inside the testid'd node forces a re-baseline of a shipped pin, on the surface whose whole
+  lesson is that a re-baselined pin is not evidence.
+- ⚠ **THE MCP SHAPE IS READ FROM `connection.mcp_server_url`, NEVER FROM A MISSING CAPABILITY**
+  (D-206.1-11). An absence is not a shape.
+- ⚠ **`Check credential` IS REMOVED FOR AN MCP ROW, NOT DISABLED**, and the reason lives in SOURCE at
+  the removal site and nowhere a person reads it — *a removed affordance that explains itself is a
+  disabled affordance wearing a disguise*. Re-open trigger, recorded in the source: **the check path
+  gains an MCP arm**, at which point this condition and `credentialReadingOf`'s MCP arm are both wrong
+  and move together.
+
+---
+
+## `frontend/src/components/settings/ConnectionFormPanel.tsx`
+
+**Re-derived at `206.1-03`'s own commit (2026-08-25): `5 commits / 3 phases / 1758 L` · ⚠ G-5 FIRES —
+and it CROSSED THE THRESHOLD IN THE COMMIT THAT ADDED THIS ROW.** Phases: `190` · `206` · `206.1`. At
+this phase's base it measured `3 / 2 / 1584`, i.e. below threshold.
+
+⚠ **ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE** until `206.1-03`. This is the `FlowEdge.tsx` /
+`phaseStatusMeta.ts` state — a file crossing the threshold in the very commit that first writes it
+down — which is the state in which a missing row costs most, because the audit that would have asked
+the question never existed.
+
+### Verdict — honoured by construction (206.1), and the NEXT SEAM IS NAMED
+
+> **NEXT SEAM: the now-FOUR per-shape field blocks (`:899-1130`) → `ConnectionShapeFields.tsx`** —
+> precisely the seam `PhaseFormPanel.tsx`'s own row already names for its seven per-type blocks.
+
+⚠ **`206.1-03` ADDED THE FOURTH BLOCK, WHICH IS THE MOMENT TO NAME IT.** Three blocks was a ladder;
+four is a table wanting a home.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE PANEL AUTHORS NO SENTENCE OF ITS OWN.** Every user-visible string is an imported identifier
+  from `connectionFormCopy` / `connectionRefusalCopy`, asserted by a source fence over `?raw`.
+  `206.1-03` added seven MCP strings and asserted each of them **absent from this source**.
+- ⚠ **IT IMPORTS NOTHING FROM `PhaseFormPanel` — AND THE FENCE MUST BE IMPORT-SCOPED.** This file's own
+  header docblock NAMES `PhaseFormPanel` **eight times** to explain the lineage it deliberately does not
+  import. A bare whole-file `grep -c "PhaseFormPanel"` expecting `0` is therefore **UNSATISFIABLE AT ITS
+  OWN BASE** — it read `8` before this plan and `8` after. That is the **187-24 trap**, measured here as
+  its eleventh recorded firing on this codebase, and it was caught only because the fence was DRIVEN
+  rather than assumed. The shipped fence at section 11 already had the right shape (filter to `import`
+  lines first); the new one mirrors it.
+- ⚠ **TWO SIMULTANEOUSLY-RENDERED DISABLED-SAVE REASON NODES MUST CARRY DISTINCT IDS.** The shipped
+  cipher case resolves the Save button's `aria-describedby` with `container.querySelector`, **which
+  returns the FIRST match**. Two nodes sharing one id would still let that assertion find *a* node and
+  read *a* sentence — just not the right one — so the failure would be **silent**. `206.1-03`'s MCP
+  reason node therefore carries `${fieldId}-mcp-save-disabled-reason`, and the button **selects**
+  between the two ids; both resolutions are asserted **in the same run**.
+- ⚠ **ZERO `title=` IN THIS SOURCE, AND THAT ONE *IS* SATISFIABLE** (measured `0` before and after).
+  The reason a control is disabled is DOM text or it does not exist.
+- ⚠ **THE `"mcp"` SENTINEL NEVER REACHES THE WIRE.** `handleSave` branches on it *before* composing a
+  body; the MCP create body is `{name, mcp_server_url, config}` with **no `capability` key at all**, and
+  an empty credential is **omitted** rather than sent as `""` (the server's `NonEmpty` rejects a present
+  empty value). Both are asserted as KEY SETS via `Object.keys().sort()`, never `toMatchObject`.
+- ⚠ **THE PANEL'S HTTPS CHECK IS A COURTESY, NEVER THE SECURITY BOUNDARY**, and the source says so
+  beside the predicate. The model raises on a non-HTTPS `mcp_server_url`, and `validate_mcp_destination`
+  refuses again at call time, after the address resolves, every time a step sends.
+
+---
+
+## `frontend/src/components/settings/connectionsCopy.ts`
+
+**Re-derived at `206.1-03`'s own commit (2026-08-25): `4 commits / 3 phases / 541 L` · ⚠ G-5 FIRES,
+EXACTLY AT THRESHOLD.** Phases: `190` · `206` · `206.1`.
+
+⚠ **ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE** until `206.1-03`.
+
+### Verdict — NO SEAM PROPOSED, deliberately
+
+The `libraryVocabulary.ts` verdict: **a vocabulary doing one thing many times is the right shape.**
+Nothing here wants extracting, and saying so is the answer rather than an omission.
+
+⚠ **The value of the row is that the audit can ASK.** `libraryVocabulary.ts` was absent at four phases
+and the recorded cost was not a missed extraction — it was that nobody was ever prompted to consider
+one. That is the cost this row removes.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`destinationFactsOf`'s ARMS ARE EXPLICIT AND ITS TAIL IS NEUTRAL.** This is the `147f3c57`
+  repair. Before it, the ladder's trailing `return` was **both the Slack arm and the fallback**, so
+  every row that was not `send_email` or `create_ticket` was described as sending to Slack's API host —
+  **seen on screen in live UAT on 2026-08-25**, on a connection pointed at an MCP server. That column is
+  the ONE place a person is told where their organisation's data is about to go, and a governed send is
+  approved on the strength of it: **a row naming the wrong host is worse than a row naming none.**
+- ⚠ **`credentialLabel` IS THE ONLY READER OF A TIMESTAMP HERE, AND IT MUST STAY THAT WAY.**
+  `206.1-03` left its body **byte-identical** — asserted by md5 over the function's own slice, with the
+  whole file diffing `+40 / -0` — and added `credentialReadingOf` **above** it as a ROUTER. That is what
+  keeps every pinned unit call on `credentialLabel` intact, and what keeps `206.1-02`'s wide-row
+  byte-identity capture green rather than re-baselined.
+- ⚠ **`credentialReadingOf`'s MCP ARM IS UNCONDITIONAL AND IGNORES `last_checked_at` ON PURPOSE.**
+  *Nobody has checked it* and *it CANNOT be checked* are two different facts; rendering `never checked`
+  forever folds them into one word, which is the `runFacts.ts` CR-01 / `DecisionsList` D-20 defect for
+  the **fifth** recorded time on this codebase. Re-open trigger, recorded in the source: **`Check
+  credential` gains an MCP arm**, at which point `no check for this kind` becomes wrong.
+- ⚠ **NEVER A FABRICATED TIMESTAMP.** An unparseable value reads as `never checked`, because a value we
+  cannot read is not a check we can claim happened (the 068-A honest-last-active rule).
+
+---
+
+## `frontend/src/components/settings/connectionFormCopy.ts`
+
+**Re-derived at `206.1-03`'s own commit (2026-08-25): `4 commits / 3 phases / 759 L` · ⚠ G-5 FIRES —
+and it CROSSED THE THRESHOLD IN THE COMMIT THAT ADDED THIS ROW.** Phases: `190` · `206` · `206.1`. At
+this phase's base it measured `2 / 2 / 531`.
+
+⚠ **ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE** until `206.1-03`.
+
+### Verdict — NO SEAM PROPOSED, same reasoning as its sibling
+
+### Invariants a future editor is bound by
+
+- ⚠ **ALL FOUR LADDERS END WITH A NEUTRAL TERMINAL RETURN, AND EVERY ARM NAMES ITS OWN CONDITION.**
+  `206.1-03` rewrote two here (`configFromDraft`, `destinationFooterOf`) and two in the panel
+  (`typedHost`, `secretLabel`). Each is armed against a **synthetic FIFTH shape** — a capability value
+  the closed set will never hold, including near-misses (`send_emails`, `mcp_server`, `MCP`, `""`) —
+  **plus the prototype-key set** (`constructor`, `toString`, `__proto__`, `hasOwnProperty`, `valueOf`),
+  with a POSITIVE CONTROL beside every negative. Before the rewrite an unrecognised shape composed
+  `{ default_channel: "" }`, which `NonEmpty` refuses at the model: **an unknown shape became a 422
+  wearing the generic "Couldn't save that" sentence, with no attributable cause.**
+- ⚠ **`refusalOf` IS REUSED VERBATIM AND NEVER RE-IMPLEMENTED.** It is already a text-only mirror of
+  `validate_mcp_destination`, and a second URL validator on this surface is a **second answer**, free to
+  drift. The footer test compares `refusedReason` against a direct `refusalOf` call, so a
+  re-implementation fails rather than passes.
+- ⚠ **`stringsOfModule()` WALKS `connectionRefusalCopy` ONLY.** Measured: the nine-banned-terms fence
+  and the absolute-verb fence therefore said **nothing** about this module and never had.
+  `206.1-03` **EXTENDED** the sweep with a dedicated structural walk over this module's exports, whose
+  first assertion is a **non-vacuity control** naming its seven new identifiers by identity. **A future
+  reader must not infer inherited coverage** — before this phase there was none.
+- ⚠ **`CAPABILITY_CHOICE_MCP_LABEL` IS DECLARED *ABOVE* `CAPABILITY_CHOICES`.** A `const` is not hoisted
+  for initialisation, so reading it from the array literal before its own line runs is a
+  temporal-dead-zone `ReferenceError` **at module load** — which no type checker reports and which the
+  first draft of this change shipped for exactly as long as it took to run the suite.
+- ⚠ **`draftFromConnection` READS THE SHAPE FROM THE ROW.** Its previous docblock read as a decision
+  (*"this draft describes the CAPABILITY form"*) and was in fact a statement of a defect; it is kept
+  VERBATIM in a `SUPERSEDED — do not re-apply` box with the corrected rule beneath it.
+- ⚠ **`FIELD_SECRET_LABEL_NEUTRAL` IS REACHABLE BY NO SHIPPED SHAPE, AND THAT IS THE POINT.** It is what
+  a FUTURE shape gets before anyone has written its label — the alternative being that it silently
+  inherits Slack's word.
+
+---
+
+## `frontend/src/components/settings/connectionMark.tsx`
+
+**Measured at `206.1-03`'s commit (2026-08-25): `1 commit / 1 phase / 232 L` · G-5 does not fire
+(1 phase).** Created by `206.1-01`.
+
+⚠ **LISTED BELOW THE THRESHOLD ON PURPOSE** — the `fileIcon.tsx` / `libraryRow.ts` precedent. A file
+escapes G-5 for years purely by not being written down: `WorkflowsPage.tsx` for ten phases,
+`backend/app/config.py` for its entire life. Writing the row now costs four lines and removes that
+failure mode permanently.
+
+**The ONE service → mark map.** Both `ConnectionsTab` call sites render through `ConnectionMarkGlyph`;
+the old `Mark ? mark : bullet-span` branch is DELETED rather than left unreachable, because a bullet
+character IS the blank mark D-206.1-10 forbids, wearing a disguise.
+
+### Invariants a future editor is bound by
+
+- ⚠ **READ THROUGH `hasOwnProperty.call`, NEVER A COALESCED BRACKET READ.** An inherited key is never an
+  own property but IS truthy on a bracket read, and `TABLE[key] ?? fallback` hands back `constructor`.
+- ⚠ **THE MCP ARM IS RESOLVED BY `mcp_server_url`, NEVER BY A MISSING CAPABILITY.** The capability map
+  holds **three keys only**, so a server-supplied `capability: "mcp"` cannot spoof MCP's mark.
+- ⚠ **A MISS RETURNS THE NAMED NEUTRAL, NEVER `null`.** The resolver is TOTAL; there is no absent-mark
+  branch for a caller to have to handle.
+- ⚠ **THE MCP MARK CARRIES `fill-current` BECAUSE ITS BODY HAS ZERO FILLS**, and would otherwise ship
+  **INVISIBLE on Deep Midnight while every test stayed green** — vitest can prove the class is applied;
+  it cannot prove the pixel. **Driven in a real browser on 2026-08-25 (`206.1-03` Task 3, step 4):**
+  the live MCP row's `<svg>` resolves `fill: rgb(107, 114, 128)` with `innerHTML.length` **1066**.
+  ⚠ **The brand-mark control read `rgb(0, 0, 0)` at the ROOT and that is CORRECT, not a defect** — a
+  brand body carries its own per-path fills, so the root-level `fill` is not its ink mechanic. The two
+  readings together are what prove the measurement is a real computed style rather than a constant.
+- ⚠ **A `fill-*` UTILITY MUST NEVER TOUCH A LUCIDE GLYPH**, whose `fill="none"` presentation attribute a
+  CSS rule overrides — the third arm of the three-ink contract (AR-02).
