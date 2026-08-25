@@ -3,7 +3,9 @@ seed_id: SEED-200
 title: "An MCP connection cannot be bound to ANY workflow step — ConnectionPicker reads capability-scoped, an MCP row has no capability, so McpToolPicker/mcp-discover-btn has no reachable mount and updateConnectorGrants has no UI caller at all. Phase 206's downstream half is built-but-unreachable."
 created: 2026-08-25
 planted_during: Phase 206.1 plan 03, Task 3 (the driven SC#1b round trip). Measured in a real browser and then confirmed over the wire with the org admin's own JWT.
-status: planted
+status: answered
+answered_as: Phase 206.2 (INSERT) — "An MCP connection has somewhere to go", registered in .planning/ROADMAP.md by operator decision 2026-08-25
+answered_on: 2026-08-25
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -24,7 +26,9 @@ relates_to:
   - SEED-146 / SEED-145 — connections as platform assets.
   - SEED-199 — the xyOps canvas grammar; a connector as a NODE rather than a form field.
 trigger_when: >
-  ALREADY TRUE. This blocks Phase 206.1's SC#1b right now, and it blocks any use of Phase 206's
+  ⚠ FIRED AND ANSWERED 2026-08-25 — registered as Phase 206.2. The text below is preserved as it
+  was written, because the trigger's own wording is the evidence that it was read rather than
+  rediscovered: ALREADY TRUE. This blocks Phase 206.1's SC#1b right now, and it blocks any use of Phase 206's
   MCP feature by anyone at all: a person can create an MCP connection and then has nowhere to
   put it. Fire at the next milestone scope, or sooner if an operator asks why the MCP
   connection they created does nothing.

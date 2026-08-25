@@ -39,6 +39,7 @@
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
 | 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | ⚠ **3 of 3 plans executed — SC#1b BLOCKED, phase NOT closeable as-is** (plans 01/02/03 all executed 2026-08-25). SC#2 and SC#3 met; SC#1a met; **SC#1b is not met and the cause is a SECOND missing door**: an MCP connection cannot be bound to any workflow step, because `ConnectionPicker` reads capability-scoped and an MCP row has no capability. See 206.1-03-SUMMARY.md. **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
+| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | Planned — **registered 2026-08-25 from `SEED-200`, operator decision.** Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null` |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -96,7 +97,8 @@
   1. **The creation door (capability).** `Add a connection` offers `send_email` / `create_ticket` / `post_message` and nothing else — no MCP option, no `mcp_server_url` field. Measured in the browser: `mentionsMcp: false`. Every part of 206 downstream of the row WORKS (discover → grant → executor, all driven live against `mcp.deepwiki.com`), so the only thing standing between the operator and the feature is a form. 206's plan never listed either Settings file, so this is scope, not a slip — but it is the Phase-118 *built-and-unreachable* shape and it must not stay that way.
   2. **The row collapses into itself when the panel opens (defect).** The list sits in a `minmax(0,1fr) 400px` grid (D-27, sketch 156-A); opening a connection takes 400px from the list column and the row's `flex-[2] min-w-0 truncate` cells are squeezed. **Measured at 1536px viewport:** list column `717px → ~317px`, and two destination cells truncate at `clientW 93` and `clientW 47` against `scrollW 272` and `169` — `https://fhdmrdautomation.a…`, `slack.com/api · #C0BNK1QCF…`. ⚠ **This needs a row SHAPE for the narrow column, not a nudge**: the honest fix is a dense/stacked variant driven by the column's own width (a container query, or a `dense` prop threaded from the same `panel && !isMobile` condition that opens the track) — which is why it is not a `/gsd:fast`.
   3. **Invented marks where real logos exist (defect).** `CAPABILITY_MARKS` maps `send_email → Envelope`, `create_ticket → Ticket`, `post_message → SpeechBalloon` — generic fluent-emoji glyphs. The **icon convention** (`references/icon-convention.md` §1, Running Design Decision 43, operator 2026-06-27) says a service shows its OWN mark, from one source, byte-identical everywhere. A Slack connection must wear the Slack logo and a Jira connection the Jira logo. ⚠ **THERE IS A REAL DEPENDENCY DECISION HERE AND THE PHASE MUST TAKE IT, not assume it away:** `@lobehub/icons` is AI-provider-shaped — measured, it ships `Github` and `Google` but **no Slack and no Jira/Atlassian** — and the only Iconify set installed is `@iconify-json/fluent-emoji`. So this needs `@iconify-json/logos` (which carries `logos:slack-icon` / `logos:jira`) or bundled SVGs, plus §3's rule: **verify every slug resolves or bundle the asset**, because `fluent-emoji:direct-hit` once rendered EMPTY in production. An MCP connection has no capability at all, so it also needs an honest mark of its own.
-- [ ] ⚠ **OWED BY 206.1 — SC#1b, and it is a SECOND missing door of exactly the shape 206.1 existed to close.** Items 2 and 3 (the dense row, the per-service marks) are COMPLETE and verified; item 1's door EXISTS — an MCP connection is created, seen and edited entirely in the UI, no direct DB insert anywhere in the evidence — but **the row it creates cannot be bound to any workflow step**, which is this phase's own FIRST named failure mode. Re-derived independently at verification: `ConnectionPicker.tsx:271` unconditionally calls `listConnectorConnections(capability)` and an MCP row has `capability = null`, so it is filtered out of every read the picker performs; `ConnectionPicker.tsx:426` mounts `McpToolPicker` only when `bound?.mcp_server_url` is set, and `bound` can never be an MCP row; `ExternalActionSection.tsx:85-87` derives its offered capabilities from `Object.keys(EXTERNAL_CAPABILITY_SENTENCES)` — exactly three, zero `"mcp"`; and `grep -rn "updateConnectorGrants" frontend/src` finds the definition plus three test mocks and **zero production callers**. ⚠ **NEITHER FILE WAS TOUCHED BY ANY 206.1 COMMIT** (`git log e155611c..5343b1e8` on both returns nothing) — this is a pre-existing Phase 206 gap the phase correctly did not widen, not a regression. The backend was ready throughout: `/discover` on the created row returns **3 tools** under the org admin's own JWT. ⚠ **206.1's OWN decision `D-206.1-18` WAS MISTAKEN AND THAT IS WHY SC#1b WAS SCOPED AS "DRIVE IT" RATHER THAN "BUILD IT"** — it measured that `McpToolPicker` exists and renders a real Discover button, not that any data path could REACH it. Recorded, not quietly re-scoped. **This is a NEW AUTHORING CAPABILITY** (a 4th `ExternalActionSection` option + an MCP-aware `ConnectionPicker` read path + a grant control), so **G-7 forbids closing it inside a gap-closure round — it is a phase.** Planted as `SEED-200`; awaiting the operator's decision to register it.
+- [ ] ⚠ **OWED BY 206.1 — SC#1b, and it is a SECOND missing door of exactly the shape 206.1 existed to close.** Items 2 and 3 (the dense row, the per-service marks) are COMPLETE and verified; item 1's door EXISTS — an MCP connection is created, seen and edited entirely in the UI, no direct DB insert anywhere in the evidence — but **the row it creates cannot be bound to any workflow step**, which is this phase's own FIRST named failure mode. Re-derived independently at verification: `ConnectionPicker.tsx:271` unconditionally calls `listConnectorConnections(capability)` and an MCP row has `capability = null`, so it is filtered out of every read the picker performs; `ConnectionPicker.tsx:426` mounts `McpToolPicker` only when `bound?.mcp_server_url` is set, and `bound` can never be an MCP row; `ExternalActionSection.tsx:85-87` derives its offered capabilities from `Object.keys(EXTERNAL_CAPABILITY_SENTENCES)` — exactly three, zero `"mcp"`; and `grep -rn "updateConnectorGrants" frontend/src` finds the definition plus three test mocks and **zero production callers**. ⚠ **NEITHER FILE WAS TOUCHED BY ANY 206.1 COMMIT** (`git log e155611c..5343b1e8` on both returns nothing) — this is a pre-existing Phase 206 gap the phase correctly did not widen, not a regression. The backend was ready throughout: `/discover` on the created row returns **3 tools** under the org admin's own JWT. ⚠ **206.1's OWN decision `D-206.1-18` WAS MISTAKEN AND THAT IS WHY SC#1b WAS SCOPED AS "DRIVE IT" RATHER THAN "BUILD IT"** — it measured that `McpToolPicker` exists and renders a real Discover button, not that any data path could REACH it. Recorded, not quietly re-scoped. **This is a NEW AUTHORING CAPABILITY** (a 4th `ExternalActionSection` option + an MCP-aware `ConnectionPicker` read path + a grant control), so **G-7 forbids closing it inside a gap-closure round — it is a phase.** Planted as `SEED-200`, and **REGISTERED AS PHASE 206.2 on 2026-08-25 by operator decision** — the seed's own `trigger_when` read `ALREADY TRUE`.
+- [ ] **Phase 206.2 (INSERT): An MCP connection has somewhere to go** — ⚠ **REGISTERED 2026-08-25 FROM `SEED-200`, BY OPERATOR DECISION.** Phase 206 shipped the MCP client, SSRF defence, discovery, per-tool grants, executor dispatch and audit; Phase 206.1 shipped the door that CREATES a connection. **This is the second door: the one that USES it.** Measured over the wire with the org admin's own JWT — unfiltered `GET /connectors/connections` returns the MCP row, all three capability-filtered reads do not, and `POST /connectors/connections/{id}/discover` on that row returns **3 tools**. The backend has been ready throughout (`harness.py:260`'s own comment: *"an MCP step names a `tool_name` and has no capability at all, which is a legitimate absence"*). ⚠ **THIS IS THE PHASE-118 BUILT-BUT-UNREACHABLE SHAPE, AND EVERY GATE WAS GREEN WHILE IT SHIPPED** — `McpToolPicker.test.tsx` is green and in the count gate, because it mounts the component directly with a connection prop **that no production code path can produce**. A component test that constructs its own props cannot see that nothing constructs them in production; that is the whole finding. ⚠ **DO NOT "FIX" THIS BY GIVING MCP ROWS A FAKE CAPABILITY** — `capability` is a CHECK-constrained closed set at migration 116, `"mcp"` is not a member, and D-206.1-04's whole point is that the wire distinguishes the two shapes by `mcp_server_url`, never by a capability value. ⚠ **THE GRANT CONTROL IS A WRITE THAT WIDENS WHAT A WORKFLOW MAY DO** — and it is not optional here, because Phase 206's enforcement denies a missing key, so a bound step with no grant control can call nothing at all. SEED-146's standing rule (*never add an outbound capability before the approval model exists*) must be answered in writing at discuss-time rather than assumed either way.
 - [ ] **Phase 207: `api.ts` split — the hottest file in the repository** — ⚠ **CREATED 2026-08-25 BY THE ONLY MECHANISM ITS OWN TRIGGER PERMITS.** `docs/HOT-FILE-LEDGER.md`'s trigger for `frontend/src/lib/api.ts` reads verbatim: *"The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or escalates it to the operator as a phase of its own. It may NOT re-decline."* Phase 206 is that phase — `discoverConnectorTools` and `updateConnectorGrants` are functions, so the type-only defence that carried 197 and 192.2 is gone. **The operator chose escalation on 2026-08-25, and escalation means THIS ROW.** ⚠ The trigger was strengthened precisely because *"another entry in this file"* is the outcome it forbids: a paragraph in the ledger would have been a third decline wearing an escalation's clothes.).
 
 ---
@@ -545,6 +547,56 @@ Plans:
     ready (`ExternalActionPhaseConfig.capability` is `| None` and its comment names the MCP shape);
     **the AUTHORING surface cannot express it.** This is the ROADMAP's own first named failure mode
     for SC#1, and it is a NEW CAPABILITY to fix — a phase, not a gap-closure round (G-7).
+
+---
+
+#### Phase 206.2: An MCP connection has somewhere to go (INSERT)
+
+**Goal**: A person who has created an MCP connection in Settings can bind it to a workflow step,
+discover that server's tools, grant one, and have the step call it — the round trip Phase 206 built
+the whole engine for and shipped no door onto.
+
+**Requirements**: CONN-02 (follow-up), CONN-03 (follow-up)
+**Depends on**: Phase 206 (shipped), Phase 206.1 (executed — this closes its owed SC#1b).
+**Source**: `SEED-200`, registered by operator decision 2026-08-25. The seed's `trigger_when` read
+`ALREADY TRUE` when it was planted.
+
+##### Why this is a phase and not a gap-closure round
+
+Binding an MCP connection is a **new authoring capability** — a fourth `ExternalActionSection`
+option, a `ConnectionPicker` read path that is not capability-scoped, and a grant control with a
+real write behind it. **G-7 forbids a closure round from introducing a capability**, and 206.1's
+verification said so explicitly rather than routing onward.
+
+##### How we'd know this failed
+
+- The fix works by giving MCP rows a fake `capability` value. Migration 116's CHECK constraint is a
+  closed set that does not contain `"mcp"`, and the two shapes are distinguished on the wire by
+  `mcp_server_url` — a sentinel capability would be a lie the database itself refuses.
+- A step can be bound but no tool can ever be called, because the grant control was left out.
+  Phase 206's enforcement is `tool_grants.get(tool_name) is True` — **a missing key DENIES**, so
+  binding without granting ships a second unreachable feature.
+- The capability picker's three existing options change behaviour, or a capability connection
+  starts appearing in an MCP step's picker (or vice versa).
+- ⚠ **The phase closes with another green component test that constructs its own props.** That is
+  precisely how this defect shipped: `McpToolPicker.test.tsx` was green, and in the count gate, the
+  entire time nothing in production could mount it.
+
+##### Success criteria
+
+1. An `external_action` step can be pointed at an MCP connection in the builder, and the picker
+   lists MCP rows — driven end to end in a real browser, not asserted from a mounted component.
+2. From that step, the server's tools are discovered and **at least one grant is flipped through
+   the UI**, with `updateConnectorGrants` gaining its first production caller. A denied tool is
+   still refused, and the refusal still writes its `tool_refused` audit event.
+3. The run calls the granted tool and records a send receipt — SC#1b of Phase 206.1, finally driven.
+4. **A REACHABILITY ASSERTION, not another component test**: an `import.meta.glob` sweep proving
+   `McpToolPicker` has at least one production importer whose props can carry an MCP row — the
+   `RunReceipt.tsx` zero-importer sweep pointed the other way, with a positive control.
+5. The three shipped capability shapes are untouched: `EXTERNAL_ACTION_CAPABILITIES` keeps exactly
+   its three members, and a capability step's picker behaviour is asserted byte-identical.
+6. Backend baseline unchanged, tsc baseline unchanged (`-p tsconfig.app.json`), count gate green
+   with no per-file decrease.
 
 ---
 
