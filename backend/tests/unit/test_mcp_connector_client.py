@@ -497,3 +497,295 @@ async def test_exec_external_action_mcp_permission_denied_emits_audit(monkeypatc
     assert call_kwargs["event_type"] == "tool_refused"
     assert call_kwargs["metadata"]["tool_name"] == "jira_create_issue"
     assert call_kwargs["metadata"]["reason"] == "permission_denied"
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# ⚠ ADDED, NEVER RE-BASELINED — every case above this banner is untouched by 206.2
+# ══════════════════════════════════════════════════════════════════════════════════════════
+#
+# 5 · PHASE 206.2 · D-206.2-16 / D-206.2-19 — THE GRANT WRITE, COVERED FOR THE FIRST TIME
+#
+# ⚠ MEASURED AT THIS PLAN'S BASE: `grep -rn "update_connection_grants|update_grants|/grants"
+# backend/tests` returned **ZERO**. `PATCH /connectors/connections/{id}/grants` and
+# `connector_service.update_connection_grants` shipped in Phase 206 with no coverage in any
+# tier, and Phase 206.2 is about to make the FIRST production call to them from the workflow
+# builder. This block adds the coverage rather than inheriting the gap.
+#
+# ⚠ THE HEADLINE IS THAT THE ENDPOINT IS A WHOLE-COLUMN **REPLACE**, NOT A MERGE.
+# `connector_service.py` does `.update({"tool_grants": sanitized_grants})`, so a naive
+# per-tool toggle sending `{[tool]: next}` **WIPES EVERY OTHER GRANT ON THE CONNECTION** —
+# and because a missing key DENIES at `phase_types.py` GATE 6, the wipe is a silent
+# revocation, not a visible error. D-206.2-16's obligation on the UI (send the FULL MERGED
+# MAP, derived from the server-owned value) is a CONSEQUENCE OF THIS MEASUREMENT, asserted
+# here at the tier that owns it, so the UI's rule rests on a drive rather than on a reading
+# of the source.
+#
+# ⚠ NO VERSION COLUMN, NO OPTIMISTIC LOCK, NO MIGRATION. `tool_grants` carries no version and
+# adding one is a migration this phase forbids. The honest mitigation is the UI's scope
+# sentence in wave 4 ("grants are per-connection and org-wide — this changes what EVERY
+# workflow bound to this connection may do"), not a lock invented here.
+#
+# ⚠ THE FAKE RECORDS AND IS ASSERTED NON-EMPTY BEFORE ITS CONTENTS ARE READ. A fake whose
+# `.update()` silently discards its payload is exactly the trap recorded in
+# `backend/app/api/workflow_runs.py`'s hot-file section — a forgotten projection passed GREEN
+# under an old fake, and the fix was to make the fake faithful AND to prove it recorded.
+
+_GRANTS_CONN_ID = "7ca5e114-0000-4000-8000-00000000000a"
+_GRANTS_ORG_ID = "11111111-1111-1111-1111-111111111111"
+
+
+def _grants_row(**overrides) -> dict:
+    """A row shaped like `_SELECTABLE_COLUMNS` — every response field present.
+
+    `_to_response` reads `row.get(key)` for each response field and coalesces only
+    `tool_grants` / `discovered_tools` / `config`, so `is_enabled` MUST be a real bool here
+    or the projection fails validation for a reason that has nothing to do with grants.
+    """
+    row = {
+        "id": _GRANTS_CONN_ID,
+        "org_id": _GRANTS_ORG_ID,
+        "capability": None,
+        "name": "DeepWiki (MCP)",
+        "config": {"headers": {}},
+        "mcp_server_url": "https://mcp.deepwiki.com/mcp",
+        "tool_grants": {},
+        "discovered_tools": [],
+        "is_enabled": True,
+        "last_checked_at": None,
+        "last_check_verdict": "ok",
+        "created_at": None,
+        "updated_at": None,
+    }
+    row.update(overrides)
+    return row
+
+
+class _GrantsRecorder:
+    """What the fake saw: the table, the update payloads, the ordered `.eq()` filters."""
+
+    def __init__(self) -> None:
+        self.tables: list[str] = []
+        self.updates: list[dict] = []
+        self.eqs: list[tuple[str, object]] = []
+
+
+class _FakeParams(dict):
+    """`postgrest`'s `QueryParams` surface, to the extent `_project` touches it."""
+
+    def set(self, key, value):
+        nxt = _FakeParams(self)
+        nxt[key] = value
+        return nxt
+
+
+class _FakeGrantsBuilder:
+    """The exact chain `update_connection_grants` builds: `.update(...).eq(...).eq(...)`.
+
+    `execute()` APPLIES the recorded payload to the seeded row rather than returning the row
+    untouched — i.e. it behaves like PostgREST's `return=representation`. A fake that
+    returned the stale row would let a write that never happened look like a success.
+    """
+
+    def __init__(self, rec: "_GrantsRecorder", rows: list[dict]) -> None:
+        self._rec = rec
+        self._rows = rows
+        self._payload: dict = {}
+        self.request = SimpleNamespace(params=_FakeParams())
+
+    def update(self, payload):
+        self._rec.updates.append(payload)
+        self._payload = payload
+        return self
+
+    def eq(self, column, value):
+        self._rec.eqs.append((column, value))
+        return self
+
+    def execute(self):
+        return SimpleNamespace(
+            data=[{**row, **self._payload} for row in self._rows]
+        )
+
+
+class _FakeGrantsClient:
+    def __init__(self, rec: "_GrantsRecorder", rows: list[dict]) -> None:
+        self._rec = rec
+        self._rows = rows
+
+    def table(self, name):
+        self._rec.tables.append(name)
+        return _FakeGrantsBuilder(self._rec, self._rows)
+
+
+async def _drive_grant_write(sent: dict, *, rows: list[dict] | None = None):
+    """Really run `update_connection_grants` against the recording fake.
+
+    `update_connection_grants` itself is NEVER monkeypatched — the function under test must
+    actually run, or the drive measures nothing. Returns `(result, recorder)`, and asserts
+    the NON-VACUITY control (the fake recorded an update at all) before any caller reads the
+    recording's contents.
+    """
+    from app.services import connector_service
+
+    rec = _GrantsRecorder()
+    client = _FakeGrantsClient(rec, [_grants_row()] if rows is None else rows)
+    result = await connector_service.update_connection_grants(
+        _GRANTS_CONN_ID, _GRANTS_ORG_ID, sent, supabase=client
+    )
+    assert rec.updates, (
+        "NON-VACUITY: the fake recorded no `.update()` call at all, so every assertion "
+        "below would be reading an empty list and passing for the wrong reason"
+    )
+    assert rec.tables == ["connector_connections"], rec.tables
+    return result, rec
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_REPLACES_the_whole_tool_grants_column():
+    """D-206.2-16 — **the headline. The endpoint REPLACES; it does not merge.**
+
+    Seeded with a stored `{"a": True}` and sent `{"b": True}`, the payload handed to
+    `.update()` carries `tool_grants` == `{"b": True}` — **`"a"` IS GONE**. Asserted by SET
+    EQUALITY on the payload's keys, so a partial fix that happened to keep one key cannot
+    pass.
+
+    This is the measurement the UI's obligation rests on: a per-tool toggle that sends
+    `{[tool]: next}` alone silently revokes every other tool on the connection, and because
+    `phase_types.py` GATE 6 reads `grants.get(tool_name) is True` — a MISSING KEY DENIES —
+    the revocation surfaces later as a `tool_refused` on a workflow nobody edited.
+    """
+    result, rec = await _drive_grant_write(
+        {"b": True}, rows=[_grants_row(tool_grants={"a": True})]
+    )
+    payload = rec.updates[0]
+
+    assert set(payload["tool_grants"].keys()) == {"b"}, (
+        f"D-206.2-16: the grant write is a whole-column REPLACE and the payload is "
+        f"{payload['tool_grants']!r}. A `{{[tool]: next}}` payload from the UI WIPES every "
+        f"other grant on the connection — the stored {{'a': True}} is not merged, it is "
+        f"gone. The UI must send the FULL MERGED MAP derived from the server-owned value."
+    )
+    # And the response the UI would refresh from carries the replaced column, not the old one.
+    assert result.tool_grants == {"b": True}, result.tool_grants
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_coerces_every_value_to_a_real_boolean():
+    """F-1 — `bool(v)` on the way in, asserted with `is True` / `is False`, never truthiness.
+
+    This matters because the two ends of the grant disagree about what "granted" means:
+    `phase_types.py` GATE 6 requires `grants.get(tool_name) is True`, while the client's
+    `isToolGranted` (`McpToolPicker.tsx`) accepts any truthy value. **The sanitizer is what
+    makes them agree** — without it, a stored `1` or `"yes"` reads GRANTED in the UI and
+    DENIED at run time, which is the worst of both.
+
+    All three coercions in ONE drive, as a table, so a partial fix cannot pass.
+    """
+    _, rec = await _drive_grant_write({"t_int": 1, "t_str": "yes", "t_zero": 0})
+    grants = rec.updates[0]["tool_grants"]
+
+    for tool, expected in (("t_int", True), ("t_str", True), ("t_zero", False)):
+        value = grants[tool]
+        assert value is expected, (
+            f"F-1: {tool!r} reached the column as {value!r} ({type(value).__name__}), not "
+            f"the boolean {expected!r}. GATE 6 compares with `is True`, so a truthy "
+            f"non-boolean reads GRANTED in the UI and DENIED at run time."
+        )
+    assert set(grants) == {"t_int", "t_str", "t_zero"}, grants
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_is_scoped_by_both_id_and_org_id():
+    """D-15 — the write is filtered by `id` AND `org_id`. A write scoped by id alone is a
+    CROSS-ORG write.
+
+    Asserted by COLUMN NAME off the recording fake, not by counting `.eq()` calls: two
+    filters on the same column would satisfy a count and would still be a cross-org write.
+    RLS is the second layer and is deliberately NOT simulated here — a test that mocked the
+    policy would prove the mock.
+    """
+    _, rec = await _drive_grant_write({"ask_question": True})
+    columns = [column for column, _ in rec.eqs]
+
+    assert "id" in columns and "org_id" in columns, (
+        f"the grant write is not scoped by both id and org_id — filters applied: {rec.eqs!r}. "
+        f"Scoped by id alone this is a cross-org write, and the service-role path would not "
+        f"be stopped by anything else."
+    )
+    assert dict(rec.eqs)["id"] == str(_GRANTS_CONN_ID)
+    assert dict(rec.eqs)["org_id"] == str(_GRANTS_ORG_ID)
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_raises_connector_not_found_when_nothing_matched():
+    """An empty `result.data` is ABSENCE, and absence raises `ConnectorNotFound` naming the id.
+
+    That is what turns a cross-org id (filtered out by the `org_id` predicate above) into a
+    404 at the route rather than a silent success on zero rows — the router's own
+    `except connector_service.ConnectorNotFound: raise _NOT_FOUND`.
+    """
+    from app.services import connector_service
+
+    rec = _GrantsRecorder()
+    client = _FakeGrantsClient(rec, [])
+
+    with pytest.raises(connector_service.ConnectorNotFound) as exc_info:
+        await connector_service.update_connection_grants(
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"ask_question": True}, supabase=client
+        )
+
+    assert rec.updates, (
+        "NON-VACUITY: the refusal fired without the write ever being attempted, so this "
+        "case would pass against a function that raised unconditionally"
+    )
+    assert _GRANTS_CONN_ID in str(exc_info.value), str(exc_info.value)
+
+
+def test_grant_and_discover_are_org_admin_only_while_the_list_read_is_not():
+    """D-206.2-13 — **the authorization ASYMMETRY, both halves in one case.**
+
+    `require_org_manage` gates `PATCH …/grants` and `POST …/discover` (→ 403 for a plain
+    member) while `GET /connectors/connections` is deliberately ungated org-wide (U-02:
+    read and bind are org-wide). **Any member may BIND a connection; only an org admin may
+    DISCOVER or GRANT** — and wave 4's three-arm audience render is built on exactly that
+    asymmetry, so asserting only the positive half would not measure it.
+
+    Asserted by INSPECTING the registered route's dependency callables, never by grepping
+    the decorator's source text: a source grep passes against a commented-out decorator.
+    """
+    from app.api import connectors as connectors_api
+    from app.dependencies import require_org_manage
+
+    def _deps_of(path: str, method: str):
+        for route in connectors_api.router.routes:
+            if getattr(route, "path", None) == path and method in (
+                getattr(route, "methods", None) or set()
+            ):
+                return [
+                    getattr(d, "dependency", None)
+                    for d in (getattr(route, "dependencies", None) or [])
+                ]
+        raise AssertionError(
+            f"no {method} route registered at {path!r} — the surface this phase's UI calls "
+            f"does not exist, which every assertion below would otherwise hide"
+        )
+
+    # The router carries the `/connectors` prefix at declaration, so these are the paths the
+    # route table really holds.
+    grants = _deps_of("/connectors/connections/{connection_id}/grants", "PATCH")
+    discover = _deps_of("/connectors/connections/{connection_id}/discover", "POST")
+    listing = _deps_of("/connectors/connections", "GET")
+
+    assert require_org_manage in grants, (
+        f"PATCH …/grants lost its org-admin gate — dependencies: {grants!r}. A rendered "
+        f"grant control the API no longer refuses is the 069-A defect: the UI would be the "
+        f"only barrier."
+    )
+    assert require_org_manage in discover, (
+        f"POST …/discover lost its org-admin gate — dependencies: {discover!r}"
+    )
+    assert require_org_manage not in listing, (
+        f"GET /connectors/connections gained an org-admin gate — dependencies: {listing!r}. "
+        f"U-02 says read and bind are org-wide; gating the list would lock a plain member "
+        f"out of BINDING a connection, which is the half of this surface they are allowed."
+    )
