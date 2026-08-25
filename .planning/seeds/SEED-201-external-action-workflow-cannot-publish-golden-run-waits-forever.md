@@ -1,9 +1,10 @@
 ---
 seed_id: SEED-201
-title: A workflow containing ANY external_action step cannot publish — the golden run stops at the step's mandatory approval and nobody is there to answer it
+title: "A workflow containing an MCP-shaped external_action step cannot publish — blocked at golden_run_error. ⚠ THE ORIGINAL TITLE AND CAUSAL DIAGNOSIS (‘ANY external_action step … stops at the mandatory approval’) WERE REFUTED AT VERIFICATION — see the correction; the CAPABILITY shape publishes fine and has a passing regression test proving it."
 created: 2026-08-25
 planted_during: Phase 206.2 plan 04, task 3 (the driven round trip) — found by actually pressing ◆ Publish, not by reading code
 status: planted
+diagnosis_status: CAUSE REFUTED 2026-08-25 at Phase 206.2 verification — the symptom is real and reproduced, the named cause is not. Re-diagnose before scoping any fix.
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -12,10 +13,49 @@ relates_to:
   - D-04 / Phase 185 (the action-risk checkpoint, "Stop and ask me first" — "That cannot be switched off")
   - Phase 103 (the 8-stage publish gauntlet and its golden run)
 trigger_when:
-  - Any request to PUBLISH a workflow that reaches outside — every such workflow is affected, not just MCP ones
+  - ⚠ CORRECTED — Any request to PUBLISH a workflow carrying an MCP-SHAPED external_action step. The original read "every such workflow is affected, not just MCP ones"; that is REFUTED (see the correction block below). The capability shapes publish.
   - Any work on the golden run, the publish gauntlet's stage 3, or unattended run execution
   - Any change to the external_action approval checkpoint's "cannot be switched off" rule
   - The first operator report of "I can Test Run it but I cannot publish it"
+---
+
+# ⚠ CORRECTION 2026-08-25 — THE CAUSE NAMED BELOW IS REFUTED. THE SYMPTOM IS NOT.
+
+**Found at Phase 206.2's verification, by an agent that re-derived the claim instead of repeating
+it.** The measurement below is real and reproducible: an MCP-shaped `external_action` workflow was
+driven through `◆ Publish` and blocked at `golden_run_error`, `published: false`. **Keep that.**
+
+**What is wrong is the CAUSAL STORY** — *"every `external_action` step always stops for approval, so
+an unattended golden run waits forever, for every shape"*. That is contradicted by a **passing,
+already-shipped regression test**:
+
+- `backend/tests/unit/test_publish_service.py::test_v20_an_external_action_workflow_publishes`
+  drives the **real armed checkpoint** through a **real golden-run ctx** for a **capability-shaped**
+  step and asserts a **successful publish**. A sibling test is a deliberate fence against exactly
+  the hang this seed describes. **Both pass on the current tree** (re-run at verification: `2 passed`).
+
+So the general mechanism is NOT the blocker, and **only the MCP-shaped case was ever actually
+driven**. The true cause is very likely something **MCP-connector-specific**, hidden inside the same
+broad `except Exception` handler in `backend/app/services/harness/publish_service.py`'s golden-run
+path — an exception-swallowing bug that **predates this entire feature** (it dates to Phase 102-09,
+commits `78aad9ee` / `18eff014`, long before 206 / 206.1 / 206.2). That is also why SC#3b is a
+**discovery in a different subsystem, not a regression Phase 206.2 introduced**, and why G-7 and the
+evidence together say it is a phase, never a gap-closure round on 206.2.
+
+⚠ **DO NOT "FIX" THE APPROVAL-CHECKPOINT MECHANISM.** The evidence says it is not the blocker, and
+D-04 / Phase 185's *"that cannot be switched off"* rule is a governance guarantee — weakening it to
+chase a symptom would trade a publish bug for a safety one.
+
+**Where to start instead:** add an **MCP-shaped mirror** of `test_v20_an_external_action_workflow_publishes`
+so the real exception is localized and NAMED, rather than swallowed. The seed's own second finding —
+`golden_run_id: null` rendered beside an explanation that contradicts the run which demonstrably
+exists — is probably the same swallowed exception seen from the UI side.
+
+**The original measurement and its (refuted) reasoning are preserved verbatim below, never
+overwritten** — the way this diagnosis failed is itself the lesson: a symptom driven in a browser is
+evidence; the cause inferred from it is a hypothesis, and this one was never tested against the
+suite that already covered the sibling case.
+
 ---
 
 # The measurement

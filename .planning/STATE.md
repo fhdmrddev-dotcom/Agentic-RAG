@@ -12,157 +12,30 @@ progress:
   completed_plans: 14
   percent: 93
 stopped_at: >
-  Phase 206.2 plan 03 EXECUTED 2026-08-25 (wave 3 of 4, FRONTEND-ONLY, main working tree -
-  worktrees forbidden). 3 commits 128dcde7 / 664ba306 / 8498b9ae; summary at
-  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-03-SUMMARY.md.
-  THE AUTHORING HALF OF SEED-200 IS BUILT: ExternalActionSection offers a TWO-POSITION
-  segmented control ABOVE the capability radiogroup and never inside it - its own radiogroup,
-  its own aria-label ("How this step reaches outside", deliberately NOT equal to the section
-  heading so the shipped EXACT accessible-name query stays unambiguous), its own testid
-  external-action-shape-option. It mounts <ConnectionPicker shape="mcp" /> - the prop wave 2
-  built - so the two waves meet with no cross-plan seam.
-  ⚠ THE FIVE SHIPPED ===3 PINS PASS UNEDITED WITH A ZERO-DELETION DIFF, AND THE CLAIM WAS
-  DRIVEN RATHER THAN ASSERTED: planting the capability testid onto a shape segment turned 20+
-  cases RED including all five, and the plant was restored md5-identical. The refuted first
-  draft (hide the capability rows until a shape is chosen) is recorded as refuted.
-  ⚠ THE FRONTEND'S FIRST CONFIG-KEY CLEAR, at exactly ONE site: press A emits
-  {tool_name, tool_args, connection_id}, press B emits {capability, connection_id}, both
-  asserted by SET EQUALITY over Object.keys (toMatchObject would pass a PARTIAL clear). It goes
-  through a NEW onChangeShape prop - never the single-key onChange (8 shipped string assertions
-  unmoved), never ConnectionPicker.bind(), never patchPhaseConfig. AR-05 honoured: BOTH
-  directions clear connection_id to null, the addition no upstream document named.
-  ⚠ RESEARCH ASSUMPTION A1 MOVES UNFALSIFIED -> FALSIFIED-AT-T1, driven against a real
-  createBuilderStore + the shipped patchConfig: an undefined value leaves the KEY PRESENT in
-  memory and is dropped by JSON.stringify. BOTH halves asserted, because the difference between
-  them IS the assumption. T4 browser confirmation still owed to 206.2-04.
-  ⚠ unset LEAVES BOTH SEGMENTS UNCHECKED (a default is not a way through a gate) and renders
-  BYTE-IDENTICALLY to today's empty-capability render below the control.
-  ⚠ ONE SHIPPED LIE STOPS BEING TOLD: stepGaps no longer shows an MCP step a "still missing" row
-  it could never satisfy. SUPPRESSED, never replaced - and three of the four new cases are
-  non-vacuity controls that were ALREADY GREEN at base, which is what stops a suppression that
-  deleted the row outright from reading as a fix.
-  The panel gains 3 JSX attributes (key={phase.slug}, toolName, onChangeShape) and NO hook -
-  numstat +2/-1, ABSOLUTE-ZERO pin green and independently re-checked with needles assembled at
-  runtime so this record's own prose cannot redden it.
-  Count gate: base "total 5643 · failed 0 · pinned total 5081 / OK - 111/111", close
-  "total 5672 · failed 0 · pinned total 5085 / OK - 111/111". +25 cases here, +4 in
-  StepPanelPort.test.tsx (pin raised 25 -> 29), no residual. tsc -p tsconfig.app.json = 34 at
-  base and 34 at close, zero in any touched file. api.ts 0 files, backend 0, migrations 0,
-  package manifests 0. The gate was never red; the worker cap stayed at 2.
-  ⚠ THREE DECLARED DEVIATIONS. (1) The panel's three attributes landed in TASK 1 rather than
-  task 2 - required props plus an empty task-1 test diff plus a task-1 tsc equal to base cannot
-  all hold, and the alternative was committing a tree with 36 errors. Every criterion's PURPOSE
-  is preserved and measured. (2) TWO ACCEPTANCE GREPS WERE UNSATISFIABLE AT THEIR OWN BASE -
-  mt-1.5 == 1 measured 2, role="radiogroup" == 2 measured 2 (one a shipped COMMENT); both are
-  restated in satisfiable form, and my own first-draft prose had pushed them to 5 and 4. The
-  187-24 trap, twelfth firing, in BOTH directions in one plan. (3) The byte-identity case's
-  first docblock claimed no id normalization was needed and was OBSERVED RED - React's useId
-  counter advances per MOUNT, so two sequential mounts in one run differ. A COUNTED
-  normalization replaced it (needle read off a real render, _r_N_), and the wrong claim is kept
-  beside its correction.
-  ⚠ DECLINED as a decision: ExternalActionSection.test.tsx's gate pin stays at 25 against an
-  actual of 59 - the ELEVENTH consecutive plan to decline it.
-  ⚠ FLAGGED FOR UAT - two deliberate non-changes the first round would otherwise report as bugs:
-  an MCP step shows NO consequence sentence (OutsideChangeLine renders nothing without a
-  capability, by its own recorded argument), and the canvas reads "Reach outside" with
-  CHANGES SOMETHING OUTSIDE even for a read-only tool (nodeEffectBanner keys on the TYPE). Both
-  carry re-open triggers.
-  ⚠ STILL NOT REACHABLE-BY-PROOF: every case constructs the section's props by hand, and a test
-  that constructs its own props cannot see that nothing constructs them in production. The
-  two-legged guard (D-206.2-07 / D-206.2-12) is 206.2-04's; what wave 3 adds toward it is the
-  missing WIRE, so there is finally something for that guard to find.
-  ⚠ HOT-FILE LEDGER - ExternalActionSection.tsx measures 4/3/498 and CROSSED G-5 IN THIS VERY
-  PLAN with NO ROW AT ALL (the FlowEdge.tsx / ConnectionPicker.tsx state). PhaseFormPanel.tsx
-  reads 24/11/1375 and measures 29/13/1561 - stale before this plan ran. vitest-count-gate.cjs
-  measures 117/21/3871. phaseVocabulary.ts 16/6/990 has never had a row and is READ by this
-  radius. PLAN 04 OWNS THE LEDGER COMMIT (D-206.2-11) - re-derive there, do not copy.
-  ⚠ CONN-02 / CONN-03 still NOT marked complete: three of four plans, and the grant control plus
-  the reachability guard are wave 4's.
-  NEXT: 206.2-04 (the grant control + the two-legged reachability guard + the driven round trip,
-  DENY case first + the hot-file ledger debt and 206.1's owed SC#1b).
-  --- prior entry, kept ---
-  Phase 206.2 plan 02 EXECUTED 2026-08-25 (wave 2 of 4, FRONTEND-ONLY, main working tree -
-  worktrees forbidden). 3 commits 26904f79 / b2309e6e / de06ce3e; summary at
-  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-02-SUMMARY.md.
-  THE CONSUMED CONTRACT WAVE 3 MOUNTS IS BUILT: ConnectionPicker takes a `shape` prop
-  (defaulting to "capability", which is why no shipped call site or test moved), and the MCP
-  shape calls listConnectorConnections() with ZERO arguments - the one line SEED-200 is about.
-  It filters client-side by mcp_server_url FIRST, counts, and only then by is_enabled; the
-  order is load-bearing and has its own case, because counting first would report "every MCP
-  connection is switched off" whenever the one disabled row in the org was a Slack connection.
-  Three absences render three sentences. api.ts is NOT edited (git diff --numstat = 0 lines);
-  backend 0, migrations 0, ExternalActionSection.tsx 0, package manifests 0.
-  ⚠ destinationPartsOf's POSITIONAL TAIL IS REPAIRED, and it was DRIVEN: at this plan's base
-  an MCP row's footer read "slack.com/api" - verbatim RED, expected [ 'slack.com/api' ] to
-  deeply equal [ 'mcp.deepwiki.com' ]. Explicit mcp_server_url arm above the capability arms,
-  explicit post_message arm, neutral return [], synthetic-fifth-shape control asserting BOTH an
-  empty list AND the absence of SLACK_FIXED_DESTINATION. The two-spellings-of-one-rule drift
-  note landed in BOTH ConnectionPicker.tsx and settings/connectionsCopy.ts in ONE commit; the
-  settings twin gained prose and lost nothing (0 deletions).
-  ⚠ D-206.2-18's PREDICTED useId FORM IS WRONG AND THE MEASUREMENT STANDS: React emits `_r_0_`
-  here, not the guillemet form and not radix-. A regex written against the prediction would
-  have replaced NOTHING and the count assertion would have read 0. Per-state replacement counts
-  MEASURED: unbound 2, bound 2, bound-failing 4, empty 1 (the empty state renders no control).
-  The 12 byte-identity captures were taken from the BASE commit's own component, observed twice
-  in agreement, and NEVER re-captured; the pin was DRIVEN RED by a planted attribute on the
-  capability empty node (4 cases red) and the plant restored md5-identical.
-  Count gate: base "total 5605 · failed 0 · pinned total 5043 / OK - 111/111", close
-  "total 5643 · failed 0 · pinned total 5081 / OK - 111/111". ConnectionPicker.test.tsx pin
-  raised 20 -> 58, read from the gate's own actual column, in the same commit as its cases.
-  tsc -p tsconfig.app.json = 34 at base and 34 at close, zero in any touched file.
-  ⚠ ONE DECLARED DEVIATION: the plan's SC#1b reading asserted a CLIENT filter the capability
-  shape does not have - its exclusion is the SERVER's ?capability= predicate. The case now uses
-  a server-shaped fake and says in the source which half is enforced where, rather than adding
-  a redundant client copy of a server rule to make a sentence literally true.
-  ⚠ HOT-FILE LEDGER - ConnectionPicker.tsx measures 4/3/616 and HAS NO ROW AT ALL; it crossed
-  the G-5 threshold in this very plan (the FlowEdge.tsx state). connectionsCopy.ts 4/3/541 ->
-  5/4/561. scripts/vitest-count-gate.cjs reads 114/19/3797 and measures 116/21/3865 - STALE
-  BEFORE THIS PLAN RAN, on the file that enforces the guardrails. PLAN 04 OWNS THE LEDGER
-  COMMIT (D-206.2-11) - re-derive there, do not copy.
-  ⚠ CONN-02 / CONN-03 still NOT marked complete: two of four plans, and nothing is reachable in
-  production until wave 3 mounts the shape control.
-  NEXT: 206.2-03 (the shape choice in ExternalActionSection), which consumes this contract.
-  --- prior entry, kept ---
-  Phase 206.2 plan 01 EXECUTED 2026-08-25 (wave 1 of 4, BACKEND-ONLY, main working tree -
-  worktrees forbidden). 3 commits 7740e010 / 5ebd40bd / 9e357dc0; summary at
-  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-01-SUMMARY.md.
-  THE MEASURED PUBLISH BLOCKER IS CLOSED: grounding._unregistered_tools now admits an
-  external_action phase's OWN tool_name inside the existing phase_type arm, so an MCP-shaped
-  step no longer earns an unregistered_tool finding and stage 2.6 grounding_fidelity no longer
-  refuses it. Proved NOT a loosening by three negative controls - control A (the SHIPPED
-  llm_agent+capability case) passes UNEDITED, control A' (llm_agent naming the MCP tool) still
-  blocks, control B (available_tools disagreeing with tool_name) still flags. The two stale
-  docstring claims stand BESIDE a dated correction, never over them (both greps read 1 at base
-  and 1 now). PATCH /grants and update_connection_grants have backend coverage for the first
-  time ever - grep read 0 at base, 12 now - with FOUR counterfactual plants driven red and both
-  source files restored md5-identical. Backend suite 68 failed / 2613 passed vs the re-derived
-  base 68 / 2605: failed UNCHANGED, passed +8, fully attributed (+3 grounding, +5 grants).
-  Zero frontend files, zero migrations, zero deletions anywhere in the plan.
-  ⚠ PROGRESS COUNTERS RE-DERIVED FROM DISK rather than incremented: 15 PLAN.md and 12
-  SUMMARY.md files across the eight v3.8 phase directories. The previous 14/13/93% could not be
-  reproduced - registering 206.2 and 207 had not updated them.
-  ⚠ CONN-02 / CONN-03 were NOT marked complete. One backend plan of a four-plan phase does not
-  satisfy either; marking them would be exactly the false record this file's header warns about.
-  ⚠ grounding.py's hot-file row moves 18/5/1252 -> 19/6/1311 BECAUSE OF THIS PLAN (the row was
-  re-derived and found CURRENT at the base, so this is a real move, not a stale cell). G-5 still
-  fires at 6 phases; honoured by construction here. PLAN 04 OWNS THE LEDGER COMMIT (CLAUDE.md row
-  + docs/HOT-FILE-LEDGER.md section, same commit, D-206.2-11) - re-derive there, do not copy.
-  NEXT: 206.2-02 (the picker's MCP branch), which is the CONSUMED CONTRACT wave 3 mounts.
-  --- prior entry, kept ---
-  Phase 206.2 (An MCP connection has somewhere to go) PLANNED - 4 plans, 4 SERIAL waves,
-  worktrees FORBIDDEN. Registered from SEED-200 by operator decision; closes 206.1's owed
-  SC#1b. Plan-checker PASSED after one blocker (a missing VALIDATION.md, owed and skipped by
-  the orchestrator - authored at ac1e20c1). Scope was WIDENED during research by D-206.2-19:
-  a workflow containing an MCP step CANNOT BE PUBLISHED today, driven and re-read at source -
-  ExternalActionPhaseConfig derives available_tools=[tool_name] while _unregistered_tools
-  admits only the three capability names, so publish blocks at stage 2.6. The fix is one
-  backend line plus both negative controls, taken here rather than escalated because shipping
-  the bind door with publish broken would be the FOURTH consecutive built-but-unreachable door
-  in this feature's history. Guardrail overrides: G-2 (sketch before a live-UI phase) OVERRIDDEN
-  and recorded as D-206.2-24 - the operator is unattended, and the obligation was answered by
-  /gsd:ui-phase --auto instead, APPROVED 6/6 by gsd-ui-checker.
-  Also still owed from 206.1: CLAUDE.md is past its 120,000-char warn band (124,357);
-  split-by-FUNCTION is due, target named ("Workflow guardrails", 76,531 chars, 62% of file).
+  Phase 206.2 (An MCP connection has somewhere to go) EXECUTED + VERIFIED 2026-08-25 - 4 plans,
+  4 serial waves. ALL SIX ROADMAP success criteria MET, each re-derived independently at
+  verification rather than quoted: the picker lists MCP rows, a grant was flipped through the UI
+  (updateConnectorGrants census 0 -> 1 production caller), the DENY case wrote its tool_refused
+  receipt, and a real run called DeepWiki and returned a real answer
+  (external_action_sent, capability="mcp", raw_status=200). Phase 206.1's owed SC#1b is CLOSED.
+  The two-legged reachability guard's vacuity is MEASURED: against the pre-phase tree leg (b)
+  went 5-of-11 RED while all three leg-(a) cases were GREEN in the same run.
+  Gates at close: count gate total 5700 / failed 0 / pinned 5125 / OK 113/113; tsc 34 with zero
+  in any touched file; backend 68 failed / 2613 passed. api.ts untouched across all four waves
+  (Phase 207 still owns it). Six hot-file rows + six sections landed in one commit (cdd31e4f).
+  ONE criterion NOT met and it is a DISCOVERY, not a regression: SC#3b - an MCP-shaped workflow
+  still cannot PUBLISH. Wave 1's validator fix is PROVED end to end (stage 2.6 passed with the
+  MCP step present); the block moved one stage later, to golden_run_error. Root cause is an
+  exception-swallowing handler in publish_service.py that dates to Phase 102-09 (78aad9ee /
+  18eff014), long before this feature existed. Per G-7 and the evidence this is a phase in a
+  different subsystem, NOT a gap-closure round on 206.2.
+  ⚠ SEED-201's CAUSAL DIAGNOSIS WAS REFUTED AT VERIFICATION and the seed is corrected:
+  test_v20_an_external_action_workflow_publishes drives a real armed checkpoint through a real
+  golden run for a CAPABILITY-shaped step and PASSES, so "every external_action workflow hangs"
+  is false - only the MCP shape was ever driven. Re-diagnose with an MCP-shaped mirror of that
+  test before scoping any fix, and do NOT weaken the D-04 approval checkpoint.
+  Still owed: CLAUDE.md is 133,006 chars, past the 120,000 warn band; the split-by-FUNCTION is
+  escalated as ROADMAP row 208 rather than shaved with thinner rows.
 ---
 
 # Project State
