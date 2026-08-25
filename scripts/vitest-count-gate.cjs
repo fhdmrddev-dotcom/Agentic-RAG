@@ -2662,6 +2662,44 @@ const BASELINE = {
   // a person to keep waiting; and that an ABSENT status asserts NO finish — never success by
   // default, which is the arm whose first draft was written backwards and corrected in place.
   "RunReceipt.test.tsx": 26,
+  // ── ADDED 206.2-04 (SEED-200 / D-206.2-14) — TWO PINS, AND THE FIRST OF THEM IS A SUITE
+  //    THAT HAS BEEN RUNNING-BUT-UNGUARDED SINCE PHASE 206 ──────────────────────────────
+  //
+  // ⚠ MEASURED AT THIS PLAN'S BASE: `grep -n "Mcp" scripts/vitest-count-gate.cjs` returned
+  // NOTHING, and this script's own printed column read `McpToolPicker.test.tsx  —  12  new`.
+  // So the whole MCP tool surface's component suite could have been DELETED with the gate
+  // green. 188-12's rule verbatim: *an unpinned file is not lightly guarded, it is
+  // UNGUARDED.* It is pinned here, in the same commit as the code that makes it meaningful.
+  //
+  // BOTH KNOBS, AND THE SECOND IS MEASURED RATHER THAN ASSUMED: `src/components/workflows`
+  // is already a `TARGETS` **directory** entry (see the array below), so both files RAN from
+  // the moment they existed — the printed `actual` column IS that proof. **NO `TARGETS` EDIT
+  // ACCOMPANIES THESE PINS**, because this script's own comment at the 189-14 block refuses a
+  // redundant file-level entry beside a directory that already covers it: it would state a
+  // dependency that is not real. Both figures are read from the `actual` column, never
+  // hand-counted from `it(` literals.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THEM:
+  //
+  //   · `McpToolPicker.test.tsx` (29) — the ONE grant predicate mirroring the server's
+  //     `grants.get(tool_name) is True`; the three audience arms (a measured member loses
+  //     BOTH write affordances and gains one sentence carrying both facts; an unmeasured
+  //     caller renders nothing new, asserted as a NODE COUNT against the pre-phase render
+  //     with a non-vacuity control); and above all THE FULL MERGED MAP, asserted by SET
+  //     EQUALITY because `PATCH /grants` is a whole-column REPLACE and a superset check
+  //     would pass the very payload that drops a grant. Plus the in-flight guard, the
+  //     absence of an optimistic flip, and two receipts for two directions.
+  //
+  //   · `McpToolPicker.reachability.test.tsx` (11) — ⚠ THE PIN THAT MATTERS MOST, because
+  //     the thing it guards is a TIER rather than a behaviour. Leg (a) is an import sweep
+  //     and was GREEN AT THIS PHASE'S BASE, AGAINST THE DEFECT. Leg (b) renders the
+  //     PRODUCTION parent and constructs NO component prop at all; its headline is a
+  //     zero-argument call assertion, and it was observed RED against the pre-phase tree
+  //     (5 of 11 red) in the same run that showed all three leg-(a) cases green. A future
+  //     editor who deletes leg (b) has deleted the guard, and the gate would not notice
+  //     unless this file is pinned.
+  "McpToolPicker.test.tsx": 29,
+  "McpToolPicker.reachability.test.tsx": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

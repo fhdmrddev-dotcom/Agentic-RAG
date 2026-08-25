@@ -35,6 +35,13 @@ vi.mock("@/lib/api", () => ({
   // that omits a symbol the composed tree can reach fails far from its cause. An empty list is
   // the SHIPPED absence — every external face renders its destination-free sentence.
   listConnectorConnections: () => Promise.resolve([]),
+  // ⚠ 206.2-04 — THE MOCK BUDGET, SPENT IN THE SAME COMMIT AS THE IMPORT THAT MAKES
+  // IT LIVE. This factory passes today only because the list above resolves `[]`, so
+  // `McpToolPicker` never mounts and its two api functions are never reached. DO NOT
+  // RELY ON A MOUNT NEVER HAPPENING: 196-08 measured 249 red tests from one added
+  // export, because an inert factory fails at MOUNT and does so loudly.
+  discoverConnectorTools: () => Promise.resolve([]),
+  updateConnectorGrants: () => Promise.resolve({}),
   // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
   // reads the author model registry at mount and this factory must declare it.
   getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),

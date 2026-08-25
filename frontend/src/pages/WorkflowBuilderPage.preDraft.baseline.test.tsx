@@ -143,6 +143,13 @@ const WIRE = vi.hoisted(() => {
     // absence — every external face renders its destination-free sentence, so this
     // BASELINE file's captures are unmoved.
     listConnectorConnections: () => Promise.resolve([]),
+    // ⚠ 206.2-04 — THE MOCK BUDGET, SPENT IN THE SAME COMMIT AS THE IMPORT THAT MAKES
+    // IT LIVE. This factory passes today only because the list above resolves `[]`, so
+    // `McpToolPicker` never mounts and its two api functions are never reached. DO NOT
+    // RELY ON A MOUNT NEVER HAPPENING: 196-08 measured 249 red tests from one added
+    // export, because an inert factory fails at MOUNT and does so loudly.
+    discoverConnectorTools: () => Promise.resolve([]),
+    updateConnectorGrants: () => Promise.resolve({}),
     createWorkflowDraft: () => Promise.reject(new Error("no row is created before a draft exists")),
     updateWorkflowDraft: () => Promise.reject(new Error("no row is updated before a draft exists")),
     validateWorkflow: () => Promise.resolve({ ok: true, verdicts: [] }),
