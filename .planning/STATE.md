@@ -2,20 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: executing
-last_updated: 2026-08-25
-last_activity: 2026-08-25
+status: planning
+last_updated: "2026-08-25T18:32:42.712Z"
+last_activity: 2026-08-20
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
-stopped_at: >
-  Phase 206.3 (A workflow that reaches outside can be published) COMPLETE. 1 plan executed.
-  Root cause fixed (_external_action_mcp_body with zero capability lookups, exception type
-  name preservation, golden_run_id preservation, 5 new unit tests, Playwright Chromium browser
-  drive verified green). Next: Phase 208 (CLAUDE.md split) & Phase 207 (api.ts split).
+  total_phases: 10
+  completed_phases: 6
+  total_plans: 13
+  completed_plans: 13
+  percent: 60
 ---
 
 # Project State
@@ -36,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 206.3 COMPLETE. Next: Phase 208 (CLAUDE.md split) & Phase 207 (api.ts split)
+**Current focus:** Phase 206.3 EXECUTED (⚠ not independently verified). Next: 207 / 208 / 209, or open the Connections milestone. ⚠ **Read `.planning/HANDOFF-260825.md` — STATE.md lost its detail mid-session and the handoff is the accurate record.**
 
 ## Current Position
 
@@ -68,6 +63,7 @@ as the browser evidence that closed it.**
    could not have proved it — the column was `{}`, so its one-key body is byte-identical to what
    the naive `{[tool]: next}` lost-update bug would have sent. **A second reading was driven for
    exactly that reason.**
+
 2. ⚠ **FOUR AUDIENCE ARMS, NOT THREE — a DECLARED DEVIATION with a measured reason.** The plan's
    `unknown` arm (hide everything when `org === null` OR `loading`) contradicts three of its own
    acceptance criteria and two shipped cases: hiding the Discover button in a provider-less render
@@ -76,12 +72,14 @@ as the browser evidence that closed it.**
    source edit, with a non-vacuity control); `probing` — the only unmeasured state a real person
    can be in, since `OrgProvider` wraps the app — **does** hide it, which is what actually honours
    *a non-admin must never see a button that 403s*.
+
 3. ✅ **THE GUARD IS TWO-LEGGED AND ITS VACUITY CLAIM IS MEASURED, NOT ARGUED.** Run against the
    pre-phase tree (base `4c9b9a7f`'s three files checked out over the working copy) leg (b) went
    **5 of 11 RED** while **all three leg-(a) cases were GREEN in that same run**. Restored
    md5-identical, `numstat` 0. ⚠ A narrower counterfactual exposed a second lesson: with only the
    read argument re-planted, the **DOM-reaching case stayed green** — a mock that ignores the
    read's argument cannot see this defect, and only the zero-argument call assertion can.
+
 4. ✅ **THE ROUND TRIP DRIVEN IN REAL CHROMIUM** (Playwright 1.60.0, `chromium-1223`; Chrome
    DevTools MCP absent — a deviation in METHOD). Dev server **5180** (5173/5174 were IPv6-bound —
    the 206.1 trap, reproduced); HEAD asserted by a marker string in the served module. Session
@@ -90,15 +88,18 @@ as the browser evidence that closed it.**
    succeeded; **DENY DRIVEN FIRST** (`tool_refused` / `permission_denied`, step text *Tool
    execution refused: …*); then the grant flipped and the same run returned DeepWiki's real page
    list for `facebook/react` with `external_action_sent {capability:"mcp", raw_status:200}`.
+
 5. ⚠ **`harness_audit.metadata` IS A JSONB STRING SCALAR ON 2,906 OF 2,906 ROWS — the plan's own
    prescribed audit query returns ZERO rows against a receipt that is there.** Use
    `(metadata #>> '{}')::jsonb ->> 'connection_id'`. And the filter matters exactly as warned:
    **8** `tool_refused` rows exist, only **1** carries a `connection_id`.
+
 6. ⚠ **RESEARCH A1 IS FALSIFIED AT T4 IN THE OPPOSITE DIRECTION FROM T1.** Wave 3 proved
    `JSON.stringify` drops an `undefined` key; the SAVED row carries `tool_name: null`,
    `tool_args: {}`, `available_tools: []` — the keys **survive, normalised**. Harmless ONLY
    because `phase_types.py:2287` branches on truthiness; a refactor to `if "tool_name" in config:`
    would silently resurrect the MCP branch, and nothing watches for that.
+
 7. ⛔ **SC#3b IS NOT MET AND IT IS NAMED RATHER THAN ABSORBED.** The gauntlet was DRIVEN:
    `✓Owner ✓Valid ✓Goal ✓Structure ✓Pause ✓Grounding` — **stage 2.6 PASSED with the MCP step
    present, which is wave 1's fix proved end to end** — then blocked at `golden_run_error`,
@@ -106,15 +107,18 @@ as the browser evidence that closed it.**
    unattended golden run waits forever. **EVERY external-action workflow is unpublishable, not
    just MCP ones.** Second defect from the same drive: the verdict says `golden_run_id: null` and
    *"this blocked before stage 3"* — both false; run `5d67d004` exists. → **`SEED-201`**.
+
 8. ✅ **THE LEDGER DEBT PAID: six rows + six sections in ONE commit**, four cells corrected by
    re-derivation (`PhaseFormPanel` `24/11/1375 → 29/13/1561`, its FIFTH consecutive staling;
    `vitest-count-gate` `115/20/3845 → 118/21/3909`; `grounding.py` `18/5/1252 → 19/6/1311`), one
    absence declined in writing (`stepReadinessContext.ts`, trigger named). ⚠ **`phaseVocabulary.ts`
    fires at SIX phases and had NEVER been in the table** — and it was **not edited by this phase**;
    the row exists only because the file was NAMED in the blast radius and MEASURED.
+
 9. ⚠ **CLAUDE.md is `124,357 → 133,006` chars (88.7%, 16,994 of headroom).** The split is
    **ESCALATED as ROADMAP row 208**, not performed and **not shaved** — the table is the audit scan
    list and only prose may leave. `Workflow guardrails (MANDATORY)` is now 85,180 chars.
+
 10. ✅ **SEED-146's approval-model clause ANSWERED in the register** (frontmatter + a dated
     section), umbrella left PLANTED. Reported-bugs scan RUN: **no report carries
     `folded_into: 206.2`**; `BUG-260810-01` noted as adjacent and explicitly NOT folded.
@@ -146,15 +150,18 @@ Frontend-only, main working tree, three commits `26904f79` / `b2309e6e` / `de06c
    `externalShapeVocabulary.ts` (zero imports, zero capability ids in its prose), because a
    fourth key in the capability table would be four separate failures in three languages: a
    server `Literal`, a migration-116 `CHECK`, and two module-scope asserts that fail at IMPORT.
+
 2. ✅ **THE MCP READ CALLS `listConnectorConnections()` WITH ZERO ARGUMENTS** — the one line
    SEED-200 is about, asserted as `mock.calls[0]` being `[]` rather than as "some call happened",
    with a positive control that the capability shape still passes its capability.
    **`api.ts` is NOT edited** (`git diff --numstat` = 0 lines); so are `backend`,
    `supabase/migrations`, `ExternalActionSection.tsx` and both package manifests.
+
 3. ⚠ **THE FILTER ORDER IS LOAD-BEARING AND HAS ITS OWN CASE.** Shape filter FIRST, count, THEN
    `is_enabled` — counting first would say *"every MCP server connection is switched off"*
    whenever the one disabled row in the org was a Slack connection. Three absences stay three
    sentences; `data-empty-reason` is MCP-shape only (AR-04), with its re-open trigger at the site.
+
 4. ⚠ **THE FOOTER NAMED THE WRONG HOST, AND IT WAS DRIVEN.** At this plan's base an MCP row read
    `🔒 slack.com/api` — RED verbatim: `expected [ 'slack.com/api' ] to deeply equal
    [ 'mcp.deepwiki.com' ]`. Repaired with an explicit `mcp_server_url` arm above the capability
@@ -162,23 +169,28 @@ Frontend-only, main working tree, three commits `26904f79` / `b2309e6e` / `de06c
    control asserting BOTH an empty list AND the absence of `SLACK_FIXED_DESTINATION`** — "not
    Slack" alone would pass on some other wrong host. The two-spellings-of-one-rule note landed in
    **both** files in one commit; the settings twin gained prose and lost nothing.
+
 5. ⚠ **D-206.2-18's PREDICTED `useId` FORM IS WRONG, AND THE RULE THAT SAVED IT WAS *read the
    needle off a real render*.** React emits **`_r_0_`** here — not the guillemet form, not
    `radix-…`. A regex written against the prediction would have replaced NOTHING and the count
    would have read 0. Per-state counts MEASURED: `unbound` 2, `bound` 2, `bound-failing` 4,
    `empty` **1** (that state renders no control, so it emits one id).
+
 6. ✅ **THE CAPABILITY BRANCH IS PROVED BYTE-IDENTICAL.** Twelve captures taken from the BASE
    commit's own component, observed twice in agreement, **never re-captured** — and the pin was
    DRIVEN: a planted `data-empty-reason` on the capability empty node turned **4 cases RED**, and
    the plant was restored md5-identical.
+
 7. ✅ Count gate base `total 5605 · failed 0 · pinned total 5043 · OK 111/111`; close
    `total 5643 · failed 0 · pinned total 5081 · OK 111/111`. The pin rose **20 → 58**, read from
    the gate's own `actual` column, in the same commit as its cases. `tsc -p tsconfig.app.json`
    **34 → 34**, zero in any touched file. The gate was never red, so SEED-171 was never entered.
+
 8. ⚠ **ONE DECLARED DEVIATION.** The plan's SC#1b reading asserted a CLIENT filter the capability
    shape does not have — its exclusion is the SERVER's `?capability=` predicate. Rather than add a
    redundant client copy of a server rule to make a sentence literally true, the case uses a
    server-shaped fake and says in its own source which half is enforced where.
+
 9. ⚠ **HOT-FILE LEDGER.** `ConnectionPicker.tsx` measures **`4 / 3 / 616`** and **has no row at
    all** — it crossed the G-5 threshold in this very plan, the `FlowEdge.tsx` state.
    `connectionsCopy.ts` `4/3/541` → **`5/4/561`**. `scripts/vitest-count-gate.cjs` reads
@@ -201,17 +213,21 @@ Backend-only, main working tree, three commits `7740e010` / `5ebd40bd` / `9e357d
    representable. `+59/-0`, one file, zero deletions; the subtraction at the top and the
    comprehension are byte-identical, and `assemble_grounding_bundle`'s `fidelity_tool_names` was
    **not** touched (widening there would re-create CR-01's wire-around for every phase type).
+
 2. ✅ **RED WAS OBSERVED BEFORE ANY SOURCE MOVED.** `2 failed, 9 passed` on the unchanged
    validator, the positive failing verbatim with
    `{'code': 'unregistered_tool', 'phase': 'act-mcp', … 'ask_question'}`.
+
 3. ✅ **THREE NEGATIVE CONTROLS HOLD, AND ONE OF THEM IS A SHIPPED CASE THAT WAS NEVER EDITED.**
    `git diff -U0 | grep -c '^-[^-]'` == **0** over the whole test file, so control A's innocence
    is a measurement rather than a claim.
+
 4. ⚠ **THE TWO STALE DOCSTRING CLAIMS STAND BESIDE A DATED CORRECTION, NEVER OVER THEM** —
    *"IT COSTS `external_action` NOTHING"* and *"D-06 … stays true by construction"* both still
    grep **1** at base and **1** now. Both stopped being true the day Phase 206 made `tool_name`
    outrank `capability` **in that same validator**, and nothing caught it because nothing in
    production could reach the shape.
+
 5. ✅ **`PATCH /grants` HAS COVERAGE FOR THE FIRST TIME** — `grep -rn update_connection_grants
    backend/tests` read **0** at base and **12** now. REPLACE semantics by set equality, the three
    `bool(v)` coercions asserted with `is True`/`is False`, `id`+`org_id` scoping by column NAME,
@@ -219,9 +235,11 @@ Backend-only, main working tree, three commits `7740e010` / `5ebd40bd` / `9e357d
    `GET /connections` carries it **not** — by route-table inspection, since a source grep passes
    against a commented-out decorator. **Four counterfactual plants driven red**, both source files
    restored md5-identical.
+
 6. ⚠ **NOTHING HERE WAS SCORED FROM ▶ Test Run** (a draft path with no verdict gate), and **no
    live publish was driven** — that is wave 4's. What is proved is that the validator no longer
    refuses the definition.
+
 7. ⚠ **`grounding.py`'s ledger row moves `18 / 5 / 1252` → `19 / 6 / 1311` because of this plan.**
    Re-derived at the base and found CURRENT there, so this is a real move. **Plan 04 owns the
    ledger commit** (D-206.2-11) — re-derive there rather than copying these figures, since waves
@@ -249,15 +267,18 @@ bound to a workflow step.** 5 commits, `e155611c`…`5343b1e8`. Summary:
    (`ExternalActionPhaseConfig.capability` is `| None`, and its own comment says *"an MCP step names a
    `tool_name` and has no capability at all"*). **The authoring surface cannot express it.** This is
    the Phase-118 built-but-unreachable shape one layer below where 206.1 looked.
+
 2. ✅ **SC#1a IS MET, on both tiers.** Four chooser options; exactly three MCP fields; a create body
    whose key set is `{config, mcp_server_url, name}` with `"capability" in body === false` and an
    empty credential **omitted** rather than sent as `""`; a disabled Save with its **own**
    `aria-describedby` id (both resolutions asserted in one run, because `querySelector` returns the
    FIRST match); and D-206.1-22's edit-mode defect fixed and pinned with four regressions.
+
 3. ⚠ **SC#4 EXTENDED past its own wording.** All four positional ladders now have NAMED arms and
    NEUTRAL tails, each armed against a synthetic FIFTH shape **plus** the prototype-key set, with a
    POSITIVE CONTROL beside every negative. Before it, an unrecognised shape composed
    `{ default_channel: "" }` — a 422 wearing the generic *"Couldn't save that"* sentence.
+
 4. ⚠ **THE 187-24 TRAP FIRED AGAIN — eleventh recorded firing — and it invalidated a PLAN CRITERION.**
    `grep -c "PhaseFormPanel" ConnectionFormPanel.tsx` was required to read `0`; it reads **8 at base
    and 8 after**, because that file's own header names the lineage eight times to explain what it does
@@ -265,31 +286,36 @@ bound to a workflow step.** 5 commits, `e155611c`…`5343b1e8`. Summary:
    (`grep -c "credentialLabel"` unchanged) is likewise unsatisfiable alongside the plan's own
    instruction to *delegate to* it; what was asserted instead is that its body is **md5-identical**
    and the file diffs `+40 / -0`.
+
 5. ⚠ **A VACUOUS-NEGATIVE TRAP, caught by its own positive control.** On EDIT the secret renders as a
    `<span>` of dots with **no control**, so its `<label>` associates with nothing and
    `queryByLabelText` returns `null` **whether or not the label is there**. Four edit-mode negatives
    were vacuous until they were moved to `queryByText`.
+
 6. ⚠ **FIVE HOT-FILE ROWS AND FIVE SECTIONS LANDED IN ONE COMMIT, AND ALL FIVE FILES WERE ABSENT FROM
    BOTH DOCUMENTS FOR THEIR ENTIRE LIVES.** Two crossed the G-5 threshold in that very commit.
    Triples RE-DERIVED, not copied: `ConnectionsTab.tsx` **8/3/1223** · `ConnectionFormPanel.tsx`
    **5/3/1758** · `connectionsCopy.ts` **4/3/541** · `connectionFormCopy.ts` **4/3/759** ·
    `connectionMark.tsx` **1/1/232** (below threshold, listed on purpose).
+
 7. ⚠ **A STALE ROW CORRECTED, AND ITS ERROR IS THE LESSON.** `scripts/vitest-count-gate.cjs` read
    `114 / 19 / 3797`, now **`115 / 20 / 3845`**. Plan 206.1-01 reported `22` and `23` phases — **both
    wrong**: they did not subtract the three six-digit DATED QUICK-TASK buckets (`260807`, `260808`,
    `260814`). The shipped `19` had subtracted them and was merely stale.
+
 8. ⚠ **CLAUDE.md CROSSED THE 120,000-CHAR WARN BAND: 116,960 → 124,357** (gate exit 0). Recorded, not
    worked around — the plan explicitly forbade thinner rows. **Split-by-FUNCTION is now DUE**, and the
    gate names its own target: *Workflow guardrails (MANDATORY)* is **76,531 chars, 62% of the file**.
    The TABLE stays complete; only PROSE leaves.
+
 9. ⚠ **`stringsOfModule()` walks `connectionRefusalCopy` ONLY** — measured. The nine-banned-terms and
    absolute-verb fences never covered `connectionFormCopy`. The sweep was **EXTENDED** with a
    non-vacuity control naming its seven new strings by identity. **Not inherited coverage.**
+
 10. ⚠ **Chrome DevTools MCP was unavailable to this executor again** (the `tools:`-frontmatter bug), so
     the round trip was driven in real Chromium via Playwright — a deviation in **method, not
     evidence**. `BUG-260810-01` recorded as a deploy-parity note and left `open`: this plan adds a
     FOURTH write affordance to the exact surface already invisible in cloud.
-
 
 ### 2026-08-25 — Phase 206.1 plan 02 EXECUTED (item 2, SC#2 — the dense row shape)
 
@@ -360,33 +386,39 @@ Decisions and findings worth carrying:
    `slopcheck install … --json` does not work in 0.6.1 (`--json` is a `scan` flag, and `install`
    would install unpinned); use `slopcheck scan --pkg npm <name> --json`, which checks without
    installing.
+
 2. ⚠ **The black-on-black MCP mark is REAL at HEAD, not an inherited claim.** Re-measured against
    the installed `@iconify-json/logos@1.2.13`: `model-context-protocol-icon` has ONE drawable
    element, **zero** `fill` attributes and **no** `currentColor`. Without the fill ink it inherits
    SVG-default black on a `--card: 220 30% 7%` surface — resolving, rendering 1060 characters,
    passing every test, and showing the person nothing.
+
 3. ⚠ **`typeof Mark === "function"` is the WRONG WR-04 guard on this surface**, observed RED on 11
    cases. `lucide-react` ships `forwardRef` components, whose `typeof` is `"object"`. It would have
    read correct only because the `fluent-emoji` map being replaced was all plain functions.
+
 4. ⚠ **The 187-24 trap fired THREE times inside this one plan** (7th and 8th recorded firings) — a
    source fence goes red on the prose that forbids the thing. Every forbidden token is now
    *described, never spelled*, with the reason in each file.
+
 5. **Declared Rule-2 deviation:** the new 39-case suite was UNGATED. Measured, not assumed — the
    gate's printed file list did not contain it and the grand total moved by exactly the five
    `ConnectionsTab` cases. Adopted into **both** knobs (`TARGETS` + `BASELINE`, `+48 / -0`).
    ⚠ The entry landed **one commit late** against the same-commit rule; recorded in source.
+
 6. ⚠ **A hot-file-ledger row is stale and plan 03 owns the file.** `scripts/vitest-count-gate.cjs`
    reads `114 / 19 / 3797` in CLAUDE.md; at this plan's base it measured `114 / 22 / 3797` — already
    stale by three phases — and it is now `115 / 23 / 3845`. CLAUDE.md is in plan 03's
    `files_modified` (D-206.1-24), so the measurement is recorded rather than applied.
+
 7. ⚠ **Item 3 stops being git-revert-independent once wave 2 lands** — plan 02 imports
    `ConnectionMarkGlyph` from this module. The separability D-206.1-01 buys is REVIEW separability,
    and it is intact.
 
-
 ### 2026-08-25 — Phase 206 EXECUTED (CONN-02, CONN-03)
 
 Phase 206 execution complete. Delivered:
+
 1. Migration 126 (`126_mcp_connector_connections.sql`): Provider-shaped connector schema (`mcp_server_url`, `tool_grants`, `discovered_tools`, `capability` nullable).
 2. Pydantic models in `backend/app/models/connector.py` & `backend/app/models/harness.py`.
 3. SSRF egress defense `validate_mcp_destination` in `backend/app/security/egress.py` (blocking loopback, RFC1918, cloud metadata 169.254.169.254, IPv6 site-local).
@@ -417,12 +449,15 @@ and every referenced object exists — but **the table does not exist on any dat
 `SCHEDULER_PROCESS_ENABLED` is `false` by default and must stay so until it does.
 
 **Three decisions worth carrying forward:**
+
 - **No leader election.** Exactly-once belongs to the claiming transaction (`FOR UPDATE SKIP
   LOCKED` **plus the `next_run_at` advance inside it** — the second half is the load-bearing
   one). So the loop runs in every worker, and there is no leader whose death silently stops
   every schedule.
+
 - **Only a PUBLISHED workflow can be scheduled.** A draft is mutable; an unattended run of a
   mutable workflow is one nobody agreed to.
+
 - **The per-run caps ride on `workflow_runs.inputs`** under a `_schedule_` namespace — `204-02`'s
   breaker reads them from the run it is already policing.
 
@@ -431,7 +466,6 @@ is ANSWERED: RE-DECLINED in writing, with a trigger that has only two outcomes.*
 adding a runtime export there TAKES the split or escalates it as a phase; it may NOT re-decline.*
 
 ⚠ **`WorkflowCard.tsx`'s ⋯-menu seam is now named for the THIRD time and is overdue.**
-
 
 ### ⚠ 2026-08-23 — Phase 200.2 CONTEXT GATHERED (`/gsd:discuss-phase 200.2`). The block below is preserved verbatim; it is the record of the 200.1 pass and is still accurate about that work.
 
@@ -448,19 +482,25 @@ could not render, and only UAT caught it. **Do not route to `/gsd:plan-phase 200
 rendered sketch exists.**
 
 ⚠ **TWO THINGS THE PLAN PASS MUST DO THAT NOTHING ELSE WILL PROMPT:**
+
   1. **`RUN-05` DOES NOT EXIST IN `REQUIREMENTS.md`** — the ROADMAP names it as the phase's
      requirement and it was never written. Add it at planning time.
+
   2. **The ROADMAP's *"RESTYLE, NOT A REBUILD"* fence must be AMENDED, not quietly exceeded.**
      D-09 gives the phase a backend half (a narrow lazy per-step citations read), because
      citations are measurably NOT on the wire and the run read is POLLED.
 
 ⚠ **FOUR SCOUTING CORRECTIONS, recorded because each was believed true going in:**
+
   - **SEED-191 §2 is CLOSED** — `8da83fe9` shipped `MarkdownRenderer` + `max-w-[72ch]` the same
     day the seed was planted, later. The 208-chars/line finding is stale.
+
   - **The seed's "third copy" is half closed** — `5a487762` removed the receipt region's step
     rows. The remaining duplication is exactly TWO lists, not three.
+
   - **`200.1-03` moved count + duration OFF the log line in writing.** D-05 reconciles rather
     than reverses: that block removed a TRAILING ATOM while asking for "one continuous phrase".
+
   - **The canvas came BACK as a switch** (`c5e3a352`, `centreView`). `RunTranscript.tsx`'s
     docblock and `docs/HOT-FILE-LEDGER.md` both still say it came off this page — correct both
     BESIDE the original when 200.2 lands.
@@ -1136,7 +1176,7 @@ WRITE**); no MCP client exists in the backend today. Three amber rows the slice 
 **REPORTED, not built**: lock-holder attribution, the preflight row count, and the fan-out router (the
 spine is LINEAR by recorded decision).
 
-Resume file: `.planning/phases/200-the-workflow-journey/200-CONTEXT.md`
+Resume file: None
 
 ---
 
