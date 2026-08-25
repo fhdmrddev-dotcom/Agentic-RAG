@@ -503,3 +503,79 @@ describe("200 port — the sheet's un-backed atoms render nothing, or a statemen
     expect([all, "chevron_right"].join(" ")).toContain("chevron_right")
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⚠ ADDED, NEVER RE-BASELINED — every case above this banner is untouched by 206.2.
+//
+// 206.2-03 (RESEARCH Open Question 4) — ONE SHIPPED LIE STOPS BEING TOLD.
+//
+// `stepGaps` pushes its `capability` row whenever an `external_action` step's
+// `outsideSentence` is `undefined`. That sentence is a lookup into the CLOSED capability
+// table, so it is `undefined` for every MCP-shaped step FOREVER, however completely the step
+// is configured — a *still missing* row that could never be satisfied, on a card whose whole
+// premise is that a row is something you can go and fix.
+//
+// ⚠ THE ROW IS SUPPRESSED, NEVER REPLACED. A step with NEITHER a capability nor a tool still
+// needs the shipped sentence, and it is true for it. Case (a) below is the non-vacuity
+// control for exactly that half: a careless suppression could delete the row outright and
+// every "no row appears" assertion would stay green.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("stepGaps — the MCP shape's permanently-unsatisfiable row (206.2)", () => {
+  const OUTSIDE: Parameters<typeof stepGaps>[0] = {
+    phaseType: "external_action",
+    prompt: "",
+    fn: "",
+    outsideSentence: undefined,
+  }
+
+  it("(a) NON-VACUITY — neither a capability nor a tool STILL yields the row", () => {
+    // The half a careless suppression would silently delete. Without this case, "no row
+    // appears" below could be satisfied by a `stepGaps` that never pushes the row at all.
+    expect(stepGaps(OUTSIDE).map((g) => g.id)).toEqual(["capability"])
+    expect(stepGaps({ ...OUTSIDE, toolName: "" }).map((g) => g.id)).toEqual(["capability"])
+    expect(stepGaps({ ...OUTSIDE, toolName: undefined }).map((g) => g.id)).toEqual(["capability"])
+  })
+
+  it("(b) a step that names an MCP tool is owed no capability row", () => {
+    expect(stepGaps({ ...OUTSIDE, toolName: "ask_question" }).map((g) => g.id)).toEqual([])
+  })
+
+  it("(c) a WHITESPACE-ONLY tool name behaves as absent — a blank is not an answer", () => {
+    // The executor refuses a blank `tool_name` by name ("there is nothing to grant and
+    // nothing to invoke"), so a step carrying one has answered neither question and is owed
+    // the row exactly as an unconfigured step is.
+    expect(stepGaps({ ...OUTSIDE, toolName: "   " }).map((g) => g.id)).toEqual(["capability"])
+  })
+
+  // ⚠ NOT the shipped `BASE`, and the reason is scope rather than preference: that literal
+  // is declared INSIDE its own `describe`, so it cannot be spread from here without moving
+  // it — and moving a shipped declaration is exactly the edit this banner forbids. This is
+  // its field-for-field twin, kept beside it deliberately.
+  const OTHER_ARMS: Parameters<typeof stepGaps>[0] = {
+    phaseType: "llm_agent",
+    prompt: "do the thing",
+    fn: "",
+    outsideSentence: undefined,
+  }
+
+  it("(d) the other arms are untouched by the new field", () => {
+    expect(
+      stepGaps({ ...OTHER_ARMS, phaseType: "llm_agent", prompt: "  ", toolName: "ask_question" })
+        .map((g) => g.id),
+    ).toEqual(["prompt"])
+    expect(
+      stepGaps({ ...OTHER_ARMS, phaseType: "programmatic", fn: "", toolName: "ask_question" })
+        .map((g) => g.id),
+    ).toEqual(["fn"])
+    expect(
+      stepGaps({
+        ...OTHER_ARMS,
+        phaseType: "llm_emit",
+        prompt: "x",
+        template: {},
+        toolName: "ask_question",
+      }).map((g) => g.id),
+    ).toEqual(["template"])
+  })
+})

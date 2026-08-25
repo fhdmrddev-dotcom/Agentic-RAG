@@ -2638,7 +2638,13 @@ const BASELINE = {
   //     it names still reds. ⚠ A pin on a characterization suite is the one place where the
   //     count matters most and the count is the least of it — the file's value is that its
   //     lines predate the change they judge.
-  "StepPanelPort.test.tsx": 25,
+  // ⚠ RE-PINNED 25 → 29 by 206.2-03. The four cases stop one shipped LIE: the readiness
+  //   card's `capability` row was pushed whenever an `external_action` step had no
+  //   capability SENTENCE — a lookup into the closed table, and therefore `undefined` for
+  //   every MCP-shaped step forever, however completely configured. Three of the four are
+  //   NON-VACUITY CONTROLS that were already GREEN at their base, which is the point: the
+  //   suppression could otherwise have deleted the row outright and read as a fix.
+  "StepPanelPort.test.tsx": 29,
   "WorkflowCard.baseline.test.tsx": 29,
   // ── ADDED 2026-08-20 in the SAME COMMIT as `RunReceipt.test.tsx`'s own growth ───────────
   //

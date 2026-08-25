@@ -111,6 +111,15 @@ export interface StepReadinessInput {
    */
   outsideSentence: string | undefined
   /**
+   * 206.2 — `config.tool_name`, already stringified by the caller, when there is one.
+   *
+   * ⚠ OPTIONAL FOR THE REASON `template` ABOVE IS: an unwired caller is told nothing about
+   * tools and is therefore owed no conclusion about one. Absence here means "we were not
+   * told", and it lands on the same side as "no tool named" only because both leave the
+   * step owing the shipped sentence — which is true for both.
+   */
+  toolName?: string
+  /**
    * Whether the caller is WIRED for templates at all, and if so what is bound.
    *
    * ⚠ `undefined` MEANS "WE WERE NOT TOLD", NOT "NOTHING IS ATTACHED", and the two must not
@@ -146,7 +155,24 @@ export function stepGaps(input: StepReadinessInput): StepGap[] {
     })
   }
 
-  if (input.phaseType === "external_action" && input.outsideSentence === undefined) {
+  // ── 206.2 — ONE SHIPPED LIE, STOPPED AT ITS SOURCE ────────────────────────────────────
+  //
+  // `outsideSentence` is the caller's lookup into the CLOSED capability table, so it is
+  // `undefined` for every MCP-shaped step FOREVER — however completely that step is
+  // configured, and no matter which tool it names. Before this guard the panel showed such a
+  // step a *still missing* row it could never satisfy, on a card whose whole premise is that
+  // a row is something you can go and fix.
+  //
+  // ⚠ THE ROW IS SUPPRESSED, NOT REPLACED. A step with NEITHER a capability nor a tool still
+  // gets the shipped sentence, because it is true for it — and that half is the one a
+  // careless suppression would silently delete, which is why the suite asserts it first.
+  const namesAnMcpTool = (input.toolName ?? "").trim() !== ""
+
+  if (
+    input.phaseType === "external_action" &&
+    input.outsideSentence === undefined &&
+    !namesAnMcpTool
+  ) {
     gaps.push({
       id: "capability",
       label: "Choose what this step changes outside the workflow",

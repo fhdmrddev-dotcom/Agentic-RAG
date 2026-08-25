@@ -1508,6 +1508,7 @@ export function PhaseFormPanel({
             prompt: asStr(cfg.prompt),
             fn: asStr(cfg.fn),
             outsideSentence: outsideChangeSentence(asStr(cfg.capability)),
+            toolName: asStr(cfg.tool_name),
             template,
           })}
         />
