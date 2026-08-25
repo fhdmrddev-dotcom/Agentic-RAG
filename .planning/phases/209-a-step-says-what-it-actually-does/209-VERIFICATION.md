@@ -57,3 +57,39 @@ gaps_count: 5
 Requirement(s) **CONN-02 (follow-up), CONN-03 (follow-up)** are satisfied by code whose evidence was re-derived on 2026-08-26.
 The gaps above are recorded as **carried debt**, not blockers - none of them claims the shipped
 behaviour is absent. **This is not a claim that the phase was verified when it shipped.**
+
+---
+
+## ⚠ CORRECTION 2026-08-26 — THE BROWSER EVIDENCE ABOVE IS QUALIFIED, BY THE INTEGRATION CHECK
+
+The 16/16 drive was run against **this machine's** database, where
+`app_settings.feature_visibility.visual_workflow_canvas` is `{"audience": "everyone"}` — an
+operator has flipped it ON. **The cold default is `"off"`** (`user_settings.py:1203`, and its own
+comment calls it *"the ONE authoritative cold default"*).
+
+`WorkflowBuilderPage.tsx:2234` passes the context **spread-conditionally**:
+
+```tsx
+{...(canvasEnabled ? { nameContext } : {})}
+```
+
+So with the flag at its shipped default, `nameContext.toolReadOnly` and `.mcpServerUrls` are
+`undefined`, every `external_action` step reads `CHANGES SOMETHING OUTSIDE` whatever the server
+declared, and the face degrades to a bare `tool_name`.
+
+**This does not make Phase 209 wrong** — the degraded state is fail-closed and therefore honest.
+**It does mean the drive proves the behaviour on a flag-flipped install, not on a fresh one**, and
+the row above should be read that way. ⚠ **I did not know this when I wrote it**; the cross-phase
+integration check found it, which is precisely the value of a check the builder does not run.
+
+## ⚠ AND THE FACE IS ABSENT FROM THE RUN SURFACE (W-2)
+
+`WorkflowRunPage.tsx:985` calls `nodeTitle(spec)` with **no** name context, so
+`phaseVocabulary.ts` falls through to the bare tool name instead of `connection · tool`. A grep for
+`effectBannerFor` returns only `canvasModel.ts` and `PhaseSpineGraph.tsx` — the run page,
+`RunSpine.tsx`, `RunStepList.tsx` and the panel's `PhaseCard` / `PhaseTimeline` render **no effect
+banner at all**.
+
+**So the step that "says what it actually does" says it in the BUILDER only, not while it runs** —
+which is `SEED-206`, planted 2026-08-26 before this was measured, and now confirmed rather than
+suspected.
