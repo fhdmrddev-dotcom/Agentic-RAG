@@ -3,7 +3,9 @@ seed_id: SEED-201
 title: "A workflow containing an MCP-shaped external_action step cannot publish — blocked at golden_run_error. ⚠ THE ORIGINAL TITLE AND CAUSAL DIAGNOSIS (‘ANY external_action step … stops at the mandatory approval’) WERE REFUTED AT VERIFICATION — see the correction; the CAPABILITY shape publishes fine and has a passing regression test proving it."
 created: 2026-08-25
 planted_during: Phase 206.2 plan 04, task 3 (the driven round trip) — found by actually pressing ◆ Publish, not by reading code
-status: planted
+status: answered
+answered_as: Phase 206.3 (INSERT) — "A workflow that reaches outside can be published", registered in .planning/ROADMAP.md by operator decision 2026-08-25. ⚠ The phase is scoped to RE-DIAGNOSE FIRST, precisely because this seed's own cause was refuted.
+answered_on: 2026-08-25
 diagnosis_status: CAUSE REFUTED 2026-08-25 at Phase 206.2 verification — the symptom is real and reproduced, the named cause is not. Re-diagnose before scoping any fix.
 priority: high
 surface: Agentic-RAG
