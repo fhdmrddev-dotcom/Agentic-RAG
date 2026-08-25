@@ -53,6 +53,12 @@ const EXTERNAL_ACTION_CAPABILITIES: readonly string[] = Object.keys(EXTERNAL_CAP
 function renderSection(over: Partial<ExternalActionSectionProps> = {}) {
   const props: ExternalActionSectionProps = {
     capability: "",
+    // 206.2-03 — the two props the shape axis adds. Defaulted here so every SHIPPED case
+    // above and below keeps its exact meaning: no tool named, and a shape writer nobody
+    // calls. ⚠ THIS IS AN ADDITION TO A HELPER, NOT AN EDIT TO A CASE — the file's
+    // zero-deletion diff is the assertion, and no assertion moved.
+    toolName: "",
+    onChangeShape: () => {},
     onChange: () => {},
     onPersist: () => {},
     ...over,

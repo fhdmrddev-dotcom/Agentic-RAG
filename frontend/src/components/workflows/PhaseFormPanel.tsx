@@ -1470,7 +1470,7 @@ export function PhaseFormPanel({
               accent="consequence"
             >
               <OutsideChangeLine capability={asStr(cfg.capability)} />
-              <ExternalActionSection capability={asStr(cfg.capability)} onChange={set("capability")} onPersist={onPersist} />
+              <ExternalActionSection key={phase.slug} capability={asStr(cfg.capability)} toolName={asStr(cfg.tool_name)} onChange={set("capability")} onChangeShape={onChange} onPersist={onPersist} />
             </StepCardSection>
           )}
         </div>
