@@ -58,7 +58,9 @@ import { useBuilderStoreOptional } from "@/components/workflows/BuilderStoreProv
 import { useSelectedPhaseSlug } from "@/components/workflows/SelectedPhaseSlugContext"
 import { listConnectorConnections } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api"
+import type { ExternalActionShape } from "./externalShapeVocabulary"
 import { McpToolPicker } from "./McpToolPicker"
+import { own } from "./ownProperty"
 
 // ── THE COPY ─────────────────────────────────────────────────────────────────────────
 // Exported identifiers, asserted by character-identity in `ConnectionPicker.test.tsx`.
@@ -108,9 +110,46 @@ export const CONNECTION_CAPABILITY_WORDS: Record<string, string> = {
 
 /** State 2 (UI-SPEC §6d, verbatim shape). TEXT ONLY, NO LINK, and that is a decision:
  *  the three-homes IA has no router on this surface and a leaf inside the Builder has no
- *  way to switch `ActiveView`. Naming the destination is honest; a dead link is not. */
+ *  way to switch `ActiveView`. Naming the destination is honest; a dead link is not.
+ *
+ *  ⚠ WR-04 — THE NINTH LIVE SINK IN THIS TREE, CLOSED HERE (Phase 206.2-02, UI-SPEC
+ *  § "One WR-04 sink this branch makes live"). This line shipped as a bare bracket read with
+ *  a `??` fallback over a plain object literal. A plain literal INHERITS `constructor`,
+ *  `toString`, `__proto__` and friends, and an inherited member is never nullish — so the
+ *  fallback never fires for those keys and the `Object` FUNCTION stringifies into the
+ *  sentence. Eight instances of this exact class have been closed in this tree already; the
+ *  most recent (`PhaseFormPanel`, Phase 200) rendered as NOTHING AT ALL rather than as
+ *  `[Function Object]`, because React refused the child outright.
+ *  It was unreachable here at 206.2's base — the section narrows the key before mounting the
+ *  picker — and the MCP shape is what widens what reaches this file. `own()` is the
+ *  zero-import leaf `ownProperty.ts` exists to be; the rendered output for all three
+ *  capability words is unchanged, which three character-identity assertions already pin. */
 export const noConnectionYetNote = (capability: string): string =>
-  `No ${CONNECTION_CAPABILITY_WORDS[capability] ?? "external"} connection yet — add one in Settings → Connections.`
+  `No ${own(CONNECTION_CAPABILITY_WORDS, capability) ?? "external"} connection yet — add one in Settings → Connections.`
+
+/** State 2, MCP shape — no MCP-shaped connection exists at all (UI-SPEC § Surface 2, verbatim).
+ *
+ *  ⚠ IT IS A SEPARATE SENTENCE FROM `noConnectionYetNote` ON PURPOSE. That one prints
+ *  *"No external connection yet"* for an unrecognised key and *"No email connection yet"* for
+ *  a known one; reusing either on this shape is `[PATTERNS]`'s named anti-pattern — an author
+ *  looking for an MCP server would be told about something else.
+ *
+ *  Same shape as the shipped sentence (the fact, then where to fix it), and TEXT ONLY, NO
+ *  LINK for the shipped reason: there is no router on this surface and a leaf inside the
+ *  Builder has no way to switch `ActiveView`. Naming the destination is honest; a dead link
+ *  is not. */
+export const CONNECTION_PICKER_NO_MCP_NOTE =
+  "No MCP server connection yet — add one in Settings → Connections."
+
+/** State 2's FIFTH arm, MCP shape only (UI-SPEC § Surface 2 / AR-04, verbatim).
+ *
+ *  ⚠ A DIFFERENT FACT FROM "none exist", AND FOLDING THE TWO IS THE DEFECT THIS TREE HAS NOW
+ *  RECORDED FIVE TIMES (`runFacts.ts` CR-01, `DecisionsList` D-20, `transcriptVocabulary.ts`,
+ *  206.1's AR-05). An author told *"none yet"* while one sits switched off goes and creates a
+ *  duplicate — the list was read, the rows were seen, and they were rejected for a reason the
+ *  author is able to undo in one click. That is worth its own sentence. */
+export const CONNECTION_PICKER_MCP_ALL_DISABLED =
+  "Every MCP server connection is switched off. Turn one on in Settings → Connections."
 
 const EMPTY_RECORD: Record<string, unknown> = Object.freeze({})
 
@@ -182,24 +221,48 @@ export const optionLabelOf = (connection: ConnectorConnection): string => {
  *  synchronous `setState` in the effect body and so no cascading render. */
 type ReadState =
   | { kind: "loading"; key: string }
-  | { kind: "ready"; key: string; connections: ConnectorConnection[] }
+  | {
+      kind: "ready"
+      key: string
+      connections: ConnectorConnection[]
+      /** MCP shape only — how many rows of THIS shape the read returned, counted BEFORE the
+       *  `is_enabled` filter ran. It is what tells *"none exist"* apart from *"every one is
+       *  switched off"*, and it reaches no DOM node: the empty render derives one attribute
+       *  and one sentence from it. Absent on the capability shape, whose `.then` body is
+       *  byte-identical to its shipped form (D-206.2-08). */
+      shapedCount?: number
+    }
   | { kind: "error"; key: string }
 
 export interface ConnectionPickerProps {
   /** The step's chosen capability, already narrowed to a recognised one by the section.
-   *  The picker is mounted only once this is answered — the two questions are ordered. */
-  capability: string
+   *
+   *  ⚠ OPTIONAL SINCE 206.2-02, AND THE TWO QUESTIONS ARE ORDERED: the section answers the
+   *  SHAPE first, and only the capability shape has a second question of this kind. An MCP
+   *  step's row carries no capability at all — its destination is its own URL — so requiring
+   *  one here would mean inventing a value the schema has no column for. */
+  capability?: string
+  /** How this step reaches outside. Defaults to `"capability"`, and the default is the whole
+   *  reason no shipped call site and no shipped test moved when this prop landed: every
+   *  render that says nothing about the shape renders exactly what it rendered before. */
+  shape?: ExternalActionShape
 }
 
-export function ConnectionPicker({ capability }: ConnectionPickerProps) {
+export function ConnectionPicker({ capability, shape = "capability" }: ConnectionPickerProps) {
   const store = useBuilderStoreOptional()
   const slug = useSelectedPhaseSlug()
   const selectId = useId()
   const refusalId = useId()
 
   /** What this render is asking for. A capability change (or a different step) makes the
-   *  settled answer stale, which is a derivation rather than an effect. */
-  const requestKey = `${slug ?? ""}::${capability}`
+   *  settled answer stale, which is a derivation rather than an effect.
+   *
+   *  ⚠ THE SHAPE IS A TERM OF IT (206.2-02). A shape switch changes which rows are being
+   *  asked for, so the settled answer for the other shape is not an answer at all — the field
+   *  reads `loading` again by derivation, with no synchronous `setState` in the effect body
+   *  and so no cascading render. The key reaches no DOM node, which is asserted rather than
+   *  stated: the capability shape's whole `outerHTML` is pinned byte-for-byte in the suite. */
+  const requestKey = `${shape}::${slug ?? ""}::${capability ?? ""}`
   const [settled, setSettled] = useState<ReadState>({ kind: "loading", key: "" })
   const read: ReadState = settled.key === requestKey ? settled : { kind: "loading", key: requestKey }
   /** The id an author reached for and Gate 1 declined. Cleared by any accepted choice. */
@@ -265,9 +328,47 @@ export function ConnectionPicker({ capability }: ConnectionPickerProps) {
 
   // THE READ. Gated on the same two nulls the write is, so a provider-less render opens no
   // request at all — see the docblock: this is what keeps two shipped suites unaffected.
+  // The guard is ahead of BOTH arms, so that property holds in either shape.
   useEffect(() => {
     if (store === null || slug === null) return
     let cancelled = false
+
+    // ── THE MCP ARM (206.2-02, D-206.2-03) ──────────────────────────────────────────────
+    // ⚠ NO ARGUMENT. `api.ts` builds an empty query string for a falsy argument, so this is a
+    // CALL-SITE change and `api.ts` is not edited (Phase 207 owns that file). The one line
+    // above this arm is what SEED-200 is about: the shipped read passes a capability, an MCP
+    // row's capability is null, so an MCP connection was filtered out of every read this
+    // picker ever performed and the `McpToolPicker` mount below was dead code.
+    if (shape === "mcp") {
+      listConnectorConnections()
+        .then((rows) => {
+          if (cancelled) return
+          // ⚠ THE ORDER OF THE TWO FILTERS IS LOAD-BEARING. An unfiltered read returns
+          // capability rows as well, so the shape filter runs FIRST and the count is taken
+          // from its result: "every one is switched off" is a fact about MCP-shaped rows
+          // specifically, and counting before the shape filter would report it whenever the
+          // only disabled row in the org was a Slack connection.
+          const shaped = rows.filter((row) => Boolean(row.mcp_server_url))
+          setSettled({
+            kind: "ready",
+            key: requestKey,
+            // The SAME `is_enabled` rule, not a laxer one — a DISABLED connection is not a
+            // choice, and this shape inherits that rather than renegotiating it.
+            connections: shaped.filter((row) => row.is_enabled),
+            shapedCount: shaped.length,
+          })
+        })
+        .catch(() => {
+          if (!cancelled) setSettled({ kind: "error", key: requestKey })
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // ── THE CAPABILITY ARM — UNTOUCHED. Two arms, one of them byte-identical to its shipped
+    // form (D-206.2-08); the two filter chains are deliberately NOT unified into one shared
+    // expression, because that would rewrite the very line the byte-identity pin protects.
     listConnectorConnections(capability)
       .then((rows) => {
         if (cancelled) return
@@ -280,7 +381,7 @@ export function ConnectionPicker({ capability }: ConnectionPickerProps) {
     return () => {
       cancelled = true
     }
-  }, [store, slug, capability, requestKey])
+  }, [store, slug, shape, capability, requestKey])
 
   /** THE WRITE — one key, and the plan's whole D-13 obligation is that it stays one key. */
   const bind = (id: string | null) => {
@@ -353,13 +454,36 @@ export function ConnectionPicker({ capability }: ConnectionPickerProps) {
 
   const connections = read.connections
 
-  // STATE 2 — none exist for this capability.
+  // STATE 2 — none exist for this shape, and on the MCP shape that splits into TWO facts.
+  //
+  // ⚠ THE ATTRIBUTE IS ADDED TO THE MCP SHAPE ONLY, AND THE ASYMMETRY IS DELIBERATE (AR-04).
+  // The honesty argument — *none exist* and *every one is switched off* are two facts and an
+  // author told the first while the second is true goes and creates a duplicate — is
+  // shape-independent, and it would otherwise be owed on both. D-206.2-08 is LOCKED: a
+  // capability step's picker behaviour is asserted byte-identical, and `data-empty-reason` on
+  // this node would change the very bytes that criterion pins. Recording the asymmetry as a
+  // decision is better than a fold nobody noticed.
+  // RE-OPEN TRIGGER: the first phase permitted to re-baseline the capability shape's empty
+  // render — at which point the same arm is owed there.
+  //
+  // The element, its `data-testid` and its `data-state` do not move. The fifth arm is a
+  // SECOND SENTENCE INSIDE THE SAME NODE plus one attribute.
   if (connections.length === 0) {
+    const mcpEmpty =
+      shape !== "mcp"
+        ? undefined
+        : (read.shapedCount ?? 0) > 0
+          ? { reason: "all-disabled", note: CONNECTION_PICKER_MCP_ALL_DISABLED }
+          : { reason: "none", note: CONNECTION_PICKER_NO_MCP_NOTE }
     return (
       <div data-testid="connection-picker" data-state="empty" className={FIELD_CLASSES}>
         {label}
-        <p data-testid="connection-picker-empty" className={NOTE_CLASSES}>
-          {noConnectionYetNote(capability)}
+        <p
+          data-testid="connection-picker-empty"
+          className={NOTE_CLASSES}
+          {...(mcpEmpty === undefined ? {} : { "data-empty-reason": mcpEmpty.reason })}
+        >
+          {mcpEmpty === undefined ? noConnectionYetNote(capability ?? "") : mcpEmpty.note}
         </p>
       </div>
     )
