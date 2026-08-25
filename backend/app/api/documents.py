@@ -499,8 +499,26 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             parsed_email = parse_msg_bytes(raw)
         return format_email_text_for_retrieval(parsed_email)
 
-    # plain text, markdown, html — decode as UTF-8
-    return raw.decode("utf-8")
+    # plain text, markdown — decode as UTF-8
+    decoded = raw.decode("utf-8")
+
+    # ── BUG-260825-02 — HTML WAS RETURNED UNCHANGED, TAGS AND ALL.
+    #
+    # ⚠ MEASURED: `extract_text(raw, "text/html")` returned its input BYTE-IDENTICAL, so every
+    #   `<h1>`/`<p>`/`<script>` flowed into the chunk text, into the embeddings, and into
+    #   whatever the agent later quoted to a person. It is a SILENT quality defect — the upload
+    #   succeeds, the chunk count looks sane, nothing errors — which is why nothing caught it.
+    #
+    # ⚠ THE CONVERTER IS THE EMAIL PARSER'S, NOT A SECOND ONE. `html_to_plain_text` is stdlib
+    #   `html.parser` only: it drops `<script>`/`<style>`/`<head>` bodies, turns block tags into
+    #   newlines and unescapes entities. Reaching for `beautifulsoup4` instead would have
+    #   shipped a CLOUD-ONLY `ImportError` — bs4 is installed in the local venv but is NOT
+    #   declared in `backend/requirements.txt`, so the deployed image does not have it.
+    if mime_type == "text/html":
+        from app.services.email_extraction_service import html_to_plain_text  # noqa: PLC0415
+        return html_to_plain_text(decoded)
+
+    return decoded
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
