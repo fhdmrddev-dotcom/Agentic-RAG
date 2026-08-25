@@ -2,16 +2,42 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: ready_to_execute
+status: executing
 last_updated: 2026-08-25
 last_activity: 2026-08-25
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 14
-  completed_plans: 13
-  percent: 93
+  total_plans: 15
+  completed_plans: 12
+  percent: 80
 stopped_at: >
+  Phase 206.2 plan 01 EXECUTED 2026-08-25 (wave 1 of 4, BACKEND-ONLY, main working tree -
+  worktrees forbidden). 3 commits 7740e010 / 5ebd40bd / 9e357dc0; summary at
+  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-01-SUMMARY.md.
+  THE MEASURED PUBLISH BLOCKER IS CLOSED: grounding._unregistered_tools now admits an
+  external_action phase's OWN tool_name inside the existing phase_type arm, so an MCP-shaped
+  step no longer earns an unregistered_tool finding and stage 2.6 grounding_fidelity no longer
+  refuses it. Proved NOT a loosening by three negative controls - control A (the SHIPPED
+  llm_agent+capability case) passes UNEDITED, control A' (llm_agent naming the MCP tool) still
+  blocks, control B (available_tools disagreeing with tool_name) still flags. The two stale
+  docstring claims stand BESIDE a dated correction, never over them (both greps read 1 at base
+  and 1 now). PATCH /grants and update_connection_grants have backend coverage for the first
+  time ever - grep read 0 at base, 12 now - with FOUR counterfactual plants driven red and both
+  source files restored md5-identical. Backend suite 68 failed / 2613 passed vs the re-derived
+  base 68 / 2605: failed UNCHANGED, passed +8, fully attributed (+3 grounding, +5 grants).
+  Zero frontend files, zero migrations, zero deletions anywhere in the plan.
+  ⚠ PROGRESS COUNTERS RE-DERIVED FROM DISK rather than incremented: 15 PLAN.md and 12
+  SUMMARY.md files across the eight v3.8 phase directories. The previous 14/13/93% could not be
+  reproduced - registering 206.2 and 207 had not updated them.
+  ⚠ CONN-02 / CONN-03 were NOT marked complete. One backend plan of a four-plan phase does not
+  satisfy either; marking them would be exactly the false record this file's header warns about.
+  ⚠ grounding.py's hot-file row moves 18/5/1252 -> 19/6/1311 BECAUSE OF THIS PLAN (the row was
+  re-derived and found CURRENT at the base, so this is a real move, not a stale cell). G-5 still
+  fires at 6 phases; honoured by construction here. PLAN 04 OWNS THE LEDGER COMMIT (CLAUDE.md row
+  + docs/HOT-FILE-LEDGER.md section, same commit, D-206.2-11) - re-derive there, do not copy.
+  NEXT: 206.2-02 (the picker's MCP branch), which is the CONSUMED CONTRACT wave 3 mounts.
+  --- prior entry, kept ---
   Phase 206.2 (An MCP connection has somewhere to go) PLANNED - 4 plans, 4 SERIAL waves,
   worktrees FORBIDDEN. Registered from SEED-200 by operator decision; closes 206.1's owed
   SC#1b. Plan-checker PASSED after one blocker (a missing VALIDATION.md, owed and skipped by
@@ -49,6 +75,49 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Current focus:** Phase 206.1 executing — plans 01 and 02 done, plan 03 next; then Phase 207 (`api.ts` split)
 
 ## Current Position
+
+### 2026-08-25 — Phase 206.2 plan 01 EXECUTED (wave 1/4) — the publish blocker is CLOSED
+
+Backend-only, main working tree, three commits `7740e010` / `5ebd40bd` / `9e357dc0`. Summary:
+`.planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-01-SUMMARY.md`.
+
+1. ✅ **AN MCP-SHAPED `external_action` STEP NOW PASSES PUBLISH STAGE 2.6.** Inside the existing
+   `phase_type == "external_action"` arm of `grounding._unregistered_tools`, `allowed` gains the
+   phase's **own `tool_name`** — the same value the model validator already derives
+   `available_tools` from, so the two are equal by construction and nothing new became
+   representable. `+59/-0`, one file, zero deletions; the subtraction at the top and the
+   comprehension are byte-identical, and `assemble_grounding_bundle`'s `fidelity_tool_names` was
+   **not** touched (widening there would re-create CR-01's wire-around for every phase type).
+2. ✅ **RED WAS OBSERVED BEFORE ANY SOURCE MOVED.** `2 failed, 9 passed` on the unchanged
+   validator, the positive failing verbatim with
+   `{'code': 'unregistered_tool', 'phase': 'act-mcp', … 'ask_question'}`.
+3. ✅ **THREE NEGATIVE CONTROLS HOLD, AND ONE OF THEM IS A SHIPPED CASE THAT WAS NEVER EDITED.**
+   `git diff -U0 | grep -c '^-[^-]'` == **0** over the whole test file, so control A's innocence
+   is a measurement rather than a claim.
+4. ⚠ **THE TWO STALE DOCSTRING CLAIMS STAND BESIDE A DATED CORRECTION, NEVER OVER THEM** —
+   *"IT COSTS `external_action` NOTHING"* and *"D-06 … stays true by construction"* both still
+   grep **1** at base and **1** now. Both stopped being true the day Phase 206 made `tool_name`
+   outrank `capability` **in that same validator**, and nothing caught it because nothing in
+   production could reach the shape.
+5. ✅ **`PATCH /grants` HAS COVERAGE FOR THE FIRST TIME** — `grep -rn update_connection_grants
+   backend/tests` read **0** at base and **12** now. REPLACE semantics by set equality, the three
+   `bool(v)` coercions asserted with `is True`/`is False`, `id`+`org_id` scoping by column NAME,
+   the not-found arm, and `require_org_manage` on **both** `/grants` and `/discover` while
+   `GET /connections` carries it **not** — by route-table inspection, since a source grep passes
+   against a commented-out decorator. **Four counterfactual plants driven red**, both source files
+   restored md5-identical.
+6. ⚠ **NOTHING HERE WAS SCORED FROM ▶ Test Run** (a draft path with no verdict gate), and **no
+   live publish was driven** — that is wave 4's. What is proved is that the validator no longer
+   refuses the definition.
+7. ⚠ **`grounding.py`'s ledger row moves `18 / 5 / 1252` → `19 / 6 / 1311` because of this plan.**
+   Re-derived at the base and found CURRENT there, so this is a real move. **Plan 04 owns the
+   ledger commit** (D-206.2-11) — re-derive there rather than copying these figures, since waves
+   2-3 may move the file again.
+
+**Next:** `206.2-02` — the picker's MCP branch. It lands before the shape choice because
+`ExternalActionSection`'s MCP arm mounts `<ConnectionPicker shape="mcp" />`, so the picker is the
+CONSUMED CONTRACT; the reverse order ships a half-built seam with each side green, which is the
+failure mode that reached the operator twice in Phase 204.
 
 ### 2026-08-25 — Phase 206.1 plan 03 EXECUTED (item 1, the MCP creation door) — ⛔ SC#1b BLOCKED
 
