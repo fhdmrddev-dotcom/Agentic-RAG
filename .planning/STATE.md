@@ -9,15 +9,17 @@ progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 14
-  completed_plans: 11
-  percent: 79
+  completed_plans: 12
+  percent: 86
 stopped_at: >
-  Phase 206.1 plan 01 (item 3, the per-service mark map / SC#3) EXECUTED - 5 commits,
-  4c698c7b..755823af. Next action: execute 206.1-02 (item 2, the dense row shape), which
-  imports ConnectionMarkGlyph from this plan's module. Worktrees remain FORBIDDEN for the
-  whole phase. All three baselines re-derived and held: tsc 34 (zero in any Connection*
-  file), backend 68 failed, count gate OK 111/111 (total 5511, pinned 5043 - up from
-  110/5467/5004 because this plan's new suite was UNGATED and was adopted into BOTH knobs).
+  Phase 206.1 plan 02 (item 2, the dense row shape / SC#2) EXECUTED - 3 commits,
+  ccb5b09c..8b6f2242. SC#2 met on BOTH tiers: the vitest SHAPE half, and a REAL-BROWSER
+  geometry half measured at 1280 and 1536 (cellFits/spanFits true everywhere,
+  whiteSpace "normal", bodyClientW 1280/1536 as the non-vacuity control, listW identical
+  at 302 as the expected max-w-3xl invariance). Next action: execute 206.1-03 (item 1,
+  the MCP creation door + the live edit-mode defect). Worktrees remain FORBIDDEN.
+  Baselines held: tsc 34 (zero in any Connection* file), backend 68 failed, count gate OK
+  111/111 (total 5533, pinned 5043 - +22, exactly ConnectionsTab.test.tsx 41 -> 63).
 ---
 
 # Project State
@@ -38,9 +40,60 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 206.1 executing — plan 01 done, plans 02 and 03 next; then Phase 207 (`api.ts` split)
+**Current focus:** Phase 206.1 executing — plans 01 and 02 done, plan 03 next; then Phase 207 (`api.ts` split)
 
 ## Current Position
+
+### 2026-08-25 — Phase 206.1 plan 02 EXECUTED (item 2, SC#2 — the dense row shape)
+
+When the 400px panel opens the list track drops to 302px, and the destination cell — the ONE column
+a person reads to approve a send — now **wraps** instead of truncating. 3 commits,
+`ccb5b09c`…`8b6f2242`. Summary:
+`.planning/phases/206.1-settings-connections-finishes-the-mcp-story-insert/206.1-02-SUMMARY.md`.
+
+Decisions and findings worth carrying:
+
+1. ⚠ **THE PLAN CONTAINED A GENUINE CONTRADICTION AND IT IS RESOLVED, NOT PAPERED OVER.** It required
+   BOTH that `data-dense` be *"always present, both values"* on the row AND that Task 1's byte-identity
+   capture *"pass UNEDITED"*. Those cannot both be literally true — adding an attribute to the wide row
+   changes the wide row's DOM. Resolved by the `PhaseNodeCard.test.tsx` house precedent: the capture
+   literals are kept **VERBATIM** and the delta is declared as a NAMED, SINGULAR, MACHINE-CHECKED
+   transformation (asserted real *and* singular before it is applied). `git diff | grep '^-[^-]'` over
+   the suite returns 2 lines and **neither is a capture literal**.
+
+2. ⚠ **THE CAPTURE WAS NOT STABLE AS TAKEN, AND THE PLAN DID NOT ANTICIPATE IT.** Radix's
+   `DropdownMenuTrigger` sets `id={useId()}`, whose value is a function of how many components rendered
+   BEFORE it — measured `radix-_r_p3_` / `_r_pc_` / `_r_pl_` on three otherwise character-identical rows.
+   That moves whenever a case is added anywhere above. One **declared and COUNTED** normalization: the
+   substitution count is asserted at exactly 1 per row and 0 per header, so a ⋯ that stopped rendering
+   goes red rather than passing on a shorter string.
+
+3. ⚠ **A SHIPPED SIBLING CASE WENT RED AND IT WAS A REAL SIGNAL.** `ConnectionFormPanel.test.tsx:463`
+   is the ONLY shipped case in the settings suites that renders with `panel` — i.e. the only one that
+   reaches the dense shape at all. It used `connections-header` as its handle on "the list", and that
+   header is now deliberately absent in dense (D-206.1-20). Handle re-pointed to the ROW; not one
+   assertion weakened; the header's absence is now asserted POSITIVELY rather than quietly lost.
+
+4. ⚠ **CHROME DEVTOOLS MCP WAS UNAVAILABLE IN THE EXECUTOR** (the upstream bug that strips MCP tools
+   from agents with a `tools:` frontmatter restriction). Rather than skip the only evidence SC#2b can
+   have, RESEARCH §OQ#6's snippet was run **verbatim inside a real Chromium via Playwright 1.60.0**.
+   Two plan preconditions were FALSE and were handled without mutating app data: no e2e credentials
+   exist (a local-only session was minted via Supabase admin `generate_link` + `verify`, behind a
+   non-localhost refusal guard), and **no MCP/n8n row exists in the local DB** — the table holds exactly
+   two rows. That turned out BETTER: the Jira row IS the row the operator measured truncating, and its
+   `cellScrollW` reads **272**, the identical figure from the defect report. `93 → 272` clientW.
+
+5. ⚠ **THE 187-24 TRAP FIRED TWICE MORE (ninth and tenth recorded firings)** — my own comments named the
+   container-query plugin and the word-boundary break variant, turning both acceptance greps red. Both
+   are now DESCRIBED and never SPELLED, and because the source then *claims* a fence exists, a real one
+   was added with a **non-vacuity control** (a `?raw` import resolving to the empty string would
+   otherwise satisfy every absence claim forever — the `gutterTokens.fences.test.ts` failure mode).
+
+6. ⚠ **A UI-SPEC FIGURE IS MEASURABLY IMPRECISE, corrected beside it rather than over it.** § Spacing
+   exception 4 says `gap-1.5` *"ships today at ONE kind of site"*. It ships at **four** (the destination
+   cell, the filter chip, and both destructive confirm buttons). The decision is unaffected — this plan
+   still adds exactly two sanctioned sites — but the whole-file grep the plan implies reads `7`, not `2`,
+   and must be scoped to the diff or it misleads.
 
 ### 2026-08-25 — Phase 206.1 plan 01 EXECUTED (item 3, SC#3 — the per-service mark map)
 

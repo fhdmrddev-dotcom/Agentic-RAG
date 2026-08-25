@@ -38,7 +38,7 @@
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
-| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | **In progress — 1 of 3 plans complete** (plan 01, item 3 / SC#3, executed 2026-08-25). **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
+| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | **In progress — 2 of 3 plans complete** (plan 01, item 3 / SC#3, and plan 02, item 2 / SC#2, both executed 2026-08-25). **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -500,11 +500,22 @@ Plans:
   BLACK while every test stays green + two corrections-beside-their-originals
   (D-206.1-08/09/10/11/23).
 
-- [ ] 206.1-02-PLAN.md — **item 2, the dense row shape.** The wide render pinned byte-for-byte BEFORE
-  the branch exists, a `dense` prop threaded from the one `panel && !isMobile` condition, a
-  destination that WRAPS (`scrollWidth <= clientWidth` is unsatisfiable by widening alone), and a
-  real-browser geometry tier at 1280 and 1536 — because jsdom reports every box metric as `0` and
-  passes SC#2 vacuously (D-206.1-12/13/14/20/21).
+- [x] 206.1-02-PLAN.md — ✅ **EXECUTED 2026-08-25** (3 commits, `ccb5b09c`…`8b6f2242`). **item 2, the
+  dense row shape.** The wide render pinned byte-for-byte BEFORE the branch existed (3 shapes + the
+  header, fixed clock, observed twice, marker rows), a `dense` prop threaded from the one
+  `panel && !isMobile` condition, and a destination that WRAPS. **SC#2 met on BOTH tiers**: the vitest
+  SHAPE half (63 cases; six testids in both shapes, `data-dense` with both values, no `truncate` on
+  cell or span, header the only thing dense drops) AND a **real-browser geometry half** measured at
+  1280 and 1536 — `cellFits`/`spanFits` true on every cell, `whiteSpace: "normal"`, `bodyClientW`
+  1280/1536 as the non-vacuity control, and `listW` identical at **302** at both widths (the expected
+  `max-w-3xl` invariance, recorded as CONFIRMATION). RESEARCH's predicted `718 / 302` matched the
+  browser exactly. The operator's defect row closed on its own figures: `272 / 93` → `272 / 272`
+  (D-206.1-12/13/14/20/21).
+  ⚠ **Three things worth carrying:** the plan's `data-dense`-vs-capture requirements were MUTUALLY
+  EXCLUSIVE and were resolved by the `PhaseNodeCard` declared-delta precedent (literals kept verbatim);
+  the capture was NOT stable as taken (Radix `useId`) and needed one declared + COUNTED normalization;
+  and Chrome DevTools MCP was unavailable, so §OQ#6's snippet was driven verbatim through real Chromium
+  via Playwright instead — a deviation in method, not in evidence.
 
 - [ ] 206.1-03-PLAN.md — **item 1, the MCP creation door**, plus the live edit-mode defect it was
   found beside. The fourth chooser option and its three fields, a create body with NO `capability`
