@@ -39,7 +39,7 @@
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
 | 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | ⚠ **3 of 3 plans executed — SC#1b BLOCKED, phase NOT closeable as-is** (plans 01/02/03 all executed 2026-08-25). SC#2 and SC#3 met; SC#1a met; **SC#1b is not met and the cause is a SECOND missing door**: an MCP connection cannot be bound to any workflow step, because `ConnectionPicker` reads capability-scoped and an MCP row has no capability. See 206.1-03-SUMMARY.md. **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
-| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | Planned — **registered 2026-08-25 from `SEED-200`, operator decision.** Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null` |
+| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | **PLANNED 2026-08-25 — 4 plans, 4 SERIAL waves** (`worktrees: forbidden`). Registered from `SEED-200` by operator decision. Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null`. ⚠ **Scope widened by research: an MCP workflow CANNOT PUBLISH today** (`_unregistered_tools` flags the tool name at severity `error`; stage 2.6 blocks) — the backend fix is plan 01. ⚠ **SC#4's guard as written is VACUOUS at its own base** (`McpToolPicker` already has one production importer), so it is TWO-LEGGED and leg (b) is the one that would have failed |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -597,6 +597,41 @@ verification said so explicitly rather than routing onward.
    its three members, and a capability step's picker behaviour is asserted byte-identical.
 6. Backend baseline unchanged, tsc baseline unchanged (`-p tsconfig.app.json`), count gate green
    with no per-file decrease.
+
+**Plans:** 4 plans, 4 SERIAL waves (`worktrees: forbidden` — three of the four edit
+`ConnectionPicker.tsx` and/or `McpToolPicker.tsx`, and the wave-4 browser drive mutates
+`connector_connections.tool_grants` and writes `harness_audit` rows).
+
+⚠ **SCOPE WIDENED BY RESEARCH, DELIBERATELY (D-206.2-19).** A workflow containing an MCP step
+**cannot be published today** — driven: `_unregistered_tools` admits only
+`EXTERNAL_ACTION_CAPABILITIES` for an `external_action` phase, so the tool name `available_tools`
+derives from is flagged at severity `error` and publish blocks at stage 2.6 `grounding_fidelity`.
+That is a defect Phase 206 introduced in the same commit that made `tool_name` outrank `capability`,
+and the fix is `206.2-01`. ⚠ **SC#3 is reachable WITHOUT it via ▶ Test Run (a draft path with no
+verdict gate)**, so it is recorded here to stop anyone scoring SC#3 green on the draft path and
+leaving publish broken.
+
+⚠ **SC#4's guard as ROADMAP wrote it is VACUOUS AT ITS OWN BASE (D-206.2-12).** `McpToolPicker`
+already has exactly one production importer, so the inverted `import.meta.glob` sweep passes GREEN on
+the broken tree. The guard is therefore **two-legged**, and leg (b) — a render through the real chain
+with only `@/lib/api` mocked, constructing NO component prop by hand — is the one that would have
+failed.
+
+Plans:
+- [ ] 206.2-01-PLAN.md — the publish-validator fix (BACKEND) + both negative controls, and the first
+      backend coverage `PATCH /grants` has ever had
+- [ ] 206.2-02-PLAN.md — the picker's MCP branch (unfiltered read, both filters, three absences) +
+      the `destinationPartsOf` footer repair, with the capability branch proved byte-identical
+- [ ] 206.2-03-PLAN.md — the shape choice: `externalShapeVocabulary.ts`, the segmented control beside
+      the capability radiogroup, the multi-key patch seam and the key-clearing
+- [ ] 206.2-04-PLAN.md — the grant control + the two-legged reachability guard + the driven round trip
+      (DENY case first) + the hot-file ledger debt and 206.1's owed SC#1b
+
+⚠ **PLANS 02 AND 03 ARE THE ORCHESTRATOR'S SUGGESTED SPLIT WITH THEIR CONTENT SWAPPED, AND THE
+REASON IS RECORDED IN `206.2-02-PLAN.md`:** `ExternalActionSection`'s MCP arm mounts
+`<ConnectionPicker shape="mcp" />`, so the picker is the CONSUMED CONTRACT and must land first —
+otherwise wave 2 ships either a typecheck failure or a half-built seam, the failure mode that reached
+the operator twice in Phase 204 with each side green.
 
 ---
 
