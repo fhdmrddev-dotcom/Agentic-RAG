@@ -1312,6 +1312,10 @@ const BASELINE = {
   // gate run (`fileIcon.test.tsx 11 41 +30`, `total 4136 · failed 0 ·
   // count gate OK — 82/82`), never hand-counted from `it(` literals.
   "fileIcon.test.tsx": 41,
+  // Added 2026-08-25 in the SAME COMMIT as its TARGETS entry. 55 is read from THIS SCRIPT'S
+  // OWN printed `actual` column, never hand-counted from `it(` literals — and note that this
+  // is an ADD, not a RAISE, so the diff on this file is `+N / -0`.
+  "fileTypeMark.test.tsx": 55,
   "MessageItem.finalOutputs.test.tsx": 11,
   // ── Added in 195-03 task 3, in the SAME COMMIT as their TARGETS entries. ────
   // Both numbers are THIS SCRIPT'S OWN printed `actual` column, on two agreeing
@@ -3148,6 +3152,12 @@ const TARGETS = [
   // 188-11 as this comment used to say — the pinning plan is 188-12), from the printed
   // `actual` column across two agreeing runs.
   "src/lib/phaseState.test.ts",
+  // Added 2026-08-25 in the SAME COMMIT that creates the file — the two-knob trap, again,
+  // and this time pre-empted rather than recorded after the fact. `fileTypeMark.test.tsx`
+  // guards the OFFICIAL file-type marks on the documents surface; unpinned it would be the
+  // `McpToolPicker.test.tsx` state this script already records, where an entire suite can be
+  // deleted with the gate green. FILE-LEVEL for the same reason as its neighbours above.
+  "src/lib/__tests__/fileTypeMark.test.tsx",
   // Added in 188-08, in the SAME COMMIT that creates the file — the fourth occurrence of
   // the SAME two-knob trap, so this comment records the rule rather than the incident:
   //
