@@ -2998,6 +2998,44 @@ deliverable (D-03).** `WorkflowCard.tsx` should not be touched at all (D-04).
 
 ### Guardrail overrides
 
+### ⚠ Phases 207 and 208 (2026-08-25) — THE WHOLE GSD CEREMONY WAS SKIPPED, AND THE OPERATOR CAUGHT IT, NOT THE PROCESS
+
+**Both phases were executed with NO `/gsd:discuss-phase`, NO `/gsd:plan-phase` and NO
+`/gsd:execute-phase`.** No phase folder existed for either one until the operator asked *"you did the
+phase but you did not document anything?"* — at which point `207-CONTEXT.md`, `207-01-SUMMARY.md`,
+`207-VERIFICATION.md`, `208-CONTEXT.md`, `208-01-SUMMARY.md` and `208-VERIFICATION.md` were authored
+**after the fact**, from the real commits and the real measurements. Every one of them says so at the
+top; none is presented as having been written before the work.
+
+**No override was requested and none was granted. This is not a waived guardrail — it is a skipped
+one, recorded here because the alternative is that it stays invisible.**
+
+⚠ **THE FINDING IS THAT NOTHING OBJECTED.** The ROADMAP rows existed, the commits landed, `STATE.md`
+and the ledger were updated in the same commits, and every gate was green — `tsc` at baseline, count
+gate `114/114 failed 0`, the size gate clear. **A phase can therefore run to completion with correct
+outcomes and honest gate evidence while leaving `/gsd:progress`, the plan-count metrics and every
+future forensic pass with nothing to read.** The outcome record survived; the *reasoning* record did
+not, and only a person noticing could tell the difference.
+
+**What was actually lost, stated so it is not softened:**
+
+| | cost |
+|---|---|
+| `D-NNN-NN` decision records | authored retroactively — they record what WAS decided, not what was agreed before the work |
+| plan-checker pass | never ran on either phase |
+| declared `files_modified` | absent, so **no hot-file ledger scan ran against Phase 207 — a phase whose entire subject IS a ledger trigger** |
+| independent verification | none; executor and verifier are the same session in both VERIFICATION files, and both say so |
+| G-3 / G-5 / G-7 evaluation | never performed at scope time |
+
+**What was NOT lost:** the measurements. Every figure in both summaries was taken at the time, the
+counterfactuals were driven (208's six guard firings, 207's 8 red fence assertions), and both
+VERIFICATION files carry an explicit **Owed** list rather than a clean bill.
+
+**Correction to how these phases are read elsewhere:** the ROADMAP rows for 207 and 208 are marked
+`COMPLETE` with gate evidence, and that remains accurate. **What those rows do not say, and this entry
+does, is that neither phase was planned or independently verified.**
+
+
 ⚠ **NONE for Phase 193.2. A G-5 override was OFFERED AND DECLINED — the THIRD consecutive phase
 (193, 193.1, 193.2) to decline one. That absence is a measurement, not an omission.**
 
