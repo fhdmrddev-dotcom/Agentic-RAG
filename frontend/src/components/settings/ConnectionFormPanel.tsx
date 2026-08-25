@@ -162,6 +162,7 @@ import {
   panelRegionLabelEdit,
   secretStoredLabel,
   type ConnectionDraft,
+  type ConnectionShape,
 } from "@/components/settings/connectionFormCopy"
 import {
   CONNECTIONS_ACTION_CHECK,
@@ -682,7 +683,12 @@ export function ConnectionFormPanel({
     try {
       if (mode === "create") {
         await onCreate?.({
-          capability: draft.capability,
+          // ⚠ 206.1 wave 3, task 1 — THE SENTINEL IS NOT A WIRE VALUE. `ConnectionShape` now
+          // admits `"mcp"`, which is not a member of the server's closed `ConnectorCapability`
+          // and would be refused. The MCP body is composed by its OWN branch, which task 2
+          // adds directly above this one; until then the sentinel is narrowed away rather
+          // than sent, because sending it would be a knowingly-refused request.
+          capability: draft.capability === "mcp" ? undefined : draft.capability,
           name: draft.name.trim(),
           config: configFromDraft(draft),
           secret: draft.secret,
@@ -711,9 +717,23 @@ export function ConnectionFormPanel({
 
   // `connection.capability` is optional since 206 (an MCP row has none). The draft's own
   // value is the fallback, not a cast: this panel edits capability connections.
-  const capability: ConnectorCapability = mode === "edit" && connection
+  const capability: ConnectionShape = mode === "edit" && connection
     ? connection.capability ?? draft.capability
     : draft.capability
+
+  /**
+   * The capability the CHECK copy is about — `null` when there is none.
+   *
+   * ⚠ 206.1 / D-206.1-19: the credential-check path is CAPABILITY-SHAPED (an SMTP login, a
+   * Jira auth, a Slack `auth.test`) and has NO MCP arm, so `CHECK_NEGATION_BY_CAPABILITY` is
+   * total over exactly three members and an MCP row has no verdict for it to describe. This
+   * narrowing is the render-side statement of that fact: the §5c success block is gated on it
+   * rather than handed a shape its vocabulary does not cover.
+   *
+   * For the three capabilities this is always truthy, so every reachable state today is
+   * BYTE-IDENTICAL to what shipped.
+   */
+  const checkCapability: ConnectorCapability | null = capability === "mcp" ? null : capability
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.
@@ -1179,7 +1199,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 2 — the one green moment, and its second clause is load-bearing. ── */}
-        {check.kind === "done" && check.result.ok && (
+        {check.kind === "done" && check.result.ok && checkCapability && (
           <NoticeBlock
             tone="positive"
             glyph={CHECK_SUCCESS_GLYPH}
@@ -1192,7 +1212,7 @@ export function ConnectionFormPanel({
                 identity: check.result.identity,
                 host: check.result.host,
                 port: check.result.port,
-                capability,
+                capability: checkCapability,
               })}
             </NoticeLine>
             <NoticeLine>{CHECK_SUCCESS_FOOTER}</NoticeLine>

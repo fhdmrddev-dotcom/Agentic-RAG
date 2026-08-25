@@ -76,15 +76,46 @@ export const CAPABILITY_LABEL = "What this connection does"
 export const CAPABILITY_HELP =
   "Pick this first — each kind of destination needs different facts, and one needs almost none."
 
-/** The closed set, in the order mig 116's CHECK constraint and `ConnectorCapability`
- *  spell it. A fourth member is a phase, not a field (D-32). */
+/**
+ * The MCP shape's chooser label (206.1 item 1 / D-206.1-03).
+ *
+ * ⚠ IT NAMES THE CAPABILITY, NOT ONE ACT, and the asymmetry with its three siblings is
+ * deliberate. `Send an email` / `Create a Jira ticket` / `Post a Slack message` each name ONE
+ * action, because each of those connections can do exactly one thing. An MCP server cannot be
+ * described that way: WHICH tools it may run is decided later, per tool, by the grants at the
+ * builder seam — so a label promising one action would be promising something the row does not
+ * decide.
+ *
+ * ⚠ It must contain neither `Jira site` nor `SMTP host and port`: the shipped field-set case
+ * asserts both strings ABSENT on a non-matching shape, and a chooser label carrying either
+ * would make that case pass or fail for a reason it is not about.
+ *
+ * ⚠ DECLARED ABOVE `CAPABILITY_CHOICES` AND NOT BESIDE ITS SIBLINGS BELOW, because a `const`
+ * is NOT hoisted for initialisation — reading it from the array literal before this line runs
+ * is a temporal-dead-zone `ReferenceError` at module load, which no type checker reports.
+ */
+export const CAPABILITY_CHOICE_MCP_LABEL = "Use tools from an MCP server"
+
+/**
+ * The chooser's four entries.
+ *
+ * The first three are the closed capability set, in the order mig 116's CHECK constraint and
+ * `ConnectorCapability` spell it. ⚠ **The fourth is not a capability at all** — it is the MCP
+ * SHAPE (`ConnectionShape`'s `"mcp"` sentinel, declared beside `ConnectionDraft` below), and
+ * it is APPENDED LAST precisely so the three capabilities keep their mig-116 order: a member
+ * added at the end cannot re-order the ones a person already knows.
+ *
+ * ⚠ The shipped docblock read *"a fourth member is a phase, not a field (D-32)"*. **That was
+ * right and it is why 206.1 is a phase.** The rule is not superseded — it was OBEYED.
+ */
 export const CAPABILITY_CHOICES: ReadonlyArray<{
-  capability: ConnectorCapability
+  capability: ConnectionShape
   label: string
 }> = [
   { capability: "send_email", label: "Send an email" },
   { capability: "create_ticket", label: "Create a Jira ticket" },
   { capability: "post_message", label: "Post a Slack message" },
+  { capability: "mcp", label: CAPABILITY_CHOICE_MCP_LABEL },
 ]
 
 /** On EDIT the capability is STATIC TEXT, never a control: `ConnectorConnectionUpdate`
@@ -145,18 +176,102 @@ export const FIELD_SLACK_CHANNEL_HELP =
   "The only thing you supply. The address this posts to is a constant in our source — it cannot be pointed anywhere else, by you or by a workflow."
 export const FIELD_SLACK_SECRET_LABEL = "Bot token"
 
-/** The field COUNT per capability, as data rather than as prose, so the suite walks the
- *  same closed set the panel renders (§3b: 4 / 5 / 3, asserted, so an extra field fails
- *  loudly — T-190-17-SCOPE). */
-export const FIELD_COUNTS: Record<ConnectorCapability, number> = {
+// ── mcp (3 fields: Name · MCP server URL · Access token — and NOTHING else) ──
+//    206.1 item 1. No headers editor, no transport picker, no timeout, no "test connection":
+//    each is a surface nobody threat-modelled (D-32 / T-190-17-SCOPE). The wire's `config` is
+//    `{ headers: {} }` and this form does not offer to fill it.
+
+export const FIELD_MCP_URL_LABEL = "MCP server URL"
+
+/** ⚠ A RESERVED EXAMPLE DOMAIN (RFC 2606), never a real vendor's endpoint. A placeholder
+ *  naming a live third party is an endorsement this form is not entitled to make — and it
+ *  would be read as a recommendation the moment someone pasted it unchanged. */
+export const FIELD_MCP_URL_PLACEHOLDER = "https://mcp.example.com/mcp"
+
+/** The `FIELD_SMTP_HOST_HELP` shape, verbatim: it states the refusal BEFORE a person can trip
+ *  it, because a refusal told after the fact is a refusal that cost someone a round trip. Both
+ *  clauses mirror a real server-side rule — `_validate_connection_shape` raises on a non-HTTPS
+ *  `mcp_server_url`, and `validate_mcp_destination` refuses a private address at call time. */
+export const FIELD_MCP_URL_HELP =
+  "Must be an https:// address reachable on the public internet. A plain http:// address is refused, and so is an address inside this network."
+
+/** The MCP client sends the credential as Bearer or Basic, so the honest noun is a TOKEN.
+ *  ⚠ NOT `Bot token` (Slack's) and NOT `API token` (Jira's): a label shared across kinds is
+ *  exactly how the fourth positional ladder becomes invisible — today an MCP draft falls
+ *  through `secretLabel`'s trailing arm and is labelled with Slack's word. */
+export const FIELD_MCP_SECRET_LABEL = "Access token"
+
+/**
+ * D-206.1-06 — the credential is OPTIONAL for the MCP shape, and only for it.
+ *
+ * ⚠ AFFIRMATIVE, NEVER A WARNING. Many MCP servers authenticate nobody; a form that treated
+ * that as a fault would be telling a person their working configuration is broken. So this
+ * carries no destructive tone, no red, and no error register — it states a fact and what
+ * happens next.
+ *
+ * It renders BESIDE `SECRET_CREATE_HELP` and never replaces it: the encryption promise is told
+ * for every kind, including the kind that may not need a credential at all.
+ *
+ * ⚠ A capability connection still REQUIRES a secret — WR-05 at the model, and the guard sits
+ * after the MCP branch returns. This note must never be shown for one.
+ */
+export const FIELD_MCP_SECRET_OPTIONAL_NOTE =
+  "Optional — many MCP servers ask for none. Leaving this empty saves a connection with no credential."
+
+/**
+ * D-206.1-05 — why Save is off, in the person's own words.
+ *
+ * ⚠ THE SECOND CLAUSE IS LOAD-BEARING AND MAY NOT BE TRIMMED AS FILLER. This panel's check is
+ * a COURTESY, never the security boundary: the model raises on a non-HTTPS `mcp_server_url`
+ * before the row is written, and `validate_mcp_destination` refuses again at call time, after
+ * the address resolves, every time a step sends. This sentence is the only place on this
+ * surface a person can see that the form is not the wall — and a disabled Save is kinder than
+ * a 422.
+ */
+export const MCP_SAVE_DISABLED_REASON =
+  "Save is off until the server address starts with https://. This form refuses it here; the server refuses it again before anything is sent."
+
+/** The field COUNT per SHAPE, as data rather than as prose, so the suite walks the same closed
+ *  set the panel renders (§3b: 4 / 5 / 3, plus 206.1's 3 for MCP — asserted, so an extra field
+ *  fails loudly — T-190-17-SCOPE).
+ *  ⚠ TOTAL over `ConnectionShape`: a fifth member added without a bound count is a TYPE ERROR
+ *  here rather than an unasserted field set discovered in a browser. */
+export const FIELD_COUNTS: Record<ConnectionShape, number> = {
   send_email: 4,
   create_ticket: 5,
   post_message: 3,
+  mcp: 3,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 4 · THE DRAFT — one flat shape, so the footer can derive from it during render
 // ═══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * What KIND of connection this form is composing — the three capabilities, plus 206.1's MCP
+ * sentinel.
+ *
+ * ⚠ THE TYPE IS WIDENED; THE STATE IS NOT FORKED, and the two alternatives are recorded here
+ * so they are not re-proposed:
+ *
+ *   (a) A separate `shape` field beside `capability`. Rejected: it turns ~10 shipped render
+ *       guards into two-term conjunctions, and it lets two fields DISAGREE — a draft claiming
+ *       `shape: "mcp"` and `capability: "send_email"` is representable, and something would
+ *       eventually read the wrong one.
+ *   (b) `capability: ConnectorCapability | null`. Rejected: `<select value={null}>` is an
+ *       uncontrolled-input warning, and it makes the panel's `??` fallback ambiguous in exactly
+ *       the place D-206.1-22's defect already lives.
+ *
+ * Widening the union costs nothing at the guards: every shipped
+ * `capability === "send_email" | "create_ticket" | "post_message"` comparison stays LITERALLY
+ * unchanged and simply does not match.
+ *
+ * ⚠ THE SENTINEL NEVER REACHES THE WIRE. `handleSave` branches on it BEFORE composing a body,
+ * and the MCP body carries no `capability` key at all — the model's `_validate_connection_shape`
+ * returns on `mcp_server_url` before the capability arm, and `"mcp"` is not a member of the
+ * server's `ConnectorCapability`.
+ */
+export type ConnectionShape = ConnectorCapability | "mcp"
 
 /**
  * Everything the form holds, flat and all-string.
@@ -167,7 +282,7 @@ export const FIELD_COUNTS: Record<ConnectorCapability, number> = {
  * on this surface that disagreement is the whole threat (T-190-17-DEST).
  */
 export interface ConnectionDraft {
-  capability: ConnectorCapability
+  capability: ConnectionShape
   name: string
   /** send_email */
   host: string
@@ -179,6 +294,9 @@ export interface ConnectionDraft {
   accountEmail: string
   /** post_message */
   channel: string
+  /** mcp (206.1) — the whole destination, as typed. Flat and all-string like every other
+   *  field, so the 🔒 footer derives it during render rather than holding a parsed copy. */
+  mcpServerUrl: string
   /** Write-only, at this boundary and nowhere else. Never populated from a read. */
   secret: string
 }
@@ -193,6 +311,7 @@ export const EMPTY_DRAFT: ConnectionDraft = {
   projectKey: "",
   accountEmail: "",
   channel: "",
+  mcpServerUrl: "",
   secret: "",
 }
 
@@ -211,10 +330,28 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     typeof config[key] === "string" ? (config[key] as string) : ""
   return {
     ...EMPTY_DRAFT,
-    // An MCP connection carries no capability (206), and this draft describes the
-    // CAPABILITY form. Falling back to the empty draft's own default keeps the form
-    // constructable rather than inventing a capability the row does not have.
-    capability: connection.capability ?? EMPTY_DRAFT.capability,
+    // ┌─ SUPERSEDED 2026-08-25 (206.1 / D-206.1-22) — KEPT VERBATIM, DO NOT RE-APPLY ────────┐
+    // │ "An MCP connection carries no capability (206), and this draft describes the        │
+    // │  CAPABILITY form. Falling back to the empty draft's own default keeps the form      │
+    // │  constructable rather than inventing a capability the row does not have."           │
+    // └────────────────────────────────────────────────────────────────────────────────────┘
+    // ⚠ THAT PARAGRAPH READS AS A DECISION AND IS IN FACT A STATEMENT OF A DEFECT. The
+    // fallback did keep the form constructable — as the SMTP form. Measured: opening a stored
+    // MCP row rendered `Send an email`, SMTP host/port fields and an `App password` label, and
+    // its Save composed a `SendEmailConfig` that the API refused with a generic
+    // "Couldn’t save that — try again." A person could not attribute that failure to anything.
+    //
+    // THE CORRECTED RULE: the shape is read from the ROW — `connection.mcp_server_url != null`
+    // — and NEVER from a missing capability. Absence read as a default is precisely the shape
+    // D-206.1-11 forbids, and `capability === null` would be that same mistake pointed the
+    // other way: a future row that legitimately lacks a capability for some third reason would
+    // be dragged into the MCP form.
+    //
+    // ⚠ A ROW CARRYING BOTH SEEDS MCP. The URL wins because MCP is a SHAPE, not a capability:
+    // the server's own validator returns on `mcp_server_url` before it ever looks at the
+    // capability arm, so the URL is what the wire will act on.
+    capability: connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability),
+    mcpServerUrl: connection.mcp_server_url ?? "",
     name: connection.name,
     host: text("host"),
     port: typeof config.port === "number" ? String(config.port) : "",
@@ -242,10 +379,26 @@ export function tlsModeOf(port: string): "implicit" | "starttls" {
   return port.trim() === "465" ? "implicit" : "starttls"
 }
 
-/** The draft's config, in the shape the API's create/update bodies declare. Total over the
- *  closed capability set; no `username` is written, because §3b lists no such field and
- *  every extra field is a surface nobody threat-modelled (D-32). */
+/**
+ * The draft's config, in the shape the API's create/update bodies declare.
+ *
+ * Total over the closed shape set; no `username` is written, because §3b lists no such field
+ * and every extra field is a surface nobody threat-modelled (D-32).
+ *
+ * ⚠ EVERY ARM NAMES ITS OWN CONDITION AND THE TAIL IS NEUTRAL — the `destinationFactsOf`
+ * repair (`connectionsCopy.ts`, commit `147f3c57`), applied here before it could ship the same
+ * way. Until 206.1 the trailing statement WAS the Slack arm and the fallback at once, so an
+ * unrecognised shape composed a `PostMessageConfig` with an EMPTY `default_channel` — which
+ * `NonEmpty` refuses at the model, turning an unknown shape into a 422 wearing the generic
+ * "Couldn’t save that" sentence. A neutral tail degrades to a config the API will reject on
+ * its own terms rather than to another kind's config.
+ */
 export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConfig {
+  // ⚠ FIRST, and by its own condition. `McpConfig` is `extra="forbid"` with exactly ONE field,
+  // so this object's KEY SET is the contract — a second key is a 422 no client type can see.
+  if (draft.capability === "mcp") {
+    return { headers: {} }
+  }
   if (draft.capability === "send_email") {
     const parsed = Number.parseInt(draft.port.trim(), 10)
     return {
@@ -262,7 +415,16 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
       account_email: draft.accountEmail.trim(),
     }
   }
-  return { default_channel: draft.channel.trim() }
+  // ⚠ EXPLICIT, NOT POSITIONAL. Slack's arm names the capability it serves, so a shape this
+  // ladder does not know falls to the neutral below instead of silently inheriting Slack's.
+  if (draft.capability === "post_message") {
+    return { default_channel: draft.channel.trim() }
+  }
+
+  // The NEUTRAL terminal. It claims no kind's facts. `McpConnectionConfig` declares `headers`
+  // optional, so an empty object satisfies the union without asserting anything — and it is
+  // distinguishable from the MCP arm above, whose key set is exactly `["headers"]`.
+  return {}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -374,16 +536,52 @@ export function destinationFooterOf(draft: ConnectionDraft): DestinationFooter {
     }
   }
 
-  const host = draft.host.trim()
-  const port = draft.port.trim()
-  const refusedReason = refusalOf(host)
-  const mode = tlsModeOf(port) === "implicit" ? FOOTER_TAG_IMPLICIT_TLS : FOOTER_TAG_STARTTLS
-  const from = draft.fromAddress.trim()
+  // ⚠ 206.1 — THE MCP ARM, COMPOSED FROM THE SHIPPED TAG VOCABULARY AND NO NEW TAG. The
+  // destination IS the typed URL: unlike Slack's, it is entirely the author's, which is why
+  // this surface exists at all.
+  // ⚠ `refusalOf` IS REUSED VERBATIM AND NOT RE-IMPLEMENTED. It is already a text-only mirror
+  // of `validate_mcp_destination` — plaintext scheme, loopback, private literal — and a second
+  // URL validator on this surface would be a SECOND ANSWER, free to drift from the first.
+  if (draft.capability === "mcp") {
+    const url = draft.mcpServerUrl.trim()
+    const refusedReason = refusalOf(url)
+    return {
+      // Normalised for DISPLAY only, exactly as the Jira site field's arm does — the wire
+      // carries what the person typed, and Save is off until that starts with `https://`.
+      destination: url ? (url.includes("://") ? url : `https://${url}`) : FOOTER_NOTHING_YET,
+      tags: url ? (refusedReason ? [FOOTER_TAG_REFUSED] : [FOOTER_TAG_TLS]) : [],
+      // No second part to name. An MCP server's tools are decided by the GRANTS, not here, so
+      // a detail line would be a fact this form does not hold.
+      detail: null,
+      refusedReason,
+    }
+  }
+
+  // ⚠ EXPLICIT, NOT POSITIONAL (206.1). Until this arm named `send_email`, it was the SMTP arm
+  // and the fallback at once — so an unrecognised shape rendered an SMTP footer, tagged with a
+  // TLS mode derived from a port it was never given, beside a `from` address it did not have.
+  if (draft.capability === "send_email") {
+    const host = draft.host.trim()
+    const port = draft.port.trim()
+    const refusedReason = refusalOf(host)
+    const mode = tlsModeOf(port) === "implicit" ? FOOTER_TAG_IMPLICIT_TLS : FOOTER_TAG_STARTTLS
+    const from = draft.fromAddress.trim()
+    return {
+      destination: host ? (port ? `${host}:${port}` : host) : FOOTER_NOTHING_YET,
+      tags: host ? (refusedReason ? [FOOTER_TAG_REFUSED] : [mode]) : [],
+      detail: from ? `· from ${from}` : null,
+      refusedReason,
+    }
+  }
+
+  // The NEUTRAL terminal. The footer NEVER disappears — an absent footer is the state a person
+  // could bind through without reading — so it degrades to the WORD rather than to nothing,
+  // and it claims no tag, no detail and no verdict about a destination it cannot name.
   return {
-    destination: host ? (port ? `${host}:${port}` : host) : FOOTER_NOTHING_YET,
-    tags: host ? (refusedReason ? [FOOTER_TAG_REFUSED] : [mode]) : [],
-    detail: from ? `· from ${from}` : null,
-    refusedReason,
+    destination: FOOTER_NOTHING_YET,
+    tags: [],
+    detail: null,
+    refusedReason: null,
   }
 }
 

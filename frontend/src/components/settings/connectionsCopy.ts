@@ -336,6 +336,46 @@ export function credentialLabel(
   return `checked ${relativeTime(now - t)}`
 }
 
+/**
+ * 206.1 / AR-05 — the reading for a row that can NEVER be checked.
+ *
+ * ⚠ *NOBODY HAS CHECKED IT* AND *IT CANNOT BE CHECKED* ARE TWO DIFFERENT FACTS. D-206.1-19
+ * REMOVES `Check credential` from an MCP row, because the check path is capability-shaped
+ * (SMTP login / Jira auth / Slack `auth.test`) and has no MCP arm at all. So an MCP row would
+ * read `never checked` for the rest of its life while the affordance that would change that
+ * does not exist — one word standing in for two facts, which is the `runFacts.ts` CR-01 /
+ * `DecisionsList` D-20 defect for the fifth recorded time on this codebase.
+ */
+export const CREDENTIAL_NO_CHECK_FOR_KIND = "no check for this kind"
+
+/**
+ * The credential cell's reading, by SHAPE.
+ *
+ * ⚠ A ROUTER, NOT A SECOND IMPLEMENTATION. `credentialLabel` above is left BYTE-IDENTICAL and
+ * is still the only place a timestamp is read, so every pinned unit call on it — and the wide
+ * row's `outerHTML` byte-identity capture, taken by plan 02 before this function existed —
+ * stays intact rather than being re-baselined. On the surface whose whole lesson is that a
+ * re-baselined pin is not evidence, that is the point.
+ *
+ * ⚠ THE MCP ARM IS UNCONDITIONAL AND IGNORES `last_checked_at` DELIBERATELY. There is no path
+ * that writes one for an MCP row today; if a stale or hand-written value ever appeared, it
+ * still would not be a check of THIS kind, and rendering `checked 3h ago` from it would be the
+ * fabricated-timestamp error `credentialLabel` refuses one line up.
+ *
+ * ⚠ THE SHAPE IS READ FROM `mcp_server_url`, NEVER FROM A MISSING CAPABILITY (D-206.1-11).
+ *
+ * ⚠ THIS IS COPY PLUS ONE PURE DERIVATION ARM — NOT A CAPABILITY. No control, no endpoint,
+ * nothing new reachable. Re-open trigger, recorded rather than left implicit: *`Check
+ * credential` gains an MCP arm*, at which point this string becomes wrong and must go.
+ */
+export function credentialReadingOf(
+  connection: ConnectorConnection,
+  now: number = Date.now(),
+): string {
+  if (connection.mcp_server_url) return CREDENTIAL_NO_CHECK_FOR_KIND
+  return credentialLabel(connection.last_checked_at, now)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 7 · THE TWO EMPTY STATES — DIFFERENT FACTS, DIFFERENT COPY (UI-SPEC §2d, §2e)
 // ═══════════════════════════════════════════════════════════════════════════════════════
