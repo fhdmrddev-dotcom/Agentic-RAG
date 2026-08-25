@@ -57,11 +57,14 @@ import {
   CONNECTIONS_NON_ADMIN_NOTE,
   CONNECTION_FIXED_TAG,
   CONNECTION_STATE_WORDS,
+  CREDENTIAL_NO_CHECK_FOR_KIND,
   LIVE_CONNECTORS_FEATURE_KEY,
+  SLACK_FIXED_HOST,
   RECEIPT_DELETED,
   RECEIPT_DISABLED,
   RECEIPT_ENABLED,
   connectionsCountLabel,
+  destinationFactsOf,
   moreActionsLabel,
   usageCountsFrom,
   usedByLabel,
@@ -1404,5 +1407,158 @@ describe("SC#2a — the dense row shape, and the five columns that survive it", 
     cleanup()
     const wideRender = renderWide()
     expect(wideRender.container.querySelector("table")).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ 206.1 · AN MCP ROW ON THE TABLE — REMOVED, NOT DISABLED (D-206.1-19 / AR-05)
+//
+// ⚠ EVERY CLAIM HERE IS ASSERTED IN **BOTH** ROW SHAPES. Plan 02 split this component into
+// two interiors, and `renderTab` still defaults to WIDE — so a change made in one branch and
+// not the other passes any suite that renders only one of them. Both helpers below drive the
+// same props through the SAME one condition that opens the 400px track.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("206.1 · an MCP row's affordances and credential reading, in BOTH shapes", () => {
+  const MCP_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+  const MCP_URL = "https://mcp.deepwiki.com/mcp"
+
+  const MCP_ROW: ConnectorConnection = makeConnection({
+    id: "conn-mcp",
+    name: "DeepWiki",
+    capability: null,
+    config: { headers: {} },
+    mcp_server_url: MCP_URL,
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+  })
+
+  /** A capability row beside it, so every negative below has a POSITIVE CONTROL rendered in
+   *  the same tree rather than in a different test. */
+  const CAPABILITY_ROW: ConnectorConnection = makeConnection({
+    id: "conn-smtp",
+    name: "Ops mailbox",
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+  })
+
+  const BOTH_ROWS = [MCP_ROW, CAPABILITY_ROW]
+
+  function renderMcpWide(props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {}) {
+    return renderTab({ connections: BOTH_ROWS, now: MCP_NOW, onCheck: vi.fn(), ...props })
+  }
+
+  /** ⚠ DENSE THROUGH THE REAL CONDITION — `panel && !isMobile`, never a prop poke. */
+  function renderMcpDense(props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {}) {
+    return renderMcpWide({ panel: <div data-testid="fake-panel" />, ...props })
+  }
+
+  const SHAPES = [
+    ["wide", renderMcpWide],
+    ["dense", renderMcpDense],
+  ] as const
+
+  function rowById(id: string): HTMLElement {
+    const row = screen
+      .getAllByTestId("connections-row")
+      .find((r) => within(r).queryByText(id === "conn-mcp" ? "DeepWiki" : "Ops mailbox"))
+    if (!row) throw new Error(`row ${id} not found`)
+    return row
+  }
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's ⋯ offers NO `Check credential`, and a capability row's still does",
+    async (_shape, renderIt) => {
+      const user = userEvent.setup({ delay: null })
+      renderIt()
+
+      // ⚠ REMOVED, NOT DISABLED. The check path is capability-shaped (an SMTP login, a Jira
+      // auth, a Slack `auth.test`) and has no MCP arm, so a rendered control the API refuses
+      // is exactly the defect this surface's rule exists to prevent — and 190-16's plant C
+      // measured that a `toBeDisabled()` assertion cannot see it.
+      await user.click(within(rowById("conn-mcp")).getByTestId("connections-row-more"))
+      expect(screen.queryByTestId("connections-action-check")).not.toBeInTheDocument()
+      // The other three items are untouched: the removal is scoped to the one that cannot work.
+      expect(screen.getByTestId("connections-action-disable")).toBeInTheDocument()
+      expect(screen.getByTestId("connections-action-delete")).toBeInTheDocument()
+      await user.keyboard("{Escape}")
+
+      // POSITIVE CONTROL, in the same tree.
+      await user.click(within(rowById("conn-smtp")).getByTestId("connections-row-more"))
+      expect(screen.getByTestId("connections-action-check")).toBeInTheDocument()
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's credential cell reads `no check for this kind`; a capability row's reads `never checked`",
+    (_shape, renderIt) => {
+      renderIt()
+      expect(
+        within(rowById("conn-mcp")).getByTestId("connections-row-credential").textContent,
+      ).toBe(CREDENTIAL_NO_CHECK_FOR_KIND)
+      // ⚠ EXACT EQUALITY, unchanged from the shipped pin — the dense inline label is a SIBLING
+      // of this node, which is what lets that pin hold in both shapes rather than be
+      // re-baselined.
+      expect(
+        within(rowById("conn-smtp")).getByTestId("connections-row-credential").textContent,
+      ).toBe("never checked")
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's destination is its OWN host — never Slack's, which is the defect this repair fixed",
+    (_shape, renderIt) => {
+      renderIt()
+      const destination = within(rowById("conn-mcp")).getByTestId("connections-row-destination")
+      expect(destination.textContent).toContain("mcp.deepwiki.com")
+      // Seen on screen in live UAT on 2026-08-25, before `147f3c57`: an MCP row describing
+      // itself as sending to Slack's API host.
+      expect(destination.textContent).not.toContain(SLACK_FIXED_HOST)
+      expect(destination.textContent).not.toContain(CONNECTION_FIXED_TAG)
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row still reads `◌ Not checked` — AR-03: no fifth state word was invented",
+    (_shape, renderIt) => {
+      renderIt()
+      // Literally true: no check has happened. The WHY is carried by the Credential cell,
+      // at zero cost to the character-identity assertion over `CONNECTION_STATE_WORDS`.
+      expect(within(rowById("conn-mcp")).getByTestId("connections-row-state").textContent).toBe(
+        CONNECTION_STATE_WORDS.not_checked,
+      )
+    },
+  )
+
+  it("⚠ with no `onCheck` at all, NEITHER row offers the item — the shipped guard is not replaced", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: BOTH_ROWS, now: MCP_NOW, onCheck: undefined })
+    await user.click(within(rowById("conn-smtp")).getByTestId("connections-row-more"))
+    expect(screen.queryByTestId("connections-action-check")).not.toBeInTheDocument()
+  })
+
+  it("⚠ `destinationFactsOf` REGRESSION CONTROL — a synthetic fifth shape yields [] and never Slack's host", () => {
+    // SC#4's named subject. The arms are already explicit and the tail already neutral (the
+    // `147f3c57` repair); this is the guard that keeps them so.
+    for (const capability of ["not_a_capability", "send_emails", "constructor", "__proto__", ""]) {
+      const facts = destinationFactsOf(
+        makeConnection({
+          capability: capability as unknown as ConnectorConnection["capability"],
+          config: { default_channel: "#ops" } as unknown as ConnectorConnection["config"],
+          mcp_server_url: null,
+        }),
+      )
+      expect(facts).toEqual([])
+      expect(facts.join(" ")).not.toContain(SLACK_FIXED_HOST)
+    }
+    // POSITIVE CONTROL — the three real shapes and the MCP shape still resolve their own.
+    expect(
+      destinationFactsOf(makeConnection({ capability: "post_message", config: { default_channel: "#ops" } })),
+    ).toContain(SLACK_FIXED_HOST)
+    expect(
+      destinationFactsOf(
+        makeConnection({ capability: null, config: { headers: {} }, mcp_server_url: MCP_URL }),
+      ),
+    ).toEqual(["mcp.deepwiki.com"])
   })
 })

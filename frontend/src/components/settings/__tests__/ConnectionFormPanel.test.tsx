@@ -2054,3 +2054,509 @@ describe("206.1 · the banned-term and absolute-verb fences, extended to the pan
     expect(FORM_COPY.FIELD_MCP_URL_PLACEHOLDER.startsWith("https://")).toBe(true)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 25 · ⭐ THE MCP SHAPE, IN THE PANEL (206.1 item 1 — the create door and the edit fix)
+//
+// Section 22 proved the copy layer. This one proves the SURFACE: a fourth option, exactly
+// three fields, a create body whose key set the server will actually accept, a Save that
+// refuses a plaintext address with a reason in real DOM text, and — the defect research found
+// while measuring all of that — an EDIT path that renders the MCP shape instead of the SMTP
+// form (D-206.1-22).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+const CHOOSER_LABEL = "What this connection does"
+
+/** An MCP row as the server sends it: a URL, an `McpConfig`, and NO capability. */
+function makeMcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
+  return makeConnection({
+    id: "conn-mcp",
+    capability: null,
+    name: "DeepWiki",
+    config: { headers: {} },
+    mcp_server_url: ACCEPTED_MCP_URL,
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+    ...overrides,
+  })
+}
+
+/**
+ * ⚠ AN MCP ROW WHOSE CONFIG ALSO CARRIES AN SMTP HOST.
+ *
+ * The server could never send this (`McpConfig` is `extra="forbid"`), and that is exactly why
+ * it is the right fixture for LADDER 3: `draftFromConnection` reads `host` off the config for
+ * every shape, so this makes `draft.host` NON-EMPTY on an MCP draft. Without it, "typedHost is
+ * not the SMTP host" would pass on an empty string and prove nothing.
+ */
+function makeMcpConnectionWithStrayHost(): ConnectorConnection {
+  return makeMcpConnection({
+    config: { headers: {}, host: "smtp.fastmail.com", port: 465 } as unknown as ConnectorConnection["config"],
+  })
+}
+
+/**
+ * ⚠ THE SYNTHETIC FIFTH SHAPE, REACHED THROUGH THE RENDER.
+ *
+ * `typedHost` and `secretLabel` live INSIDE the component, and the plan forbids widening the
+ * module's export surface to make a test easier — so the only honest way in is a row whose
+ * `capability` is a value the closed set will never hold. It carries a full SMTP config, so
+ * every "not the SMTP one" assertion below is falsifiable rather than vacuous.
+ */
+function makeUnknownShapeConnection(): ConnectorConnection {
+  return makeConnection({
+    id: "conn-unknown",
+    name: "Something new",
+    capability: "not_a_capability" as unknown as ConnectorCapability,
+    mcp_server_url: null,
+  })
+}
+
+async function chooseMcp(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "mcp")
+}
+
+describe("206.1 · the fourth chooser option and the three-field MCP block (SC#1a)", () => {
+  it("the create chooser renders FOUR options and the MCP one is LAST", () => {
+    renderPanel()
+    const options = within(screen.getByLabelText(CHOOSER_LABEL)).getAllByRole("option")
+    expect(options).toHaveLength(4)
+    expect(options.map((o) => o.textContent)).toEqual([
+      "Send an email",
+      "Create a Jira ticket",
+      "Post a Slack message",
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+    ])
+    expect((options[3] as HTMLOptionElement).value).toBe("mcp")
+  })
+
+  it("selecting MCP renders exactly `FIELD_COUNTS.mcp` fields — Name, the URL and the token", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(FORM_COPY.FIELD_COUNTS.mcp)
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).toBeInTheDocument()
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_URL_HELP)).toBeInTheDocument()
+  })
+
+  it("the URL input is `font-mono` — a machine value — while its label and help are prose", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    const input = screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)
+    expect(input.className).toContain("font-mono")
+    // ⚠ ONE INPUT, ONE COLUMN. The `1fr 92px` grid exists for host+port; an MCP URL has no
+    // second part, and borrowing that shape would leave a 92px hole beside the field.
+    expect(input.className).not.toContain("92px")
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_URL_HELP).className).not.toContain("font-mono")
+  })
+
+  it("⚠ the MCP block does NOT leak into the other three renders", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    for (const capability of ["send_email", "create_ticket", "post_message"] as const) {
+      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[capability])
+    }
+  })
+
+  it("…and the other three blocks do not leak into the MCP render", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    // The two labels the shipped case at section 5 asserts absent — the collision the MCP
+    // label was deliberately chosen to avoid.
+    expect(screen.queryByLabelText("Jira site")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Channel")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Send from")).not.toBeInTheDocument()
+  })
+
+  it("the optional-credential note renders BESIDE the encryption promise, never instead of it", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    // D-206.1-06: the credential is optional for this shape and only for it — but the
+    // encryption promise is told for EVERY kind, so both sentences are present.
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE)).toBeInTheDocument()
+    expect(screen.getByTestId("connection-secret-create-help")).toHaveTextContent(
+      "Encrypted before it touches the database",
+    )
+  })
+
+  it("POSITIVE CONTROL — the note is absent for a capability shape, which still REQUIRES a secret", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    expect(screen.queryByText(FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE)).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-04)", () => {
+  async function saveMcp(
+    user: ReturnType<typeof userEvent.setup>,
+    onCreate: ReturnType<typeof vi.fn>,
+    opts: { url?: string; secret?: string } = {},
+  ) {
+    renderPanel({ onCreate })
+    await chooseMcp(user)
+    await user.type(screen.getByLabelText("Name"), "DeepWiki")
+    await user.type(
+      screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL),
+      opts.url ?? ACCEPTED_MCP_URL,
+    )
+    if (opts.secret) {
+      await user.type(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL), opts.secret)
+    }
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    return onCreate.mock.calls[0][0] as Record<string, unknown>
+  }
+
+  it("an MCP save sends EXACTLY `{name, mcp_server_url, config}` — the key set, not a subset match", async () => {
+    const user = userEvent.setup({ delay: null })
+    const body = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // ⚠ `Object.keys(...).sort()`, NEVER `toMatchObject`: an extra key is a 422 the client's
+    // own types cannot see, and a subset match would pass straight through it.
+    expect(Object.keys(body).sort()).toEqual(["config", "mcp_server_url", "name"])
+    expect(body.mcp_server_url).toBe(ACCEPTED_MCP_URL)
+    expect(body.config).toEqual({ headers: {} })
+  })
+
+  it("⚠ the body carries NO `capability` KEY AT ALL — present-and-null is not absent", async () => {
+    const user = userEvent.setup({ delay: null })
+    const body = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // `_validate_connection_shape` branches on `mcp_server_url` FIRST and returns before the
+    // capability arm; the model is `extra`-strict and `"mcp"` is not a member of the server's
+    // closed `ConnectorCapability`. Absence is the contract, so absence is what is asserted.
+    expect("capability" in body).toBe(false)
+  })
+
+  it("a typed credential adds `secret`; ⚠ an EMPTY one OMITS the key rather than sending an empty string", async () => {
+    const user = userEvent.setup({ delay: null })
+    const withSecret = await saveMcp(user, vi.fn().mockResolvedValue(undefined), {
+      secret: "mcp-token-abc",
+    })
+    expect(Object.keys(withSecret).sort()).toEqual(["config", "mcp_server_url", "name", "secret"])
+    expect(withSecret.secret).toBe("mcp-token-abc")
+    cleanup()
+
+    const withoutSecret = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // ⚠ `secret: ""` is a PRESENT value, and the server's `NonEmpty` rejects it — so an
+    // optional credential left blank must not travel at all. It is also a pointless plaintext
+    // round trip for a value that is not there.
+    expect("secret" in withoutSecret).toBe(false)
+  })
+
+  it("POSITIVE CONTROL — a Slack save still sends `capability` and a channel config", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ onCreate })
+    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    await user.type(screen.getByLabelText("Name"), "#ops-alerts")
+    await user.type(screen.getByLabelText("Channel"), "#ops-alerts")
+    await user.type(screen.getByLabelText("Bot token"), "xoxb-real")
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+
+    const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+    expect(body.capability).toBe("post_message")
+    expect(body.config).toEqual({ default_channel: "#ops-alerts" })
+    expect("mcp_server_url" in body).toBe(false)
+  })
+})
+
+describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => {
+  async function renderMcpWithUrl(url: string) {
+    const user = userEvent.setup({ delay: null })
+    const view = renderPanel()
+    await chooseMcp(user)
+    if (url) await user.type(screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL), url)
+    return view
+  }
+
+  it.each(["", "http://mcp.example.com/mcp", "ftp://mcp.example.com", "mcp.example.com"])(
+    "a non-https address (%s) leaves Save DISABLED with the reason in real DOM text",
+    async (url) => {
+      await renderMcpWithUrl(url)
+      expect(screen.getByTestId("connection-form-save")).toBeDisabled()
+      const reason = screen.getByTestId("connection-mcp-save-disabled-reason")
+      expect(reason.textContent).toBe(FORM_COPY.MCP_SAVE_DISABLED_REASON)
+      expect(reason.className).toContain("text-destructive")
+    },
+  )
+
+  it("a valid https address ENABLES Save and removes the reason node entirely", async () => {
+    await renderMcpWithUrl(ACCEPTED_MCP_URL)
+    expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+    expect(screen.queryByTestId("connection-mcp-save-disabled-reason")).not.toBeInTheDocument()
+  })
+
+  it("`aria-describedby` RESOLVES to the MCP reason node, and the node sits ABOVE the Save button", async () => {
+    const { container } = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const save = screen.getByTestId("connection-form-save")
+    const describedBy = save.getAttribute("aria-describedby")
+    expect(describedBy).toBeTruthy()
+    const node = container.querySelector(`#${CSS.escape(describedBy!)}`)
+    expect(node).not.toBeNull()
+    expect(node!.textContent).toBe(FORM_COPY.MCP_SAVE_DISABLED_REASON)
+    // A reason a person must scroll PAST the button to find is a reason they will not read.
+    expect(
+      node!.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it("⚠ the two disabled-Save reason ids are DISTINCT — the shipped CIPHER resolution is asserted in the SAME run", async () => {
+    // `ConnectionFormPanel.test.tsx`'s cipher case resolves `aria-describedby` with
+    // `container.querySelector`, which returns the FIRST match. Two simultaneously-rendered
+    // nodes sharing one id would break that resolution SILENTLY — the shipped assertion would
+    // still find A node and still read A sentence, just not the right one.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("no key", 503, "no_encryption_key"))
+    const cipher = renderEditable({ onUpdate })
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-cipher-refusal")).toBeInTheDocument(),
+    )
+    const cipherId = screen.getByTestId("connection-form-save").getAttribute("aria-describedby")!
+    expect(
+      cipher.container.querySelector(`#${CSS.escape(cipherId)}`)!.textContent,
+    ).toBe(CIPHER_UNAVAILABLE_SAVE_DISABLED_REASON)
+    cleanup()
+
+    const mcp = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const mcpId = screen.getByTestId("connection-form-save").getAttribute("aria-describedby")!
+    expect(mcp.container.querySelector(`#${CSS.escape(mcpId)}`)!.textContent).toBe(
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+    )
+    // ⭐ THE PROPERTY: two different reasons, two different ids.
+    expect(mcpId).not.toBe(cipherId)
+  })
+
+  it("⚠ ZERO `[title]` nodes in the MCP create render AND the MCP edit render", async () => {
+    const create = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    expect(create.container.querySelectorAll("[title]")).toHaveLength(0)
+    cleanup()
+
+    const edit = renderPanel({ mode: "edit", connection: makeMcpConnection() })
+    expect(edit.container.querySelectorAll("[title]")).toHaveLength(0)
+  })
+
+  it("the Save button is DISABLED, not REMOVED — removal is reserved for a different fact", async () => {
+    await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const save = screen.getByTestId("connection-form-save")
+    expect(save).toBeInTheDocument()
+    expect(save.className).toContain("disabled:opacity-60")
+  })
+})
+
+describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live defect, pinned)", () => {
+  it("an MCP row's panel names the MCP kind statically and seeds its own URL", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection() })
+
+    const staticKind = screen.getByTestId("connection-capability-static")
+    expect(staticKind).toHaveTextContent(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
+    expect(screen.getByText(CAPABILITY_LOCKED_NOTE)).toBeInTheDocument()
+    expect(
+      (screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL) as HTMLInputElement).value,
+    ).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("⚠ FOUR REGRESSION PINS, all four live today: no SMTP kind, no host/port, no `App password`, no SMTP footer", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection() })
+
+    // 1 — the kind. Today `capability ?? "send_email"` renders `Send an email`.
+    expect(screen.queryByText("Send an email")).not.toBeInTheDocument()
+    // 2 — the SMTP fields.
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Send from")).not.toBeInTheDocument()
+    // 3 — the secret's label. Today it reads SMTP's word; it must read MCP's.
+    // ⚠ `queryByText`, NOT `queryByLabelText`. On EDIT the secret is a `<span>` of dots with
+    // NO control, so its `<label>` associates with nothing and `queryByLabelText` returns null
+    // whether the label is present or not — the negative would be VACUOUS. Measured, not
+    // predicted: the positive control below failed on exactly this before it was corrected.
+    expect(screen.queryByText("App password")).not.toBeInTheDocument()
+    expect(screen.queryByText("Bot token")).not.toBeInTheDocument()
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    // 4 — the footer. The destination is the row's own URL, and no SMTP TLS-mode tag.
+    expect(screen.getByTestId("connection-destination-value")).toHaveTextContent(ACCEPTED_MCP_URL)
+    const tags = screen.queryAllByTestId("connection-destination-tag").map((n) => n.textContent)
+    expect(tags).not.toContain(FOOTER_TAG_STARTTLS)
+    expect(tags).not.toContain(FOOTER_TAG_IMPLICIT_TLS)
+  })
+
+  it("the MCP update body is `{name, mcp_server_url, config}` — the panel is the ONLY guard here", async () => {
+    // ⚠ `ConnectorConnectionUpdate` performs NO cross-field validation, so a wrong body is
+    // accepted at the model and refused (or worse, stored) downstream.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: makeMcpConnection(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    const [, body] = onUpdate.mock.calls[0]
+    expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
+      "config",
+      "mcp_server_url",
+      "name",
+    ])
+    expect((body as Record<string, unknown>).config).toEqual({ headers: {} })
+    expect((body as Record<string, unknown>).mcp_server_url).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("POSITIVE CONTROL — editing a `send_email` row still renders the SMTP form unchanged", () => {
+    renderPanel({ mode: "edit", connection: makeConnection() })
+    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent("Send an email")
+    expect(screen.getByLabelText("SMTP host and port")).toBeInTheDocument()
+    // ⚠ `getByText` — see the note above: on EDIT this label has no control to point at.
+    expect(screen.getByText("App password")).toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · LADDERS 3 and 4, driven through the RENDER (SC#4 extended)", () => {
+  it("LADDER 4 — an MCP draft's secret is labelled `Access token`, never Slack's word", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    // ⚠ Today an MCP draft falls to `secretLabel`'s trailing arm — `FIELD_SLACK_SECRET_LABEL`.
+    expect(screen.queryByLabelText("Bot token")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("App password")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("API token")).not.toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — the three shipped shapes still resolve their own secret labels", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    for (const [capability, label] of [
+      ["send_email", "App password"],
+      ["create_ticket", "API token"],
+      ["post_message", "Bot token"],
+    ] as const) {
+      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      expect(screen.getByLabelText(label)).toBeInTheDocument()
+    }
+  })
+
+  it("LADDER 3 — an MCP save-path refusal names the URL's HOST, and NOT the stray SMTP host", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("refused", 400, "address_not_public"))
+    renderPanel({ mode: "edit", connection: makeMcpConnectionWithStrayHost(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(screen.getByTestId("connection-save-refusal")).toBeInTheDocument())
+
+    const body = screen.getByTestId("connection-save-refusal-body").textContent ?? ""
+    expect(body).toContain("mcp.deepwiki.com")
+    // ⚠ THE FALSIFIABLE HALF: the fixture's config carries `smtp.fastmail.com`, so
+    // `draft.host` is NON-EMPTY. Today the ladder's trailing arm reports it.
+    expect(body).not.toContain("smtp.fastmail.com")
+  })
+
+  it("⚠ the SYNTHETIC FIFTH SHAPE gets NEUTRAL answers from both panel ladders", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("refused", 400, "address_not_public"))
+    renderPanel({ mode: "edit", connection: makeUnknownShapeConnection(), onUpdate })
+
+    // LADDER 4 — a neutral noun, never Slack's. (`getByText`: EDIT mode, unassociated label.)
+    expect(screen.getByText(FORM_COPY.FIELD_SECRET_LABEL_NEUTRAL)).toBeInTheDocument()
+    expect(screen.queryByText("Bot token")).not.toBeInTheDocument()
+
+    // No per-shape field block at all: Name and the secret, and nothing invented.
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(2)
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+
+    // The footer degrades to the WORD rather than claiming SMTP's facts.
+    expect(screen.getByTestId("connection-destination-value")).toHaveTextContent(FOOTER_NOTHING_YET)
+    expect(
+      screen.queryAllByTestId("connection-destination-tag").map((n) => n.textContent),
+    ).not.toContain(FOOTER_TAG_IMPLICIT_TLS)
+
+    // LADDER 3 — the refusal names no host it was not given.
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(screen.getByTestId("connection-save-refusal")).toBeInTheDocument())
+    expect(screen.getByTestId("connection-save-refusal-body").textContent ?? "").not.toContain(
+      "smtp.fastmail.com",
+    )
+  })
+})
+
+describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-03-EL)", () => {
+  it("a non-admin gets no chooser, no MCP option and no Save", () => {
+    const { container } = renderPanel({ isOrgAdmin: false })
+    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByText(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+    // ⚠ ABSENCE, not `toBeDisabled()` — 190-16's plant C shipped the exact defect a disabled
+    // assertion PASSES on.
+    expect(container.querySelectorAll("[disabled]")).toHaveLength(0)
+    expect(screen.getByText(PANEL_NON_ADMIN_NOTE)).toBeInTheDocument()
+  })
+
+  it("with `live_connectors` OFF the MCP option, its field block and Save are all gone", () => {
+    const { container } = renderPanel({ liveConnectorsOn: false })
+    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-mcp-save-disabled-reason")).not.toBeInTheDocument()
+    expect(container.querySelectorAll("[disabled]")).toHaveLength(0)
+  })
+
+  it("an MCP row opened while the kill-switch is off is READ-ONLY and still renders the MCP kind", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection(), liveConnectorsOn: false })
+    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent(
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+    )
+    expect(screen.getByText(PANEL_OFF_HEADING)).toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · the two shipped SOURCE fences still hold over the widened panel", () => {
+  it("the panel still authors NO sentence of its own — every MCP string is an imported identifier", () => {
+    for (const sentence of [
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      FORM_COPY.FIELD_MCP_URL_LABEL,
+      FORM_COPY.FIELD_MCP_URL_HELP,
+      FORM_COPY.FIELD_MCP_SECRET_LABEL,
+      FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE,
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+      FORM_COPY.FIELD_MCP_URL_PLACEHOLDER,
+    ]) {
+      expect(panelSource).not.toContain(sentence)
+    }
+    // Positive control: the fence can see a string in this source at all.
+    expect(panelSource).toContain("connection-mcp-save-disabled-reason")
+  })
+
+  it("the panel still imports NOTHING from `PhaseFormPanel`, and spells no tooltip attribute", () => {
+    // ⚠ IMPORT-SCOPED, NEVER A BARE GREP OVER THE WHOLE SOURCE — the 187-24 trap, measured
+    // here as this plan's own eleventh recorded firing. This file's header docblock NAMES
+    // `PhaseFormPanel` seven times to explain the lineage it deliberately does not import, so
+    // a whole-file grep expecting 0 is UNSATISFIABLE AT ITS OWN BASE and would go red on the
+    // prose that forbids the thing. The shipped fence at section 11 already got this right;
+    // this is the same filter, re-applied over the widened panel.
+    const importLines = panelSource
+      .split("\n")
+      .filter((line) => /^\s*import\b/.test(line) || /^\s*}\s*from\s+["']/.test(line))
+      .join("\n")
+    expect(importLines).not.toContain("PhaseFormPanel")
+    expect(importLines).toContain("connectionFormCopy")
+    // The tooltip refusal IS satisfiable over the whole source, and measured 0 at base.
+    expect(panelSource).not.toContain("title=")
+  })
+})
