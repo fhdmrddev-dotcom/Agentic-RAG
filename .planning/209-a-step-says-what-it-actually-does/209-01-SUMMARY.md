@@ -186,3 +186,64 @@ caller never feeds it, which is the defect this phase shipped twice.
 4. `outputSchema` is still discarded in the same four sanitizer lines — the competitor study's
    *"single cheapest actionable finding"*. Deliberately NOT taken here: it was not in the
    operator's ruling, and smuggling it into a fix commit would be scope creep.
+
+---
+
+# ✅ SC#1 / SC#2 / SC#3 — DRIVEN IN A REAL BROWSER, 2026-08-26
+
+`scripts/drive_phase_209_sc1_sc3.py` (system Python 3.12 + Playwright/Chromium, headless,
+against the live local stack). **16/16 assertions pass.** Evidence:
+`scripts/209-sc1-canvas.png` · `209-sc1-spine.png` · `209-sc3-connections.png`.
+
+The drive seeds its own connection + workflow, navigates **by clicking** (rail → Workflows →
+search → Open → Spine/Canvas → Settings → Connections), and deletes both rows in a `finally`.
+
+## What the canvas actually renders
+
+```
+DriveWiki 53be25 · read_wiki_structure     ONLY READS                  (dim)
+DriveWiki 53be25 · get_and_purge_records   CHANGES SOMETHING OUTSIDE   (warning)
+```
+
+Both nodes wear the **MCP mark** from `connectionMark.tsx`. Confirmed on BOTH the Spine and the
+Canvas — they are different components (`PhaseSpineGraph` vs `PhaseNodeCard`) and driving one
+would have asserted half the criterion from the other half's evidence.
+
+## ⭐ SC#2's POSITIVE ARM IS NOW DRIVEN — the phase recorded it as undrivable
+
+That was true of DeepWiki (no annotations on any of its 3 tools). The drive instead **seeds a
+connection whose `discovered_tools` carries an explicit `readOnlyHint: true`** — what a compliant
+server sends. ⚠ **What this proves is OUR rendering of a declared hint.** It does not prove any
+particular server declares one; that remains a fact about servers, not about us.
+
+⭐ **And the second step is the exploit the first draft admitted, driven as a control:**
+`get_and_purge_records` — a name beginning with the read verb `get` — declares **nothing** and
+correctly renders `CHANGES SOMETHING OUTSIDE`. Under the original regex it would have said
+`ONLY READS` while deleting. **The defect is now refuted in a browser, not only in a unit test.**
+
+## SC#3 — stated as the property that matters
+
+`All | Connected | Not connected` is a **partition**: the row is visible under `All` and under
+**exactly one** state chip, so it can never vanish — which is precisely what the old capability
+chips did to it. Measured: `['All', 'Not connected']`. No `Email` / `Tickets` / `Messages` chip
+remains.
+
+⚠ **The first draft of this script asserted the row under `Connected` and reported the app as
+FAILING.** It was wrong: the seeded row has `last_check_verdict` NULL ⇒ `not_checked`, and
+`connectionStateOf` is right to keep it out of `Connected`. **A drive can assert a bug into
+existence** — the assertion was corrected against the source, not the app against the assertion.
+
+⚠ Likewise the first run reported all five canvas assertions FAILING. The cause was a
+`div:has-text()` locator matching an ancestor so the `Open` click landed on nothing — **the drive
+never left the library**. The screenshot is what showed it. *All-N-fail-together is a signal to
+check the harness before believing it.*
+
+## Observations — NOT defects, recorded so they are not lost
+
+1. **The tool name is CLAMPED on the canvas face** (`read_wiki…`, `get_and_…`) though it is full
+   on the Spine. The face names the tool; at this width it cannot show all of it.
+2. ⚠ **Both steps still read "Stops for your approval before it acts outside"** — the
+   `external_action` type subtitle — including the one that `ONLY READS`. Now that a step can
+   declare itself read-only, the type's "one invariant fact" is in mild tension with the banner
+   directly beneath it. Worth a decision in the Connections milestone: does a declared read-only
+   tool still stop for approval, and if it does, should the subtitle say so differently?
