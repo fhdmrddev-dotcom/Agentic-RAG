@@ -9,9 +9,78 @@ progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 stopped_at: >
+  Phase 206.2 plan 03 EXECUTED 2026-08-25 (wave 3 of 4, FRONTEND-ONLY, main working tree -
+  worktrees forbidden). 3 commits 128dcde7 / 664ba306 / 8498b9ae; summary at
+  .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-03-SUMMARY.md.
+  THE AUTHORING HALF OF SEED-200 IS BUILT: ExternalActionSection offers a TWO-POSITION
+  segmented control ABOVE the capability radiogroup and never inside it - its own radiogroup,
+  its own aria-label ("How this step reaches outside", deliberately NOT equal to the section
+  heading so the shipped EXACT accessible-name query stays unambiguous), its own testid
+  external-action-shape-option. It mounts <ConnectionPicker shape="mcp" /> - the prop wave 2
+  built - so the two waves meet with no cross-plan seam.
+  ⚠ THE FIVE SHIPPED ===3 PINS PASS UNEDITED WITH A ZERO-DELETION DIFF, AND THE CLAIM WAS
+  DRIVEN RATHER THAN ASSERTED: planting the capability testid onto a shape segment turned 20+
+  cases RED including all five, and the plant was restored md5-identical. The refuted first
+  draft (hide the capability rows until a shape is chosen) is recorded as refuted.
+  ⚠ THE FRONTEND'S FIRST CONFIG-KEY CLEAR, at exactly ONE site: press A emits
+  {tool_name, tool_args, connection_id}, press B emits {capability, connection_id}, both
+  asserted by SET EQUALITY over Object.keys (toMatchObject would pass a PARTIAL clear). It goes
+  through a NEW onChangeShape prop - never the single-key onChange (8 shipped string assertions
+  unmoved), never ConnectionPicker.bind(), never patchPhaseConfig. AR-05 honoured: BOTH
+  directions clear connection_id to null, the addition no upstream document named.
+  ⚠ RESEARCH ASSUMPTION A1 MOVES UNFALSIFIED -> FALSIFIED-AT-T1, driven against a real
+  createBuilderStore + the shipped patchConfig: an undefined value leaves the KEY PRESENT in
+  memory and is dropped by JSON.stringify. BOTH halves asserted, because the difference between
+  them IS the assumption. T4 browser confirmation still owed to 206.2-04.
+  ⚠ unset LEAVES BOTH SEGMENTS UNCHECKED (a default is not a way through a gate) and renders
+  BYTE-IDENTICALLY to today's empty-capability render below the control.
+  ⚠ ONE SHIPPED LIE STOPS BEING TOLD: stepGaps no longer shows an MCP step a "still missing" row
+  it could never satisfy. SUPPRESSED, never replaced - and three of the four new cases are
+  non-vacuity controls that were ALREADY GREEN at base, which is what stops a suppression that
+  deleted the row outright from reading as a fix.
+  The panel gains 3 JSX attributes (key={phase.slug}, toolName, onChangeShape) and NO hook -
+  numstat +2/-1, ABSOLUTE-ZERO pin green and independently re-checked with needles assembled at
+  runtime so this record's own prose cannot redden it.
+  Count gate: base "total 5643 · failed 0 · pinned total 5081 / OK - 111/111", close
+  "total 5672 · failed 0 · pinned total 5085 / OK - 111/111". +25 cases here, +4 in
+  StepPanelPort.test.tsx (pin raised 25 -> 29), no residual. tsc -p tsconfig.app.json = 34 at
+  base and 34 at close, zero in any touched file. api.ts 0 files, backend 0, migrations 0,
+  package manifests 0. The gate was never red; the worker cap stayed at 2.
+  ⚠ THREE DECLARED DEVIATIONS. (1) The panel's three attributes landed in TASK 1 rather than
+  task 2 - required props plus an empty task-1 test diff plus a task-1 tsc equal to base cannot
+  all hold, and the alternative was committing a tree with 36 errors. Every criterion's PURPOSE
+  is preserved and measured. (2) TWO ACCEPTANCE GREPS WERE UNSATISFIABLE AT THEIR OWN BASE -
+  mt-1.5 == 1 measured 2, role="radiogroup" == 2 measured 2 (one a shipped COMMENT); both are
+  restated in satisfiable form, and my own first-draft prose had pushed them to 5 and 4. The
+  187-24 trap, twelfth firing, in BOTH directions in one plan. (3) The byte-identity case's
+  first docblock claimed no id normalization was needed and was OBSERVED RED - React's useId
+  counter advances per MOUNT, so two sequential mounts in one run differ. A COUNTED
+  normalization replaced it (needle read off a real render, _r_N_), and the wrong claim is kept
+  beside its correction.
+  ⚠ DECLINED as a decision: ExternalActionSection.test.tsx's gate pin stays at 25 against an
+  actual of 59 - the ELEVENTH consecutive plan to decline it.
+  ⚠ FLAGGED FOR UAT - two deliberate non-changes the first round would otherwise report as bugs:
+  an MCP step shows NO consequence sentence (OutsideChangeLine renders nothing without a
+  capability, by its own recorded argument), and the canvas reads "Reach outside" with
+  CHANGES SOMETHING OUTSIDE even for a read-only tool (nodeEffectBanner keys on the TYPE). Both
+  carry re-open triggers.
+  ⚠ STILL NOT REACHABLE-BY-PROOF: every case constructs the section's props by hand, and a test
+  that constructs its own props cannot see that nothing constructs them in production. The
+  two-legged guard (D-206.2-07 / D-206.2-12) is 206.2-04's; what wave 3 adds toward it is the
+  missing WIRE, so there is finally something for that guard to find.
+  ⚠ HOT-FILE LEDGER - ExternalActionSection.tsx measures 4/3/498 and CROSSED G-5 IN THIS VERY
+  PLAN with NO ROW AT ALL (the FlowEdge.tsx / ConnectionPicker.tsx state). PhaseFormPanel.tsx
+  reads 24/11/1375 and measures 29/13/1561 - stale before this plan ran. vitest-count-gate.cjs
+  measures 117/21/3871. phaseVocabulary.ts 16/6/990 has never had a row and is READ by this
+  radius. PLAN 04 OWNS THE LEDGER COMMIT (D-206.2-11) - re-derive there, do not copy.
+  ⚠ CONN-02 / CONN-03 still NOT marked complete: three of four plans, and the grant control plus
+  the reachability guard are wave 4's.
+  NEXT: 206.2-04 (the grant control + the two-legged reachability guard + the driven round trip,
+  DENY case first + the hot-file ledger debt and 206.1's owed SC#1b).
+  --- prior entry, kept ---
   Phase 206.2 plan 02 EXECUTED 2026-08-25 (wave 2 of 4, FRONTEND-ONLY, main working tree -
   worktrees forbidden). 3 commits 26904f79 / b2309e6e / de06ce3e; summary at
   .planning/phases/206.2-an-mcp-connection-has-somewhere-to-go-insert/206.2-02-SUMMARY.md.

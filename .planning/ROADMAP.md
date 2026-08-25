@@ -39,7 +39,7 @@
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
 | 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | ⚠ **3 of 3 plans executed — SC#1b BLOCKED, phase NOT closeable as-is** (plans 01/02/03 all executed 2026-08-25). SC#2 and SC#3 met; SC#1a met; **SC#1b is not met and the cause is a SECOND missing door**: an MCP connection cannot be bound to any workflow step, because `ConnectionPicker` reads capability-scoped and an MCP row has no capability. See 206.1-03-SUMMARY.md. **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
-| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | 🚧 **EXECUTING 2026-08-25 — 2 of 4 plans done (wave 2: the picker's MCP branch, `26904f79`…`de06ce3e`).** ✅ The picker has a SECOND SHAPE: the MCP read calls `listConnectorConnections()` with ZERO arguments (the line SEED-200 is about), filters by `mcp_server_url` then `is_enabled` in that order, and renders three absences as three sentences. ✅ `destinationPartsOf`'s positional tail is REPAIRED — an MCP row's footer read `🔒 slack.com/api` at base, driven RED verbatim — with a synthetic-fifth-shape control. ✅ The capability branch is proved byte-identical against 12 base-commit captures, the pin DRIVEN RED by a plant. Gate `5605 → 5643 · failed 0 · OK 111/111`; pin `20 → 58`. ⚠ `api.ts` NOT edited (0 files), and nothing is reachable in PRODUCTION until wave 3 mounts the shape control — the suite says so at the site. ⚠ D-206.2-18's predicted `useId` form is wrong: React emits `_r_0_` here. Previously: **1 of 4 plans done (wave 1: the BACKEND publish fix, `7740e010`…`9e357dc0`).** ✅ The measured publish blocker is CLOSED: `_unregistered_tools` admits an `external_action` phase's own `tool_name`, proved not-a-loosening by three negative controls (control A is a SHIPPED case that passes UNEDITED). ✅ `PATCH /grants` has backend coverage for the first time (grep 0 → 12). Backend 68 failed / 2613 passed vs base 68 / 2605 — failed unchanged, passed +8. ⚠ No live publish driven yet (wave 4); nothing scored from ▶ Test Run. Originally: **PLANNED 2026-08-25 — 4 plans, 4 SERIAL waves** (`worktrees: forbidden`). Registered from `SEED-200` by operator decision. Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null`. ⚠ **Scope widened by research: an MCP workflow CANNOT PUBLISH today** (`_unregistered_tools` flags the tool name at severity `error`; stage 2.6 blocks) — the backend fix is plan 01. ⚠ **SC#4's guard as written is VACUOUS at its own base** (`McpToolPicker` already has one production importer), so it is TWO-LEGGED and leg (b) is the one that would have failed |
+| 206.2 | **(INSERT)** An MCP connection has somewhere to go | The workflow builder can bind an MCP connection to an `external_action` step, discover its tools, and grant one — closing the SECOND missing door Phase 206 left, and 206.1's owed SC#1b with it | CONN-02 (follow-up), CONN-03 (follow-up) | 🚧 **EXECUTING 2026-08-25 — 3 of 4 plans done (wave 3: the shape choice, `128dcde7`…`8498b9ae`).** ✅ An `external_action` step can now be told it calls a tool on an MCP server, through a control that is NOT a member of the capability set and NOT a `role="radio"` child of the capability radiogroup — and all five shipped `=== 3` pins pass with a ZERO-DELETION diff, DRIVEN RED against a planted testid (20+ cases) and restored md5-identical. ✅ Switching shape emits ONE multi-key patch clearing the other shape's keys AND `connection_id`, asserted by SET EQUALITY over `Object.keys`. ✅ **RESEARCH assumption A1 FALSIFIED AT T1** — an `undefined` value stays a KEY in memory and is dropped by `JSON.stringify`, both halves asserted. ✅ `unset` leaves BOTH segments unchecked and renders byte-identically below the control. ✅ The panel gains 3 JSX attributes and NO hook (`+2/-1`). ✅ One permanently-unsatisfiable readiness row stops appearing on MCP steps, suppressed never replaced. Gate `5643 → 5672 · failed 0 · OK 111/111`; tsc `34 → 34`. ⚠ 3 declared deviations, incl. TWO acceptance greps UNSATISFIABLE AT THEIR OWN BASE and a byte-identity claim OBSERVED RED (React's `useId` advances per MOUNT). ⚠ Still NOT reachable-by-proof — every case builds its own props; the two-legged guard is wave 4's. Previously: **2 of 4 plans done (wave 2: the picker's MCP branch, `26904f79`…`de06ce3e`).** ✅ The picker has a SECOND SHAPE: the MCP read calls `listConnectorConnections()` with ZERO arguments (the line SEED-200 is about), filters by `mcp_server_url` then `is_enabled` in that order, and renders three absences as three sentences. ✅ `destinationPartsOf`'s positional tail is REPAIRED — an MCP row's footer read `🔒 slack.com/api` at base, driven RED verbatim — with a synthetic-fifth-shape control. ✅ The capability branch is proved byte-identical against 12 base-commit captures, the pin DRIVEN RED by a plant. Gate `5605 → 5643 · failed 0 · OK 111/111`; pin `20 → 58`. ⚠ `api.ts` NOT edited (0 files), and nothing is reachable in PRODUCTION until wave 3 mounts the shape control — the suite says so at the site. ⚠ D-206.2-18's predicted `useId` form is wrong: React emits `_r_0_` here. Previously: **1 of 4 plans done (wave 1: the BACKEND publish fix, `7740e010`…`9e357dc0`).** ✅ The measured publish blocker is CLOSED: `_unregistered_tools` admits an `external_action` phase's own `tool_name`, proved not-a-loosening by three negative controls (control A is a SHIPPED case that passes UNEDITED). ✅ `PATCH /grants` has backend coverage for the first time (grep 0 → 12). Backend 68 failed / 2613 passed vs base 68 / 2605 — failed unchanged, passed +8. ⚠ No live publish driven yet (wave 4); nothing scored from ▶ Test Run. Originally: **PLANNED 2026-08-25 — 4 plans, 4 SERIAL waves** (`worktrees: forbidden`). Registered from `SEED-200` by operator decision. Measured blocker: `ConnectionPicker` reads capability-scoped and an MCP row has `capability = null`. ⚠ **Scope widened by research: an MCP workflow CANNOT PUBLISH today** (`_unregistered_tools` flags the tool name at severity `error`; stage 2.6 blocks) — the backend fix is plan 01. ⚠ **SC#4's guard as written is VACUOUS at its own base** (`McpToolPicker` already has one production importer), so it is TWO-LEGGED and leg (b) is the one that would have failed |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -656,8 +656,60 @@ Plans:
       `vitest-count-gate.cjs` reads `114/19/3797` and measures `116/21/3865`. **Plan 04 owns the
       ledger commit** (D-206.2-11). ⚠ CONN-02 / CONN-03 still NOT complete: nothing is reachable in
       production until wave 3 mounts the shape control.
-- [ ] 206.2-03-PLAN.md — the shape choice: `externalShapeVocabulary.ts`, the segmented control beside
-      the capability radiogroup, the multi-key patch seam and the key-clearing
+- [x] 206.2-03-PLAN.md — ✅ **EXECUTED 2026-08-25** (3 commits, `128dcde7`…`8498b9ae`). The shape
+      choice, and the frontend's FIRST config-key clear. ✅ `ExternalActionSection` offers a
+      TWO-POSITION segmented control ABOVE the capability radiogroup and never inside it — its own
+      `radiogroup`, its own `aria-label` (`How this step reaches outside`, deliberately ≠ the section
+      heading so the shipped EXACT accessible-name query stays unambiguous), its own testid
+      `external-action-shape-option`. ✅ **The five shipped `=== 3` pins pass UNEDITED with a
+      ZERO-DELETION diff — and the claim was DRIVEN, not asserted:** planting the capability testid
+      onto a segment turned **20+ cases RED** including all five, and the plant was restored
+      md5-identical. ✅ Three derived states (`unset` / `capability` / `mcp`) from two props plus one
+      session fact; **`unset` leaves BOTH segments unchecked** (*a default is not a way through a
+      gate*) and renders BYTE-IDENTICALLY to today's empty-capability render below the control. ✅
+      **The multi-key clear exists in exactly one place**, through a NEW `onChangeShape` prop —
+      never through the single-key `onChange` (8 shipped string assertions unmoved), never through
+      the picker's `bind()`, never through `patchPhaseConfig`. Press A clears
+      `{tool_name, tool_args, connection_id}`, press B clears `{capability, connection_id}`, both
+      asserted by **SET EQUALITY over `Object.keys`** because `toMatchObject` passes a partial clear.
+      ✅ **AR-05 honoured — BOTH directions clear `connection_id` to `null`**, the addition no
+      upstream document named. ✅ **RESEARCH assumption A1 FALSIFIED AT T1** against a real
+      `createBuilderStore` + the shipped `patchConfig`: an `undefined` value leaves the KEY present
+      in memory and is dropped by `JSON.stringify` — **both halves asserted**, because the difference
+      between them IS the assumption. ✅ One shipped LIE stops being told: `stepGaps` no longer shows
+      an MCP step a *still missing* row it could never satisfy; the row is **suppressed, never
+      replaced**, and three of the four new cases are non-vacuity controls that were already GREEN at
+      base. ✅ The panel gains three JSX attributes (`key={phase.slug}`, `toolName`, `onChangeShape`)
+      and **no hook** — numstat `+2/-1`, the ABSOLUTE-ZERO pin green and re-checked with needles
+      assembled at runtime. Gate `5643 → 5672 · failed 0 · OK 111/111` (`+25` here, `+4` in
+      `StepPanelPort.test.tsx`, no residual); `tsc -p tsconfig.app.json` **34 → 34**, zero in any
+      touched file. `api.ts` 0 files, `backend` 0, migrations 0, manifests 0.
+      ⚠ **THREE DECLARED DEVIATIONS.** (1) The panel's three attributes landed in TASK 1 rather than
+      task 2, because required props + an empty task-1 test diff + a task-1 tsc equal to base cannot
+      all hold — the alternative was committing a tree with 36 errors. (2) **TWO acceptance greps
+      were UNSATISFIABLE AT THEIR OWN BASE** — `mt-1.5 == 1` measured **2** and
+      `role="radiogroup" == 2` measured **2** (one of them a shipped COMMENT); both are restated in
+      satisfiable form, and my own first-draft prose had pushed them to 5 and 4 (the 187-24 trap,
+      twelfth firing, in both directions in one plan). (3) The byte-identity case's first docblock
+      claimed no id normalization was needed and was **OBSERVED RED** — React's `useId` counter
+      advances per MOUNT, so two sequential mounts in one run differ; a COUNTED normalization
+      replaced it, needle read off a real render (`_r_N_`), and the wrong claim is kept beside its
+      correction.
+      ⚠ **DECLINED, as a decision:** `ExternalActionSection.test.tsx`'s pin stays at **25** against
+      an actual of **59** — the eleventh consecutive plan to decline it.
+      ⚠ **FLAGGED FOR UAT — two deliberate non-changes:** an MCP step shows NO consequence sentence
+      (`OutsideChangeLine` renders nothing without a capability, by its own argument), and the canvas
+      reads *"Reach outside"* with `CHANGES SOMETHING OUTSIDE` even for a read-only tool
+      (`nodeEffectBanner` keys on the TYPE). Both carry re-open triggers.
+      ⚠ **STILL NOT REACHABLE-BY-PROOF:** every case constructs the section's props by hand. The
+      two-legged guard (D-206.2-07 / D-206.2-12) is `206.2-04`'s, and the suite says so at the site —
+      what wave 3 adds toward it is the missing WIRE, so there is finally something to find.
+      ⚠ **HOT-FILE LEDGER — `ExternalActionSection.tsx` measures `4 / 3 / 498` and CROSSED G-5 IN
+      THIS VERY PLAN with no row at all**; `PhaseFormPanel.tsx` reads `24/11/1375`, measures
+      `29/13/1561` (stale before this plan ran); `vitest-count-gate.cjs` measures `117/21/3871`;
+      `phaseVocabulary.ts` `16/6/990` has never had a row. **PLAN 04 OWNS THE LEDGER COMMIT**
+      (D-206.2-11) — re-derive there, do not copy. ⚠ CONN-02 / CONN-03 still NOT complete: three of
+      four plans, and the grant control plus the reachability guard are wave 4's.
 - [ ] 206.2-04-PLAN.md — the grant control + the two-legged reachability guard + the driven round trip
       (DENY case first) + the hot-file ledger debt and 206.1's owed SC#1b
 
