@@ -4,6 +4,7 @@ title: "The operator's own picture of what a workflow should be — pull from th
 created: 2026-08-25
 planted_during: conversation with the operator, 2026-08-25, immediately after Phase 209 was registered
 status: planted
+diagnosis_status: PARTLY REFUTED 2026-08-25 by .planning/research/connections-competitor-study.md — the REQUIREMENT stands; two of this seed's supporting claims do not. Read the correction before scoping anything from it.
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -88,3 +89,40 @@ comparison, and cross-check against what our engine can actually express.
 Nothing about implementation. It records the requirement, names the one structural gap it exposes
 (read vs. write), and states that the research the operator asked for is **owed and undone**. A
 milestone scoped without that research would be scoped from three screenshots and one example.
+
+
+---
+
+## ⚠ CORRECTED 2026-08-25 BY THE COMPETITOR STUDY — TWO CLAIMS ABOVE ARE WRONG
+
+The operator's requirement is untouched. **Two things I asserted to support it are refuted**, and
+both are kept above rather than rewritten, because the way they were wrong is the useful part.
+
+**1. ⛔ *"`external_action` is WRITE-ONLY"* — REFUTED at source.**
+`phase_types.py:2542` returns `{"text": tool_result.get("text", "")}` into `accumulated_outputs`.
+**Step 2 of the operator's example — go and READ, then blend it with the KB — is EXECUTABLE AT HEAD**
+against any MCP server exposing a Slack read tool. What is missing is not the data path. It is
+(a) a way to *declare* a step's direction and (b) a first-party path that does not require the user
+to know what an MCP server is. **That is a much smaller and much cheaper gap than this seed claimed.**
+
+**2. ⚠ *"It stopped for an approval it did not need"* — HALF WRONG, and the half that is wrong
+matters.** MCP specifies `readOnlyHint` default **`false`** and `destructiveHint` default **`true`**:
+an unannotated tool is *specified* to be treated as destructive. **Our gate defaulted correctly.**
+The real defect is narrower and more actionable — **we never read the hint.**
+⚠ `mcp_client.py:293-296` sanitizes every discovered tool down to `name` / `description` /
+`inputSchema`, **discarding `annotations`, `title` and `outputSchema`** — which are, in order, the
+direction answer, the catalog label and the output-shape answer. **All three arrive from every
+compliant server today and we throw them away.** Verified at source.
+
+**3. Also refuted — the industry does NOT split read from write.** Zapier and Make separate
+*searches* from actions for a **data-flow** reason (0..N results, pairs with create-if-not-found),
+not a safety one; n8n and Activepieces do not split at all. **The read/write axis is an MCP
+invention, not an automation-industry convention** — which *strengthens* the MCP-first verdict
+rather than testing it.
+
+**4. And a sequencing correction for the milestone:** six of the operator's eight named services are
+reachable at today's credential shape. Only **Google** and **Microsoft Graph** require OAuth. A
+"Google + Microsoft first" tier would front-load 100% of the OAuth cost before a single read ships.
+
+**The one open question the whole direction rests on**, and nobody has answered it: **do the official
+Atlassian / GitHub MCP servers actually set `readOnlyHint`?** That is one live call.
