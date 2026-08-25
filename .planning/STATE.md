@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: gaps_found
+status: ready_to_execute
 last_updated: 2026-08-25
 last_activity: 2026-08-25
 progress:
@@ -12,22 +12,20 @@ progress:
   completed_plans: 13
   percent: 93
 stopped_at: >
-  Phase 206.1 (Settings -> Connections finishes the MCP story) EXECUTED 2026-08-25 - 3 plans,
-  3 serial waves, 14 commits. Verified 4/5 success criteria MET (SC#2 dense row, SC#3 marks,
-  SC#4 explicit arms, SC#5 baselines). SC#1 SPLITS: SC#1a MET (an MCP connection is created,
-  seen and edited entirely in the UI - 201, body key set {config, mcp_server_url, name},
-  "capability" absent, no direct DB insert anywhere in the evidence). SC#1b NOT MET and OWED:
-  the created row cannot be bound to any workflow step because ConnectionPicker reads
-  capability-scoped and an MCP row has capability = null. Re-derived independently at
-  verification; neither ConnectionPicker.tsx nor McpToolPicker.tsx was touched by any 206.1
-  commit, so this is a pre-existing Phase 206 gap, not a regression. 206.1's own decision
-  D-206.1-18 was MISTAKEN - it measured that McpToolPicker exists and renders, not that any
-  data path could reach it - and that is why SC#1b was scoped as "drive it" rather than
-  "build it". Binding an MCP row is a NEW AUTHORING CAPABILITY, so G-7 forbids a gap-closure
-  round: it is a phase. Planted as SEED-200. AWAITING OPERATOR DECISION on registering it.
-  Also owed: CLAUDE.md crossed the 120,000-char WARN band during this phase (116,960 ->
-  124,357, gate exit 0 WITH WARNINGS). Recorded, not worked around; split-by-FUNCTION is due
-  and the gate names its own target - "Workflow guardrails" is 76,531 chars, 62% of the file.
+  Phase 206.2 (An MCP connection has somewhere to go) PLANNED - 4 plans, 4 SERIAL waves,
+  worktrees FORBIDDEN. Registered from SEED-200 by operator decision; closes 206.1's owed
+  SC#1b. Plan-checker PASSED after one blocker (a missing VALIDATION.md, owed and skipped by
+  the orchestrator - authored at ac1e20c1). Scope was WIDENED during research by D-206.2-19:
+  a workflow containing an MCP step CANNOT BE PUBLISHED today, driven and re-read at source -
+  ExternalActionPhaseConfig derives available_tools=[tool_name] while _unregistered_tools
+  admits only the three capability names, so publish blocks at stage 2.6. The fix is one
+  backend line plus both negative controls, taken here rather than escalated because shipping
+  the bind door with publish broken would be the FOURTH consecutive built-but-unreachable door
+  in this feature's history. Guardrail overrides: G-2 (sketch before a live-UI phase) OVERRIDDEN
+  and recorded as D-206.2-24 - the operator is unattended, and the obligation was answered by
+  /gsd:ui-phase --auto instead, APPROVED 6/6 by gsd-ui-checker.
+  Also still owed from 206.1: CLAUDE.md is past its 120,000-char warn band (124,357);
+  split-by-FUNCTION is due, target named ("Workflow guardrails", 76,531 chars, 62% of file).
 ---
 
 # Project State
