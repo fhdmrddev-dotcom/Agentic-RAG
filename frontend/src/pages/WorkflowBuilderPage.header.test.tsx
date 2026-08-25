@@ -719,7 +719,7 @@ describe("Builder header — the canvas gate is defined ONCE (D-184.1-04)", () =
 
 import { UNBOUND_KB_INVITATION } from "./WorkflowBuilderPage"
 import phaseFormPanelSource from "@/components/workflows/PhaseFormPanel?raw"
-import apiSource from "@/lib/api?raw"
+import { API_SOURCE as apiSource } from "@/lib/apiSource.testutil"
 import nodePresentationSource from "@/components/workflows/nodePresentation?raw"
 
 const FOLDER_ID = "75755ec9-5ba7-495b-ad93-7500011cf6f2"

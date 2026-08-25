@@ -1769,6 +1769,76 @@ forty-two, and `frontend/src/lib/api.ts` for ninety-seven.**
 
 ### `frontend/src/lib/api.ts`
 
+### ✅ 2026-08-25 (Phase 207) — THE SPLIT IS TAKEN. The trigger is RETIRED, not re-declined.
+
+This seam was declined at 197, at 192.2 and again at 204-03, each time in writing. The 204-03
+re-decline set a trigger deliberately stronger than the one it replaced — *"the NEXT phase adding a
+runtime export here TAKES the split, or escalates it as a phase of its own; it may NOT re-decline"* —
+and Phase 206 fired it with two runtime exports (`discoverConnectorTools`, `updateConnectorGrants`).
+The operator chose escalation, which created Phase 207. **This is that phase, and the answer is TAKEN.**
+
+| | before | after |
+|---|---|---|
+| `lib/api.ts` | 6,815 lines | **412** (re-exports only) |
+| modules | 1 | **12** under `lib/api/` |
+| exported symbols | 325 | **325** — set identical in BOTH directions |
+| triple | `180 / 103 / 6728` | **`182 / 105 / 412`** |
+
+**The domains, cut on CONTIGUOUS line ranges** — never by name — so a domain-local private helper is
+never separated from its only callers: `_core` (150) · `threads` (1,549) · `documents` (278) · `skills`
+(685) · `settings` (387) · `knowledge` (723) · `workflows` (1,021) · `tuner` (280) · `admin` (969) ·
+`org` (488) · `connectors` (278) · `schedules` (124).
+
+⚠ **THE PATH DOES NOT MOVE, AND THAT IS THE WHOLE SAFETY STORY.** 108 test files mock this module BY
+PATH at 118 call sites; `196-08` measured **249 red tests from a single added export**. A split that
+moved the path would turn every one of those factories inert — and an inert factory that still resolves
+fails QUIETLY, which is the bad case. Census after the split: **108 files / 118 sites, every one still
+on `@/lib/api`** — unchanged in count AND in path.
+
+⚠ **THE PUBLIC SURFACE IS UNCHANGED IN BOTH DIRECTIONS, asserted by diffing the export list rather
+than by reading it.** Nothing was lost and **nothing was gained**: helpers that were module-private in
+the old single file (`API_BASE`, `getAuthHeaders`, `getAuthToken`, `_mapMessageResponse`, …) are now
+exported from their new home so siblings can import them, and are DELIBERATELY NOT re-exported by the
+barrel. A widened surface would have been a silent change too.
+
+#### Three things this phase MEASURED rather than assumed
+
+1. ⚠ **A DEPENDENCY SCANNER THAT STRIPS TEMPLATE LITERALS DESTROYS THE MAIN DEPENDENCY.** The first run
+   emitted modules missing their `API_BASE` import and tsc reported **196 × `Cannot find name 'API_BASE'`**
+   — because `${API_BASE}/…` is how ~200 blocks reference it, and the comment/string stripper was eating
+   the whole template including its interpolations. Keep `${…}`; strip only the literal text.
+2. ⚠ **`supabase` MUST BE MATCHED AS A VALUE USE, NOT AS A BARE TOKEN.** `tuner.ts` carries an interface
+   field literally named `supabase`, so a token test imported the client into a module that never calls
+   it (TS6133). The test is `\bsupabase\s*\.`.
+3. ⚠ **THREE SHIPPED FENCES SWEEP THIS CLIENT'S SOURCE TEXT, NOT ITS BEHAVIOUR, AND ALL THREE WENT RED
+   — 8 assertions.** `apiRunFields.fences.test.ts`, `WorkflowBuilderPage.header.test.tsx` and
+   `TemplateNameCheck.test.tsx` each imported `@/lib/api?raw`, which now returns the 412-line BARREL.
+   **The dangerous fix would have been to lower their size thresholds**: two of the three open with a
+   non-vacuity control (`expect(src.length).toBeGreaterThan(100000)`) whose entire job is to prove the
+   sweep read something, and relaxing it would leave the fence **green and blind** — strictly worse than
+   the red it was showing. Instead the sweep follows the source: `lib/apiSource.testutil.ts` is the ONE
+   place that knows the client spans many files, and each fence changed by **exactly one line**.
+
+#### The declared deviation from SC#3
+
+SC#3 reads *"zero lines changed in any file that imports from `@/lib/api`"*. **Two of the three fences
+live outside `lib/`, and one of them (`WorkflowBuilderPage.header.test.tsx:136`) also carries a TYPE
+import from `@/lib/api`** — untouched, and still resolving through the barrel. So the literal criterion
+is missed by one line in one file, and **the property it exists to protect is fully met: not one API
+CALL SITE changed.** Both diffs are `+1 / -1` and both changed lines are the `?raw` sweep, asserted
+mechanically rather than claimed.
+
+#### The new obligation this creates
+
+⚠ **ADDING AN EXPORT NOW COSTS TWO EDITS, NOT ONE:** the domain module AND the barrel's list, in the
+same commit. A symbol exported from a module but absent from the barrel is invisible to every consumer
+while typechecking perfectly inside `lib/api/` — the failure mode this file's own history is full of.
+
+**Next seam, named rather than left `satisfied` with no successor:** `threads.ts` at 1,549 lines is now
+the largest module and holds two concerns — the SSE stream client (`subscribeToRun` and its callback
+surface, ~900 lines) and the ordinary thread/message CRUD. The stream client is the extraction.
+
+
 **Re-derived 2026-08-18 (plan `196-09`): `170 commits / 97 phases / 6154 L`** · quick-task buckets excluded:
 `260405`, `260814` · **G-5 FIRES HARDER THAN ANY FILE ON THIS LEDGER** (97 phases vs threshold 3) — **the
 hottest file in the repository, and it had no row at all.**

@@ -521,7 +521,7 @@ wc -l <file>                                                           # lines
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 25 / 8 / 1601 | **FIRES** | honoured by construction (200, 200.1, **200.2**) |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 8 / 5 / 334 | **FIRES** | honoured by construction (195) |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 180 / 103 / 6728 | ⚠ **FIRES HARDEST** | **the HOTTEST file in the repository** — ⚠ RE-DECLINED in writing (204-03); the next runtime export TAKES the split |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 182 / 105 / 412 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — 12 domain modules under `lib/api/`, this path kept as a re-export barrel. The trigger is RETIRED, not re-declined |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 70 / 56 / 1154 | ⚠ **FIRES** | ⚠ absent at 56 phases (added 196) |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 74 / 54 / 835 | ⚠ **FIRES** | honoured by construction (204) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 73 / 43 / 1331 | ⚠ **FIRES** | honoured by construction (204) — seam named: `MODEL_CAPABILITIES` + its readers out |
