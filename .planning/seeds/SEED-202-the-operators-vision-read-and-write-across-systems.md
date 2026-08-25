@@ -126,3 +126,45 @@ reachable at today's credential shape. Only **Google** and **Microsoft Graph** r
 
 **The one open question the whole direction rests on**, and nobody has answered it: **do the official
 Atlassian / GitHub MCP servers actually set `readOnlyHint`?** That is one live call.
+
+
+---
+
+## ⚠ THE OPEN QUESTION IS ANSWERED — LIVE, 2026-08-25 — AND `readOnlyHint` CANNOT CARRY THE DESIGN
+
+The study closed with one question it called the thing *"the whole direction design rests on"*:
+**do real MCP servers actually set `readOnlyHint`?** A raw `tools/list` was driven against three.
+
+| Server | Result | `annotations` | `title` | `outputSchema` |
+|---|---|---|---|---|
+| **DeepWiki** (`mcp.deepwiki.com/mcp`) | HTTP 200 · 3 tools | ⛔ **ABSENT on all 3** | ⛔ ABSENT on all 3 | ✅ **PRESENT on all 3** |
+| **Atlassian** (`mcp.atlassian.com/v1/sse`) | **401 `invalid_token`** | not reachable | — | — |
+| **GitHub** (`api.githubcopilot.com/mcp/`) | non-JSON (gated) | not reachable | — | — |
+
+### ⭐ The finding
+
+**`read_wiki_structure` — a tool whose NAME BEGINS WITH "read" — ships no `readOnlyHint` at all.**
+Under MCP's own defaults (`readOnlyHint: false`, `destructiveHint: true`) it is therefore
+*specified* to be treated as destructive, which means **our approval gate is behaving exactly as the
+spec instructs.** That half of the earlier correction is confirmed again, from the wire.
+
+**But the consequence for the design is the opposite of what was hoped:**
+
+1. ⛔ **`readOnlyHint` CANNOT be the primary direction signal.** It is OPTIONAL in the spec and it is
+   **absent in the wild on the one server we can actually reach.** A design that reads direction
+   from the annotation has **no signal at all** against DeepWiki. It can be an OPTIMISATION when
+   present — never the mechanism.
+2. ✅ **The `outputSchema` half of the sanitizer finding is STRENGTHENED.** It is present on **every**
+   tool here, and `mcp_client.py:293-296` discards it. That is the Q1 output-shape answer arriving
+   from a real server today and being thrown away — and unlike `annotations`, it is actually there.
+3. ⚠ **Two of the three servers are unreachable without OAuth — MEASURED, not predicted.** This is
+   Q4 landing in practice, and it supports the study's sequencing correction: **start with the six
+   services that work on static credentials**, not with the two that cannot be reached at all.
+
+### What is still open, stated honestly
+
+Atlassian and GitHub remain **untested** — not because the question changed, but because we cannot
+authenticate to them. ⚠ **Do not record their behaviour as unknown-but-probably-fine.** If either
+turns out to annotate, that is an argument for reading the hint *opportunistically*; it is not an
+argument for building the direction model on it, because DeepWiki has already proved the signal can
+be missing. **A mechanism that works only on servers that opt in is not a mechanism.**
