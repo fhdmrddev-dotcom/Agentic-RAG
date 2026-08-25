@@ -237,3 +237,64 @@ migration SEED-146 warns about.
    the most surface per OAuth app, and they are the two where pasted tokens are not offered at all.
 3. **Does chat-side outbound ship in this milestone or wait?** It needs the approval model, which is
    real work in its own right.
+
+---
+
+## ⚠ AMENDED 2026-08-25 — the operator SAW the MCP round trip work, and the reaction sharpened this milestone
+
+Phase 206.2 shipped the MCP authoring door and it was demonstrated live in the browser on
+2026-08-25: connection bound, tools discovered from `mcp.deepwiki.com`, one permission granted and
+one denied. **Nothing was broken.** The operator's response was about the *shape of the product*,
+and it is the clearest statement of this milestone's requirement anyone has written:
+
+> *"I still see that it's a little bit complicated for the user to know how to call external
+> actions… I did not see the real action. How it is really cool this MCP… on the connections tab we
+> are still using this filter that is meaningless like Message or Ticket. This is very specific and
+> it [isn't] reflecting the real purpose of the MCP connection… add specified each tool's logo and
+> each tool's specific actions."*
+
+### What that adds to the milestone, beyond what was written on 2026-08-24
+
+**1. The unit of the catalog is a SERVICE, not a capability.** The 2026-08-24 direction already said
+*"as many famous applications as we can"*. What the demo proved is **why the current model cannot
+grow into that**: `capability` is a CHECK-constrained closed set of three verbs at migration 116, so
+every new service either squeezes into `send_email` / `create_ticket` / `post_message` or becomes
+invisible — to the filter, to the node face, to the picker. **The catalog cannot be built on
+`capability`.** MCP already proved this by being the first thing that did not fit.
+
+**2. "Very simple to use" now has a measurable meaning.** Today, calling an external action requires
+a person to: know MCP exists → find the right tab → know a server URL → click Discover → know which
+tool → hand-write a JSON argument object. **The target is: pick a service, pick a named action.**
+No URL, no JSON.
+
+**3. The reference designs are in `screenshots/` and they are the acceptance bar.**
+
+| File | What it fixes |
+|---|---|
+| `Screenshot 2026-08-24 202011.png` — Claude.ai **Connectors** | Real service marks · a **Popular** row · `Connect` buttons · a filter about **state** (`All / Connected / Not connected`), ⚠ **never about what the connector can DO** — which is precisely where ours breaks |
+| `Screenshot 2026-08-24 202036.png` — Claude.ai **Plugins directory** | The catalog shape: search, `Filter by`, `Sort by`, icon + name + one-line purpose per entry |
+| `…workflow-edit.webp` — **xyOps** | ⭐ Nodes state their own identity on the face (`CATEGORY` / `PLUGIN` / `TARGETS` / `TAGS`), per-node glyphs, **typed edges** (`On Success` / `On Error` / `On Critical`), and named action nodes — **Send Email**, **Web Hook Discord**, **Create Ticket** — never a generic "reach outside" |
+
+**4. Authentication is the gate the operator is waiting on.** *"When will we reach this phase of
+authenticating [and] connecting to external actions"* — today the only credential shapes are D-03's
+three static tokens plus an optional MCP bearer. **There is no OAuth anywhere in the product**, and
+a catalog of famous services is not reachable without it. This milestone owns that; no scheduled
+phase does.
+
+### ⚠ What is deliberately NOT folded in here
+
+The **small, immediate** half of the operator's complaint — the canvas node saying "Reach outside"
+with an envelope, and the meaningless filter chips — is scoped as a **separate phase proposal**:
+`.planning/PHASE-209-PROPOSAL-a-step-says-what-it-actually-does.md`. It is frontend-only and needs
+no catalog, no OAuth and no schema change.
+
+**Keeping them apart is the point.** Folding a two-day legibility fix into an unscheduled milestone
+would leave the product saying "Reach outside" for however long the milestone waits — and folding
+the milestone into a small phase is how a phase becomes six.
+
+### Sequencing, stated plainly
+
+Nothing currently on the ROADMAP addresses any of this. The remaining registered work is **206.3**
+(a publish bug), **207** (`api.ts` split) and **208** (CLAUDE.md split) — one fix and two debts.
+**The honest answer to "when do we reach it" is: not on the current plan.** It needs the operator to
+either register Phase 209, open this milestone, or both.
