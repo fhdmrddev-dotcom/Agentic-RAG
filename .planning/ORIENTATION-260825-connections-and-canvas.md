@@ -96,7 +96,20 @@ servers set `readOnlyHint`?** A raw `tools/list` was driven against three server
 
 ### 2.4 Authentication — the honest state
 
-- **There is NO OAuth in this product.** None. Connections carry static credentials.
+⚠ **CORRECTED 2026-08-25 BY THE OPERATOR, and the original is kept below rather than rewritten.**
+This section first said *"There is NO OAuth in this product. None."* — factually true, **and the
+framing was wrong**: it reads as a boundary, as though OAuth were something we had decided against.
+It is simply **work not yet done**. *"That does not mean that we will not do it."* A limitation gets
+designed AROUND; a gap gets FILLED. The study's "start with the six that work" advice is an
+**ORDERING** — *do OAuth second*, never *do not do OAuth*. See `SEED-204`.
+
+⭐ **AND THERE ARE THREE PATHS, NOT TWO.** The operator's ladder: **authenticate (OAuth) — or MCP —
+or a plain API.** Path 3 is **captured NOWHERE in any planning document** (the milestone doc's only
+REST-API line is about this app *exposing* one, the opposite direction), which means the written plan
+currently says a service with no OAuth app and no MCP server is unreachable. That contradicts
+*"connect to any external application."* `SEED-204` records the gap and the fences path 3 must respect.
+
+- **No OAuth is BUILT yet** — a gap on the roadmap, not a boundary. Connections carry static credentials today.
 - **Measured, not predicted:** 2 of the 3 MCP servers tried are **unreachable without OAuth**.
 - Of the operator's eight named services, **six are reachable at today's credential shape**; only
   **Google** and **Microsoft Graph** need OAuth.
@@ -189,7 +202,8 @@ the xyOps workflow editor. **They are the acceptance bar; read them before plann
 | 3 | **Independent verification of 207 and 208** | both VERIFICATION files |
 | 4 | **Cloud verification of two bugs closed on LOCAL-only evidence** — a `.docx` + `.pdf` upload, and the OpenRouter model that 404'd (**its id was never captured**) | `HANDOFF-260825.md` |
 | 5 | **`SEED-203`** — the judge passed a golden run whose deliverable refuses the work, at score 100 | `SEED-203-*.md` |
-| 6 | **Scope the Connections & Open Platform milestone** against `SEED-202` | `CONNECTIONS-MILESTONE-CANDIDATE.md` |
+| 6 | **Scope the Connections & Open Platform milestone** against `SEED-202` **and `SEED-204`** — the first is WHAT a workflow should do, the second is HOW we reach anything (three paths), WHERE it lives (chat, not only the canvas) and HOW it is organised (the Claude.ai Connectors + Plugins IA) | `CONNECTIONS-MILESTONE-CANDIDATE.md` |
+| 7 | **Path 3 — a plain API for a service with no OAuth app and no MCP server** — absent from every planning document, and the written plan currently implies such a service is unreachable | `SEED-204` |
 
 ### The product decision nobody has made yet
 
