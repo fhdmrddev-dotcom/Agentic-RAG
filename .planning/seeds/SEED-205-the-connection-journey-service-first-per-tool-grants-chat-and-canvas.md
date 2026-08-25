@@ -89,3 +89,79 @@ deny. So the sequencing that satisfies both is:
 - The service MARK for an arbitrary service. `connectionMark.tsx` is total and falls back to a
   NAMED neutral; a catalog of hundreds needs an answer better than "everything is a plug", and the
   icon convention forbids drawing one by hand.
+
+---
+
+## ⚠ AMENDMENT, 2026-08-26 — THE NAMED SERVICES WERE EXAMPLES. THE REQUIREMENT IS GENERIC.
+
+Recorded verbatim, immediately after the above:
+
+> *"I said ClickUp or Jira or anything else as example — this should be GENERIC. Any connection
+> that is supported should be added and naturally digest it into the chat or the workflow. So to
+> sum it up: I need it as per Claude.ai exactly, but also synthesizing it to our application and
+> the research you did before."*
+
+**Read this as a fence against the obvious wrong build:** a per-vendor ClickUp integration, then a
+per-vendor Jira one. That is the shape Phase 206 already refused for MCP ("no per-vendor code"),
+and it must survive contact with OAuth and with a catalog.
+
+### The research already agrees, and states our bug more precisely than we did
+
+`.planning/research/connections-competitor-study.md` §Q2 surveyed seven products. **The unit is a
+SERVICE, universally**, containing a two-level tree (Zapier *App* → triggers/creates/searches;
+n8n *Node* → resources × operations; Claude.ai *Connector* → per-tool list with per-tool
+permission). And:
+
+> ⭐ *"The closest thing anyone has to our `capability` is Make's module SUBTYPE — and it is an
+> ATTRIBUTE OF A MODULE INSIDE AN APP, never the axis you browse by. That is our bug stated
+> precisely: **we promoted an attribute to be the browse axis.**"*
+
+⚠ **Not one of the seven filters by what a connector can DO.** All three catalogs use the same
+controls: **free-text search · filter by STATE · sort**. That is why Phase 209 item 3 is right to
+kill the verb chips rather than add a fourth.
+
+### ⚠ MEASURED BLOCKER — the table can represent exactly TWO shapes, and generic needs at least FOUR
+
+Migration 116 pinned `capability text NOT NULL CHECK (capability IN ('send_email','create_ticket',
+'post_message'))`. Migration 126 relaxed it — `capability` is now NULLABLE — but added:
+
+```sql
+CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)
+```
+
+So a row must be **either** a legacy capability **or** an MCP server. **An OAuth-authenticated
+service with neither would be REFUSED BY THE DATABASE**, and so would a plain-API connection
+(`SEED-204` path 3). The generic vision is blocked at the schema, not merely at the UI — and that
+blocker is invisible from the frontend, which is where Phase 209 is working. **A migration is
+owed before path 1 or path 3 can store a single row.**
+
+### ⚠ AND "GENERIC" IS NOT FREE IN THE SAME WAY TWICE — the honest split
+
+| Layer | Generic? |
+|---|---|
+| **MCP reach** | ✅ **Free.** Proven at Phase 206 — zero per-vendor code, any server with `tools/list` |
+| **Per-tool grants** | ✅ **Free.** `tool_grants` is a string→bool map; it never knew the vendor |
+| **The MECHANISM of OAuth** | ✅ generic — one authorization-code + refresh implementation serves every provider |
+| **The REGISTRATION for OAuth** | ⛔ **PER VENDOR, unavoidably.** Someone registers an OAuth app, per provider, and holds its client id/secret and scopes |
+| **The service MARK + catalog entry** | ⛔ per vendor — and `connectionMark.tsx` currently maps THREE, falling back to a named neutral |
+
+⭐ **The study's Q2 headline is the decision hiding inside "exactly like Claude.ai":** getting to a
+working Slack connection is **2 steps on Claude.ai** and **≥ 8 self-hosted on n8n** — *"the same
+protocol. The entire difference is who registered the OAuth application."* Claude.ai is 2 steps
+because **Anthropic registered it once, for everyone.**
+
+> **So "as per Claude.ai exactly" is a request to become the OAuth app owner for every service we
+> ship.** That is a product and business commitment — per-provider registration, secret custody,
+> scope review, and a review process with each vendor — not an engineering task. It is the single
+> largest decision in the Connections milestone and it is NOT YET MADE.
+>
+> The alternative, which the study also documents, is the self-hosted shape: the OPERATOR supplies
+> the OAuth client per instance. Cheaper for us, 8 steps for them. **A middle path exists — we own
+> the apps for a curated popular set, and a paste-your-own door covers the tail** — and that is the
+> `curated set + paste-a-URL` pattern both Claude.ai screenshots actually show.
+
+### What this amendment does NOT change
+
+Everything in the six-claim table above still stands. This narrows HOW, not WHAT: **one connection
+object, service-shaped, consumed identically by chat and by the canvas** — and no vendor's name
+appearing in a code path anywhere.
