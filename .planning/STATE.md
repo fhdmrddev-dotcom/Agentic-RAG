@@ -2,20 +2,22 @@
 gsd_state_version: 1.0
 milestone: v3.8
 milestone_name: Document Intelligence, Automations & Connectors
-status: ready_to_execute
+status: executing
 last_updated: 2026-08-25
 last_activity: 2026-08-25
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 14
-  completed_plans: 10
-  percent: 71
+  completed_plans: 11
+  percent: 79
 stopped_at: >
-  Phase 206.1 (Settings -> Connections finishes the MCP story) PLANNED - 3 plans, 3 serial waves,
-  worktrees FORBIDDEN (all three edit ConnectionsTab.tsx, and a worktree's node_modules is a
-  junction to the operator's real tree so the one npm install must happen on the main tree).
-  Plan-checker PASSED at revision round 1. Ready to execute.
+  Phase 206.1 plan 01 (item 3, the per-service mark map / SC#3) EXECUTED - 5 commits,
+  4c698c7b..755823af. Next action: execute 206.1-02 (item 2, the dense row shape), which
+  imports ConnectionMarkGlyph from this plan's module. Worktrees remain FORBIDDEN for the
+  whole phase. All three baselines re-derived and held: tsc 34 (zero in any Connection*
+  file), backend 68 failed, count gate OK 111/111 (total 5511, pinned 5043 - up from
+  110/5467/5004 because this plan's new suite was UNGATED and was adopted into BOTH knobs).
 ---
 
 # Project State
@@ -36,9 +38,51 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 206.1 planned and ready to execute; then Phase 207 (`api.ts` split)
+**Current focus:** Phase 206.1 executing — plan 01 done, plans 02 and 03 next; then Phase 207 (`api.ts` split)
 
 ## Current Position
+
+### 2026-08-25 — Phase 206.1 plan 01 EXECUTED (item 3, SC#3 — the per-service mark map)
+
+Every Settings → Connections row now wears its own service's real mark from ONE module
+(`frontend/src/components/settings/connectionMark.tsx`, 232 L): a total own-property resolver with a
+NAMED neutral, MCP resolved FIRST by its own `mcp_server_url` condition, and a three-ink contract.
+5 commits, `4c698c7b`…`755823af`. Summary:
+`.planning/phases/206.1-settings-connections-finishes-the-mcp-story-insert/206.1-01-SUMMARY.md`.
+
+Decisions and findings worth carrying:
+
+1. **The Task-1 checkpoint was `auto-approved-with-evidence`, and stronger than planned.** ⚠
+   `slopcheck` was recorded `UNAVAILABLE` in UI-SPEC — it is **installed here (0.6.1) and returns
+   `status: OK`**, so the gate's own stated reason for blocking was satisfied live rather than
+   waived. Its one `NO_REPO` info flag was **controlled**: the already-shipped
+   `@iconify-json/fluent-emoji` returns the identical verdict and flag. ⚠ The plan's exact command
+   `slopcheck install … --json` does not work in 0.6.1 (`--json` is a `scan` flag, and `install`
+   would install unpinned); use `slopcheck scan --pkg npm <name> --json`, which checks without
+   installing.
+2. ⚠ **The black-on-black MCP mark is REAL at HEAD, not an inherited claim.** Re-measured against
+   the installed `@iconify-json/logos@1.2.13`: `model-context-protocol-icon` has ONE drawable
+   element, **zero** `fill` attributes and **no** `currentColor`. Without the fill ink it inherits
+   SVG-default black on a `--card: 220 30% 7%` surface — resolving, rendering 1060 characters,
+   passing every test, and showing the person nothing.
+3. ⚠ **`typeof Mark === "function"` is the WRONG WR-04 guard on this surface**, observed RED on 11
+   cases. `lucide-react` ships `forwardRef` components, whose `typeof` is `"object"`. It would have
+   read correct only because the `fluent-emoji` map being replaced was all plain functions.
+4. ⚠ **The 187-24 trap fired THREE times inside this one plan** (7th and 8th recorded firings) — a
+   source fence goes red on the prose that forbids the thing. Every forbidden token is now
+   *described, never spelled*, with the reason in each file.
+5. **Declared Rule-2 deviation:** the new 39-case suite was UNGATED. Measured, not assumed — the
+   gate's printed file list did not contain it and the grand total moved by exactly the five
+   `ConnectionsTab` cases. Adopted into **both** knobs (`TARGETS` + `BASELINE`, `+48 / -0`).
+   ⚠ The entry landed **one commit late** against the same-commit rule; recorded in source.
+6. ⚠ **A hot-file-ledger row is stale and plan 03 owns the file.** `scripts/vitest-count-gate.cjs`
+   reads `114 / 19 / 3797` in CLAUDE.md; at this plan's base it measured `114 / 22 / 3797` — already
+   stale by three phases — and it is now `115 / 23 / 3845`. CLAUDE.md is in plan 03's
+   `files_modified` (D-206.1-24), so the measurement is recorded rather than applied.
+7. ⚠ **Item 3 stops being git-revert-independent once wave 2 lands** — plan 02 imports
+   `ConnectionMarkGlyph` from this module. The separability D-206.1-01 buys is REVIEW separability,
+   and it is intact.
+
 
 ### 2026-08-25 — Phase 206 EXECUTED (CONN-02, CONN-03)
 

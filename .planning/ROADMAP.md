@@ -38,7 +38,7 @@
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | ✅ Complete (2026-08-25) |
-| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | Planned — **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
+| 206.1 | **(INSERT)** Settings → Connections finishes the MCP story | A person can CREATE an MCP connection without touching the database, the row stays readable when the 400px panel opens, and every connection wears its own service's real logo | CONN-02 (follow-up) | **In progress — 1 of 3 plans complete** (plan 01, item 3 / SC#3, executed 2026-08-25). **3 plans in 3 SERIAL waves, one per item** (worktrees forbidden); 3 items, all found by live UAT + the operator's eye 2026-08-25 |
 | 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
@@ -483,7 +483,13 @@ others** — the separability *"Why one phase and not three"* above requires.
 
 Plans:
 
-- [ ] 206.1-01-PLAN.md — **item 3, the per-service mark map.** FIRST because it is the only item
+- [x] 206.1-01-PLAN.md — ✅ **EXECUTED 2026-08-25** (5 commits, `4c698c7b`…`755823af`). 39 new unit
+  cases + 5 added render cases; all 36 shipped `ConnectionsTab.test.tsx` cases pass UNEDITED
+  (`92 / 0`). tsc unchanged at 34 with zero in any `Connection*` file; backend unchanged at
+  `68 failed`; **`count gate OK — 111/111 pinned files present, no per-file decrease, 0 failing`**
+  (`total 5511 · pinned total 5043`, up from `5467 / 5004 / 110` — the new suite was UNGATED and was
+  adopted into BOTH knobs, a declared Rule-2 deviation). ⚠ slopcheck was **AVAILABLE** and returned
+  `status: OK`, correcting UI-SPEC's recorded `UNAVAILABLE`. — **item 3, the per-service mark map.** FIRST because it is the only item
 
 **Cross-cutting constraints:**
 
