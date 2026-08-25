@@ -228,6 +228,21 @@ export const FIELD_MCP_SECRET_OPTIONAL_NOTE =
  * surface a person can see that the form is not the wall — and a disabled Save is kinder than
  * a 422.
  */
+/**
+ * The NEUTRAL terminal for the panel's `secretLabel` ladder (206.1, SC#4 extended).
+ *
+ * ⚠ IT EXISTS SO THAT LADDER HAS SOMETHING TRUE TO END WITH. Every other arm names a specific
+ * vendor's own word — `App password` / `API token` / `Bot token` / `Access token` — and a
+ * trailing arm that is also the fallback hands an UNRECOGNISED shape one of those four, which
+ * is the `destinationFactsOf` defect wearing a label. `Credential` claims nothing about which
+ * vendor or which mechanism; it is also the word the table's own column header already uses,
+ * so a person meets one noun rather than two.
+ *
+ * ⚠ It is not offered anywhere a person can reach today — no shipped shape resolves to it.
+ * That is the point: it is what a FUTURE shape gets before anyone has written its label.
+ */
+export const FIELD_SECRET_LABEL_NEUTRAL = "Credential"
+
 export const MCP_SAVE_DISABLED_REASON =
   "Save is off until the server address starts with https://. This form refuses it here; the server refuses it again before anything is sent."
 
@@ -377,6 +392,21 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
  */
 export function tlsModeOf(port: string): "implicit" | "starttls" {
   return port.trim() === "465" ? "implicit" : "starttls"
+}
+
+/**
+ * The HOST of a typed MCP server URL — the fact a refusal is about (206.1).
+ *
+ * ⚠ NO URL PARSER, DELIBERATELY. A half-typed value must still yield SOMETHING true rather
+ * than throw while a person is mid-keystroke, and the raw string is the truest thing available
+ * when it cannot be split. This is the same split `connectionsCopy.destinationFactsOf`
+ * performs for the ROW — one derivation, two surfaces, exactly the relationship these two copy
+ * modules already have for every other reading on this page.
+ */
+export function mcpHostOf(rawUrl: string): string {
+  const url = rawUrl.trim()
+  if (!url) return ""
+  return url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split("/")[0] || url
 }
 
 /**

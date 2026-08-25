@@ -158,7 +158,7 @@ import {
   connectionMatchesQuery,
   connectionStateOf,
   connectionsCountLabel,
-  credentialLabel,
+  credentialReadingOf,
   deleteConfirmLabel,
   deleteSheetBody,
   deleteSheetTitle,
@@ -594,6 +594,10 @@ function ConnectionRow({
   const state = connectionStateOf(connection)
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
+  /** ⚠ READ FROM THE ROW'S OWN URL, NEVER FROM A MISSING CAPABILITY (D-206.1-11). An absence
+   *  is not a shape, and a future row that legitimately carries no capability for some third
+   *  reason must not be dragged in here. */
+  const isMcp = Boolean(connection.mcp_server_url)
 
   /** One write, its receipt, and a retry on failure — the `UsersAndAccess.tsx:224-238`
    *  idiom. The RECEIPT is transient (062-A: a receipt, never a toast); the persistent
@@ -684,7 +688,19 @@ function ConnectionRow({
               `onCheck &&` guard STAYS: it is what keeps the removed-not-disabled
               rule true for the view when it is rendered without one (the suite
               drives both directions). */}
-          {onCheck && (
+          {/* ⚠ 206.1 / D-206.1-19 — AN MCP ROW DOES NOT GET THIS ITEM, AND IT IS REMOVED
+              RATHER THAN DISABLED. The check path is CAPABILITY-SHAPED — an SMTP login, a
+              Jira auth, a Slack `auth.test` — and has NO MCP arm at any layer, so the endpoint
+              would refuse a row it cannot describe. A rendered control the API refuses is
+              precisely the defect this surface's removed-not-disabled rule exists to prevent,
+              and 190-16's plant C measured that a `toBeDisabled()` assertion cannot see it.
+              ⚠ THE REASON LIVES HERE, IN SOURCE, AND NOWHERE A PERSON READS IT: a removed
+              affordance that explains itself is a disabled affordance wearing a disguise. What
+              the person is told instead is a FACT about the row — its Credential cell reads
+              `no check for this kind` (AR-05), which is true whether or not this item exists.
+              ⚠ Re-open trigger: the check path gains an MCP arm. Then this condition AND
+              `credentialReadingOf`'s MCP arm both become wrong, and they move together. */}
+          {onCheck && !isMcp && (
             <DropdownMenuItem
               data-testid="connections-action-check"
               onSelect={() => void runWrite(() => onCheck(connection), RECEIPT_CHECKED)}
@@ -845,7 +861,7 @@ function ConnectionRow({
                 data-testid="connections-row-credential"
                 className="font-mono text-muted-foreground"
               >
-                {credentialLabel(connection.last_checked_at, now)}
+                {credentialReadingOf(connection, now)}
               </span>
             </span>
           </div>
@@ -897,7 +913,7 @@ function ConnectionRow({
         data-testid="connections-row-credential"
         className="w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground"
       >
-        {credentialLabel(connection.last_checked_at, now)}
+        {credentialReadingOf(connection, now)}
       </div>
 
       {/* 5 · State — glyph AND word, so it reads in greyscale (WCAG 1.4.1). */}

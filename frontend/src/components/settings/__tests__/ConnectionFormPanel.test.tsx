@@ -134,6 +134,7 @@ import type {
   ConnectorCapability,
   ConnectorCheckResult,
   ConnectorConnection,
+  ConnectorConnectionCreate,
 } from "@/lib/api"
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────────────
@@ -2204,7 +2205,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     onCreate: ReturnType<typeof vi.fn>,
     opts: { url?: string; secret?: string } = {},
   ) {
-    renderPanel({ onCreate })
+    renderPanel({ onCreate: onCreate as unknown as (body: ConnectorConnectionCreate) => Promise<void> })
     await chooseMcp(user)
     await user.type(screen.getByLabelText("Name"), "DeepWiki")
     await user.type(
