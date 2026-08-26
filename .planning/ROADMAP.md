@@ -147,7 +147,7 @@ it.*
   4. A user whose `org_id` is null triggers a schedule manually and the run starts — no 500, and no CORS error in the browser standing in for one (CONN-11 — closes `BUG-260826-03`).
   5. When the embedding provider fails, the answer says the provider failed and names it — never *"your documents returned nothing"* (RAG-09 — closes ⛔ `BUG-260815-05`).
 
-**Plans**: TBD
+**Plans**: 3 plans (210-01, 210-02, 210-03)
 
 **UI hint**: yes
 **Flags**: Closes 5 of the milestone's 9 folded bugs, including ⛔ `BUG-260815-05`. **G-5**: `backend/app/api/admin.py` (32 commits / 12 phases / 1733 L — **fires**, and ⚠ **it has been absent from the ledger for its whole life**, so G-5 has never been able to fire on it; re-derive from git at discuss-phase rather than trusting the cell). **SC#10 applies with a DIFFERENT roster** — RAG-09's axis is the *embedding* provider set (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible, per Phase 111.1), not the 8-row chat roster; a blocked provider is recorded ⛔ with its reason, never omitted. No threat model expected (no new trust boundary — CONN-09 tightens an existing one). No migration expected; if CONN-10's budget default is stored in `app_settings`, deployment-artifact parity applies in the same commit. ⚠ **CONN-10 has two halves and a plan must not close on one** — "cannot be silently accepted" and "the default budget does not guarantee cancellation" are two different defects (`-06` and `-07`) that share a requirement.

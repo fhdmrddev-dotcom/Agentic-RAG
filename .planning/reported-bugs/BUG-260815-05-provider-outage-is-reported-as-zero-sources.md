@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: blocking
 status: open
 affected_areas: [RAG/retrieval, backend/harness, workflows/publish-gauntlet, observability, embeddings, settings, admin/control-room]
-folded_into: null
+folded_into: 210
 verified_closed_by: null
 related_seeds: [SEED-165]
 re_open_trigger: null

@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: major
 status: open
 affected_areas: [frontend/admin, frontend/settings, backend/api, operator-surface]
-folded_into: null
+folded_into: 210
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
