@@ -39,8 +39,8 @@ can be taught new behaviors (skills) that persist and can be shared.
 
 Phase: 210 — Ground Truth — Operability & Failure Honesty (completed)
 Plan: 210-01, 210-02, 210-03 (3/3 complete)
-Status: Phase 210 execution complete — all gates green (tsc 34, count gate 5798, backend unit rot set at 68 baseline), BUS-008 opened to reviewer
-Last activity: 2026-08-26 — Phase 210 complete (CONN-09, CONN-10, CONN-11, RAG-09 verified and committed)
+Status: Phase 210 review round 1 fixes committed (V-1, V-2, V-3 resolved at HEAD 705a7412) — all gates green (tsc 34, count gate 5798, backend unit rot set at 68 baseline), BUS-009 opened to reviewer
+Last activity: 2026-08-26 — Phase 210 review fixes complete (V-1/V-2/V-3 resolved, clean citations channel, dedicated retrieval_error propagation)
 
 ## Milestone v3.9 — scope as agreed with the operator (2026-08-26)
 
