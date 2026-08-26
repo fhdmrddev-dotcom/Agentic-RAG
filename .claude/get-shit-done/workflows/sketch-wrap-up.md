@@ -2,7 +2,7 @@
 Curate sketch design findings and package them into a persistent project skill for future
 UI implementation. Reads from `.planning/sketches/`, writes skill to `./.claude/skills/sketch-findings-[project]/`
 (project-local) and summary to `.planning/sketches/WRAP-UP-SUMMARY.md`.
-Companion to `/gsd-sketch`.
+Companion to `/gsd:sketch`.
 </purpose>
 
 <required_reading>
@@ -31,7 +31,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 If no unprocessed sketches exist:
 ```
 No unprocessed sketches found in `.planning/sketches/`.
-Run `/gsd-sketch` first to create design explorations.
+Run `/gsd:sketch` first to create design explorations.
 ```
 Exit.
 
@@ -232,7 +232,7 @@ If this routing line already exists (append mode), leave it as-is.
 Commit all artifacts (if `COMMIT_DOCS` is true):
 
 ```bash
-gsd-sdk query commit "docs(sketch-wrap-up): package [N] sketch findings into project skill" .planning/sketches/WRAP-UP-SUMMARY.md
+gsd-sdk query commit "docs(sketch-wrap-up): package [N] sketch findings into project skill" --files .planning/sketches/WRAP-UP-SUMMARY.md
 ```
 </step>
 
@@ -255,16 +255,17 @@ The sketch-findings skill will auto-load when building the UI.
 
 ## ▶ Next Up
 
-**Start building** — implement the validated design
+**Explore frontier sketches** — see what else is worth sketching based on what we've explored
 
-`/gsd-plan-phase`
+`/gsd:sketch` (run with no argument — its frontier mode analyzes the sketch landscape and proposes consistency and frontier sketches)
 
 ───────────────────────────────────────────────────────────────
 
 **Also available:**
-- `/gsd-ui-phase` — generate a UI design contract for a frontend phase
-- `/gsd-sketch` — sketch additional design areas
-- `/gsd-explore` — continue exploring
+- `/gsd:plan-phase` — start building the real UI
+- `/gsd:ui-phase` — generate a UI design contract for a frontend phase
+- `/gsd:sketch [idea]` — sketch a specific new design area
+- `/gsd:explore` — continue exploring
 
 ───────────────────────────────────────────────────────────────
 </step>
@@ -279,5 +280,6 @@ The sketch-findings skill will auto-load when building the UI.
 - [ ] Reference files contain design decisions, CSS patterns, HTML structures, anti-patterns
 - [ ] `.planning/sketches/WRAP-UP-SUMMARY.md` written for project history
 - [ ] Project CLAUDE.md has auto-load routing line
-- [ ] Summary presented with next-step routing
+- [ ] Summary presented
+- [ ] Next-step options presented (including frontier sketch exploration via `/gsd:sketch`)
 </success_criteria>
