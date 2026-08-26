@@ -16,11 +16,14 @@ one schedule row, both listed below.
 | 5 | Look for where to set the recipient | ❌ no such field anywhere in the UI → BUG-01 |
 | 6 | Workaround via a scheduled run's `inputs` | ❌ trigger 500'd, browser reported it as CORS → BUG-03 |
 | 7 | Fall back to letting the poller fire it | ❌ the scheduler is **off by default** and not running here → BUG-06 |
+| 8 | Trigger by hand | ❌ 500 — the launcher parses `definition` unguarded; the column is a jsonb string scalar → BUG-03 (confirmed) |
+| 9 | Normalise the definition in the DB, trigger again | ✅ `launched: true`, and **`inputs` carried `to` + `subject`** — the arguments finally reached a run |
+| 10 | Wait for the email step | ❌ run **cancelled after 61s**: 181,892 tokens against the default 50,000 cap → BUG-07 |
 
 The connector itself is sound: the transport reached Gmail, negotiated TLS, and was rejected only
 on credentials. What is missing is the last mile — nothing can tell the step who to email.
 
-## The six reports
+## The seven reports
 
 | id | severity | one line |
 |---|---|---|
@@ -30,6 +33,7 @@ on credentials. What is missing is the last mile — nothing can tell the step w
 | [BUG-260826-04](BUG-260826-04-live-connectors-has-no-control-room-card.md) | major | The OFF banner points at a Control Room card that does not exist (`D-190-DEF-09`) |
 | [BUG-260826-05](BUG-260826-05-run-failed-reason-empty-for-external-action-failure.md) | minor | The panel says the failure reason is missing while chat displays it |
 | [BUG-260826-06](BUG-260826-06-schedules-can-be-created-while-the-scheduler-is-disabled.md) | major | Schedules are accepted and listed on an install where nothing will ever fire them |
+| [BUG-260826-07](BUG-260826-07-scheduled-run-default-token-budget-cancels-realistic-workflows.md) | major | The default 50k scheduled-run token budget cancels any workflow with a retrieval phase |
 
 ## Suggested order of work
 
@@ -43,8 +47,9 @@ on credentials. What is missing is the last mile — nothing can tell the step w
    it second, never first.
 3. **BUG-04** — its own phase. It is a user-facing capability, so under **G-7** it must not be
    folded into a gap-closure round.
-4. **BUG-03 + BUG-06** — one scheduler-honesty change: stop writing rows that cannot fire, and
-   stop presenting an automations surface that is switched off.
+4. **BUG-03 + BUG-06 + BUG-07** — one scheduler-honesty change: stop writing rows that cannot fire,
+   stop presenting an automations surface that is switched off, and stop shipping a default budget
+   that cancels realistic work while still spending the tokens.
 5. **BUG-05** — small; fold into whichever phase next touches the harness failure path.
 
 ## Two things confirmed NOT to be defects
