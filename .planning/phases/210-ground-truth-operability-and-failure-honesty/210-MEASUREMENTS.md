@@ -30,8 +30,8 @@ itself.
 | Gate | Command | Baseline |
 |---|---|---|
 | Frontend typecheck | `npx tsc --noEmit -p tsconfig.app.json` (from `frontend/`) | **34 errors** |
-| Frontend count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (from repo root) | _see §1.1_ |
-| Backend unit suite | `python -m pytest tests/unit -q` (from `backend/`, venv active) | _see §1.1_ |
+| Frontend count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (from repo root) | **OK** · 114/114 pinned · **total 5793** · pinned 5180 · **failed 0** |
+| Backend unit suite | `python -m pytest tests/unit -q` (from `backend/`, venv active) | **68 failed · 2680 passed** · 2 xfailed · 2 xpassed |
 | CLAUDE.md size | `node scripts/check-claude-md-size.cjs` | **83,431 chars · 55.6% of limit · OK** |
 
 ⚠ **`tsc --noEmit` WITHOUT `-p tsconfig.app.json` checks ZERO files.** The v3.7 close audit reported
@@ -40,19 +40,34 @@ that bare form as "clean" while a real defect sat in the 35th error. Use the fla
 ⚠ **34 is a BASELINE, not a target.** It matches the figure Gemini recorded at Phase 209's close.
 A Phase 210 plan is clean if it introduces **no error in a file it touched**, not if the total is 0.
 
-### 1.1 Pending at the time of writing
+### 1.1 The backend rot set — per file, so a pre-existing failure cannot read as one you caused
 
-The count gate and backend suite were still running when this pack was committed. **Re-derive them
-yourself rather than trusting a number in this file** — that is this repo's most-repeated lesson
-(the gated test total has rotted four times, twice within two days).
+⚠ **The count-gate total GREW and that is the gate WORKING**, not drifting. Its contract is *no
+per-file DECREASE* and *zero failing*, never a fixed grand total. Phase 209's close read **5773**;
+this reads **5793** (`+613` over the pinned baseline, with `automationFacts.test.ts` +11,
+`nodeEffectBanner.test.ts` +8 and `toolReadOnlyMap.test.ts` +7 newly adopted). A plan that sees a
+bigger figure than this file quotes has seen the correct current one — **re-derive, do not doubt**.
 
-For orientation only, the last recorded readings: count gate `OK 114/114 pinned, 0 failing,
-total 5773` (Phase 209 close). Backend `tests/unit` carries a **known rot set of ~62-63 failures**
-(`retrieval_service` 13, `sql_service` 12, `sandbox_service` 3, `streaming_reliability` 1) that
-predates this milestone.
+⚠ **The backend rot set is 68, not the ~62-63 this project last recorded.** It has grown, and the
+growth is unattributed. Full per-file breakdown, `python -m pytest tests/unit -q` on the untouched
+tree:
 
-⚠ **`retrieval_service` is 13 of that rot set AND is RAG-09's home file.** Establish which of those
-13 are pre-existing before touching it, or a pre-existing failure will read as one you caused.
+| Failures | File | |
+|---|---|---|
+| **15** | `test_retrieval_service.py` | ⚠ **RAG-09's home file** |
+| **12** | `test_sql_service.py` | |
+| 6 | `test_explorer_agent.py` | |
+| 5 | `test_multimodal_query.py` | |
+| **4** | `test_111_1_reembed_kickoff.py` | ⚠ embedding-provider path — RAG-09 adjacent |
+| 3 | `test_sandbox_service.py` · `test_lifespan.py` · `test_db_runs.py` | 3 each |
+| 2 | `test_module7_tools.py` · `test_extraction_service.py` · `test_cross_worker_cancellation.py` | 2 each |
+| 1 | `test_streaming_reliability.py` · `test_published_workflow_ownership.py` · `test_phase56_iteration_start.py` · `test_get_model_capability_inference.py` · `test_forced_emit.py` · `test_email_ingestion.py` · `test_200_1_phase_output_shape.py` · `test_182_validate.py` · `test_075_4_unknown_provider_error.py` · `test_071_1_threadpool_sweep.py` · `test_061_consumer.py` | 1 each |
+
+⚠ **`test_retrieval_service.py` is 15 of the 68 — up from the 13 previously recorded — and it is
+RAG-09's home file.** `test_111_1_reembed_kickoff.py` adds 4 more on the embedding path. **Capture
+the failing test NAMES in these two files before touching either**, or a pre-existing failure will
+read as one this phase caused. Full run output preserved at
+`<scratchpad>/backend-baseline.txt` for the session that produced it; re-derive rather than cite it.
 
 ---
 
