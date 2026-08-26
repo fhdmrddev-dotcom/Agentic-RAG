@@ -74,6 +74,11 @@ _EXPECTED_MODULES = frozenset({
     "smtp_adapter.py",
     "jira_adapter.py",
     "slack_adapter.py",
+    # Phase 211 (CONN-04) — the static tool descriptors for a first-party capability
+    # connection. It opens nothing and sends nothing, but it joins the walk deliberately:
+    # a module under this package that the fence does not visit is a module D-05 does not
+    # cover, and "it only builds a dict today" is a property of today.
+    "descriptors.py",
 })
 
 #: D-05 expressed as PROPERTIES. Each entry is ``name -> matcher``; the name is what a
@@ -584,7 +589,13 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # pinned: a deferred import is cheap enough that "just add one" is a real temptation, and
     # every one is a module reaching across a seam it was not given.
     assert sorted({site.rsplit(":", 1)[0] for site in function_local_importers}) == [
+        # Phase 211 (CONN-04) — `descriptors.py` resolves the adapter to read its own
+        # INPUT_SCHEMA. Pinned here deliberately, in answer to this assertion's own
+        # instruction: the fence fired on the commit that added the import, which is the
+        # fence working. It is function-local for the reason stated below and in that
+        # module's "WHY LAZY IMPORT" block — a module-scope form would join the cycle.
         "app/api/connectors.py",
+        "app/services/connectors/descriptors.py",
     ], (
         f"the connector registry now has function-local importers in unexpected files: "
         f"{function_local_importers!r}. These do NOT open the import cycle (they run at call "
