@@ -5861,3 +5861,84 @@ checked, none of them touched. Empty diff across the whole phase, by the command
 that is the phase's named anti-pattern avoided rather than committed: *optional* and *closed* are
 independent properties, and retiring a guard while demoting the thing it guards is how a closed
 set quietly stops being one.
+
+---
+
+## `frontend/src/components/settings/ConnectionsTab.tsx`
+
+**Re-derived 2026-08-27 (Phase 212):** `10 commits / 3 phases / 1153 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 206.1, 212.
+
+**Disposition: honoured by construction (212).** Adheres strictly to the unified density catalog layout from `.planning/sketches/203-the-catalog-at-density/index.html`. Column 1 carries Mark + Name + provenance chip (`ADDED BY URL` for uncurated custom MCP) with tagline on line 2 (truncating). Column 5 renders the state dot indicator. Characterized and pinned byte-for-byte in `ConnectionsTab.test.tsx` (77 tests green).
+
+---
+
+## `frontend/src/components/settings/ConnectionFormPanel.tsx`
+
+**Re-derived 2026-08-27 (Phase 212):** `8 commits / 4 phases / 2010 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 211, 212.
+
+**Disposition: honoured by construction (212).** Extended to support `presetServiceId` for preselecting service identity on creation, interactive pre-save discovery probe (`probeMcpServer`), and per-tool grant toggling with persistence. All 144 unit tests green in `ConnectionFormPanel.test.tsx`.
+
+---
+
+## `frontend/src/components/settings/connectionsCopy.ts`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 4 phases / 573 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 206.2, 212.
+
+**Disposition: no seam proposed.** Vocabulary module doing one thing many times. Extended `connectionMatchesQuery` to inspect `service_id`.
+
+---
+
+## `frontend/src/components/settings/connectionFormCopy.ts`
+
+**Re-derived 2026-08-27 (Phase 212):** `6 commits / 4 phases / 968 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 211, 212.
+
+**Disposition: no seam proposed.** Vocabulary module doing one thing many times. Added `custom_mcp` and `mcp` mappings to `SERVICE_TO_SHAPE`.
+
+---
+
+## `frontend/src/components/settings/connectionMark.tsx`
+
+**Re-derived 2026-08-27 (Phase 212):** `4 commits / 2 phases / 217 L` · **no (2 phases)** — young (206.1-01, 212).
+Phases touched: 206.1, 212.
+
+**Disposition: young.** Added `service_id` resolution order with fallbacks for standard and custom MCP icons. All 42 unit tests green in `connectionMark.test.tsx`.
+
+---
+
+## `backend/app/models/connector.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `6 commits / 3 phases / 468 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 211, 212.
+
+**Disposition: honoured by construction (212).** Added `McpDiscoverRequest` and `McpDiscoverResponse` models for pre-save interactive discovery.
+
+---
+
+## `backend/app/services/mcp_client.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `4 commits / 2 phases / 407 L` · **no (2 phases)** — young (211, 212).
+Phases touched: 211, 212.
+
+**Disposition: young.** Hardened egress boundary: off-event-loop DNS resolution with threadpool, TOCTOU IP pinning with Host/SNI restoration, `follow_redirects=False`, `trust_env=False`, 2MB response cap.
+
+---
+
+## `backend/app/api/connectors.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 3 phases / 781 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 211, 212.
+
+**Disposition: honoured by construction (212).** Added `POST /api/connectors/discover-tools` pre-save probe endpoint gated with `require_visible("live_connectors")` and `require_org_manage`.
+
+---
+
+## `backend/app/services/connector_service.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 3 phases / 1149 L` · **G-5 FIRES (3 phases)**.
+Phases touched: 190, 206.1, 211.
+
+**Disposition: honoured by construction (211).** Connector persistence and decryption service.

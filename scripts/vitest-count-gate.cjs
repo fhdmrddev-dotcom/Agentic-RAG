@@ -2757,6 +2757,9 @@ const BASELINE = {
   //     rather than blanket. Restored md5-identical.
   "connectionVerbFence.test.ts": 21,
   "connectionCardReachability.test.tsx": 10,
+  // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
+  "servicesCatalog.test.ts": 3,
+  "apiBarrel.test.ts": 3,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3762,6 +3765,9 @@ const TARGETS = [
   // path was `ls`-confirmed and the bare filename confirmed unique tree-wide (the BASELINE key
   // space is global) before this line was written.
   "src/lib/apiRunFields.fences.test.ts",
+  // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
+  "src/components/settings/__tests__/servicesCatalog.test.ts",
+  "src/lib/__tests__/apiBarrel.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

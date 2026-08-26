@@ -108,7 +108,7 @@ import type {
 } from "@/lib/api"
 import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
-import { PROVENANCE_ADDED_BY_URL, CATALOG_SEARCH_PLACEHOLDER } from "@/components/settings/catalogCopy"
+import { PROVENANCE_ADDED_BY_URL } from "@/components/settings/catalogCopy"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   Sheet,
