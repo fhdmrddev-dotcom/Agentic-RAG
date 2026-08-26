@@ -37,10 +37,33 @@ can be taught new behaviors (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: 211 (the-connection-is-a-service-not-a-verb) — EXECUTING
-Plan: wave 1 of 4 landed (211-01)
-Status: Executing Phase 211. Phase 210 is ✅ COMPLETE (closed 2026-08-26 with owed rows).
-Last activity: 2026-08-26 — Phase 210 closed with owed rows; Phase 211 wave 1 landed
+Phase: 212 (the-catalog-and-its-doors) — NOT STARTED
+Plan: —
+Status: 210 ✅ and 211 ✅ both COMPLETE with owed rows. **Three operator-only actions are owed
+before 212 opens** — see "Owed before 212" below.
+Last activity: 2026-08-27 — Phase 211 closed (5/5 plans); migration 127 applied to the live DB
+
+## ⚠ Owed before 212 — all three are OPERATOR-ONLY
+
+1. ⛔ **`bash scripts/regenerate-full-schema.sh`** (no `--reset`). Migration 127 IS applied to the
+   live DB, but **`supabase/full-schema.sql` is NOT regenerated**, so the greenfield deploy
+   artifact does not carry `service_id`, `has_a_service_identity` or `shape_is_not_ambiguous`.
+   A fresh environment built from it today gets migration 126's shape and CONN-08 fails there.
+   The agent cannot run it — it needs `docker`, which is denied.
+2. ⭐ **`/code-review ultra review-210-211-base`** — 46 files / 5,784 lines, both phases' source
+   in one pass. It is the ONLY independent gate on **two reviewer-authored fixes that have no
+   verifier** (`7bd77065` W-1, `ca015df9` SC#10). Branch built in `.claude/worktrees/revbase`;
+   tear down with `scripts/teardown-worktree.sh` afterwards, and **never `rm -rf`** it.
+3. **211's five per-shape UAT rows + four G-4 lived-experience checks.** Row 5 is named as the one
+   to run first; **row 3 (SMTP · `send_email`) is ⛔ BLOCKED** — no such connection exists here
+   (the table holds `slack`, `jira`, `mcp.deepwiki.com`).
+
+⚠ **`BUG-260827-01` has `folded_into: null` while affecting 212, 214 AND 215.** A service-only
+connection makes a run say *"the bound connection is for a different capability"* — it has NO
+capability. Independently verified 2026-08-27: `getattr(conn, "capability", cap)`'s default fires
+only on a MISSING attribute, never on `None`, so `phase_types.py:2460` fires on exactly the row
+shape migration 127 exists to permit. **Name its owner at 212's discuss-phase** or three phases
+will each assume another has it.
 
 ---
 

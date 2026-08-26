@@ -270,7 +270,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 210. Ground Truth — Operability & Failure Honesty | 3/3 | ✅ Complete (1/5 SC driven; 4 owed — see 210-VERIFICATION.md) | 2026-08-26 |
-| 211. The Connection Is a Service, Not a Verb | 0/5 | Not started | - |
+| 211. The Connection Is a Service, Not a Verb | 5/5 | ✅ Complete (mig 127 applied; UAT rows + schema regen owed — see 211-05-SUMMARY.md) | 2026-08-27 |
 | 212. The Catalog and Its Doors | 0/? | Not started | - |
 | 213. Per-Tool Grants and the Approval Moment | 0/? | Not started | - |
 | 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
