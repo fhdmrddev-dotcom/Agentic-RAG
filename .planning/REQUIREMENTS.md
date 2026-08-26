@@ -178,8 +178,54 @@ branch, and **each new surface pays the branch again**.
 
 ## Traceability
 
-Filled by `/gsd:new-milestone`'s roadmapper. Every requirement above maps to exactly one phase.
+Filled by `/gsd:new-milestone`'s roadmapper (2026-08-26). **Every requirement maps to exactly one
+phase: 32 / 32 mapped, no orphans, no duplicates.**
 
-| REQ-ID | Phase | Status |
-|---|---|---|
-| _pending roadmap_ | — | Planned |
+⚠ **The scoping brief said 31 requirements; this file contains 32.** `grep -c "^- \[ \] \*\*"` returns
+`32`. The roadmap is validated against the file, not against the brief.
+
+**Counts by phase:** 210 → 4 · 211 → 3 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
+
+| REQ-ID | Phase | What the phase must make true | Status |
+|---|---|---|---|
+| **CONN-04** | Phase 211 | A connection is created against a service; actions come from advertised tools | Planned |
+| **CONN-05** | Phase 211 | The three legacy verbs keep working as one shape among many and organise nothing | Planned |
+| **CONN-06** | Phase 212 | Paste an MCP URL — tools discovered and grantable with zero engineering | Planned |
+| **CONN-07** | Phase 212 | See / edit / delete a connection without losing its per-tool grants | Planned |
+| **CONN-08** | Phase 211 | An OAuth-authenticated service row is accepted by the database (mig 126 CHECK) | Planned |
+| **CAT-01** | Phase 212 | Browse connections as a searchable catalog of services | Planned |
+| **CAT-02** | Phase 212 | A Popular row of one-click connects inside the same generic list | Planned |
+| **CAT-03** | Phase 212 | Filter on connection STATE, never on what a connector can do | Planned |
+| **CAT-04** | Phase 216 | Starter prompt suggestions on a connected service | Planned |
+| **CAT-05** | Phase 212 | Add a connection from Settings → Connections on a cloud install | Planned |
+| **OAUTH-01** | Phase 215 | Authorization-code flow with a customer-registered client id/secret | Planned |
+| **OAUTH-02** | Phase 215 | Silent refresh; a revoked/unrefreshable connection says so plainly | Planned |
+| **OAUTH-03** | Phase 215 | Client secrets and refresh tokens encrypted at rest and org-scoped | Planned |
+| **GRANT-01** | Phase 213 | Grant or deny each tool individually, reads and writes in one list | Planned |
+| **GRANT-02** | Phase 213 | A connection-level default approval posture tools inherit | Planned |
+| **GRANT-03** | Phase 213 | The run pauses and asks a person, naming service / tool / arguments | Planned |
+| **GRANT-04** | Phase 213 | A denied or ungranted tool is refused, naming the grant that would allow it | Planned |
+| **GRANT-05** | Phase 213 | Every outbound call writes an audit receipt | Planned |
+| **CHAT-05** | Phase 216 | Add any connected service to a thread by name; the agent picks a granted tool | Planned |
+| **CHAT-06** | Phase 216 | See and remove the services active in the current thread | Planned |
+| **CHAT-07** | Phase 216 | A chat tool call renders with the service's mark and the tool's real name | Planned |
+| **STEP-01** | Phase 214 | Pick a service then a named action — no URL, no hand-written JSON | Planned |
+| **STEP-02** | Phase 214 | Required arguments author-fillable from every launch path | Planned |
+| **STEP-03** | Phase 214 | Publish refuses an unsatisfiable step, naming step and missing argument | Planned |
+| **STEP-04** | Phase 214 | Service mark + action name on the run spine and run surfaces | Planned |
+| **STEP-05** | Phase 214 | A failed external step reports its own failure reason on the panel | Planned |
+| **STEP-06** | Phase 214 | The describe door is bound to connected services + granted tools, and refuses | Planned |
+| **ATTACH-01** | Phase 216 | Pick one specific file from a connected source and attach or ingest it | Planned |
+| **CONN-09** | Phase 210 | The `live_connectors` kill-switch is visible and controllable in the Control Room | Planned |
+| **CONN-10** | Phase 210 | No silent schedule on a scheduler-off install; the default budget does not self-cancel | Planned |
+| **CONN-11** | Phase 210 | A manual schedule trigger succeeds when `org_id` is null | Planned |
+| **RAG-09** | Phase 210 | An embedding-provider failure is reported as a provider failure | Planned |
+
+**Load-bearing order** (see `.planning/ROADMAP.md` → *The sequencing constraints*):
+**211** (`SEED-207`, the connection model) precedes **212 / 214 / 216** · **213** (per-tool approval)
+is a HARD prerequisite for **216** (chat) · **CONN-08** (211) precedes **OAUTH-01** (215) ·
+MCP-first (212) precedes OAuth (215) · the governed canvas (214) precedes chat (216).
+
+⚠ **Update a row's Status when its phase closes, not at the milestone audit.** Seven of twelve v3.8
+phases had no `VERIFICATION.md` and this table was stale from day one — the second consecutive
+milestone to close that way.

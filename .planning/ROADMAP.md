@@ -22,6 +22,327 @@
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
+- 🚧 **v3.9 Connections: Any Service, Any Tool** — Phases **210-216** (ACTIVE, opened 2026-08-26). Seven phases, **32/32 requirements mapped**. A person connects a **service** — not a protocol — sees every tool it offers, grants each one individually, and then uses it **by name in chat** and as a **specific step** on the canvas. ⭐ Nothing is per-vendor: a connection is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds **rows, not code**. Order is load-bearing — `SEED-207` (retire `capability` as the browse axis) is a PREREQUISITE, the per-tool approval model is a HARD prerequisite for the chat surface, CONN-08's migration precedes OAuth, and MCP-first precedes OAuth. Nine bugs folded (2 blocking).
+
+---
+
+## v3.9 Connections: Any Service, Any Tool — ACTIVE (opened 2026-08-26)
+
+**Started:** 2026-08-26 via `/gsd:new-milestone`. **Roadmap created:** 2026-08-26.
+**Numbering:** continues at **210** (v3.8 ended at 209). **No number is reserved or skipped.**
+**Scope source:** `.planning/REQUIREMENTS.md` — **32 REQ-IDs** across 7 phases.
+⚠ **The scoping brief said "31 requirements"; the file contains 32** (`grep -c "^- \[ \] \*\*"` →
+`32`). Coverage below is validated against the file, not against the brief.
+
+**The one sentence this milestone is measured against:**
+
+> A person connects a **service** — not a protocol — sees every tool it offers, grants each one
+> individually, and then uses it **by name in chat** and as a **specific step** on the canvas.
+
+⭐ **NOTHING IS PER-VENDOR, and that is the architectural point.** A connection is
+`{service identity, auth, discovered tools, per-tool grants}`. Adding a service adds **rows, not
+code**. Three doors in, in cost order: **custom MCP URL** (zero engineering — this is what makes the
+menu unbounded) → **Popular catalog entry** (a few strings) → **BYO OAuth** (only for first-party
+APIs with no MCP server; the cost is per AUTH FAMILY, not per product). **If a requirement can only
+be met by writing code per service, it is the wrong requirement.**
+
+### Measured facts this roadmap is built on — do NOT re-derive them from stale prose
+
+- ✅ **MCP-first is already HALF-BUILT.** `backend/app/services/mcp_client.py` (367 L) ships at HEAD;
+  Phase 206.2 shipped **per-tool grants** (`tool_grants` — the industry's most advanced permission
+  grain, per the competitor study, *"do not regress it"*); Phase 209 shipped the
+  `All / Connected / Not connected` filter. **These phases EXTEND that work; none of them rebuilds
+  it.** ⚠ `CONNECTIONS-MILESTONE-CANDIDATE.md`'s claims that *"no MCP client exists in the backend
+  today"* and that `test_189_no_egress.py`'s fence must still be retired are **both STALE** — the
+  fence was retired in v3.8. That document is rich and mostly right; those two lines are not.
+- ⚠ **OAuth genuinely IS zero.** Exactly one occurrence of the string in all of `backend/app`, and
+  it is a comment in `models/connector.py` saying there is no flow, no redirect URI, no callback, no
+  refresh token and no consent surface.
+- ⚠ **A migration is owed before OAuth can store one row.** Migration 126 leaves
+  `CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)`; an OAuth service has neither and
+  the database refuses the row. **That is why CONN-08 sits in Phase 211 and OAUTH-01 in Phase 215.**
+- ⚠ **The three fixed verbs must NOT be deleted.** `send_email` / `create_ticket` / `post_message`
+  (`phase_types.py:2311-2322`) are the only external path that works with **no MCP server**. They
+  become an ATTRIBUTE, never the organising axis.
+- ⚠ **`readOnlyHint` CANNOT carry a direction design.** Driven live 2026-08-25: DeepWiki ships
+  **no `annotations` at all** on any of its three tools — including one whose name begins with
+  `read`. It is an optimisation when present, never the mechanism. `outputSchema`, by contrast, was
+  **present on every tool** and is discarded by `mcp_client.py:293-296` — the study's *"single
+  cheapest actionable finding"*, and it lands in Phase 211.
+- ⚠ **`mcp_client.py:220` does blocking DNS inside an async handler** (D-v2.5-01) while the sibling
+  capability path IS threadpooled. In scope by adjacency → Phase 212.
+
+### The sequencing constraints — this order is not a preference
+
+1. **`SEED-207` is a PREREQUISITE, not a feature.** While two connection models coexist, every
+   downstream surface — node face, service mark, filter, chat mention, catalog entry, picker — must
+   branch, and **each new surface pays the branch again**. Phase **211 lands before 212, 214 and
+   216**.
+2. **The per-tool approval model (GRANT-01..05, Phase 213) is a HARD PREREQUISITE for the chat
+   surface (CHAT-05..07, Phase 216).** Standing project rule: *never add an outbound capability to
+   `_TOOL_REGISTRY` before the approval model exists.* An ordering that ships chat first is wrong.
+3. **CONN-08 (Phase 211) before OAUTH-01 (Phase 215)** — the database refuses the row otherwise.
+4. **MCP-first, then OAuth** (operator direction, and the competitor study's inverted tiering:
+   six of the eight named services are reachable at today's credential shape; **Google and Microsoft
+   are the only two that are not, and they were the proposed Tier 1**). Leading with them would
+   front-load 100% of the auth bill before one read shipped.
+5. **Prove the model and the grants on the GOVERNED surface first.** Phase 214 (workflow steps)
+   precedes Phase 216 (chat) because the canvas already carries D-19's armed checkpoint and the
+   egress guard; chat carries neither today.
+
+### Bugs folded (9) — no phase is a bug phase; each bug rides its requirement
+
+| Bug | Requirement | Phase |
+|---|---|---|
+| `BUG-260826-01` ⛔ **BLOCKING** — a `send_email` step can never receive its arguments | STEP-02 | **214** |
+| `BUG-260826-02` — publish accepts a step nothing can satisfy | STEP-03 | **214** |
+| `BUG-260826-03` — manual schedule trigger 500s on null `org_id` (browser reports CORS) | CONN-11 | **210** |
+| `BUG-260826-04` — `live_connectors` kill-switch invisible in the Control Room | CONN-09 | **210** |
+| `BUG-260826-05` — a failed external step does not report its own reason | STEP-05 | **214** |
+| `BUG-260826-06` — schedules accepted while the scheduler is off | CONN-10 | **210** |
+| `BUG-260826-07` — default scheduled-run token budget cancels realistic workflows | CONN-10 | **210** |
+| `BUG-260810-01` — cloud Connections tab has no Add button | CAT-05 | **212** |
+| `BUG-260815-05` ⛔ **BLOCKING** — an embedding-provider 429 surfaces as *"your documents returned nothing"* | RAG-09 | **210** |
+
+⚠ **RAG-09 is deliberately NOT connector work.** It rides in Phase 210 rather than owning a phase
+because it **poisons the trustworthiness of every deliverable this milestone produces** — a
+connections milestone whose retrieval lies about its own failures cannot be believed. Phase 210 is
+its natural home: *the install reports its own state honestly, before anything new is connected to
+it.*
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 210 | Ground Truth — Operability & Failure Honesty | The install honestly reports and controls its own external-action, scheduling and retrieval state — before anything new is connected to it | CONN-09, CONN-10, CONN-11, RAG-09 | 5 | Closes 5 bugs incl. ⛔ `BUG-260815-05`; **G-5** (`api/admin.py` — 32/12/1733, ⚠ **absent from the ledger at 12 phases**); UI hint; SC#10 **embedding roster** (not the chat roster); no threat model; no migration expected |
+| 211 | The Connection Is a Service, Not a Verb | A connection is created against a service and its actions come from that service's own advertised tools; the three legacy verbs survive as one shape among many and organise nothing | CONN-04, CONN-05, CONN-08 | 4 | ⭐ **PREREQUISITE (`SEED-207`)** — blocks 212 / 214 / 216; **G-5** (`phase_types.py`, `grounding.py`, `models/connector.py`) — the retire IS the refactor; **migration 127** (drop mig 126's CHECK + service identity); widen the `mcp_client` sanitizer (`title` / `outputSchema`); light threat model (CHECK relaxation) |
+| 212 | The Catalog and Its Doors | A person finds a service the way they find an app — by mark, name and purpose — and adds one from a Popular row or by pasting a URL, on every install including cloud | CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07 | 5 | **G-2 sketch** (`screenshots/` is the bar); **G-5 ×4** (`ConnectionsTab.tsx`, `ConnectionFormPanel.tsx`, `connectionsCopy.ts`, `connectionFormCopy.ts` — **all four fire**); closes `BUG-260810-01`; **threat model** (custom-URL door = SSRF / egress); fixes `mcp_client.py:220` blocking DNS (D-v2.5-01); UI hint |
+| 213 | Per-Tool Grants and the Approval Moment | Each tool of a connection is granted or denied individually, and a tool whose posture requires approval stops and asks a real person before anything leaves | GRANT-01..05 | 5 | ⭐ **HARD PREREQUISITE for 216**; **G-2 sketch** (grant list + approval moment); ⚠ **G-1 risk** — 2nd consecutive phase on `ConnectionFormPanel.tsx`; **threat model** (the trust boundary of this milestone); SC#10 (pauses a live run); builds on 206.2 `tool_grants` + Phase 085 `ask_user` — **extend, do not regress**; migration likely (posture column) |
+| 214 | A Step Names Its Service and Its Action | An author adds an external step by picking a service and a named action, the step's arguments arrive from whatever launched the run, publish refuses one nothing can satisfy, and every run surface says which service and action it was | STEP-01..06 | 5 | Closes ⛔ `BUG-260826-01` + `-02` + `-05`; **G-2 sketch** (step picker, canvas + run faces); **G-5 ×3** (`ConnectionPicker.tsx`, `ExternalActionSection.tsx`, `phase_types.py`) + `McpToolPicker.tsx` (⚠ **no ledger row of its own**); **threat model** (publish gate + argument provenance); SC#10; ⚠ **launch decision owed on `visual_workflow_canvas`** (cold default `off`) |
+| 215 | BYO OAuth | A customer registers their own OAuth application, connects a first-party service with it on any deployment including self-hosted, and the connection keeps working without them reconnecting | OAUTH-01, OAUTH-02, OAUTH-03 | 4 | **Depends on CONN-08 (211)**; **threat model — MANDATORY** (this is migration 118's defect class); **G-2 sketch** ⚠ **whose bar is NOT `screenshots/`** — those show a vendor-owned 2-click Connect this milestone explicitly does not ship (D-v3.9-01); **migration** (token / refresh / expiry / scope / account identity); refresh must be **claim-based** (`WORKER_COUNT=2`, no leader); deployment-artifact parity (redirect URI is a new env var) |
+| 216 | Connections in Chat, and One File In by Hand | A connected service is a platform asset a person uses by name in a thread, the agent picks which granted tool to call, and a person can pull a single named file from a connected source into the thread | CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01 | 5 | ⭐ **Gated behind 213** — never an outbound capability in `_TOOL_REGISTRY` before the approval model; **G-2 sketch** (service chip, starter prompts, attach picker); **G-5 ×4** (`ChatLayout.tsx` ⚠ 21 phases and **absent from the ledger**, `MessageInput.tsx`, `ToolCallPanel.tsx`, `MessageItem.tsx` — the last two read **extraction due**); **threat model** (⚠ **prompt injection** — every read lands untrusted text in the model's context; the tree has never faced this because until 206.2 every connector was a write); **SC#10 full 8-row roster** |
+
+### Phase Checklist
+
+- [ ] **Phase 210: Ground Truth — Operability & Failure Honesty** — kill-switch visible and effective, a schedule cannot be silently accepted on a scheduler-off install, a null-`org_id` manual trigger works, and an embedding-provider failure is named as one (CONN-09, CONN-10, CONN-11, RAG-09)
+- [ ] **Phase 211: The Connection Is a Service, Not a Verb** — service-shaped connections whose actions come from advertised tools; the three verbs demoted to an attribute; the OAuth-shaped row can exist (CONN-04, CONN-05, CONN-08) ⭐ PREREQUISITE
+- [ ] **Phase 212: The Catalog and Its Doors** — searchable service catalog with marks and purposes, state-only filters, a Popular row, the paste-a-URL door, and edit/delete that keeps grants (CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07)
+- [ ] **Phase 213: Per-Tool Grants and the Approval Moment** — one list of reads and writes, an inheritable default posture, a run that pauses and names service/tool/arguments, a refusal that names its grant, and an audit receipt per call (GRANT-01..05) ⭐ HARD PREREQUISITE for 216
+- [ ] **Phase 214: A Step Names Its Service and Its Action** — service→action picking with no URL and no hand-written JSON, arguments that arrive from every launch path, a publish that refuses the unsatisfiable, honest step identity and failure on the run surfaces, and a describe door bound to the author's real vocabulary (STEP-01..06)
+- [ ] **Phase 215: BYO OAuth** — customer-registered client id/secret, an authorization-code consent that works self-hosted, silent refresh, a plainly-stated revoked state, and secrets unreadable at rest (OAUTH-01..03)
+- [ ] **Phase 216: Connections in Chat, and One File In by Hand** — add a service to a thread by name, see and remove what is active, tool calls that render with the real mark and name, starter prompts that actually run, and one file pulled in by hand (CHAT-05..07, CAT-04, ATTACH-01)
+
+### Phase Details
+
+#### Phase 210: Ground Truth — Operability & Failure Honesty
+
+**Goal**: The install honestly reports and controls its own external-action, scheduling and retrieval state — so that everything this milestone connects to it lands on a platform that does not lie about its own condition.
+**Depends on**: Nothing (first phase — deliberately independent of the connection model so the two ⛔ blocking-class defects are not gated behind a schema change).
+**Requirements**: CONN-09, CONN-10, CONN-11, RAG-09
+**Success Criteria** (what must be TRUE):
+
+  1. An operator opens the Control Room, sees the `live_connectors` kill-switch with its current state, flips it, and a subsequent external call is refused (CONN-09 — closes `BUG-260826-04`).
+  2. A user who saves a schedule on an install whose scheduler is disabled is told so at save time; the schedule is never silently accepted and then never run (CONN-10 — closes `BUG-260826-06`).
+  3. A scheduled run starts with a token budget a realistic workflow can finish inside, instead of cancelling itself part-way (CONN-10 — closes `BUG-260826-07`).
+  4. A user whose `org_id` is null triggers a schedule manually and the run starts — no 500, and no CORS error in the browser standing in for one (CONN-11 — closes `BUG-260826-03`).
+  5. When the embedding provider fails, the answer says the provider failed and names it — never *"your documents returned nothing"* (RAG-09 — closes ⛔ `BUG-260815-05`).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: Closes 5 of the milestone's 9 folded bugs, including ⛔ `BUG-260815-05`. **G-5**: `backend/app/api/admin.py` (32 commits / 12 phases / 1733 L — **fires**, and ⚠ **it has been absent from the ledger for its whole life**, so G-5 has never been able to fire on it; re-derive from git at discuss-phase rather than trusting the cell). **SC#10 applies with a DIFFERENT roster** — RAG-09's axis is the *embedding* provider set (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible, per Phase 111.1), not the 8-row chat roster; a blocked provider is recorded ⛔ with its reason, never omitted. No threat model expected (no new trust boundary — CONN-09 tightens an existing one). No migration expected; if CONN-10's budget default is stored in `app_settings`, deployment-artifact parity applies in the same commit. ⚠ **CONN-10 has two halves and a plan must not close on one** — "cannot be silently accepted" and "the default budget does not guarantee cancellation" are two different defects (`-06` and `-07`) that share a requirement.
+
+#### Phase 211: The Connection Is a Service, Not a Verb
+
+**Goal**: A connection is created against a **service**, and the actions it offers come from that service's own advertised tools — so that adding a service is data rather than code, and no surface downstream ever has to branch on which of two connection models it is looking at.
+**Depends on**: Nothing structural (may run alongside 210). ⭐ **Everything after it depends on this.**
+**Requirements**: CONN-04, CONN-05, CONN-08
+**Success Criteria** (what must be TRUE):
+
+  1. A user creates a connection by naming a **service**, and the actions offered are the tools that service advertises — the three-verb dropdown appears nowhere in the flow (CONN-04).
+  2. A Slack / Jira / SMTP connection created before this phase still sends, unchanged, and now presents as a service with named actions rather than as a capability (CONN-05).
+  3. A user browsing, filtering or picking a connection is never offered `Message` / `Ticket` / `Email` as a category — the verb survives as an attribute of one shape, and organises nothing (CONN-05).
+  4. A connection row for a service with **neither a capability nor an MCP URL** saves successfully (CONN-08).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: ⭐ **PREREQUISITE — `SEED-207`.** **G-5, and this phase IS the refactor**: `phase_types.py` (45/20/2621 — fires; the 200-03 extraction was taken, the file stays hot), `harness/grounding.py` (19/6/1311 — fires; `EXTERNAL_ACTION_CAPABILITIES` is the runtime home of the closed set), `models/connector.py`. ⚠ **`capability` is spelled in FOUR places held in agreement by two module-scope `assert`s** — migration 116's `CHECK`, `grounding.EXTERNAL_ACTION_CAPABILITIES`, `ConnectorCapability`, `ExternalActionPhaseConfig.capability`. That machinery is *good engineering of the wrong model*; **do not add a fifth verb**. The industry replacement is **service → (resource, operation)** as free text on the discovered-tool list, with the closed set moving to the **per-tool grant**, which is data and already ships. **Migration 127** (head is 126): drop mig 126's `CHECK`, add service identity. Apply by pasting into the Supabase SQL editor, then `bash scripts/regenerate-full-schema.sh`. **Widen the `mcp_client` sanitizer allow-list** (`mcp_client.py:293-296`) to carry `title` and `outputSchema` — ⚠ **widen the list, never remove it**; a raw passthrough puts server-controlled keys into `discovered_tools` JSONB. `title` feeds Phase 212's catalog label; `outputSchema` feeds Phase 214's argument satisfiability. ⚠ **`annotations` / `readOnlyHint` may be carried but MUST NOT be depended on** — measured absent in the wild, and per spec a hint from an untrusted server may never *widen* a permission. Light threat model (relaxing a `CHECK` is removing a database-level guarantee — say what replaces it). D-14 red line: no new executor.
+
+#### Phase 212: The Catalog and Its Doors
+
+**Goal**: A person finds a service the way they find an app — by its mark, its name and a one-line purpose — and adds one either from a curated Popular row or by pasting a URL for a service we have never heard of, on every install including cloud.
+**Depends on**: Phase 211 (the catalog cannot be built on `capability` — that is the measured reason DeepWiki vanished from every chip).
+**Requirements**: CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07
+**Success Criteria** (what must be TRUE):
+
+  1. A user browses connections as a **searchable list of services**, each with its own mark, display name and one-line purpose (CAT-01).
+  2. A user filters that list by `All / Connected / Not connected`, and finds no filter anywhere describing what a connector can *do* (CAT-03).
+  3. A user **on a cloud install** connects one of the curated Popular services in one click, from the same list every other service lives in (CAT-02, CAT-05 — closes `BUG-260810-01`).
+  4. A user pastes an MCP server URL for a service nobody here has heard of, its tools are discovered and become grantable, and **no code changed on our side** (CONN-06).
+  5. A user edits a connection's name, credentials or endpoint and saves — and its existing per-tool grants are still exactly as they were; deleting the connection removes it cleanly (CONN-07).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: **G-2 sketch owed before planning** — `screenshots/` is the acceptance bar (⚠ **Claude.ai**, verified by reading the images 2026-08-26; `202011` Connectors → the catalog IA and the `Custom` badge that IS the custom-URL door; `202036`/`202044` Plugins Directory → the long-tail catalog IA). ⚠ **The bar is the catalog IA and the grant grain, NOT the two-click Connect moment** — those shots depict a product where the vendor owns every OAuth app, which D-v3.9-01 explicitly declines. **G-5 fires on FOUR files this phase will touch** — `ConnectionsTab.tsx` (8/3/1223), `ConnectionFormPanel.tsx` (5/3/1758 — crossed the threshold in the commit that added its row), `connectionsCopy.ts` (4/3/541), `connectionFormCopy.ts` (4/3/759) — **so discuss-phase opens with a refactor recommendation, not with the feature**; the catalog rebuild plausibly discharges it by construction, but that must be *argued*, not assumed. **Threat model REQUIRED**: the paste-a-URL door is an operator-supplied outbound endpoint — SSRF, redirect chasing, response size, and the egress guard's ruling on a URL nobody curated. **Fix `mcp_client.py:220`'s blocking DNS in an async handler** (D-v2.5-01) — in scope by adjacency, and the sibling capability path already shows the threadpooled shape. ⚠ **`D-207-06` has no guard**: a symbol exported from a `lib/api` domain module but forgotten in the barrel typechecks perfectly and is invisible to every consumer — this phase adds `lib/api` surface, so check the barrel explicitly.
+
+#### Phase 213: Per-Tool Grants and the Approval Moment
+
+**Goal**: Each tool of a connection is granted or denied individually — reads and writes in one list — and a tool whose posture requires approval stops the run and asks a real person, naming the service, the tool and the arguments, before anything leaves.
+**Depends on**: Phase 211 (grants key to a service's discovered tools) and Phase 212 (the detail screen the grant list lives on).
+**Requirements**: GRANT-01, GRANT-02, GRANT-03, GRANT-04, GRANT-05
+**Success Criteria** (what must be TRUE):
+
+  1. A user sees every tool a connection offers in **one list** — a search and a create side by side — and switches each on or off independently, granting the search freely while holding the create back (GRANT-01).
+  2. A user sets a connection-level approval posture **once**, and every tool shows that posture until it is individually overridden (GRANT-02).
+  3. When the agent calls a tool whose posture requires approval, the run **pauses** and shows a person the service, the tool and the exact arguments — and nothing leaves until they answer (GRANT-03).
+  4. A tool that is denied, or was never granted, is **refused** — and the refusal names the grant that would allow it (GRANT-04).
+  5. Every outbound call made through a connection appears in the audit ledger naming service, tool, actor and outcome (GRANT-05).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: ⭐ **HARD PREREQUISITE for Phase 216** — the standing rule is *never an outbound capability in `_TOOL_REGISTRY` before the approval model exists*, and this phase is that model. **Extend, do not rebuild:** 206.2 already shipped `tool_grants` at the per-tool grain, which the competitor study calls the industry's most advanced permission model with the instruction *"do not regress it"*; Phase 085's `ask_user` is the existing pause/ask primitive; Phase 189/190's armed checkpoint (D-19) and audit receipts are the existing run-time gate. **G-2 sketch owed** — the grant list and the approval moment are both "feels like" surfaces; the Rovo detail screen (7 tools, reads and writes in one list, a connector-level `Needs approval` default) is the bar. ⚠ **G-1 risk**: this is the **second consecutive phase** on `ConnectionFormPanel.tsx` / `ConnectionsTab.tsx`. If Phase 212 did not take the seam, this phase must — surface it at discuss-phase rather than paying the branch twice. **Threat model REQUIRED** — this is the trust boundary of the whole milestone. ⚠ **Two gates, and they must differ**: grant-time (per-tool, human, once) is where the industry approves a read; run-time (D-19, armed) is ours and is stricter than any engine studied. **The run-time gate may key on direction; the grant-time gate must NOT**, because a read is exactly where prompt injection enters. ⚠ **Direction must not be built on `readOnlyHint`** — measured absent on the one server we can reach; fail closed on absence, exactly as the spec specifies. **SC#10** (a pause suspends a live run — streaming and UI state). Migration likely (default posture on the connection).
+
+#### Phase 214: A Step Names Its Service and Its Action
+
+**Goal**: An author adds an external step by picking a service and then a named action; that step's required arguments arrive from whatever launched the run; publish refuses a step nothing can satisfy; and every surface a run appears on says which service and which action — including when it fails.
+**Depends on**: Phase 211 (the service model) and Phase 213 (STEP-06 needs *granted* tools as its vocabulary).
+**Requirements**: STEP-01, STEP-02, STEP-03, STEP-04, STEP-05, STEP-06
+**Success Criteria** (what must be TRUE):
+
+  1. An author adds an external step by picking a **service** and then a **named action** — no server URL and no hand-written JSON argument object anywhere in the flow (STEP-01).
+  2. An author fills a step's required arguments and a run supplies them **from every launch path** — a `send_email` step actually receives its recipient, subject and body, whether launched from the library, from a thread, or on a schedule (STEP-02 — closes ⛔ `BUG-260826-01`).
+  3. Publishing a workflow whose external step has a required argument nothing can supply is **refused**, naming the step and the missing argument (STEP-03 — closes `BUG-260826-02`).
+  4. A run's spine and run surfaces show the service's mark and the action's real name — and when a step fails, the panel shows **that step's own failure reason**, not a generic one (STEP-04, STEP-05 — closes `BUG-260826-05`).
+  5. The describe-a-workflow door is handed the author's connected services and granted tools as its vocabulary, and a named-but-absent service produces a **stated refusal with a next action** (*"Slack is not connected"*) rather than an invented step that validates and fails at 03:00 (STEP-06).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: Closes three folded bugs including ⛔ **`BUG-260826-01`** — the milestone's blocking defect on the shipped surface. **Sequenced BEFORE chat deliberately**: the canvas already carries D-19's armed checkpoint and the egress guard, so the model and the grants are proven on the governed surface before outbound reaches chat, which carries neither. **G-2 sketch owed** (step picker + the canvas and run node faces; the `…workflow-edit.webp` **xyOps** reference is the canvas bar — named action nodes, per-node glyphs, typed edges — and the `sketch-findings-agentic-rag` skill auto-loads; read `references/icon-convention.md` §4 before drawing any canvas mark). **G-5**: `ConnectionPicker.tsx` (5/3/651 — fires at threshold), `ExternalActionSection.tsx` (4/3/498 — fires at threshold), `phase_types.py` (fires), plus `McpToolPicker.tsx` (2/2/570) which ⚠ **is named inside Phase 206's ledger section but has no row of its own**. Refactor recommendation owed first at discuss-phase. **Threat model REQUIRED** (the publish gate is a safety gate, and argument provenance decides what a step is allowed to send). ⚠ **A launch decision is owed on `visual_workflow_canvas`, whose cold default is `off`** — Phase 209's 16/16 browser drive ran against a flag-flipped database, so a criterion here that renders only behind the flag is not shipped. ⚠ **`SEED-206` is exactly SC#4's second half** — 209's node face never reached the run surface. **SC#10.** ⚠ **`{{prior_run.*}}` misses `llm_emit`** (carried from v3.8) — if STEP-02's argument plumbing reuses that resolver, the same gap applies. **Existing precedent to reuse, not reinvent**: `DESCRIBE_REFUSAL` in `doorVocabulary.ts` (Phase 199) already knows how to refuse in a governed vocabulary — ⚠ *a refusal is only honest if it names the next action*.
+
+#### Phase 215: BYO OAuth
+
+**Goal**: A customer registers their **own** OAuth application, connects a first-party service with it on any deployment including self-hosted and on-prem, and the connection keeps working afterwards without them reconnecting — or says plainly that it cannot.
+**Depends on**: Phase 211 (**CONN-08** — until mig 126's `CHECK` is gone the database refuses an OAuth row) and Phase 212 (OAuth is a third door in the same Add menu).
+**Requirements**: OAUTH-01, OAUTH-02, OAUTH-03
+**Success Criteria** (what must be TRUE):
+
+  1. A user pastes a client id and secret **they registered themselves**, completes an authorization-code consent, and lands back on a connected service — on a self-hosted install as readily as on cloud (OAUTH-01).
+  2. A connection whose access token has expired keeps working on the next call, with nobody reconnecting anything (OAUTH-02).
+  3. A connection whose grant was revoked, or cannot be refreshed, says so **as a connection state in plain words** — never as a tool error in the middle of a run (OAUTH-02).
+  4. Client secrets and refresh tokens are unreadable at rest and to any database role that does not need them — verified the same way migration 118 verified `secret_ciphertext` (OAUTH-03).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: **D-v3.9-01 binds this phase**: BYO first, we-own-the-app later. ⚠ **G-2 sketch owed, but `screenshots/` is NOT its bar** — Claude.ai's 2-click Connect exists because *Anthropic* registered the app; our redirect URI would point at our cloud and exclude every self-hosted install. **Do not let a sketch promise it.** The honest comparison is n8n / Windmill's per-operator registration (8+ steps for Google), and the design job is making that *tolerable and legible*, not pretending it is two clicks. **Threat model MANDATORY** — ⚠ **this is exactly the defect class migration 118 closed for `secret_ciphertext`; do not re-introduce it by copying an RLS shape from a table with no secret column**, and remember the measured trap that mig 118 granted SELECT *column by column*, so a NEW column is unreadable by default and the failure looks like an outage. **Migration** for access token + refresh token + expiry + scope set + provider account identity — ⚠ the `enc:v1:` envelope generalises, **the column shape does not**; this is the migration `SEED-146` warns about, so commit it once. **Refresh must be claim-based**: `WORKER_COUNT=2` with no leader, so two workers racing a rotation invalidates each other's token. **New public callback route + `state` CSRF param + per-org binding** — ⚠ the frontend has no URL router (`SEED-185`), which is a real cost to size at discuss-phase. **Deployment-artifact parity in the same commit** (the redirect URI is a new env var → `deploy/onebox.env.example`, `docs/OPERATOR.md`, `scripts/check-deploy-drift.sh`). ⚠ **MCP defers OAuth, it does not remove it** — a remote MCP server fronting Google holds a live grant we do not control, which is a credential concentration our egress guard does not answer.
+
+#### Phase 216: Connections in Chat, and One File In by Hand
+
+**Goal**: A connected service is a platform asset a person uses **by name in a thread** — the agent chooses which granted tool to call, the call renders as itself, a fresh connection offers a way in, and a person can pull one named file from a connected source into the thread by hand.
+**Depends on**: ⭐ **Phase 213 (HARD)** — the approval model. Also Phase 211, Phase 212, and Phase 215 (so ATTACH-01 can be driven against a real first-party source rather than only an MCP one).
+**Requirements**: CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01
+**Success Criteria** (what must be TRUE):
+
+  1. A user adds a connected service to a thread **by name**, asks for something in their own words, and the agent chooses one of that service's **granted** tools and calls it (CHAT-05).
+  2. A user sees which connected services are active in the current thread and removes one **without starting a new thread** (CHAT-06).
+  3. A tool call made from chat renders with the **service's own mark and the tool's real name**, never as a generic external action (CHAT-07).
+  4. A freshly connected service offers starter prompts, and clicking one starts a thread that actually runs against that connection (CAT-04).
+  5. A user picks **one named file** from a connected source and attaches it to the thread or ingests it — a deliberate act with a visible result, never a background sync (ATTACH-01).
+
+**Plans**: TBD
+
+**UI hint**: yes
+**Flags**: ⭐ **Gated behind Phase 213.** ⚠ **CAT-04 lives here, not in the catalog phase, and the reason is honesty**: a starter prompt is only truthful once the agent can act on it — chips shipped before the chat surface are suggestions that fail. **G-2 sketch owed** (service chip in the thread, starter prompts, the attach picker). **G-5 ×4, and two of them read *extraction due***: `ChatLayout.tsx` (40/21/815 — ⚠ fires at **21 phases** and has been **absent from the ledger for its entire life**), `MessageInput.tsx` (25/13/478), `ToolCallPanel.tsx` (47/19/995 — *extraction due*), `MessageItem.tsx` (57/29/856 — *extraction due*). Refactor recommendation owed first. ⚠ **The workspace panel is a CROSS-SURFACE shell mounted by `ChatLayout`** — a change here lands in chat first, so UAT on a workflow surface alone will miss it. **Threat model REQUIRED — and the named threat is PROMPT INJECTION**: every read lands untrusted external text in a model's context, and this tree has never faced that class because until 206.2 every connector was a write. ⚠ *No vendor in the competitor study documents a defence; treat it as unsolved, design for it rather than discovering it.* **SC#10 — the FULL 8-row native roster + OpenRouter**, plus multi-tool, parallel-thread and long-message rows; derive the roster from `MODEL_CAPABILITIES`, never re-type it; blocked rows recorded ⛔ with a reason. **ATTACH-01 is mode C and is deliberately human-initiated** — it dodges ACL mirroring, deletion propagation and sync loops by construction. ⚠ **The re-open trigger for `SEED-209/210/211/212` is "the first AUTOMATIC or BACKGROUND sync from a connected source"** — if any plan in this phase reaches for a poll, a watcher or a scheduled pull, **it has left this milestone** and the Connected Knowledge deferral applies.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 210. Ground Truth — Operability & Failure Honesty | 0/? | Not started | - |
+| 211. The Connection Is a Service, Not a Verb | 0/? | Not started | - |
+| 212. The Catalog and Its Doors | 0/? | Not started | - |
+| 213. Per-Tool Grants and the Approval Moment | 0/? | Not started | - |
+| 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
+| 215. BYO OAuth | 0/? | Not started | - |
+| 216. Connections in Chat, and One File In by Hand | 0/? | Not started | - |
+
+**Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
+Counts by phase: 210 → 4 · 211 → 3 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
+
+**Guardrails firing (v3.9):**
+
+- **G-2 sketch-first** on **212** (catalog), **213** (grant list + approval moment), **214** (step
+  picker + canvas/run node faces), **215** (the connect moment — ⚠ **with a different bar**), **216**
+  (chat service chip, starter prompts, attach picker). `screenshots/` is the acceptance bar for the
+  **catalog IA, the per-tool grant grain and the starter chips**; the `…workflow-edit.webp` xyOps
+  file is the canvas bar. ⚠ **Not for the Connect moment** — those shots are a vendor-owned-OAuth
+  product and D-v3.9-01 declines that. The `sketch-findings-agentic-rag` skill auto-loads on 212-216.
+  ⚠ **A sketch must RENDER the shipped component, not hand-write its own CSS** (`SEED-155`) — Stitch
+  first for language, then a sketch that renders real components; never collapse the two.
+- **G-5 hot files (re-derive from git at discuss-phase — do NOT trust a ledger cell).** 210:
+  `api/admin.py`. 211: `phase_types.py`, `grounding.py`, `models/connector.py`. 212 + 213:
+  `ConnectionsTab.tsx`, `ConnectionFormPanel.tsx`, `connectionsCopy.ts`, `connectionFormCopy.ts`
+  (**all four fire**). 214: `ConnectionPicker.tsx`, `ExternalActionSection.tsx`, `phase_types.py`,
+  `McpToolPicker.tsx`. 216: `ChatLayout.tsx`, `MessageInput.tsx`, `ToolCallPanel.tsx`,
+  `MessageItem.tsx`. **Each of those phases opens discuss-phase with a refactor recommendation, not
+  with the feature** — 211, 212 and 214 plausibly discharge theirs *by construction*, but that has to
+  be argued in the phase's own CONTEXT, never assumed. ⚠ **`api.ts` was measured the hottest file in
+  the repo while having no ledger row at all**; `ChatLayout.tsx` and `admin.py` are in the same
+  condition here.
+- **G-1 phase chain cap**: **213 is the second consecutive phase on `ConnectionFormPanel.tsx` /
+  `ConnectionsTab.tsx`.** If a third lands on them, a refactor phase comes first.
+- **G-7 gap-closure round cap**: run `node scripts/check-gap-closure-rounds.cjs <phase>` at every
+  `gaps_found` — do not eyeball the round count. ⚠ **A closure round may never introduce a new
+  user-facing capability**; on this milestone the temptation will be "the catalog has no X".
+- **SC#10 (cross-provider mandate):** **216** owes the full 8-row native roster + OpenRouter with
+  multi-tool / parallel-thread / long-message rows. **213** and **214** owe it because both suspend
+  or resume a live run. **210** owes it on the **embedding-provider** roster (a different set —
+  say so in VALIDATION.md rather than borrowing the chat table). Rows are authored under
+  `VALIDATION.md`, never as PLAN.md tasks; blocked rows are ⛔ with a reason, **never omitted**.
+- **Threat models:** **REQUIRED** on 212 (custom-URL door → SSRF/egress), 213 (the milestone's trust
+  boundary), 214 (publish gate + argument provenance), **215 (mandatory — the mig-118 defect class)**
+  and 216 (**prompt injection on reads — the class this tree has never faced**). 211 light (relaxing
+  a `CHECK` removes a database-level guarantee; say what replaces it). 210 none expected.
+- **Migrations:** head is **126**. Expected: **127** (211 — drop mig 126's `CHECK`, service
+  identity), then 213 (posture) and 215 (OAuth token/refresh/expiry/scope/account identity) in the
+  order they land. **Paste into the Supabase SQL editor — never `db push` / `db reset`** — then
+  `bash scripts/regenerate-full-schema.sh`. ⚠ **Filenames must match `<digits>_name.sql`**; letter
+  suffixes are silently skipped. ⚠ **Adding a column to `connector_connections` breaks every read of
+  it** until it is granted — mig 118 granted SELECT column-by-column, and the failure looks like an
+  outage on a pre-existing row.
+- **Deployment-artifact parity (same-commit rule):** 215's redirect URI and any new
+  `app_settings` seed row update `deploy/onebox.env.example`, `docs/OPERATOR.md` and
+  `docker-compose.prod.yml` in the **same commit**; `scripts/check-deploy-drift.sh` enforces it.
+- **Red lines:** **D-14** — no new harness executor; `external_action` already takes two shapes
+  through one executor and a first-party read is a third shape on the same one. **D-v2.5-01** — no
+  blocking I/O in an async handler (`mcp_client.py:220` is the standing violation, fixed in 212).
+  **D-v2.5-03** — Realtime is a hint; reconcile via fetch on reconnect. **No arbitrary-code /
+  community-node connectors, ever** — excluded by construction, and Gumloop's AI-generated node is
+  the most seductive wrong answer in the study.
+- **Reported-bugs mandate:** nine reports are folded (table above). At each `/gsd:discuss-phase`,
+  re-list open `surface: Agentic-RAG` reports and write the routing **back into each report's
+  frontmatter** — ⚠ **`status:` frontmatter IS the index; prose in the body is invisible to the
+  scan.** ⚠ Also carried and still **unrouted**: `BUG-260818-01/-02/-03` (Resume replays the prompt ·
+  Resume drops the model · the Continue that already exists and did not render). **Triage them
+  together** — a user cannot tell Resume from Continue, and fixing one leaves the moment still lying.
+- **Seeds register sweep:** 12 seeds are folded (`SEED-202` `204` `205` `206` `207` `208` + `142`
+  `144` `145` `146` `177` + `213`). **A seed is answered by editing the seed** — flip `status` and
+  record where it went, or it is re-proposed forever. ⚠ `SEED-209/210/211/212` are deferred with a
+  **binding re-open trigger: the first automatic or background sync from a connected source.**
+- **Verification-documentation debt is the standing failure mode here.** ⚠ **Seven of twelve v3.8
+  phases had no `VERIFICATION.md` and `REQUIREMENTS.md` was stale from day one — the SECOND
+  consecutive milestone to close that way**, and v3.6's own retrospective already read *"the
+  paperwork was the problem, never the code."* Every phase in this milestone writes its
+  `VERIFICATION.md` at its own close, and the traceability table below is updated as each phase
+  ships — not at the audit.
+- **Ceremony budget.** v3.7 spent **147 plans across 17 phases**; the operator's recorded direction
+  is **fewer, larger, well-scoped phases**, because ceremony scales with PLAN COUNT rather than with
+  risk. Seven phases here. **A phase that decomposes into 15 plans has been mis-scoped, not
+  discovered to be large** — say so and re-scope rather than proceeding.
 
 ---
 

@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-26T00:00:00.000Z"
 last_activity: 2026-08-26
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -37,10 +37,10 @@ can be taught new behaviors (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started — **210 is next** (roadmap created, no phase planned yet)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-26 — Milestone v3.9 started
+Status: Roadmap created — 7 phases (210-216), 32/32 requirements mapped
+Last activity: 2026-08-26 — v3.9 ROADMAP.md written; REQUIREMENTS.md traceability filled
 
 ## Milestone v3.9 — scope as agreed with the operator (2026-08-26)
 
@@ -169,3 +169,42 @@ control in one moment and must be triaged together:
 
 ⚠ **TRIAGE 01/02/03 TOGETHER** — a user today cannot tell Resume from Continue, and fixing one
 leaves the moment still lying.
+
+## v3.9 roadmap shape — APPENDED 2026-08-26 by the roadmapper
+
+Written to `.planning/ROADMAP.md` (§ *v3.9 Connections: Any Service, Any Tool*). **Nothing above
+this line was rewritten.** Seven phases, **32/32 requirements mapped to exactly one phase each**.
+
+⚠ **The scoping brief said 31 requirements; `REQUIREMENTS.md` contains 32**
+(`grep -c "^- \[ \] \*\*" .planning/REQUIREMENTS.md` → `32`). Coverage was validated against the
+file, not the brief.
+
+| Phase | Name | Reqs | Why it sits here |
+|---|---|---|---|
+| **210** | Ground Truth — Operability & Failure Honesty | CONN-09/10/11, RAG-09 (4) | Independent of the schema change, so the two ⛔ blocking-class defects are not gated behind it |
+| **211** | The Connection Is a Service, Not a Verb | CONN-04/05/08 (3) | ⭐ **PREREQUISITE (`SEED-207`)** — two coexisting models make every downstream surface branch, and each new surface pays the branch again |
+| **212** | The Catalog and Its Doors | CAT-01/02/03/05, CONN-06/07 (6) | The catalog cannot be built on `capability`; needs 211 |
+| **213** | Per-Tool Grants and the Approval Moment | GRANT-01..05 (5) | ⭐ **HARD PREREQUISITE for 216** — never an outbound capability in `_TOOL_REGISTRY` before the approval model |
+| **214** | A Step Names Its Service and Its Action | STEP-01..06 (6) | Proves the model + grants on the **governed** canvas (D-19 armed checkpoint, egress guard) before outbound reaches chat, which carries neither. Closes ⛔ `BUG-260826-01` |
+| **215** | BYO OAuth | OAUTH-01/02/03 (3) | Blocked by **CONN-08** (mig 126's `CHECK` refuses the row); MCP-first precedes OAuth |
+| **216** | Connections in Chat, and One File In by Hand | CHAT-05/06/07, CAT-04, ATTACH-01 (5) | The headline, and it lands last on purpose — everything before it is its prerequisite |
+
+**Two placements that are decisions, not defaults, and should be argued with rather than assumed:**
+
+- **CAT-04 (starter prompts) is in 216, not in the catalog phase.** A starter prompt is only honest
+  once the agent can act on it; chips shipped before the chat surface are suggestions that fail.
+- **RAG-09 rides in 210 rather than owning a phase.** It is deliberately not connector work — it is
+  folded because an embedding failure reported as *"your documents returned nothing"* poisons the
+  trustworthiness of every deliverable this milestone produces.
+
+**Guardrails recorded in the roadmap:** G-2 sketch owed on 212 / 213 / 214 / 215 / 216 (⚠ **215's bar
+is NOT `screenshots/`** — those show a vendor-owned 2-click Connect that D-v3.9-01 declines) · G-5
+fires in every phase's blast radius, with `ChatLayout.tsx` (21 phases) and `api/admin.py` (12 phases)
+⚠ **absent from the ledger entirely** · G-1 risk at 213 (second consecutive phase on
+`ConnectionFormPanel.tsx`) · threat models required on 212/213/214/215/216, with **prompt injection**
+named as the class this tree has never faced · SC#10 full roster on 216, and on an **embedding**
+roster for 210.
+
+**Next action:** `/gsd:sketch` is NOT owed for Phase 210 (no "feels like" surface beyond a Control
+Room tile). Start with **`/gsd:discuss-phase 210`** — and it opens with the G-5 re-derive on
+`backend/app/api/admin.py`, which has never had a ledger row.
