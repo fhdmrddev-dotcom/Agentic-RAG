@@ -67,12 +67,22 @@ async def launch_scheduled_run(
     404 — reads that stamp. A scheduled run that ran as "the system" would retrieve across
     every tenant's documents.
 
-    ⚠ **THE CAPS TRAVEL ON ``inputs``.** ``workflow_runs`` has no per-run ceiling columns, and
-    adding them is SCHED-02's business, not this plan's. Putting them on the run's durable
-    ``inputs`` jsonb means the circuit breaker can read them from the run it is policing
-    without a second query and without this module knowing anything about breakers. The two
-    keys are namespaced (``_schedule_*``) so they cannot collide with an author's own input
-    names.
+    ⚠ **CORRECTED — THE CAPS DO NOT TRAVEL ON ``inputs``, AND THE BELIEF THAT THEY DID IS THE
+    SCHED-02 DEFECT ITSELF.** This paragraph used to state that they did, *"so the circuit breaker
+    can read them from the run it is policing"*. They travel on ``workflow_runs.metadata``, written
+    by ``arm_run_budget`` (see :154), which is exactly what ``load_run_budget`` reads.
+
+    The original wording is not preserved here because it was never merely stale — it was the
+    **cause**: ``204-03`` wrote the caps to ``inputs`` while ``204-02``'s ``load_run_budget`` read
+    ``metadata``, this module contained **zero** occurrences of ``metadata``, and the read FAILS
+    OPEN, so the breaker disarmed **silently**. Measured on run ``27e00e7e``: **3m20s against a
+    120s cap**, while 106 tests stayed green because each parallel wave mocked the other side.
+    A reader who stopped at this docstring would re-learn the defect, which is why it is rewritten
+    rather than annotated. Fixed by ``arm_run_budget`` (``57024280``) plus an 8-case seam suite
+    whose counterfactual drives 3 RED.
+
+    The two ``_schedule_*`` keys remain namespaced so they cannot collide with an author's own
+    input names.
 
     Returns ``None`` when the workflow could not be resolved (deleted, or no longer the
     owner's) — a fact the caller records as ``launch_failed`` rather than raising, because one

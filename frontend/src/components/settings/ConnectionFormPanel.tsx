@@ -1518,7 +1518,15 @@ export function ConnectionFormPanel({
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
             {/* §5c's check. Its own footer sentence sits beside it while it runs, because
                 that is the moment a person wants to be told nothing is being sent. */}
+            {/* Audit B-1 — `!connection.mcp_server_url`. An MCP connection has NO capability,
+                so the server has no adapter to check it with and the route raised a bare
+                `KeyError` -> 500. `ConnectionsTab.tsx:698` hid this from the row menu with the
+                same rule; THIS file — the same control, one file over — never took the decision,
+                which is precisely the drift `ConnectionsTab.tsx:1203-1206` claims passing the
+                handler unconditionally would prevent. It did not. The route now refuses with a
+                worded 409 as well; this guard is so the control is never OFFERED. */}
             {onCheck &&
+              !connection.mcp_server_url &&
               (connection.is_enabled ? (
                 <button
                   type="button"

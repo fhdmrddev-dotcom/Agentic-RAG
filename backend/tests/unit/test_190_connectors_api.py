@@ -41,6 +41,7 @@ middleware ordering on the real app. Task 2 then asserts separately that the REA
 carries the route, so "the router refuses correctly" and "the router is reachable" stay two
 separately-falsifiable claims.
 """
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -480,3 +481,52 @@ def test_the_router_is_registered_on_the_real_app():
         "on the probe app while the real surface 404s"
     )
     assert "/connectors/connections/{connection_id}" in paths
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 209 close / milestone-audit finding B-1
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def test_check_refuses_an_mcp_connection_with_409_never_a_500(
+    router_client, monkeypatch, mock_asyncpg_pool
+):
+    """B-1 — POST /connectors/connections/{id}/check on an MCP row must be a WORDED 409.
+
+    An MCP connection has ``capability = NULL`` by construction (mig 126's shape CHECK admits
+    either a capability OR an mcp_server_url). The route read that NULL straight into
+    ``get_adapter(capability)``, and ``registry.get_adapter`` raises a BARE ``KeyError`` for
+    anything outside its closed three-member set — a ``KeyError`` that is NOT in this route's
+    ``except`` ladder. The result was an unhandled **HTTP 500** on a control the shipped UI
+    offered: ``ConnectionsTab.tsx:698`` hid it from the row menu with ``!isMcp`` and
+    ``ConnectionFormPanel.tsx`` — the same control, one file over — never took that decision.
+
+    ⚠ THIS TEST GUARDS THE ROUTE, NOT THE BUTTON. The endpoint is reachable without any UI, so
+    a front-end guard alone would leave the 500 one curl away. Both were fixed; this pins the
+    half that a future UI can never re-open.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool)
+    _install_perms(monkeypatch, {"org:manage": True})
+
+    mcp_row = SimpleNamespace(
+        id="11111111-1111-1111-1111-111111111111",
+        org_id=ACTIVE_ORG,
+        name="DeepWiki",
+        capability=None,                       # the shape that broke it
+        mcp_server_url="https://mcp.deepwiki.com/mcp",
+        config={},
+        is_enabled=True,
+    )
+    monkeypatch.setattr(
+        connector_service, "resolve_connection", AsyncMock(return_value=mcp_row)
+    )
+
+    resp = router_client.post(
+        f"/connectors/connections/{mcp_row.id}/check", headers=_org_headers()
+    )
+
+    assert resp.status_code == 409, (
+        f"an MCP row must be refused with a worded 409, got {resp.status_code}: {resp.text}"
+    )
+    detail = resp.json()["detail"]
+    assert detail["reason_code"] == "check_not_available_for_mcp"
+    # The message must tell the operator what to do INSTEAD, not merely that it declined.
+    assert "Discover tools" in detail["message"]
