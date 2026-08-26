@@ -100,6 +100,45 @@ satisfiability enforcement (214 — though this phase pre-pays it, see D-211-06)
   absent in the wild, and per the MCP spec a hint from an untrusted server may never *widen* a
   permission. **No direction/read-ness design may rest on it.**
 
+### Decisions taken at plan-phase (2026-08-26), after `211-RESEARCH.md` measured them
+
+- **D-211-11: Migration 127's replacement guarantee is RESEARCH §H Candidate 1 + Candidate 3,
+  stacked as two independent constraints.** (1) the service identity is mandatory and non-blank;
+  (2) `capability` and `mcp_server_url` may not BOTH be set on one row.
+  ⚠ **Say what this does NOT refuse, in the migration's own comment block:** an identified row with
+  no reachable path is still storable. That is a deliberate loosening of migration 126's
+  *"resolves to something"* — accepted because the alternative (Candidate 2's `auth_kind`)
+  re-introduces a closed set on a new axis, which is the shape D-211-01 rejected, and commits Phase
+  215's vocabulary early — `SEED-146`'s named expensive mistake, committing the connection shape twice.
+  ⭐ **Candidate 3 is a guarantee the table has NEVER had.** `phase_types.py:2311-2322` branches on
+  `mcp_tool_name` FIRST, so a row carrying both shapes silently takes the MCP path and the capability
+  goes inert; nothing today stops an `UPDATE` from setting both, and RESEARCH §D.2 verified the live
+  table has no such constraint.
+  ⚠ Per D-211-04 the model must not be laxer than the database — `_validate_connection_shape`
+  (`models/connector.py:257-258`) owes a matching arm, or the refusal is a 500 instead of a 422.
+
+- **D-211-12: RESEARCH §J.4 is fixed IN 211, not deferred to 212.** `McpToolPicker.tsx:302`
+  (`if (!connection?.mcp_server_url) return null`) and `ConnectionPicker.tsx:436` must read the TOOL
+  LIST, not the URL — otherwise 211 ships static descriptors that no surface can display, which is
+  this project's built-but-unreachable signature (Phase 118, Phase 200 SC#3). It changes no layout,
+  so D-211-07's line against Phase 212 holds unchanged.
+
+### Measurements that QUALIFY the decisions above (from `211-RESEARCH.md` §J — read it)
+
+- **§J.2: SEVEN backend spellings held by FIVE import-time asserts**, not the five/three this file
+  recorded. The extra two are `connectors/registry.py:48-64` and `phase_types.py:2039-2059`.
+  Direction of error is *more work, never less*; each is an import-time `assert`, so one left
+  disagreeing is an `ImportError` for the whole app — loud, not latent.
+- **§J.3: CONN-08 is gated TWICE.** `models/connector.py:257-258` raises before any INSERT.
+  **Migration 127 alone does not make SC#4 true from the API.**
+- **§J.1: there is no `send_email` row on this box** — the live DB holds 3 rows (`post_message`,
+  `create_ticket`, one NULL-capability MCP). SC#2's SMTP arm needs a row created first **or an
+  explicit ⛔ with the reason** — never a silent omission (CLAUDE.md UAT scoreboard rule).
+- **§J.5: `canvasModel.ts` carries ZERO verb literals** — a plan that budgets a task for it finds
+  nothing to do.
+- **A new column owes `GRANT SELECT (col)` in the SAME migration** or every read of the table 503s
+  (migration 118's column-by-column grant; it already caused that outage on 2026-08-25).
+
 ### Claude's Discretion
 
 - The exact column name and type for the service identifier, and whether the presentation lookup
