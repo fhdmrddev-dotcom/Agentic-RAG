@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>203 — The catalog at density</title>
+<link rel="stylesheet" href="../themes/default.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  body { padding: var(--space-10) var(--space-8) var(--space-16); }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-family: var(--font-headline); font-size: var(--text-2xl); margin: 0 0 var(--space-2); letter-spacing: -0.01em; }
+  .sub { color: var(--color-text-muted); margin: 0 0 var(--space-10); max-width: 62ch; }
+  h2 { font-family: var(--font-headline); font-size: var(--text-lg); margin: var(--space-12) 0 var(--space-2); }
+  h2 .n { color: var(--color-text-dim); font-family: var(--font-mono); font-size: var(--text-sm); margin-right: var(--space-2); }
+  .note { color: var(--color-text-muted); font-size: var(--text-sm); max-width: 74ch; margin: 0 0 var(--space-5); }
+  .note b { color: var(--color-text); font-weight: 600; }
+  .warn { border-left: 2px solid var(--color-warning); padding-left: var(--space-3); }
+
+  /* ── the shipped shell: rounded 10px, 1px border, divided rows ── */
+  .tbl { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .hdr { display: flex; align-items: center; gap: 0 var(--space-3);
+         border-bottom: 1px solid var(--color-border); background: hsl(220 30% 11% / 0.2);
+         padding: var(--space-2) 14px; }
+  .hdr > div { font-size: 11px; font-weight: 500; color: var(--color-text-muted); }
+  .rows > .row { border-top: 1px solid var(--color-border-soft); }
+  .rows > .row:first-child { border-top: 0; }
+
+  /* five-column contract: Connection · Sends to · Used by · Credential · State */
+  .c1 { flex: 2 1 0; min-width: 0; }
+  .c2 { flex: 2 1 0; min-width: 0; }
+  .c3 { width: 96px;  flex: none; }
+  .c4 { width: 128px; flex: none; }
+  .c5 { width: 144px; flex: none; }
+  .c6 { width: 32px;  flex: none; }
+
+  .row { display: flex; align-items: center; gap: 0 var(--space-3); padding: var(--space-3) 14px;
+         transition: background var(--dur-base) var(--ease-out); }
+  .row:hover { background: hsl(220 30% 11% / 0.35); }
+
+  /* mark */
+  .mark { width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
+          display: grid; place-items: center; font-family: var(--font-mono);
+          font-size: 10px; font-weight: 500; letter-spacing: .02em; }
+  .mark.brand { background: var(--color-muted); color: var(--color-text); border: 1px solid var(--color-border); }
+  .mark.generic { background: var(--color-primary-dim); color: var(--color-primary);
+                  border: 1px solid hsl(239 100% 82% / 0.28); }
+
+  .idcell { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+  .idtext { min-width: 0; }
+  .nm { font-weight: 500; font-size: var(--text-base); line-height: 1.3;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* ⭐ THE NEW ATOM — the one-line purpose */
+  .purpose { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.35;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .purpose.unknown { color: var(--color-text-dim); font-style: italic; }
+
+  .dest { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted);
+          min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dest .lk { margin-right: 5px; }
+  .num { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  /* state — colour ALWAYS carries its word */
+  .st { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); white-space: nowrap; }
+  .dot { width: 6px; height: 6px; border-radius: var(--radius-full); flex: none; }
+  .ok   .dot { background: var(--color-success); } .ok   { color: var(--color-success); }
+  .warn2 .dot{ background: var(--color-warning); } .warn2{ color: var(--color-warning); }
+  .off  .dot { background: var(--color-text-dim); } .off { color: var(--color-text-dim); }
+  .none .dot { background: transparent; border: 1px solid var(--color-text-dim); } .none { color: var(--color-text-muted); }
+
+  /* provenance — a SEPARATE axis, deliberately not a state */
+  .prov { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em;
+          color: var(--color-text-dim); border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm); padding: 1px 5px; white-space: nowrap; }
+
+  .kebab { color: var(--color-text-dim); text-align: right; font-size: var(--text-md); line-height: 1; }
+  .btn { font-size: var(--text-xs); padding: 4px 10px; border-radius: var(--radius-sm);
+         border: 1px solid var(--color-border); background: transparent; color: var(--color-text); }
+  .btn.p { background: var(--color-primary); color: hsl(220 45% 8%); border-color: transparent; font-weight: 500; }
+
+  .attn { font-size: var(--text-xs); color: var(--color-warning); margin-top: 3px; line-height: 1.35; }
+
+  /* chips */
+  .chips { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); align-items: center; }
+  .chip { font-size: var(--text-xs); padding: 4px 11px; border-radius: var(--radius-full);
+          border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .chip.on { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-dim); }
+  .spacer { flex: 1; }
+
+  .grouphd { font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+             color: var(--color-text-dim); padding: var(--space-2) 14px var(--space-1);
+             background: hsl(220 30% 11% / 0.14); border-top: 1px solid var(--color-border-soft); }
+
+  /* dense (panel-open) shape */
+  .dense { max-width: 302px; }
+  .dense .row { display: block; padding: var(--space-3) var(--space-3); }
+  .dense .l1 { display: flex; align-items: center; gap: var(--space-2); }
+  .dense .l2 { margin-top: 5px; font-family: var(--font-mono); font-size: var(--text-xs);
+               color: var(--color-text-muted); word-break: break-all; }
+  .dense .l3 { margin-top: 5px; display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+  .dense .purpose { white-space: normal; margin-top: 3px; }
+  .inlbl { color: var(--color-text-dim); font-size: 10px; font-family: var(--font-mono);
+           letter-spacing: .04em; margin-right: 4px; }
+
+  .legend { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+  .card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); background: var(--color-surface); }
+  .card h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-family: var(--font-headline); }
+  .card p { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  table.matrix { border-collapse: collapse; width: 100%; margin-top: var(--space-3); }
+  table.matrix th, table.matrix td { border: 1px solid var(--color-border); padding: var(--space-2) var(--space-3);
+        font-size: var(--text-sm); text-align: left; vertical-align: top; }
+  table.matrix th { color: var(--color-text-muted); font-weight: 500; font-size: var(--text-xs); background: hsl(220 30% 11% / 0.2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>203 — The catalog at density</h1>
+  <p class="sub">
+    Direction <b>C</b> from the Stitch pass, re-expressed against the components that actually ship.
+    Real tokens from <code>themes/default.css</code>, the shipped five-column contract, and the
+    shipped dense shape. <b>This is the G-2 acceptance bar.</b> The Stitch renders are not — they were
+    generated in the wrong palette and redraw nothing we own.
+  </p>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">1</span>The row, and where the purpose goes</h2>
+  <p class="note">
+    The five columns are a <b>locked contract</b> (<code>CONNECTIONS_COLUMNS</code>, 155-C):
+    <code>Connection · Sends to · Used by · Credential · State</code>. Direction C adds exactly one
+    atom — <b>the one-line purpose</b> — and it lands <b>inside column 1, beneath the name</b>. No
+    column is added, none is renamed, none is dropped. The name stays the row's primary anchor, which
+    is what UI-SPEC § Surface 2 already requires in both shapes.
+  </p>
+
+  <div class="tbl">
+    <div class="hdr">
+      <div class="c1">Connection</div><div class="c2">Sends to</div><div class="c3">Used by</div>
+      <div class="c4">Credential</div><div class="c5">State</div><div class="c6"></div>
+    </div>
+    <div class="rows">
+      <div class="row">
+        <div class="c1 idcell">
+          <div class="mark brand">SL</div>
+          <div class="idtext">
+            <div class="nm">Slack</div>
+            <div class="purpose">Post updates and read channels in your workspace.</div>
+          </div>
+        </div>
+        <div class="c2 dest"><span class="lk">🔒</span>hooks.slack.com</div>
+        <div class="c3 num">2 steps</div>
+        <div class="c4"><span class="st ok"><span class="dot"></span>Checked 3d ago</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div>
+        <div class="c6 kebab">⋯</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">2</span>Sparse — three rows, which is what this install actually has</h2>
+  <p class="note">
+    Measured on the live DB: <code>slack</code>, <code>jira</code>, <code>mcp.deepwiki.com</code>.
+    <b>This is the common state, so it is drawn first.</b> The Popular group sits inside the same
+    list, not on a shelf above it.
+  </p>
+
+  <div class="chips">
+    <span class="chip on">All</span><span class="chip">Connected</span><span class="chip">Not connected</span>
+    <span class="spacer"></span><span class="btn p">Add a service</span>
+  </div>
+
+  <div class="tbl">
+    <div class="hdr">
+      <div class="c1">Connection</div><div class="c2">Sends to</div><div class="c3">Used by</div>
+      <div class="c4">Credential</div><div class="c5">State</div><div class="c6"></div>
+    </div>
+    <div class="rows">
+
+      <div class="row">
+        <div class="c1 idcell">
+          <div class="mark brand">SL</div>
+          <div class="idtext">
+            <div class="nm">Slack</div>
+            <div class="purpose">Post updates and read channels in your workspace.</div>
+          </div>
+        </div>
+        <div class="c2 dest"><span class="lk">🔒</span>hooks.slack.com</div>
+        <div class="c3 num">2 steps</div>
+        <div class="c4"><span class="st ok"><span class="dot"></span>Checked 3d ago</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div>
+        <div class="c6 kebab">⋯</div>
+      </div>
+
+      <div class="row">
+        <div class="c1 idcell">
+          <div class="mark brand">JI</div>
+          <div class="idtext">
+            <div class="nm">Jira</div>
+            <div class="purpose">Raise and track issues for your team.</div>
+            <div class="attn">Your login for this service has expired, and updates have stopped.</div>
+          </div>
+        </div>
+        <div class="c2 dest"><span class="lk">🔒</span>acme.atlassian.net</div>
+        <div class="c3 num">1 step</div>
+        <div class="c4"><span class="st warn2"><span class="dot"></span>Sign-in expired</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div>
+        <div class="c6 kebab">⋯</div>
+      </div>
+
+      <!-- ⭐ the uncurated row: a PEER. Same height, same weight, same affordances. -->
+      <div class="row">
+        <div class="c1 idcell">
+          <div class="mark generic">◈</div>
+          <div class="idtext">
+            <div class="nm">deepwiki <span class="prov">ADDED BY URL</span></div>
+            <div class="purpose">Search a shared internal knowledge base.</div>
+          </div>
+        </div>
+        <div class="c2 dest"><span class="lk">🔒</span>mcp.deepwiki.com</div>
+        <div class="c3 num">0 steps</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>No credential needed</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div>
+        <div class="c6 kebab">⋯</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">3</span>⭐ The fix for the thing C broke — provenance is not a state</h2>
+  <p class="note warn">
+    In the Stitch density render, <code>Uncurated</code> appeared <b>in the State column</b>, in place
+    of <code>Connected</code> — so a reader could not tell whether <code>deepwiki</code> was connected
+    at all. Provenance had eaten the connection state. <b>They are two independent axes and each keeps
+    its own slot:</b> provenance is a quiet mono tag beside the <em>name</em>; State stays State.
+  </p>
+
+  <table class="matrix">
+    <tr><th style="width:22%"></th><th>State column</th><th>Beside the name</th></tr>
+    <tr><td><b>Slack</b> — curated, connected</td>
+        <td><span class="st ok"><span class="dot"></span>Connected</span></td><td>—</td></tr>
+    <tr><td><b>deepwiki</b> — uncurated, connected</td>
+        <td><span class="st ok"><span class="dot"></span>Connected</span></td>
+        <td><span class="prov">ADDED BY URL</span></td></tr>
+    <tr><td><b>deepwiki</b> — uncurated, <em>not</em> connected</td>
+        <td><span class="st off"><span class="dot"></span>Not connected</span></td>
+        <td><span class="prov">ADDED BY URL</span></td></tr>
+    <tr><td><b>Notion</b> — curated, not connected</td>
+        <td><span class="st off"><span class="dot"></span>Not connected</span></td><td>—</td></tr>
+  </table>
+  <p class="note" style="margin-top:var(--space-3)">
+    Both axes are readable at once, and neither costs the other. The tag is quiet enough to be
+    provenance and never reads as a warning.
+  </p>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">4</span>Density — twelve rows, the aspirational state</h2>
+  <p class="note">
+    The question C answered: <b>does the purpose line survive when twelve stack?</b> It does — because
+    it sits in column 1 under the name and truncates on one line, so the row height never changes and
+    the list keeps its rhythm. <b>Two uncurated rows, deliberately</b>, to check they still read as
+    peers when more than one sits in the list.
+  </p>
+
+  <div class="chips">
+    <span class="chip on">All</span><span class="chip">Connected</span><span class="chip">Not connected</span>
+    <span class="spacer"></span><span class="btn p">Add a service</span>
+  </div>
+
+  <div class="tbl">
+    <div class="hdr">
+      <div class="c1">Connection</div><div class="c2">Sends to</div><div class="c3">Used by</div>
+      <div class="c4">Credential</div><div class="c5">State</div><div class="c6"></div>
+    </div>
+    <div class="rows">
+      <div class="grouphd">Popular</div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">SL</div><div class="idtext">
+        <div class="nm">Slack</div><div class="purpose">Post updates and read channels in your workspace.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>hooks.slack.com</div><div class="c3 num">2 steps</div>
+        <div class="c4"><span class="st ok"><span class="dot"></span>Checked 3d ago</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div><div class="c6 kebab">⋯</div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">GH</div><div class="idtext">
+        <div class="nm">GitHub</div><div class="purpose">Track code changes and manage pull requests.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.github.com</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">NO</div><div class="idtext">
+        <div class="nm">Notion</div><div class="purpose">Organise notes and collaborate on documents.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.notion.com</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="grouphd">All services</div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">JI</div><div class="idtext">
+        <div class="nm">Jira</div><div class="purpose">Raise and track issues for your team.</div>
+        <div class="attn">Your login for this service has expired, and updates have stopped.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>acme.atlassian.net</div><div class="c3 num">1 step</div>
+        <div class="c4"><span class="st warn2"><span class="dot"></span>Sign-in expired</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div><div class="c6 kebab">⋯</div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark generic">◈</div><div class="idtext">
+        <div class="nm">deepwiki <span class="prov">ADDED BY URL</span></div>
+        <div class="purpose">Search a shared internal knowledge base.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>mcp.deepwiki.com</div><div class="c3 num">0 steps</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>No credential needed</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div><div class="c6 kebab">⋯</div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">FI</div><div class="idtext">
+        <div class="nm">Figma</div><div class="purpose">Design interfaces and prototype user flows.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.figma.com</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">LI</div><div class="idtext">
+        <div class="nm">Linear</div><div class="purpose">Plan projects and manage developer workflows.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.linear.app</div><div class="c3 num">3 steps</div>
+        <div class="c4"><span class="st ok"><span class="dot"></span>Checked 1d ago</span></div>
+        <div class="c5"><span class="st ok"><span class="dot"></span>Connected</span></div><div class="c6 kebab">⋯</div></div>
+
+      <!-- second uncurated row: a different generic mark, still a peer -->
+      <div class="row"><div class="c1 idcell"><div class="mark generic">◇</div><div class="idtext">
+        <div class="nm">metrics-hub <span class="prov">ADDED BY URL</span></div>
+        <div class="purpose">Read dashboards and pull recent figures.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>mcp.metrics-hub.io</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <!-- the explicit unknown: three arms, never two -->
+      <div class="row"><div class="c1 idcell"><div class="mark generic">◈</div><div class="idtext">
+        <div class="nm">internal-tools <span class="prov">ADDED BY URL</span></div>
+        <div class="purpose unknown">Purpose not recorded — add one</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>mcp.internal-tools.corp</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">SE</div><div class="idtext">
+        <div class="nm">Sentry</div><div class="purpose">Monitor errors and watch releases.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>sentry.io</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">IN</div><div class="idtext">
+        <div class="nm">Intercom</div><div class="purpose">Chat with customers and manage support tickets.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.intercom.io</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+      <div class="row"><div class="c1 idcell"><div class="mark brand">MI</div><div class="idtext">
+        <div class="nm">Miro</div><div class="purpose">Sketch ideas on a shared whiteboard.</div></div></div>
+        <div class="c2 dest"><span class="lk">🔒</span>api.miro.com</div><div class="c3 num">—</div>
+        <div class="c4"><span class="st none"><span class="dot"></span>Not set</span></div>
+        <div class="c5"><span class="st off"><span class="dot"></span>Not connected</span></div><div class="c6"><span class="btn">Connect</span></div></div>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">5</span>The dense shape — the same row when the panel is open (~302px)</h2>
+  <p class="note">
+    The shipped dense shape drops the five-word header and gives <code>Used by</code> and
+    <code>Credential</code> inline labels instead (D-206.1-20). <b>The purpose line is the one atom
+    that must NOT wrap to a third line here</b> — it truncates, exactly as the name does, because the
+    destination on line 2 already owns the wrapping budget.
+  </p>
+
+  <div class="tbl dense">
+    <div class="rows">
+      <div class="row">
+        <div class="l1"><div class="mark brand">SL</div><div class="nm" style="flex:1;min-width:0">Slack</div><div class="kebab">⋯</div></div>
+        <div class="purpose">Post updates and read channels in your workspace.</div>
+        <div class="l2">🔒 hooks.slack.com</div>
+        <div class="l3">
+          <span class="num"><span class="inlbl">USED BY</span>2 steps</span>
+          <span class="st ok"><span class="dot"></span>Connected</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="l1"><div class="mark generic">◈</div><div class="nm" style="flex:1;min-width:0">deepwiki</div><div class="kebab">⋯</div></div>
+        <div style="margin-top:3px"><span class="prov">ADDED BY URL</span></div>
+        <div class="purpose">Search a shared internal knowledge base.</div>
+        <div class="l2">🔒 mcp.deepwiki.com</div>
+        <div class="l3">
+          <span class="num"><span class="inlbl">USED BY</span>0 steps</span>
+          <span class="st ok"><span class="dot"></span>Connected</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────────────── -->
+  <h2><span class="n">6</span>What this sketch does NOT settle</h2>
+  <div class="legend">
+    <div class="card">
+      <h3>The mark is still open</h3>
+      <p>Brand marks come from <code>@lobehub/icons</code> — the monograms here are placeholders and
+      must not be built. The real design problem is the <b>generic mark</b> for an uncurated service,
+      drawn here as <span class="mark generic" style="display:inline-grid;width:18px;height:18px;vertical-align:middle">◈</span>
+      in primary-dim. That is a proposal, not a decision.</p>
+    </div>
+    <div class="card">
+      <h3>“Sends to” prints the mechanism</h3>
+      <p>The locked column shows a host, with the always-on 🔒 (024-A). The catalog language says a
+      person adds Slack without learning what a protocol is. <b>Both are deliberate and they pull
+      against each other.</b> Not resolved here — it goes to the builder as a question.</p>
+    </div>
+    <div class="card">
+      <h3>The empty and flag-off states</h3>
+      <p>Not drawn. <code>live_connectors</code> ships cold as <code>off</code> and this install has
+      it flipped on, so the off state is unexercised here and still owed.</p>
+    </div>
+    <div class="card">
+      <h3>The paste-a-URL door</h3>
+      <p>Its five stages are direction only, in <code>212-stitch-catalog/</code>. They are new surface
+      and were not re-expressed here — the door deserves its own sketch.</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Knowledge Curator Systems - Discovery Stages</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-container": "#00574d",
+                      "on-primary-fixed": "#00201c",
+                      "on-surface-variant": "#bacac5",
+                      "tertiary-fixed-dim": "#ffb875",
+                      "secondary-fixed-dim": "#b9c8de",
+                      "on-primary": "#003731",
+                      "secondary-container": "#39485a",
+                      "outline": "#859490",
+                      "on-primary-fixed-variant": "#005047",
+                      "background": "#0b1326",
+                      "surface-container-lowest": "#060e20",
+                      "surface-tint": "#3cddc7",
+                      "on-tertiary-container": "#744000",
+                      "surface-container-low": "#131b2e",
+                      "tertiary": "#ffd1aa",
+                      "on-secondary-fixed-variant": "#39485a",
+                      "primary-container": "#2dd4bf",
+                      "on-secondary-container": "#a7b6cc",
+                      "secondary": "#b9c8de",
+                      "on-secondary-fixed": "#0d1c2d",
+                      "surface-container-high": "#222a3d",
+                      "error-container": "#93000a",
+                      "on-surface": "#dae2fd",
+                      "surface-variant": "#2d3449",
+                      "error": "#ffb4ab",
+                      "surface": "#0b1326",
+                      "surface-bright": "#31394d",
+                      "on-tertiary-fixed": "#2d1600",
+                      "surface-container": "#171f33",
+                      "on-background": "#dae2fd",
+                      "inverse-surface": "#dae2fd",
+                      "inverse-primary": "#006b5f",
+                      "on-error": "#690005",
+                      "on-error-container": "#ffdad6",
+                      "secondary-fixed": "#d4e4fa",
+                      "tertiary-fixed": "#ffdcc0",
+                      "inverse-on-surface": "#283044",
+                      "primary-fixed": "#62fae3",
+                      "primary-fixed-dim": "#3cddc7",
+                      "tertiary-container": "#ffac5a",
+                      "primary": "#57f1db",
+                      "surface-container-highest": "#2d3449",
+                      "on-secondary": "#233143",
+                      "on-tertiary": "#4b2800",
+                      "surface-dim": "#0b1326",
+                      "on-tertiary-fixed-variant": "#6b3b00",
+                      "outline-variant": "#3c4a46"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "stack-sm": "0.5rem",
+                      "gutter": "1.5rem",
+                      "unit": "4px",
+                      "stack-lg": "2rem",
+                      "container-padding": "2rem",
+                      "stack-md": "1rem"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "letterSpacing": "0em",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .loading-pulse {
+            animation: pulse-op 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-op {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background min-h-screen p-stack-lg font-body-lg text-body-lg flex flex-col gap-stack-lg items-center">
+<!-- STAGE 1 (EMPTY) -->
+<div class="w-[400px] bg-surface-container rounded-lg border border-outline-variant flex flex-col shrink-0">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-high rounded-t-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Add New Service</h2>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors duration-200">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-stack-md flex flex-col gap-stack-md">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                We'll check what this service offers and show you a preview before anything is saved.
+            </p>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-caps text-label-caps text-secondary">Service Address</label>
+<input class="bg-surface-container-low border-b border-surface-container-highest text-on-surface focus:border-primary focus:ring-0 focus:outline-none px-unit py-2 font-body-sm text-body-sm transition-colors" placeholder="e.g., api.service.com" type="text"/>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-caps text-label-caps text-secondary">Display Name</label>
+<input class="bg-surface-container-low border-b border-surface-container-highest text-on-surface focus:border-primary focus:ring-0 focus:outline-none px-unit py-2 font-body-sm text-body-sm transition-colors" placeholder="My New Service" type="text"/>
+</div>
+<div class="flex flex-col gap-stack-sm">
+<label class="font-label-caps text-label-caps text-secondary">Credential (Optional)</label>
+<input class="bg-surface-container-low border-b border-surface-container-highest text-on-surface focus:border-primary focus:ring-0 focus:outline-none px-unit py-2 font-body-sm text-body-sm transition-colors" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="p-stack-md border-t border-outline-variant bg-surface-container-low rounded-b-lg flex justify-end gap-stack-md mt-auto">
+<button class="px-gutter py-2 font-body-sm text-body-sm border border-outline text-secondary rounded hover:bg-surface-high transition-colors">Cancel</button>
+<button class="px-gutter py-2 font-body-sm text-body-sm bg-primary text-on-primary rounded hover:bg-primary-fixed-dim transition-colors">Connect</button>
+</div>
+</div>
+<!-- STAGE 2 (LOOKING) -->
+<div class="w-[400px] bg-surface-container rounded-lg border border-outline-variant flex flex-col shrink-0">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-high rounded-t-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Connecting...</h2>
+</div>
+<div class="p-stack-md flex flex-col items-center justify-center gap-stack-md py-[60px]">
+<div class="w-12 h-12 rounded-full border-4 border-surface-container-highest border-t-primary animate-spin mb-4"></div>
+<p class="font-body-lg text-body-lg text-on-surface loading-pulse">Checking... 0:04</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-center">Contacting the address to see what this service offers.</p>
+</div>
+<div class="p-stack-md border-t border-outline-variant bg-surface-container-low rounded-b-lg flex justify-center mt-auto">
+<button class="px-gutter py-2 font-body-sm text-body-sm text-error hover:bg-error-container hover:text-on-error-container rounded transition-colors">Cancel Connection</button>
+</div>
+</div>
+<!-- STAGE 3 (FOUND) -->
+<div class="w-[400px] bg-surface-container rounded-lg border border-outline-variant flex flex-col shrink-0">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-high rounded-t-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">deepwiki — what it offers</h2>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors duration-200">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-stack-sm bg-tertiary-container text-on-tertiary-container flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">info</span>
+<span class="font-body-sm text-body-sm">Nothing has been saved yet. Review the tools below before adding the service.</span>
+</div>
+<div class="p-stack-md flex flex-col gap-unit">
+<!-- Item 1 -->
+<div class="p-stack-sm bg-surface-container-low hover:bg-surface-container-high transition-colors flex items-center gap-stack-md rounded group">
+<div class="w-8 h-8 bg-surface-container-highest rounded flex items-center justify-center text-primary font-label-caps text-label-caps group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors">
+                     DA
+                 </div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">Data Aggregator</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[12px]">Collects and summarizes recent activity logs.</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="p-stack-sm bg-surface-container-low hover:bg-surface-container-high transition-colors flex items-center gap-stack-md rounded group">
+<div class="w-8 h-8 bg-surface-container-highest rounded flex items-center justify-center text-primary font-label-caps text-label-caps group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors">
+                     US
+                 </div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">User Sync</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[12px]">Synchronizes user profile updates across platforms.</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="p-stack-sm bg-surface-container-low hover:bg-surface-container-high transition-colors flex items-center gap-stack-md rounded group">
+<div class="w-8 h-8 bg-surface-container-highest rounded flex items-center justify-center text-primary font-label-caps text-label-caps group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors">
+                     NM
+                 </div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface">Notification Manager</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[12px]">Handles routing of alert messages.</span>
+</div>
+</div>
+</div>
+<div class="p-stack-md border-t border-outline-variant bg-surface-container-low rounded-b-lg flex justify-end gap-stack-md mt-auto">
+<button class="px-gutter py-2 font-body-sm text-body-sm border border-outline text-secondary rounded hover:bg-surface-high transition-colors">Discard</button>
+<button class="px-gutter py-2 font-body-sm text-body-sm bg-primary text-on-primary rounded hover:bg-primary-fixed-dim transition-colors">Add service</button>
+</div>
+</div>
+<!-- STAGE 4 (REFUSED) -->
+<div class="w-[400px] bg-surface-container rounded-lg border border-error-container flex flex-col shrink-0">
+<div class="p-stack-md border-b border-error-container flex justify-between items-center bg-surface-container-high rounded-t-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error">gpp_bad</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Connection Refused</h2>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors duration-200">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-stack-md flex flex-col gap-stack-md">
+<p class="font-body-sm text-body-sm text-on-surface">
+                We can't connect to this address for security reasons. Please use a standard web address.
+            </p>
+<div class="p-stack-sm bg-surface-container-lowest border border-outline-variant rounded flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">link</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant font-mono">local.internal.network</span>
+</div>
+</div>
+<div class="p-stack-md border-t border-error-container bg-surface-container-low rounded-b-lg flex justify-end mt-auto">
+<button class="px-gutter py-2 font-body-sm text-body-sm bg-surface-container-highest text-on-surface border border-outline-variant rounded hover:bg-surface-bright transition-colors">Edit Address</button>
+</div>
+</div>
+<!-- STAGE 5 (DID NOT ANSWER) -->
+<div class="w-[400px] bg-surface-container rounded-lg border border-outline-variant flex flex-col shrink-0">
+<div class="p-stack-md border-b border-outline-variant flex justify-between items-center bg-surface-container-high rounded-t-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary-fixed-dim">timer_off</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">No Response</h2>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors duration-200">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-stack-md flex flex-col gap-stack-md">
+<p class="font-body-sm text-body-sm text-on-surface">
+                We reached the address, but it didn't respond with any tools. Check the address and try again.
+            </p>
+<div class="p-stack-sm bg-surface-container-lowest border border-outline-variant rounded flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">link</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant font-mono">api.unknown-service.net</span>
+</div>
+<div class="font-label-caps text-label-caps text-secondary ml-6 mt-1">Status: Unknown</div>
+</div>
+</div>
+<div class="p-stack-md border-t border-outline-variant bg-surface-container-low rounded-b-lg flex justify-end gap-stack-md mt-auto">
+<button class="px-gutter py-2 font-body-sm text-body-sm border border-outline text-secondary rounded hover:bg-surface-high transition-colors">Cancel</button>
+<button class="px-gutter py-2 font-body-sm text-body-sm bg-surface-container-highest text-on-surface border border-outline-variant rounded hover:bg-surface-bright transition-colors">Edit Address</button>
+</div>
+</div>
+</body></html>

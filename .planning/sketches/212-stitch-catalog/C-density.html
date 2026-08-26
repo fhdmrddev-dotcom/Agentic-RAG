@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Variant C: Density Stress Test</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#131b2e",
+                        "primary-fixed-dim": "#3cddc7",
+                        "surface-tint": "#3cddc7",
+                        "surface-container": "#171f33",
+                        "on-secondary-container": "#a7b6cc",
+                        "surface-variant": "#2d3449",
+                        "outline": "#859490",
+                        "on-tertiary-fixed": "#2d1600",
+                        "on-primary": "#003731",
+                        "tertiary-fixed-dim": "#ffb875",
+                        "surface": "#0b1326",
+                        "primary-fixed": "#62fae3",
+                        "inverse-surface": "#dae2fd",
+                        "secondary": "#b9c8de",
+                        "on-tertiary-container": "#744000",
+                        "background": "#0b1326",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary-fixed": "#00201c",
+                        "inverse-primary": "#006b5f",
+                        "on-background": "#dae2fd",
+                        "surface-dim": "#0b1326",
+                        "tertiary-container": "#ffac5a",
+                        "on-surface-variant": "#bacac5",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary-fixed": "#0d1c2d",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "inverse-on-surface": "#283044",
+                        "on-tertiary": "#4b2800",
+                        "on-secondary": "#233143",
+                        "secondary-container": "#39485a",
+                        "outline-variant": "#3c4a46",
+                        "on-surface": "#dae2fd",
+                        "surface-container-high": "#222a3d",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-container": "#00574d",
+                        "tertiary-fixed": "#ffdcc0",
+                        "tertiary": "#ffd1aa",
+                        "on-primary-fixed-variant": "#005047",
+                        "primary": "#57f1db",
+                        "on-tertiary-fixed-variant": "#6b3b00",
+                        "primary-container": "#2dd4bf",
+                        "secondary-fixed-dim": "#b9c8de",
+                        "secondary-fixed": "#d4e4fa",
+                        "surface-bright": "#31394d",
+                        "error": "#ffb4ab"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-md": "1rem",
+                        "container-padding": "2rem",
+                        "unit": "4px",
+                        "gutter": "1.5rem",
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "2rem"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "display-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .material-symbols-outlined {
+                font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            }
+            .material-symbols-outlined[data-weight="fill"] {
+                font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg min-h-screen">
+<main class="max-w-5xl mx-auto p-container-padding space-y-16 py-16">
+<!-- Header -->
+<header class="mb-12">
+<h1 class="font-display-lg text-display-lg text-primary">Variant C: Density Stress Test</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2">Evaluating readability and tonal separation across variable vertical rhythm.</p>
+</header>
+<!-- BLOCK 1: ALONE (Generous Density) -->
+<section>
+<h2 class="font-label-caps text-label-caps text-secondary mb-6 border-b border-surface-container-high pb-2">BLOCK 1: ALONE (Generous Density)</h2>
+<div class="flex flex-col space-y-stack-lg">
+<!-- Slack Row (Generous) -->
+<div class="flex items-start gap-4 p-4 rounded-xl hover:bg-surface-container-high transition-colors duration-200">
+<div class="w-8 h-8 rounded-lg bg-[#E01E5A] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[20px]" data-icon="chat_bubble" data-weight="fill">chat_bubble</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline-md text-headline-md text-on-surface">Slack</span>
+<div class="flex items-center gap-2 bg-surface-container px-2 py-1 rounded-full border border-surface-container-highest">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</p>
+</div>
+</div>
+<!-- Jira Row (Generous) -->
+<div class="flex items-start gap-4 p-4 rounded-xl hover:bg-surface-container-high transition-colors duration-200 bg-error-container/10 border border-error/20">
+<div class="w-8 h-8 rounded-lg bg-[#0052CC] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[20px]" data-icon="bug_report" data-weight="fill">bug_report</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline-md text-headline-md text-on-surface">Jira</span>
+<div class="flex items-center gap-2 bg-error-container px-2 py-1 rounded-full">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="font-label-caps text-label-caps text-error">Needs Attention</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-2">Raise and track issues for your team.</p>
+<p class="font-body-sm text-body-sm text-error bg-error-container/20 px-3 py-2 rounded-lg inline-block border border-error/20">Your login for this service has expired, and updates have stopped.</p>
+</div>
+</div>
+<!-- deepwiki Row (Generous) -->
+<div class="flex items-start gap-4 p-4 rounded-xl hover:bg-surface-container-high transition-colors duration-200">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant">
+<span class="font-label-caps text-label-caps text-on-surface">DE</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline-md text-headline-md text-on-surface">deepwiki</span>
+<div class="flex items-center gap-2 bg-surface-container px-2 py-1 rounded-full border border-surface-container-highest">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Uncurated</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Search a shared internal knowledge base.</p>
+<p class="font-body-sm text-body-sm text-outline mt-1 text-xs">(Added via URL)</p>
+</div>
+</div>
+</div>
+</section>
+<!-- BLOCK 2: AT DENSITY (Tight List) -->
+<section>
+<h2 class="font-label-caps text-label-caps text-secondary mb-6 border-b border-surface-container-high pb-2">BLOCK 2: AT DENSITY (Tight List)</h2>
+<div class="flex flex-col bg-surface-container-low rounded-xl border border-surface-container-high overflow-hidden">
+<!-- 1. Slack -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#E01E5A] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="chat_bubble" data-weight="fill">chat_bubble</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Slack</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Post updates and read channels in your workspace.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+</div>
+<!-- 2. GitHub -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#24292F] border border-outline-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="code" data-weight="fill">code</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">GitHub</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Track code changes and manage pull requests.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-outline"></div>
+<span class="font-label-caps text-label-caps text-outline">Not Connected</span>
+</div>
+</div>
+</div>
+<!-- 3. Jira -->
+<div class="flex items-start gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0 bg-error-container/5">
+<div class="w-6 h-6 rounded bg-[#0052CC] flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="bug_report" data-weight="fill">bug_report</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Jira</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Raise and track issues for your team.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="font-label-caps text-label-caps text-error">Needs Attention</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-error/90 text-sm">Your login for this service has expired, and updates have stopped.</p>
+</div>
+</div>
+<!-- 4. deepwiki -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0">
+<span class="font-label-caps text-label-caps text-on-surface text-[10px]">DE</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">deepwiki</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Search a shared internal knowledge base.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Uncurated</span>
+</div>
+</div>
+</div>
+<!-- 5. Notion -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#FFFFFF] flex items-center justify-center shrink-0">
+<span class="font-label-caps text-label-caps text-black text-[12px] font-bold">N</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Notion</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Organize notes and collaborate on documents.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+</div>
+<!-- 6. Figma -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#F24E1E] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="draw" data-weight="fill">draw</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Figma</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Design interfaces and prototype user flows.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-outline"></div>
+<span class="font-label-caps text-label-caps text-outline">Not Connected</span>
+</div>
+</div>
+</div>
+<!-- 7. Linear -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#5E6AD2] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="timeline" data-weight="fill">timeline</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Linear</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Plan projects and manage developer workflows.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+</div>
+<!-- 8. Custom Service A -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0 overflow-hidden relative">
+<!-- Geometric pattern variant B -->
+<div class="absolute inset-0 bg-gradient-to-br from-surface-variant to-surface-container-highest opacity-50"></div>
+<div class="w-2 h-2 rounded-full bg-on-surface-variant absolute top-1 left-1"></div>
+<div class="w-2 h-2 rounded-sm bg-on-surface-variant absolute bottom-1 right-1"></div>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Custom Service A</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Process incoming data streams for analysis.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Uncurated</span>
+</div>
+</div>
+</div>
+<!-- 9. Sentry -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#362D59] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="troubleshoot" data-weight="fill">troubleshoot</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Sentry</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Monitor application errors and performance issues.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+</div>
+<!-- 10. Intercom -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#1F8CEB] flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="forum" data-weight="fill">forum</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Intercom</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Chat with customers and manage support tickets.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-outline"></div>
+<span class="font-label-caps text-label-caps text-outline">Not Connected</span>
+</div>
+</div>
+</div>
+<!-- 11. Miro -->
+<div class="flex items-center gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0">
+<div class="w-6 h-6 rounded bg-[#FFD02F] flex items-center justify-center shrink-0">
+<span class="font-label-caps text-label-caps text-black text-[12px] font-bold">M</span>
+</div>
+<div class="flex-1 min-w-0 flex items-center justify-between">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Miro</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Visualize ideas on a shared digital whiteboard.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary">Connected</span>
+</div>
+</div>
+</div>
+<!-- 12. Jira (At foot) -->
+<div class="flex items-start gap-4 px-4 py-3 hover:bg-surface-container-high transition-colors duration-200 group border-b border-surface-container-high last:border-b-0 bg-error-container/5">
+<div class="w-6 h-6 rounded bg-[#0052CC] flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="bug_report" data-weight="fill">bug_report</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-baseline gap-3 overflow-hidden">
+<span class="font-body-lg text-body-lg text-on-surface font-medium truncate">Jira</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate hidden sm:inline">Raise and track issues for your team.</span>
+</div>
+<div class="flex items-center gap-2 shrink-0 ml-4">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="font-label-caps text-label-caps text-error">Needs Attention</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-error/90 text-sm">Your login for this service has expired, and updates have stopped.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>
