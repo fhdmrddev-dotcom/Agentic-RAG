@@ -248,7 +248,7 @@ file, no schema and no API surface, which is G-3 territory by the guardrails' ow
 | Item | Owner | State |
 |---|---|---|
 | The five per-shape rows + the four G-4 lived-experience checks | **operator** | ⬜ **OWED** — the executor cannot drive a browser; see the board above. Run row 5 first |
-| `bash scripts/regenerate-full-schema.sh` (rebuild `supabase/full-schema.sql` for migration 127) | **operator** | ⬜ **OWED** — needs `docker`, which is denied to the agent. `full-schema.sql` is **not yet regenerated** for migration 127 |
+| `bash scripts/regenerate-full-schema.sh` (rebuild `supabase/full-schema.sql` for migration 127) | operator | ✅ **DONE 2026-08-27** — 6258 lines; and it surfaced a defect, see below |
 | `/gsd:fast` fix for `BUG-260827-01` | **operator** | ⬜ owed, deliberately deferred out of this phase |
 | `pytest tests/test_migration_127.py -q` → `10 passed, 0 skipped` | operator | ✅ **DONE 2026-08-27** — see below |
 
@@ -290,3 +290,42 @@ and the rest is prior waves' work already on the base.
 *Phase: 211-the-connection-is-a-service-not-a-verb*
 *Validation strategy created: 2026-08-26 · source `211-RESEARCH.md` §K*
 *Wave 4 results recorded: 2026-08-27 (`211-05`)*
+
+### ✅ `regenerate-full-schema.sh` — done, and it caught a defect that would have shipped
+
+Run 2026-08-27 by the operator. `supabase/full-schema.sql` rebuilt, 6258 lines, live-DB dump
+(no `--reset`). Verified in the artifact: `service_id` present, `has_a_service_identity` and
+`shape_is_not_ambiguous` present, `shape_is_one_of_two` **gone**, `idx_connector_connections_org_service`
+present.
+
+⚠ **THE GRANT WAS NOT IN IT, AND NOT ONLY MIGRATION 127'S.** `regenerate-full-schema.sh` runs
+`pg_dump --no-privileges`, so **no ACL is ever carried by the dump** — every column GRANT is
+mirrored by hand in `scripts/full-schema-supplement.sql`. That mirror had fallen **four columns**
+behind the live table. Measured against `information_schema.column_privileges` rather than read
+off a diff:
+
+| Column | live SELECT | was in artifact | landed |
+|---|---|---|---|
+| `mcp_server_url` | yes | **NO** | Phase 206 — latent a whole milestone |
+| `tool_grants` | yes | **NO** | Phase 206 — latent a whole milestone |
+| `discovered_tools` | yes | **NO** | Phase 206 — latent a whole milestone |
+| `service_id` | yes | **NO** | migration 127 — this phase |
+| `secret_ciphertext` | NO | absent | correct, deliberate (CR-01) |
+
+**The failure it ships is TOTAL, not partial.** `_SELECTABLE_COLUMNS` is DERIVED from
+`ConnectorConnectionResponse`, so every read projects every response field by name. A greenfield
+bootstrap from `full-schema.sql` would name four ungranted columns and PostgREST answers
+`42501 permission denied for table connector_connections` on **every** read of the table —
+including a pre-existing row unrelated to this phase. It presents as an **outage**, not a
+permissions bug. That is migration 118's own recorded lesson, in that very file, recurring
+because the mirror is manual.
+
+Fixed at the SOURCE (`scripts/full-schema-supplement.sql` — editing the generated artifact would
+be erased by the next regen), regenerated, and re-verified that all four now appear **and** that
+`secret_ciphertext` still does not. `scripts/check-deploy-drift.sh` → PASS. Commit `0396aea2`.
+
+⚠ **THREE OF THE FOUR WERE NOBODY'S PHASE.** They were watched by no gate: the drift check passes
+on them, the dump cannot see them, and no test bootstraps from `full-schema.sql`. **The only reason
+they were found is that someone read the regen's output instead of its "Done." line.** A gate that
+compares this block against `information_schema.column_privileges` is the missing mechanism, and it
+is not written yet.
