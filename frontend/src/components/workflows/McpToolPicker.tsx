@@ -42,13 +42,25 @@ import type { ConnectorConnection, McpDiscoveredTool } from "@/lib/api"
 // `require_org_manage` plus an RLS policy in both USING and WITH CHECK are the wall.
 import { useOrgOptional } from "@/providers/OrgProvider"
 
-export const MCP_TOOL_PICKER_HEADING = "MCP Tool & Action"
-export const MCP_DISCOVER_BUTTON_LABEL = "Discover Tools"
-export const MCP_DISCOVERING_LABEL = "Discovering tools…"
+/* ─────────────────────────────────────────────────────────────────────────────────────
+ * ⚠ 211-04 (D-211-12) — THE VALUES BELOW CHANGED; NOT ONE IDENTIFIER DID, and not one
+ * `data-testid` moved. Five of them said *tools* / *discover* / *remote server*, which read
+ * as a remote-server act — and this card now serves a first-party capability connection as
+ * well, whose action list is REFRESHED from the server we already own rather than DISCOVERED
+ * from someone else's. Renaming the identifiers or the test ids would be churn with no defect
+ * behind it: `mcp-tool-picker`, `mcp-discover-btn`, `mcp-no-tools`, `mcp-tool-select` and the
+ * `mcp-grant-*` family are pinned across three suites.
+ * ───────────────────────────────────────────────────────────────────────────────────── */
+
+/** The card's own name. Shape-neutral: it heads the list of things THIS CONNECTION can do,
+ *  whether those arrived from a remote MCP server or from plan 211-01's static descriptor. */
+export const MCP_TOOL_PICKER_HEADING = "What this connection can do"
+export const MCP_DISCOVER_BUTTON_LABEL = "Refresh actions"
+export const MCP_DISCOVERING_LABEL = "Refreshing…"
 export const MCP_NO_TOOLS_DISCOVERED =
-  "No tools discovered yet. Click Discover Tools to fetch available actions from the remote server."
-export const MCP_TOOL_SELECT_LABEL = "Select Tool"
-export const MCP_TOOL_NONE_OPTION = "— choose a tool —"
+  "No actions listed for this connection yet. Refresh to fetch what it offers."
+export const MCP_TOOL_SELECT_LABEL = "Action"
+export const MCP_TOOL_NONE_OPTION = "— choose an action —"
 export const MCP_GRANT_GRANTED_LABEL = "Permission Granted"
 export const MCP_GRANT_DENIED_LABEL = "Permission Not Granted"
 export const MCP_GRANT_DENIED_WARNING =
@@ -94,7 +106,7 @@ export const MCP_GRANT_ADMIN_ONLY_NOTE =
  *  the reader to click a button that AR-01 removes for them. This names NO second location,
  *  because nothing was measured that lets a member reach discovery anywhere. */
 export const MCP_NO_TOOLS_ADMIN_ONLY =
-  "No tools have been fetched from this server yet. Only an organisation admin can fetch them."
+  "No actions have been listed for this connection yet. Only an organisation admin can refresh them."
 
 export interface McpToolPickerProps {
   connection: ConnectorConnection | null
@@ -114,6 +126,26 @@ export interface McpToolPickerProps {
    */
   onConnectionUpdated?: (row: ConnectorConnection) => void
   disabled?: boolean
+  /**
+   * 211-04 — WHETHER `tool_grants` IS ACTUALLY ENFORCED FOR THE BOUND CONNECTION.
+   *
+   * ⚠ IT IS A PROP RATHER THAN A LOCAL READ, AND THAT IS THE WHOLE POINT. D-211-12 requires
+   * this component to take NO rendering decision from the connection's endpoint — its own
+   * suite sweeps the live source for that field and finds zero occurrences. But the grant
+   * gate really IS endpoint-shaped on the server: `phase_types.py` reads `tool_grants` only
+   * INSIDE its remote-server branch (Gate 6), so on the capability path a step is not refused by
+   * that map at all. Rendering *"Permission Not Granted — execution will be refused by policy
+   * at run time"* over a first-party connection would therefore be a measured lie.
+   *
+   * So the CALLER — which is allowed to know a connection's shape — answers the question, and
+   * this component renders the consequence. Default `true`, which is what keeps every shipped
+   * MCP call site and every shipped assertion byte-unmoved.
+   *
+   * ⚠ THIS OBLIGATION IS CREATED BY THIS PLAN AND DISCHARGED BY IT. Before the card rendered
+   * for a bound capability row, the sentence could not appear on one; making the card render
+   * is what put it there.
+   */
+  grantsEnforced?: boolean
 }
 
 /** Which of the two audiences on this panel is looking, or that we do not yet know.
@@ -171,6 +203,7 @@ export function McpToolPicker({
   onChangeArgs,
   onConnectionUpdated,
   disabled = false,
+  grantsEnforced = true,
 }: McpToolPickerProps) {
   const [isDiscovering, setIsDiscovering] = useState(false)
   const [discoveryError, setDiscoveryError] = useState<string | null>(null)
@@ -294,7 +327,33 @@ export function McpToolPicker({
     }
   }, [grantBusy, connection, toolName, onConnectionUpdated])
 
-  if (!connection?.mcp_server_url) {
+  // ── ⭐ 211-04 (D-211-12 / T-211-22) · THE CARD GATE — and it is ONE OF TWO GATES, never
+  //    the one gate this line used to be. ──────────────────────────────────────────────
+  //
+  // ⚠ WHAT WAS HERE: an early return on the connection's SERVER-URL field being absent.
+  // (The field is deliberately not spelled anywhere in this file, including here — this
+  // component's own suite sweeps its live source for that token and a comment quoting it
+  // would make the fence count itself. That is the 187-24 trap, and it has now fired
+  // fourteen times in this tree.) It conflated two different decisions — *should this card
+  // exist?* and *is there a list to show?* — and it answered BOTH from the endpoint. A bound
+  // capability connection carrying a perfectly
+  // shaped `discovered_tools` list therefore rendered NOTHING, which is why plan 211-01's
+  // descriptors had no surface able to display them.
+  //
+  // ⚠ AND THE OBVIOUS REPLACEMENT IS A WORSE DEFECT, WHICH IS WHY THIS COMMENT IS LONG.
+  // *"Render when `discovered_tools.length > 0`, else return null"* reads like the honest
+  // form of D-211-12 and closes a loop with no way out through the UI: the list is empty →
+  // the card returns null → the Refresh control (which lives BELOW this line) never renders →
+  // nothing can populate the list → the card never renders. It would ALSO regress the MCP
+  // path, where a brand-new connection legitimately starts with `discovered_tools: []` and
+  // the Discover button is its only affordance. **Do not write that gate.**
+  //
+  // So: the CARD gates on BOUNDNESS — the honest question, because this component is only
+  // ever mounted after an author has chosen a connection: *you have chosen a connection, here
+  // is what it can do*. The TOOL LIST gates on `tools`, below, where it always did. And the
+  // endpoint decides nothing about rendering anywhere in this file — asserted mechanically by
+  // a source fence in this component's own suite, not merely promised here.
+  if (!connection?.id) {
     return null
   }
 
@@ -303,7 +362,7 @@ export function McpToolPicker({
   // ⚠ THE ONE GRANT PREDICATE, NOT FORKED. `isToolGranted` already mirrors the server's
   // `grants.get(tool_name) is True`; the switch and the badge both read THIS value, so the
   // control can never disagree with the reading printed beside it.
-  const canWriteGrants = audience === "admin"
+  const canWriteGrants = audience === "admin" && grantsEnforced
   const showDiscover = audience === "admin" || audience === "no-provider"
   const grantWriteState = grantFailed ? "failed" : grantBusy ? "pending" : "idle"
 
@@ -382,9 +441,16 @@ export function McpToolPicker({
             className="h-8 rounded border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">{MCP_TOOL_NONE_OPTION}</option>
+            {/* ⚠ 211-04 — THE VALUE IS THE WIRE NAME, THE LABEL IS THE HUMAN ONE. Plan
+                211-01 widened the sanitizer's allow-list by exactly `title` and
+                `outputSchema` so a descriptor could carry its own words; this is the one
+                place that reads the first of them. `||` rather than `??` on purpose: the
+                sanitizer omits the key for a blank, but a `title` that arrived as `""` from
+                any other route must still fall through to the name rather than render an
+                empty option. */}
             {tools.map((t) => (
               <option key={t.name} value={t.name}>
-                {t.name}
+                {t.title || t.name}
               </option>
             ))}
           </select>
@@ -393,7 +459,15 @@ export function McpToolPicker({
 
       {toolName && (
         <div className="mt-1 flex flex-col gap-2">
-          {/* Grant Status Indicator */}
+          {/* Grant Status Indicator.
+              ⚠ 211-04 — GATED ON `grantsEnforced`, and the gate is a correctness fix rather
+              than a preference. `MCP_GRANT_DENIED_WARNING` says the run will be *refused by
+              policy*; on the capability path the executor never consults `tool_grants`, so
+              that sentence would be false for a first-party connection. The badge, the
+              switch and the member sentence are ONE surface about ONE mechanism, so they
+              appear and disappear together — leaving the badge while removing the switch
+              would stage the lie without its explanation. */}
+          {grantsEnforced && (
           <div
             data-testid="mcp-grant-status"
             data-granted={isGranted ? "true" : "false"}
@@ -420,6 +494,7 @@ export function McpToolPicker({
               </>
             )}
           </div>
+          )}
 
           {/* ── 206.2-04 · THE GRANT CONTROL ────────────────────────────────────────
               ⚠ OUTSIDE THE BADGE, NOT INSIDE IT. The badge above is a tinted box carrying
@@ -515,7 +590,7 @@ export function McpToolPicker({
           {/* ⚠ THE SENTENCE IS THE SECOND FACT, NOT DECORATION. *This tool is not granted*
               and *you cannot grant it* are two facts, and leaving only the first strands a
               member in front of a badge with no way to read why nothing can be done. */}
-          {audience === "member" && (
+          {grantsEnforced && audience === "member" && (
             <p
               data-testid="mcp-grant-admin-only"
               className="text-[10px] leading-tight text-muted-foreground"
