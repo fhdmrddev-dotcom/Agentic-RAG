@@ -168,9 +168,9 @@ it.*
 
 Plans:
 - [x] 211-01-PLAN.md - one shape: static tool descriptors derived from each adapter's own INPUT_SCHEMA, the sanitizer widened by `title` + `outputSchema`, and all seven closed-set spellings enumerated (incl. migration 116's SQL CHECK, held by nothing executable until now)
-- [ ] 211-02-PLAN.md - migration 127: `service_id` + backfill + ⭐ the §2b **descriptor backfill** that makes SC#2 true for the two rows that already exist + the stated replacement guarantee + the column GRANT; the five-point column lockstep, the third arm in `_validate_connection_shape`, and the `lib/api/org.ts` wire contract wave 3 compiles against. [BLOCKING] operator paste + `regenerate-full-schema.sh`
-- [ ] 211-03-PLAN.md - the create flow names a SERVICE: the three-verb chooser leaves the source, an unheard-of service saves with no capability key, no per-vendor branch enters the tree (settings only)
-- [ ] 211-04-PLAN.md - ⭐ the pickers read the tool list, never the endpoint: one unscoped read lists every shape, the browse axis goes, and **an empty action list keeps its Refresh control on EVERY shape** — the closed loop plan review caught (workflows only)
+- [x] 211-02-PLAN.md - migration 127: `service_id` + backfill + ⭐ the §2b **descriptor backfill** that makes SC#2 true for the two rows that already exist + the stated replacement guarantee + the column GRANT; the five-point column lockstep, the third arm in `_validate_connection_shape`, and the `lib/api/org.ts` wire contract wave 3 compiles against. [BLOCKING] operator paste + `regenerate-full-schema.sh`
+- [x] 211-03-PLAN.md - the create flow names a SERVICE: the three-verb chooser leaves the source, an unheard-of service saves with no capability key, no per-vendor branch enters the tree (settings only)
+- [x] 211-04-PLAN.md - ⭐ the pickers read the tool list, never the endpoint: one unscoped read lists every shape, the browse axis goes, and **an empty action list keeps its Refresh control on EVERY shape** — the closed loop plan review caught (workflows only)
 - [ ] 211-05-PLAN.md - the two absences proved: the SC#3 source fence, **both halves of the seam** (backend data + frontend render, each naming the other), both count-gate knobs, five owed ledger rows, and the per-shape G-4 board
 
 **UI hint**: yes
