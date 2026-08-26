@@ -5444,3 +5444,354 @@ carries the verdict — **young (192.1, 192.2)** — and this is the cell it car
 carries the verdict — **young (192.2)** — and this is the cell it carried before the split:
 
 > young (192.2) — ⚠ **listed because its entire 192.2 history is an ADD then a REMOVE**: it is byte-identical to its pre-sketch shape. The app has **no url router** (`SEED-185`), so a guarded pathname branch here is the throwaway-surface precedent **and** its teardown — a dev route that outlives its sketch becomes production surface by accident
+
+
+---
+
+## Phase 211 · 2026-08-27 — FIVE connector-surface files reach the G-5 threshold in ONE phase, and four had no row at all
+
+⚠ **Every triple below was RE-DERIVED FROM GIT in the worktree at Phase 211's wave 4**, using
+`CLAUDE.md`'s recipe verbatim, with six-digit dated quick-task buckets subtracted. **Nothing was
+copied forward from `211-MEASUREMENTS.md` §2**, and the reason is that the measurement pack was
+captured *before the phase began* — plans 211-01 and 211-02 then edited three of these files, so
+two of §2's four figures were already stale by the time the phase reached this plan:
+
+| File | `211-MEASUREMENTS.md` §2, captured pre-phase | **re-derived at wave 4** |
+|---|---|---|
+| `backend/app/models/connector.py` | `4 / 2 / 346` | **`5 / 3 / 450`** |
+| `backend/app/services/mcp_client.py` | `2 / 2 / 367` | **`3 / 3 / 400`** |
+
+**That is this ledger's own repeated finding arriving on schedule** — a figure written at a
+phase's open goes stale on the next commit that touches the file, sometimes within the same
+phase. The two rows moved from *below* the G-5 threshold to *at* it, which is the difference
+between a row a future auditor skips and a row that fires.
+
+### ⭐ THE HEADLINE: all five cross the threshold in THIS phase, and it is the same shape the
+### Settings surface hit at Phase 206.1 and `config.py` hit for the project's entire life
+
+Every one of the five has **exactly three** numeric phase buckets, and `211` is the third in
+every case:
+
+| File | commits / phases / lines | buckets |
+|---|---|---|
+| `backend/app/models/connector.py` | `5 / 3 / 450` | `190` · `206` · `211` |
+| `backend/app/services/mcp_client.py` | `3 / 3 / 400` | `206` · `209` · `211` |
+| `backend/app/api/connectors.py` | `6 / 3 / 734` | `190` · `206` · `211` (plus a non-numeric `connectors` bucket, correctly discarded) |
+| `backend/app/services/connector_service.py` | `7 / 3 / 1149` | `190` · `206` · `211` |
+| `frontend/src/components/workflows/McpToolPicker.tsx` | `3 / 3 / 645` | `206` · `206.2` · `211` |
+
+⚠ **FOUR OF THE FIVE HAD NO ROW IN `CLAUDE.md` AT ALL, so G-5 could never have fired on any of
+them at any count.** Measured before these rows were written:
+`grep -c "backend/app/models/connector.py" CLAUDE.md` → **0**, and the same for
+`mcp_client.py`, `api/connectors.py` and `connector_service.py`. Three of the four are the
+**entire backend connector surface** — the model that decides which shapes are representable,
+the route module that admits them, and the service that resolves credentials for them.
+
+⚠ **AND THE FIFTH HAD A ROW THAT WAS PRESENT AND WRONG, WHICH IS THE WORSE STATE.**
+`McpToolPicker.tsx`'s row read `2 / 2 / 570 | no (2 phases) | ⚠ named inside Phase 206's section
+with no row of its own (added 206.2)` — a disposition describing the moment *before* the row
+existed, attached to the row that fixed it, over a triple stale by one phase. A row that answers
+the auditor with *"no (2 phases)"* stops the audit; an absent row at least leaves the absence
+visible. **Plan `211-05`'s own task text inherited that stale cell** and instructed this plan to
+*add* a row for a file that already had one — recorded here rather than tidied away, because the
+plan being wrong in exactly the way the ledger predicts is the finding.
+
+⚠ **`connector_service.py` was in the third state again — NAMED IN ANOTHER FILE'S SECTION, with
+no row and a DEAD ANCHOR.** This document already carried
+`### backend/app/services/connector_service.py — Phase 206, honoured by construction` at `:4424`,
+nested under the Phase 206 narrative. That heading's anchor is
+`#backendappservicesconnector_servicepy--phase-206-honoured-by-construction`, so a `CLAUDE.md`
+link to `#backendappservicesconnector_servicepy` would have landed nowhere. The `##` section
+below is what makes the new row's link resolve — the `useTemplateFirstDraft.ts` drift, one more
+time, on the backend.
+
+---
+
+## `backend/app/models/connector.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `5 commits / 3 phases / 450 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211`.
+
+**What it is.** The request/response trio for `public.connector_connections`, and — this is the
+part that matters — **the place where WHICH SHAPES EXIST is decided.** `ConnectorConnectionCreate`
+is the API's gate; the CHECK constraints in migration 127 are the gate for every writer that is
+not the API. The two must agree exactly (D-211-04): a model LAXER than the database yields a 500
+where a 422 belongs, and a model STRICTER than it refuses a row the database would have stored.
+
+**Phase 211's change, and why it is honoured by construction.** `_validate_connection_shape` gained
+an arm at each END and the two existing arms are byte-unchanged: FIRST a refusal of the AMBIGUOUS
+body (both a capability and an endpoint), LAST the SERVICE-ONLY shape, which **replaces** the old
+blanket refusal that demanded one of the two. `service_id` became REQUIRED on every shape.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE AMBIGUOUS ARM'S POSITION IS LOAD-BEARING.** The ambiguous body carries an
+  `mcp_server_url`, and the MCP branch RETURNS — so an arm placed after it would never run.
+- ⚠ **A WIDENED `config` UNION ONCE SWITCHED WR-05 OFF, AND IT WAS MEASURED, NOT REASONED ABOUT.**
+  `ConnectorConfig | dict[str, Any]` meant a raw dict satisfied the annotation outright, so
+  Pydantic's smart union stopped coercing a capability row's config into its bound model and the
+  deterministic capability↔config binding never ran on the wire path it exists to defend. Three
+  bodies were ACCEPTED that should not have been, including `send_email` with an empty config and
+  no secret. **The fix is to branch on the SHAPE and validate each on its own terms, never to
+  loosen the shared path.**
+- ⚠ **THE SERVICE-ONLY ARM DELIBERATELY DOES NOT INHERIT THE CAPABILITY ARM'S SECRET OR CONFIG
+  REQUIREMENTS.** An OAuth-authenticated service has neither until Phase 215, and demanding one
+  would make the shape unusable in the only case it exists for.
+- ⚠ **`ConnectorConnectionResponse` IS THE REAL T7 GATE** — no `secret_ciphertext` field, no
+  `secret` field, `extra='forbid'`. A column added to the table tomorrow cannot reach a client
+  unless somebody adds the field HERE, in a diff a reviewer reads.
+- ⚠ **`ConnectorCapability` IS THE THIRD SPELLING OF ONE CLOSED SET** and the agreement is a
+  module-scope assert, checked at import. Nothing here is remembered.
+
+**Seam NAMED, for the phase that needs it:** the three per-capability config models plus their
+binding are ~90 L of pure data-shape that has nothing to do with the request/response trio; a
+`models/connector_configs.py` leaf is the cut, and it becomes worth taking the moment a fourth
+service shape appears (Phase 212's catalog, or Phase 215's OAuth rows).
+
+---
+
+## `backend/app/services/mcp_client.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `3 commits / 3 phases / 400 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `206` · `209` · `211`.
+
+⚠ **ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE** — and it is the module that performs the
+app's only live outbound MCP egress, so an audit that never sees it never sees the egress.
+
+**What it is.** The Model-Context-Protocol client: `list_tools` and the tool-call dispatch, the
+per-tool sanitizer, and the auth-header builder that deliberately returns headers with NO
+`Authorization` for a credential-less public server.
+
+**Phase 211's change.** The tool sanitizer's allow-list was widened by **exactly two keys** —
+`title` and `outputSchema` — and it remains an ALLOW-LIST. That is the whole edit.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE SANITIZER IS AN ALLOW-LIST AND MUST STAY ONE.** An off-list, server-controlled key is
+  DROPPED. **The load-bearing case is the DROP, not the carry** (D-211-09): a remote server
+  chooses these keys, and a deny-list cannot be made fail-closed by extension (the Phase 185
+  lesson, restated on a different surface).
+- ⚠ **`title` REACHING THE WIRE IS WHAT LETS A DESCRIPTOR CARRY ITS OWN WORDS.** Its first and
+  only consumer anywhere is `McpToolPicker`'s option label, which reads `t.title || t.name` —
+  `||` and not `??`, because the sanitizer omits the key for a blank but a `title: ""` arriving
+  by any other route must still fall through to the name.
+- ⚠ **AN ABSENT `readOnlyHint` STILL FAILS CLOSED** (D-211-10). Widening the allow-list did not
+  widen what is TRUSTED.
+- ⚠ **IT IS IMPORTED LAZILY, INSIDE FUNCTION BODIES.** A standing fence asserts that a cold
+  `import app.services.harness.phase_types` loads no vendor module until a send happens.
+
+**Seam NAMED:** the sanitizer (~60 L) is a pure function over an untrusted dict and shares nothing
+with the transport; it is the natural leaf, and the phase that adds a third MCP consumer should
+take it.
+
+---
+
+## `backend/app/api/connectors.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `6 commits / 3 phases / 734 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211` (a sixth commit carries a non-numeric `connectors` bucket, which
+the recipe correctly discards).
+
+**What it is.** Every route for `connector_connections`: list, get, create, update, delete, the
+credential check, `POST /connections/{id}/discover`, and `PATCH /connections/{id}/grants`.
+
+**Phase 211's change.** `discover_tools`'s docstring stopped being true — *"discover tools from a
+remote MCP server"* — because a first-party CAPABILITY connection now refreshes here too, with no
+network call at all. The route gained `ConnectorNothingToDiscover` and a 409 arm.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE EXCEPTION ORDER IS THE CONTRACT, NOT A STYLE.** `ConnectorNothingToDiscover` **IS** a
+  `ConnectorError`, so an arm placed below the generic clause would be dead code. Both must stay
+  above the bare `except Exception`.
+- ⚠ **THE 502 IS NARROWED TO THE ARM THAT CAN ACTUALLY MEET A GATEWAY.** A capability refresh
+  contacts nothing; reporting its failure as *bad gateway* misnames an internal fault as a remote
+  one and sends the reader hunting an outage. **This is not hypothetical** — the same shape was
+  measured in live UAT on 2026-08-25, when a caching write refused by a missing column grant
+  surfaced as a **502 "MCP tool discovery failed"** after the remote server had already answered
+  correctly.
+- ⚠ **`require_visible("live_connectors")` IS PER ENDPOINT, NEVER ON THE ROUTER** (D-26). A
+  router-level gate would silently cover routes added later, including read-only ones.
+- ⚠ **A CROSS-ORG ID AND A NONEXISTENT ID PRODUCE THE SAME RESPONSE.** Answering *"you may not
+  have this"* confirms the id names a real row in some other org.
+- ⚠ **`org_id` AND `created_by` ARE HARD-SET FROM THE CALLER.** There is no body field for either,
+  because that would be the D-14 tenant-selection leak with a friendlier name.
+
+**Seam NAMED:** the module has one shape worth cutting — the ~120 L of exception→HTTP mapping,
+which is pure and testable and currently interleaved with six handlers. A
+`api/connector_errors.py` leaf makes the ordering invariant above assertable in one place
+instead of at each call site.
+
+---
+
+## `backend/app/services/connector_service.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `7 commits / 3 phases / 1149 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211`.
+
+⚠ **IT HAD NO ROW AND A DEAD ANCHOR** — see this phase's headline above. The `###` heading at
+`:4424` (*"Phase 206, honoured by construction"*) is kept where it is; this `##` section is what
+makes `CLAUDE.md`'s link resolve, and the two are not in conflict.
+
+**What it is.** The credential resolver (`resolve_connection` — the headline security gate of
+Phase 190), the CRUD, the tool-discovery cache write, and the grant write.
+
+**Phase 211's change.** `discover_connection_tools` gained a second arm: a capability connection
+refreshes from `descriptors.static_descriptors_for_capability` with **no network call at all**, so
+ONE refresh path serves both reachable shapes and a stale action list self-heals in one click.
+`resolve_connection`'s credential-less relaxation gained its **second** scoped shape.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`resolve_connection` TAKES `org_id` WITH NO DEFAULT, AND A TEST ASSERTS THAT MECHANICALLY**
+  via `inspect.signature`. An optional org scope is the id-only `SELECT` wearing a disguise: it
+  type-checks, it reads scoped, and it silently defaults to unscoped for every caller that
+  forgets. **The leak was reproduced in this module before it was closed** — org A's run received
+  org B's decrypted bot token.
+- ⚠ **THE SECOND GATE IS NOT REDUNDANT.** The storage layer is asked to scope, and the row it
+  returns is CHECKED to have obeyed. That term is what survives a future fetch seam whose SQL
+  drops the `org_id` predicate.
+- ⚠ **THE CREDENTIAL-LESS RELAXATION IS SCOPED TO THE TWO CREDENTIAL-LESS SHAPES AND NOWHERE
+  ELSE.** A CAPABILITY connection with no secret is still `ConnectorNotFound`, unchanged: an SMTP
+  host, a Jira instance and a Slack workspace each REQUIRE a credential, so a row without one is
+  absent *for the purpose of sending*. Phase 211 adds the SERVICE-ONLY shape for the same reason
+  the MCP shape was added, not by widening the rule.
+- ⚠ **`_project(...)` IS NOT OPTIONAL ON A WRITE THAT MAY RUN ON THE USER-JWT CLIENT.**
+  postgrest-py sends `return=representation` by default — `RETURNING *` — and migration 118 grants
+  `authenticated` SELECT column by column, omitting `secret_ciphertext`, so the star is refused
+  every single time. `discover_connection_tools` shipped without it and the failure was measured
+  in live UAT.
+- ⚠ **`_fetch_connection_row` IS THE ONE QUERY HERE THAT MAY STILL SAY `select("*")`**, because
+  migration 118 leaves `secret_ciphertext` readable by `service_role` alone and this is the only
+  caller that needs it.
+- ⚠ **`tool_grants` IS NEVER TOUCHED BY ANY DISCOVERY ARM.** A descriptor ADVERTISES an action; it
+  does not GRANT one, and the executor's gate denies on a missing grant key by design.
+- ⚠ **THE GRANT WRITE IS A WHOLE-COLUMN REPLACE**, so every client of it must send the full merged
+  map. It is a read-modify-write over a client snapshot with no version column; the honest
+  mitigation is the scope sentence, not a lock.
+
+**Seam NAMED:** the resolver plus its two gates (~150 L) is the security-bearing half and shares
+nothing with the CRUD half but a table name. `services/connector_credentials.py` is the cut, and
+the phase that adds OAuth (215) will be holding the knife anyway — a token-refresh lifecycle
+belongs beside the resolver, not beside `delete_connection`.
+
+---
+
+### `frontend/src/components/workflows/McpToolPicker.tsx` — Phase 211 update
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `3 commits / 3 phases / 645 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD.** Phases: `206` · `206.2` · `211`. The file's main section is at
+[`McpToolPicker.tsx`](#frontendsrccomponentsworkflowsmcptoolpickertsx); this is the Phase 211
+addendum, and the row it corrects is described in this phase's headline above.
+
+**Honoured by construction (211).** ⭐ **THE CARD GATE WAS SPLIT INTO THE TWO DECISIONS IT WAS
+CONFLATING, NEVER RE-POINTED AT A DIFFERENT SINGLE FIELD.** What was there answered *should this
+card exist?* and *is there a list to show?* from ONE field — the connection's server URL — so a
+bound capability connection carrying a perfectly shaped `discovered_tools` rendered NOTHING.
+
+- **the CARD** gates on `!connection?.id` — *are we bound?*, the honest question, because the
+  component is only ever mounted after an author has chosen a connection;
+- **the TOOL LIST** gates on `tools.length === 0`, where it always did;
+- **the REFRESH control** gates on AUDIENCE ONLY. **No shape condition was added**, and that is
+  what makes 211-02's capability arm of `discover_connection_tools` reachable at all —
+  `handleDiscover` is that route's only caller in the entire product.
+
+⚠ **THE OBVIOUS REPLACEMENT IS A WORSE DEFECT, AND IT IS REFUSED IN WRITING AT THE SITE.**
+*"Render when `discovered_tools.length > 0`, else return null"* reads like the honest form of
+D-211-12 and closes a loop with no way out: empty list → card returns null → the Refresh control
+(which lives BELOW the gate) never renders → nothing can populate the list. It would ALSO regress
+the MCP path, where a brand-new connection legitimately starts at `[]`. **Revision iteration 1 of
+this phase caught exactly that gate being proposed.**
+
+⚠ **`grantsEnforced` IS A PROP, NOT A LOCAL READ, AND THAT IS THE WHOLE POINT.** D-211-12 forbids
+this component taking any rendering decision from the connection's endpoint — its own suite
+sweeps the live source for that field and finds zero occurrences. But the grant gate really IS
+endpoint-shaped on the server: `phase_types.py` reads `tool_grants` only inside its remote-server
+branch, so on the capability path a step is not refused by that map at all. Rendering *"Permission
+Not Granted — execution will be refused by policy at run time"* over a first-party connection
+would be a measured lie. **The caller — which is allowed to know a connection's shape — answers
+the question; this component renders the consequence.** The obligation was CREATED by this plan
+and DISCHARGED by it: before the card rendered for a bound capability row, the sentence could not
+appear on one.
+
+⚠ **VALUES CHANGED; NOT ONE IDENTIFIER AND NOT ONE `data-testid` DID.**
+`git diff … | grep -cE '^[-+]\s*data-testid='` → **0**. Five constants said *tools* / *discover* /
+*remote server*, which read as a remote-server act on a card that now also serves a first-party
+connection. `mcp-tool-picker`, `mcp-discover-btn`, `mcp-no-tools`, `mcp-tool-select` and the
+`mcp-grant-*` family are pinned across three suites and renaming them would be churn with no
+defect behind it.
+
+**Guarded by, as of `211-05`:** `connectionCardReachability.test.tsx` (10 cases, pinned in both
+count-gate knobs) drives the render gate through the PRODUCTION CHAIN against the four REAL row
+shapes and **constructs not one prop of this component**. It was observed RED against the
+pre-211-04 gate planted back into this file — **4 of 10 failing, with the MCP-empty case correctly
+still green**, which is what makes the RED discriminating rather than blanket.
+
+---
+
+### `backend/app/services/harness/phase_types.py` — Phase 211 (NOT EDITED, and that is the record)
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `46 commits / 21 phases / 2627 L` · G-5
+FIRES.** The row previously read `45 / 20 / 2621`; the movement is **Phase 210's**, not 211's.
+
+⚠ **THE ROADMAP FLAGS THIS PHASE AS THIS FILE'S REFACTOR, AND THE PHASE MODIFIED IT ZERO TIMES.
+THAT IS SAID PLAINLY HERE RATHER THAN WRITTEN AS `satisfied`** — a row that is present and wrong
+answers the auditor and stops the audit, which is worse than an absent row.
+
+**Evidence, run rather than asserted.** Across the WHOLE phase (base `5f2c7d8c` → wave 4):
+
+```
+git diff --numstat 5f2c7d8c HEAD -- backend/app/models/harness.py \
+    backend/app/services/harness/grounding.py backend/app/services/harness/phase_types.py
+```
+
+**prints nothing.**
+
+**Disposition: honoured by construction.** Phase 211's subject is *which shapes a connection may
+wear and how an author browses them* — a model, a migration, two frontend surfaces. The executor's
+branch on those shapes is untouched, deliberately: 211-04's must_have promises it stays untouched,
+and this is a G-5 hot file with no review cycle in the phase.
+
+⚠ **AND THE COST OF THAT DECISION IS RECORDED RATHER THAN ABSORBED.** The third shape this phase
+makes representable meets a line here that predates it:
+
+```python
+if not getattr(connection, "mcp_server_url", None) and getattr(connection, "capability", capability) != capability:
+```
+
+`getattr`'s DEFAULT fires only when the attribute is MISSING, never when its value is `None`, so a
+SERVICE-ONLY connection is recorded-and-not-sent with the sentence *"the bound connection is for a
+different capability"* — which is false: it is not a different capability, it is **no** capability.
+Filed as **`BUG-260827-01`** (`status: open`), recorded in `211-VALIDATION.md`, and given its RED
+in `backend/tests/integration/test_211_service_shape_seam.py` §7, which pins **today's** condition
+AND **today's** sentence separately so a fix that changes one without the other cannot pass. The
+operator closes it via `/gsd:fast` immediately after this phase — ~4 lines, one file, G-3
+territory.
+
+**Re-open trigger for this file's own G-5 obligation:** *the first phase whose `files_modified`
+names it* — which is the `/gsd:fast` above, and which should therefore read this section first.
+
+---
+
+### `backend/app/services/harness/grounding.py` — Phase 211 (NOT EDITED)
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `19 commits / 6 phases / 1311 L` · G-5
+FIRES.** Identical to the figure the row already carried — **the one row in this pass that was
+NOT stale**, recorded because a re-derivation that only reports the rows it changed is not a
+re-derivation.
+
+**Disposition: honoured by construction (193.1, **211**).** `EXTERNAL_ACTION_CAPABILITIES` is the
+runtime home of the closed capability set, and Phase 211 changed **the connection's AXIS, never
+the capability set**. The set is still exactly three, still closed, still held in agreement with
+`harness.py`'s `Literal`, `models/connector.py`'s `ConnectorCapability`, migration 116's SQL
+`CHECK` and the client mirror in `ExternalActionSection.tsx` — five spellings, mechanically
+checked, none of them touched. Empty diff across the whole phase, by the command quoted above.
+
+⚠ **THE MIRROR AND ITS FENCE WERE KEPT WHILE THE CONTROL THAT CONSUMED THEM WAS DELETED**, and
+that is the phase's named anti-pattern avoided rather than committed: *optional* and *closed* are
+independent properties, and retiring a guard while demoting the thing it guards is how a closed
+set quietly stops being one.

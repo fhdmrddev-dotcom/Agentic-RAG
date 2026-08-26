@@ -163,7 +163,7 @@ const MCP_EMPTY = {
  *  unrecognised service — so this row is creatable, listable and bindable as of today.
  *
  *  ⚠ SEE `211-VALIDATION.md` § "Known gap — the service-only run-time seam" AND
- *  `.planning/reported-bugs/BUG-260826-06-*.md`. Binding THIS shape to a native
+ *  `.planning/reported-bugs/BUG-260827-01-service-only-connection-records-a-false-capability-mismatch.md`. Binding THIS shape to a native
  *  external_action step is recorded-and-not-sent at run time with an INACCURATE sentence.
  *  That is a BACKEND seam and is deliberately NOT fixed in this phase; the render gate — the
  *  only thing this file is about — is correct for it, which is what the case below proves. */
