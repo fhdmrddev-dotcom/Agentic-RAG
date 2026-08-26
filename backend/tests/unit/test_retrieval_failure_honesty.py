@@ -245,3 +245,75 @@ def test_deduplication_and_downstream_consumers_safe_from_keyerror():
     ]
     assert len(cm_dedup(valid_cits)) == 2
     assert len(al_dedup(valid_cits)) == 2
+
+
+def test_resolve_effective_embedding_provider_matches_routing():
+    """W-1 / SC#5: Provider name resolution accurately matches get_embedding_client routing."""
+    from app.services.openai_service import resolve_effective_embedding_provider
+
+    # 1. Live Postgres DB scenario (measured in W-1):
+    # embedding_provider="openai", but embedding_api_key is empty -> routes to active_provider "deepseek"
+    live_settings = MagicMock()
+    live_settings.embedding_provider = "openai"
+    live_settings.embedding_api_key = ""
+    live_settings.embedding_base_url = ""
+    live_settings.active_provider = "deepseek"
+    live_settings.llm_model = "deepseek-v4-flash"
+    assert resolve_effective_embedding_provider(live_settings) == "deepseek"
+
+    # 2. Dedicated embedding key configured
+    dedicated_settings = MagicMock()
+    dedicated_settings.embedding_provider = "openai"
+    dedicated_settings.embedding_api_key = "sk-dedicated"
+    dedicated_settings.embedding_base_url = ""
+    dedicated_settings.active_provider = "deepseek"
+    assert resolve_effective_embedding_provider(dedicated_settings) == "openai"
+
+    # 3. Dedicated local embedder configured
+    ollama_settings = MagicMock()
+    ollama_settings.embedding_provider = "ollama"
+    ollama_settings.embedding_api_key = "ollama"
+    ollama_settings.embedding_base_url = "http://localhost:11434/v1"
+    ollama_settings.active_provider = "openai"
+    assert resolve_effective_embedding_provider(ollama_settings) == "ollama"
+
+    # 4. Empty-label default (embedding_provider="") with dedicated key
+    empty_label_settings = MagicMock()
+    empty_label_settings.embedding_provider = ""
+    empty_label_settings.embedding_api_key = "sk-dedicated"
+    empty_label_settings.embedding_base_url = ""
+    empty_label_settings.embedding_model = "text-embedding-3-small"
+    assert resolve_effective_embedding_provider(empty_label_settings) == "openai"
+
+    # 5. Dedicated key with openrouter base url
+    or_settings = MagicMock()
+    or_settings.embedding_provider = ""
+    or_settings.embedding_api_key = "sk-or-test"
+    or_settings.embedding_base_url = "https://openrouter.ai/api/v1"
+    or_settings.embedding_model = ""
+    assert resolve_effective_embedding_provider(or_settings) == "openrouter"
+
+
+@pytest.mark.asyncio
+async def test_search_documents_provider_honesty_with_deepseek_fallback():
+    """W-1 / SC#5: search_documents reports deepseek when embedding falls back to DeepSeek LLM credentials."""
+    mock_ctx = MagicMock(spec=ToolContext)
+    mock_ctx.current_user = {"id": "user-123"}
+    mock_ctx.supabase = MagicMock()
+    mock_ctx.user_settings = MagicMock()
+    # Stale embedding_provider="openai", but NO dedicated key -> active_provider="deepseek"
+    mock_ctx.user_settings.embedding_provider = "openai"
+    mock_ctx.user_settings.embedding_api_key = ""
+    mock_ctx.user_settings.embedding_base_url = ""
+    mock_ctx.user_settings.active_provider = "deepseek"
+    mock_ctx.user_settings.llm_model = "deepseek-v4-flash"
+    mock_ctx.folder_subtree_ids = None
+    mock_ctx.run_id = "run-456"
+
+    with patch("app.services.tool_dispatcher.search_documents", AsyncMock(side_effect=Exception("Connection refused"))):
+        tool_result = await _handle_search_documents({"query": "quarterly earnings"}, mock_ctx)
+
+    assert tool_result.retrieval_error is not None
+    # ⚠ Must be deepseek, NOT openai
+    assert tool_result.retrieval_error["provider"] == "deepseek"
+    assert "the search provider (deepseek) returned" in tool_result.result

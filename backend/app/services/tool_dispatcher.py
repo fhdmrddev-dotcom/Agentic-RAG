@@ -720,7 +720,8 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         # and it does not reach the phase record the author reads. Returning an explicit
         # unavailable result puts the reason where a person will meet it.
         logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
-        provider = getattr(ctx.user_settings, "embedding_provider", None) or "openai"
+        from app.services.openai_service import resolve_effective_embedding_provider
+        provider = resolve_effective_embedding_provider(getattr(ctx, "user_settings", None))
         return ToolResult(
             result=json.dumps({
                 "error": "retrieval_unavailable",

@@ -1315,6 +1315,109 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     return OpenAI(**kwargs)
 
 
+def resolve_effective_embedding_provider(user_settings: UserEffectiveSettings | None = None) -> str:
+    """Resolve the honest provider name whose endpoint receives the embedding call (RAG-09 / SC#5).
+
+    Matches the exact routing logic in get_embedding_client():
+      1. When user_settings is provided and user_settings.embedding_api_key is set (or user_settings
+         is None and settings.embedding_api_key is set), the request routes to the dedicated
+         embedding provider. Uses user_settings.embedding_provider if set, else infers from base_url/model.
+      2. When NO dedicated embedding key is set, get_embedding_client() reuses the LLM credentials
+         (llm_api_key + llm_base_url). The request routes to the active LLM provider (active_provider,
+         or inferred from llm_base_url / llm_model).
+    """
+    from app.config import _infer_provider_for
+
+    if user_settings is not None:
+        if getattr(user_settings, "embedding_api_key", None):
+            # Dedicated embedding key on user_settings
+            emb_prov = (getattr(user_settings, "embedding_provider", "") or "").strip()
+            if emb_prov:
+                return emb_prov
+            emb_base_url = getattr(user_settings, "embedding_base_url", "") or ""
+            if "openrouter" in emb_base_url:
+                return "openrouter"
+            if "ollama" in emb_base_url or ":11434" in emb_base_url:
+                return "ollama"
+            if "deepseek" in emb_base_url:
+                return "deepseek"
+            if "anthropic" in emb_base_url:
+                return "anthropic"
+            if "googleapis" in emb_base_url:
+                return "google"
+            emb_model = getattr(user_settings, "embedding_model", "") or ""
+            if emb_model:
+                inferred = _infer_provider_for(emb_model)
+                if inferred != "ollama" or "ollama" in emb_model:
+                    return inferred
+            return "openai"
+        else:
+            # No dedicated key — reuse LLM credentials (matching get_embedding_client)
+            active_prov = (
+                getattr(user_settings, "active_provider", "")
+                or getattr(user_settings, "llm_provider", "")
+                or ""
+            ).strip()
+            if active_prov:
+                return active_prov
+            llm_base_url = getattr(user_settings, "llm_base_url", "") or ""
+            if "openrouter" in llm_base_url:
+                return "openrouter"
+            if "ollama" in llm_base_url or ":11434" in llm_base_url:
+                return "ollama"
+            if "deepseek" in llm_base_url:
+                return "deepseek"
+            if "anthropic" in llm_base_url:
+                return "anthropic"
+            if "googleapis" in llm_base_url:
+                return "google"
+            llm_model = getattr(user_settings, "llm_model", "") or ""
+            if llm_model:
+                return _infer_provider_for(llm_model)
+            return "openai"
+    else:
+        # user_settings is None -> check app settings
+        if settings.embedding_api_key:
+            emb_base_url = settings.embedding_base_url or ""
+            if "openrouter" in emb_base_url:
+                return "openrouter"
+            if "ollama" in emb_base_url or ":11434" in emb_base_url:
+                return "ollama"
+            if "deepseek" in emb_base_url:
+                return "deepseek"
+            if "anthropic" in emb_base_url:
+                return "anthropic"
+            if "googleapis" in emb_base_url:
+                return "google"
+            if settings.embedding_model:
+                inferred = _infer_provider_for(settings.embedding_model)
+                if inferred != "ollama" or "ollama" in settings.embedding_model:
+                    return inferred
+            return "openai"
+        else:
+            active_prov = (
+                getattr(settings, "active_provider", "")
+                or getattr(settings, "llm_provider", "")
+                or ""
+            ).strip()
+            if active_prov:
+                return active_prov
+            llm_base_url = settings.llm_base_url or ""
+            if "openrouter" in llm_base_url:
+                return "openrouter"
+            if "ollama" in llm_base_url or ":11434" in llm_base_url:
+                return "ollama"
+            if "deepseek" in llm_base_url:
+                return "deepseek"
+            if "anthropic" in llm_base_url:
+                return "anthropic"
+            if "googleapis" in llm_base_url:
+                return "google"
+            if settings.llm_model:
+                return _infer_provider_for(settings.llm_model)
+            return "openai"
+
+
 # Per-provider safe max output token defaults (fallback when no model entry exists).
 #
 # Anthropic's compat layer silently defaults to 1024 tokens if max_tokens is
