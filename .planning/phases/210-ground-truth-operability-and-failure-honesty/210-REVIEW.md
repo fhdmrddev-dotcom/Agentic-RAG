@@ -134,3 +134,87 @@ lands in `messages.source_refs` so the references render with passages."* An `is
 - **R-4 resolved better than asked**: the budget lift targets the exact legacy `50_000`, so an
   operator's deliberate low budget is preserved.
 - **P-1 stayed resolved**: `connectionsCopy.ts` is untouched by 210 and 211's fence held.
+
+---
+
+# Round 2 — against the fix commit (`705a7412`)
+
+**V-1 and V-3 are properly fixed.** The synthetic pseudo-citation is gone: the outage path now
+returns `citations=[]`, `source_refs=[]` and a dedicated `retrieval_error` field on `ToolResult`,
+threaded `run_task_sub_agent` → `_exec_llm_agent` / `_exec_llm_batch_agents` → the gate. `is_error`
+no longer appears anywhere in the tree, so the `KeyError: 'document_id'` I drove is structurally
+unreachable — nothing foreign enters the citations channel at all. **This is the right shape:
+`citations` and `source_refs` keep meaning "here is what was read."**
+
+**Gates re-derived independently, all three reproduce:** tsc **34**; count gate **OK 114/114, total
+5798, pinned 5180, failed 0**; backend **68 failed / 2690 passed** — rot set exactly at baseline, `+10`
+passing, per-file distribution unchanged (`test_retrieval_service.py` 15, `test_111_1_reembed_kickoff.py` 4).
+
+**Two findings remain. One is SC#5 again, and this time it is measured against the live database.**
+
+## W-1 · SC#5 still unmet — the name is a stored LABEL, not the provider that is actually called
+
+`tool_dispatcher.py:723` derives the name from `ctx.user_settings.embedding_provider`. **That field
+is not what routes the embedding call.** `openai_service.get_embedding_client:1292-1315` reads only
+two things, and `embedding_provider` is not among them:
+
+```python
+if user_settings.embedding_api_key:            # dedicated embedding credentials
+    api_key, base_url = embedding_api_key, embedding_base_url or None
+else:                                          # NO dedicated key -> reuse the LLM's
+    api_key, base_url = llm_api_key, embedding_base_url or llm_base_url or None
+```
+
+**Measured on this install's live `app_settings` row (local Postgres :54322):**
+
+| field | value |
+|---|---|
+| `embedding_provider` | `openai` — the label the new message prints |
+| `embedding_api_key` | **empty** |
+| `embedding_base_url` | **empty** |
+| `llm_provider` | **`deepseek`** |
+| `llm_model` | `deepseek-v4-flash` |
+
+With no dedicated embedding key and no embedding base URL, `get_embedding_client` takes the
+**"reuse LLM credentials"** branch — so the embedding call goes out on **DeepSeek's** credentials
+while the outage message says **`openai`**.
+
+⚠ **That is worse than the generic phrase it replaced.** V-2's fallback said `retrieval provider` —
+uninformative but true. This says `openai` — informative and, on this box today, false. It would send
+an operator to check an OpenAI balance while DeepSeek is the thing refusing, which is the *precise*
+failure mode `BUG-260815-05` was filed for: *"sent them to re-check their documents, their folder and
+their prompt, all of which were correct."*
+
+⚠ **The wrong name reaches the model too**, not just the gate: `provider` is interpolated into the
+tool result's `detail` string (`:729`), which is addressed to the LLM, so the model repeats it to the
+user in prose.
+
+⚠ **And the tests cannot see it — the fourth recurrence of one shape.** All four cases set
+`mock_ctx.user_settings.embedding_provider = "openai"` on a `MagicMock` (`:28`, `:59`, `:193`) and then
+assert the provider is `"openai"` (`:42`, `:108`). The test supplies the value that makes its own
+assertion true. Nothing exercises the empty-label default (`embedding_provider: str = ""`,
+`user_settings.py:241`) or an install whose embedding routes anywhere else.
+
+**Measurement, not a direction:** the two fields `get_embedding_client` actually reads are
+`embedding_api_key` / `embedding_base_url`, with `llm_api_key` / `llm_base_url` as the fallback. What
+the honest name should be derived from is the builder's call.
+
+## W-2 · The fence was crossed — `phase_types.py` is 211's, and 211 is being built right now
+
+`705a7412` modifies `backend/app/services/harness/phase_types.py` (+6 lines at `:825` and `:941`).
+
+BUS-006's own operator ruling reads: *"`phase_types.py`: Remains inside Phase 211's fence (untouched
+by 210)"* — and the whole `ctx`-channel design of round 1 was chosen to honour it. Pre-flight P-2
+predicted this file would be needed; that prediction being right does not by itself re-open the fence.
+
+⚠ **211 is not idle.** `7ce9c6ce docs(211): research phase 211 + validation strategy` landed between
+the review and this fix, and `phase_types.py` is one of the two files 211's refactor is *about*
+(`45/20/2621`, G-5 firing, the `capability` spellings live there).
+
+The edits themselves are small, additive and correct. **The problem is that 211's builder does not
+know they happened** — no bus item announced the crossing. That is the coordination failure AGENTS.md
+§3.1 exists to prevent, and it is cheap to fix by telling them.
+
+## Still owed
+
+Browser-driven UAT for SC#1–#4 is **not run**. SC#5 cannot pass UAT while W-1 stands.
