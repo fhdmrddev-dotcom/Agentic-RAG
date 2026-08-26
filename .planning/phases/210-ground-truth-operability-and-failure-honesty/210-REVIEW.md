@@ -218,3 +218,128 @@ know they happened** — no bus item announced the crossing. That is the coordin
 ## Still owed
 
 Browser-driven UAT for SC#1–#4 is **not run**. SC#5 cannot pass UAT while W-1 stands.
+
+---
+
+# Driven UAT — reviewer, 2026-08-26 (browser, `localhost:5173`)
+
+Driven by the reviewer, not the builder (§6.3). Gemini was out of quota; the operator authorised
+the reviewer to drive. **Before-state captured first:** `workflow_schedules` = **0 rows**,
+`feature_visibility.live_connectors.audience` = **`everyone`**.
+
+## SC#1 — `live_connectors` kill-switch · ✅ PASS, end to end
+
+| Step | Observed |
+|---|---|
+| Card renders | Control Room → **Users & Access** → *Live connectors*, with its description and `lives on Workflows & Settings` |
+| Current state is TRUE, not defaulted | UI showed **On**; DB `feature_visibility.live_connectors.audience` = `everyone`. **They agreed** |
+| Control shape | Exactly two controls, `aria-checked` — **binary Off/On**, no `operators` / `role` audience offered. T-210-01's mitigation is live |
+| Flip → Off | `Off:true` · receipt rendered **`✎ Turned Off · recorded`** |
+| Persisted | DB re-read: `{"roles": [], "groups": [], "audience": "off"}` |
+| **A subsequent external call is refused** | Settings → Connections rendered: **⛨ "Live sending is off for this platform"** — *"Connections below are read-only until an operator turns it on — nothing here can be added or changed, and no message, ticket or email will leave. Steps still record what they would have done and read 'Not sent — recorded'."* plus *"An operator turns `live_connectors` on in the Control Room."* All 3 connections listed read-only |
+| Flip back → On | `On:true` · receipt **`✎ Set to Everyone · recorded`**; DB restored to `everyone` |
+
+**Both directions exercised** (G-4), and the install was **restored to the state it was found in**.
+
+⚠ Note the refusal banner is `connectionsCopy.ts`'s `liveConnectorsOnFrom` path rendering correctly —
+so pre-flight P-1's resolution (leave the cast alone in 210, retire it in 211) is proven live, not
+just argued.
+
+## SC#2 and SC#4 — ⛔ NOT DRIVEABLE on this install · blocked on test data, not on defects
+
+The scheduling door is a `DropdownMenuItem` gated on **`onSchedule && row.provenance === "published"`**
+(`WorkflowCard.tsx:1426`), and `Provenance` is `"starter" | "published" | "draft"`
+(`libraryRow.ts:36`).
+
+**Measured in the running app:** the library shows `Ready to run 3` / **`Yours 0`** / `Still building 0`,
+and all three visible rows are **Shared starters** — provenance `"starter"`. Opening a card's
+*Workflow actions* menu yields exactly **`Run log`** and **`Make my own copy`**; `data-testid=
+"workflow-schedules"` is **absent**. The gate is deliberate and correct (the API refuses a draft, so
+offering the item would be an affordance that exists only to be refused) — but the consequence is that
+**this operator has no row from which a schedule can be created at all.**
+
+So SC#2 (*"told so at save time"*) cannot be reached without first forking a starter and taking it
+through the 8-stage publish gauntlet, which writes a new workflow into the operator's library. **The
+reviewer did not do that** — creating library content is not a review action, and it is the operator's
+call.
+
+SC#4 (*manual trigger with a null `org_id`*) queues behind SC#2: it needs the schedule row SC#2 creates.
+
+## SC#3 — ⛔ NOT DRIVEABLE, and it is structurally unreachable through the UI
+
+`scheduler_service.py:142-147` lifts a budget only on an **exact** match:
+
+```python
+if sched_max_tokens == 50_000:   sched_max_tokens = 500_000
+if sched_max_duration == 600:    sched_max_duration = 1_800
+```
+
+`workflow_schedules` holds **0 rows**, so there is no legacy row to lift. And a schedule created
+through the modal now defaults to `500_000` / `1_800`, so **the UI can no longer produce a row that
+meets the lift's condition.** SC#3 is provable only against pre-existing cloud data or a hand-inserted
+legacy row.
+
+## SC#5 — blocked on W-1's disposition (see Round 2 and the correction below)
+
+## Summary
+
+| SC | Verdict |
+|---|---|
+| #1 `live_connectors` kill-switch | ✅ **PASS** — driven both ways, DB-verified, refusal observed |
+| #2 scheduler-off notice at save | ⛔ **NOT RUN** — no `published`-provenance row exists to open the door |
+| #3 budget floor on existing schedules | ⛔ **NOT RUN** — 0 schedule rows, and the UI cannot create a qualifying one |
+| #4 null-`org_id` manual trigger | ⛔ **NOT RUN** — depends on #2's row |
+| #5 provider named on outage | ⛔ **BLOCKED** — W-1 |
+
+**Three ⛔ rows, recorded with their reasons rather than omitted.**
+
+---
+
+# ⚠ CORRECTION to W-1 — my evidence was wrong, and the original stands above rather than being edited
+
+**What I claimed** (Round 2, and on BUS-009): that on this install the outage message would name
+`openai` while the embedding call actually routed to DeepSeek. I read
+`app_settings.embedding_api_key` as empty in the database and concluded `get_embedding_client` takes
+its "reuse the LLM credentials" branch.
+
+**That is false.** `_val(row, key, env_key, default)` falls back to the **environment variable** when
+the DB column is empty, so a dedicated embedding key **is** present. Resolved the way the running
+backend resolves it — `_load_settings_from_db()` then `_build_settings_from_row()`, rather than the
+DB row alone:
+
+```
+embedding_provider (label) : 'openai'
+embedding_api_key set      : True          <- from env, not the DB column
+embedding_base_url         : ''
+active_provider            : 'deepseek'    <- the LLM, NOT used for embeddings here
+resolve_effective_embedding_provider -> 'openai'
+get_embedding_client(...).base_url        -> 'https://api.openai.com/v1/'
+```
+
+The client really does point at OpenAI, so `openai` is the **truthful** name here, and the pre-fix
+code would also have said `openai` — correctly.
+
+⚠ **My earlier reading used `load_app_settings()` in a subprocess, which is a COLD-CACHE read**
+(`user_settings.py:937-944` returns env/Pydantic defaults when `_settings_cache` is unset). That is
+the trap: neither the raw DB row nor a cold `load_app_settings()` is the runtime view, and I quoted
+the first as if it were.
+
+**What survives:** the structural half. `embedding_provider` is a stored *label* and was not the
+routing input, so an install with a dedicated **non-OpenAI** embedding key and an empty label would
+have printed `openai` wrongly. W-1 therefore drops from *blocking and observable here* to **a correct
+fix for a real latent gap this install does not exhibit.**
+
+## Review of Gemini's uncommitted W-1 fix (working tree, not yet committed)
+
+Three modified files: `openai_service.py` (new `resolve_effective_embedding_provider`),
+`tool_dispatcher.py` (calls it), `test_retrieval_failure_honesty.py`.
+
+- ✅ **The branch mirrors `get_embedding_client` exactly** — dedicated embedding key → the embedding
+  side; no dedicated key → the LLM side. That is the right shape, and it is what makes the name track
+  the routing instead of a label.
+- ✅ Returns `openai` on this install, matching where the client actually points.
+- ✅ `test_retrieval_failure_honesty.py` — **9 passed**.
+- ⚠ **Weakness worth naming:** the fallback infers the provider by substring-matching base URLs
+  (`"ollama" in url`, `":11434"`, `"deepseek"`, `"googleapis"`…). Serviceable as a last resort, but it
+  is guesswork and it is the part most likely to rot — a self-hosted OpenAI-compatible endpoint on a
+  custom domain lands in none of those arms and falls through to `openai`.
