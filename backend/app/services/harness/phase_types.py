@@ -822,6 +822,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
         "similarity_scores": result.get("similarity_scores") or [],
+        "retrieval_error": result.get("retrieval_error"),
         # 200 (D-07) — DECLARED measure, site 1 of 3. The number is a fact this executor
         # already produced: how many grounding sources the sub-agent actually gathered.
         # ⚠ ZERO IS EMITTED, NOT SUPPRESSED: a sub-agent that searched and found nothing
@@ -937,12 +938,17 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         batch_citations.extend(r.get("citations") or [])
         batch_similarity_scores.extend(r.get("similarity_scores") or [])
 
+    batch_retrieval_error = next(
+        (r.get("retrieval_error") for r in results if r.get("retrieval_error")),
+        None,
+    )
     return {
         "text": merged,
         "sub_run_ids": sub_run_ids,
         "source_refs": batch_source_refs,
         "citations": batch_citations,
         "similarity_scores": batch_similarity_scores,
+        "retrieval_error": batch_retrieval_error,
         # 200 (D-07) — DECLARED measure, site 2 of 3. How many parallel sub-agents this
         # phase actually fanned out to — one ``sub_run_id`` per branch that really ran, so
         # the number is the executor's own fact and not a re-derivation of the config's

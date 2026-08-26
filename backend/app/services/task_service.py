@@ -703,6 +703,7 @@ async def run_task_sub_agent(
     sub_source_refs: list[dict] = []
     sub_citations: list[dict] = []
     sub_similarity_scores: list[float] = []
+    sub_retrieval_error: dict | None = None
 
     try:
         for step in range(max_steps):
@@ -765,6 +766,8 @@ async def run_task_sub_agent(
                         sub_citations.extend(tr.citations)
                     if tr.similarity_score is not None:
                         sub_similarity_scores.append(tr.similarity_score)
+                    if tr.retrieval_error:
+                        sub_retrieval_error = tr.retrieval_error
 
             # Replay assistant + tool messages for next iteration.
             # D-16 (mirror agent_loop.py:1866-1901): the conditional spreads
@@ -951,4 +954,5 @@ async def run_task_sub_agent(
         "similarity_scores": sub_similarity_scores,
         "input_tokens": _sub_in,
         "output_tokens": _sub_out,
+        "retrieval_error": sub_retrieval_error,
     }

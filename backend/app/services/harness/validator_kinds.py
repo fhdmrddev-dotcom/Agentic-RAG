@@ -288,12 +288,12 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
     if mode in ("presence", "retrieved_and_cited"):
         raw_citations = output.get("citations") or []
         # Phase 210 (RAG-09 / BUG-260815-05) — Provider failure honesty.
-        # If any citation carries an error object, report an honest provider outage rather
-        # than blaming model non-compliance or reporting 0 sources.
-        error_cit = next((c for c in raw_citations if isinstance(c, dict) and c.get("is_error")), None)
-        if error_cit:
-            provider = error_cit.get("provider") or "retrieval provider"
-            detail = error_cit.get("detail") or "service unavailable"
+        # If the phase output carries a structured retrieval_error, report an honest provider outage
+        # rather than blaming model non-compliance or reporting 0 sources.
+        retrieval_err = output.get("retrieval_error")
+        if retrieval_err:
+            provider = retrieval_err.get("provider") or "retrieval provider"
+            detail = retrieval_err.get("detail") or "service unavailable"
             return GateResult(
                 False,
                 f"citations_required: retrieval failed ({provider}: {detail}) — this is a service outage, not model non-compliance",

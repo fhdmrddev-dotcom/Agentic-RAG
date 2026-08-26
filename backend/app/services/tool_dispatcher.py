@@ -184,6 +184,7 @@ class ToolResult:
     citations: list[dict] = field(default_factory=list)  # New citation objects
     similarity_score: float | None = None  # Avg similarity to accumulate
     sub_agent_record: dict | None = None  # Sub-agent metadata (analyze_document)
+    retrieval_error: dict | None = None  # Phase 210 (RAG-09) provider outage details
 
 
 # ---------------------------------------------------------------------------
@@ -719,21 +720,25 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         # and it does not reach the phase record the author reads. Returning an explicit
         # unavailable result puts the reason where a person will meet it.
         logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
+        provider = getattr(ctx.user_settings, "embedding_provider", None) or "openai"
         return ToolResult(
             result=json.dumps({
                 "error": "retrieval_unavailable",
+                "provider": provider,
                 "detail": (
-                    f"The document search could not run — the search provider returned: {exc}. "
+                    f"The document search could not run — the search provider ({provider}) returned: {exc}. "
                     "This is NOT a result of zero matches: your documents were never queried. "
                     "Say plainly that document search is unavailable; do not state or imply "
                     "that the knowledge base contains no relevant information."
                 ),
             }),
-            citations=[{
-                "is_error": True,
-                "retrieval_status": "provider_error",
+            citations=[],
+            source_refs=[],
+            retrieval_error={
+                "provider": provider,
                 "detail": str(exc),
-            }],
+                "retrieval_status": "provider_error",
+            },
         )
     # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
     # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
