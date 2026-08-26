@@ -103,7 +103,7 @@ Phase 196 measured `failed 249` that was entirely REAL (missing mock exports).
 | **Closed set** | Seven spellings agree; an outside value is **refused** | unit (BE), import-time | `pytest tests/unit/test_189_external_action_model.py tests/unit/test_103_grounding_fidelity.py tests/unit/test_185_detection.py -q` | ✅ **green untouched** | ⬜ |
 | **Column grant** | The new columns are readable by the `authenticated` role | integration (DB), **role-scoped** | `pytest tests/integration/test_211_service_shape_seam.py -q` (§6) | ✅ (`211-05` T2a). ⚠ **A 42501 looks like an outage, not a missing column** (mig 126 §3), and a service-role client cannot see it at all. FALSIFIED: a `REVOKE` inside a rolled-back transaction produced `42501`, grant intact afterwards | ✅ |
 | **D-211-11** | Both shapes on one row are refused — at the model **AND** at the database | integration + unit | same file (§3) | ✅ **TWO separate assertions, because one passing does not imply the other.** The model is the API's gate; the CHECK constraint is the gate for every writer that is not the API (a migration, a script, a hand-edit in the SQL editor). Asserted by SQLSTATE `23514` and the constraint's NAME | ✅ |
-| **⭐ Seam defect** | A service-only row bound to a native step records an INACCURATE sentence | integration (§7), **pins TODAY'S behaviour as the fix's RED** | same file | ⚠ **KNOWN GAP — `BUG-260827-01`, `status: open`, deliberately NOT fixed.** §7 pins the condition AND the sentence separately, plus the measured two-arm finding. See the *Known gap* section below | ⚠️ |
+| **⭐ Seam defect** | A service-only row bound to a native step records an INACCURATE sentence | integration (§7), **pins TODAY'S behaviour as the fix's RED** | same file | ✅ **CLOSED — `BUG-260827-01` fixed `8487ec99` (arm 2); §7 rewritten in the same commit. Arm 1 still open.** §7 pins the condition AND the sentence separately, plus the measured two-arm finding. See the *Known gap* section below | ⚠️ |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -177,7 +177,7 @@ performs, not a tool the LLM may call"*). What it owes instead is a **per-shape*
 | 2 | Legacy capability — Jira (`create_ticket`) | ✅ exists (`jira` · `Jira – KAN` · `discovered_tools` length **1**) | ⬜ **OWED — operator.** Same as row 1, against the Jira row |
 | 3 | Legacy capability — SMTP (`send_email`) | ⛔ **NO ROW EXISTS ON THIS BOX** (RESEARCH §J.1; re-confirmed 2026-08-27 — the table holds exactly three rows: `slack`, `jira`, `mcp.deepwiki.com`) | ⛔ **BLOCKED, recorded rather than omitted.** ⚠ The automated coverage that stands in its place is NOT a substitute and is named so it is not mistaken for one: `test_211_service_shape_seam.py` exercises `send_email`'s descriptor derivation against the adapter's own `INPUT_SCHEMA`, and `test_190_smtp_header_injection.py` (13 cases) still guards its refusals. **Neither drives a real send.** To clear: create an SMTP connection and drive it, or leave the ⛔ standing with this reason |
 | 4 | MCP (DeepWiki) | ✅ exists (`mcp.deepwiki.com` · `discovered_tools` length **3**) | ⬜ **OWED — operator.** Its tool list still renders and its grants are unchanged |
-| 5 | ⭐ Service-only — neither capability nor URL (CONN-08) | ❌ new; **this phase makes it representable, and no such row exists on the box yet** — the seam test creates one and deletes it in teardown, verified byte-identical afterwards | ⬜ **OWED — operator, AND RUN THIS ONE FIRST.** Create a connection naming a service nobody here has heard of, with no credential and no endpoint. It SAVES (SC#4), it appears in the list, and it is offered no verb category anywhere. ⚠ Then do the closed-loop check below with it. ⚠ **Expect `BUG-260827-01` if you bind it to a step and run** — that is known, recorded and not a new finding |
+| 5 | ⭐ Service-only — neither capability nor URL (CONN-08) | ❌ new; **this phase makes it representable, and no such row exists on the box yet** — the seam test creates one and deletes it in teardown, verified byte-identical afterwards | ⬜ **OWED — operator, AND RUN THIS ONE FIRST.** Create a connection naming a service nobody here has heard of, with no credential and no endpoint. It SAVES (SC#4), it appears in the list, and it is offered no verb category anywhere. ⚠ Then do the closed-loop check below with it. ✅ **`BUG-260827-01` IS FIXED (`8487ec99`, 2026-08-27) — so binding row 5 to a step and running is now a REAL CHECK, not a known-failure to shrug past.** Arm 2 must now record *"the bound connection names a service but no way to reach it yet"*. ⚠ **Arm 1 is STILL OPEN**: through the shipped UI the bind CLEARS the step's `capability`, so the closed-set guard raises a bare `KeyError` first — if you see a stack trace rather than that sentence, you have hit arm 1, which is expected and is NOT a new finding |
 
 **Rows may be blocked, but never silently omitted** — CLAUDE.md UAT scoreboard rule.
 
@@ -194,7 +194,9 @@ closed-loop check depends on, and it is the one carrying a known run-time gap (b
 
 ---
 
-## ⚠ KNOWN GAP — the service-only RUN-TIME seam (`BUG-260827-01`, `status: open`)
+## ✅ CLOSED GAP — the service-only RUN-TIME seam (`BUG-260827-01`, `status: closed` — **ARM 2 ONLY**)
+
+> ⚠ **This section is PRESERVED as written, because it was the fix's specification and the RED it names actually fired.** Closed 2026-08-27 by `/gsd:fast` (`8487ec99`) — the guard is split into two arms, the `getattr` DEFAULT is KEPT and the guard was NOT widened. §7 was rewritten in the same commit → 14 passed. **Arm 1 — the UI-reachable `KeyError` at the closed-set guard — is UNTOUCHED and is now the report's `re_open_trigger`.** Read the two-arm subsection below before driving row 5; it is what tells you which failure you are looking at.
 
 ⭐ **FOUND AFTER THIS PHASE'S PLANS WERE WRITTEN, RECORDED HERE, AND DELIBERATELY NOT FIXED.**
 Full report: `.planning/reported-bugs/BUG-260827-01-service-only-connection-records-a-false-capability-mismatch.md`.
@@ -249,7 +251,7 @@ file, no schema and no API surface, which is G-3 territory by the guardrails' ow
 |---|---|---|
 | The five per-shape rows + the four G-4 lived-experience checks | **operator** | ⬜ **OWED** — the executor cannot drive a browser; see the board above. Run row 5 first |
 | `bash scripts/regenerate-full-schema.sh` (rebuild `supabase/full-schema.sql` for migration 127) | operator | ✅ **DONE 2026-08-27** — 6258 lines; and it surfaced a defect, see below |
-| `/gsd:fast` fix for `BUG-260827-01` | **operator** | ⬜ owed, deliberately deferred out of this phase |
+| `/gsd:fast` fix for `BUG-260827-01` | operator | ✅ **DONE 2026-08-27 — `8487ec99`, arm 2 only.** RED observed firing before the rewrite; `tests/unit` held at the 68 baseline. ⚠ It also added the fix to the 211 backend review scope (`7e0ce0d9`), because a G-3 fast fix on a G-5 hot file otherwise ships ungated — and G-5 on `phase_types.py` is now **OWED**, not honoured |
 | `pytest tests/test_migration_127.py -q` → `10 passed, 0 skipped` | operator | ✅ **DONE 2026-08-27** — see below |
 
 ### ✅ `test_migration_127.py` — the transition happened
