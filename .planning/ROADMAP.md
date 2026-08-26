@@ -269,7 +269,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 210. Ground Truth — Operability & Failure Honesty | 0/? | Not started | - |
+| 210. Ground Truth — Operability & Failure Honesty | 3/3 | ✅ Complete (1/5 SC driven; 4 owed — see 210-VERIFICATION.md) | 2026-08-26 |
 | 211. The Connection Is a Service, Not a Verb | 0/5 | Not started | - |
 | 212. The Catalog and Its Doors | 0/? | Not started | - |
 | 213. Per-Tool Grants and the Approval Moment | 0/? | Not started | - |

@@ -4,10 +4,10 @@ title: live_connectors has no Control Room card — the only way to turn live se
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/admin, frontend/settings, backend/api, operator-surface]
 folded_into: 210
-verified_closed_by: null
+verified_closed_by: "210"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

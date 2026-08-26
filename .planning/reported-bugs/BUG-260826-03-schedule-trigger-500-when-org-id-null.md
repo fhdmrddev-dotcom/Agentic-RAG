@@ -4,7 +4,7 @@ title: POST /schedules/{id}/trigger 500s — the launcher parses the definition 
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/scheduler, backend/api, backend/automations]
 folded_into: 210
 verified_closed_by: null
@@ -160,3 +160,9 @@ transaction, so it fires exactly once.
 - `backend/app/api/schedules.py:227-265` — the trigger route
 - `backend/app/db/schedules.py:47-50, 121-132, 263-330` — claim columns, launch read, claim predicate
 - `supabase/migrations/124_workflow_schedules.sql:173` — the autofill trigger
+
+---
+
+## Phase 210 disposition (2026-08-26) — FOLDED, not closed
+
+Code shipped (string-scalar guard, org fallback, structured trigger errors). **UAT could not be driven:** manual trigger needs a schedule row, and none can be created here — see `BUG-260826-06`. Closes after one driven trigger by a null-`org_id` user.

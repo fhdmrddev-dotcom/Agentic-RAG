@@ -4,7 +4,7 @@ title: Schedules can be created and listed on an install where the scheduler is 
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/scheduler, backend/api, frontend/workflows, deployment/config]
 folded_into: 210
 verified_closed_by: null
@@ -123,3 +123,9 @@ boot with the log line `Workflow scheduler started (poll every 60s, max 10 claim
 - `backend/app/db/schedules.py:263-330` — `claim_due_schedules`, the loop that never runs here
 - `backend/app/api/schedules.py:88-136` — creation, which knows nothing about the flag
 - Observed on schedule `75886bcb-ae3c-4d65-a158-739119cffb80`, 2026-08-26
+
+---
+
+## Phase 210 disposition (2026-08-26) — FOLDED, not closed
+
+Code shipped (banner + `scheduler_process_enabled` on `GET /features`). **UAT could not be driven:** the schedule door is a menu item gated on `provenance === "published"` (`WorkflowCard.tsx:1426`) and this install has **no published-provenance workflow** (`Yours 0`), so the door never appears. Closes after one driven save on an install where the scheduler is off.

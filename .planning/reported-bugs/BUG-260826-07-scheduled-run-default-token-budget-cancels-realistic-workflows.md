@@ -4,7 +4,7 @@ title: The default scheduled-run token budget (50k) cancels any workflow with a 
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/scheduler, frontend/workflows, backend/harness, automations]
 folded_into: 210
 verified_closed_by: null
@@ -117,3 +117,9 @@ cancelled point.
 - `frontend/src/components/workflows/WorkflowScheduleModal.tsx:110` — the duplicated UI default
 - `backend/app/db/workflows.py:2437-2511` — `arm_run_budget` / `load_run_budget`, the wall-clock anchor
 - `backend/app/services/scheduler_service.py:125-137` — the `_schedule_*` caps written into run inputs
+
+---
+
+## Phase 210 disposition (2026-08-26) — FOLDED, not closed
+
+Code shipped (defaults 500k/1800s + an exact-`50_000` lift in `scheduler_service.py:142-147`). **UAT could not be driven and is structurally unreachable through the UI:** `workflow_schedules` holds **0 rows**, and a schedule created through the modal now defaults to `500_000`, so the UI cannot produce a row meeting the lift's condition. Provable only against pre-existing cloud data or a hand-inserted legacy row.

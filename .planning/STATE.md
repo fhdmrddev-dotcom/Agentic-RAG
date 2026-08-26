@@ -38,16 +38,48 @@ can be taught new behaviors (skills) that persist and can be shared.
 ## Current Position
 
 Phase: 211 (the-connection-is-a-service-not-a-verb) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 211
-Last activity: 2026-08-26 -- Phase 211 execution started
+Plan: wave 1 of 4 landed (211-01)
+Status: Executing Phase 211. Phase 210 is ✅ COMPLETE (closed 2026-08-26 with owed rows).
+Last activity: 2026-08-26 — Phase 210 closed with owed rows; Phase 211 wave 1 landed
 
 ---
 
-**Phase: 211 — The Connection Is a Service, Not a Verb — PLANNED (5 plans, 4 waves; plan-checker PASSED).**
-Plan: — (none executed yet). **Next action: `/gsd:execute-phase 211`.**
-Last activity: 2026-08-26 — Phase 211 plan-phase complete: research (1,299 L), VALIDATION.md, 5 plans,
-plan-checker PASSED at iteration 2 (0 blockers / 2 warnings, both applied inline).
+**Phase: 211 — The Connection Is a Service, Not a Verb — EXECUTING (5 plans, 4 waves; plan-checker
+PASSED at iteration 2 — 0 blockers / 2 warnings, both applied inline).** Wave 1 landed
+(`4bf1142f` sanitizer widened by exactly two keys, `bf06a2b1` the seven closed-set spellings pinned).
+⭐ **211 is CLAUDE-BUILT** (AGENTS.md §3.1 — migration 127 commits a table shape and drops mig 126's
+`CHECK`). **Gemini reviews it; the operator runs `/code-review ultra`** — that is the real gate.
+
+**Phase: 210 — Ground Truth — Operability & Failure Honesty — ✅ COMPLETE (3/3 plans), closed
+2026-08-26 WITH OWED ROWS.** Closed as a DECISION, not as a claim everything passed —
+`210-VERIFICATION.md` carries the full record.
+- **SC#1 DRIVEN and passing** (kill-switch both ways, DB-verified, refusal observed, install restored).
+- **SC#2 / #3 / #4 shipped but NOT DRIVEN** — blocked on absent test data, not on defects: the schedule
+  door needs a `provenance === "published"` row and this install has none (`Yours 0`), and
+  `workflow_schedules` holds 0 rows. ⚠ **SC#3 is structurally unreachable through the UI** — the lift
+  fires only on an exact `50_000` while the modal now defaults to `500_000`.
+- **SC#5 code-complete, never observed** against a real embedding outage.
+- ⚠ **SC#10 was NEVER RUN.** The ROADMAP binds 210 to SC#10 with the **embedding** roster
+  (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible), and no row was executed. That is the axis
+  where W-1's residual weakness lives — the provider name falls back to substring-matching base URLs.
+
+⚠ **GUARDRAIL / SEPARATION OVERRIDES — audited, per AGENTS.md §6.3:**
+1. **No independent verifier exists for SC#5's W-1 fix.** Gemini authored it, ran out of quota, and the
+   **reviewer committed it** (`7bd77065`, disclosed in that commit message). `/code-review ultra` —
+   operator-only — is the outstanding gate.
+2. **The reviewer drove the UAT** because the builder was out of quota and the operator authorised it.
+   Correct seat under §3.1; the before-state was captured before any browser touched the install.
+3. **W-2 has NO OPERATOR RULING.** `705a7412` modified `phase_types.py`, which BUS-006 ruled 210 would
+   leave inside 211's fence — and 211 has since committed into that same file.
+4. **A reviewer claim was WRONG and is corrected in `210-REVIEW.md`, not edited away** — the W-1
+   "names the wrong provider on this install" assertion. `_val()` falls back to the env var, so a
+   dedicated embedding key is set and the client really points at OpenAI.
+
+**Review history:** pre-flight (7 findings) → round 1 **BLOCKER** (`KeyError: 'document_id'` driven at
+3 reachable sites) → round 2 (V-1/V-3 fixed, SC#5 unmet, fence crossed) → W-1 fix reviewed + committed.
+
+**Bugs:** `BUG-260826-04` → `closed` (`verified_closed_by: "210"`). `BUG-260815-05`, `BUG-260826-03`,
+`-06`, `-07` → `folded`, each carrying its own reason for not closing.
 
 ⚠ **210 and 211 run alongside and share the `live_connectors` flag.** File fence, agreed with the
 operator (`211-CONTEXT.md` § Integration Points): **211 owns** `models/connector.py`,
@@ -55,7 +87,8 @@ operator (`211-CONTEXT.md` § Integration Points): **211 owns** `models/connecto
 `phase_types.py`, migration 127, all of `components/settings/`. **210 owns** `api/admin.py`,
 `components/admin/`, `scheduler_service.py`, `retrieval_service.py`, `embedding_service.py`.
 A file needed from the other side goes on the bus.
-⚠ **`BUS-009` is OPEN and unanswered — Phase 210's re-review is owed by Claude** (`AGENTS.md §3.1`:
+⚠ **`BUS-009` is ANSWERED and closed** — Phase 210's re-review is delivered (`210-REVIEW.md` Round 2).
+⚠ **`BUS-005` / `BUS-006` / `BUS-007` are answered and closed.** (`AGENTS.md §3.1`:
 the reviewer must not have shaped the build).
 
 ### Phase 211 — wave structure
