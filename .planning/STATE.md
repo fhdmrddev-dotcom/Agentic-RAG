@@ -37,10 +37,10 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 212 (the-catalog-and-its-doors) — IN PROGRESS (discuss-phase complete)
-Plan: —
-Status: Phase 212 context gathered & decisions locked in `212-CONTEXT.md` (D-212-01..16). Ready for plan-phase.
-Last activity: 2026-08-27 — Phase 212 discuss-phase completed; BUG-260810-01 folded, SEED-207 marked answered.
+Phase: 212 (the-catalog-and-its-doors) — PLANNED (5 plans across 4 waves)
+Plan: 212-01 .. 212-05
+Status: Phase 212 plans, research, UI-SPEC, and validation strategy written. Ready for reviewer preflight / execution.
+Last activity: 2026-08-27 — Phase 212 planning complete (5 plans across 4 waves).
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 
