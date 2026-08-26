@@ -149,6 +149,11 @@ def _stored(capability: str) -> dict:
         "id": CONNECTION_ID,
         "org_id": ORG_A,
         "capability": capability,
+        # Phase 211 — `ConnectorConnectionResponse.service_id` is REQUIRED (migration 127
+        # guarantees a non-blank value on every row), so a stored row without it fails
+        # `_to_response` outright rather than passing a None through.
+        "service_id": {"send_email": "smtp", "create_ticket": "jira",
+                       "post_message": "slack"}[capability],
         "name": "Ops",
         "config": _CONFIG_FOR[capability].model_dump(mode="json", exclude_none=True),
         "is_enabled": True,
@@ -290,6 +295,7 @@ def test_WR05_a_COMPLETE_connection_is_still_accepted():
     them plus one that is legitimately optional, breaks every real create."""
     payload = ConnectorConnectionCreate(
         capability="send_email",
+        service_id="smtp",  # Phase 211 — required on every shape (D-211-01 / D-211-04)
         name="Billing mailer",
         config=SendEmailConfig(
             host="smtp.example.com", port=587, from_address="billing@example.com"

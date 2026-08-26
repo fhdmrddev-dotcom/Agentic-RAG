@@ -71,6 +71,11 @@ STORED_ROW = {
     "org_id": ACTIVE_ORG,
     "created_by": CALLER_ID,
     "capability": "post_message",
+    # Phase 211 — REQUIRED on `ConnectorConnectionResponse`, so a stored row without it is a
+    # `ValidationError` rather than a missing key. That strictness is deliberate: after
+    # migration 127 the database GUARANTEES a non-blank value on every row, and a None here
+    # would mean the row is broken.
+    "service_id": "slack",
     "name": "#ops-alerts",
     "config": {"default_channel": "#ops-alerts"},
     "secret_ciphertext": SENTINEL_CIPHERTEXT,
@@ -83,6 +88,9 @@ STORED_ROW = {
 
 VALID_CREATE_BODY = {
     "capability": "post_message",
+    # Phase 211 — required on EVERY shape (D-211-01 / D-211-04: the model and the database
+    # agree exactly, because a laxer model turns a check violation into a 500).
+    "service_id": "slack",
     "name": "#ops-alerts",
     "config": {"default_channel": "#ops-alerts"},
     "secret": "xoxb-a-real-looking-bot-token",
@@ -530,3 +538,273 @@ def test_check_refuses_an_mcp_connection_with_409_never_a_500(
     assert detail["reason_code"] == "check_not_available_for_mcp"
     # The message must tell the operator what to do INSTEAD, not merely that it declined.
     assert "Discover tools" in detail["message"]
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 211 (CONN-05 / CONN-08) — the connection is a SERVICE, not a verb
+# ══════════════════════════════════════════════════════════════════════════════════════════
+#
+# Migration 127 drops `connector_connections_shape_is_one_of_two` so that a row naming a
+# service reached by NEITHER a first-party adapter NOR a remote MCP server can be stored, and
+# adds two independent constraints in its place. The model must move with it, in BOTH
+# directions: laxer than the database is a 500 where a 422 belongs, and stricter is a shape
+# the database accepts that the API refuses.
+#
+# ⚠ The stored rows below grow `service_id` because the RESPONSE model does, and that model is
+# `extra='forbid'` — a row missing it is a `ValidationError`, not a missing key.
+
+SERVICE_ONLY_CREATE_BODY = {
+    "service_id": "notion",
+    "name": "Notion (the team wiki)",
+}
+
+
+def _stored(**overrides):
+    """A stored row wearing every column the response model projects."""
+    row = dict(STORED_ROW)
+    row.update(
+        {"service_id": "slack", "mcp_server_url": None, "tool_grants": {},
+         "discovered_tools": []}
+    )
+    row.update(overrides)
+    return row
+
+
+def _last_insert_row(mock_builder) -> dict:
+    """The row dict `create_connection` actually handed to PostgREST.
+
+    ⚠ ASSERTED ON THE INSERT, NEVER ON THE MOCKED RESPONSE. The mock echoes back whatever the
+    test told it to, so a response-side assertion would pass for a service that wrote nothing.
+    `create_connection`'s row dict is an explicit literal — a column absent from it is never
+    written, whatever the model declares — which is exactly the thing worth pinning.
+    """
+    assert mock_builder.insert.call_args is not None, "no insert was performed"
+    return mock_builder.insert.call_args[0][0]
+
+
+def test_a_service_only_connection_saves_and_comes_back_with_its_identity(
+    mock_asyncpg_pool, mock_execute_result, monkeypatch, router_client
+):
+    """⭐ SC#4 / CONN-08 THROUGH THE API — the case this whole phase exists for.
+
+    A connection that names a service and NOTHING ELSE: no capability, no MCP server URL, no
+    secret. Before Phase 211 the model refused it outright with a blanket demand for one of
+    the two shapes — a 422 on the one shape an OAuth-authenticated service will have until
+    Phase 215 gives it a credential. (The retired sentence is not quoted here: `grep -rn` over
+    `backend/` is what proves nothing still expects it, and quoting it would defeat that.)
+
+    ⚠ **IT MUST NOT REQUIRE A SECRET OR A CONFIG.** The capability arm's secret requirement
+    (WR-05) is deliberately NOT inherited here: an OAuth service has no static token to store,
+    and demanding one would make the shape unusable in exactly the case it was added for.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_feature(monkeypatch, "everyone")
+    _install_perms(monkeypatch, {"org:manage": True})
+
+    mock_execute_result.data = [
+        _stored(capability=None, service_id="notion", secret_ciphertext=None,
+                name="Notion (the team wiki)", config={})
+    ]
+
+    res = router_client.post(
+        "/connectors/connections", headers=_org_headers(), json=SERVICE_ONLY_CREATE_BODY
+    )
+
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["service_id"] == "notion", body
+    assert body["capability"] is None, body
+    assert body["mcp_server_url"] is None, body
+
+
+def test_a_blank_service_identity_is_a_422_on_every_one_of_the_three_shapes(
+    mock_asyncpg_pool, mock_execute_result, monkeypatch, router_client
+):
+    """⚠ THE NEGATIVE CONTROL. Without it, SC#4's green proves only that a rule was DELETED.
+
+    Three shapes × three spellings of "no identity" (absent, empty, whitespace). Every one is
+    a **422**, never a 500: the model and migration 127's
+    `connector_connections_has_a_service_identity` must agree exactly, because a model laxer
+    than the database turns a check violation into an unhandled error at the driver.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_feature(monkeypatch, "everyone")
+    _install_perms(monkeypatch, {"org:manage": True})
+    mock_execute_result.data = [_stored()]
+
+    shapes = {
+        "capability": dict(VALID_CREATE_BODY),
+        "mcp": {"name": "DeepWiki", "mcp_server_url": "https://mcp.deepwiki.com/mcp"},
+        "service_only": {"name": "Notion"},
+    }
+    for shape_name, base in shapes.items():
+        for spelling, identity in (("absent", None), ("empty", ""), ("whitespace", "   ")):
+            body = dict(base)
+            body.pop("service_id", None)
+            if identity is not None:
+                body["service_id"] = identity
+            res = router_client.post(
+                "/connectors/connections", headers=_org_headers(), json=body
+            )
+            assert res.status_code == 422, (
+                f"{shape_name}/{spelling} service_id produced {res.status_code}, not 422: "
+                f"{res.text[:400]}"
+            )
+
+
+def test_a_body_wearing_both_shapes_is_a_422_naming_the_ambiguity(
+    mock_asyncpg_pool, mock_execute_result, monkeypatch, router_client
+):
+    """D-211-11 AT THE MODEL — the mirror of `connector_connections_shape_is_not_ambiguous`.
+
+    ⚠ The refusal must be a **422**, which means it has to happen in the validator rather than
+    at the database: the model guards the API, the constraint guards a service-role writer, and
+    a body that reaches Postgres to be refused there arrives back as a 500.
+
+    ⚠ The check must run BEFORE the MCP arm's `return self`. The ambiguous body carries an
+    `mcp_server_url`, so an arm ordered after it would return early and ACCEPT.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_feature(monkeypatch, "everyone")
+    _install_perms(monkeypatch, {"org:manage": True})
+    mock_execute_result.data = [_stored()]
+
+    res = router_client.post(
+        "/connectors/connections",
+        headers=_org_headers(),
+        json={
+            "service_id": "slack",
+            "name": "both at once",
+            "capability": "post_message",
+            "config": {"default_channel": "#ops"},
+            "secret": "xoxb-token",
+            "mcp_server_url": "https://mcp.example.com/v1/mcp",
+        },
+    )
+
+    assert res.status_code == 422, res.text
+    # The wording must teach WHY, not merely refuse: the executor branches on the tool name
+    # first, so the capability on such a row would go inert.
+    assert "capability" in res.text and "mcp_server_url" in res.text, res.text
+
+
+def test_the_column_lockstep_reaches_the_projection_and_t7_still_holds():
+    """POINTS 3 AND 4 OF THE FIVE-POINT LOCKSTEP, asserted at the DERIVED constant.
+
+    `_SELECTABLE_COLUMNS` is `",".join(ConnectorConnectionResponse.model_fields)` — it is not
+    hand-maintained, and this asserts that the derivation actually carried the new field rather
+    than that somebody remembered to add it somewhere.
+
+    ⚠ **THE GRANT IS THE OTHER HALF AND IT IS NOT IN THIS FILE.** A column in this projection
+    with no `GRANT SELECT` in migration 127 makes EVERY read of the table 503 — measured
+    2026-08-25, on a pre-existing row that had nothing to do with the new feature.
+    `tests/test_migration_127.py::test_the_migration_grants_select_on_the_new_column` is the
+    fence for that half.
+    """
+    from app.models.connector import ConnectorConnectionResponse
+
+    assert "service_id" in connector_service._SELECTABLE_COLUMNS.split(",")
+    assert "service_id" in ConnectorConnectionResponse.model_fields
+    # T7, untouched: the projection still cannot name a credential, in either spelling.
+    assert "secret_ciphertext" not in connector_service._SELECTABLE_COLUMNS
+    assert "secret" not in connector_service._SELECTABLE_COLUMNS.split(",")
+
+
+def test_a_new_capability_row_is_born_advertising_its_own_action(
+    mock_asyncpg_pool, mock_execute_result, mock_builder, monkeypatch, router_client
+):
+    """⭐ SC#2 FOR NEW ROWS — the descriptor is WRITTEN at create time, never projected at read.
+
+    Read-time branching is what D-211-03 rejected: it makes a legacy row *look* like a service
+    in one surface and not in the next. The row itself carries the advertisement, so every
+    reader — picker, catalog, Phase 214's satisfiability check — sees the same thing.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_feature(monkeypatch, "everyone")
+    _install_perms(monkeypatch, {"org:manage": True})
+    mock_execute_result.data = [_stored(capability="post_message", service_id="slack")]
+
+    body = dict(VALID_CREATE_BODY)
+    body["service_id"] = "slack"
+    res = router_client.post("/connectors/connections", headers=_org_headers(), json=body)
+    assert res.status_code == 201, res.text
+
+    insert_row = _last_insert_row(mock_builder)
+    assert insert_row["service_id"] == "slack", insert_row
+    tools = insert_row["discovered_tools"]
+    assert len(tools) == 1, tools
+    assert tools[0]["name"] == "post_message", tools
+    assert tools[0]["inputSchema"]["required"] == ["text"], tools
+    # A descriptor ADVERTISES an action; it does not GRANT one. The executor's gate denies on
+    # a missing grant key by design, and that asymmetry is the desirable direction.
+    assert insert_row["tool_grants"] == {}, insert_row
+
+
+def test_a_service_only_row_is_born_advertising_nothing(
+    mock_asyncpg_pool, mock_execute_result, mock_builder, monkeypatch, router_client
+):
+    """The counterfactual: no capability, so no static descriptor — an EMPTY list, honestly.
+
+    It is not a stub. A service-only row genuinely has no action until OAuth (Phase 215) gives
+    it one, and inventing a placeholder action would be worse than showing none.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_feature(monkeypatch, "everyone")
+    _install_perms(monkeypatch, {"org:manage": True})
+    mock_execute_result.data = [
+        _stored(capability=None, service_id="notion", secret_ciphertext=None, config={})
+    ]
+
+    res = router_client.post(
+        "/connectors/connections", headers=_org_headers(), json=SERVICE_ONLY_CREATE_BODY
+    )
+    assert res.status_code == 201, res.text
+    assert _last_insert_row(mock_builder)["discovered_tools"] == []
+
+
+def test_discover_refuses_a_service_only_row_by_name_never_as_a_bad_gateway(
+    mock_asyncpg_pool, mock_execute_result, monkeypatch, router_client
+):
+    """T-211-13d — a THIRD named refusal, and the reason it is not merely tidiness.
+
+    A service-only row reaches `POST /connections/{id}/discover` through the Refresh control,
+    hits `discover_connection_tools`'s generic `ConnectorError`, and the route's blanket
+    `except Exception -> 502` renders it as *"MCP tool discovery failed: connection X is not
+    configured with an mcp_server_url"* — **a remote-gateway error naming a shape the row never
+    had**, about a server that was never contacted.
+
+    ⚠ It is an ERROR-MESSAGE CONTRACT, not a loop. Nothing in Phase 211 gives a service-only
+    row a way to populate tools; OAuth (Phase 215) does. That is precisely why the refusal has
+    to be WORDED rather than generic — the honest sentence is *"not yet"*, and a 502 says
+    *"something is broken"*.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_perms(monkeypatch, {"org:manage": True})
+
+    service_only = SimpleNamespace(
+        connection_id="99999999-9999-4999-8999-999999999999",
+        org_id=ACTIVE_ORG,
+        name="Notion",
+        capability=None,
+        mcp_server_url=None,
+        config={},
+        secret=None,
+        tool_grants={},
+        discovered_tools=[],
+    )
+    monkeypatch.setattr(
+        connector_service, "resolve_connection", AsyncMock(return_value=service_only)
+    )
+
+    res = router_client.post(
+        f"/connectors/connections/{service_only.connection_id}/discover",
+        headers=_org_headers(),
+    )
+
+    assert res.status_code == 409, (
+        f"a service-only row must be refused by NAME, got {res.status_code}: {res.text}"
+    )
+    detail = res.json()["detail"]
+    assert detail["reason_code"] == "nothing_to_discover_yet", detail
+    # ⚠ The row NEVER had an mcp_server_url, so naming one would be a lie about its shape.
+    assert "mcp_server_url" not in res.text, res.text

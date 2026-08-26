@@ -94,6 +94,10 @@ STORED_ROW = {
     "org_id": ACTIVE_ORG,
     "created_by": CALLER_ID,
     "capability": "post_message",
+    # Phase 211 — `ConnectorConnectionResponse.service_id` is REQUIRED, so a stored row
+    # without it is a `ValidationError` at `_to_response` rather than a missing key. Migration
+    # 127 guarantees every real row carries one.
+    "service_id": "slack",
     "name": "#ops-alerts",
     "config": {"default_channel": "#ops-alerts"},
     "secret_ciphertext": SENTINEL_CIPHERTEXT,
@@ -842,3 +846,75 @@ class _RecordingSupabase:
     def execute(self):
         data = self._results.pop(0) if self._results else []
         return SimpleNamespace(data=data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 211 (T-211-13) · the THIRD shape reaches this route, and it must be NAMED
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def test_check_refuses_a_service_only_connection_by_name_never_by_raising(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """A SERVICE-ONLY row (CONN-08) has no adapter, so there is nothing to check.
+
+    ⚠ THIS ROUTE ALREADY HAS THIS EXACT HISTORY, ONE SHAPE OVER, AND THAT IS WHY THE CASE
+    EXISTS BEFORE THE 500 RATHER THAN AFTER IT. An MCP row's NULL ``capability`` reached
+    ``registry.get_adapter``, which raises a BARE ``KeyError`` for anything outside its closed
+    three-member set — a ``KeyError`` absent from this route's ``except`` ladder, so it escaped
+    as an unhandled **HTTP 500** on a control the shipped UI offered. Migration 127 introduces
+    a THIRD shape that arrives at the same two calls (``_check_destination`` then
+    ``get_adapter``) by the same door, with a NULL capability of its own.
+
+    ⚠ THE ADAPTER SEAM IS BOOBY-TRAPPED ON PURPOSE. ``get_adapter`` is patched to something
+    that EXPLODES if it is called at all, so this case cannot pass merely because an adapter
+    happened to tolerate the shape — it passes only if the refusal happens BEFORE the adapter
+    is reached. A 409 obtained after ``get_adapter`` ran would be the same status for a
+    different, worse reason.
+
+    ⚠ IT MUST NOT BE A 404. The row IS in the caller's org and IS listed in their table, so
+    "not found" would be a sentence that is not true about a row they can see — the identical
+    defect measured on the MCP shape in live UAT on 2026-08-25. Naming its STATE discloses
+    nothing across the tenant boundary, which is why 409 is the honest status.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    # No capability, no mcp_server_url, no secret — a row that names a service and nothing
+    # else. It is stored EXACTLY like this: migration 127 drops the shape CHECK that used to
+    # refuse it and requires only a non-blank `service_id` in its place.
+    async def _service_only_fetch(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "notion",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _service_only_fetch)
+
+    def _must_not_be_reached(_capability):
+        raise AssertionError(
+            "T-211-13: the check reached registry.get_adapter for a SERVICE-ONLY row. That "
+            "call raises a bare KeyError on a NULL capability and this route does not catch "
+            "it — the refusal must happen before it, not by surviving it."
+        )
+
+    monkeypatch.setattr("app.services.connectors.registry.get_adapter", _must_not_be_reached)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 409, (
+        f"a service-only row must be refused by NAME, got {res.status_code}: {res.text}"
+    )
+    detail = res.json()["detail"]
+    assert detail["reason_code"] == "nothing_to_check_yet", detail
+    # ⚠ SEPARATELY FALSIFIABLE FROM THE MCP ARM. Two shapes, two reason codes: an arm that
+    # absorbed both would make the two refusals indistinguishable to a client that has to word
+    # them differently, and would hide a regression in either.
+    assert detail["reason_code"] != "check_not_available_for_mcp", detail
+    # The row never had a server URL, so naming one would be a lie about its shape.
+    assert "mcp_server_url" not in res.text.lower(), res.text
