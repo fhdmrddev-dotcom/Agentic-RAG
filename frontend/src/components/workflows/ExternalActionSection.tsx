@@ -472,7 +472,7 @@ export function ExternalActionSection({
       </div>
       )}
 
-      {shape === "capability" && selected !== null && <ConnectionPicker capability={selected} />}
+      {shape === "capability" && selected !== null && <ConnectionPicker />}
       {/* AXIS 2b — the MCP shape's own second question, answered by the same picker in its
           other shape. ⚠ NO CONSEQUENCE SENTENCE AND NO CANVAS CHANGE accompany it, both
           deliberately: the consequence line renders nothing for a step with no capability
@@ -480,7 +480,7 @@ export function ExternalActionSection({
           failed lookup), and the node face falls through to the type sentence, which is
           honest and identical for every MCP step. Both are flagged in this plan's summary,
           because the first UAT round would otherwise report them as bugs. */}
-      {shape === "mcp" && <ConnectionPicker shape="mcp" />}
+      {shape === "mcp" && <ConnectionPicker />}
       {/* Said ONLY when no row is selected — the empty/no-capability note by name
           (UI-SPEC §9d). A step with a capability chosen still sends nothing in 189, and
           that fact is carried where D-12 and D-16 put it: the canvas badge at design
