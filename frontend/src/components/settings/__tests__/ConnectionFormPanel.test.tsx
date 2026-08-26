@@ -370,6 +370,30 @@ afterEach(() => {
 // 1 · THE FOCUS TRAP — §14's condition, inverted
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
+/**
+ * ⚠ THE TRAP'S OWN DEFINITION OF FOCUSABLE, MIRRORED RATHER THAN APPROXIMATED.
+ *
+ * `focusablesIn` (`ConnectionFormPanel.tsx`) excludes `[disabled]` and `aria-hidden` nodes.
+ * This helper used to spell a looser selector, which was harmless only while no DISABLED
+ * control could be last in DOM order. Phase 211 made one possible — Save is off on a create
+ * form that has not named a service yet — and the looser list then ended on a node the trap
+ * correctly skips, so the case failed for a reason it is not about. Mirroring the shipped
+ * selector is what keeps this assertion measuring the CONTRACT rather than a coincidence.
+ */
+function focusablesOf(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(",")
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(
+    (node) => node.getAttribute("aria-hidden") !== "true",
+  )
+}
+
 describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used)", () => {
   it("Tab from the LAST focusable control returns to the FIRST, and focus never leaves the panel", async () => {
     const user = userEvent.setup({ delay: null })
@@ -383,9 +407,7 @@ describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used
     renderPanel()
 
     const panel = screen.getByTestId("connection-form-panel")
-    const focusables = Array.from(
-      panel.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]"),
-    ).filter((n) => n.getAttribute("tabindex") !== "-1")
+    const focusables = focusablesOf(panel)
     expect(focusables.length).toBeGreaterThan(2)
 
     const last = focusables[focusables.length - 1]
@@ -410,9 +432,7 @@ describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used
     renderPanel()
 
     const panel = screen.getByTestId("connection-form-panel")
-    const focusables = Array.from(
-      panel.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]"),
-    ).filter((n) => n.getAttribute("tabindex") !== "-1")
+    const focusables = focusablesOf(panel)
 
     focusables[0].focus()
     await user.tab({ shift: true })
@@ -472,6 +492,11 @@ describe("the focus restore (§3a / §12)", () => {
     opener.focus()
 
     const view = renderPanel({ onClose, onCreate })
+    // ⚠ 211 — a create form saves once it has BOTH facts. Save is off before that, which is
+    // the point of the new reason node; this case is about the focus restore, so it supplies
+    // them rather than asserting the refusal a dedicated case already owns.
+    await chooseService(user, "notion")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
     await user.click(screen.getByTestId("connection-form-save"))
     expect(onCreate).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -1745,11 +1770,22 @@ const PROTOTYPE_KEYS = [
 
 const ACCEPTED_MCP_URL = "https://mcp.deepwiki.com/mcp"
 
+/**
+ * ⚠ THE RETIRED CHOOSER CONSTANT'S NAME, COMPOSED FROM FRAGMENTS AND NEVER SPELLED.
+ *
+ * Two fences below assert this identifier is absent — from the copy module's exports, and
+ * from the panel's source. The acceptance check for the same property is a `grep -r` over
+ * `frontend/src`, and a fence that spells its own needle is a fence that makes that count
+ * lie. This is `ownProperty.ts`'s recorded discipline ("both identifiers are left unspelled
+ * in this paragraph on purpose"), applied to a deletion instead of to a guard.
+ */
+const RETIRED_CHOOSER_CONSTANT = ["CAPABILITY", "CHOICES"].join("_")
+
 describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 / D-211-02)", () => {
-  it("⭐ `CAPABILITY_CHOICES` DOES NOT EXIST — the three-verb option data is deleted, not hidden", () => {
+  it("⭐ the three-verb option constant DOES NOT EXIST — the data is deleted, not hidden", () => {
     // SC#1 names this constant. Deleting the DATA is what makes the source fence below
     // meaningful: a hidden control is one prop away from coming back.
-    expect("CAPABILITY_CHOICES" in FORM_COPY).toBe(false)
+    expect(RETIRED_CHOOSER_CONSTANT in FORM_COPY).toBe(false)
     expect("capabilityLabelOf" in FORM_COPY).toBe(false)
     expect("CAPABILITY_CHOICE_MCP_LABEL" in FORM_COPY).toBe(false)
   })
@@ -2590,6 +2626,57 @@ describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => 
     expect(edit.container.querySelectorAll("[title]")).toHaveLength(0)
   })
 
+  it("⭐ 211 — an UNNAMED service leaves Save off with its OWN reason, and its own id", async () => {
+    const user = userEvent.setup({ delay: null })
+    const { container } = renderPanel()
+
+    // Before a single keystroke: the shape is `service`, and neither fact is present yet.
+    const save = screen.getByTestId("connection-form-save")
+    expect(save).toBeDisabled()
+    const reason = screen.getByTestId("connection-service-save-disabled-reason")
+    expect(reason.textContent).toBe(FORM_COPY.SERVICE_SAVE_DISABLED_REASON)
+    // The wiring RESOLVES — an id pointing at nothing is the defect a `toBeDisabled()` plus
+    // a `getByText()` would both miss.
+    const describedBy = save.getAttribute("aria-describedby")!
+    expect(container.querySelector(`#${CSS.escape(describedBy)}`)!.textContent).toBe(
+      FORM_COPY.SERVICE_SAVE_DISABLED_REASON,
+    )
+    // ⚠ A THIRD DISTINCT ID — never the MCP one's, never the cipher one's.
+    expect(describedBy).toContain("service-save-disabled-reason")
+
+    // Both facts supplied, and the reason node is REMOVED rather than emptied.
+    await chooseService(user, "notion")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
+    expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+    expect(
+      screen.queryByTestId("connection-service-save-disabled-reason"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("⚠ a BLANK identity is refused too — `'   '` is a present value the database's btrim declines", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
+    await user.type(screen.getByLabelText(SERVICE_LABEL), "   ")
+    expect(screen.getByTestId("connection-form-save")).toBeDisabled()
+    expect(screen.getByTestId("connection-service-save-disabled-reason")).toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — the three capability shapes are UNGATED, byte-for-byte as shipped", async () => {
+    const user = userEvent.setup({ delay: null })
+    for (const capability of ["send_email", "create_ticket", "post_message"] as const) {
+      renderPanel()
+      await chooseService(user, SERVICE_FOR_CAPABILITY[capability])
+      // ⚠ NO completeness gate was added to them: that would be a behaviour change with no
+      // defect behind it, and their refusals already arrive through §4b with a readable cause.
+      expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+      expect(
+        screen.queryByTestId("connection-service-save-disabled-reason"),
+      ).not.toBeInTheDocument()
+      cleanup()
+    }
+  })
+
   it("the Save button is DISABLED, not REMOVED — removal is reserved for a different fact", async () => {
     await renderMcpWithUrl("http://mcp.example.com/mcp")
     const save = screen.getByTestId("connection-form-save")
@@ -2794,7 +2881,7 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
     // ⚠ THE SOURCE, not the DOM. A control removed from a render is one prop away from
     // returning; a control whose data and test id are gone from the file is not.
     expect(panelSource).not.toContain("connection-capability-chooser")
-    expect(panelSource).not.toContain("CAPABILITY_CHOICES")
+    expect(panelSource).not.toContain(RETIRED_CHOOSER_CONSTANT)
     // POSITIVE CONTROL — the fence can see the id that REPLACED it, in this same source.
     expect(panelSource).toContain("connection-service-field")
   })

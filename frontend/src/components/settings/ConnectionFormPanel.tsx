@@ -97,10 +97,6 @@ import type {
 } from "@/lib/api"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
-  CAPABILITY_CHOICES,
-  CAPABILITY_HELP,
-  CAPABILITY_LABEL,
-  CAPABILITY_LOCKED_NOTE,
   EMPTY_DRAFT,
   FIELD_JIRA_EMAIL_HELP,
   FIELD_JIRA_EMAIL_LABEL,
@@ -161,13 +157,21 @@ import {
   SECRET_REPLACE_LABEL,
   SECRET_STORED_DATE_NOTE,
   SECRET_STORED_NOTE,
-  capabilityLabelOf,
+  SERVICE_HELP,
+  SERVICE_LABEL,
+  SERVICE_LOCKED_NOTE,
+  SERVICE_PLACEHOLDER,
+  SERVICE_SAVE_DISABLED_REASON,
+  SERVICE_SUGGESTIONS,
   configFromDraft,
+  draftIsSavable,
   destinationFooterOf,
   draftFromConnection,
   mcpHostOf,
   orgSharedLine,
   panelRegionLabelEdit,
+  serviceLabelOf,
+  shapeForService,
   secretStoredLabel,
   type ConnectionDraft,
   type ConnectionShape,
@@ -417,7 +421,7 @@ function NoticeLine({ children, testId }: { children: React.ReactNode; testId?: 
 
 export interface ConnectionFormPanelProps {
   open: boolean
-  /** `create` shows the capability chooser; `edit` renders the stored row. */
+  /** `create` asks which service; `edit` renders the stored row. */
   mode: "create" | "edit"
   /** The row being edited. Required in `edit` mode; ignored in `create`. */
   connection?: ConnectorConnection | null
@@ -621,6 +625,26 @@ export function ConnectionFormPanel({
 
   const set = (patch: Partial<ConnectionDraft>) => setDraft((d) => ({ ...d, ...patch }))
 
+  /**
+   * ⭐ PHASE 211 — THE ONE PLACE `capability` IS DERIVED IN CREATE MODE, and the reason it is
+   * ONE place rather than two.
+   *
+   * `serviceId` is the identity a person supplies; `capability` is the field set that follows
+   * from it. Two controls can move that derivation — the service field and the endpoint field
+   * — so both call THIS, and nothing else assigns `capability` while creating. A second
+   * assignment site is how the two facts would come to disagree, which is the failure mode
+   * `ConnectionDraft`'s own docblock rejected alternative (a) over.
+   *
+   * ⚠ It derives from the NEXT draft, never from the current one: `set` is a functional
+   * update and the patch has not landed yet, so reading `draft.serviceId` here would resolve
+   * the shape from the keystroke BEFORE the one just typed.
+   */
+  const setShapedBy = (patch: Partial<ConnectionDraft>) =>
+    setDraft((d) => {
+      const next = { ...d, ...patch }
+      return { ...next, capability: shapeForService(next.serviceId, next.mcpServerUrl) }
+    })
+
   const canSubmit = mode === "create" ? onCreate !== undefined : onUpdate !== undefined
   const showSave = canWrite && canSubmit
 
@@ -689,35 +713,57 @@ export function ConnectionFormPanel({
     setSaving(true)
     setSaveRefusal(null)
     try {
-      if (mode === "create" && draft.capability === "mcp") {
-        // ══ 206.1 · THE MCP CREATE BODY (D-206.1-04) ══════════════════════════════════════
-        // ⚠ ITS KEY SET IS THE CONTRACT, and it is a DIFFERENT key set from a capability
-        // connection's — not a superset of it. Measured at the model:
-        // `_validate_connection_shape` branches on `mcp_server_url` FIRST and RETURNS before
-        // the capability arm, so a `capability` sent alongside a URL is at best ignored and at
-        // worst refused (`"mcp"` is not a member of the server's closed `ConnectorCapability`).
-        // `McpConfig` is `extra="forbid"` with exactly one field, so a `SendEmailConfig`-shaped
-        // config here is a 422 no client-side type can see.
-        // ⚠ `capability` is OMITTED ENTIRELY, never sent as null — present-and-null is not the
-        // same thing as absent, and only absence is what the branch above reads.
+      if (mode === "create") {
+        // ══ 211 · THE CREATE BODY — ONE COMPOSER, THREE SHAPES ═══════════════════════════
+        // ⚠ ITS KEY SET IS THE CONTRACT, and the three shapes' key sets are DIFFERENT rather
+        // than nested. Measured at the model: `_validate_connection_shape` branches on
+        // `mcp_server_url` FIRST and RETURNS before the capability arm, so a `capability` sent
+        // alongside a URL is at best ignored and at worst refused (`"mcp"` is not a member of
+        // the server's closed `ConnectorCapability`). `McpConfig` is `extra="forbid"` with
+        // exactly one field, so a `SendEmailConfig`-shaped config there is a 422 no
+        // client-side type can see.
+        //
+        // ⭐ `service_id` IS ON EVERY SHAPE, and it is the only key that is. 211-02 made it
+        // REQUIRED on the wire because migration 127's
+        // `connector_connections_has_a_service_identity` makes it required in the database —
+        // the client type and the column agree exactly, so a body without one cannot compile.
         const body: ConnectorConnectionCreate = {
+          service_id: draft.serviceId.trim(),
           name: draft.name.trim(),
-          mcp_server_url: draft.mcpServerUrl.trim(),
           config: configFromDraft(draft),
         }
-        // ⚠ AN EMPTY CREDENTIAL IS OMITTED, NOT SENT AS "" — the server's `NonEmpty` rejects an
-        // empty string as a PRESENT value, and D-206.1-06 makes the credential optional for
-        // this shape. Sending it would also be a pointless plaintext round trip for a value
-        // that is not there. The `:698` edit-branch omit idiom, reused.
-        if (draft.secret.trim() !== "") body.secret = draft.secret
+
+        // ⚠ EXACTLY ONE OF THE TWO REACHABLE PATHS, NEVER BOTH. Migration 127's
+        // `connector_connections_shape_is_not_ambiguous` and 211-02's model arm each refuse a
+        // row wearing both shapes, and the panel must not be the thing that discovers that.
+        // The `else if` is what makes "never both" structural rather than merely intended.
+        if (draft.capability === "mcp") {
+          body.mcp_server_url = draft.mcpServerUrl.trim()
+        } else if (
+          draft.capability === "send_email" ||
+          draft.capability === "create_ticket" ||
+          draft.capability === "post_message"
+        ) {
+          // ⚠ EACH MEMBER NAMED, AND NO TRAILING `else`. *A default is not a way through a
+          // gate*: a positional fallback here would send `send_email` for a service nobody
+          // curated — the elevation T-211-17a is about, and the exact defect
+          // `phase_types.py`'s preamble records from the other end. A `"service"` draft
+          // therefore emits NO `capability` KEY AT ALL, which is CONN-08's whole row.
+          body.capability = draft.capability
+        }
+
+        // ⚠ AN EMPTY CREDENTIAL IS OMITTED, NOT SENT AS "" — the server's `NonEmpty` rejects
+        // an empty string as a PRESENT value, and D-206.1-06 makes the credential optional for
+        // the endpoint shape while the service shape has no credential field at all. Sending
+        // it would also be a pointless plaintext round trip for a value that is not there.
+        // The three capability shapes keep their shipped behaviour: their credential is
+        // required, and a blank one travels so the server refuses it in its own words.
+        if (draft.capability === "mcp" || draft.capability === "service") {
+          if (draft.secret.trim() !== "") body.secret = draft.secret
+        } else {
+          body.secret = draft.secret
+        }
         await onCreate?.(body)
-      } else if (mode === "create") {
-        await onCreate?.({
-          capability: draft.capability as ConnectorCapability,
-          name: draft.name.trim(),
-          config: configFromDraft(draft),
-          secret: draft.secret,
-        })
       } else if (connection) {
         const body: ConnectorConnectionUpdate = {
           name: draft.name.trim(),
@@ -778,8 +824,15 @@ export function ConnectionFormPanel({
    *
    * For the three capabilities this is always truthy, so every reachable state today is
    * BYTE-IDENTICAL to what shipped.
+   *
+   * ⚠ 211 — THE THIRD SHAPE JOINS THE MCP ARM, and the type system is what said so: widening
+   * `ConnectionShape` made this assignment fail to compile rather than silently hand a
+   * `"service"` to a vocabulary total over exactly three capabilities. A service-only row has
+   * no credential and no check path at all, so it has no verdict for that copy to describe —
+   * the same fact the MCP arm records, met by a shape that has even less.
    */
-  const checkCapability: ConnectorCapability | null = capability === "mcp" ? null : capability
+  const checkCapability: ConnectorCapability | null =
+    capability === "mcp" || capability === "service" ? null : capability
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.
@@ -845,6 +898,28 @@ export function ConnectionFormPanel({
    * SELECTS between the two ids below rather than either node borrowing the other's.
    */
   const mcpSaveDisabledReasonId = `${fieldId}-mcp-save-disabled-reason`
+
+  /**
+   * ⚠ 211 — A THIRD DISTINCT ID, for the same reason the second one exists.
+   *
+   * Three reasons a Save can be off (the cipher, an unusable address, an unnamed service) and
+   * therefore three ids: the button SELECTS between them and no node borrows another's, so a
+   * `container.querySelector` resolution can never find A sentence that is not the right one.
+   * The three states are mutually exclusive by shape, so at most one node is ever rendered.
+   */
+  const serviceSaveDisabledReasonId = `${fieldId}-service-save-disabled-reason`
+
+  /**
+   * ⚠ SCOPED TO THE `service` SHAPE, DELIBERATELY.
+   *
+   * `draftIsSavable` is total, but the three capability shapes return `true` from it
+   * unconditionally — they are ungated exactly as shipped, because adding a completeness gate
+   * to them would be a behaviour change with no defect behind it. The endpoint shape keeps
+   * its own `mcpUrlUnusable` predicate and its own sentence. What is NEW is the third shape:
+   * a blank identity is a certain refusal at both the model and the database, so saying so
+   * here costs nothing and spares a person a generic "Couldn't save that".
+   */
+  const serviceIncomplete = capability === "service" && !draftIsSavable(draft)
 
   const title = mode === "create" ? PANEL_TITLE_CREATE : (connection?.name ?? "")
   const regionLabel =
@@ -945,45 +1020,66 @@ export function ConnectionFormPanel({
           </p>
         )}
 
-        {/* ── The capability is chosen FIRST and the rest of the form appears (§3b). On
-               edit it is STATIC — `ConnectorConnectionUpdate` carries no `capability`. ── */}
+        {/* ── ⭐ 211 · THE SERVICE IS NAMED FIRST and the rest of the form follows (SC#1).
+               THE SAME SLOT, THE SAME POSITION, THE SAME `mb-3.5` + <label> + help + control
+               STRUCTURE the three-verb chooser occupied — D-211-07: this phase removes an
+               organising axis, it does not design a surface, so nothing about the layout
+               moves. On edit it is STATIC: editing identity is CONN-07 and Phase 212 owns it
+               (`ConnectorConnectionUpdate` carries no `service_id`, on purpose). ── */}
         {mode === "create" && !readOnly ? (
-          <div data-testid="connection-capability-chooser" className="mb-3.5">
+          <div data-testid="connection-service-field" className="mb-3.5">
             <label
-              htmlFor={`${fieldId}-capability`}
+              htmlFor={`${fieldId}-service`}
               className="mb-1 block text-[11px] font-medium text-foreground"
             >
-              {CAPABILITY_LABEL}
+              {SERVICE_LABEL}
             </label>
             <p
-              id={`${fieldId}-capability-help`}
+              id={`${fieldId}-service-help`}
               className="mb-1 text-[11px] leading-snug text-muted-foreground"
             >
-              {CAPABILITY_HELP}
+              {SERVICE_HELP}
             </p>
-            {/* A native <select>, the 190-12 precedent: one control, a real <label>, and no
-                portal for a keyboard user to escape into while a trap is armed. */}
-            <select
-              id={`${fieldId}-capability`}
-              value={draft.capability}
-              aria-describedby={`${fieldId}-capability-help`}
-              onChange={(e) => set({ capability: e.target.value as ConnectionShape })}
+            {/* ⚠ A TEXT INPUT WITH A `<datalist>`, NEVER A `<select>`. The 190-12 precedent
+                still holds — one control, a real <label>, and no portal for a keyboard user
+                to escape into while a trap is armed — but the CONTROL KIND is load-bearing
+                here: a `<select>` would make the curated set a CONSTRAINT, and a closed set
+                on this axis is migration 116's mistake moved to a nicer one (D-211-01). The
+                list suggests; the box accepts anything. */}
+            <input
+              id={`${fieldId}-service`}
+              type="text"
+              value={draft.serviceId}
+              list={`${fieldId}-service-suggestions`}
+              placeholder={SERVICE_PLACEHOLDER}
+              autoComplete="off"
+              aria-describedby={`${fieldId}-service-help`}
+              onChange={(e) => setShapedBy({ serviceId: e.target.value })}
               className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
-            >
-              {CAPABILITY_CHOICES.map((choice) => (
-                <option key={choice.capability} value={choice.capability}>
-                  {choice.label}
+            />
+            {/* ⚠ REACT ESCAPES THESE, and no `dangerouslySetInnerHTML` may ever take a value
+                from this lookup (T-211-14a). The identifiers here are our own literals; the
+                threat is the day Phase 212 sources them from a table. */}
+            <datalist id={`${fieldId}-service-suggestions`}>
+              {SERVICE_SUGGESTIONS.map((suggestion) => (
+                <option key={suggestion.service_id} value={suggestion.service_id}>
+                  {suggestion.label}
                 </option>
               ))}
-            </select>
+            </datalist>
           </div>
         ) : (
           <div data-testid="connection-capability-static" className="mb-3.5">
-            <div className="mb-1 text-[11px] font-medium text-foreground">{CAPABILITY_LABEL}</div>
-            <div className="text-[13px] text-foreground">{capabilityLabelOf(capability)}</div>
+            <div className="mb-1 text-[11px] font-medium text-foreground">{SERVICE_LABEL}</div>
+            {/* ⚠ IT READS THE IDENTITY AND DOES NOT OFFER TO CHANGE IT. CONN-07 is Phase
+                212's, and 211-02 deliberately left `ConnectorConnectionUpdate` without the
+                field — so a control here would compose a body the model discards, which is a
+                change that appears to work and does not. A miss degrades to the raw
+                identifier (D-211-02): never a placeholder, never a refusal. */}
+            <div className="text-[13px] text-foreground">{serviceLabelOf(draft.serviceId)}</div>
             {mode === "edit" && (
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                {CAPABILITY_LOCKED_NOTE}
+                {SERVICE_LOCKED_NOTE}
               </p>
             )}
           </div>
@@ -1114,7 +1210,11 @@ export function ConnectionFormPanel({
             <TextControl
               id={`${fieldId}-mcp-url`}
               value={draft.mcpServerUrl}
-              onChange={(mcpServerUrl) => set({ mcpServerUrl })}
+              // ⚠ 211 — THROUGH THE DERIVATION SITE, not `set`. This is the second of the two
+              // controls that can move the shape (the `https://` override in
+              // `shapeForService`); routing it through `set` would let the endpoint and the
+              // field set disagree the moment a person pasted an address.
+              onChange={(mcpServerUrl) => setShapedBy({ mcpServerUrl })}
               placeholder={FIELD_MCP_URL_PLACEHOLDER}
               describedBy={`${fieldId}-mcp-url-help`}
               readOnly={readOnly}
@@ -1140,7 +1240,16 @@ export function ConnectionFormPanel({
           </Field>
         )}
 
-        {/* ── 3 · The write-only secret (§3d / T-190-17-SECRET). ── */}
+        {/* ── 3 · The write-only secret (§3d / T-190-17-SECRET).
+               ⚠ 211 — ABSENT FOR THE `service` SHAPE, AND ONLY FOR IT. An identified row
+               with no reachable path has nothing to authenticate with until OAuth lands in
+               Phase 215, so a credential box here would be an input offering to hold a value
+               nothing can spend. ⚠ THE SYNTHETIC UNKNOWN SHAPE STILL GETS ONE, with the
+               neutral noun: `"service"` is a KNOWN shape meaning *identified, no path yet*,
+               while an unrecognised `capability` value is a row we cannot describe — and
+               removing a person's ability to replace a credential on a row we merely fail to
+               recognise would be a worse answer than a neutral label. ── */}
+        {capability !== "service" && (
         <Field label={secretLabel} htmlFor={`${fieldId}-secret`}>
           {mode === "create" || replacing ? (
             <>
@@ -1243,6 +1352,7 @@ export function ConnectionFormPanel({
             </>
           )}
         </Field>
+        )}
 
         {/* ── 4 · The org-shared line (§3e), at the foot of the fields. ── */}
         <p
@@ -1631,6 +1741,17 @@ export function ConnectionFormPanel({
           </p>
         )}
 
+        {/* ── 211 — the same shape, the third reason. Same slot, same treatment, its own id. ── */}
+        {serviceIncomplete && (
+          <p
+            id={serviceSaveDisabledReasonId}
+            data-testid="connection-service-save-disabled-reason"
+            className="mb-1 text-[11px] leading-snug text-destructive"
+          >
+            {SERVICE_SAVE_DISABLED_REASON}
+          </p>
+        )}
+
         <div className="mt-3 flex items-center justify-end gap-2">
           {saveRefusal?.kind === "generic" && (
             <span
@@ -1652,7 +1773,7 @@ export function ConnectionFormPanel({
           {showSave && (
             <button
               type="button"
-              disabled={saving || saveBlocked || mcpUrlUnusable}
+              disabled={saving || saveBlocked || mcpUrlUnusable || serviceIncomplete}
               // ⚠ SELECTS BETWEEN TWO DISTINCT IDS, never shares one. The cipher refusal wins
               // when both hold: it is the one thing on this surface nothing the person types
               // can fix, so it is the reason worth reading first.
@@ -1661,7 +1782,9 @@ export function ConnectionFormPanel({
                   ? saveDisabledReasonId
                   : mcpUrlUnusable
                     ? mcpSaveDisabledReasonId
-                    : undefined
+                    : serviceIncomplete
+                      ? serviceSaveDisabledReasonId
+                      : undefined
               }
               onClick={() => void handleSave()}
               data-testid="connection-form-save"
