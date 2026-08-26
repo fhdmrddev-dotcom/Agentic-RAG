@@ -15,11 +15,12 @@ one schedule row, both listed below.
 | 4 | Run the workflow | ❌ `the 'to' recipient must be a string, got NoneType` → **BUG-01, the headline finding** |
 | 5 | Look for where to set the recipient | ❌ no such field anywhere in the UI → BUG-01 |
 | 6 | Workaround via a scheduled run's `inputs` | ❌ trigger 500'd, browser reported it as CORS → BUG-03 |
+| 7 | Fall back to letting the poller fire it | ❌ the scheduler is **off by default** and not running here → BUG-06 |
 
 The connector itself is sound: the transport reached Gmail, negotiated TLS, and was rejected only
 on credentials. What is missing is the last mile — nothing can tell the step who to email.
 
-## The five reports
+## The six reports
 
 | id | severity | one line |
 |---|---|---|
@@ -28,6 +29,7 @@ on credentials. What is missing is the last mile — nothing can tell the step w
 | [BUG-260826-03](BUG-260826-03-schedule-trigger-500-when-org-id-null.md) | major | Manual schedule trigger 500s on a NULL `org_id`; the browser blames CORS |
 | [BUG-260826-04](BUG-260826-04-live-connectors-has-no-control-room-card.md) | major | The OFF banner points at a Control Room card that does not exist (`D-190-DEF-09`) |
 | [BUG-260826-05](BUG-260826-05-run-failed-reason-empty-for-external-action-failure.md) | minor | The panel says the failure reason is missing while chat displays it |
+| [BUG-260826-06](BUG-260826-06-schedules-can-be-created-while-the-scheduler-is-disabled.md) | major | Schedules are accepted and listed on an install where nothing will ever fire them |
 
 ## Suggested order of work
 
@@ -41,14 +43,17 @@ on credentials. What is missing is the last mile — nothing can tell the step w
    it second, never first.
 3. **BUG-04** — its own phase. It is a user-facing capability, so under **G-7** it must not be
    folded into a gap-closure round.
-4. **BUG-03** and **BUG-05** — small; fold into whichever phase next touches the scheduler and the
-   harness failure path respectively.
+4. **BUG-03 + BUG-06** — one scheduler-honesty change: stop writing rows that cannot fire, and
+   stop presenting an automations surface that is switched off.
+5. **BUG-05** — small; fold into whichever phase next touches the harness failure path.
 
 ## Two things confirmed NOT to be defects
 
 - **The golden run's send-skip is correct.** Gate 2 (D-16) skips the send during publish so a
   golden run cannot fire a real email. That is why BUG-01 is invisible to the gauntlet — the
   behaviour is right, the missing check (BUG-02) is what is wrong.
+- **`workflow_schedules.inputs` is stored correctly** as a jsonb `object` — verified on the live
+  row. The string-scalar defect below is on a *different* writer; do not confuse the two.
 - **`workflow_runs.inputs` stored as a JSON *string* rather than an object** is a **known,
   recorded, deliberately-left** defect (`db/workflows.py:388-435`, measured at 230/230 rows) with
   its own re-open trigger. The reader `json.loads` it back
@@ -62,7 +67,7 @@ on credentials. What is missing is the last mile — nothing can tell the step w
 |---|---|---|
 | `live_connectors` → `everyone` | `app_settings.feature_visibility` | same PUT with `"audience":"off"` |
 | Gmail SMTP connection "Gmail (test)" | `connector_connections` | delete/disable in Settings → Connections |
-| Schedule `75886bcb-ae3c-4d65-a158-739119cffb80` (`is_active: false`) | `workflow_schedules` | `DELETE FROM workflow_schedules WHERE id = '75886bcb-…'` |
+| Schedule `75886bcb-ae3c-4d65-a158-739119cffb80` (left `is_active: true`, due daily 06:40 UTC) | `workflow_schedules` | `DELETE FROM workflow_schedules WHERE id = '75886bcb-…'` — harmless while the scheduler is off (BUG-06), but it WOULD start firing daily if `SCHEDULER_PROCESS_ENABLED` is ever set true |
 
 ⚠ **Live sending is ON in production.** Every published workflow with an `external_action` step
 now sends for real on its next run, at most once, with no retry and no queue (D-18). Each such
