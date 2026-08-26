@@ -82,20 +82,11 @@ export type GovernedFeature =
   | "workflow_authoring"
   | "governance_health"
   | "visual_workflow_canvas"
+  | "live_connectors"
 
-// ⚠ THIS UNION IS STALE AGAINST THE SERVER, DELIBERATELY AND WITH AN OWNER — see
-// `D-190-DEF-09` in `.planning/phases/190-…/deferred-items.md`. Plan 190-09 added
-// `"live_connectors"` to the backend's `_VISIBILITY_FEATURES` (`api/admin.py`) and
-// `_GOVERNED_FEATURES` (`models/user_settings.py`, cold default `"off"`), so
-// `GET /features` DOES return the key (`api/features.py:81` iterates
-// `_GOVERNED_FEATURES`). It is NOT added here by plan 190-16 because widening this union
-// makes five `Record<GovernedFeature, …>` exhaustive maps fail to typecheck — two of them
-// inside `/admin`, which phase 190's D-25 fences ("do not add anything to /admin") — and
-// the honest completion of that half is a `FeatureVisibility.FEATURES` operator card,
-// which is a user-facing capability and belongs to its own plan, not to the Settings table.
-// 190-16 therefore reads the key through ONE documented, fail-closed reader
-// (`settings/connectionsCopy.ts` → `liveConnectorsOnFrom`) rather than half-widening the
-// type. Both halves — this union AND the operator card — land in the same later commit.
+// Phase 210 (CONN-09 / BUG-260826-04) — `live_connectors` is now formally part of the
+// GovernedFeature union. Fulfilled D-190-DEF-09. All exhaustive maps across the frontend
+// are updated in lockstep.
 
 /** The caller's effective feature→visible map. Partial so the fail-CLOSED `{}`
  *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */

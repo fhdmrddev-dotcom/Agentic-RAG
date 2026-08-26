@@ -91,6 +91,7 @@ function visibilityWith(
     workflow_authoring: "everyone",
     governance_health: "everyone",
     visual_workflow_canvas: canvas,
+    live_connectors: "off",
   }
 }
 

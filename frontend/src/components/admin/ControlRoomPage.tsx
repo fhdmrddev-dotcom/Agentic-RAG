@@ -194,6 +194,8 @@ const DEFAULT_VISIBILITY: Record<GovernedFeature, FeatureAudience> = {
   // for EVERYONE incl. operators (byte-identical to the backend `_GOVERNED_FEATURES`
   // cold-default). The operator flips it On (audience "everyone") via the Off|On control.
   visual_workflow_canvas: "off",
+  // Phase 210 (CONN-09 / BUG-260826-04) — the live-connectors master switch cold-defaults OFF.
+  live_connectors: "off",
 }
 
 export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
@@ -234,6 +236,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     // Phase 181 — the canvas master switch uses the Off|On control (never a role greenlist),
     // but the map is a full Record<GovernedFeature, …>, so the key is present (always empty).
     visual_workflow_canvas: [],
+    live_connectors: [],
   })
   // Phase 154 (D-01a): the two-audience toggle state is now the ONE app-wide
   // shared reveal context (was a local useState). Flipping it here and flipping
