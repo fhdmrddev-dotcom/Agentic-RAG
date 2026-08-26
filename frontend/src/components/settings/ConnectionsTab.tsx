@@ -107,6 +107,8 @@ import type {
   ConnectorConnectionUpdate,
 } from "@/lib/api"
 import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
+import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
+import { PROVENANCE_ADDED_BY_URL, CATALOG_SEARCH_PLACEHOLDER } from "@/components/settings/catalogCopy"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   Sheet,
@@ -589,10 +591,10 @@ function ConnectionRow({
   const state = connectionStateOf(connection)
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
-  /** ⚠ READ FROM THE ROW'S OWN URL, NEVER FROM A MISSING CAPABILITY (D-206.1-11). An absence
-   *  is not a shape, and a future row that legitimately carries no capability for some third
-   *  reason must not be dragged in here. */
   const isMcp = Boolean(connection.mcp_server_url)
+  const catalogEntry = getServiceCatalogEntry(connection.service_id)
+  const isAddedByUrl = Boolean(connection.mcp_server_url) && !catalogEntry.isPopular
+  const tagline = catalogEntry.tagline
 
   /** One write, its receipt, and a retry on failure — the `UsersAndAccess.tsx:224-238`
    *  idiom. The RECEIPT is transient (062-A: a receipt, never a toast); the persistent
@@ -677,24 +679,6 @@ function ConnectionRow({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {/* Check has a side effect (it writes `last_checked_at`), so it lives in
-              the overflow rather than as a visible per-row button. The handler
-              landed with the endpoint in plan 190-15, so this renders now — and the
-              `onCheck &&` guard STAYS: it is what keeps the removed-not-disabled
-              rule true for the view when it is rendered without one (the suite
-              drives both directions). */}
-          {/* ⚠ 206.1 / D-206.1-19 — AN MCP ROW DOES NOT GET THIS ITEM, AND IT IS REMOVED
-              RATHER THAN DISABLED. The check path is CAPABILITY-SHAPED — an SMTP login, a
-              Jira auth, a Slack `auth.test` — and has NO MCP arm at any layer, so the endpoint
-              would refuse a row it cannot describe. A rendered control the API refuses is
-              precisely the defect this surface's removed-not-disabled rule exists to prevent,
-              and 190-16's plant C measured that a `toBeDisabled()` assertion cannot see it.
-              ⚠ THE REASON LIVES HERE, IN SOURCE, AND NOWHERE A PERSON READS IT: a removed
-              affordance that explains itself is a disabled affordance wearing a disguise. What
-              the person is told instead is a FACT about the row — its Credential cell reads
-              `no check for this kind` (AR-05), which is true whether or not this item exists.
-              ⚠ Re-open trigger: the check path gains an MCP arm. Then this condition AND
-              `credentialReadingOf`'s MCP arm both become wrong, and they move together. */}
           {onCheck && !isMcp && (
             <DropdownMenuItem
               data-testid="connections-action-check"
@@ -708,9 +692,6 @@ function ConnectionRow({
             <DropdownMenuItem
               data-testid="connections-action-disable"
               onSelect={() => {
-                // GRADED, honestly, by whether a victim exists (§2g). With no known
-                // victim the flip is DIRECT — and Disable is the reversible half of
-                // the pair, which is exactly why 068-A grades it below Delete.
                 if (usedBy > 0) setConfirm("disable")
                 else void runWrite(() => onSetEnabled(connection, false), RECEIPT_DISABLED)
               }}
@@ -720,7 +701,6 @@ function ConnectionRow({
           ) : (
             <DropdownMenuItem
               data-testid="connections-action-enable"
-              // RESTORATIVE → direct flip. The deliberate asymmetry 068-A ships.
               onSelect={() => void runWrite(() => onSetEnabled(connection, true), RECEIPT_ENABLED)}
             >
               {CONNECTIONS_ACTION_ENABLE}
@@ -729,8 +709,6 @@ function ConnectionRow({
 
           <DropdownMenuItem
             data-testid="connections-action-delete"
-            // ALWAYS the victim-naming sheet — irreversible, and the credential it
-            // destroys cannot be recovered whatever the count says.
             onSelect={() => setConfirm("delete")}
             className="text-destructive focus:text-destructive"
           >
@@ -745,39 +723,16 @@ function ConnectionRow({
     <div
       data-testid="connections-row"
       data-state={state}
-      // ⚠ ALWAYS PRESENT, AND IT CARRIES BOTH VALUES. An attribute that were merely absent
-      // in the wide shape would read as falsy to every consumer and would make the suite's
-      // dense claim unfalsifiable — the "0 is a fact, absence is a different one" trap.
       data-dense={dense ? "true" : "false"}
       className={cn(
         dense
-          ? // ⚠ `px-3.5 py-3` is REUSED UNCHANGED from the wide shape, so the two shapes
-            //   share one outer box and the row's edges do not move when the panel opens.
-            // ⚠ `gap-1.5` (6px) IS THE ONE SPACING DECISION THIS PHASE MAKES, and it is an
-            //   EXTENSION of a shipped exception rather than a new token (UI-SPEC § Spacing
-            //   exception 4). 6px ships today at exactly one kind of site — mark→text
-            //   INSIDE the destination cell — and here it spaces three stacked LINES. 8px
-            //   (`gap-2`) is this row's own inter-column gap, so reusing it would make the
-            //   three lines read as gapped siblings rather than as ONE row; 4px (`gap-1`)
-            //   is the label→value step and collides the 11px/13px baselines. It is bounded
-            //   to this container and the shipped destination cell, and to nowhere else.
-            "flex flex-col gap-1.5 px-3.5 py-3"
+          ? "flex flex-col gap-1.5 px-3.5 py-3"
           : "flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3",
         !connection.is_enabled && "bg-muted/20",
       )}
     >
       {dense ? (
         <>
-          {/* ── DENSE LINE 1 · mark · name · action ──────────────────────────────────────
-                 The NAME is the row's primary visual anchor in BOTH shapes (UI-SPEC
-                 § Surface 2), so it leads line 1 and takes the free width. RESEARCH's
-                 layout A was refused for putting the state word here too: at a 302px track
-                 the fixed costs (`✕ Credential failed` ≈105px, ⋯ 32px, gaps 16px, padding
-                 28px) leave the name ≈110px, and squeezing the author's own word to buy a
-                 line is the wrong trade on the one surface whose defect IS squeezing.
-                 The ⋯ stays on line 1 rather than moving to line 3 (RESEARCH B) or being
-                 `row-span`ed (C): it is a 28px hit target already, and neither refusal is
-                 worth moving it. */}
           <div className="flex items-center gap-2">
             <ConnectionMarkGlyph shape={connection} size="row" />
             {nameNode}
@@ -786,23 +741,6 @@ function ConnectionRow({
             </div>
           </div>
 
-          {/* ── DENSE LINE 2 · the destination, ON A LINE OF ITS OWN, AND IT WRAPS ───────
-                 ⚠ THIS LINE IS WHERE SC#2 IS WON OR LOST. The wide cell is `truncate`,
-                 which is `white-space: nowrap` — and under `nowrap` `scrollWidth` is the
-                 FULL UN-WRAPPED TEXT WIDTH, so `scrollWidth <= clientWidth` is
-                 UNSATISFIABLE BY WIDENING ALONE. A dense layout that merely handed this
-                 cell more room would fail SC#2 silently. Hence no `truncate` on the cell
-                 AND none on the value span (it ships on both today, and removing one leaves
-                 the other).
-                 ⚠ `break-all`, and NOT the word-boundary variant beside it in Tailwind's
-                 scale: a URL contains no spaces, so a break that only happens AT a word
-                 boundary never happens at all, and the cell overflows exactly as before
-                 while looking fixed. (That variant is described, not spelled — same
-                 187-24 trap as above; the suite asserts its absence from this file.)
-                 ⚠ A `title` tooltip is FORBIDDEN on this surface and the suite asserts zero
-                 `[title]` nodes with a menu and a sheet open — wrapping is the answer
-                 BECAUSE the cheap fix is not available.
-                 It needs no inline label: the 🔒 leads it and it is the only mono line. */}
           <div
             data-testid="connections-row-destination"
             className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
@@ -816,25 +754,6 @@ function ConnectionRow({
             )}
           </div>
 
-          {/* ── DENSE LINE 3 · state · Used by · Credential ──────────────────────────────
-                 ⚠ EACH LABEL IS A SIBLING OF THE TESTID'D VALUE NODE, NEVER INSIDE IT. The
-                 shipped suite asserts `connections-row-credential`'s textContent
-                 `.toBe("never checked")` by EXACT EQUALITY and anchors `/^checked /` at the
-                 start; keeping the label outside is what leaves the value node's textContent
-                 CHARACTER-IDENTICAL in both shapes, so that pin holds for dense too rather
-                 than being re-baselined — on the surface whose whole lesson is that a
-                 re-baselined pin is not evidence.
-                 ⚠ The labels are NOT `aria-hidden`: "Credential checked 3d ago" is the
-                 reading, and it is the reading for everyone. A decorative label would leave
-                 a screen reader with a bare relative time and no noun.
-                 ⚠ `text-muted-foreground`, and never the dimmed variant beside it in the
-                 CSS variables — that utility has no Tailwind key on this surface and
-                 compiles to NOTHING, shipping while looking intentional (the `bg-warning`
-                 defect Phase 192.2 found). The forbidden spelling is described here rather
-                 than written, because this file's own source is swept (the 187-24 trap,
-                 which fired three times inside plan 01 of this phase).
-                 The state cell needs no label — glyph AND word are self-describing, and
-                 both survive greyscale (WCAG 1.4.1). */}
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
             <span
               data-testid="connections-row-state"
@@ -863,22 +782,27 @@ function ConnectionRow({
         </>
       ) : (
         <>
-      {/* 1 · Connection — the service's OWN mark + the AUTHOR'S word. Never the row id.
-          ⚠ THE WHOLE CONNECTION IS PASSED, not just its capability. That is what lets an
-          MCP row — which has no capability at all — reach MCP's own mark by its own
-          `mcp_server_url` condition. Passing `capability` alone here would send every MCP
-          row to the neutral, which is a quieter version of the ROADMAP's named failure.
-          ⚠ AND THE OLD `Mark ? mark : bullet-span` BRANCH IS GONE. The resolver is TOTAL,
-          so the else-arm became unreachable — and it is DELETED rather than left in place,
-          because a bullet character IS the blank mark D-206.1-10 forbids, wearing a
-          disguise, and an unreachable branch that renders one is a defect waiting for a
-          refactor to make it reachable again. ⚠ Its exact glyph is deliberately not spelled
-          in this file: acceptance greps this source for it and expects ZERO, so naming it
-          here would turn the guard red on the comment that forbids it (the 187-24 trap —
-          which fired THREE times inside that plan). */}
-      <div className="flex min-w-0 flex-[2] items-center gap-2">
-        <ConnectionMarkGlyph shape={connection} size="row" />
-        {nameNode}
+      <div className="flex min-w-0 flex-[2] flex-col gap-0.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <ConnectionMarkGlyph shape={connection} size="row" />
+          {nameNode}
+          {isAddedByUrl && (
+            <span
+              data-testid="connection-provenance-tag"
+              className="rounded border border-border px-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+            >
+              {PROVENANCE_ADDED_BY_URL}
+            </span>
+          )}
+        </div>
+        {tagline && (
+          <span
+            data-testid="connection-tagline"
+            className="truncate text-[11px] text-muted-foreground"
+          >
+            {tagline}
+          </span>
+        )}
       </div>
 
       {/* 2 · Sends to — 024-A's always-on 🔒 endpoint footer, applied to a destination. */}
@@ -912,11 +836,22 @@ function ConnectionRow({
       </div>
 
       {/* 5 · State — glyph AND word, so it reads in greyscale (WCAG 1.4.1). */}
-      <div className="w-36 flex-none">
+      <div className="w-36 flex-none flex items-center gap-1.5 text-[11px]">
         <span
           data-testid="connections-row-state"
-          className={cn("inline-flex items-center text-[11px] font-medium", STATE_TONE[state])}
+          className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", STATE_TONE[state])}
         >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full flex-none",
+              state === "ready"
+                ? "bg-success"
+                : state === "disabled"
+                  ? "bg-muted-foreground"
+                  : "bg-warning",
+            )}
+            aria-hidden="true"
+          />
           {CONNECTION_STATE_WORDS[state]}
         </span>
       </div>

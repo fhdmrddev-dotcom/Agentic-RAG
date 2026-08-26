@@ -130,6 +130,7 @@ import {
   deleteSheetBody,
   disableSheetBody,
 } from "../connectionsCopy"
+import * as api from "@/lib/api"
 import { ConnectorApiError } from "@/lib/api"
 import type {
   ConnectorCapability,
@@ -2901,5 +2902,40 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
     expect(importLines).toContain("connectionFormCopy")
     // The tooltip refusal IS satisfiable over the whole source, and measured 0 at base.
     expect(panelSource).not.toContain("title=")
+  })
+})
+
+describe("Phase 212 · interactive pre-save discovery in MCP mode", () => {
+  it("probes MCP server and renders discovered tools list with auto-populated name", async () => {
+    const user = userEvent.setup({ delay: null })
+    const mockProbe = vi.fn().mockResolvedValue({
+      server_url: "https://mcp.github.com",
+      tools: [
+        { name: "github_search", description: "Search repositories and code", inputSchema: {} },
+        { name: "github_issue", description: "Create issues", inputSchema: {} },
+      ],
+      count: 2,
+    })
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    renderPanel({ mode: "create", presetServiceId: "custom_mcp" })
+    const urlInput = screen.getByPlaceholderText(FORM_COPY.FIELD_MCP_URL_PLACEHOLDER)
+    await user.type(urlInput, "https://mcp.github.com/v1")
+
+    const probeBtn = screen.getByTestId("connection-probe-mcp-btn")
+    expect(probeBtn).toBeInTheDocument()
+    await user.click(probeBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    })
+    expect(screen.getByText("Discovered tools (2)")).toBeInTheDocument()
+    expect(screen.getByText("github_search")).toBeInTheDocument()
+    expect(screen.getByText("github_issue")).toBeInTheDocument()
+  })
+
+  it("pre-fills form when opened with presetServiceId from catalog", () => {
+    renderPanel({ mode: "create", presetServiceId: "slack" })
+    expect(screen.getByDisplayValue("Slack")).toBeInTheDocument()
   })
 })

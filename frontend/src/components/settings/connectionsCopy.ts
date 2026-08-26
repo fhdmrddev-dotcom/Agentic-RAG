@@ -180,8 +180,10 @@ export function connectionMatchesQuery(connection: ConnectorConnection, query: s
   if (!q) return true
   const mcpUrl = typeof connection.mcp_server_url === "string" ? connection.mcp_server_url : ""
   const cap = typeof connection.capability === "string" ? connection.capability : ""
+  const serviceId = typeof connection.service_id === "string" ? connection.service_id : ""
   const haystack = [
     connection.name,
+    serviceId,
     cap,
     mcpUrl,
     ...destinationFactsOf(connection),

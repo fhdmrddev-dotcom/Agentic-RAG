@@ -87,14 +87,16 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { ConnectorApiError } from "@/lib/api"
+import { ConnectorApiError, probeMcpServer, updateConnectorGrants } from "@/lib/api"
 import type {
   ConnectorCapability,
   ConnectorCheckResult,
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
+  McpDiscoveredTool,
 } from "@/lib/api"
+import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   EMPTY_DRAFT,
@@ -425,6 +427,8 @@ export interface ConnectionFormPanelProps {
   mode: "create" | "edit"
   /** The row being edited. Required in `edit` mode; ignored in `create`. */
   connection?: ConnectorConnection | null
+  /** Optional service preset for creation from catalog. */
+  presetServiceId?: string | null
   /** Render-only (U-02). `require_org_manage` on the API is the wall (plan 190-09). */
   isOrgAdmin: boolean
   /** Render-only (D-26 / §9). `require_visible("live_connectors")` on the three WRITE
@@ -435,7 +439,7 @@ export interface ConnectionFormPanelProps {
   orgName?: string | null
   onClose: () => void
   /** Absent ⇒ NO save affordance (removed, never inert). */
-  onCreate?: (body: ConnectorConnectionCreate) => Promise<void>
+  onCreate?: (body: ConnectorConnectionCreate) => Promise<ConnectorConnection | void>
   onUpdate?: (id: string, body: ConnectorConnectionUpdate) => Promise<void>
   /** 190-18 · §5c. Absent ⇒ NO check affordance. Runs on the STORED connection and returns a
    *  VERDICT — never a credential (`ConnectorCheckResult` declares none, and the Pydantic
@@ -495,6 +499,7 @@ export function ConnectionFormPanel({
   open,
   mode,
   connection = null,
+  presetServiceId = null,
   isOrgAdmin,
   liveConnectorsOn,
   orgName,
@@ -521,40 +526,89 @@ export function ConnectionFormPanel({
   const [busy, setBusy] = useState(false)
   const [writeFailed, setWriteFailed] = useState(false)
   const [receipt, setReceipt] = useState<string | null>(null)
+  const [probing, setProbing] = useState(false)
+  const [probeResult, setProbeResult] = useState<McpDiscoveredTool[] | null>(null)
+  const [probeError, setProbeError] = useState<string | null>(null)
+  const [toolGrants, setToolGrants] = useState<Record<string, boolean>>({})
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
    *  halves mirror a REAL server gate, and neither is the gate itself. */
   const canWrite = isOrgAdmin && liveConnectorsOn
   const readOnly = !canWrite
 
-  // ── Seed the draft when the panel opens (or the row behind it changes). ──
-  // ⚠ `secret` is seeded to `""` BY CONSTRUCTION — `draftFromConnection` is unable to do
-  // otherwise, because `ConnectorConnection` declares no credential field to copy from.
-  //
-  // ⚠ 190-18 — IT RE-SEEDS ON A DIFFERENT **ROW**, NOT ON A DIFFERENT **OBJECT**, and that
-  // is a fix rather than a tidy-up. This plan gives the panel a Check button whose container
-  // handler RE-FETCHES the list (the 068-A rule: a chip comes from the server's new truth,
-  // never from an optimistic flip). A re-fetch hands back a NEW object for the SAME row, so
-  // re-seeding on object identity would discard whatever the person had typed — at the exact
-  // moment they were checking a credential before saving it. The guard below is written as a
-  // seeded-key ref rather than as a narrowed dependency array so the dependency stays honest
-  // (`connection` IS read here) and the rule stays on.
   const seededKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!open) {
       seededKeyRef.current = null
       return
     }
-    const key = `${mode}:${connection?.id ?? ""}`
+    const key = `${mode}:${connection?.id ?? ""}:${presetServiceId ?? ""}`
     if (seededKeyRef.current === key) return
     seededKeyRef.current = key
-    setDraft(mode === "edit" && connection ? draftFromConnection(connection) : EMPTY_DRAFT)
+    if (mode === "edit" && connection) {
+      setDraft(draftFromConnection(connection))
+      setToolGrants(connection.tool_grants ?? {})
+    } else if (mode === "create" && presetServiceId) {
+      const entry = getServiceCatalogEntry(presetServiceId)
+      const isMcpPreset =
+        presetServiceId === "custom_mcp" ||
+        presetServiceId === "mcp" ||
+        presetServiceId === "github" ||
+        presetServiceId === "google" ||
+        presetServiceId === "notion"
+      const shape = shapeForService(presetServiceId, isMcpPreset ? "https://" : "")
+      setDraft({
+        ...EMPTY_DRAFT,
+        serviceId: presetServiceId,
+        capability: shape,
+        name: entry.isPopular && presetServiceId !== "custom_mcp" ? entry.name : "",
+      })
+      setToolGrants({})
+    } else {
+      setDraft(EMPTY_DRAFT)
+      setToolGrants({})
+    }
+    setProbeResult(null)
+    setProbeError(null)
     setReplacing(false)
     setSaveRefusal(null)
     setCheck({ kind: "idle" })
     setReceipt(null)
     setWriteFailed(false)
-  }, [open, mode, connection])
+  }, [open, mode, connection, presetServiceId])
+
+  async function handleProbeMcp() {
+    if (!draft.mcpServerUrl.trim()) return
+    setProbing(true)
+    setProbeError(null)
+    try {
+      const res = await probeMcpServer({
+        mcp_server_url: draft.mcpServerUrl.trim(),
+        secret: draft.secret.trim() || undefined,
+      })
+      setProbeResult(res.tools)
+      if (!draft.name.trim()) {
+        const suggested = mcpHostOf(draft.mcpServerUrl.trim())
+        if (suggested) {
+          set({ name: suggested })
+        }
+      }
+      setToolGrants((prev) => {
+        const next = { ...prev }
+        for (const t of res.tools) {
+          if (next[t.name] === undefined) {
+            next[t.name] = true
+          }
+        }
+        return next
+      })
+    } catch (err) {
+      setProbeError(err instanceof Error ? err.message : "Failed to discover tools from MCP server")
+      setProbeResult([])
+    } finally {
+      setProbing(false)
+    }
+  }
 
   // ── FOCUS RESTORE (§12 — net-new; `Dialog` would have given it free). ──
   // The opener is captured on open and re-focused on close, INCLUDING a close that follows
@@ -763,23 +817,32 @@ export function ConnectionFormPanel({
         } else {
           body.secret = draft.secret
         }
-        await onCreate?.(body)
+        const created = await onCreate?.(body)
+        if (created && typeof created === "object" && "id" in created && draft.capability === "mcp" && Object.keys(toolGrants).length > 0) {
+          try {
+            await updateConnectorGrants(created.id, toolGrants)
+          } catch {
+            // non-fatal grant initialization
+          }
+        }
       } else if (connection) {
         const body: ConnectorConnectionUpdate = {
           name: draft.name.trim(),
           config: configFromDraft(draft),
         }
-        // ⚠ 206.1 — AN MCP ROW'S UPDATE CARRIES ITS URL, and the panel composing it correctly
-        // is the ONLY guard: `ConnectorConnectionUpdate` performs NO cross-field validation at
-        // all, so a body pairing an SMTP config with an MCP row is accepted at the model and
-        // discovered later, by somebody else. Before D-206.1-22's fix this branch composed a
-        // `SendEmailConfig` for every MCP row and 422'd into the generic save failure.
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
-        // A present `secret` is a REPLACE, never a merge — so it is sent ONLY when the
-        // person actually typed a new one. Sending an empty string would replace a working
-        // credential with nothing AND reset the verdict, in one silent UPDATE.
         if (replacing && draft.secret !== "") body.secret = draft.secret
         await onUpdate?.(connection.id, body)
+        if (draft.capability === "mcp" && Object.keys(toolGrants).length > 0) {
+          try {
+            await updateConnectorGrants(connection.id, {
+              ...(connection.tool_grants || {}),
+              ...toolGrants,
+            })
+          } catch {
+            // non-fatal
+          }
+        }
       }
       onClose()
     } catch (error) {
@@ -1198,29 +1261,87 @@ export function ConnectionFormPanel({
                surface nobody threat-modelled (D-32 / T-190-17-SCOPE), and the `config` this
                form composes is `{ headers: {} }` precisely so it offers to fill nothing. ── */}
         {capability === "mcp" && (
-          <Field
-            label={FIELD_MCP_URL_LABEL}
-            help={FIELD_MCP_URL_HELP}
-            htmlFor={`${fieldId}-mcp-url`}
-          >
-            {/* FULL WIDTH — one input, one column. The `1fr 92px` grid above exists for
-                host+port; an MCP URL has no second part, and borrowing that shape would
-                leave a 92px hole beside the field. `font-mono` because this is a machine
-                value, like the Jira project key; the label and help above are prose. */}
-            <TextControl
-              id={`${fieldId}-mcp-url`}
-              value={draft.mcpServerUrl}
-              // ⚠ 211 — THROUGH THE DERIVATION SITE, not `set`. This is the second of the two
-              // controls that can move the shape (the `https://` override in
-              // `shapeForService`); routing it through `set` would let the endpoint and the
-              // field set disagree the moment a person pasted an address.
-              onChange={(mcpServerUrl) => setShapedBy({ mcpServerUrl })}
-              placeholder={FIELD_MCP_URL_PLACEHOLDER}
-              describedBy={`${fieldId}-mcp-url-help`}
-              readOnly={readOnly}
-              className="font-mono"
-            />
-          </Field>
+          <>
+            <Field
+              label={FIELD_MCP_URL_LABEL}
+              help={FIELD_MCP_URL_HELP}
+              htmlFor={`${fieldId}-mcp-url`}
+            >
+              <div className="flex gap-2">
+                <TextControl
+                  id={`${fieldId}-mcp-url`}
+                  value={draft.mcpServerUrl}
+                  onChange={(mcpServerUrl) => setShapedBy({ mcpServerUrl })}
+                  placeholder={FIELD_MCP_URL_PLACEHOLDER}
+                  describedBy={`${fieldId}-mcp-url-help`}
+                  readOnly={readOnly}
+                  className="font-mono flex-1"
+                />
+                {!readOnly && (
+                  <button
+                    type="button"
+                    disabled={probing || !draft.mcpServerUrl.trim()}
+                    onClick={() => void handleProbeMcp()}
+                    data-testid="connection-probe-mcp-btn"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+                  >
+                    {probing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                    {probing ? "Probing..." : "Discover tools"}
+                  </button>
+                )}
+              </div>
+            </Field>
+
+            {probeError && (
+              <p
+                role="status"
+                data-testid="connection-probe-error"
+                className="mb-3 text-[11px] leading-snug text-destructive"
+              >
+                {probeError}
+              </p>
+            )}
+
+            {probeResult && probeResult.length > 0 && (
+              <div data-testid="connection-discovered-tools" className="mb-3.5 rounded-md border border-border/70 bg-card p-2.5">
+                <div className="mb-1.5 text-[11px] font-medium text-foreground">
+                  Discovered tools ({probeResult.length})
+                </div>
+                <div className="max-h-48 divide-y divide-border/40 overflow-y-auto pr-1">
+                  {probeResult.map((tool) => (
+                    <div key={tool.name} className="py-1.5 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[11px] font-semibold text-foreground">
+                          {tool.name}
+                        </span>
+                        {!readOnly && (
+                          <label className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={toolGrants[tool.name] !== false}
+                              onChange={(e) =>
+                                setToolGrants((prev) => ({
+                                  ...prev,
+                                  [tool.name]: e.target.checked,
+                                }))
+                              }
+                              className="rounded border-border text-primary focus:ring-primary"
+                            />
+                            Granted
+                          </label>
+                        )}
+                      </div>
+                      {tool.description && (
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
+                          {tool.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {capability === "post_message" && (

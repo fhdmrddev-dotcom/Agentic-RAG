@@ -160,27 +160,26 @@ export const CONNECTION_MARK_KEYS: readonly string[] = Object.keys(MARKS)
  * Resolve a connection's mark. TOTAL over any input — it always returns an entry and NEVER null.
  */
 export function connectionMark(shape: ConnectionMarkShape | null | undefined): ConnectionMarkEntry {
-  const serviceId = shape?.service_id
-  if (typeof serviceId === "string" && serviceId.trim().length > 0) {
-    const key = serviceId.trim().toLowerCase()
-    if (Object.prototype.hasOwnProperty.call(SERVICE_MARKS, key)) {
-      return SERVICE_MARKS[key]
-    }
-    // If unknown service_id has an mcp_server_url or tool_name, resolve MCP mark
-    if (shape?.mcp_server_url || shape?.tool_name) {
-      return MCP_MARK
-    }
-  }
-
   const url = shape?.mcp_server_url
   if (typeof url === "string" && url.trim().length > 0) return MCP_MARK
 
   const tool = shape?.tool_name
   if (typeof tool === "string" && tool.trim().length > 0) return MCP_MARK
 
-  const capability = shape?.capability
-  if (typeof capability === "string" && Object.prototype.hasOwnProperty.call(MARKS, capability)) {
-    return MARKS[capability]
+  const cap = shape?.capability
+  if (typeof cap === "string" && cap.trim().length > 0) {
+    const key = cap.trim().toLowerCase()
+    if (Object.prototype.hasOwnProperty.call(MARKS, key)) {
+      return MARKS[key]
+    }
+  }
+
+  const serviceId = shape?.service_id
+  if (typeof serviceId === "string" && serviceId.trim().length > 0) {
+    const key = serviceId.trim().toLowerCase()
+    if (Object.prototype.hasOwnProperty.call(SERVICE_MARKS, key)) {
+      return SERVICE_MARKS[key]
+    }
   }
 
   return NEUTRAL_MARK

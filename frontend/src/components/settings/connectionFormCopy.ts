@@ -174,6 +174,8 @@ export const SERVICE_TO_SHAPE: Record<string, ConnectionShape> = {
   jira: "create_ticket",
   smtp: "send_email",
   custom: "mcp",
+  custom_mcp: "mcp",
+  mcp: "mcp",
 }
 
 /**
