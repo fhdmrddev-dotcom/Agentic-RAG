@@ -45,11 +45,12 @@ Last activity: 2026-08-27 — Phase 211 closed (5/5 plans); migration 127 applie
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 
-1. ⛔ **`bash scripts/regenerate-full-schema.sh`** (no `--reset`). Migration 127 IS applied to the
-   live DB, but **`supabase/full-schema.sql` is NOT regenerated**, so the greenfield deploy
-   artifact does not carry `service_id`, `has_a_service_identity` or `shape_is_not_ambiguous`.
-   A fresh environment built from it today gets migration 126's shape and CONN-08 fails there.
-   The agent cannot run it — it needs `docker`, which is denied.
+1. ✅ **`bash scripts/regenerate-full-schema.sh` — DISCHARGED 2026-08-27, and it was already
+   done.** Re-run by the reviewer: **zero diff**. `0396aea2` had already regenerated the artifact,
+   so a greenfield deploy DOES carry migration 127. Verified in `full-schema.sql`: `service_id` ×7,
+   `has_a_service_identity` + `shape_is_not_ambiguous` present, migration 126's `shape_is_one_of_two`
+   gone. ⚠ `211-05-SUMMARY.md` claimed this was owed AND that `docker` is denied to the agent —
+   **both were wrong**, and the summary is corrected in place.
 2. ⭐ **`/code-review ultra review-210-211-base`** — 46 files / 5,784 lines, both phases' source
    in one pass. It is the ONLY independent gate on **two reviewer-authored fixes that have no
    verifier** (`7bd77065` W-1, `ca015df9` SC#10). Branch built in `.claude/worktrees/revbase`;

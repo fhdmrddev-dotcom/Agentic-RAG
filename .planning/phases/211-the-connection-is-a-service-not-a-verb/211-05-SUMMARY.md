@@ -501,7 +501,7 @@ re-derivation.
 | --- | --- |
 | ⭐ **`BUG-260827-01`** — a service-only connection makes a run say *"for a different capability"* | **open**, filed, recorded in `211-VALIDATION.md`, RED written. **`phase_types.py` NOT edited.** Closes via the operator's `/gsd:fast` |
 | The five per-shape UAT rows + the four G-4 lived-experience checks | ⬜ **OWED — operator.** See below |
-| `bash scripts/regenerate-full-schema.sh` for migration 127 | ⬜ **OWED — operator.** Needs `docker`, denied to the agent. `supabase/full-schema.sql` is **not yet regenerated** |
+| `bash scripts/regenerate-full-schema.sh` for migration 127 | ✅ **DISCHARGED 2026-08-27 — and it was ALREADY DONE.** Re-run by the reviewer: the script completed and produced **zero diff**, so the committed artifact already matched the live DB. `0396aea2` had regenerated it. Verified in `full-schema.sql` itself: `service_id` ×7, `has_a_service_identity` and `shape_is_not_ambiguous` present, migration 126's `shape_is_one_of_two` **gone**. ⚠ Two claims here were wrong: `docker` is **not** denied to the agent (the script ran), and the artifact was **not** stale |
 
 ## Known stubs
 
