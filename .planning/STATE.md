@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-26T17:02:47.310Z"
-last_activity: 2026-08-26 -- Phase 211 execution started
+last_updated: "2026-08-27T03:33:00.000Z"
+last_activity: 2026-08-27 -- Phase 212 execution complete across 5 plans (4 waves)
 progress:
   total_phases: 14
-  completed_phases: 1
-  total_plans: 8
-  completed_plans: 3
-  percent: 7
+  completed_phases: 3
+  total_plans: 13
+  completed_plans: 13
+  percent: 21
 ---
 
 # Project State
@@ -32,15 +32,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 212 — the-catalog-and-its-doors
+**Current focus:** Phase 212 complete — ready for Phase 213 planning / Phase 212 review
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 212 (the-catalog-and-its-doors) — PLANNED (5 plans across 4 waves)
+Phase: 212 (the-catalog-and-its-doors) — ✅ COMPLETE (5 plans across 4 waves)
 Plan: 212-01 .. 212-05
-Status: Phase 212 plans, research, UI-SPEC, and validation strategy written. Ready for reviewer preflight / execution.
-Last activity: 2026-08-27 — Phase 212 planning complete (5 plans across 4 waves).
+Status: Phase 212 fully executed and verified. All 4 waves committed (7a694693, f0e53da5, b917b9dc, 46af07c2). Count gate 118/118 OK, tsc 34 baseline, rot set 68 baseline.
+Last activity: 2026-08-27 — Phase 212 execution complete. Ready for reviewer post-phase gate.
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 
