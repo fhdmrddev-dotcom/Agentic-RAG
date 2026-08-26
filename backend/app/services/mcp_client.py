@@ -264,6 +264,11 @@ class McpClient:
 
         Returns a list of tool specifications:
           [{"name": "...", "description": "...", "inputSchema": {...}}, ...]
+
+        Three further keys are forwarded ONLY when the server sent a usable value, so their
+        absence stays meaningful: ``title`` (a stripped, non-empty string), ``outputSchema``
+        (an object) and ``annotations`` (an object). The emitted key set is an ALLOW-LIST —
+        see the comment above the dict literal below before adding to it.
         """
         result = await self._send_jsonrpc(
             server_url,
@@ -289,10 +294,38 @@ class McpClient:
             if not isinstance(input_schema, dict):
                 input_schema = {"type": "object", "properties": {}}
 
+            # Phase 211 (D-211-09) — `title`, coerced with the same discipline `name` and
+            # `description` already receive rather than read bare off the item. An absent,
+            # blank or non-string title contributes NO KEY AT ALL: absence is meaningful
+            # here exactly as it is for `annotations`, and a fabricated `""` would claim the
+            # server named this tool when it said nothing, costing the reader its fallback
+            # to `name`.
+            raw_title = item.get("title")
+            title = str(raw_title).strip() if isinstance(raw_title, str) else ""
+
+            # Phase 211 (D-211-09) — `outputSchema`. Forwarded only when the server sent an
+            # object, and NEVER coerced to a default the way `inputSchema` is: the
+            # specification makes `inputSchema` mandatory and `outputSchema` optional, so an
+            # absent output schema is a fact about the server ("this tool makes no
+            # structural promise about its result") and inventing `{"type": "object"}` would
+            # make a promise on its behalf.
+            raw_output_schema = item.get("outputSchema")
+
+            # ⚠ WIDEN THE LIST, NEVER REMOVE IT (D-211-09). This object stays an explicit
+            # per-key dict literal, built key by key. It must not become a spread of `item`
+            # minus a set of unwanted names, and it must not become a comprehension over the
+            # server's keys: a list of what we refuse cannot be made fail-closed (the
+            # measured v3.6 finding), and the entire value of this function is that a key
+            # nobody named here cannot reach the `discovered_tools` jsonb column — and from
+            # there a client that will index into whatever it finds.
             sanitized_tools.append({
                 "name": name,
                 "description": description,
                 "inputSchema": input_schema,
+                **({"title": title} if title else {}),
+                **({
+                    "outputSchema": raw_output_schema
+                } if isinstance(raw_output_schema, dict) else {}),
                 # Phase 209 (SC#2 · D-209-02) — forward annotations so `readOnlyHint`
                 # reaches the frontend. The MCP spec places `readOnlyHint` inside the
                 # `annotations` object on a tool entry; dropping it here is what made the

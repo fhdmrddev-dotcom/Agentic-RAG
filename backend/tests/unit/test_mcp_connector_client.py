@@ -881,3 +881,317 @@ async def test_list_tools_forwards_annotations_and_omits_them_when_absent(monkey
     assert "annotations" not in by_name["ask_question"], (
         "a non-dict `annotations` must be dropped, never forwarded for the client to index into"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# 8 · PHASE 211 (D-211-09) — THE ALLOW-LIST IS WIDENED BY TWO KEYS AND IS STILL AN
+#     ALLOW-LIST
+#
+# ⚠ **THE LOAD-BEARING CASE IS THE DROP, NOT THE CARRY.** Anyone can see that `title` now
+# arrives; the property worth a test is that widening the list did not turn it into a
+# deny-list. `test_the_sanitizer_drops_every_key_nobody_named` is therefore asserted on the
+# WHOLE KEY SET rather than on three individual absences — a fourth invented key would slip
+# past `assert "_meta" not in tool` forever, and "a deny-list cannot be made fail-closed" is
+# the measured v3.6 finding this function exists to honour.
+#
+# **Driven RED before the widening landed** — the observed failure is recorded verbatim in
+# `211-01-SUMMARY.md`.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+
+def _tools_list_transport(raw_tools: list, session_id: str = "sess-211"):
+    """Return a `mock_post` that answers the handshake and then serves ``raw_tools``.
+
+    Factored out because the cases below need the identical three-step conversation and a
+    copy of it in each would drift.
+    """
+
+    async def mock_post(url, json=None, headers=None):
+        if json["method"] == "initialize":
+            return httpx.Response(
+                200,
+                json={"jsonrpc": "2.0", "id": 0, "result": {"protocolVersion": "2025-06-18"}},
+                headers={"Mcp-Session-Id": session_id},
+                request=httpx.Request("POST", url),
+            )
+        if json["method"].startswith("notifications/"):
+            return httpx.Response(202, request=httpx.Request("POST", url))
+        return httpx.Response(
+            200,
+            json={"jsonrpc": "2.0", "id": 1, "result": {"tools": raw_tools}},
+            request=httpx.Request("POST", url),
+        )
+
+    return mock_post
+
+
+async def _sanitize(raw_tools: list) -> list[dict]:
+    client = McpClient()
+    with patch("httpx.AsyncClient.post", side_effect=_tools_list_transport(raw_tools)):
+        return await client.list_tools("https://mcp.example.invalid/mcp")
+
+
+@pytest.mark.asyncio
+async def test_the_sanitizer_drops_every_key_nobody_named(monkeypatch):
+    """⭐ THE NEGATIVE CONTROL — a server-controlled key that is not on the list is DROPPED.
+
+    `_meta` is a reserved key in the Model Context Protocol, `execute` is the shape of a
+    plausible-looking instruction, and `__proto__` is the one whose presence in a JSON object
+    that crosses into a JavaScript client is a known prototype-pollution vector. None of the
+    three is named by the sanitizer, so none of the three may reach `discovered_tools` — and
+    from there a `jsonb` column and a React render.
+
+    Asserted on the KEY SET so an invented FOURTH key is caught by the same assertion.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {
+            "name": "t",
+            "title": "T",
+            "description": "d",
+            "inputSchema": {"type": "object", "properties": {}},
+            "outputSchema": {"type": "object"},
+            "_meta": 1,
+            "execute": "x",
+            "__proto__": {},
+            "annotations": "not-a-dict",
+        }
+    ])
+
+    assert len(tools) == 1
+    assert set(tools[0]) == {"name", "description", "inputSchema", "title", "outputSchema"}, (
+        f"the sanitizer emitted {sorted(tools[0])!r}. The emitted object is an explicit "
+        "per-key dict literal and must stay one: widening it to a spread minus a deny-list "
+        "would carry every key a server invents, and the whole value of this function is "
+        "that a key nobody named cannot reach jsonb"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_maximal_input_yields_exactly_the_six_possible_keys(monkeypatch):
+    """The upper bound on the emitted shape: six keys, and no seventh is reachable.
+
+    Pins that the emitted object is still built key by key. A refactor to a set
+    comprehension over `item` would make this number a function of the SERVER's input rather
+    than of our source, which is precisely the property being fenced.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {
+            "name": "maximal",
+            "title": "Maximal",
+            "description": "everything the spec allows, at once",
+            "inputSchema": {"type": "object", "properties": {"a": {"type": "string"}}},
+            "outputSchema": {"type": "object", "properties": {"b": {"type": "number"}}},
+            "annotations": {"readOnlyHint": True},
+            "somethingElseEntirely": {"nested": ["values"]},
+        }
+    ])
+
+    assert set(tools[0]) == {
+        "name",
+        "title",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "annotations",
+    }, f"the maximal sanitized object carries {sorted(tools[0])!r}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_title,expected",
+    [
+        ("Weather Data Retriever", "Weather Data Retriever"),
+        ("  Padded Title  ", "Padded Title"),  # stripped, like `name` and `description`
+    ],
+)
+async def test_a_real_title_survives_stripped(monkeypatch, raw_title, expected):
+    """`title` is the spec's optional human-readable display name (2025-06-18 § Tool).
+
+    Coerced with the SAME discipline the existing keys receive — `str(...).strip()` — rather
+    than read bare off the item, which is what RESEARCH §G item 2 asks for.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "get_weather_data", "title": raw_title, "inputSchema": {"type": "object"}}
+    ])
+    assert tools[0]["title"] == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_title,label",
+    [
+        (None, "absent-as-null"),
+        ("", "empty string"),
+        ("   ", "whitespace only"),
+        (42, "a number"),
+        (["Title"], "a list"),
+        ({"text": "Title"}, "an object"),
+    ],
+)
+async def test_a_blank_or_non_string_title_contributes_no_key(monkeypatch, raw_title, label):
+    """⚠ ABSENCE MUST STAY MEANINGFUL — no key at all, never `""`.
+
+    The same rule `annotations` carries, and for the same reason from the other side of the
+    language boundary: a fabricated empty `title` would claim the server named this tool
+    when it did not, and a catalog would render a blank label instead of falling back to the
+    tool's `name`.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "t", "title": raw_title, "inputSchema": {"type": "object"}}
+    ])
+    assert "title" not in tools[0], (
+        f"a {label} title produced a `title` key ({tools[0].get('title')!r}); absence must "
+        "stay meaningful"
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_entirely_absent_title_contributes_no_key(monkeypatch):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([{"name": "t", "inputSchema": {"type": "object"}}])
+    assert "title" not in tools[0]
+
+
+@pytest.mark.asyncio
+async def test_a_dict_output_schema_survives_verbatim(monkeypatch):
+    """`outputSchema` is optional in the spec while `inputSchema` is mandatory — so it is
+    forwarded when it is a dict and is NEVER coerced to a default.
+
+    An absent output schema is a FACT ABOUT THE SERVER ("this tool makes no structural
+    promise about its result"), and defaulting it to `{"type": "object"}` would invent a
+    promise the server never made — the same fabrication the `annotations` arm refuses.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    schema = {
+        "type": "object",
+        "properties": {"temperature": {"type": "number"}, "conditions": {"type": "string"}},
+        "required": ["temperature", "conditions"],
+    }
+    tools = await _sanitize([
+        {"name": "get_weather_data", "inputSchema": {"type": "object"}, "outputSchema": schema}
+    ])
+    assert tools[0]["outputSchema"] == schema
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_output_schema,label",
+    [
+        (None, "null"),
+        ("object", "a string"),
+        ([{"type": "object"}], "a list"),
+        (0, "a number"),
+        (True, "a boolean"),
+    ],
+)
+async def test_a_non_dict_output_schema_contributes_no_key(
+    monkeypatch, raw_output_schema, label
+):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([
+        {"name": "t", "inputSchema": {"type": "object"}, "outputSchema": raw_output_schema}
+    ])
+    assert "outputSchema" not in tools[0], (
+        f"{label} produced an `outputSchema` key; it is optional in the spec and must be "
+        "absent rather than defaulted — unlike `inputSchema`, which is mandatory"
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_absent_output_schema_contributes_no_key(monkeypatch):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([{"name": "t", "inputSchema": {"type": "object"}}])
+    assert "outputSchema" not in tools[0]
+
+
+@pytest.mark.asyncio
+async def test_the_four_pre_existing_keys_behave_exactly_as_before(monkeypatch):
+    """The regression half of D-211-09: widening changed nothing that already worked.
+
+    Four properties, all pre-211, restated here so a change to any of them shows up in the
+    plan that made it rather than three phases later:
+      * a blank / non-string / absent `name` DROPS THE WHOLE TOOL;
+      * `description` defaults to `""` (never `None`);
+      * `inputSchema` defaults to the empty object schema (it is mandatory in the spec);
+      * `annotations` is forwarded only when it is a dict.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "   ", "title": "Blank name"},           # dropped
+        {"name": None, "title": "Null name"},             # dropped
+        {"title": "No name at all"},                      # dropped
+        "not-even-a-dict",                                # dropped
+        {"name": "survivor"},                             # every optional key absent
+        {"name": "annotated", "annotations": {"readOnlyHint": True}},
+        {"name": "mis-annotated", "annotations": ["readOnlyHint"]},
+    ])
+
+    by_name = {t["name"]: t for t in tools}
+    assert set(by_name) == {"survivor", "annotated", "mis-annotated"}, (
+        f"the sanitizer emitted {sorted(by_name)!r}; a tool with no usable `name` must be "
+        "dropped entirely — the name is the grant key, and a nameless tool cannot be granted"
+    )
+
+    assert by_name["survivor"]["description"] == ""
+    assert by_name["survivor"]["inputSchema"] == {"type": "object", "properties": {}}
+    assert set(by_name["survivor"]) == {"name", "description", "inputSchema"}
+
+    assert by_name["annotated"]["annotations"] == {"readOnlyHint": True}
+    assert "annotations" not in by_name["mis-annotated"]
+
+
+def test_the_sanitizer_source_is_an_allow_list_and_not_a_deny_list():
+    """⚠ D-211-09's actual instruction: WIDEN THE LIST, NEVER REMOVE IT.
+
+    A source-level fence, because the behavioural cases above can only test the keys someone
+    thought to invent. Asserted as a PROPERTY: the emitted object is built from named string
+    keys, and no deny/blocklist vocabulary appears anywhere in the module.
+
+    ⚠ Falsified on synthetic input first — a matcher that never fires would pass forever.
+    """
+    import re
+    from pathlib import Path
+
+    import app.services.mcp_client as mcp_client_module
+
+    source = Path(mcp_client_module.__file__).read_text(encoding="utf-8")
+
+    # ⚠ THE FIRST DRAFT OF THIS MATCHER WAS `\b(deny|denylist|blocklist|blacklist)\b` AND
+    # ITS OWN CONTROL FALSIFIED IT — `_` is a word character, so `\b` never occurs between
+    # `_` and `DENY`, and `_DENYLIST` (the single most likely spelling of the thing being
+    # fenced) did not match. The control is kept exactly as it was; only the matcher moved.
+    banned = re.compile(r"(?i)(deny.{0,2}list|blocklist|blacklist)")
+    assert banned.search("_DENYLIST = {'_meta'}"), (
+        "the deny-list matcher does not fire on a real deny-list declaration, so the walk "
+        "below would report green against the very refactor it exists to catch"
+    )
+    assert not banned.search("    # forwarded only when present and a dict"), (
+        "the deny-list matcher fires on ordinary prose"
+    )
+    offenders = [
+        f"{lineno}: {line.strip()}"
+        for lineno, line in enumerate(source.splitlines(), start=1)
+        if banned.search(line)
+    ]
+    assert offenders == [], (
+        "mcp_client.py now carries deny-list vocabulary:\n" + "\n".join(offenders) + "\n"
+        "A deny-list cannot be made fail-closed (the measured v3.6 finding). Every key the "
+        "sanitizer emits must be named in source."
+    )
+
+    # And each of the six possible keys is named as a literal in the module.
+    for key in ("name", "description", "inputSchema", "title", "outputSchema", "annotations"):
+        assert f'"{key}"' in source, (
+            f"`{key}` is no longer a named string key in mcp_client.py — the emitted object "
+            "must stay an explicit per-key dict literal"
+        )
