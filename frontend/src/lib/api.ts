@@ -396,11 +396,14 @@ export {
   deleteConnectorConnection,
   checkConnectorConnection,
   discoverConnectorTools,
+  probeMcpServer,
   updateConnectorGrants,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
   ConnectorCheckResult,
+  McpProbeRequest,
+  McpProbeResponse,
 } from "./api/connectors"
 
 // ── schedules ─────────────────────────────────────────────────────────

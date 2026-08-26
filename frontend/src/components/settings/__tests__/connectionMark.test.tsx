@@ -112,6 +112,16 @@ describe("resolution — a vendor shows its own mark", () => {
     expect(connectionMark(MCP).key).toBe("mcp")
   })
 
+  it("resolves marks by service_id with case-insensitivity", () => {
+    expect(connectionMark({ service_id: "slack" }).key).toBe("slack")
+    expect(connectionMark({ service_id: "Slack" }).key).toBe("slack")
+    expect(connectionMark({ service_id: "jira" }).key).toBe("jira")
+    expect(connectionMark({ service_id: "smtp" }).key).toBe("smtp")
+    expect(connectionMark({ service_id: "custom_mcp" }).key).toBe("mcp")
+    expect(connectionMark({ service_id: "mcp.deepwiki.com", mcp_server_url: "https://mcp.deepwiki.com" }).key).toBe("mcp")
+    expect(connectionMark({ service_id: "unknown_custom" }).key).toBe("unknown")
+  })
+
   it("exports the CAPABILITY keys and NOT the map (phaseGlyph.tsx:96's shape)", () => {
     expect([...CONNECTION_MARK_KEYS].sort()).toEqual([
       "create_ticket",

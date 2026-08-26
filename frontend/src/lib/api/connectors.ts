@@ -232,6 +232,36 @@ export async function discoverConnectorTools(id: string): Promise<McpDiscoveredT
   return res.json() as Promise<McpDiscoveredTool[]>
 }
 
+export interface McpProbeRequest {
+  mcp_server_url: string
+  secret?: string | null
+  timeout?: number
+}
+
+export interface McpProbeResponse {
+  server_url: string
+  tools: McpDiscoveredTool[]
+  count: number
+}
+
+/** Phase 212 (CONN-06 / S-1) — Probe an arbitrary remote MCP server URL before saving. */
+export async function probeMcpServer(payload: McpProbeRequest): Promise<McpProbeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/discover-tools`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to probe MCP server",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<McpProbeResponse>
+}
+
 /** Phase 206 (F-1 / D-206-06) — Update boolean per-tool grants on an MCP connection. */
 export async function updateConnectorGrants(
   id: string,

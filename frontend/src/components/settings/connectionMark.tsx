@@ -116,6 +116,7 @@ export type ConnectionMarkInk = "self" | "fill" | "stroke"
  * trigger, so this surface reads those types and never edits or widens them.
  */
 export interface ConnectionMarkShape {
+  service_id?: string | null
   capability?: string | null
   mcp_server_url?: string | null
   tool_name?: string | null
@@ -129,16 +130,6 @@ export interface ConnectionMarkEntry {
 }
 
 // ── The map. MODULE-PRIVATE, and that is load-bearing ────────────────────────────────
-//
-// Handing the map out would let a caller bypass the own-property guard below, and an
-// inherited key read that way is the `[Function Object]` React child that hard-crashed a
-// node face before 188.1-04 and was still the EIGHTH live sink at 200-04. Only the KEYS are
-// exported (`phaseGlyph.tsx:96`'s shape); a key list cannot be misused that way.
-//
-// ⚠ IT HOLDS THE THREE CAPABILITY ARMS AND NOTHING ELSE. `mcp` and `unknown` are separately
-// named constants ON PURPOSE: `capability` is server data, so if `mcp` were a key of this
-// map, a row carrying `capability: "mcp"` and no server URL would wear MCP's mark. Keeping
-// it out makes that spoof structurally impossible rather than merely unlikely.
 const MARKS: Record<string, ConnectionMarkEntry> = {
   send_email: { key: "send_email", Mark: Mail, ink: "stroke" },
   create_ticket: { key: "create_ticket", Mark: JiraIcon, ink: "self" },
@@ -151,42 +142,36 @@ const MCP_MARK: ConnectionMarkEntry = { key: "mcp", Mark: McpIcon, ink: "fill" }
 /** The NAMED neutral — never nothing, and never another service's mark (D-206.1-10). */
 const NEUTRAL_MARK: ConnectionMarkEntry = { key: "unknown", Mark: Plug, ink: "stroke" }
 
+/** Known service identity marks. */
+const SERVICE_MARKS: Record<string, ConnectionMarkEntry> = {
+  slack: { key: "slack", Mark: SlackIcon, ink: "self" },
+  jira: { key: "jira", Mark: JiraIcon, ink: "self" },
+  smtp: { key: "smtp", Mark: Mail, ink: "stroke" },
+  mcp: MCP_MARK,
+  custom_mcp: MCP_MARK,
+}
+
 /**
  * The CAPABILITY keys this map covers. The keys only — never the map itself.
- *
- * `mcp` and `unknown` are absent by construction (see the map's comment): they are not
- * capabilities, and a caller must not be able to reach them through a capability string.
  */
 export const CONNECTION_MARK_KEYS: readonly string[] = Object.keys(MARKS)
 
 /**
- * Resolve a connection's mark. TOTAL over any input — it always returns an entry and NEVER
- * null.
- *
- * ⚠ WHY NOT `null`, WHEN `phaseGlyph()` RETURNS `null`: a null return puts the fallback
- * decision at the CALL SITE, where SC#3(e)'s *"the fallback is not blank"* cannot be
- * asserted on this module at all — and where the shipped call site rendered a bare `•`,
- * which is the blank mark D-206.1-10 forbids wearing a disguise. The miss arm therefore
- * copies `components/panel/phaseStatusMeta.ts:207-210`'s NAMED default instead.
- *
- * ⚠ AND NEVER A COALESCED BRACKET READ. `MARKS` is a plain object literal, so it INHERITS
- * `constructor`, `toString`, `__proto__` and friends. Reading an inherited key with a
- * nullish-coalescing fallback hands back the `Object` FUNCTION — never nullish, so the
- * fallback never fires — and React refuses a function as a child, rendering NOTHING AT ALL
- * rather than a wrong icon. `capability` arrives raw off the wire; totality is a property of
- * the lookup rather than of its current callers (`lib/phaseState.ts:65-75`, the house
- * argument). The `hasOwnProperty.call` spelling below is written inline on purpose:
- * `components/workflows/ownProperty.ts:35-44` states in writing that these guards stay
- * inline, and it is the only spelling shipped anywhere in `frontend/src`.
- *
- * ── ARM ORDER, STATED AND ENFORCED ──
- *  1. MCP, by `mcp_server_url` or `tool_name` being a non-empty string. It is FIRST
- *     because MCP is a SHAPE, not a capability. ⚠ It is never resolved by
- *     `capability === null` and never by falling off the end of a ladder.
- *  2. the three capability arms, each by its own key, through the own-property guard.
- *  3. the NAMED neutral.
+ * Resolve a connection's mark. TOTAL over any input — it always returns an entry and NEVER null.
  */
 export function connectionMark(shape: ConnectionMarkShape | null | undefined): ConnectionMarkEntry {
+  const serviceId = shape?.service_id
+  if (typeof serviceId === "string" && serviceId.trim().length > 0) {
+    const key = serviceId.trim().toLowerCase()
+    if (Object.prototype.hasOwnProperty.call(SERVICE_MARKS, key)) {
+      return SERVICE_MARKS[key]
+    }
+    // If unknown service_id has an mcp_server_url or tool_name, resolve MCP mark
+    if (shape?.mcp_server_url || shape?.tool_name) {
+      return MCP_MARK
+    }
+  }
+
   const url = shape?.mcp_server_url
   if (typeof url === "string" && url.trim().length > 0) return MCP_MARK
 
@@ -194,9 +179,11 @@ export function connectionMark(shape: ConnectionMarkShape | null | undefined): C
   if (typeof tool === "string" && tool.trim().length > 0) return MCP_MARK
 
   const capability = shape?.capability
-  if (typeof capability !== "string") return NEUTRAL_MARK
-  if (!Object.prototype.hasOwnProperty.call(MARKS, capability)) return NEUTRAL_MARK
-  return MARKS[capability]
+  if (typeof capability === "string" && Object.prototype.hasOwnProperty.call(MARKS, capability)) {
+    return MARKS[capability]
+  }
+
+  return NEUTRAL_MARK
 }
 
 /** Size tokens. The ONLY thing the consuming call sites differ by. */
