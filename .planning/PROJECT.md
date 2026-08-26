@@ -8,12 +8,34 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Active Milestone: v3.8 Document Intelligence, Automations & Connectors
+## Current State
 
-**Opened:** 2026-08-24 (Phases 201–206)
-**Goal:** Elevate document ingestion to first-class structured table and email parsing, deliver unattended recurring workflow execution with strict spend caps, provide stateful multi-run memory, and wire governed outbound action connectors.
+**No active milestone.** v3.8 shipped 2026-08-26; the next one is unscoped.
 
-## Last Shipped: v3.7 Workflow Product Completion
+**Next up — Connections & Open Platform.** Scope it against, in this order:
+`SEED-202` (what a workflow should be able to do) → `SEED-204` (the THREE paths in — authenticate/OAuth,
+or MCP, or a plain API) → `SEED-205` (the journey: pick a SERVICE, authenticate, see its tools, grant
+each one, then use it by name in chat and as a specific step) → `SEED-207` (retire the three fixed verbs
+as the organising axis — a PREREQUISITE for 205 and 208) → `SEED-208` (the describe door hands the
+generator its connections as vocabulary) → `SEED-206` (the service mark on every step surface).
+
+⚠ **Its first question is a PRODUCT and BUSINESS decision, not an engineering one:** getting to a
+working Slack connection is **2 steps on Claude.ai and ≥8 self-hosted on n8n — the same protocol**.
+The only difference is **who registered the OAuth application**. *"Exactly like Claude.ai"* means we
+become the OAuth app owner for every service we ship. That decision sizes the whole milestone and is
+**not yet made** (`.planning/research/connections-competitor-study.md` §Q4).
+
+⚠ **And a migration is owed before path 1 or path 3 can store a single row:** mig 126 leaves
+`CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)`, so an OAuth-authenticated service —
+which has neither — is **refused by the database**.
+
+## Last Shipped: v3.8 Document Intelligence, Automations & Connectors
+
+**Shipped:** 2026-08-26 (12 phases [201, 202, 203, 204, 204.1, 205, 206, 206.1, 206.2, 206.3, 207, 208, 209], 17 plans, migrations 124-126, **11/11 requirements delivered**, git tag `v3.8`).
+**Goal:** Structured tables and email became first-class ingestion; workflows run unattended with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**.
+⚠ **Closed `gaps_closed_partial`, not `passed`** — three requirements are narrower than their wording (`{{prior_run.*}}` misses `llm_emit`; email thread dedup is stored and read by nothing; TAB-02 covers new ingests only). Carried with re-open triggers: `milestones/v3.8-MILESTONE-AUDIT.md`.
+
+## Previously Shipped: v3.7 Workflow Product Completion
 
 **Shipped:** 2026-08-24 (17 phases [192, 192.1, 192.2, 193, 193.1, 193.2, 194, 194.1, 195, 196, 197, 198, 199, 200, 200.1, 200.2, 200.3], 147 plans, 20/20 requirements satisfied).
 **Goal:** Made the workflow product built across v2.8→v3.6 usable end to end — find it, understand the door, build it with the right vocabulary, stop it, test run it, and see what it produced.
