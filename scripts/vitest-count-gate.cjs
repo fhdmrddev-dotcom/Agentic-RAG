@@ -2704,6 +2704,59 @@ const BASELINE = {
   //     unless this file is pinned.
   "McpToolPicker.test.tsx": 29,
   "McpToolPicker.reachability.test.tsx": 11,
+  // ── 211-05 Task 1(c) · the phase's TWO new suites, pinned in the commit that creates
+  //    them. TARGETS decides what RUNS, BASELINE decides what is PINNED, and a file can sit
+  //    outside BOTH by default. An unpinned file is not lightly guarded — it is UNGUARDED.
+  //
+  // ⚠ THEY NEEDED DIFFERENT KNOBS, AND WHICH ONE WAS **MEASURED, NOT ASSUMED**. The gate was
+  // run from the repo root with both files on disk and green, BEFORE either line below was
+  // written, and its own `actual` column was read:
+  //
+  //     connectionCardReachability.test.tsx           —      10     new
+  //     (connectionVerbFence.test.ts: ABSENT from the printed list entirely)
+  //     total 5808  ·  failed 0  ·  pinned total 5180
+  //   count gate OK — 114/114 pinned files present, no per-file decrease, 0 failing.
+  //
+  //   · `connectionCardReachability.test.tsx` lives under `src/components/workflows`, which is
+  //     already a DIRECTORY entry in TARGETS, so it RAN the moment it existed. **NO `TARGETS`
+  //     EDIT ACCOMPANIES IT** — the 189-14 block above refuses a redundant file-level entry
+  //     beside a directory that already covers it, because it would state a dependency that is
+  //     not real. Only the pin was missing.
+  //   · `connectionVerbFence.test.ts` lives under `src/components/settings`, whose three
+  //     existing entries are FILE-LEVEL, so a FOURTH file there is reached by none of them. It
+  //     therefore takes BOTH knobs, and its TARGETS line lands in this same commit. A
+  //     falsification that does not run has falsified nothing (verification truth 14).
+  //
+  // Both numbers are read from THIS SCRIPT'S OWN `actual` column across two agreeing runs —
+  // never a hand count of `it(` literals, which is unsound under the two `it.each` blocks the
+  // fence suite uses for its MUST-FIRE / MUST-NOT-FIRE controls.
+  //
+  // ⚠ ADDITIONS ONLY — NOT ONE EXISTING PIN IS RAISED OR LOWERED BY THIS PHASE. Raising a pin
+  // necessarily deletes a line, which is the thing that makes a `-0` deletion check wrong; and
+  // a LOWERING is permitted only when the deleted cases are named in a summary, which this
+  // phase has no occasion for (211-03 and 211-04 already re-baselined their own files).
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THEM:
+  //
+  //   · `connectionVerbFence.test.ts` (21) — SC#3 IN ITS ENTIRETY. It is a pure ABSENCE fence
+  //     over BOTH surface trees, and an absence assertion is the easiest kind to delete
+  //     unnoticed. Eleven of its cases are the matcher's own falsification (five MUST-FIRE
+  //     shapes of the deleted chooser, six MUST-NOT-FIRE shapes of prose this tree
+  //     legitimately ships), three are non-vacuity floors, and one asserts the single
+  //     exemption is LOAD-BEARING. Three plants were applied to real production source —
+  //     a category chip in `connectionsCopy.ts`, a `role="radio"` segment in
+  //     `ExternalActionSection.tsx`, a native `<option>` in `ConnectionFormPanel.tsx` — each
+  //     observed RED naming `file:line`, and each file restored md5-identical.
+  //
+  //   · `connectionCardReachability.test.tsx` (10) — ⭐ THE RENDER HALF OF THE SEAM, which no
+  //     backend test can see. Its case 1 (a legacy row with an EMPTY action list still
+  //     rendering its card, its in-words empty state and a pressable Refresh) is the closed
+  //     loop revision iteration 1 of this phase caught, and it was observed RED against the
+  //     pre-211-04 gate planted back into `McpToolPicker.tsx` — 4 of 10 failing, with case 3
+  //     (MCP + empty) correctly still passing, which is what makes the RED discriminating
+  //     rather than blanket. Restored md5-identical.
+  "connectionVerbFence.test.ts": 21,
+  "connectionCardReachability.test.tsx": 10,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3338,6 +3391,29 @@ const TARGETS = [
   // unnoticed, and three of them guard properties that exist NOWHERE else in the tree: the
   // ink contract, the wordmark refusal, and the MCP arm's own-condition rule.
   "src/components/settings/__tests__/connectionMark.test.tsx",
+  // ── Added in 211-05 (Task 1(c), SC#3) — the FOURTH entry on `src/components/settings/`,
+  //    for the identical reason the three above give: every one of them is FILE-LEVEL, so a
+  //    fourth file in that directory is reached by none of them.
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN rather than assumed. The gate was run from the repo
+  // root with the suite already on disk and green (21 passing), and its printed file list did
+  // NOT contain `connectionVerbFence.test.ts` at all — while its sibling
+  // `connectionCardReachability.test.tsx` DID appear, as `— 10 new`, because that one sits
+  // under the `src/components/workflows` DIRECTORY entry above and so ran the moment it
+  // existed. That contrast is the measurement: same phase, same commit, two new files, and
+  // only ONE of them needed this knob. A falsification that does not run has falsified
+  // nothing (verification truth 14).
+  //
+  // ⚠ THE TIMING IS NOT COSMETIC: an entry pointing at a path that does not yet exist makes
+  // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
+  // the file — never before, never after.
+  //
+  // What would be unguarded without it: the whole of SC#3 — *"browsing, filtering and picking
+  // never offer Message / Ticket / Email as a category"*. The suite is a SOURCE fence over
+  // BOTH `src/components/settings/**` and `src/components/workflows/**`, so it is the only
+  // artifact in the tree that proves that absence anywhere other than on a surface some test
+  // happened to mount.
+  "src/components/settings/__tests__/connectionVerbFence.test.ts",
   // ── Added in 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ──────────────
   // The EIGHTH occurrence of the two-knob trap, and the first one that lands on the very
   // file the phase exists to rewrite. Stated as the rule rather than as an incident, for a
