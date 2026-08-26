@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-26T00:00:00.000Z"
-last_activity: 2026-08-26
+last_updated: "2026-08-26T17:02:47.310Z"
+last_activity: 2026-08-26 -- Phase 211 execution started
 progress:
-  total_phases: 7
+  total_phases: 14
   completed_phases: 1
-  total_plans: 3
+  total_plans: 8
   completed_plans: 3
-  percent: 14
+  percent: 7
 ---
 
 # Project State
@@ -32,15 +32,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** **Milestone v3.9 — Connections: Any Service, Any Tool.** Started 2026-08-26 via
+**Current focus:** Phase 211 — the-connection-is-a-service-not-a-verb
 `/gsd:new-milestone`. Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 210 — Ground Truth — Operability & Failure Honesty (completed)
-Plan: 210-01, 210-02, 210-03 (3/3 complete)
-Status: Phase 210 review round 1 fixes committed (V-1, V-2, V-3 resolved at HEAD 705a7412) — all gates green (tsc 34, count gate 5798, backend unit rot set at 68 baseline), BUS-009 opened to reviewer
-Last activity: 2026-08-26 — Phase 210 review fixes complete (V-1/V-2/V-3 resolved, clean citations channel, dedicated retrieval_error propagation)
+Phase: 211 (the-connection-is-a-service-not-a-verb) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 211
+Last activity: 2026-08-26 -- Phase 211 execution started
 
 ---
 
@@ -133,16 +133,20 @@ problems — no ACL mirroring, no deletion propagation, no sync loop.
 - ✅ **MCP-first is already HALF-BUILT.** `backend/app/services/mcp_client.py` (367 L) and Phase
   206.2's per-tool grants both ship at HEAD. **`CONNECTIONS-MILESTONE-CANDIDATE.md`'s claim that
   "no MCP client exists in the backend today" is STALE** — do not plan against it.
+
 - ⚠ **OAuth genuinely is zero.** Exactly ONE occurrence of the string in all of `backend/app`, and
   it is a comment in `models/connector.py` stating there is no authorization-code flow, no redirect
   URI, no callback, no refresh token and no consent surface.
+
 - ⚠ **A migration is owed before OAuth can store one row.** Migration 126 leaves
   `CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)`; an OAuth service has neither and
   is refused by the database.
+
 - ⚠ **The three fixed verbs must NOT be deleted.** `send_email` / `create_ticket` / `post_message`
   are the only external path that works with **no MCP server** (`phase_types.py:2311-2322` — two
   shapes reach the executor, each closed by a different set). They become an ATTRIBUTE, never the
   organising axis.
+
 - **Reference designs are `screenshots/` and they are Claude.ai** — verified 2026-08-26 by reading
   the images. (An earlier conversation attributed them to "Plot AI"; that is wrong.) The sixth file
   is a `.webp` whose hex filename decodes to
@@ -159,23 +163,31 @@ Full evidence: `.planning/milestones/v3.8-MILESTONE-AUDIT.md` (`status: gaps_clo
    typed deliverable; email thread dedup is **parsed at four sites, stored at three, read by none**;
    `TAB-02` covers **newly ingested** documents only (`backfill_document_table_chunks()` has zero
    production callers).
+
 2. ⛔ **Seven of twelve v3.8 phases had no `VERIFICATION.md`** and `REQUIREMENTS.md` was stale from
    day one. Both repaired at the close audit. **This is the SECOND consecutive milestone to close
    this way** — v3.6's own retrospective reads *"the paperwork was the problem, never the code."*
+
 3. ⚠ **Phase 209 is gated behind `visual_workflow_canvas`, whose cold default is `off`.** Its 16/16
    browser drive ran against a flag-flipped database. **A launch decision is owed.**
+
 4. ⚠ **209's node face is absent from the RUN surface** (`SEED-206`) and **209's final fix was
    authored by the reviewer** — self-assessed, no independent review, **owed**.
+
 5. ⚠ **207 and 208 ran with no GSD ceremony and no independent verification** (audited under
    *Guardrail overrides*). **`D-207-06` has no guard**: a symbol exported from a `lib/api` module
    but forgotten in the barrel typechecks perfectly and is invisible to every consumer.
+
 6. ⚠ **Blocking DNS inside an async handler** at `mcp_client.py:220` — violates D-v2.5-01 while the
    sibling capability path IS threadpooled. **Directly in this milestone's blast radius.**
+
 7. ⚠ **`SEED-203`**: the publish judge passed a golden run whose deliverable REFUSES the work, at
    score 100.
+
 8. ⚠ **`outputSchema` is still discarded by the MCP sanitizer** — the competitor study's *"single
    cheapest actionable finding"*. `annotations` was recovered in 209; its sibling was left
    deliberately, as it was outside that phase's ruling.
+
 9. ⚠ **Two ingestion bugs closed on LOCAL-only evidence** await cloud verification.
 
 ## Deferred Items
@@ -256,6 +268,7 @@ file, not the brief.
 
 - **CAT-04 (starter prompts) is in 216, not in the catalog phase.** A starter prompt is only honest
   once the agent can act on it; chips shipped before the chat surface are suggestions that fail.
+
 - **RAG-09 rides in 210 rather than owning a phase.** It is deliberately not connector work — it is
   folded because an embedding failure reported as *"your documents returned nothing"* poisons the
   trustworthiness of every deliverable this milestone produces.
