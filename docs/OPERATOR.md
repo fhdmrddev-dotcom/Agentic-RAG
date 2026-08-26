@@ -116,6 +116,15 @@ Then edit `./.env` and fill in:
   `app_settings.supabase_management_token` (Step 3 below), where `SECRETS_ENCRYPTION_KEY` encrypts
   it at rest. On **self-hosted** GoTrue set `SUPABASE_SELF_HOSTED=true` — it authenticates with
   `SUPABASE_SERVICE_ROLE_KEY`, so no management token is needed.
+- **Scheduled workflow runs — optional (Phase 204, SCHED-01)** — `SCHEDULER_PROCESS_ENABLED`
+  ships **`false`**. Set it to `true` only when you want published workflows to run on a cron
+  or interval **with nobody watching**. It is safe at any `WORKER_COUNT`: every worker polls,
+  and a due schedule still fires exactly once, because the claim is a database transaction
+  (`FOR UPDATE SKIP LOCKED` plus the `next_run_at` advance inside it) rather than an
+  in-process lock. `SCHEDULER_POLL_INTERVAL_SECONDS` (default `60`) is the tick;
+  `SCHEDULER_MAX_CLAIMS_PER_TICK` (default `10`) is backpressure — it stops a box that was
+  offline over a weekend from launching every overdue schedule at once. Each schedule carries
+  its own per-run token and duration ceilings, set in the app when the schedule is created.
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick
@@ -187,8 +196,15 @@ SQL editor, in order:
    set `SUPABASE_PROJECT_REF` in `./.env` (see Step 2). On **self-hosted** GoTrue
    (`SUPABASE_SELF_HOSTED=true`) skip this entirely — the `service_role` key is used instead.
 
-> Migrations currently run to 102 (migration 102 adds the `app_settings.setup_complete` flag
-> for the Phase-158 install wizard — schema, not a seed, so it is not in the table above).
+> Migrations currently run to **124** (⚠ this line read `102` until 2026-08-24 and had been
+> stale for twenty-two migrations — re-derive it with `ls supabase/migrations | tail -1` rather
+> than trusting it). The newest, migration **124** (Phase 204, SCHED-01), creates the
+> `workflow_schedules` table with owner-scoped RLS — **schema, not a seed**, so like 102 it is
+> deliberately absent from the table above and needs no separate paste on a fresh box:
+> `full-schema.sql` already carries it. ⚠ Its FILENAME is deliberately not spelled here:
+> `scripts/check-deploy-drift.sh` greps this WHOLE document for `NNN_name.sql`, not just the
+> Step-3 table, so any prose mention is counted as a listed seed — which both inflates the
+> reported seed count and raises the ceiling that suppresses its own seed-bearing warning.
 > `full-schema.sql` is regenerated per migration commit, so it should already carry the schema
 > through the latest — the seed-row gap above is separate from schema currency. Background:
 > [`../supabase/SETUP.md`](../supabase/SETUP.md). **Cloud-parity pending:** migrations 099–102

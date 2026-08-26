@@ -114,6 +114,14 @@ vi.mock("@/lib/api", () => {
     }
   }
   return {
+    // 204-03 (SCHED-01) — the measured mock budget (see `WorkflowsPage.test.tsx`'s copy of
+    // this note): a whole-module factory missing a new RUNTIME export throws AT MOUNT.
+    listSchedules: () => Promise.resolve([]),
+    listWorkflowSchedules: () => Promise.resolve([]),
+    createWorkflowSchedule: () => Promise.resolve({}),
+    updateSchedule: () => Promise.resolve({}),
+    deleteSchedule: () => Promise.resolve(undefined),
+    triggerSchedule: () => Promise.resolve({ launched: false }),
     generateWorkflow: mockGenerate,
     createWorkflowDraft: mockCreate,
     updateWorkflowDraft: mockUpdate,
@@ -124,6 +132,13 @@ vi.mock("@/lib/api", () => {
     // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
     // absence — every external face renders its destination-free sentence.
     listConnectorConnections: () => Promise.resolve([]),
+    // ⚠ 206.2-04 — THE MOCK BUDGET, SPENT IN THE SAME COMMIT AS THE IMPORT THAT MAKES
+    // IT LIVE. This factory passes today only because the list above resolves `[]`, so
+    // `McpToolPicker` never mounts and its two api functions are never reached. DO NOT
+    // RELY ON A MOUNT NEVER HAPPENING: 196-08 measured 249 red tests from one added
+    // export, because an inert factory fails at MOUNT and does so loudly.
+    discoverConnectorTools: () => Promise.resolve([]),
+    updateConnectorGrants: () => Promise.resolve({}),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
     // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page

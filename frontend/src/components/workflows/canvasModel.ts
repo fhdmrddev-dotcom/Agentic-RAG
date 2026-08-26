@@ -42,6 +42,7 @@ import type { Edge, Node } from "@xyflow/react"
 // committed snapshot depend on view state. `connectionState.ts` is a true leaf anyway,
 // but the type-only form is what makes the independence structural.
 import type { ConnectionState } from "@/components/workflows/connectionState"
+import { effectBannerFor } from "@/components/workflows/nodeEffectBanner"
 import {
   actionRiskArmed,
   branchConditionOf,
@@ -215,6 +216,16 @@ export interface PhaseNodeData {
    * definition the projection already holds.
    */
   condition?: string
+  /** Phase 200 / Phase 209 (Item 2 · D-209-03) — the effect banner string, resolved once. */
+  effectBanner?: string | null
+  /** Phase 209 (Item 1 · D-209-01) — the tool name on MCP steps. */
+  toolName?: string
+  /** The external capability on capability steps. */
+  capability?: string
+  /** The MCP server URL if configured. */
+  mcpServerUrl?: string
+  /** The connection id if bound. */
+  connectionId?: string
   [k: string]: unknown
 }
 
@@ -402,8 +413,16 @@ function checkpointOnTarget(phase: PhaseSpecJSON): boolean | undefined {
 /**
  * Resolve every face value a phase card needs, once.
  *
- * `nameContext` reaches `nodeTitle` and NOTHING else (Phase 187 / D-187-05). The
- * technical form is deliberately left on one argument: it is the `label · slug` pair,
+ * ⚠ CORRECTED AT PHASE 209, and the original is quoted rather than silently rewritten:
+ * this docblock said *"`nameContext` reaches `nodeTitle` and NOTHING else (Phase 187 /
+ * D-187-05)"*. That was true when written and is now FALSE in two further places, both
+ * added this phase — `mcpServerUrls` feeds the MARK and `toolReadOnly` feeds the EFFECT
+ * BANNER. The rule it was really asserting still holds and is worth restating properly:
+ * **`nameContext` is a read-only LOOKUP of facts that live on other rows, never a second
+ * source of phase state.** Every member is `connection id →` something the server owns, and
+ * nothing in it is ever written back into a definition.
+ *
+ * The technical form is deliberately left on one argument: it is the `label · slug` pair,
  * and a derived face behind the ⌥ reveal would hide the slug the reveal exists to show.
  */
 function buildPhaseData(
@@ -430,6 +449,59 @@ function buildPhaseData(
   // `data` object byte-identical to what it produced before this plan — which is what
   // keeps the committed projection snapshot unmoved for every fixture but the branching one.
   const condition = branchConditionOf(phase, resolveName)
+  // Phase 209 (Item 2 · SC#2) — the read/write banner resolves from the SERVER'S OWN
+  // `annotations.readOnlyHint`, looked up by (connection, tool) through `nameContext`.
+  //
+  // ⚠ WHY NOT `phase.config` ALONE, which is what this line used to pass:
+  // `ExternalActionPhaseConfig` declares `connection_id` + `tool_name` and NOTHING ELSE, so
+  // `config.readOnlyHint` is structurally always `undefined` and the `ONLY READS` arm was
+  // dead code one layer down from where it looked wired. The hint belongs to the TOOL on the
+  // connection, not to the step.
+  //
+  // ⚠ FAILS CLOSED. A missing map, a missing connection, a missing tool, or a server that
+  // sent no hint all leave `resolvedReadOnly` undefined, and `effectBannerFor` then returns
+  // `CHANGES SOMETHING OUTSIDE`. The MCP specification says an unannotated tool is to be
+  // treated as DESTRUCTIVE — so silence must never render as the quiet banner.
+  const rawBannerToolName = phase.config?.tool_name
+  const rawBannerConnId = phase.config?.connection_id
+  const resolvedReadOnly =
+    typeof rawBannerConnId === "string" && typeof rawBannerToolName === "string"
+      ? nameContext.toolReadOnly?.[rawBannerConnId.trim()]?.[rawBannerToolName.trim()]
+      : undefined
+  // Spread CONDITIONALLY: with no hint the object handed to `effectBannerFor` is the phase
+  // config itself, byte-identical to the shipped call, so every non-MCP fixture projects
+  // exactly as before.
+  const effectBanner = effectBannerFor(
+    phaseType,
+    resolvedReadOnly === undefined
+      ? phase.config
+      : { ...phase.config, readOnlyHint: resolvedReadOnly },
+  )
+  const rawToolName = phase.config?.tool_name
+  const toolName =
+    typeof rawToolName === "string" && rawToolName.trim().length > 0
+      ? rawToolName.trim()
+      : undefined
+  const rawConnId = phase.config?.connection_id
+  const connectionId =
+    typeof rawConnId === "string" && rawConnId.trim().length > 0 ? rawConnId.trim() : undefined
+  // Phase 209 (Item 1 fix) — `mcp_server_url` lives on the CONNECTION, not on the phase config.
+  // `ExternalActionPhaseConfig` carries only `connection_id` + `tool_name`; reading
+  // `phase.config?.mcp_server_url` always yields `undefined` and the MCP mark never renders.
+  // Resolved here via the injected `nameContext.mcpServerUrls` map (parallel to `connectionNames`),
+  // which maps connection id → mcp_server_url | null. A missing key (map not yet fetched) yields
+  // `undefined`, which is the same as the pre-Phase-209 state (no mark). A stored `null` means
+  // the connection explicitly has no mcp_server_url (capability-type connection).
+  const mcpServerUrl =
+    connectionId !== undefined
+      ? (nameContext.mcpServerUrls?.[connectionId] ?? undefined)
+      : undefined
+  // Coerce null (known non-MCP) to undefined so it is not spread into node data.
+  const resolvedMcpUrl = typeof mcpServerUrl === "string" ? mcpServerUrl : undefined
+  const rawCap = phase.config?.capability
+  const capability =
+    typeof rawCap === "string" && rawCap.trim().length > 0 ? rawCap.trim() : undefined
+
   return {
     slug: phase.slug,
     phaseIndex: phase.phase_index,
@@ -455,6 +527,11 @@ function buildPhaseData(
     waitsForYou: waitsForYou(phase),
     notConnected: isNotConnected(phase),
     ...(condition === null ? {} : { condition }),
+    ...(effectBanner === null ? {} : { effectBanner }),
+    ...(toolName === undefined ? {} : { toolName }),
+    ...(capability === undefined ? {} : { capability }),
+    ...(resolvedMcpUrl === undefined ? {} : { mcpServerUrl: resolvedMcpUrl }),
+    ...(connectionId === undefined ? {} : { connectionId }),
   }
 }
 

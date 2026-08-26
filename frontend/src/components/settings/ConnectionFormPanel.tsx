@@ -127,8 +127,15 @@ import {
   FIELD_SMTP_PORT_PLACEHOLDER,
   FIELD_SMTP_SECRET_LABEL,
   FOOTER_GLYPH,
+  FIELD_MCP_SECRET_LABEL,
+  FIELD_MCP_SECRET_OPTIONAL_NOTE,
+  FIELD_MCP_URL_HELP,
+  FIELD_MCP_URL_LABEL,
+  FIELD_MCP_URL_PLACEHOLDER,
+  FIELD_SECRET_LABEL_NEUTRAL,
   FOOTER_PREFIX,
   FOOTER_SERVER_NOTE,
+  MCP_SAVE_DISABLED_REASON,
   ORG_SHARED_FALLBACK_NAME,
   PANEL_CANCEL,
   PANEL_CLOSE_LABEL,
@@ -158,10 +165,12 @@ import {
   configFromDraft,
   destinationFooterOf,
   draftFromConnection,
+  mcpHostOf,
   orgSharedLine,
   panelRegionLabelEdit,
   secretStoredLabel,
   type ConnectionDraft,
+  type ConnectionShape,
 } from "@/components/settings/connectionFormCopy"
 import {
   CONNECTIONS_ACTION_CHECK,
@@ -680,9 +689,31 @@ export function ConnectionFormPanel({
     setSaving(true)
     setSaveRefusal(null)
     try {
-      if (mode === "create") {
+      if (mode === "create" && draft.capability === "mcp") {
+        // ══ 206.1 · THE MCP CREATE BODY (D-206.1-04) ══════════════════════════════════════
+        // ⚠ ITS KEY SET IS THE CONTRACT, and it is a DIFFERENT key set from a capability
+        // connection's — not a superset of it. Measured at the model:
+        // `_validate_connection_shape` branches on `mcp_server_url` FIRST and RETURNS before
+        // the capability arm, so a `capability` sent alongside a URL is at best ignored and at
+        // worst refused (`"mcp"` is not a member of the server's closed `ConnectorCapability`).
+        // `McpConfig` is `extra="forbid"` with exactly one field, so a `SendEmailConfig`-shaped
+        // config here is a 422 no client-side type can see.
+        // ⚠ `capability` is OMITTED ENTIRELY, never sent as null — present-and-null is not the
+        // same thing as absent, and only absence is what the branch above reads.
+        const body: ConnectorConnectionCreate = {
+          name: draft.name.trim(),
+          mcp_server_url: draft.mcpServerUrl.trim(),
+          config: configFromDraft(draft),
+        }
+        // ⚠ AN EMPTY CREDENTIAL IS OMITTED, NOT SENT AS "" — the server's `NonEmpty` rejects an
+        // empty string as a PRESENT value, and D-206.1-06 makes the credential optional for
+        // this shape. Sending it would also be a pointless plaintext round trip for a value
+        // that is not there. The `:698` edit-branch omit idiom, reused.
+        if (draft.secret.trim() !== "") body.secret = draft.secret
+        await onCreate?.(body)
+      } else if (mode === "create") {
         await onCreate?.({
-          capability: draft.capability,
+          capability: draft.capability as ConnectorCapability,
           name: draft.name.trim(),
           config: configFromDraft(draft),
           secret: draft.secret,
@@ -692,6 +723,12 @@ export function ConnectionFormPanel({
           name: draft.name.trim(),
           config: configFromDraft(draft),
         }
+        // ⚠ 206.1 — AN MCP ROW'S UPDATE CARRIES ITS URL, and the panel composing it correctly
+        // is the ONLY guard: `ConnectorConnectionUpdate` performs NO cross-field validation at
+        // all, so a body pairing an SMTP config with an MCP row is accepted at the model and
+        // discovered later, by somebody else. Before D-206.1-22's fix this branch composed a
+        // `SendEmailConfig` for every MCP row and 422'd into the generic save failure.
+        if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
         // A present `secret` is a REPLACE, never a merge — so it is sent ONLY when the
         // person actually typed a new one. Sending an empty string would replace a working
         // credential with nothing AND reset the verdict, in one silent UPDATE.
@@ -709,9 +746,40 @@ export function ConnectionFormPanel({
 
   if (!open) return null
 
-  const capability: ConnectorCapability = mode === "edit" && connection
-    ? connection.capability
-    : draft.capability
+  // ┌─ SUPERSEDED 2026-08-25 (206.1 / D-206.1-22) — KEPT VERBATIM, DO NOT RE-APPLY ──────────┐
+  // │ "`connection.capability` is optional since 206 (an MCP row has none). The draft's own   │
+  // │  value is the fallback, not a cast: this panel edits capability connections."           │
+  // └────────────────────────────────────────────────────────────────────────────────────────┘
+  // ⚠ THAT PARAGRAPH READS AS A DECISION AND IS IN FACT THE DEFECT. On first render the draft
+  // is still `EMPTY_DRAFT`, so the fallback resolved to `send_email` and an MCP row's panel
+  // opened as the SMTP form — the kind, the host/port fields, the `App password` label and a
+  // Save that composed a `SendEmailConfig` and 422'd into "Couldn’t save that — try again."
+  //
+  // THE CORRECTED RULE: the shape is read from the ROW, and never from a missing capability.
+  // `connection.mcp_server_url != null` is a POSITIVE fact about the row; `capability === null`
+  // is an ABSENCE, and absence read as a shape is the same mistake pointed the other way
+  // (D-206.1-11). It also removes the dependency on draft-seeding ORDER, which is what made
+  // the old expression flash the wrong form before the seeding effect ran.
+  const capability: ConnectionShape =
+    mode === "edit" && connection
+      ? connection.mcp_server_url
+        ? "mcp"
+        : (connection.capability ?? draft.capability)
+      : draft.capability
+
+  /**
+   * The capability the CHECK copy is about — `null` when there is none.
+   *
+   * ⚠ 206.1 / D-206.1-19: the credential-check path is CAPABILITY-SHAPED (an SMTP login, a
+   * Jira auth, a Slack `auth.test`) and has NO MCP arm, so `CHECK_NEGATION_BY_CAPABILITY` is
+   * total over exactly three members and an MCP row has no verdict for it to describe. This
+   * narrowing is the render-side statement of that fact: the §5c success block is gated on it
+   * rather than handed a shape its vocabulary does not cover.
+   *
+   * For the three capabilities this is always truthy, so every reachable state today is
+   * BYTE-IDENTICAL to what shipped.
+   */
+  const checkCapability: ConnectorCapability | null = capability === "mcp" ? null : capability
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.
@@ -723,19 +791,60 @@ export function ConnectionFormPanel({
    * Slack has no typed host by construction (D-02: its endpoint is a constant in our source),
    * so it degrades to the destination the footer already renders rather than to a blank.
    */
+  // ⚠ 206.1 — EVERY ARM NAMES ITS OWN CONDITION AND THE TAIL IS NEUTRAL. Until this plan the
+  //   trailing expression WAS the SMTP arm and the fallback at once, so an MCP draft reported
+  //   `draft.host` — a value it never typed, read off a config field an MCP row does not have.
   const typedHost =
     capability === "post_message"
       ? footer.destination
       : capability === "create_ticket"
         ? draft.baseUrl.trim()
-        : draft.host.trim()
+        : capability === "send_email"
+          ? draft.host.trim()
+          : capability === "mcp"
+            ? mcpHostOf(draft.mcpServerUrl)
+            : // NEUTRAL: degrade to the destination the footer already renders — the same
+              // move Slack's arm makes — rather than to another shape's typed value.
+              footer.destination
 
+  // ⚠ 206.1 — same rewrite, same reason. The trailing arm was Slack's, so an MCP draft's
+  //   credential field was labelled `Bot token`.
   const secretLabel =
     capability === "send_email"
       ? FIELD_SMTP_SECRET_LABEL
       : capability === "create_ticket"
         ? FIELD_JIRA_SECRET_LABEL
-        : FIELD_SLACK_SECRET_LABEL
+        : capability === "post_message"
+          ? FIELD_SLACK_SECRET_LABEL
+          : capability === "mcp"
+            ? FIELD_MCP_SECRET_LABEL
+            : FIELD_SECRET_LABEL_NEUTRAL
+
+  /**
+   * ⚠ THE PANEL'S HTTPS CHECK IS A COURTESY, NEVER THE SECURITY BOUNDARY (D-206.1-05).
+   *
+   * The wall is the server, twice over: `ConnectorConnectionCreate._validate_connection_shape`
+   * raises on a non-HTTPS `mcp_server_url` before the row is written, and
+   * `validate_mcp_destination` refuses again AT CALL TIME — after the address resolves, every
+   * time a step sends. A browser cannot resolve anything, so this predicate can only recognise
+   * what is provable from the TEXT.
+   *
+   * It exists because a disabled Save is kinder than a 422, and for no other reason. Do not
+   * describe it as the gate, and do not let a future change here relax the server's.
+   */
+  const mcpUrlUnusable =
+    capability === "mcp" && !draft.mcpServerUrl.trim().toLowerCase().startsWith("https://")
+
+  /**
+   * ⚠ A SECOND, DISTINCT ID — NEVER `saveDisabledReasonId`.
+   *
+   * `ConnectionFormPanel.test.tsx`'s shipped cipher case resolves the Save button's
+   * `aria-describedby` with `container.querySelector`, which returns the FIRST match. Two
+   * simultaneously-rendered nodes carrying ONE id would still let that assertion find A node
+   * and read A sentence — just not the right one — so the failure would be SILENT. The button
+   * SELECTS between the two ids below rather than either node borrowing the other's.
+   */
+  const mcpSaveDisabledReasonId = `${fieldId}-mcp-save-disabled-reason`
 
   const title = mode === "create" ? PANEL_TITLE_CREATE : (connection?.name ?? "")
   const regionLabel =
@@ -858,7 +967,7 @@ export function ConnectionFormPanel({
               id={`${fieldId}-capability`}
               value={draft.capability}
               aria-describedby={`${fieldId}-capability-help`}
-              onChange={(e) => set({ capability: e.target.value as ConnectorCapability })}
+              onChange={(e) => set({ capability: e.target.value as ConnectionShape })}
               className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
             >
               {CAPABILITY_CHOICES.map((choice) => (
@@ -988,6 +1097,32 @@ export function ConnectionFormPanel({
           </>
         )}
 
+        {/* ── 206.1 · THE MCP SHAPE — ONE field, because the wire needs one fact. No headers
+               editor, no transport picker, no timeout, no "test connection": each is a
+               surface nobody threat-modelled (D-32 / T-190-17-SCOPE), and the `config` this
+               form composes is `{ headers: {} }` precisely so it offers to fill nothing. ── */}
+        {capability === "mcp" && (
+          <Field
+            label={FIELD_MCP_URL_LABEL}
+            help={FIELD_MCP_URL_HELP}
+            htmlFor={`${fieldId}-mcp-url`}
+          >
+            {/* FULL WIDTH — one input, one column. The `1fr 92px` grid above exists for
+                host+port; an MCP URL has no second part, and borrowing that shape would
+                leave a 92px hole beside the field. `font-mono` because this is a machine
+                value, like the Jira project key; the label and help above are prose. */}
+            <TextControl
+              id={`${fieldId}-mcp-url`}
+              value={draft.mcpServerUrl}
+              onChange={(mcpServerUrl) => set({ mcpServerUrl })}
+              placeholder={FIELD_MCP_URL_PLACEHOLDER}
+              describedBy={`${fieldId}-mcp-url-help`}
+              readOnly={readOnly}
+              className="font-mono"
+            />
+          </Field>
+        )}
+
         {capability === "post_message" && (
           <Field
             label={FIELD_SLACK_CHANNEL_LABEL}
@@ -1028,6 +1163,23 @@ export function ConnectionFormPanel({
               >
                 {SECRET_CREATE_HELP}
               </p>
+              {/* ── 206.1 / D-206.1-06 — the credential is OPTIONAL for the MCP shape, and
+                     ONLY for it. ⚠ It renders UNDER the encryption promise, never instead of
+                     it: that promise is told for every kind, including the kind that may not
+                     need a credential at all. ⚠ And it carries the ordinary muted treatment,
+                     never a destructive one — many MCP servers ask for no credential, and a
+                     form that presented that as an error state would be telling a person
+                     their working configuration is broken. A capability connection still
+                     REQUIRES a secret (WR-05, enforced after the model's MCP branch returns),
+                     which is why this is scoped to the one shape. ── */}
+              {capability === "mcp" && (
+                <p
+                  data-testid="connection-secret-optional-note"
+                  className="mt-1 text-[11px] leading-snug text-muted-foreground"
+                >
+                  {FIELD_MCP_SECRET_OPTIONAL_NOTE}
+                </p>
+              )}
               {replacing && (
                 <>
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
@@ -1177,7 +1329,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 2 — the one green moment, and its second clause is load-bearing. ── */}
-        {check.kind === "done" && check.result.ok && (
+        {check.kind === "done" && check.result.ok && checkCapability && (
           <NoticeBlock
             tone="positive"
             glyph={CHECK_SUCCESS_GLYPH}
@@ -1190,7 +1342,7 @@ export function ConnectionFormPanel({
                 identity: check.result.identity,
                 host: check.result.host,
                 port: check.result.port,
-                capability,
+                capability: checkCapability,
               })}
             </NoticeLine>
             <NoticeLine>{CHECK_SUCCESS_FOOTER}</NoticeLine>
@@ -1366,7 +1518,15 @@ export function ConnectionFormPanel({
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
             {/* §5c's check. Its own footer sentence sits beside it while it runs, because
                 that is the moment a person wants to be told nothing is being sent. */}
+            {/* Audit B-1 — `!connection.mcp_server_url`. An MCP connection has NO capability,
+                so the server has no adapter to check it with and the route raised a bare
+                `KeyError` -> 500. `ConnectionsTab.tsx:698` hid this from the row menu with the
+                same rule; THIS file — the same control, one file over — never took the decision,
+                which is precisely the drift `ConnectionsTab.tsx:1203-1206` claims passing the
+                handler unconditionally would prevent. It did not. The route now refuses with a
+                worded 409 as well; this guard is so the control is never OFFERED. */}
             {onCheck &&
+              !connection.mcp_server_url &&
               (connection.is_enabled ? (
                 <button
                   type="button"
@@ -1456,6 +1616,21 @@ export function ConnectionFormPanel({
             non-admin (U-02) and while the kill-switch is off (D-26 / §9). The ONE exception
             is §4b moment 9, immediately below: there the control is meaningful and its
             refusal IS the message, so it is DISABLED with its reason in real DOM text. */}
+        {/* ── 206.1 / D-206.1-05 — WHY SAVE IS OFF, in real DOM text, DIRECTLY ABOVE the
+               button it is about. A reason a person has to hunt for is a reason they will not
+               read, and a `title` tooltip is FORBIDDEN on this surface (the suite asserts zero
+               `[title]` nodes in create AND edit): the reason is DOM text or it does not
+               exist. Its id is deliberately NOT `saveDisabledReasonId` — see that constant. ── */}
+        {mcpUrlUnusable && (
+          <p
+            id={mcpSaveDisabledReasonId}
+            data-testid="connection-mcp-save-disabled-reason"
+            className="mb-1 text-[11px] leading-snug text-destructive"
+          >
+            {MCP_SAVE_DISABLED_REASON}
+          </p>
+        )}
+
         <div className="mt-3 flex items-center justify-end gap-2">
           {saveRefusal?.kind === "generic" && (
             <span
@@ -1477,8 +1652,17 @@ export function ConnectionFormPanel({
           {showSave && (
             <button
               type="button"
-              disabled={saving || saveBlocked}
-              aria-describedby={saveBlocked ? saveDisabledReasonId : undefined}
+              disabled={saving || saveBlocked || mcpUrlUnusable}
+              // ⚠ SELECTS BETWEEN TWO DISTINCT IDS, never shares one. The cipher refusal wins
+              // when both hold: it is the one thing on this surface nothing the person types
+              // can fix, so it is the reason worth reading first.
+              aria-describedby={
+                saveBlocked
+                  ? saveDisabledReasonId
+                  : mcpUrlUnusable
+                    ? mcpSaveDisabledReasonId
+                    : undefined
+              }
               onClick={() => void handleSave()}
               data-testid="connection-form-save"
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"

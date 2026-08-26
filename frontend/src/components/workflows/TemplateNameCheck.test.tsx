@@ -20,7 +20,7 @@ import nameCheckSource from "./TemplateNameCheck?raw"
 import bucketsSource from "./templateNameBuckets?raw"
 // 199-08: the api client's own SOURCE. The sheet's §6 needs a name-availability answer, and
 // the strongest form of "we cannot express that" is that there is nothing anywhere to ask.
-import apiClientSource199 from "@/lib/api?raw"
+import { API_SOURCE as apiClientSource199 } from "@/lib/apiSource.testutil"
 
 import { TemplateNameCheck, NAME_CHECK_CAP } from "./TemplateNameCheck"
 import { classifyTemplateNames } from "./templateNameBuckets"

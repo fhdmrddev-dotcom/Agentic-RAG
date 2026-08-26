@@ -95,6 +95,14 @@ vi.mock("@/lib/api", () => {
     }
   }
   return {
+    // 204-03 (SCHED-01) — the measured mock budget (see `WorkflowsPage.test.tsx`'s copy of
+    // this note): a whole-module factory missing a new RUNTIME export throws AT MOUNT.
+    listSchedules: () => Promise.resolve([]),
+    listWorkflowSchedules: () => Promise.resolve([]),
+    createWorkflowSchedule: () => Promise.resolve({}),
+    updateSchedule: () => Promise.resolve({}),
+    deleteSchedule: () => Promise.resolve(undefined),
+    triggerSchedule: () => Promise.resolve({ launched: false }),
     generateWorkflow: mockGenerate,
     createWorkflowDraft: mockCreate,
     updateWorkflowDraft: mockUpdate,
@@ -105,6 +113,8 @@ vi.mock("@/lib/api", () => {
     // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
     // absence — every external face renders its destination-free sentence.
     listConnectorConnections: () => Promise.resolve([]),
+    discoverConnectorTools: () => Promise.resolve([]),
+    updateConnectorGrants: () => Promise.resolve({}),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
     // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
@@ -709,7 +719,7 @@ describe("Builder header — the canvas gate is defined ONCE (D-184.1-04)", () =
 
 import { UNBOUND_KB_INVITATION } from "./WorkflowBuilderPage"
 import phaseFormPanelSource from "@/components/workflows/PhaseFormPanel?raw"
-import apiSource from "@/lib/api?raw"
+import { API_SOURCE as apiSource } from "@/lib/apiSource.testutil"
 import nodePresentationSource from "@/components/workflows/nodePresentation?raw"
 
 const FOLDER_ID = "75755ec9-5ba7-495b-ad93-7500011cf6f2"
@@ -1307,13 +1317,15 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
       "net-new",
       "vendor-brief",
       "draft",
-      // ⚠ The merged row says MORE than the flag-off one, and the two extra readings are
-      // both INSIDE `identityGroup` (D-186-15's KB chip and 197's requirement field), not
-      // extra bands — `headerBandsAbove` still returns exactly one. That distinction is
+      // ⚠ The merged row says MORE than the flag-off one, and the extra readings are
+      // all INSIDE `identityGroup` (D-186-15's KB chip, 197's requirement field, and 205's Living Register toggle),
+      // not extra bands — `headerBandsAbove` still returns exactly one. That distinction is
       // the whole of D-184.1-01 and is asserted separately above.
       "📁",
       "No knowledge base · searches everything",
       "✎",
+      "○",
+      "Living Register",
       STRIP_BACK,
       STRIP_LABEL_GOVERN,
       "🔒",

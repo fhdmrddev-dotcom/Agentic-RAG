@@ -144,13 +144,54 @@ def _make_user_settings(
 @patch("app.services.openai_service.get_llm_client")
 @patch("app.services.openai_service._resolve_max_tokens")
 @patch("app.services.openai_service._uses_max_completion_tokens")
-def test_parallel_tool_calls_false(mock_uses_max, mock_resolve_tokens, mock_get_client):
+def test_parallel_tool_calls_not_required_of_openrouter(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    """⚠ CHANGED BY BUG-260825-03, AND THE ORIGINAL ASSERTION IS PRESERVED ONE TEST DOWN.
+
+    This test previously asserted ``parallel_tool_calls is False`` on the OpenRouter +
+    ``quality`` path. That path ALSO sends ``provider.require_parameters: True``, which per
+    OpenRouter's own provider-selection documentation stops being a preference and becomes a
+    hard endpoint EXCLUSION — the documented cause of
+    ``404 No endpoints found that can handle the requested parameters``. Requiring an
+    endpoint to support a parameter we send purely as an optimisation shrank the candidate
+    set for no benefit, so it is dropped on this path and ONLY on this path.
+    """
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
     mock_resolve_tokens.return_value = 1000
     mock_uses_max.return_value = False
 
-    user_settings = _make_user_settings()
+    user_settings = _make_user_settings()  # openrouter + quality
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert "parallel_tool_calls" not in call_kwargs
+    # Positive control: the narrowing this test is about really WAS applied.
+    assert call_kwargs["extra_body"]["provider"] == {"require_parameters": True}
+    assert call_kwargs.get("tools"), "tools must still be attached — only the requirement moved"
+
+
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_parallel_tool_calls_false(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    """The ORIGINAL assertion, on a provider that never had the OpenRouter narrowing.
+
+    ⚠ THIS IS THE SHARED-PATH GUARD: the BUG-260825-03 fix must not degrade every provider
+    to fix one, so a non-OpenRouter call still carries ``parallel_tool_calls=False`` exactly
+    as it always did."""
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings(provider="openai", llm_model="gpt-4o")
     messages = [{"role": "user", "content": "hello"}]
 
     from app.services.openai_service import create_adaptive_streaming_chat
@@ -162,6 +203,7 @@ def test_parallel_tool_calls_false(mock_uses_max, mock_resolve_tokens, mock_get_
 
     call_kwargs = mock_client.chat.completions.create.call_args.kwargs
     assert call_kwargs.get("parallel_tool_calls") is False
+    assert "extra_body" not in call_kwargs, "no OpenRouter narrowing on a non-OpenRouter call"
 
 
 @patch("app.services.openai_service.get_llm_client")

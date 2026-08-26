@@ -57,6 +57,18 @@ const {
 // Mock the api seam (the RunModal.test harness set + the 152-04 delete clients so
 // the workflow-delete confirm renders its terminal "Delete forever" control).
 vi.mock("@/lib/api", () => ({
+  // 204-03 (SCHED-01) — THE MEASURED MOCK BUDGET, SPENT IN THE COMMIT THAT ADDED THE EXPORTS.
+  // A whole-module `vi.mock("@/lib/api")` factory that omits a newly-added RUNTIME export makes
+  // every suite reaching it throw AT MOUNT, far from the cause: `196-08` cost 249 red tests
+  // exactly this way. `WorkflowsPage` now mounts `WorkflowScheduleModal`, which imports these
+  // six. They resolve to empty/no-op answers because no case here opens the schedules dialog —
+  // their job is to EXIST.
+  listSchedules: () => Promise.resolve([]),
+  listWorkflowSchedules: () => Promise.resolve([]),
+  createWorkflowSchedule: () => Promise.resolve({}),
+  updateSchedule: () => Promise.resolve({}),
+  deleteSchedule: () => Promise.resolve(undefined),
+  triggerSchedule: () => Promise.resolve({ launched: false }),
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
   createWorkflowDraft: mockCreateDraft,

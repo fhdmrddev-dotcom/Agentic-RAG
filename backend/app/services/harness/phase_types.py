@@ -201,6 +201,69 @@ def _first_phase_user_turn(accumulated_outputs: dict, ctx) -> str:
     return prior or _kickoff_prompt(ctx)
 
 
+# ── Phase 205 (STATE-01 / STATE-02 / D-03 / D-05) ───────────────────────────
+# Living register / incremental stateful execution variable interpolation
+def _interpolate_prior_run_variables(text: str, prior_run: dict | None) -> str:
+    """Interpolate {{prior_run.*}} template variables into prompt text (Phase 205 / STATE-01).
+
+    Replaces:
+      - ``{{prior_run.output}}`` -> prior deliverable text (or baseline notice on cold start)
+      - ``{{prior_run.id}}`` -> prior run ID
+      - ``{{prior_run.created_at}}`` -> prior run timestamp
+    """
+    if not text:
+        return ""
+
+    if prior_run:
+        output_text = prior_run.get("deliverable_text")
+        if output_text is None:
+            raw_out = prior_run.get("output")
+            if isinstance(raw_out, dict):
+                output_text = raw_out.get("text") or ""
+            elif isinstance(raw_out, str):
+                output_text = raw_out
+            else:
+                output_text = ""
+
+        run_id = str(prior_run.get("id") or prior_run.get("run_id") or "")
+        created_at = str(prior_run.get("created_at") or "")
+    else:
+        output_text = "[Initial Run - No Prior State]"
+        run_id = ""
+        created_at = ""
+
+    interpolated = text.replace("{{prior_run.output}}", output_text)
+    interpolated = interpolated.replace("{{prior_run.id}}", run_id)
+    interpolated = interpolated.replace("{{prior_run.created_at}}", created_at)
+    return interpolated
+
+
+def _stateful_framing_block(ctx) -> str:
+    """Phase 205 (STATE-02 / D-05) — Living register prompt framing for stateful workflows.
+
+    Instructs the model on change badge conventions ([NEW], [UPDATED], [RESOLVED]) when prior
+    run output is present or when running in stateful mode.
+
+    NOTE (N-4): STATE-02 is satisfied via prompt-framing and markdown badges in deliverable text.
+    Structured JSON deltas payload is deferred with a re-open trigger (when automated downstream
+    aggregators require structured diff APIs).
+    """
+    prior_run = getattr(ctx, "prior_run", None)
+    definition = getattr(ctx, "definition", None)
+    if prior_run is None and not (getattr(definition, "is_stateful", False)):
+        return ""
+
+    return (
+        "\n\n## Living Register & Incremental Updates (Stateful Execution)\n"
+        "This workflow maintains an ongoing register across recurring runs.\n"
+        "When comparing current findings with the previous run, format state changes clearly using markdown badges:\n"
+        "- `[NEW]` for items, findings, or tasks discovered in this run that were not in the prior state.\n"
+        "- `[UPDATED]` for items from the prior state whose status, details, or severity have changed.\n"
+        "- `[RESOLVED]` or `[CLOSED]` for items from the prior state that are now resolved, completed, or no longer active.\n"
+        "Preserve existing unchanged items to maintain continuity in the register."
+    )
+
+
 async def _surface_failure_message(ctx, run_id, reason, pool):
     """101.1 (D-08 layer 6 / RC-4) — persist a real failure reason before an emit
     failure return, via the engine's owner-scoped honest-fail surface.
@@ -586,6 +649,46 @@ async def _exec_programmatic(phase, accumulated_outputs: dict, ctx) -> dict:
     return await fn(fn_input, ctx)
 
 
+def _run_usage_box(ctx) -> dict | None:
+    """The RUN-level cumulative token accumulator the engine put on ``ctx``, if any.
+
+    Phase 204 (SCHED-02). ``harness_engine.run_workflow`` sets ``ctx.run_usage_box = {}``
+    once per run and the circuit breaker reads it after every phase. Executors below
+    thread it into the substrate that already knows how to fill it.
+
+    ⚠ ``getattr`` WITH A SAFE DEFAULT, LIKE EVERY OTHER FIELD THIS MODULE READS OFF THE
+    CTX BAG. A Deep run, a unit stub and a publish golden run all reach these executors
+    with a ctx that has no box — they get ``None`` and every call below is byte-identical
+    to what shipped. The box's ABSENCE is the disarmed case, and it is the common one.
+    """
+    box = getattr(ctx, "run_usage_box", None)
+    return box if isinstance(box, dict) else None
+
+
+def _record_run_usage(ctx, input_tokens, output_tokens) -> None:
+    """SUM one completed sub-agent's usage into the run-level box.
+
+    ⚠ THE SUM HAPPENS HERE AND NOT IN THE SUB-AGENT, AND THAT IS NOT AN ACCIDENT.
+    ``run_task_sub_agent`` keeps its OWN ``_sub_usage`` box because it persists that total
+    to its own ``runs`` row on finalize; handing it the run-level box instead would make
+    sub-run N record the cumulative spend of sub-runs 1..N — a silent, plausible,
+    permanently wrong number in a column the Deep drill-down renders. So the sub-agent
+    keeps its local box, RETURNS the total (204-02 widened its return dict), and the
+    addition lands here where the scope is the run.
+
+    ⚠ ``None`` ADDS NOTHING. A provider that emitted no usage must not be read as zero;
+    the two are different facts and only the first is worth a warning (which
+    ``run_task_sub_agent`` already logs).
+    """
+    box = _run_usage_box(ctx)
+    if box is None:
+        return
+    if input_tokens:
+        box["input_tokens"] = (box.get("input_tokens") or 0) + int(input_tokens)
+    if output_tokens:
+        box["output_tokens"] = (box.get("output_tokens") or 0) + int(output_tokens)
+
+
 async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     """One bounded LLM call — no tools. The phase prompt is the system framing.
 
@@ -595,8 +698,13 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 WFSKILL-01 (D-05/D-07): compose the skill framing BEFORE the retry suffix.
     # llm_single runs tools=[], so read_skill_file is inert and the file manifest would
     # be dead weight — pass no-files so only the instructions compose ('' when no snapshot).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     system_prompt = (
-        phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+        _raw_prompt
+        + _skill_block(phase, ctx, with_files=False)
+        + _stateful_framing_block(ctx)
+        + _retry_suffix(ctx)
     )
     # F8 (092-07): first phase → the user's kickoff question; later phases → prior
     # output (chaining unchanged). Without this the first phase saw an empty user turn.
@@ -608,6 +716,14 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
         tools=[],
         model=await _effective_model_checked(phase, ctx),
         user_settings=getattr(ctx, "user_settings", None),
+        # Phase 204 (SCHED-02) — THE RUN-LEVEL BOX, PASSED STRAIGHT THROUGH. This is the
+        # one executor that reaches a provider directly rather than through a sub-agent,
+        # and `_stream_one_iteration` has SUMMED each turn's usage into whatever box it is
+        # handed since Phase 093 (D-17). Nothing new accumulates anything: the box that
+        # was already being filled is now the run's, so an llm_single phase's spend
+        # reaches the circuit breaker. `None` when no breaker is armed — the shipped
+        # `usage_box is None` branch then allocates a throwaway local, exactly as before.
+        usage_box=_run_usage_box(ctx),
     )
     return {"text": content or ""}
 
@@ -658,9 +774,12 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # the requirement invisible again. Placed BEFORE the retry suffix so feedback about a
     # failed attempt stays last, closest to the model's next turn. '' for every phase with
     # no such gate => byte-identical (D-14).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     system_prompt = (
-        phase.config.prompt
+        _raw_prompt
         + _skill_block(phase, ctx)
+        + _stateful_framing_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -687,6 +806,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         system_prompt_override=system_prompt,
         tools_override=tools_override,
     )
+    # Phase 204 (SCHED-02): fold this sub-agent's token spend into the run-level box the
+    # circuit breaker reads. Same shape as the F7 hand-off directly below — a fact the
+    # sub-agent already produced, threaded up to the one scope that can act on it.
+    _record_run_usage(ctx, result.get("input_tokens"), result.get("output_tokens"))
     # F7 (092-07): thread the grounding the sub-agent gathered (search_documents'
     # source_refs/citations/similarity) up to the phase output. The engine unions
     # it across ALL phases and attaches the accumulated set to the final answer —
@@ -747,9 +870,12 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # DETECTABLE — a fix on the single-agent path alone would leave every batch step
     # failing a gate nothing told it about. Do not "simplify" it away. Before the retry
     # suffix; '' when this phase has no such gate => byte-identical (D-14).
+    # Phase 205: interpolate {{prior_run.*}} variables and attach stateful framing.
+    _raw_prompt = _interpolate_prior_run_variables(phase.config.prompt, getattr(ctx, "prior_run", None))
     base_prompt = (
-        phase.config.prompt
+        _raw_prompt
         + _skill_block(phase, ctx)
+        + _stateful_framing_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -783,6 +909,12 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
             )
 
     results = await asyncio.gather(*[_one(q) for q in sub_questions])
+    # Phase 204 (SCHED-02): EVERY branch's spend counts, and this is the phase type where
+    # a runaway is most expensive — N parallel sub-agents, each with its own step budget.
+    # Folded after the gather rather than inside `_one` so the addition is not racing
+    # itself across N concurrent coroutines on a plain dict.
+    for _r in results:
+        _record_run_usage(ctx, _r.get("input_tokens"), _r.get("output_tokens"))
     summaries = [r["summary"] for r in results]
     sub_run_ids = [str(r["sub_run_id"]) for r in results]
 
@@ -1800,6 +1932,30 @@ def _external_action_body(capability: str, resolved: dict) -> str:
     return "\n".join(lines)
 
 
+def _external_action_mcp_body(tool_name: str, resolved: dict) -> str:
+    """Compose the NOT-SENT body for an MCP external action step.
+
+    ⚠ Phase 206.3 / G-1 / D-206.3-05: `_external_action_body` indexes `capability` in TWO places
+    (_EXTERNAL_ACTION_PHRASE and _EXTERNAL_ACTION_NEGATION). For an MCP step, `capability` is None.
+    This composer is separate by design and MUST contain ZERO `[capability]` indexes.
+    """
+    labels = ["Action", *(str(k) for k in resolved)]
+    width = max(len(lbl) for lbl in labels)
+    lines = [
+        "NOT SENT — recorded only.",
+        "",
+        "What this step would have done",
+        f"  {'Action'.ljust(width)}: Call MCP tool '{tool_name}'",
+    ]
+    lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
+    lines += [
+        "",
+        "No external MCP tool was invoked. Nothing left this workflow. "
+        "This is a record of an intention, not a receipt.",
+    ]
+    return "\n".join(lines)
+
+
 def _external_action_sent_body(capability: str, resolved: dict, result, host: str) -> str:
     """Compose the SENT body — the ONLY body in this file that may describe something that
     actually happened, and it is reached only from the adapter's own ``ok`` verdict.
@@ -1908,7 +2064,7 @@ assert (
 )
 
 
-def _pre_credential_destination(config, capability: str) -> str | None:
+def _pre_credential_destination(config, capability: str | None) -> str | None:
     """The destination this step can be checked against BEFORE anything looks for a secret.
 
     An author-declared destination on the step wins when one exists. Today
@@ -1921,6 +2077,20 @@ def _pre_credential_destination(config, capability: str) -> str | None:
     declared = getattr(config, "base_url", None)
     if declared:
         return str(declared)
+
+    # ⚠ AN MCP STEP HAS NO CAPABILITY AND SO NO CONSTANT DESTINATION — its destination is the
+    # `mcp_server_url` on the CONNECTION, which is not resolved yet at this point in the
+    # executor. Returning None here is NOT a hole and must not be read as one: the MCP path's
+    # equivalent guard is `validate_mcp_destination`, called inside `mcp_client._send_jsonrpc`
+    # before any socket is opened, so the D-06 ordering property (validate BEFORE a credential
+    # is fetched) holds through a different door rather than being skipped.
+    #
+    # ⚠ THE `None` IS SCOPED TO THAT ONE CASE ON PURPOSE. A NATIVE capability still indexes
+    # the map and still raises if it is missing — the D-04 assert above exists to make that
+    # unreachable, and softening this read to `.get()` would silently disarm the pre-check for
+    # every native step the day that assert is edited.
+    if capability is None:
+        return None
     return _PRE_CREDENTIAL_DESTINATION[capability]
 
 
@@ -2125,7 +2295,26 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     callable tool would let an LLM decide *whether and how* to send.
     """
     capability = getattr(phase.config, "capability", None)
-    if capability not in EXTERNAL_ACTION_CAPABILITIES:
+    mcp_tool_name = getattr(phase.config, "tool_name", None)
+
+    # ⚠ TWO SHAPES REACH THIS EXECUTOR AND EACH IS CLOSED BY A DIFFERENT SET. A native step
+    # names one of the three D-15 capabilities; an MCP step (206) names a `tool_name` and has
+    # no capability at all, and its closure is the PER-TOOL GRANT checked below — an ungranted
+    # tool is refused there, by name, with an audit row.
+    #
+    # ⚠ THIS GUARD WAS SATISFIED BY ACCIDENT FOR THE LENGTH OF ONE PHASE, and the accident is
+    # worth recording because it looked like it worked. `ExternalActionPhaseConfig.capability`
+    # was given the default `"send_email"`, so EVERY MCP step arrived here claiming to be an
+    # email step and passed a closed-set check it was never meant to take. Removing that
+    # default turned this line into a `KeyError` — which is the guard finally SEEING the MCP
+    # shape rather than a new fault. A default is not a way through a gate.
+    if mcp_tool_name:
+        if not str(mcp_tool_name).strip():
+            raise KeyError(
+                f"external_action phase {getattr(phase, 'slug', '?')!r}: an MCP step's "
+                f"tool_name is blank — there is nothing to grant and nothing to invoke"
+            )
+    elif capability not in EXTERNAL_ACTION_CAPABILITIES:
         raise KeyError(
             f"external_action phase {getattr(phase, 'slug', '?')!r}: capability "
             f"{capability!r} is not registered in EXTERNAL_ACTION_CAPABILITIES "
@@ -2137,10 +2326,20 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
 
     def _record(reason: str) -> dict:
         """The 189 terminal, unchanged: ONE composer for the one sentence."""
+        target_name = mcp_tool_name or capability
         logger.info(
             "190 D-17: external_action phase %r RECORDED the intended %r and sent nothing "
-            "(%s)", slug, capability, reason,
+            "(%s)", slug, target_name, reason,
         )
+        if mcp_tool_name:
+            return {
+                "text": _external_action_mcp_body(mcp_tool_name, resolved),
+                RECORDED_INTENT_KEY: {
+                    "tool_name": mcp_tool_name,
+                    "capability": "mcp",
+                    "inputs": resolved,
+                },
+            }
         return {
             "text": _external_action_body(capability, resolved),
             RECORDED_INTENT_KEY: {"capability": capability, "inputs": resolved},
@@ -2252,24 +2451,13 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         # change — the gate AND UI-SPEC §5b's sentence, in ONE commit — never this line alone.
         return _record("the bound connection is disabled (is_enabled is false — Gate 2)")
 
-    if getattr(connection, "capability", capability) != capability:
+    if not getattr(connection, "mcp_server_url", None) and getattr(connection, "capability", capability) != capability:
         # A connection bound for another capability would send a bot token to a mail host,
         # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
         # the refusal: this used to raise a bare ``ValueError``, which is not an
         # ``AdapterError``, so the handler below never caught it. The run died with no
         # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
         # stack-trace-shaped error on the surface whose whole discipline is not over-claiming.
-        #
-        # It is a DATA condition an author caused, not a programming error, and it is
-        # REACHABLE by an ordinary edit: binding a Slack connection to a step and then
-        # changing the step's capability strands ``connection_id`` in the JSONB. Nothing
-        # clears it — not ``ExternalActionSection`` (its capability rows patch ``capability``
-        # only), not ``ConnectionPicker`` (which writes on ``<select>`` change), not
-        # ``PhaseFormPanel`` (``0 0`` by D-23). And the author is told there is nothing to
-        # clean up: the picker's read is capability-filtered so the footer reads *"🔒 nothing
-        # bound"*, while ``notConnectedOf`` sees a non-empty string and drops the canvas
-        # badge. (The UI half — clearing the reference on a capability change — is
-        # ``D-190-DEF-11``; this half makes the run honest regardless of what the UI does.)
         logger.warning(
             "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
             "recording rather than sending", slug,
@@ -2277,7 +2465,84 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         )
         return _record("the bound connection is for a different capability")
 
-    # ── GATE 6 · dispatch ───────────────────────────────────────────────────────────────
+    # ── GATE 6 · MCP Tool Dispatch (Phase 206 / CONN-02 / D-206-06) ───────────────────
+    if getattr(connection, "mcp_server_url", None):
+        tool_name = getattr(phase.config, "tool_name", None)
+        if not tool_name:
+            return _record("no tool_name specified for MCP connection")
+
+        grants = getattr(connection, "tool_grants", {}) or {}
+        is_granted = grants.get(tool_name) is True
+
+        if not is_granted:
+            logger.warning(
+                "206 F-3: MCP tool %r is NOT granted on connection %s (grants: %s) — refusing",
+                tool_name, connection_id, grants,
+            )
+            pool = getattr(ctx, "pool", None)
+            user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+            if pool is not None:
+                try:
+                    await write_audit(
+                        pool,
+                        getattr(ctx, "run_id", None),
+                        user_id=user_id,
+                        event_type="tool_refused",
+                        metadata={
+                            "phase": slug,
+                            "connection_id": str(connection_id),
+                            "tool_name": tool_name,
+                            "reason": "permission_denied",
+                        },
+                    )
+                except Exception as exc:
+                    logger.warning("206: failed to write tool_refused audit event: %s", exc)
+
+            return {
+                "text": f"Tool execution refused: Tool '{tool_name}' is not granted permission on connection '{getattr(connection, 'name', connection_id)}'.",
+                "failure": f"tool '{tool_name}' refused: permission not granted",
+            }
+
+        tool_args = getattr(phase.config, "tool_args", None) or {}
+        final_args = dict(tool_args) if isinstance(tool_args, dict) else {}
+
+        from app.services import mcp_client
+        try:
+            tool_result = await mcp_client.call_tool(
+                connection.mcp_server_url,
+                tool_name=tool_name,
+                arguments=final_args,
+                secret=connection.secret,
+            )
+        except Exception as exc:
+            logger.warning("206: MCP tool %r execution failed: %s", tool_name, exc)
+            return {
+                "text": f"MCP tool '{tool_name}' failed: {exc}",
+                "failure": f"MCP tool execution failed: {exc}",
+            }
+
+        if tool_result.get("isError"):
+            err_text = tool_result.get("text", "Unknown MCP tool error")
+            return {
+                "text": f"MCP tool '{tool_name}' returned error: {err_text}",
+                "failure": f"MCP tool error: {err_text}",
+            }
+
+        await _write_send_receipt(
+            ctx,
+            phase,
+            capability="mcp",
+            connection_id=str(connection_id),
+            host=connection.mcp_server_url,
+            raw_status=200,
+        )
+        logger.info(
+            "206 CONN-02: external_action phase %r performed tool %r via connection %s",
+            slug, tool_name, connection_id,
+        )
+        return {"text": tool_result.get("text", "")}
+
+    # ── GATE 7 · dispatch legacy adapter ───────────────────────────────────────────────
     adapter = get_adapter(capability)
     config = dict(getattr(connection, "config", None) or {})
     args = _adapter_args(adapter, capability, resolved)

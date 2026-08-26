@@ -292,5 +292,10 @@ export interface PhaseNodeCardProps {
    *  Rendered as the FIRST child so the DOM is byte-identical to the pre-split node.
    *  It is a plain `ReactNode` precisely so this file imports no graph library: a
    *  provider-less render (unit tests, Phase 188's reuse) simply omits it. */
+  /**
+   * Phase 200 / Phase 209 (Item 2) — the effect banner, resolved by `effectBannerFor`.
+   * Absent or null => rendered or resolved from phaseType.
+   */
+  effectBanner?: string | null
   anchors?: ReactNode
 }

@@ -64,6 +64,7 @@ import {
   FOOTER_TAG_IMPLICIT_TLS,
   FOOTER_TAG_REFUSED,
   FOOTER_TAG_STARTTLS,
+  FOOTER_TAG_TLS,
   PANEL_NON_ADMIN_NOTE,
   PANEL_OFF_BODY,
   PANEL_OFF_FOOTER,
@@ -79,7 +80,14 @@ import {
   refusalOf,
   tlsModeOf,
   EMPTY_DRAFT,
+  type ConnectionDraft,
 } from "../connectionFormCopy"
+// ⚠ ALSO AS A NAMESPACE, and the reason is recorded in section 22's banner: 206.1's new
+// identifiers are reached through `FORM_COPY.*` so that a RED commit fails on each new
+// claim rather than on a whole-file load error. It is ALSO what section 24's extended
+// string sweep walks — `stringsOfModule()` walks `connectionRefusalCopy` ONLY.
+import * as FORM_COPY from "../connectionFormCopy"
+import * as CONNECTIONS_COPY from "../connectionsCopy"
 import * as REFUSAL_COPY from "../connectionRefusalCopy"
 import {
   CHECK_FAILURE_SENTENCE,
@@ -126,6 +134,7 @@ import type {
   ConnectorCapability,
   ConnectorCheckResult,
   ConnectorConnection,
+  ConnectorConnectionCreate,
 } from "@/lib/api"
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────────────
@@ -482,12 +491,26 @@ describe("the push/split container (§3a / D-27)", () => {
       />,
     )
 
-    const table = screen.getByTestId("connections-header")
-    expect(table).toBeInTheDocument()
-    expect(screen.getAllByTestId("connections-row")).toHaveLength(1)
-    // A dialog would have scrimmed it away. Walk UP from the table: nothing between it and
+    // ⚠ THE HANDLE MOVED IN 206.1-02, THE CLAIM DID NOT — and the difference matters.
+    // This case reads "the list is still there and was not scrimmed away" (D-27, the whole
+    // reason 156-A beat a dialog). It used to reach for `connections-header` as its handle
+    // on "the table". That header is now deliberately ABSENT whenever the panel is open:
+    // D-206.1-20 drops the five-word column header in the dense shape, because stacked
+    // cells form no columns for a header to head — and this is the ONLY shipped case in the
+    // settings suites that renders with `panel`, i.e. the only one that reaches the dense
+    // shape at all. So the handle is re-pointed to the ROW, which is present in BOTH shapes
+    // by D-206.1-13 and is a strictly better handle for a claim about "the list".
+    // ⚠ This is NOT a re-baselined pin: not one assertion below changed, and the header's
+    // absence is asserted POSITIVELY here rather than quietly lost, so this case now
+    // documents the interaction instead of stopping at a missing node.
+    expect(screen.queryByTestId("connections-header")).toBeNull()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toBeInTheDocument()
+    expect(rows[0].getAttribute("data-dense")).toBe("true")
+    // A dialog would have scrimmed it away. Walk UP from the list: nothing between it and
     // the document may be `aria-hidden`, which is what a portal-backed modal would set.
-    for (let node: HTMLElement | null = table; node; node = node.parentElement) {
+    for (let node: HTMLElement | null = rows[0]; node; node = node.parentElement) {
       expect(node.getAttribute("aria-hidden")).not.toBe("true")
     }
     // And the track really is the 400px split, not a full-width takeover.
@@ -1555,5 +1578,986 @@ describe("§9's panel notice, alongside the 190-18 surfaces", () => {
     }
     // Positive control: the fence can see a phrase in this source at all.
     expect(panelSource).toContain("connectionFormCopy")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 22 · ⭐ THE MCP SHAPE, IN THE COPY LAYER (206.1 item 1 — D-206.1-03 / -04 / -22, SC#4)
+//
+// Phase 206 shipped a complete MCP connector path — client, SSRF defense, discovery,
+// per-tool grants, executor dispatch, audit — and shipped NO DOOR ONTO IT. This section is
+// the copy layer's half of that door, plus the live edit-mode defect research found while
+// measuring it.
+//
+// ⚠ THE NEW IDENTIFIERS ARE REACHED THROUGH THE MODULE NAMESPACE (`FORM_COPY.*`), NOT BY
+// NAMED IMPORT, and that is deliberate rather than stylistic: a named import of an export
+// that does not exist yet reddens the WHOLE FILE as a load failure, which would have made
+// this plan's RED commit report 63 shipped cases failing for a reason none of them is
+// about. Through the namespace each new claim fails on its own sentence, which is what a
+// RED is for. The named-import block above is left exactly as the shipped cases need it.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A draft in an arbitrary shape.
+ *
+ * ⚠ CAST THROUGH `unknown` ON PURPOSE. At RED `ConnectionDraft.capability` is
+ * `ConnectorCapability` and carries no `mcpServerUrl`, so a fixture spelled in the obvious
+ * way would add `tsc` errors to the baseline this phase measures every plan against — plan
+ * 02 recorded paying exactly that cost for one commit (its deviation 3), and it is avoidable.
+ * The cast survives GREEN unchanged, so nothing here is re-typed once the type widens.
+ */
+function draftOfShape(capability: string, over: Record<string, unknown> = {}): ConnectionDraft {
+  return {
+    ...EMPTY_DRAFT,
+    capability,
+    mcpServerUrl: "",
+    ...over,
+  } as unknown as ConnectionDraft
+}
+
+/**
+ * ⚠ THE SYNTHETIC FIFTH SHAPE — the negative control all four positional ladders are armed
+ * against (SC#4, deliberately extended past its own wording).
+ *
+ * A ladder whose LAST ARM IS ALSO ITS FALLBACK answers an unknown shape with Slack's facts.
+ * That is not hypothetical: it shipped in `destinationFactsOf`, and on 2026-08-25 a live UAT
+ * screen showed a connection pointed at an MCP server describing itself as sending to
+ * Slack's API host. This is `runFacts.test.ts:168-213`'s three-part shape — near-miss values,
+ * the prototype-key set, and an explicit POSITIVE CONTROL beside each.
+ */
+const SYNTHETIC_SHAPES = [
+  "not_a_capability",
+  // Near-misses: one character away from a real member, which is how a `startsWith` or a
+  // truthiness test would let one through while an equality arm does not.
+  "send_emails",
+  "mcp_server",
+  "MCP",
+  "",
+] as const
+
+/** Inherited keys are never own properties, but they ARE truthy on a bracket read — the
+ *  `modelFitness.ts` / `toolNames.ts` finding, applied to a ladder rather than to a map. */
+const PROTOTYPE_KEYS = [
+  "constructor",
+  "toString",
+  "__proto__",
+  "hasOwnProperty",
+  "valueOf",
+] as const
+
+const ACCEPTED_MCP_URL = "https://mcp.deepwiki.com/mcp"
+
+describe("206.1 · the MCP sentinel, the fourth choice and the field count (D-206.1-03)", () => {
+  it("`CAPABILITY_CHOICES` gains a FOURTH entry and `mcp` is LAST — the shipped three keep mig 116's order", () => {
+    const choices = FORM_COPY.CAPABILITY_CHOICES
+    expect(choices).toHaveLength(4)
+    expect(choices.map((c) => c.capability)).toEqual([
+      "send_email",
+      "create_ticket",
+      "post_message",
+      "mcp",
+    ])
+    expect(choices[3].label).toBe(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
+  })
+
+  it("`capabilityLabelOf('mcp')` renders the LABEL, never the raw schema token", () => {
+    // `capabilityLabelOf` is `...?.label ?? capability`, so a missing choice does not throw —
+    // it renders the wire word to a person. That is the failure this case exists to catch.
+    expect(FORM_COPY.capabilityLabelOf("mcp")).toBe(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
+    expect(FORM_COPY.capabilityLabelOf("mcp")).not.toBe("mcp")
+    // POSITIVE CONTROL — the three shipped labels are untouched.
+    expect(FORM_COPY.capabilityLabelOf("send_email")).toBe("Send an email")
+  })
+
+  it("the MCP label names the CAPABILITY, and collides with no other field label", () => {
+    const label = FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL
+    expect(label.length).toBeGreaterThan(10)
+    // ⚠ Section 5 asserts both of these strings ABSENT on a non-matching shape. A chooser
+    // label containing either would make that case pass or fail for a reason it is not about.
+    expect(label).not.toContain("Jira site")
+    expect(label).not.toContain("SMTP host and port")
+    // The MCP URL field's own label is deliberately distinct from every shipped one, so the
+    // negative `queryByLabelText` cases stay meaningful.
+    for (const shipped of ["Jira site", "SMTP host and port", "Channel", "Send from", "Project key"]) {
+      expect(FORM_COPY.FIELD_MCP_URL_LABEL).not.toBe(shipped)
+    }
+  })
+
+  it("`FIELD_COUNTS` is TOTAL over all four shapes and binds MCP at exactly 3", () => {
+    expect(FORM_COPY.FIELD_COUNTS.mcp).toBe(3)
+    // Total: the suite walks the same closed set the panel renders, so a fifth shape without
+    // a bound count fails here rather than silently rendering an unasserted field set.
+    for (const shape of ["send_email", "create_ticket", "post_message", "mcp"] as const) {
+      expect(typeof FORM_COPY.FIELD_COUNTS[shape]).toBe("number")
+    }
+    expect(Object.keys(FORM_COPY.FIELD_COUNTS).sort()).toEqual([
+      "create_ticket",
+      "mcp",
+      "post_message",
+      "send_email",
+    ])
+  })
+
+  it("`EMPTY_DRAFT` carries an empty `mcpServerUrl` — flat and all-string, like every other field", () => {
+    expect((EMPTY_DRAFT as unknown as Record<string, unknown>).mcpServerUrl).toBe("")
+    // The draft's default shape is UNCHANGED: a new member appended to the union does not
+    // move where the form starts.
+    expect(EMPTY_DRAFT.capability).toBe("send_email")
+  })
+})
+
+describe("206.1 · LADDER 1 — `configFromDraft` names its arms (SC#4)", () => {
+  it("an MCP draft composes EXACTLY one key — the key SET, not merely the shape", () => {
+    const config = FORM_COPY.configFromDraft(
+      draftOfShape("mcp", { mcpServerUrl: ACCEPTED_MCP_URL }),
+    )
+    // ⚠ KEY SET, ASSERTED. `McpConfig` is `extra="forbid"` with exactly one field, so a
+    // second key is a 422 that no client-side type can see.
+    expect(Object.keys(config as unknown as Record<string, unknown>).sort()).toEqual(["headers"])
+    expect(config).toEqual({ headers: {} })
+  })
+
+  it("POSITIVE CONTROL — the three shipped capabilities still compose their own configs", () => {
+    expect(FORM_COPY.configFromDraft(draftOfShape("post_message", { channel: "#ops" }))).toEqual({
+      default_channel: "#ops",
+    })
+    expect(
+      FORM_COPY.configFromDraft(
+        draftOfShape("create_ticket", {
+          baseUrl: "northwind.atlassian.net",
+          projectKey: "NW",
+          accountEmail: "ops@northwind.co",
+        }),
+      ),
+    ).toEqual({
+      base_url: "northwind.atlassian.net",
+      project_key: "NW",
+      account_email: "ops@northwind.co",
+    })
+    const email = FORM_COPY.configFromDraft(
+      draftOfShape("send_email", {
+        host: "smtp.fastmail.com",
+        port: "465",
+        fromAddress: "ops@northwind.co",
+      }),
+    ) as unknown as Record<string, unknown>
+    expect(email.host).toBe("smtp.fastmail.com")
+    expect(email.tls).toBe("implicit")
+  })
+
+  it("⚠ the SYNTHETIC FIFTH SHAPE gets a NEUTRAL config — never Slack's empty-channel one", () => {
+    for (const shape of SYNTHETIC_SHAPES) {
+      const config = FORM_COPY.configFromDraft(
+        draftOfShape(shape, { channel: "#ops" }),
+      ) as unknown as Record<string, unknown>
+      // ⚠ THAT LITERAL IS THE LIVE 422. `default_channel` is `NonEmpty` at the model, so a
+      // trailing positional arm turns an unrecognised shape into a refused save with a
+      // generic failure sentence and no attributable cause.
+      expect(config).not.toHaveProperty("default_channel")
+      expect(config).not.toHaveProperty("host")
+      expect(config).not.toHaveProperty("base_url")
+    }
+  })
+
+  it("⚠ a prototype key as the shape is ALSO neutral — an inherited key is truthy on a bracket read", () => {
+    for (const key of PROTOTYPE_KEYS) {
+      const config = FORM_COPY.configFromDraft(
+        draftOfShape(key, { channel: "#ops" }),
+      ) as unknown as Record<string, unknown>
+      expect(config).not.toHaveProperty("default_channel")
+    }
+  })
+})
+
+describe("206.1 · LADDER 2 — `destinationFooterOf` names its arms (SC#4)", () => {
+  it("an MCP draft with no URL yet still renders a footer — it degrades to a WORD", () => {
+    const footer = FORM_COPY.destinationFooterOf(draftOfShape("mcp"))
+    expect(footer.destination).toBe(FOOTER_NOTHING_YET)
+    expect(footer.tags).toEqual([])
+    expect(footer.refusedReason).toBeNull()
+  })
+
+  it("an accepted https address reads back as itself, tagged from the SHIPPED vocabulary", () => {
+    const footer = FORM_COPY.destinationFooterOf(
+      draftOfShape("mcp", { mcpServerUrl: ACCEPTED_MCP_URL }),
+    )
+    expect(footer.destination).toBe(ACCEPTED_MCP_URL)
+    expect(footer.tags).toEqual([FOOTER_TAG_TLS])
+    expect(footer.refusedReason).toBeNull()
+    // No new footer tag was invented for this shape.
+    expect(footer.tags.every((t) => [FOOTER_TAG_TLS, FOOTER_TAG_REFUSED].includes(t))).toBe(true)
+  })
+
+  it("a refused address carries the refused tag AND `refusalOf`'s OWN reason", () => {
+    for (const url of [
+      "http://mcp.example.com/mcp",
+      "https://localhost/mcp",
+      "https://192.168.1.9/mcp",
+    ]) {
+      const footer = FORM_COPY.destinationFooterOf(draftOfShape("mcp", { mcpServerUrl: url }))
+      expect(footer.tags).toEqual([FOOTER_TAG_REFUSED])
+      // ⚠ COMPARED AGAINST A DIRECT `refusalOf` CALL, never against a re-typed sentence: a
+      // second URL validator on this surface is a SECOND ANSWER, and the two would drift.
+      expect(footer.refusedReason).toBe(refusalOf(url))
+      expect(footer.refusedReason).not.toBeNull()
+    }
+  })
+
+  it("POSITIVE CONTROL — a `send_email` draft still gets the SMTP footer with its TLS-mode tag", () => {
+    const footer = FORM_COPY.destinationFooterOf(
+      draftOfShape("send_email", {
+        host: "smtp.fastmail.com",
+        port: "587",
+        fromAddress: "ops@northwind.co",
+      }),
+    )
+    expect(footer.destination).toBe("smtp.fastmail.com:587")
+    expect(footer.tags).toEqual([FOOTER_TAG_STARTTLS])
+    expect(footer.detail).toBe("· from ops@northwind.co")
+  })
+
+  it("⚠ the SYNTHETIC FIFTH SHAPE gets a NEUTRAL footer — not the SMTP one", () => {
+    for (const shape of [...SYNTHETIC_SHAPES, ...PROTOTYPE_KEYS]) {
+      const footer = FORM_COPY.destinationFooterOf(
+        draftOfShape(shape, {
+          host: "smtp.fastmail.com",
+          port: "587",
+          fromAddress: "ops@northwind.co",
+        }),
+      )
+      expect(footer.destination).toBe(FOOTER_NOTHING_YET)
+      expect(footer.tags).toEqual([])
+      // ⚠ Today the trailing arm IS the SMTP arm, so an unknown shape claims a TLS mode and
+      // names a `from` address it was never given.
+      expect(footer.tags).not.toContain(FOOTER_TAG_STARTTLS)
+      expect(footer.detail).toBeNull()
+    }
+  })
+})
+
+describe("206.1 · `draftFromConnection` — the EDIT shape (D-206.1-22, a live defect)", () => {
+  /** An MCP row exactly as the server sends it: a URL, an `McpConfig`, and NO capability. */
+  function mcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
+    return makeConnection({
+      capability: null,
+      name: "DeepWiki",
+      config: { headers: {} },
+      mcp_server_url: ACCEPTED_MCP_URL,
+      last_checked_at: null,
+      last_check_verdict: "not_checked",
+      ...overrides,
+    })
+  }
+
+  it("an MCP row seeds the MCP shape and its own URL — today it seeds the SMTP form", () => {
+    const draft = FORM_COPY.draftFromConnection(mcpConnection()) as unknown as Record<string, unknown>
+    expect(draft.capability).toBe("mcp")
+    expect(draft.mcpServerUrl).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("POSITIVE CONTROL — a `send_email` row still seeds `send_email` and its SMTP facts", () => {
+    const draft = FORM_COPY.draftFromConnection(makeConnection())
+    expect(draft.capability).toBe("send_email")
+    expect(draft.host).toBe("smtp.fastmail.com")
+    expect(draft.port).toBe("465")
+  })
+
+  it("⚠ ABSENCE ALONE IS NOT MCP — a capability-less row with NO url keeps the empty draft's default", () => {
+    // D-206.1-11: absence read as a default is the defect, and detecting MCP from
+    // `capability === null` would be the same mistake pointed the other way.
+    const draft = FORM_COPY.draftFromConnection(
+      makeConnection({ capability: null, mcp_server_url: null }),
+    )
+    expect(draft.capability).toBe(EMPTY_DRAFT.capability)
+    expect(draft.capability).not.toBe("mcp")
+  })
+
+  it("⚠ a row carrying BOTH seeds MCP — the URL wins, because MCP is a SHAPE and not a capability", () => {
+    const draft = FORM_COPY.draftFromConnection(
+      mcpConnection({ capability: "send_email" }),
+    ) as unknown as Record<string, unknown>
+    expect(draft.capability).toBe("mcp")
+    expect(draft.mcpServerUrl).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("an MCP draft still carries NO secret — there was never anything to copy", () => {
+    expect(FORM_COPY.draftFromConnection(mcpConnection()).secret).toBe("")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 23 · AR-05 — `no check for this kind` is a DIFFERENT FACT from `never checked`
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("206.1 · AR-05 — the credential reading for a row that can never be checked", () => {
+  const CHECKED_AT = "2026-08-25T00:00:00Z"
+  const NOW = Date.parse("2026-08-25T03:00:00Z")
+  const MCP_URL = "https://mcp.deepwiki.com/mcp"
+
+  it("an MCP row reads `no check for this kind`, and NOT `never checked`", () => {
+    const reading = CONNECTIONS_COPY.credentialReadingOf(
+      makeConnection({ capability: null, mcp_server_url: MCP_URL, last_checked_at: null }),
+      NOW,
+    )
+    expect(reading).toBe(CONNECTIONS_COPY.CREDENTIAL_NO_CHECK_FOR_KIND)
+    // ⚠ *nobody has checked it* and *it CANNOT be checked* are two different facts, and
+    // folding them into one word is the `runFacts.ts` CR-01 / `DecisionsList` D-20 defect
+    // for the fifth recorded time.
+    expect(reading).not.toBe(CONNECTIONS_COPY.CREDENTIAL_NEVER_CHECKED)
+  })
+
+  it("⚠ and it reads so UNCONDITIONALLY — a stale timestamp on an MCP row is not a check", () => {
+    expect(
+      CONNECTIONS_COPY.credentialReadingOf(
+        makeConnection({
+          capability: null,
+          mcp_server_url: MCP_URL,
+          last_checked_at: CHECKED_AT,
+        }),
+        NOW,
+      ),
+    ).toBe(CONNECTIONS_COPY.CREDENTIAL_NO_CHECK_FOR_KIND)
+  })
+
+  it("POSITIVE CONTROL — a capability row's reading is byte-identical to the shipped one", () => {
+    const never = makeConnection({ last_checked_at: null })
+    expect(CONNECTIONS_COPY.credentialReadingOf(never, NOW)).toBe("never checked")
+    const checked = makeConnection({ last_checked_at: CHECKED_AT })
+    expect(CONNECTIONS_COPY.credentialReadingOf(checked, NOW)).toMatch(/^checked /)
+    // ⚠ EQUAL TO `credentialLabel`'s OWN OUTPUT, so the new function is a router and not a
+    // second implementation — this is what keeps every pinned unit call on `credentialLabel`
+    // and the wide row's byte-identity capture intact.
+    expect(CONNECTIONS_COPY.credentialReadingOf(checked, NOW)).toBe(
+      CONNECTIONS_COPY.credentialLabel(checked.last_checked_at, NOW),
+    )
+  })
+
+  it("`credentialLabel` itself is untouched — its three shipped readings still hold", () => {
+    expect(CONNECTIONS_COPY.credentialLabel(null, NOW)).toBe("never checked")
+    expect(CONNECTIONS_COPY.credentialLabel(CHECKED_AT, NOW)).toBe("checked 3h ago")
+    expect(CONNECTIONS_COPY.credentialLabel("not-a-date", NOW)).toBe("never checked")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 24 · ⚠ THE STRING SWEEP, EXTENDED TO `connectionFormCopy` — it was NEVER covered
+//
+// `stringsOfModule()` above walks `connectionRefusalCopy` ONLY. Measured: the nine-banned-
+// terms fence (section 19) and the absolute-verb fence (section 16) therefore say NOTHING
+// about `connectionFormCopy`'s strings, and never have. Item 1 adds seven of them. Rather
+// than record them as unswept, the sweep is EXTENDED here — cheap, and the alternative is a
+// SUMMARY sentence claiming coverage that does not exist.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** Every string any export of `connectionFormCopy` can produce. Structural, so a NEW export
+ *  is fenced the day it is added rather than the day someone remembers it. */
+function stringsOfFormCopyModule(): string[] {
+  const seen: string[] = []
+  // Arguments broad enough to reach every signature this module actually declares: a draft,
+  // a connection, an org name, and a timestamp. A function this does not fit throws and is
+  // caught — the seven identifiers item 1 adds are named explicitly in the case below, so a
+  // silently-skipped one leaves the fence red rather than green over nothing.
+  const ARGS: unknown[] = [
+    draftOfShape("mcp", { mcpServerUrl: ACCEPTED_MCP_URL }),
+    makeConnection(),
+    "Northwind",
+    "2026-08-03T09:00:00Z",
+  ]
+  const walk = (value: unknown, depth: number): void => {
+    if (depth > 4) return
+    if (typeof value === "string") {
+      seen.push(value)
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach((v) => walk(v, depth + 1))
+      return
+    }
+    if (typeof value === "function") {
+      for (const arg of ARGS) {
+        try {
+          walk((value as (...args: unknown[]) => unknown)(arg), depth + 1)
+        } catch {
+          // A signature this walker does not fit.
+        }
+      }
+      return
+    }
+    if (value && typeof value === "object") {
+      Object.values(value).forEach((v) => walk(v, depth + 1))
+    }
+  }
+  walk(FORM_COPY, 0)
+  return seen
+}
+
+describe("206.1 · the banned-term and absolute-verb fences, extended to the panel's copy module", () => {
+  it("the sweep is NON-VACUOUS and reaches item 1's seven new strings by identity", () => {
+    const all = stringsOfFormCopyModule()
+    expect(all.length).toBeGreaterThan(40)
+    // ⚠ NON-VACUITY FIRST. A walker that reached nothing would satisfy every absence claim
+    // below forever — the `gutterTokens.fences.test.ts` lesson, one module over.
+    for (const added of [
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      FORM_COPY.FIELD_MCP_URL_LABEL,
+      FORM_COPY.FIELD_MCP_URL_PLACEHOLDER,
+      FORM_COPY.FIELD_MCP_URL_HELP,
+      FORM_COPY.FIELD_MCP_SECRET_LABEL,
+      FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE,
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+    ]) {
+      expect(all).toContain(added)
+    }
+  })
+
+  it("no string this module can produce carries any of the nine banned terms", () => {
+    const all = stringsOfFormCopyModule()
+    for (const term of BANNED_VOCABULARY) {
+      expect(all.filter((s) => s.toLowerCase().includes(term.toLowerCase()))).toEqual([])
+    }
+    // POSITIVE CONTROL — the fence sees a banned term when one is present.
+    expect(
+      [...all, "refused: the address fell inside an RFC1918 range"].filter((s) =>
+        s.toLowerCase().includes("rfc1918"),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it("no string this module can produce carries one of the three absolutes", () => {
+    const all = stringsOfFormCopyModule()
+    for (const phrase of ABSOLUTE_VERB_FENCE) {
+      expect(all.filter((s) => s.toLowerCase().includes(phrase))).toEqual([])
+    }
+  })
+
+  it("⚠ `MCP_SAVE_DISABLED_REASON`'s SECOND CLAUSE is load-bearing and may not be trimmed", () => {
+    // The panel's check is a COURTESY, never the security boundary: the model raises on a
+    // non-HTTPS `mcp_server_url` and `validate_mcp_destination` refuses again at call time,
+    // after the address resolves. This sentence is the ONLY place a person can see that.
+    expect(FORM_COPY.MCP_SAVE_DISABLED_REASON).toContain("https://")
+    expect(FORM_COPY.MCP_SAVE_DISABLED_REASON).toContain("the server refuses it again")
+  })
+
+  it("the optional-credential note is AFFIRMATIVE — D-206.1-06 forbids presenting absence as an error", () => {
+    const note = FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE
+    expect(note).toContain("Optional")
+    // No destructive tone and no warning register: an MCP server may legitimately ask for
+    // no credential at all, and a form that treats that as a fault is telling a lie.
+    for (const alarm of ["error", "invalid", "must", "required", "warning"]) {
+      expect(note.toLowerCase()).not.toContain(alarm)
+    }
+  })
+
+  it("the URL placeholder names a RESERVED example domain, never a live third party", () => {
+    // A placeholder naming a real vendor's endpoint is an endorsement the form is not
+    // entitled to make — and `example.com` is reserved by RFC 2606 for exactly this.
+    expect(FORM_COPY.FIELD_MCP_URL_PLACEHOLDER).toContain("example.com")
+    expect(FORM_COPY.FIELD_MCP_URL_PLACEHOLDER.startsWith("https://")).toBe(true)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 25 · ⭐ THE MCP SHAPE, IN THE PANEL (206.1 item 1 — the create door and the edit fix)
+//
+// Section 22 proved the copy layer. This one proves the SURFACE: a fourth option, exactly
+// three fields, a create body whose key set the server will actually accept, a Save that
+// refuses a plaintext address with a reason in real DOM text, and — the defect research found
+// while measuring all of that — an EDIT path that renders the MCP shape instead of the SMTP
+// form (D-206.1-22).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+const CHOOSER_LABEL = "What this connection does"
+
+/** An MCP row as the server sends it: a URL, an `McpConfig`, and NO capability. */
+function makeMcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
+  return makeConnection({
+    id: "conn-mcp",
+    capability: null,
+    name: "DeepWiki",
+    config: { headers: {} },
+    mcp_server_url: ACCEPTED_MCP_URL,
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+    ...overrides,
+  })
+}
+
+/**
+ * ⚠ AN MCP ROW WHOSE CONFIG ALSO CARRIES AN SMTP HOST.
+ *
+ * The server could never send this (`McpConfig` is `extra="forbid"`), and that is exactly why
+ * it is the right fixture for LADDER 3: `draftFromConnection` reads `host` off the config for
+ * every shape, so this makes `draft.host` NON-EMPTY on an MCP draft. Without it, "typedHost is
+ * not the SMTP host" would pass on an empty string and prove nothing.
+ */
+function makeMcpConnectionWithStrayHost(): ConnectorConnection {
+  return makeMcpConnection({
+    config: { headers: {}, host: "smtp.fastmail.com", port: 465 } as unknown as ConnectorConnection["config"],
+  })
+}
+
+/**
+ * ⚠ THE SYNTHETIC FIFTH SHAPE, REACHED THROUGH THE RENDER.
+ *
+ * `typedHost` and `secretLabel` live INSIDE the component, and the plan forbids widening the
+ * module's export surface to make a test easier — so the only honest way in is a row whose
+ * `capability` is a value the closed set will never hold. It carries a full SMTP config, so
+ * every "not the SMTP one" assertion below is falsifiable rather than vacuous.
+ */
+function makeUnknownShapeConnection(): ConnectorConnection {
+  return makeConnection({
+    id: "conn-unknown",
+    name: "Something new",
+    capability: "not_a_capability" as unknown as ConnectorCapability,
+    mcp_server_url: null,
+  })
+}
+
+async function chooseMcp(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "mcp")
+}
+
+describe("206.1 · the fourth chooser option and the three-field MCP block (SC#1a)", () => {
+  it("the create chooser renders FOUR options and the MCP one is LAST", () => {
+    renderPanel()
+    const options = within(screen.getByLabelText(CHOOSER_LABEL)).getAllByRole("option")
+    expect(options).toHaveLength(4)
+    expect(options.map((o) => o.textContent)).toEqual([
+      "Send an email",
+      "Create a Jira ticket",
+      "Post a Slack message",
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+    ])
+    expect((options[3] as HTMLOptionElement).value).toBe("mcp")
+  })
+
+  it("selecting MCP renders exactly `FIELD_COUNTS.mcp` fields — Name, the URL and the token", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(FORM_COPY.FIELD_COUNTS.mcp)
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).toBeInTheDocument()
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_URL_HELP)).toBeInTheDocument()
+  })
+
+  it("the URL input is `font-mono` — a machine value — while its label and help are prose", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    const input = screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)
+    expect(input.className).toContain("font-mono")
+    // ⚠ ONE INPUT, ONE COLUMN. The `1fr 92px` grid exists for host+port; an MCP URL has no
+    // second part, and borrowing that shape would leave a 92px hole beside the field.
+    expect(input.className).not.toContain("92px")
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_URL_HELP).className).not.toContain("font-mono")
+  })
+
+  it("⚠ the MCP block does NOT leak into the other three renders", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    for (const capability of ["send_email", "create_ticket", "post_message"] as const) {
+      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[capability])
+    }
+  })
+
+  it("…and the other three blocks do not leak into the MCP render", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    // The two labels the shipped case at section 5 asserts absent — the collision the MCP
+    // label was deliberately chosen to avoid.
+    expect(screen.queryByLabelText("Jira site")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Channel")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Send from")).not.toBeInTheDocument()
+  })
+
+  it("the optional-credential note renders BESIDE the encryption promise, never instead of it", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+
+    // D-206.1-06: the credential is optional for this shape and only for it — but the
+    // encryption promise is told for EVERY kind, so both sentences are present.
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE)).toBeInTheDocument()
+    expect(screen.getByTestId("connection-secret-create-help")).toHaveTextContent(
+      "Encrypted before it touches the database",
+    )
+  })
+
+  it("POSITIVE CONTROL — the note is absent for a capability shape, which still REQUIRES a secret", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    expect(screen.queryByText(FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE)).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-04)", () => {
+  async function saveMcp(
+    user: ReturnType<typeof userEvent.setup>,
+    onCreate: ReturnType<typeof vi.fn>,
+    opts: { url?: string; secret?: string } = {},
+  ) {
+    renderPanel({ onCreate: onCreate as unknown as (body: ConnectorConnectionCreate) => Promise<void> })
+    await chooseMcp(user)
+    await user.type(screen.getByLabelText("Name"), "DeepWiki")
+    await user.type(
+      screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL),
+      opts.url ?? ACCEPTED_MCP_URL,
+    )
+    if (opts.secret) {
+      await user.type(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL), opts.secret)
+    }
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    return onCreate.mock.calls[0][0] as Record<string, unknown>
+  }
+
+  it("an MCP save sends EXACTLY `{name, mcp_server_url, config}` — the key set, not a subset match", async () => {
+    const user = userEvent.setup({ delay: null })
+    const body = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // ⚠ `Object.keys(...).sort()`, NEVER `toMatchObject`: an extra key is a 422 the client's
+    // own types cannot see, and a subset match would pass straight through it.
+    expect(Object.keys(body).sort()).toEqual(["config", "mcp_server_url", "name"])
+    expect(body.mcp_server_url).toBe(ACCEPTED_MCP_URL)
+    expect(body.config).toEqual({ headers: {} })
+  })
+
+  it("⚠ the body carries NO `capability` KEY AT ALL — present-and-null is not absent", async () => {
+    const user = userEvent.setup({ delay: null })
+    const body = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // `_validate_connection_shape` branches on `mcp_server_url` FIRST and returns before the
+    // capability arm; the model is `extra`-strict and `"mcp"` is not a member of the server's
+    // closed `ConnectorCapability`. Absence is the contract, so absence is what is asserted.
+    expect("capability" in body).toBe(false)
+  })
+
+  it("a typed credential adds `secret`; ⚠ an EMPTY one OMITS the key rather than sending an empty string", async () => {
+    const user = userEvent.setup({ delay: null })
+    const withSecret = await saveMcp(user, vi.fn().mockResolvedValue(undefined), {
+      secret: "mcp-token-abc",
+    })
+    expect(Object.keys(withSecret).sort()).toEqual(["config", "mcp_server_url", "name", "secret"])
+    expect(withSecret.secret).toBe("mcp-token-abc")
+    cleanup()
+
+    const withoutSecret = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
+    // ⚠ `secret: ""` is a PRESENT value, and the server's `NonEmpty` rejects it — so an
+    // optional credential left blank must not travel at all. It is also a pointless plaintext
+    // round trip for a value that is not there.
+    expect("secret" in withoutSecret).toBe(false)
+  })
+
+  it("POSITIVE CONTROL — a Slack save still sends `capability` and a channel config", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ onCreate })
+    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    await user.type(screen.getByLabelText("Name"), "#ops-alerts")
+    await user.type(screen.getByLabelText("Channel"), "#ops-alerts")
+    await user.type(screen.getByLabelText("Bot token"), "xoxb-real")
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+
+    const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+    expect(body.capability).toBe("post_message")
+    expect(body.config).toEqual({ default_channel: "#ops-alerts" })
+    expect("mcp_server_url" in body).toBe(false)
+  })
+})
+
+describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => {
+  async function renderMcpWithUrl(url: string) {
+    const user = userEvent.setup({ delay: null })
+    const view = renderPanel()
+    await chooseMcp(user)
+    if (url) await user.type(screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL), url)
+    return view
+  }
+
+  it.each(["", "http://mcp.example.com/mcp", "ftp://mcp.example.com", "mcp.example.com"])(
+    "a non-https address (%s) leaves Save DISABLED with the reason in real DOM text",
+    async (url) => {
+      await renderMcpWithUrl(url)
+      expect(screen.getByTestId("connection-form-save")).toBeDisabled()
+      const reason = screen.getByTestId("connection-mcp-save-disabled-reason")
+      expect(reason.textContent).toBe(FORM_COPY.MCP_SAVE_DISABLED_REASON)
+      expect(reason.className).toContain("text-destructive")
+    },
+  )
+
+  it("a valid https address ENABLES Save and removes the reason node entirely", async () => {
+    await renderMcpWithUrl(ACCEPTED_MCP_URL)
+    expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+    expect(screen.queryByTestId("connection-mcp-save-disabled-reason")).not.toBeInTheDocument()
+  })
+
+  it("`aria-describedby` RESOLVES to the MCP reason node, and the node sits ABOVE the Save button", async () => {
+    const { container } = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const save = screen.getByTestId("connection-form-save")
+    const describedBy = save.getAttribute("aria-describedby")
+    expect(describedBy).toBeTruthy()
+    const node = container.querySelector(`#${CSS.escape(describedBy!)}`)
+    expect(node).not.toBeNull()
+    expect(node!.textContent).toBe(FORM_COPY.MCP_SAVE_DISABLED_REASON)
+    // A reason a person must scroll PAST the button to find is a reason they will not read.
+    expect(
+      node!.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it("⚠ the two disabled-Save reason ids are DISTINCT — the shipped CIPHER resolution is asserted in the SAME run", async () => {
+    // `ConnectionFormPanel.test.tsx`'s cipher case resolves `aria-describedby` with
+    // `container.querySelector`, which returns the FIRST match. Two simultaneously-rendered
+    // nodes sharing one id would break that resolution SILENTLY — the shipped assertion would
+    // still find A node and still read A sentence, just not the right one.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("no key", 503, "no_encryption_key"))
+    const cipher = renderEditable({ onUpdate })
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-cipher-refusal")).toBeInTheDocument(),
+    )
+    const cipherId = screen.getByTestId("connection-form-save").getAttribute("aria-describedby")!
+    expect(
+      cipher.container.querySelector(`#${CSS.escape(cipherId)}`)!.textContent,
+    ).toBe(CIPHER_UNAVAILABLE_SAVE_DISABLED_REASON)
+    cleanup()
+
+    const mcp = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const mcpId = screen.getByTestId("connection-form-save").getAttribute("aria-describedby")!
+    expect(mcp.container.querySelector(`#${CSS.escape(mcpId)}`)!.textContent).toBe(
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+    )
+    // ⭐ THE PROPERTY: two different reasons, two different ids.
+    expect(mcpId).not.toBe(cipherId)
+  })
+
+  it("⚠ ZERO `[title]` nodes in the MCP create render AND the MCP edit render", async () => {
+    const create = await renderMcpWithUrl("http://mcp.example.com/mcp")
+    expect(create.container.querySelectorAll("[title]")).toHaveLength(0)
+    cleanup()
+
+    const edit = renderPanel({ mode: "edit", connection: makeMcpConnection() })
+    expect(edit.container.querySelectorAll("[title]")).toHaveLength(0)
+  })
+
+  it("the Save button is DISABLED, not REMOVED — removal is reserved for a different fact", async () => {
+    await renderMcpWithUrl("http://mcp.example.com/mcp")
+    const save = screen.getByTestId("connection-form-save")
+    expect(save).toBeInTheDocument()
+    expect(save.className).toContain("disabled:opacity-60")
+  })
+})
+
+describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live defect, pinned)", () => {
+  it("an MCP row's panel names the MCP kind statically and seeds its own URL", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection() })
+
+    const staticKind = screen.getByTestId("connection-capability-static")
+    expect(staticKind).toHaveTextContent(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
+    expect(screen.getByText(CAPABILITY_LOCKED_NOTE)).toBeInTheDocument()
+    expect(
+      (screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL) as HTMLInputElement).value,
+    ).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("⚠ FOUR REGRESSION PINS, all four live today: no SMTP kind, no host/port, no `App password`, no SMTP footer", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection() })
+
+    // 1 — the kind. Today `capability ?? "send_email"` renders `Send an email`.
+    expect(screen.queryByText("Send an email")).not.toBeInTheDocument()
+    // 2 — the SMTP fields.
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Send from")).not.toBeInTheDocument()
+    // 3 — the secret's label. Today it reads SMTP's word; it must read MCP's.
+    // ⚠ `queryByText`, NOT `queryByLabelText`. On EDIT the secret is a `<span>` of dots with
+    // NO control, so its `<label>` associates with nothing and `queryByLabelText` returns null
+    // whether the label is present or not — the negative would be VACUOUS. Measured, not
+    // predicted: the positive control below failed on exactly this before it was corrected.
+    expect(screen.queryByText("App password")).not.toBeInTheDocument()
+    expect(screen.queryByText("Bot token")).not.toBeInTheDocument()
+    expect(screen.getByText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    // 4 — the footer. The destination is the row's own URL, and no SMTP TLS-mode tag.
+    expect(screen.getByTestId("connection-destination-value")).toHaveTextContent(ACCEPTED_MCP_URL)
+    const tags = screen.queryAllByTestId("connection-destination-tag").map((n) => n.textContent)
+    expect(tags).not.toContain(FOOTER_TAG_STARTTLS)
+    expect(tags).not.toContain(FOOTER_TAG_IMPLICIT_TLS)
+  })
+
+  it("the MCP update body is `{name, mcp_server_url, config}` — the panel is the ONLY guard here", async () => {
+    // ⚠ `ConnectorConnectionUpdate` performs NO cross-field validation, so a wrong body is
+    // accepted at the model and refused (or worse, stored) downstream.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: makeMcpConnection(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    const [, body] = onUpdate.mock.calls[0]
+    expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
+      "config",
+      "mcp_server_url",
+      "name",
+    ])
+    expect((body as Record<string, unknown>).config).toEqual({ headers: {} })
+    expect((body as Record<string, unknown>).mcp_server_url).toBe(ACCEPTED_MCP_URL)
+  })
+
+  it("POSITIVE CONTROL — editing a `send_email` row still renders the SMTP form unchanged", () => {
+    renderPanel({ mode: "edit", connection: makeConnection() })
+    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent("Send an email")
+    expect(screen.getByLabelText("SMTP host and port")).toBeInTheDocument()
+    // ⚠ `getByText` — see the note above: on EDIT this label has no control to point at.
+    expect(screen.getByText("App password")).toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · LADDERS 3 and 4, driven through the RENDER (SC#4 extended)", () => {
+  it("LADDER 4 — an MCP draft's secret is labelled `Access token`, never Slack's word", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseMcp(user)
+    expect(screen.getByLabelText(FORM_COPY.FIELD_MCP_SECRET_LABEL)).toBeInTheDocument()
+    // ⚠ Today an MCP draft falls to `secretLabel`'s trailing arm — `FIELD_SLACK_SECRET_LABEL`.
+    expect(screen.queryByLabelText("Bot token")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("App password")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("API token")).not.toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — the three shipped shapes still resolve their own secret labels", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    for (const [capability, label] of [
+      ["send_email", "App password"],
+      ["create_ticket", "API token"],
+      ["post_message", "Bot token"],
+    ] as const) {
+      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      expect(screen.getByLabelText(label)).toBeInTheDocument()
+    }
+  })
+
+  it("LADDER 3 — an MCP save-path refusal names the URL's HOST, and NOT the stray SMTP host", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("refused", 400, "address_not_public"))
+    renderPanel({ mode: "edit", connection: makeMcpConnectionWithStrayHost(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(screen.getByTestId("connection-save-refusal")).toBeInTheDocument())
+
+    const body = screen.getByTestId("connection-save-refusal-body").textContent ?? ""
+    expect(body).toContain("mcp.deepwiki.com")
+    // ⚠ THE FALSIFIABLE HALF: the fixture's config carries `smtp.fastmail.com`, so
+    // `draft.host` is NON-EMPTY. Today the ladder's trailing arm reports it.
+    expect(body).not.toContain("smtp.fastmail.com")
+  })
+
+  it("⚠ the SYNTHETIC FIFTH SHAPE gets NEUTRAL answers from both panel ladders", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi
+      .fn()
+      .mockRejectedValue(new ConnectorApiError("refused", 400, "address_not_public"))
+    renderPanel({ mode: "edit", connection: makeUnknownShapeConnection(), onUpdate })
+
+    // LADDER 4 — a neutral noun, never Slack's. (`getByText`: EDIT mode, unassociated label.)
+    expect(screen.getByText(FORM_COPY.FIELD_SECRET_LABEL_NEUTRAL)).toBeInTheDocument()
+    expect(screen.queryByText("Bot token")).not.toBeInTheDocument()
+
+    // No per-shape field block at all: Name and the secret, and nothing invented.
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(2)
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+
+    // The footer degrades to the WORD rather than claiming SMTP's facts.
+    expect(screen.getByTestId("connection-destination-value")).toHaveTextContent(FOOTER_NOTHING_YET)
+    expect(
+      screen.queryAllByTestId("connection-destination-tag").map((n) => n.textContent),
+    ).not.toContain(FOOTER_TAG_IMPLICIT_TLS)
+
+    // LADDER 3 — the refusal names no host it was not given.
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(screen.getByTestId("connection-save-refusal")).toBeInTheDocument())
+    expect(screen.getByTestId("connection-save-refusal-body").textContent ?? "").not.toContain(
+      "smtp.fastmail.com",
+    )
+  })
+})
+
+describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-03-EL)", () => {
+  it("a non-admin gets no chooser, no MCP option and no Save", () => {
+    const { container } = renderPanel({ isOrgAdmin: false })
+    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByText(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+    // ⚠ ABSENCE, not `toBeDisabled()` — 190-16's plant C shipped the exact defect a disabled
+    // assertion PASSES on.
+    expect(container.querySelectorAll("[disabled]")).toHaveLength(0)
+    expect(screen.getByText(PANEL_NON_ADMIN_NOTE)).toBeInTheDocument()
+  })
+
+  it("with `live_connectors` OFF the MCP option, its field block and Save are all gone", () => {
+    const { container } = renderPanel({ liveConnectorsOn: false })
+    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-mcp-save-disabled-reason")).not.toBeInTheDocument()
+    expect(container.querySelectorAll("[disabled]")).toHaveLength(0)
+  })
+
+  it("an MCP row opened while the kill-switch is off is READ-ONLY and still renders the MCP kind", () => {
+    renderPanel({ mode: "edit", connection: makeMcpConnection(), liveConnectorsOn: false })
+    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent(
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+    )
+    expect(screen.getByText(PANEL_OFF_HEADING)).toBeInTheDocument()
+    expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
+  })
+})
+
+describe("206.1 · the two shipped SOURCE fences still hold over the widened panel", () => {
+  it("the panel still authors NO sentence of its own — every MCP string is an imported identifier", () => {
+    for (const sentence of [
+      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      FORM_COPY.FIELD_MCP_URL_LABEL,
+      FORM_COPY.FIELD_MCP_URL_HELP,
+      FORM_COPY.FIELD_MCP_SECRET_LABEL,
+      FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE,
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+      FORM_COPY.FIELD_MCP_URL_PLACEHOLDER,
+    ]) {
+      expect(panelSource).not.toContain(sentence)
+    }
+    // Positive control: the fence can see a string in this source at all.
+    expect(panelSource).toContain("connection-mcp-save-disabled-reason")
+  })
+
+  it("the panel still imports NOTHING from `PhaseFormPanel`, and spells no tooltip attribute", () => {
+    // ⚠ IMPORT-SCOPED, NEVER A BARE GREP OVER THE WHOLE SOURCE — the 187-24 trap, measured
+    // here as this plan's own eleventh recorded firing. This file's header docblock NAMES
+    // `PhaseFormPanel` seven times to explain the lineage it deliberately does not import, so
+    // a whole-file grep expecting 0 is UNSATISFIABLE AT ITS OWN BASE and would go red on the
+    // prose that forbids the thing. The shipped fence at section 11 already got this right;
+    // this is the same filter, re-applied over the widened panel.
+    const importLines = panelSource
+      .split("\n")
+      .filter((line) => /^\s*import\b/.test(line) || /^\s*}\s*from\s+["']/.test(line))
+      .join("\n")
+    expect(importLines).not.toContain("PhaseFormPanel")
+    expect(importLines).toContain("connectionFormCopy")
+    // The tooltip refusal IS satisfiable over the whole source, and measured 0 at base.
+    expect(panelSource).not.toContain("title=")
   })
 })

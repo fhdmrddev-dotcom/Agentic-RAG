@@ -741,3 +741,186 @@ describe("canvasModel.toCanvas — the injected name context (Phase 187 / D-187-
     expect(JSON.stringify(after)).not.toContain(SKILL_ID)
   })
 })
+
+// ── Phase 209 (Item 1 fix) — mcpServerUrls resolution ───────────────────────────────────
+//
+// Finding F2 from the Phase 209 review: `canvasModel.ts` was reading
+// `phase.config?.mcp_server_url` which does not exist on `ExternalActionPhaseConfig`.
+// The mark must be resolved from the bound connection's `mcp_server_url` via
+// `NameContext.mcpServerUrls`. These tests verify the entire resolution chain through
+// `toCanvas` without touching `connectionMark.tsx` or `nodePresentation.ts` — the
+// "mocking neither side" requirement means the mock is only at the API boundary (the
+// injected `nameContext`), not inside the resolver or the mark primitive.
+
+const MCP_CONN_ID = "conn-mcp-deepwiki"
+const CAP_CONN_ID = "conn-cap-slack"
+const MCP_SERVER_URL = "https://mcp.deepwiki.com/mcp"
+
+const mcpPhase: PhaseSpecJSON = {
+  slug: "wiki-read",
+  phase_index: 0,
+  config: {
+    phase_type: "external_action",
+    connection_id: MCP_CONN_ID,
+    tool_name: "read_wiki_structure",
+  },
+}
+
+const capPhase: PhaseSpecJSON = {
+  slug: "slack-post",
+  phase_index: 0,
+  config: {
+    phase_type: "external_action",
+    connection_id: CAP_CONN_ID,
+    capability: "send_message",
+  },
+}
+
+describe("toCanvas — mcpServerUrls resolution (Phase 209 Item 1 fix)", () => {
+  it("forwards mcpServerUrl onto node data when the connection id resolves to an MCP URL", () => {
+    const result = toCanvas([mcpPhase], {
+      nameContext: {
+        mcpServerUrls: { [MCP_CONN_ID]: MCP_SERVER_URL },
+        connectionNames: { [MCP_CONN_ID]: "DeepWiki" },
+      },
+    })
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.mcpServerUrl).toBe(MCP_SERVER_URL)
+  })
+
+  it("does NOT forward mcpServerUrl when the connection is a capability-type (null in map)", () => {
+    const result = toCanvas([capPhase], {
+      nameContext: {
+        mcpServerUrls: { [CAP_CONN_ID]: null },
+        connectionNames: { [CAP_CONN_ID]: "Slack — Reports" },
+      },
+    })
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.mcpServerUrl).toBeUndefined()
+  })
+
+  it("does NOT forward mcpServerUrl when the map is absent (pre-fetch state)", () => {
+    const result = toCanvas([mcpPhase])
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.mcpServerUrl).toBeUndefined()
+  })
+
+  it("does NOT forward mcpServerUrl when the connection_id is missing from the map (miss = fall through)", () => {
+    const result = toCanvas([mcpPhase], {
+      nameContext: { mcpServerUrls: { "some-other-id": MCP_SERVER_URL } },
+    })
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.mcpServerUrl).toBeUndefined()
+  })
+
+  it("forwards connectionId onto node data alongside mcpServerUrl (both keys present)", () => {
+    const result = toCanvas([mcpPhase], {
+      nameContext: {
+        mcpServerUrls: { [MCP_CONN_ID]: MCP_SERVER_URL },
+      },
+    })
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.connectionId).toBe(MCP_CONN_ID)
+    expect(node.data.mcpServerUrl).toBe(MCP_SERVER_URL)
+  })
+
+  it("does NOT set mcpServerUrl when phase has no connection_id at all", () => {
+    const noConn: PhaseSpecJSON = {
+      slug: "cap-only",
+      phase_index: 0,
+      config: { phase_type: "external_action", capability: "send_email" },
+    }
+    const result = toCanvas([noConn], {
+      nameContext: { mcpServerUrls: { [MCP_CONN_ID]: MCP_SERVER_URL } },
+    })
+    const node = phaseNodes(result.nodes)[0]
+    expect(node.data.mcpServerUrl).toBeUndefined()
+    expect(node.data.connectionId).toBeUndefined()
+  })
+})
+
+describe("Phase 209 · SC#2 — the effect banner resolves from the SERVER'S annotation", () => {
+  /**
+   * ⚠ THESE ARE REGRESSION GUARDS FOR A DEFECT THAT SHIPPED IN THIS PHASE'S FIRST DRAFT, not
+   * speculative cases. That draft decided read-ness with
+   * `/^(read|get|list|search|fetch|query|describe|find|check|view|inspect)(_|[A-Z]|$)/i`
+   * over the TOOL NAME. MCP does not constrain tool naming, so a server author's
+   * `get_user_and_purge_records` matched `get_` and rendered ONLY READS while it deleted.
+   *
+   * The hint is a property of the TOOL on the CONNECTION, never of the step, so it arrives
+   * through `nameContext.toolReadOnly` — the same lookup shape as `connectionNames` and
+   * `mcpServerUrls` beside it.
+   */
+  const mcpStep = (toolName: string): PhaseSpecJSON[] => [
+    {
+      slug: "reach",
+      phase_index: 0,
+      config: {
+        phase_type: "external_action",
+        connection_id: "conn-1",
+        tool_name: toolName,
+      },
+    },
+  ]
+
+  const bannerOf = (phases: PhaseSpecJSON[], ctx?: Record<string, unknown>) =>
+    phaseNodes(toCanvas(phases, ctx ? { nameContext: ctx } : undefined).nodes)[0].data.effectBanner
+
+  it("renders ONLY READS on an explicit readOnlyHint === true", () => {
+    expect(
+      bannerOf(mcpStep("read_wiki_structure"), {
+        toolReadOnly: { "conn-1": { read_wiki_structure: true } },
+      }),
+    ).toBe("ONLY READS")
+  })
+
+  it("⚠ FAILS CLOSED: a read-VERB name with NO hint still says CHANGES SOMETHING OUTSIDE", () => {
+    // The anti-fabrication control. This is the DeepWiki shape, measured live 2026-08-25:
+    // a tool named `read_*` whose server ships no annotations at all. Silence must never be
+    // read as "safe" — the MCP spec treats an unannotated tool as destructive.
+    expect(bannerOf(mcpStep("read_wiki_structure"))).toBe("CHANGES SOMETHING OUTSIDE")
+    expect(bannerOf(mcpStep("get_issue"), { toolReadOnly: {} })).toBe("CHANGES SOMETHING OUTSIDE")
+    expect(
+      bannerOf(mcpStep("list_pages"), { toolReadOnly: { "conn-1": {} } }),
+    ).toBe("CHANGES SOMETHING OUTSIDE")
+  })
+
+  it("⚠ a WRITE tool whose name merely starts with a read verb is never quieted", () => {
+    // The exact exploit the first draft admitted.
+    expect(
+      bannerOf(mcpStep("get_user_and_purge_records"), {
+        toolReadOnly: { "conn-1": { get_user_and_purge_records: false } },
+      }),
+    ).toBe("CHANGES SOMETHING OUTSIDE")
+    // …and with no hint at all, which is how it would really arrive.
+    expect(bannerOf(mcpStep("get_user_and_purge_records"))).toBe("CHANGES SOMETHING OUTSIDE")
+  })
+
+  it("a hint for a DIFFERENT tool on the same connection does not leak across", () => {
+    expect(
+      bannerOf(mcpStep("create_issue"), {
+        toolReadOnly: { "conn-1": { read_wiki_structure: true } },
+      }),
+    ).toBe("CHANGES SOMETHING OUTSIDE")
+  })
+
+  it("a hint on a DIFFERENT connection does not leak across", () => {
+    expect(
+      bannerOf(mcpStep("read_wiki_structure"), {
+        toolReadOnly: { "conn-2": { read_wiki_structure: true } },
+      }),
+    ).toBe("CHANGES SOMETHING OUTSIDE")
+  })
+
+  it("the three shipped capability shapes are untouched (SC#5)", () => {
+    for (const capability of ["send_email", "create_ticket", "post_message"]) {
+      const phases: PhaseSpecJSON[] = [
+        { slug: "act", phase_index: 0, config: { phase_type: "external_action", capability } },
+      ]
+      expect(bannerOf(phases)).toBe("CHANGES SOMETHING OUTSIDE")
+      expect(bannerOf(phases, { toolReadOnly: { "conn-1": { read_x: true } } })).toBe(
+        "CHANGES SOMETHING OUTSIDE",
+      )
+    }
+  })
+})

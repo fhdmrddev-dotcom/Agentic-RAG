@@ -124,10 +124,8 @@ import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
 import { NodeCornerMarks } from "@/components/workflows/NodeCornerMarks"
 import { NodeIconWell } from "@/components/workflows/NodeIconWell"
 import { NodeRunOverlay } from "@/components/workflows/NodeRunOverlay"
-// Phase 200 (canvas port) — the sheet's third body line and its ONE string home. The
-// module is a true leaf (it imports nothing), and its docblock carries the reason the
-// sheet's SECOND banner, `ONLY READS`, is declined rather than approximated.
-import { effectBannerFor } from "@/components/workflows/nodeEffectBanner"
+// Phase 200 (canvas port) / Phase 209 (Item 2) — the effect banner.
+import { EFFECT_BANNER_READ_ONLY, effectBannerFor } from "@/components/workflows/nodeEffectBanner"
 // 188.2-06: the slot contract, imported back from its own leaf. THERE IS NO RE-EXPORT
 // SHIM here and there may never be one (D-06): a re-export that exists so nobody has to
 // change two lines is a second name for the same type, free to be the one a later phase
@@ -193,16 +191,16 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     grounded,
     selected,
     anchors,
+    effectBanner: explicitEffectBanner,
   } = props
 
   // RUN MODE is exactly "a reading was supplied". Everything 188 adds hangs off this one
   // boolean, so the Builder — which supplies no reading — renders the 185 card unchanged.
   const reading = status ?? null
   const runBorder = reading === null ? undefined : runReadingBorder(reading)
-  // Phase 200 (canvas port) — resolved by a total function over the phase type, so an
-  // unrecognised forward-compat discriminator yields `null` and the card renders no
-  // banner element at all. No lookup and no default string: see `nodeEffectBanner.ts`.
-  const effectBanner = effectBannerFor(phaseType)
+  // Phase 200 (canvas port) / Phase 209 — resolved by a total function over the phase type,
+  // or explicit prop from caller with tool/read config.
+  const effectBanner = explicitEffectBanner !== undefined ? explicitEffectBanner : effectBannerFor(phaseType)
   const minHeight = reading === null ? CANVAS_LAYOUT.NODE_MIN_HEIGHT : RUN_MODE_NODE_MIN_HEIGHT
 
   return (
@@ -361,7 +359,10 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
             // RESTING card (any `external_action` step), so a prefixed name would be counted
             // as a node. Measured: `WorkflowCanvas.test.tsx`'s seven-type roster read 8.
             data-testid="canvas-effect-banner"
-            className="mt-1 text-[9px] font-bold leading-snug tracking-wider text-warning"
+            className={cn(
+              "mt-1 text-[9px] font-bold leading-snug tracking-wider",
+              effectBanner === EFFECT_BANNER_READ_ONLY ? "text-muted-foreground" : "text-warning",
+            )}
           >
             {effectBanner}
           </p>

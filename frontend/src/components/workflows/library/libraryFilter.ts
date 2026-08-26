@@ -123,6 +123,16 @@ export function fromPublished(
     // it. Both fields pass through untouched — no default, no coalesce, no normalization.
     lastRunAt: row.last_run_at,
     lastRunStatus: row.last_run_status,
+    // Phase 204.1 (SCHED-01 follow-up) — the active-schedule facts, on the SAME verbatim
+    // rule as the two lines above: passed through with NO default and NO coalesce. An
+    // absence here is a real answer ("nothing is scheduled"), and manufacturing one would be
+    // the CR-01 shape a third time. ⚠ `fromDraft` below does NOT get these — a draft cannot
+    // hold a schedule, so the field would be permanently null rather than merely empty.
+    nextScheduleAt: row.next_schedule_at,
+    nextScheduleCron: row.next_schedule_cron,
+    nextScheduleIntervalSeconds: row.next_schedule_interval_seconds,
+    nextScheduleTimezone: row.next_schedule_timezone,
+    nextScheduleCount: row.next_schedule_count,
     // 192.2-10 (LIB-06 / CR-01 / DEC-10-A) — the ROW-LEVEL run bit, on the SAME verbatim rule
     // as the two lines above; the paragraph there is the argument and is deliberately not
     // written a third time. ⚠ NO `??`, NO `Boolean(...)`, NO DEFAULT: a `?? false` here would

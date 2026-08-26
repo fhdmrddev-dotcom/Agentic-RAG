@@ -267,6 +267,25 @@ class PublishedWorkflow(BaseModel):
     last_run_at: str | None = None
     last_run_status: str | None = None
     has_any_run: bool | None = None
+    # ── Phase 204.1 (SCHED-01 follow-up) — the ACTIVE schedule, so a card can say so ──
+    # ⚠ DECLARED HERE OR THE COLUMNS ARE DROPPED SILENTLY. This route carries
+    # ``response_model=list[PublishedWorkflow]``, and an undeclared key vanishes without an
+    # error — a green db test beside an unchanged UI (T-192.2-11, measured on this very
+    # model). The projection, this model and the serializer move in ONE commit or none.
+    # ⚠ ON `PublishedWorkflow` ONLY. `DraftRow` carries these same three lines and is
+    # deliberately NOT widened: the schedules API refuses a draft, so a draft can never have
+    # one and a nullable field there would be structurally always null.
+    # ⚠ ``next_schedule_count`` counts ACTIVE schedules on the row, not runs — a workflow may
+    # carry many (nothing constrains ``workflow_id``); the soonest is the only one a card
+    # line can hold.
+    # ⚠ ABSENT means "no active schedule", NOT "never scheduled": a PAUSED schedule reads
+    # absent on purpose, because the modal's Pause exists to stop it without deleting it and
+    # a badge ignoring that would contradict the button.
+    next_schedule_at: str | None = None
+    next_schedule_cron: str | None = None
+    next_schedule_interval_seconds: int | None = None
+    next_schedule_timezone: str | None = None
+    next_schedule_count: int | None = None
 
 
 def _caller_uuid(current_user: dict) -> UUID | None:
@@ -501,6 +520,13 @@ async def get_published_workflows(
             # key into ``False``, i.e. into the affirmative claim "nobody has run this", which
             # is this bug one layer down (DEC-08-C).
             has_any_run=r.get("has_any_run"),
+            # Phase 204.1 — the active-schedule projection. ``r.get`` for the reason the
+            # line above gives: a MISSING key stays absent, never an affirmative claim.
+            next_schedule_at=_iso_or_none(r.get("next_schedule_at")),
+            next_schedule_cron=r.get("next_schedule_cron"),
+            next_schedule_interval_seconds=r.get("next_schedule_interval_seconds"),
+            next_schedule_timezone=r.get("next_schedule_timezone"),
+            next_schedule_count=r.get("next_schedule_count"),
         )
         for r in rows
     ]

@@ -149,7 +149,8 @@ import { countDeclared } from "@/components/workflows/receiptVocabulary"
 // than a second predicate: a re-spelled banner here would agree with the canvas only until
 // one of them was edited. Its `ONLY READS` sibling stays DECLINED — no wire field can
 // resolve a step to it — and the decline plus its dated re-open trigger live in that module.
-import { effectBannerFor } from "@/components/workflows/nodeEffectBanner"
+import { EFFECT_BANNER_READ_ONLY, effectBannerFor } from "@/components/workflows/nodeEffectBanner"
+import { cn } from "@/lib/utils"
 // Phase 200 (FE-WIRING) — the selected row's two detail lines, string home + worded scale.
 import {
   literalReading,
@@ -396,7 +397,23 @@ export function PhaseSpineGraph({
           // outside" is true of the DRAFT, before anything has ever executed. That is what
           // separates it from the duration, the outcome and the branch reading on this same
           // card, all three of which stay behind `runTense`.
-          const effectBanner = effectBannerFor(phase.config.phase_type)
+          // Phase 209 (Item 2 · SC#2) — same resolution as `canvasModel.buildPhaseData`, and
+          // deliberately the same shape rather than a spine-local variant: the hint belongs to
+          // the TOOL on the bound connection, never to the step, so `phase.config.readOnlyHint`
+          // is structurally always undefined. FAILS CLOSED — no map, no connection, no tool, or
+          // a server that sent no hint all yield `CHANGES SOMETHING OUTSIDE`.
+          const spineConnId = phase.config?.connection_id
+          const spineToolName = phase.config?.tool_name
+          const spineReadOnly =
+            typeof spineConnId === "string" && typeof spineToolName === "string"
+              ? nameContext?.toolReadOnly?.[spineConnId.trim()]?.[spineToolName.trim()]
+              : undefined
+          const effectBanner = effectBannerFor(
+            phase.config.phase_type,
+            spineReadOnly === undefined
+              ? phase.config
+              : { ...phase.config, readOnlyHint: spineReadOnly },
+          )
           // Phase 200 (FE-WIRING) — the sheet's two detail lines, rendered ONLY on the
           // selected row (the sheet draws them under a dashed divider on its Step 3 card,
           // which is its selected one). Both are what the AUTHOR wrote, read back: the
@@ -522,7 +539,12 @@ export function PhaseSpineGraph({
                     <span className="flex items-center">
                       <span
                         data-testid="node-effect-banner"
-                        className="rounded border border-warning/20 bg-warning/10 px-2 py-0.5 font-mono text-[10px] tracking-widest text-warning"
+                        className={cn(
+                          "rounded border px-2 py-0.5 font-mono text-[10px] tracking-widest",
+                          effectBanner === EFFECT_BANNER_READ_ONLY
+                            ? "border-border bg-muted/30 text-muted-foreground"
+                            : "border-warning/20 bg-warning/10 text-warning",
+                        )}
                       >
                         {effectBanner}
                       </span>

@@ -725,3 +725,42 @@ export const MATCH_REASON_WORDS = {
  * line spends, so the card carries one separator vocabulary rather than two.
  */
 export const MATCH_REASON_SEPARATOR = "·"
+
+/**
+ * Phase 204.1 (SCHED-01 follow-up) — the AUTOMATION words, for the identity line.
+ *
+ * ⚠ WHY THESE EXIST. 204 shipped scheduling and the card said nothing: a workflow that fires
+ * every Monday at 08:00 read identically to one that had never been automated, and the only
+ * way to tell was to open the ⋯ menu on every card in turn. For a feature whose whole point
+ * is running while nobody watches, invisible is the wrong default.
+ *
+ * ⚠ THEY SAY *RUNS ON ITS OWN*, NOT *SCHEDULED*. "Scheduled" is the author's word for the
+ * thing they configured; "runs on its own" is the reader's word for what it MEANS — and this
+ * line is read by someone scanning 122 cards, not by the person who just set it up. Same
+ * register as `changed 2 days ago` beside it: a fact about the row in plain words.
+ *
+ * ⚠ NO GLYPH. The identity line is the card's ONE uppercase run and spends no colour and no
+ * icon — that is what demotes it below the 14px name. A clock emoji here would make the
+ * automation fact louder than the workflow's own name.
+ *
+ * ⚠ THE PLURAL IS A SEPARATE STRING, NOT A CONDITIONAL `s`. Many schedules on one workflow
+ * is the intended shape (a weekday digest plus a monthly roll-up), so the line has to survive
+ * saying so; building it from string concatenation is how a copy change stops being a
+ * one-line diff in one file.
+ */
+export const AUTOMATION_RUNS_ITSELF = "runs on its own"
+
+/** The cadence, when it is one of the offered presets. `null` when it is a custom cron —
+ *  the card says only THAT it runs itself, never a cron expression a reader cannot parse. */
+export const AUTOMATION_CADENCE: Record<string, string> = {
+  "0 * * * *": "runs hourly",
+  "0 3 * * *": "runs daily",
+  "0 8 * * 1-5": "runs every weekday",
+  "0 8 * * 1": "runs every Monday",
+  "0 6 1 * *": "runs monthly",
+}
+
+/** `+2 more` — the OTHER active schedules, when the row carries more than one. */
+export function automationMoreCount(n: number): string {
+  return `+${n} more`
+}

@@ -257,6 +257,46 @@ def _definition_with_external_actions(capabilities: list[str], *, extra_phases=(
     }
 
 
+def _definition_with_mcp_external_action(
+    tool_name: str, *, available_tools: list[str] | None = None
+) -> dict:
+    """ONE ``external_action`` phase in the **MCP SHAPE** — ``tool_name``, no ``capability``.
+
+    Phase 206 added ``tool_name`` / ``tool_args`` to ``ExternalActionPhaseConfig`` and made
+    ``tool_name`` OUTRANK ``capability`` inside the very same D-03 validator
+    ``_definition_with_external_actions`` above documents: an MCP step derives
+    ``available_tools = [tool_name]``. **So the omission of ``available_tools`` here is the
+    SHIPPED shape, not an oversight** — the model fills it in, and a client that sent
+    anything else would have it totally replaced.
+
+    ``available_tools`` is accepted only so a caller can ASK for the disagreeing shape on
+    purpose; the model will still overwrite it, which is precisely why control B drives
+    ``_unregistered_tools`` directly rather than through a real config (see its docstring).
+    """
+    config: dict = {
+        "phase_type": "external_action",
+        "tool_name": tool_name,
+        "tool_args": {"repoName": "facebook/react"},
+    }
+    if available_tools is not None:
+        config["available_tools"] = list(available_tools)
+    return {
+        "slug": "mcp-wf",
+        "version": 1,
+        "name": "MCP Workflow",
+        "status": "draft",
+        "phases": [
+            {
+                "slug": "act-mcp",
+                "phase_index": 0,
+                "config": config,
+                "validators": [],
+            }
+        ],
+    }
+
+
+
 async def _production_tool_names() -> set[str]:
     """The ACTUAL ``tool_names`` set stage 2.6 tests membership against.
 
@@ -529,4 +569,177 @@ async def test_the_fidelity_membership_set_contains_the_capabilities():
     assert "search_documents" in tool_names, (
         f"the widened set no longer contains a known shipped tool — tool_names was "
         f"REPLACED rather than widened. Got {sorted(tool_names)!r}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# ⚠ ADDED, NEVER RE-BASELINED — every case above this banner is untouched by 206.2
+# ══════════════════════════════════════════════════════════════════════════════════════
+#
+# PHASE 206.2 · D-206.2-19 — THE MCP SHAPE CANNOT PUBLISH, AND THIS IS THE BOUNDARY
+#
+# Phase 206 shipped the MCP engine and, in the SAME commit, made ``tool_name`` outrank
+# ``capability`` inside ``ExternalActionPhaseConfig._available_tools_is_the_capability``.
+# That is correct — ``tool_name`` IS an MCP step's one whitelist. What it also did, and what
+# nothing caught, is falsify the paragraph in ``_unregistered_tools``' own docstring saying
+# the CR-01 narrowing "COSTS ``external_action`` NOTHING" and that D-06 ("a workflow
+# containing the external-action node PUBLISHES") "stays true by construction".
+#
+# Measured at this plan's base, against the REAL functions:
+#
+#     RULE 2 offenders (MCP step):    ['ask_question']
+#     RULE 2 offenders (native step): []
+#
+# ``unregistered_tool`` is in neither of ``api/workflows.py``'s soft severity buckets
+# (``_ERROR_CODES = _KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES``), so it resolves
+# to **``error``**, and ``publish_service.py`` stage 2.6 ``grounding_fidelity`` blocks BEFORE
+# the golden run. Nothing in production could reach the shape, so the whole gate was green
+# while the feature was unpublishable.
+#
+# ⚠ THE FIX IS A WIDENING BY EXACTLY ONE NAME, AND THESE CASES ARE WHAT PROVE IT IS NOT A
+# LOOSENING. The admissible set for an ``external_action`` phase gains THAT PHASE'S OWN
+# ``tool_name`` — the same value ``available_tools`` is already DERIVED from — so the two are
+# equal by construction and nothing new becomes representable. Three cases hold the boundary:
+#
+#   * the POSITIVE: an MCP-shaped step earns zero rule-2 findings;
+#   * CONTROL A-prime: an ``llm_agent`` step naming the SAME MCP tool is STILL flagged (the
+#     widening is scoped by the ``phase_type`` test, never by the name) — the MCP mirror of
+#     the shipped ``test_a_capability_on_an_llm_agent_step_still_blocks_publish``, which is
+#     CONTROL A and passes here UNEDITED;
+#   * CONTROL B: an ``external_action`` phase whose ``available_tools`` DISAGREES with its
+#     own ``tool_name`` is STILL flagged (the widening admits the SOURCE, not the DERIVED
+#     list, so the check cannot become tautological).
+#
+# ⚠ PUBLISHING GRANTS NOTHING. An MCP tool is closed at run time by the PER-TOOL GRANT —
+# ``phase_types.py`` GATE 6, ``grants.get(tool_name) is True``, where a MISSING KEY DENIES and
+# a refusal writes a ``tool_refused`` audit row. Admitting a name to a fidelity check is not
+# an authorization decision (D-206.2-05).
+
+
+@pytest.mark.asyncio
+async def test_an_mcp_shaped_external_action_step_publishes_clean():
+    """D-206.2-19 — **the MCP publish blocker. RED at this plan's base.**
+
+    A single ``external_action`` phase in the MCP shape — ``tool_name`` set, ``capability``
+    genuinely absent — must earn **zero** ``unregistered_tool`` findings. While it earns one,
+    publish stage 2.6 (``publish_service._grounding_fidelity_failures`` →
+    ``_block(stage="grounding_fidelity")``) refuses the workflow BEFORE the golden run, and
+    the MCP authoring door Phase 206.2 builds leads somewhere a publish cannot follow.
+
+    Driven through ``_unregistered_tool_findings_for`` — the SAME collector
+    (``grounding_verdicts``) and the SAME production ``tool_names`` set the publish gate uses,
+    for the reason ``_production_tool_names``' docstring gives: a re-derived set would measure
+    the patch instead of the property.
+
+    ⚠ **The fix this case owns is a WIDENING BY ONE NAME, never a disabling of rule 2.**
+    ``test_a_genuinely_unknown_tool_still_produces_the_finding`` above is the fence around the
+    cheapest wrong fix, and controls A / A-prime / B are the fences around the next two.
+    """
+    findings = await _unregistered_tool_findings_for(
+        _definition_with_mcp_external_action("ask_question")
+    )
+
+    assert findings == [], (
+        f"D-206.2-19: stage 2.6 rule 2 refuses an MCP-shaped external_action step. "
+        f"Findings emitted: {findings!r}. `available_tools` is DERIVED as [tool_name] by "
+        f"ExternalActionPhaseConfig._available_tools_is_the_capability, and "
+        f"_unregistered_tools admits only EXTERNAL_ACTION_CAPABILITIES on this type — so "
+        f"the tool name is a rule-2 offender, api/workflows.py resolves it to severity "
+        f"'error' (it is in neither soft bucket), and publish_service.py blocks at stage "
+        f"2.6 grounding_fidelity before the golden run. FIX: inside the existing "
+        f"`phase_type == 'external_action'` arm, admit the phase's OWN tool_name — one "
+        f"name, the same one available_tools is derived from. NEVER disable rule 2, and "
+        f"NEVER widen assemble_grounding_bundle's fidelity_tool_names (that would re-create "
+        f"CR-01's wire-around one level up, for every phase type)."
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_mcp_tool_name_on_an_llm_agent_step_still_blocks_publish():
+    """**CONTROL A-prime** — the MCP mirror of CR-01. The widening is scoped by TYPE, not NAME.
+
+    Its partner is the SHIPPED ``test_a_capability_on_an_llm_agent_step_still_blocks_publish``
+    (control A), which this plan may not edit and which proves the *capability* half of the
+    same boundary. This case proves the *MCP tool* half, and it is the one that would go red
+    if the widening were written as "admit ``tool_name`` wherever a phase happens to carry
+    one" rather than inside the existing ``phase_type == "external_action"`` arm.
+
+    Why it matters, in CR-01's own terms: an ``llm_agent`` step has ``action_risk_armed:
+    false`` and no D-04 checkpoint. A definition reaching the server through ``POST
+    /workflows`` / the draft ``PATCH`` / the NL generator — none of which is the
+    author-facing rail — carrying ``{"phase_type": "llm_agent", "available_tools":
+    ["ask_question"]}`` must NOT publish clean. The author-facing rail fences what the CLIENT
+    is OFFERED; it fences nothing about what the SERVER ACCEPTS.
+
+    Same collector, same ``tool_names`` source and same fixture family as the positive above
+    — the ONLY difference is ``phase_type``, which is what makes the pair a measurement of
+    the boundary itself rather than of two unrelated code paths.
+    """
+    findings = await _unregistered_tool_findings(["ask_question"])
+
+    assert len(findings) == 1, (
+        f"CONTROL A-prime / SC#2: an ORDINARY, UNARMED llm_agent step may whitelist the MCP "
+        f"tool 'ask_question' and publish clean. That is CR-01's wire-around in the MCP "
+        f"shape — it makes action_risk_armed decorative and skips the D-04 checkpoint "
+        f"entirely. The 206.2 widening must live INSIDE the existing phase_type == "
+        f"'external_action' arm. Findings emitted: {findings!r}"
+    )
+    assert findings[0]["code"] == "unregistered_tool", findings
+    assert findings[0]["phase"] == "research", findings          # per-node, keyed on the slug
+    assert repr("ask_question") in findings[0]["message"], findings
+
+
+@pytest.mark.asyncio
+async def test_an_external_action_whose_available_tools_disagrees_with_its_tool_name_is_flagged():
+    """**CONTROL B** — the widening admits the SOURCE (``tool_name``), never the DERIVED list.
+
+    ⚠ **THIS CASE DRIVES ``_unregistered_tools`` DIRECTLY, WITH A ``SimpleNamespace`` STUB,
+    AND THAT IS DELIBERATE ENGINEERING RATHER THAN A SHORTCUT.** The disagreeing state is NOT
+    REPRESENTABLE through ``ExternalActionPhaseConfig``: its ``@model_validator(mode="after")``
+    TOTALLY REPLACES ``available_tools`` with ``[tool_name]``, so a definition built through
+    the model can never carry the shape this case must measure. ``_unregistered_tools`` reads
+    ``phase.config`` exclusively through ``getattr`` and is contractually duck-typed — both
+    presentations share it — so a stub is a legitimate caller. **This is the only test that
+    would still catch a publish-bypass if the model validator's invariant were ever
+    weakened**, which is exactly why it is worth having despite not going through the model.
+
+    Both halves live in ONE case on purpose, so the pair measures the boundary rather than
+    being two unrelated drives: the DISAGREEING list is still flagged (and the flagged name
+    is the disagreeing one, never the ``tool_name``), while the AGREEING list is clean. A
+    widening written as ``allowed |= set(available_tools)`` would make the check tautological
+    and would turn the first half green for the wrong reason.
+    """
+    # Imports inside the body — this file's stated Phase-102 posture.
+    from types import SimpleNamespace
+
+    from app.services.harness.grounding import _unregistered_tools
+
+    tool_names = await _production_tool_names()
+
+    disagreeing = SimpleNamespace(
+        config=SimpleNamespace(
+            phase_type="external_action",
+            tool_name="ask_question",
+            available_tools=["read_wiki_contents"],
+        )
+    )
+    assert _unregistered_tools(disagreeing, tool_names) == ["read_wiki_contents"], (
+        "CONTROL B: an external_action phase whose available_tools DISAGREES with its own "
+        "tool_name is no longer flagged. The 206.2 widening must add the phase's own "
+        "tool_name to `allowed` — the SOURCE the model derives from — and must NOT add "
+        "`available_tools` itself, which would make rule 2 tautological on this type. Got "
+        f"{_unregistered_tools(disagreeing, tool_names)!r}"
+    )
+
+    agreeing = SimpleNamespace(
+        config=SimpleNamespace(
+            phase_type="external_action",
+            tool_name="ask_question",
+            available_tools=["ask_question"],
+        )
+    )
+    assert _unregistered_tools(agreeing, tool_names) == [], (
+        "D-206.2-19: the AGREEING shape — the only one ExternalActionPhaseConfig can "
+        "actually produce for an MCP step — is still flagged, so publish stage 2.6 still "
+        f"blocks. Got {_unregistered_tools(agreeing, tool_names)!r}"
     )

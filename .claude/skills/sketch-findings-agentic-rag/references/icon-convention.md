@@ -54,6 +54,42 @@ and always keep a fallback.
 - For a build that ships an icon set: confirm presence at build time (or bundle the
   exact SVGs) so no production icon can render empty.
 
+### ⚠ CORRECTED 2026-08-25 (Phase 206.1-01) — the FACT above is right, the MECHANISM is not
+
+**Both sentences above are kept verbatim and neither is deleted.** The `direct-hit` FACT was
+re-measured at HEAD this phase and is TRUE: it is genuinely ABSENT from the installed
+`@iconify-json/fluent-emoji` (3,174 icons), and `bullseye` is PRESENT. *"Verify the slug"* is
+still the right instruction. What is corrected is **what happens when you don't**, because the
+remedy the bullets prescribe is aimed at a failure this repo can no longer have.
+
+**Measured, by driving throwaway suites under `unplugin-icons@23.0.1` + vitest and deleting them:**
+under `unplugin-icons` with a **LOCAL collection**, an absent slug is a **transform-time HARD
+ERROR** — `Error: Icon \`fluent-emoji/definitely-not-a-real-icon-xyz\` not found`, and the suite
+loads **zero tests**. Identical behaviour for a slug from an **uninstalled** collection. It cannot
+render empty because it cannot build.
+
+The **empty render** §3 describes belongs to the **RUNTIME Iconify API path** — `<Icon icon="…"/>`
+fetching from `api.iconify.design` — which this repo does not use on these surfaces.
+
+**Three consequences, none of which the original bullets imply:**
+
+1. **The import IS the fence.** *"Confirm presence at build time"* needs no extra build assertion
+   on a `~icons/<set>/<slug>` import: writing the import is the confirmation, and a test file that
+   imports the mark is simultaneously the non-vacuity control for the dependency itself.
+2. **What still needs a test is `resolved-but-EMPTY`** — `svg.innerHTML.length > 0` per mark, plus
+   pairwise distinctness so a copy-paste mapping two keys to one import fails.
+3. ⚠ **And a class §3 did not anticipate: `resolved-but-INVISIBLE`.** Found this phase.
+   `logos:model-context-protocol-icon` resolves, renders a 1,060-character body, and passes every
+   test — and its single drawable element carries **no `fill` and no `currentColor`**, so it
+   inherits the SVG default `fill: black` and is effectively **invisible** on Deep Midnight
+   (`--card: 220 30% 7%`). §3's trap in a new form, and a build-error fence structurally cannot see
+   it. The remedy is an **ink contract**, written and asserted at
+   `frontend/src/components/settings/connectionMark.tsx` — three inks, one per icon-body mechanic,
+   each with its measured reason. ⚠ Its third arm matters as much as the second: a colour utility
+   must **never** be applied to a `lucide-react` glyph, whose `fill="none" stroke="currentColor"`
+   are presentation attributes that a CSS rule on the same element overrides, filling the outline
+   into a solid blob.
+
 ## 4. The CANVAS glyph vocabulary — read this before drawing any canvas mark
 
 Added 2026-08-01 (MANIFEST decision 64) after an icon audit of sketches 148-151 caught **four

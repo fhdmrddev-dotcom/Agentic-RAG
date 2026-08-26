@@ -153,6 +153,25 @@ export interface LibraryRow {
    * of the middle one. The ROW-LEVEL answer now arrives separately, on `hasAnyRun` below, and
    * `runFacts.ts` reads the PAIR.
    */
+  /**
+   * Phase 204.1 (SCHED-01 follow-up) — the soonest ACTIVE schedule on this row, if any.
+   *
+   * ⚠ PUBLISHED ROWS ONLY. `fromDraft` does not set these: the schedules API refuses a draft,
+   * so a draft can never carry one and a value here would be structurally always absent.
+   *
+   * ⚠ ABSENT IS "NO ACTIVE SCHEDULE", NOT "NEVER SCHEDULED". A PAUSED schedule reads absent
+   * on purpose — the modal's Pause exists to stop a schedule without deleting it, and a card
+   * that still claimed "runs every Monday" would contradict the button the author just used.
+   *
+   * ⚠ `nextScheduleCount` counts ACTIVE SCHEDULES, never runs. A workflow may carry many
+   * (nothing constrains `workflow_id` — a weekday digest plus a monthly roll-up is the
+   * intended shape); the soonest is the only one an 11px identity line can hold.
+   */
+  nextScheduleAt?: string | null
+  nextScheduleCron?: string | null
+  nextScheduleIntervalSeconds?: number | null
+  nextScheduleTimezone?: string | null
+  nextScheduleCount?: number | null
   lastRunAt: string | null | undefined
   /**
    * Phase 192.2 (LIB-06 / D-08) — the RAW status of that run, exactly as `workflow_runs.status`

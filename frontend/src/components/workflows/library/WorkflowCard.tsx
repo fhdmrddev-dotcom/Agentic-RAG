@@ -262,6 +262,9 @@ import { Fragment, useRef, useState } from "react"
 // the footer verbs as ICON + WORD (`play_arrow` / `open_in_new`) rather than as a glyph baked
 // into the label string, and it leads the `not-by-you` status line with `person`.
 import {
+  // 204 (SCHED-01) — the schedules door's mark, from the SAME house chrome set as `History`
+  // beside it. Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
+  CalendarClock,
   ExternalLink,
   FileText,
   Folder,
@@ -292,6 +295,7 @@ import {
 import { templateAdmission } from "@/components/workflows/soulData"
 import { deleteWorkflowDraft } from "@/lib/api"
 
+import { automationFacts } from "./automationFacts"
 import { cardFace, type CardFace, type CardMark } from "./cardFace"
 import { CHIP_PREDICATES, type MatchReason } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
@@ -349,6 +353,9 @@ const DELETE_WORKFLOW_LABEL = "Delete workflow…"
  * clicking it lands on a screen whose heading is the word you clicked.
  */
 const RUN_LOG_LABEL = "Run log"
+// Phase 204 (SCHED-01). Sited beside RUN_LOG_LABEL and following its precedent exactly: a
+// card-local constant, because that is where this card already keeps its own menu words.
+const SCHEDULE_LABEL = "Schedules…"
 
 /**
  * D-18's word for a draft. NO ellipsis, and the asymmetry is the point: this guard is one
@@ -758,6 +765,23 @@ export interface WorkflowCardProps {
    * has to SAY what it is filtered to and a slug is a machine name.
    */
   onRunLog?: (scope: { slug: string; name: string }) => void
+  /**
+   * Phase 204 (SCHED-01) — open this workflow's SCHEDULES. Absent = the door is not offered,
+   * exactly like `onRunLog` above, which is how this card behaves anywhere schedules have no
+   * host.
+   *
+   * ⚠ IT HANDS UP THE ROW'S `id` AND NOT ITS SLUG, and that is the OPPOSITE of `onRunLog` for
+   * a reason worth stating rather than looking like an inconsistency. A run LOG spans a
+   * workflow's published versions, so it is slug-scoped. A SCHEDULE is a foreign key to ONE
+   * `workflow_definitions` row — the exact version that will execute unattended — so it is id-
+   * scoped. Handing up a slug here would leave the server to pick a version, and "which
+   * version does the 3am run use" is not a question a caller should answer by omission.
+   *
+   * ⚠ OFFERED ON PUBLISHED ROWS ONLY. The API refuses a draft with a 400 (a draft is mutable,
+   * and an unattended run of a mutable workflow is one nobody agreed to), so offering it on a
+   * draft would be an affordance that exists only to be refused.
+   */
+  onSchedule?: (scope: { id: string; name: string }) => void
   /** Launch a runnable row (the Phase-121 one-click launch, unchanged). */
   onRun: (row: LibraryRow) => void
   /** Open a draft in the Builder (edit-in-place; saves PATCH the same row). */
@@ -872,6 +896,7 @@ export function WorkflowCard({
   folderName = null,
   onRun,
   onRunLog,
+  onSchedule,
   onOpen,
   onForkNewVersion,
   onForkStarter,
@@ -1033,6 +1058,9 @@ export function WorkflowCard({
    * does not move. `templateMark` spreads an empty array on the two silent arms, so a row that
    * does not admit composes byte-identically to the way it did before this phase.
    */
+  // Phase 204.1 — resolved by the leaf, never decided here. See `automationFacts.ts`.
+  const automation = automationFacts(row)
+
   const identityParts: string[] = [
     ...templateMark,
     // ⚠ BUG-260819-01 — THE STATE WORD RENDERED TWICE ON A NAME-COLLIDING ROW, and this is the
@@ -1201,6 +1229,47 @@ export function WorkflowCard({
                 spells NO lifecycle word anywhere; `row.provenance` reaches `cardFace` as an
                 input key and nothing else. */}
             <span className={STATE_TONE[face.mark]}>{face.state}</span>
+            {/* ⚠ Phase 204.1 (SCHED-01 follow-up) — THE AUTOMATION FACT, MOVED HERE FROM THE
+                IDENTITY LINE ON OPERATOR FEEDBACK, and the move is the finding. It first
+                shipped as a segment on the 11px uppercase meta line, which honoured that
+                line's no-colour/no-glyph rule perfectly and WAS NOT SEEN — the operator
+                scanned the card and asked where it was. A fact that survives the style guide
+                and fails the glance has not indicated anything.
+
+                ⚠ THIS LINE IS WHERE A READER ALREADY LOOKS. It answers *does this one work*
+                — `Worked 4 days ago | Ready to run` — and "it also runs itself on Mondays" is
+                the same KIND of fact at the same 12px weight, which is why it belongs beside
+                them rather than one register down among the discriminators.
+
+                ⚠ IT SPENDS A GLYPH AND THE ACCENT TONE, WHICH THE META LINE COULD NOT. This
+                line already carries a coloured dot and a `Wrench`, so a `CalendarClock` here
+                introduces no new vocabulary — and it is the SAME glyph the ⋯ menu's
+                `Schedules…` item uses, so the mark that says "automated" is one mark in two
+                places rather than two spellings of one idea.
+
+                ⚠ IT STAYS SILENT ON EVERY UNSCHEDULED ROW. `automation.phrase === null`
+                renders nothing at all — no separator, no glyph — so 110 of 111 cards compose
+                byte-identically and this column's by-child-order pins keep passing. */}
+            {automation.phrase !== null && (
+              <>
+                <span aria-hidden="true" className="text-border">
+                  {ANSWER_SEPARATOR}
+                </span>
+                <CalendarClock
+                  data-testid="row-automation-glyph"
+                  className="h-3.5 w-3.5 flex-none text-primary"
+                  aria-hidden="true"
+                />
+                <span data-testid="row-automation" className="text-primary">
+                  {automation.phrase}
+                </span>
+                {automation.more !== null && (
+                  <span data-testid="row-automation-more" className="text-muted-foreground">
+                    {automation.more}
+                  </span>
+                )}
+              </>
+            )}
           </div>
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
@@ -1339,6 +1408,28 @@ export function WorkflowCard({
                   >
                     <History className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
                     {RUN_LOG_LABEL}
+                  </DropdownMenuItem>
+                )}
+
+                {/* ── Phase 204 (SCHED-01) — THE DOOR TO THIS WORKFLOW'S SCHEDULES ──
+                    Second, directly under the run log, because those two are the menu's
+                    only non-destructive items and they belong together above the forks
+                    and the deletes.
+
+                    ⚠ PUBLISHED ROWS ONLY (see the prop's docblock): the API refuses a
+                    draft, so offering it on one would be an affordance that exists only
+                    to be refused.
+
+                    ⚠ IT IS A `DropdownMenuItem`, WHICH IS WHAT KEEPS WR-03 GREEN — the
+                    suite sweeps the five `aria-required-children` roles over this menu's
+                    element children, and anything else here turns that green red. */}
+                {onSchedule && row.provenance === "published" && (
+                  <DropdownMenuItem
+                    data-testid="workflow-schedules"
+                    onClick={() => onSchedule({ id: row.id, name: row.name })}
+                  >
+                    <CalendarClock className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                    {SCHEDULE_LABEL}
                   </DropdownMenuItem>
                 )}
 

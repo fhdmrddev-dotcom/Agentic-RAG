@@ -105,6 +105,7 @@ const {
 vi.mock("@/lib/api", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/api")>()
   return {
+    ...actual,
     ApiError: actual.ApiError,
     postMessage: mockPostMessage,
     subscribeToRun: mockSubscribeToRun,

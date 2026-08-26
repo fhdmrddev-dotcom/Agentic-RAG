@@ -143,3 +143,16 @@ The cheapest honest interim, if a second Slack capability is wanted before this 
 one connection row to declare MULTIPLE capabilities (`capability text[]` or a join table)
 WITHOUT touching auth. That removes the duplicate-token problem — the sharpest edge — for one
 migration and no OAuth work, and it is forward-compatible with the account/grant split above.
+
+
+---
+
+## ROUTED 2026-08-24 — Connections & Open Platform milestone
+
+Operator decision: *"open a connections milestone from SEED-146 instead of 206."* Phase 206
+(Outbound Action Connectors) is RETIRED from the v3.8 roadmap; this seed is a source for the
+milestone instead. Scope, the binding one-provider-many-capabilities constraint, and the open
+questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
+
+Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
+v3.8 closes (204 running, 205 planned).
