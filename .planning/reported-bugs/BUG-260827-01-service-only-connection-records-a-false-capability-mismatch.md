@@ -4,16 +4,16 @@ title: A step bound to a service-only connection records "the bound connection i
 reported: 2026-08-27
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas:
   - backend/harness
   - backend/connectors
   - frontend/settings
   - frontend/workflows
 folded_into: null
-verified_closed_by: null
+verified_closed_by: /gsd:fast 2026-08-27 (G-3) — arm 2 only; see § Closure
 related_seeds: [SEED-207]
-re_open_trigger: null
+re_open_trigger: arm 1 (the UI-reachable KeyError) is NOT closed — re-open when a phase gives a service-only connection a way to be reached (OAuth, Phase 215) or touches the closed-set guard at phase_types.py:~2323
 reproduces_on:
   branch: worktree-agent-a89e80cc09e006aa4 (Phase 211, wave 4)
   commit: d9d62b29
@@ -139,3 +139,53 @@ one was never going to send — the step's behaviour is right, only its words ar
   `connector_connections_shape_is_not_ambiguous`, which permits both NULL by design
 - `.planning/phases/211-the-connection-is-a-service-not-a-verb/211-VALIDATION.md`
   § "Known gap — the service-only run-time seam"
+
+---
+
+## ✅ Closure — 2026-08-27, `/gsd:fast` (G-3)
+
+**Fixed exactly where this report said it would be, in the way this report said it should be, and
+the RED fired.**
+
+`backend/app/services/harness/phase_types.py` — the single guard is split into its two arms.
+The `getattr` DEFAULT is **kept**, so a connection object carrying no `capability` attribute at
+all still passes as it always did; only *present-and-`None`* is split out and given the honest
+sentence **"the bound connection names a service but no way to reach it yet"** — the same
+*"not yet"* the refresh path already carries as
+`connector_service.ConnectorNothingToDiscover`. **The guard was NOT widened**: a genuinely
+mismatched row (`post_message` against a `create_ticket` connection) is still refused with the
+sentence it was written for, which this report named as the protection a careless fix would
+delete.
+
+**The RED was observed firing, not assumed.** Run against the fixed source, the original §7
+failed exactly where it was designed to:
+
+```
+>       assert 'getattr(connection, "capability", capability) != capability' in source
+tests\integration	est_211_service_shape_seam.py:684: AssertionError
+1 failed, 13 deselected
+```
+
+§7 was rewritten in the **same commit** to pin the two arms and both sentences — including a
+dedicated `_RowWithNoCapabilityAttribute` case holding the preserved default — and the file then
+read `14 passed`.
+
+### ⚠ ARM 1 IS STILL OPEN. This report is `closed` for the WORDS, not for both paths it measured.
+
+This report deliberately recorded **two** reachable arms as **different failures**. Only **arm 2**
+(the definition/API-reachable state) is closed. **Arm 1 — the UI-reachable state, where
+`ConnectionPicker.bind` clears the step's `capability`, a service-only row advertises no action,
+and the closed-set guard raises a bare `KeyError` at `phase_types.py:~2323` — is untouched** and
+remains a stack-trace-shaped failure. It is kept asserted in §7's
+`test_the_ui_reachable_service_only_binding_hits_a_DIFFERENT_arm_first` so it cannot quietly
+disappear, and it is the `re_open_trigger` in this file's frontmatter.
+
+### ⚠ The G-5 obligation on this file is now OWED, not honoured
+
+The hot-file row read *honoured by construction (211)* on the strength of an **empty diff**. That
+diff is no longer empty, and this was a G-3 `/gsd:fast` with no review cycle — the right
+instrument for four lines, the wrong one for a 2,664-line G-5 hot file's extraction. Re-derived at
+the fix's commit: **`47 commits / 21 phases / 2664 L`**. The next phase whose `files_modified`
+names this file must produce a refactor recommendation as its FIRST option. Full record:
+`docs/HOT-FILE-LEDGER.md` → `backend/app/services/harness/phase_types.py` — Phase 211 →
+*"✅ CLOSURE — 2026-08-27"*.

@@ -2457,19 +2457,56 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         # change — the gate AND UI-SPEC §5b's sentence, in ONE commit — never this line alone.
         return _record("the bound connection is disabled (is_enabled is false — Gate 2)")
 
-    if not getattr(connection, "mcp_server_url", None) and getattr(connection, "capability", capability) != capability:
-        # A connection bound for another capability would send a bot token to a mail host,
-        # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
-        # the refusal: this used to raise a bare ``ValueError``, which is not an
-        # ``AdapterError``, so the handler below never caught it. The run died with no
-        # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
-        # stack-trace-shaped error on the surface whose whole discipline is not over-claiming.
-        logger.warning(
-            "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
-            "recording rather than sending", slug,
-            getattr(connection, "capability", None), capability,
-        )
-        return _record("the bound connection is for a different capability")
+    if not getattr(connection, "mcp_server_url", None):
+        # ⚠ BUG-260827-01 — ``getattr(obj, name, default)`` returns the ATTRIBUTE whenever the
+        # attribute EXISTS, so the default below can never stand in for a stored ``None``.
+        # This gate was written in Phase 190, when a connection could only ever be one of TWO
+        # shapes and each carried a non-null discriminator. Phase 211 made a THIRD shape
+        # reachable — a SERVICE-ONLY row naming a service and neither a ``capability`` nor an
+        # ``mcp_server_url`` (migration 127's ``shape_is_not_ambiguous`` forbids BOTH being set
+        # and PERMITS both being NULL, by design — CONN-08). Such a row has ``capability``
+        # present-and-``None``, so it fell into the mismatch arm and the run said *"the bound
+        # connection is for a different capability"*. That is FALSE: it is not a DIFFERENT
+        # capability, it is NO capability — and on the one surface in this codebase whose
+        # entire stated discipline is not over-claiming, it sends a reader hunting a mismatch
+        # that does not exist.
+        #
+        # ⚠ THE DEFAULT IS KEPT ON PURPOSE. A connection object with no ``capability``
+        # ATTRIBUTE AT ALL still passes this gate exactly as it did before; only
+        # present-and-``None`` is split out. Widening the guard instead would delete a real
+        # protection — the genuinely-mismatched case below MUST stay refused.
+        bound_capability = getattr(connection, "capability", capability)
+
+        if bound_capability is None:
+            # The honest sentence is *"not yet"*, and it is the same one the refresh path
+            # already carries one module over (``connector_service.ConnectorNothingToDiscover``
+            # — read that class for why a worded refusal beats a generic one here). Nothing is
+            # broken and nothing is misconfigured: a service-only row simply has no way to be
+            # reached until OAuth (Phase 215) or an endpoint supplies one, so the step was
+            # never going to send. The behaviour was already right; only the words were wrong.
+            logger.info(
+                "211 BUG-260827-01: external_action phase %r is bound to a SERVICE-ONLY "
+                "connection (no capability, no mcp_server_url) — recording rather than "
+                "sending", slug,
+            )
+            return _record(
+                "the bound connection names a service but no way to reach it yet"
+            )
+
+        if bound_capability != capability:
+            # A connection bound for another capability would send a bot token to a mail host,
+            # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
+            # the refusal: this used to raise a bare ``ValueError``, which is not an
+            # ``AdapterError``, so the handler below never caught it. The run died with no
+            # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
+            # stack-trace-shaped error on the surface whose whole discipline is not
+            # over-claiming.
+            logger.warning(
+                "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
+                "recording rather than sending", slug,
+                bound_capability, capability,
+            )
+            return _record("the bound connection is for a different capability")
 
     # ── GATE 6 · MCP Tool Dispatch (Phase 206 / CONN-02 / D-206-06) ───────────────────
     if getattr(connection, "mcp_server_url", None):

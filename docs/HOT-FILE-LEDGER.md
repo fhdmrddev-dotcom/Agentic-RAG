@@ -5775,6 +5775,72 @@ territory.
 **Re-open trigger for this file's own G-5 obligation:** *the first phase whose `files_modified`
 names it* — which is the `/gsd:fast` above, and which should therefore read this section first.
 
+#### ✅ CLOSURE — 2026-08-27, `/gsd:fast` for `BUG-260827-01`. The section above is PRESERVED, not rewritten, because the prediction being right is the record.
+
+**The `/gsd:fast` this section predicted is the commit that carries this paragraph, and it read
+this section first — which is the re-open trigger working rather than being asserted.**
+
+**Re-derived at the fix's own commit: `47 commits / 21 phases / 2664 L` · G-5 still FIRES.**
+The phase count did NOT move: a `/gsd:fast` commit subject carries no `NNN` bucket, so the
+recipe's `^[0-9]+(\.[0-9]+)?$` filter correctly does not count it. **`21` is therefore not a
+stale figure that escaped a re-derivation — it is the re-derived one**, and the distinction
+matters because this ledger's own repeated finding is that a present-and-wrong row stops an audit.
+
+**What changed, and it is four lines of logic inside forty of comment:**
+
+```python
+if not getattr(connection, "mcp_server_url", None):
+    bound_capability = getattr(connection, "capability", capability)
+    if bound_capability is None:
+        return _record("the bound connection names a service but no way to reach it yet")
+    if bound_capability != capability:
+        ...                      # unchanged — the WR-03 terminal, verbatim
+```
+
+⚠ **THE `getattr` DEFAULT WAS KEPT, AND THAT IS THE LOAD-BEARING CHOICE.** Replacing it with
+`None` reads as a harmless tidy-up and would silently start refusing every caller whose connection
+object carries no `capability` **attribute at all** — a different population from the
+present-and-`None` rows this bug is about. Only present-and-`None` is split out. §7 pins that
+distinction with a dedicated `_RowWithNoCapabilityAttribute`, because a preserved default that
+nothing exercises is a preserved default nobody will preserve next time.
+
+⚠ **THE GUARD WAS NOT WIDENED.** A genuinely mismatched row (`post_message` against a
+`create_ticket` connection) is still refused with the sentence it was written for. The bug report
+named this explicitly as the way a careless fix would delete a real protection while closing a
+wording bug; §7 holds that line as its own assertion.
+
+**The RED fired, and it was measured rather than assumed.** `test_211_service_shape_seam.py` §7
+was authored to pin **today's wrong behaviour on purpose**. Run against the fixed source, the
+original section fails exactly where it was designed to:
+
+```
+>       assert 'getattr(connection, "capability", capability) != capability' in source
+tests\integration	est_211_service_shape_seam.py:684: AssertionError
+1 failed, 13 deselected
+```
+
+— and §7 was rewritten in the **same commit** to pin the two arms and both sentences, then
+`14 passed`. **A fix whose RED was never observed firing is an asserted fix**; this one was.
+
+⚠ **ONE ARM OF THE REPORT IS DELIBERATELY STILL OPEN AND MUST NOT BE READ AS CLOSED BY THIS
+COMMIT.** BUG-260827-01 measured **two** reachable paths and they are different failures. This fix
+closes **arm 2** — the definition/API-reachable state, where a step names a valid capability
+alongside a service-only connection and the run said something untrue. **Arm 1 — the
+UI-reachable state, where `ConnectionPicker.bind` clears the step's `capability` and the closed-set
+guard raises a bare `KeyError` at `phase_types.py:~2323` — is untouched**, and remains a
+stack-trace-shaped failure on the surface whose whole discipline is not over-claiming. It is kept
+asserted in §7's `test_the_ui_reachable_service_only_binding_hits_a_DIFFERENT_arm_first` so it
+cannot quietly disappear. **Re-open trigger: the first phase that gives a service-only connection
+a way to be reached (OAuth, Phase 215) or that touches the closed-set guard.**
+
+⚠ **THE G-5 OBLIGATION IS NOW OWED, NOT HONOURED.** The row above read *honoured by
+construction (211)* on the strength of an **empty diff** — the file was not edited, so there was
+nothing to review. **That diff is no longer empty.** This commit is a G-3 `/gsd:fast` with no
+review cycle, which is the correct instrument for four lines and the wrong one for a 2,664-line
+G-5 hot file's extraction. **The next phase whose `files_modified` names this file must produce a
+refactor recommendation as its FIRST option**, per the ledger scan rule — and must not read the
+`✅` in the row as discharge of anything but the bug.
+
 ---
 
 ### `backend/app/services/harness/grounding.py` — Phase 211 (NOT EDITED)

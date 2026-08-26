@@ -599,46 +599,56 @@ async def test_the_new_columns_are_readable_by_the_authenticated_role(pool, migr
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════
-# 7 · ⭐⭐ THE CROSS-PLAN SEAM DEFECT — RECORDED, NOT FIXED
+# 7 · ⭐⭐ THE CROSS-PLAN SEAM DEFECT — FIXED 2026-08-27, AND THIS SECTION IS ITS GREEN
 # ═══════════════════════════════════════════════════════════════════════════════════════════
 #
-# ⚠ **EVERY ASSERTION IN THIS SECTION PINS TODAY'S ACTUAL BEHAVIOUR, INCLUDING THE WRONG
-# SENTENCE.** It is deliberately NOT the behaviour we want. This is the follow-up fix's RED:
-# when `phase_types.py:2460` is corrected, THESE CASES GO RED and are updated in that commit,
-# which is what makes the fix provable. A test asserting the behaviour we want, left failing,
-# would be a broken suite rather than a record.
+# ⚠ **THIS SECTION USED TO PIN THE DEFECT, INCLUDING THE WRONG SENTENCE, ON PURPOSE.** It was
+# written as the follow-up fix's RED: *"when `phase_types.py:2460` is corrected, THESE CASES GO
+# RED and are updated in that commit, which is what makes the fix provable."* That is exactly
+# what happened — `test_the_inaccurate_sentence_is_the_one_the_shipped_source_composes` went RED
+# on the source pin, and this section is updated in the SAME commit as the fix. The original
+# wording of the pin is preserved in the git history of this file and in
+# `.planning/reported-bugs/BUG-260827-01-service-only-connection-records-a-false-capability-mismatch.md`.
 #
-# THE CHAIN, and it is a SEAM — each plan is correct on its own:
+# THE CHAIN, and it was a SEAM — each plan was correct on its own:
 #   1. `ConnectionFormPanel.tsx` (211-03) emits `{name, config, service_id}` for an
 #      unrecognised service — no `capability` key at all. A service-only row is CREATABLE.
 #   2. `ConnectionPicker.tsx` (211-04) reads unscoped and unfiltered. That row is LISTED and
 #      BINDABLE.
-#   3. `phase_types.py:2460` reads
-#      `getattr(connection, "capability", capability) != capability`. The `getattr` DEFAULT
-#      fires only when the attribute is MISSING — never when its value is `None`.
+#   3. `phase_types.py` read `getattr(connection, "capability", capability) != capability`.
+#      The `getattr` DEFAULT fires only when the attribute is MISSING — never when its value
+#      is `None`. A service-only row has it present-and-`None`, so the step was recorded with
+#      a sentence claiming a DIFFERENT capability. It is not a different capability; it is NO
+#      capability.
 #   Migration 127's `shape_is_not_ambiguous` forbids BOTH being set and PERMITS both being
-#   NULL, by design (CONN-08). Before this phase the row could neither exist nor be listed;
-#   both halves are new today.
+#   NULL, by design (CONN-08). Before Phase 211 the row could neither exist nor be listed;
+#   both halves arrived in that phase.
 #
-# WHY IT IS NOT FIXED HERE: `phase_types.py` is in no 211 plan's `files_modified`, 211-04's
-# must_have promises that branch stays untouched, and it is a G-5 hot file (45 commits /
-# 20 phases) with no review cycle in this phase. Recorded in `211-VALIDATION.md` and filed as
-# a reported bug. The operator closes it immediately after this phase via `/gsd:fast`.
+# ⚠ WHAT THE FIX DELIBERATELY DID **NOT** DO: it did not widen the guard. The genuinely
+# mismatched case is still refused — a fix that simply let `None` through would have deleted a
+# real protection while closing a wording bug, and the case below is what holds that line.
 
 
-def _capability_branch_verdict(capability: str | None, connection: Any) -> bool:
-    """`phase_types.py:2460`'s condition, re-expressed EXACTLY as the line reads it.
+def _capability_gate_reason(capability: str | None, connection: Any) -> str | None:
+    """The shipped capability gate, re-expressed EXACTLY as the lines read it.
 
-    ⚠ It is re-expressed rather than imported because the line is an inline expression inside a
+    Returns the `_record` reason the gate produces, or `None` when the gate lets the step
+    through.
+
+    ⚠ It is re-expressed rather than imported because the gate is an inline branch inside a
     600-line async executor with eight gates ahead of it, and reaching it for real needs a full
-    run context. §7 therefore pins the CONDITION and the SENTENCE separately, and the case
-    below asserts the sentence is the one the shipped source really composes — so a fix that
-    changed only one of the two cannot leave this section green.
+    run context. §7 therefore pins the CONDITION and the SENTENCES separately, and the case
+    below asserts the sentences are the ones the shipped source really composes — so a change
+    to either one alone cannot leave this section green.
     """
-    return bool(
-        not getattr(connection, "mcp_server_url", None)
-        and getattr(connection, "capability", capability) != capability
-    )
+    if getattr(connection, "mcp_server_url", None):
+        return None
+    bound_capability = getattr(connection, "capability", capability)
+    if bound_capability is None:
+        return "the bound connection names a service but no way to reach it yet"
+    if bound_capability != capability:
+        return "the bound connection is for a different capability"
+    return None
 
 
 class _Row:
@@ -649,29 +659,47 @@ class _Row:
         self.mcp_server_url = mcp_server_url
 
 
-def test_the_service_only_seam_defect_is_present_today_and_this_is_its_RED():
-    """⭐ RECORDED, NOT FIXED. See `.planning/reported-bugs/BUG-260827-01-service-only-connection-records-a-false-capability-mismatch.md` and `211-VALIDATION.md`."""
-    # A matching capability row passes the gate — the branch is not simply always true.
-    assert _capability_branch_verdict("post_message", _Row("post_message", None)) is False
-    # A genuinely MISMATCHED row is refused, correctly, and this is the case the line was
-    # written for. It must keep working after the fix.
-    assert _capability_branch_verdict("post_message", _Row("create_ticket", None)) is True
-    # A remote-server row skips the branch entirely — the first arm.
+class _RowWithNoCapabilityAttribute:
+    """⚠ A connection object that does not carry a `capability` ATTRIBUTE AT ALL.
+
+    The fix KEPT `getattr`'s default rather than replacing it with `None`, so this object still
+    passes the gate exactly as it did before. Pinned because swapping the default to `None`
+    reads as a harmless tidy-up and would silently start refusing every such caller.
+    """
+
+    def __init__(self, mcp_server_url: str | None = None) -> None:
+        self.mcp_server_url = mcp_server_url
+
+
+def test_a_service_only_connection_is_no_capability_not_a_different_one():
+    """⭐ BUG-260827-01, CLOSED. The step still declines to act — only the words changed."""
+    # ⭐ THE FIX. A SERVICE-ONLY row — `capability` present-and-`None`, no `mcp_server_url` —
+    # gets its own honest sentence, the same "not yet" the refresh path carries one module over
+    # as `connector_service.ConnectorNothingToDiscover`.
     assert (
-        _capability_branch_verdict("post_message", _Row(None, "https://mcp.example.com/mcp"))
-        is False
+        _capability_gate_reason("post_message", _Row(None, None))
+        == "the bound connection names a service but no way to reach it yet"
     )
-    # ⭐ THE DEFECT. A SERVICE-ONLY row: `capability` is present-and-None, so the `getattr`
-    # default never fires, `None != "post_message"` is True, and the step is recorded-and-not-
-    # sent with a sentence claiming a DIFFERENT capability. It is not a different capability;
-    # it is NO capability. That is a false statement on the one surface in this codebase whose
-    # entire stated discipline is not over-claiming.
-    assert _capability_branch_verdict("post_message", _Row(None, None)) is True
+    # ⚠ AND THE GUARD WAS NOT WIDENED. A genuinely MISMATCHED row is still refused, with the
+    # sentence it was written for. This is the protection a careless fix would have deleted.
+    assert (
+        _capability_gate_reason("post_message", _Row("create_ticket", None))
+        == "the bound connection is for a different capability"
+    )
+    # A matching capability row still passes the gate — the branch is not simply always true.
+    assert _capability_gate_reason("post_message", _Row("post_message", None)) is None
+    # A remote-server row still skips the branch entirely — the first arm, untouched.
+    assert (
+        _capability_gate_reason("post_message", _Row(None, "https://mcp.example.com/mcp"))
+        is None
+    )
+    # ⚠ The `getattr` DEFAULT is preserved: no `capability` attribute at all still passes.
+    assert _capability_gate_reason("post_message", _RowWithNoCapabilityAttribute()) is None
 
 
-def test_the_inaccurate_sentence_is_the_one_the_shipped_source_composes():
-    """⚠ Pins the WORDS, so a fix that changes the condition without the sentence — or the
-    sentence without the condition — cannot leave the case above green on its own."""
+def test_both_sentences_are_the_ones_the_shipped_source_composes():
+    """⚠ Pins the WORDS, so a change to the condition without the sentences — or the sentences
+    without the condition — cannot leave the case above green on its own."""
     from pathlib import Path
 
     source = (
@@ -681,7 +709,16 @@ def test_the_inaccurate_sentence_is_the_one_the_shipped_source_composes():
         / "harness"
         / "phase_types.py"
     ).read_text(encoding="utf-8")
-    assert 'getattr(connection, "capability", capability) != capability' in source
+    # The condition, split into its two arms.
+    assert 'bound_capability = getattr(connection, "capability", capability)' in source
+    assert "if bound_capability is None:" in source
+    assert "if bound_capability != capability:" in source
+    # ⚠ THE DEFECTIVE ONE-LINER IS GONE, and this is what actually went RED when the fix landed.
+    assert 'getattr(connection, "capability", capability) != capability' not in source
+    # Both sentences, each still owned by the one composer.
+    assert (
+        '"the bound connection names a service but no way to reach it yet"' in source
+    )
     assert '_record("the bound connection is for a different capability")' in source
 
 
@@ -691,17 +728,21 @@ def test_the_ui_reachable_service_only_binding_hits_a_DIFFERENT_arm_first():
     Through the SHIPPED UI, binding a connection CLEARS the step's `capability`
     (`ConnectionPicker.bind`), and a service-only row advertises no action to choose — so the
     step reaches the executor with `capability=None` and `tool_name=None` and is refused by the
-    CLOSED-SET guard (a `KeyError`) long before line 2460. Line 2460's inaccurate sentence is
+    CLOSED-SET guard (a `KeyError`) long before the capability gate. That gate's sentence is
     reached when a step names a VALID capability alongside a service-only connection, which the
     definition/API surface permits and cross-checks nowhere.
 
-    Both arms are therefore real, and they are DIFFERENT failures. Recorded here so the fix
-    addresses the one it means to.
+    ⚠ BOTH ARMS ARE STILL REAL AND THEY ARE STILL DIFFERENT FAILURES. BUG-260827-01 named and
+    fixed the SECOND — the words. **Arm 1 is untouched and remains a stack-trace-shaped
+    failure**, recorded here so it is not mistaken for closed by this commit.
     """
     from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 
-    # Arm 1 — the UI-reachable state. Refused by the closed-set guard, not by line 2460.
+    # Arm 1 — the UI-reachable state. Refused by the closed-set guard, not by the gate below.
     assert None not in EXTERNAL_ACTION_CAPABILITIES
-    # Arm 2 — the definition/API-reachable state, which IS line 2460.
+    # Arm 2 — the definition/API-reachable state, which IS the gate this bug was about.
     assert "post_message" in EXTERNAL_ACTION_CAPABILITIES
-    assert _capability_branch_verdict("post_message", _Row(None, None)) is True
+    assert (
+        _capability_gate_reason("post_message", _Row(None, None))
+        == "the bound connection names a service but no way to reach it yet"
+    )
