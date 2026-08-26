@@ -1,6 +1,6 @@
 ---
 id: BUG-260826-03
-title: POST /schedules/{id}/trigger returns an unhandled 500 when the schedule's org_id is NULL
+title: POST /schedules/{id}/trigger 500s — the launcher parses the definition without the str guard every other caller has (org_id was a refuted first hypothesis)
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
@@ -16,9 +16,51 @@ reproduces_on:
   date: 2026-08-26
 ---
 
-# BUG-260826-03: Manual schedule trigger 500s on a NULL org_id, and the browser reports it as CORS
+# BUG-260826-03: Manual schedule trigger 500s, and the browser reports it as CORS
 
-## What we observed
+## ⚠ CORRECTION 2026-08-26 — THE FIRST HYPOTHESIS WAS REFUTED BY MEASUREMENT
+
+The original diagnosis below (NULL `org_id`) is **kept rather than deleted**, because the refutation
+is the finding. After `org_id` was confirmed POPULATED on the live row
+(`747c6210-4ade-4e0d-8507-c810e3e3f4af`), **the trigger 500'd again, identically**. So the org was
+never the cause of the observed failure.
+
+**The measured asymmetry, and the current primary hypothesis:**
+
+| caller | how it parses `definition` |
+|---|---|
+| publish (`publish_service.py:140-148`) | `isinstance(raw, str)` → `json.loads`, THEN `model_validate` inside a `try` that returns a structured `definition_invalid` block — never a 500 |
+| scheduled launch (`scheduler_service.py:107`) | `WorkflowDefinition.model_validate(row["definition"])` — **bare: no str guard, no try** |
+
+`workflow_definitions.definition` is a jsonb **STRING SCALAR on 261 of 291 rows** — the measured,
+recorded, deliberately-left double-encoding defect (`db/workflows.py:388-435`). For any such row the
+pool codec hands back a Python `str`, `model_validate` raises, and the route 500s with no handler.
+
+This explains the otherwise-odd fact that **the same workflow published successfully and cannot be
+launched by schedule**: publish decodes the string, the scheduler does not. `get_definition`'s own
+docstring asserts *"asyncpg's pool codec decodes it to a dict"* (`db/workflows.py:826`) — which is
+true only for the ~30 rows written in the correct shape, and is what makes the bare call look safe.
+
+⚠ **This also means the recorded string-scalar defect is NOT inert.** It has been carried as a
+cosmetic/́query-shape problem with a re-open trigger; here it takes out an entire launch path. That
+raises its priority independently of this report.
+
+**Confirm with:** `SELECT jsonb_typeof(definition) FROM workflow_definitions WHERE id = '<workflow id>'`
+— observed workflow `ee53ed2c-2040-4daf-828c-4196b8730037`. Pending at time of writing; the
+Coolify traceback is the definitive check.
+
+**Consequence for the fix list:** item 2 below (handle the failure honestly) is now the PRIMARY fix
+and should be a `str`-guard mirroring publish's, not merely an exception handler. Items 1 and 3 stay
+worth doing — a NULL `org_id` really would 500 the same way, it just was not what happened here.
+
+⚠ **The poller hits the identical line.** `SchedulerService.tick` catches per-tick (*"a failed tick
+never ends the loop"*), so on an install where the scheduler IS running this presents as schedules
+that silently never fire, with an exception in the log and no user-visible signal — see
+BUG-260826-06.
+
+---
+
+## What we observed (original, first hypothesis)
 
 Creating a schedule succeeded (`POST /workflows/{id}/schedules` → 201, row
 `75886bcb-ae3c-4d65-a158-739119cffb80`). Triggering it immediately failed:

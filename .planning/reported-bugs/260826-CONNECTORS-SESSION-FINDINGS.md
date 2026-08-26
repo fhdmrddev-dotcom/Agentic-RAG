@@ -26,7 +26,7 @@ on credentials. What is missing is the last mile — nothing can tell the step w
 |---|---|---|
 | [BUG-260826-01](BUG-260826-01-send-email-arguments-unreachable-from-every-launch-path.md) | **blocking** | A `send_email` step can never receive `to`/`subject` from any UI launch path |
 | [BUG-260826-02](BUG-260826-02-publish-gauntlet-does-not-validate-adapter-argument-satisfiability.md) | major | Publish certifies a send step whose required arguments nothing can supply |
-| [BUG-260826-03](BUG-260826-03-schedule-trigger-500-when-org-id-null.md) | major | Manual schedule trigger 500s on a NULL `org_id`; the browser blames CORS |
+| [BUG-260826-03](BUG-260826-03-schedule-trigger-500-when-org-id-null.md) | major | Schedule trigger 500s — the launcher parses `definition` without the str guard publish has; the browser blames CORS. ⚠ first hypothesis (NULL `org_id`) REFUTED in-file |
 | [BUG-260826-04](BUG-260826-04-live-connectors-has-no-control-room-card.md) | major | The OFF banner points at a Control Room card that does not exist (`D-190-DEF-09`) |
 | [BUG-260826-05](BUG-260826-05-run-failed-reason-empty-for-external-action-failure.md) | minor | The panel says the failure reason is missing while chat displays it |
 | [BUG-260826-06](BUG-260826-06-schedules-can-be-created-while-the-scheduler-is-disabled.md) | major | Schedules are accepted and listed on an install where nothing will ever fire them |
@@ -60,6 +60,10 @@ on credentials. What is missing is the last mile — nothing can tell the step w
   (`harness_engine.py:2560-2570`), so it does not block the schedule-inputs path. Do not
   re-discover it as new — but note its re-open trigger is *"the next phase that touches `inputs`
   on the write path"*, which BUG-01's fix may well be.
+  ⚠ **AND IT IS NOT INERT.** The sibling defect on `workflow_definitions.definition` (261/291 rows
+  stored as string scalars) is the current primary suspect for BUG-03's 500 — publish decodes the
+  string, `scheduler_service.py:107` does not. A defect carried as a query-shape nuisance is taking
+  out a whole launch path, which raises its priority on its own account.
 
 ## Production state left behind
 
