@@ -203,6 +203,48 @@ _CHECK_NOT_AVAILABLE_FOR_MCP = HTTPException(
     },
 )
 
+# ── Phase 211 (T-211-13 / T-211-13d) — the THIRD shape's two named refusals ──────────────
+# A SERVICE-ONLY row names a service and no way to reach it: no adapter, no server URL, no
+# credential (CONN-08 — the shape migration 127 makes storable). Both of the actions below
+# reach code written for the other two shapes, and BOTH would otherwise report something
+# untrue about it rather than merely declining.
+#
+# ⚠ THE PRECEDENT IS ONE FILE UP AND ONE SHAPE OVER. `_CHECK_NOT_AVAILABLE_FOR_MCP` exists
+# because an MCP row's NULL `capability` reached `registry.get_adapter` and produced a BARE
+# `KeyError` — an unhandled 500 on a control the shipped UI offered. A third shape reaches
+# the same code by the same door. The lesson recorded there was *never a bare error, never a
+# silent widening*, and these are that lesson applied before the 500 rather than after it.
+_CHECK_NOTHING_TO_CHECK = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail={
+        "reason_code": "nothing_to_check_yet",
+        "message": (
+            "This connection names a service but no way to reach it yet, so there is no "
+            "credential to check."
+        ),
+    },
+)
+
+# ⚠ 409 AND NOT 502, AND THE DIFFERENCE IS THE WHOLE POINT. Without this the route's blanket
+# `except Exception -> 502` renders the refusal as "MCP tool discovery failed: connection X is
+# not configured with an mcp_server_url" — a BAD GATEWAY naming a shape the row never had,
+# about a server that was never contacted. A person reading it goes looking for an outage that
+# does not exist.
+#
+# ⚠ IT IS AN ERROR-MESSAGE CONTRACT, NOT A DEAD END TO BE DESIGNED AWAY. Nothing in Phase 211
+# gives a service-only row a way to populate tools; OAuth (Phase 215) does. That is precisely
+# why the sentence is "not yet" rather than a generic failure.
+_NOTHING_TO_DISCOVER = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail={
+        "reason_code": "nothing_to_discover_yet",
+        "message": (
+            "This connection names a service but no way to reach it yet, so there are no "
+            "actions to list."
+        ),
+    },
+)
+
 # ── the check action's two ADDITIONAL platform reason codes ──────────────────────────────
 # Same rule as `CIPHER_UNAVAILABLE_REASON` above and for the same reason: these are PLATFORM
 # refusals, deliberately NOT members of `egress.REFUSAL_REASONS` (a CLOSED six-row table
@@ -534,6 +576,15 @@ async def check_connection(
     if connection.mcp_server_url:
         raise _CHECK_NOT_AVAILABLE_FOR_MCP
 
+    # Phase 211 (T-211-13) — the THIRD shape, refused by name for the same reason and BEFORE
+    # the same two calls. `_check_destination` would read an empty config and `get_adapter`
+    # would raise its bare `KeyError` on a NULL capability — the identical 500 the arm above
+    # exists to prevent, reached by a row that is neither of the two shapes it knows about.
+    # ⚠ Keyed on the ABSENCE OF A CAPABILITY, after the MCP arm has already returned, so the
+    # two refusals stay separately falsifiable and neither absorbs the other's shape.
+    if not capability:
+        raise _CHECK_NOTHING_TO_CHECK
+
     host, port = _check_destination(capability, config)
 
     # Lazily imported INSIDE the handler, and that is a DECISION rather than an oversight.
@@ -604,7 +655,7 @@ async def check_connection(
     "/connections/{connection_id}/discover",
     response_model=list[dict],
     dependencies=[Depends(require_org_manage)],
-    summary="Discover available tools from a remote MCP server",
+    summary="Refresh this connection's action list, whatever its shape",
 )
 async def discover_tools(
     connection_id: str,
@@ -612,7 +663,19 @@ async def discover_tools(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ) -> list[dict]:
-    """Phase 206 (D-206-05) — Discover available tools from the connection's MCP server."""
+    """Refresh the connection's list of available actions and cache it on the row.
+
+    Phase 206 (D-206-05) shipped this as *"discover tools from a remote MCP server"*, and that
+    sentence stopped being true in Phase 211: a first-party CAPABILITY connection now refreshes
+    here too, from the adapter's own declared input schema, **with no network call at all**.
+    One control, one endpoint, both reachable shapes — which is what lets a stale action list
+    self-heal in one click rather than needing a shape-specific button.
+
+    ⚠ THE 502 IS NARROWED TO THE ARM THAT CAN ACTUALLY MEET A GATEWAY. A capability refresh
+    contacts nothing, so reporting its failure as *bad gateway* would misname an internal fault
+    as a remote one and send the reader hunting an outage. `ConnectorNothingToDiscover` and
+    `ConnectorError` are therefore caught by name ahead of it.
+    """
     try:
         return await connector_service.discover_connection_tools(
             str(connection_id), org_id=str(active_org), supabase=supabase
@@ -623,7 +686,22 @@ async def discover_tools(
         raise _CIPHER_UNAVAILABLE
     except connector_service.ConnectorSecretNotEncrypted:
         raise _CREDENTIAL_UNREADABLE
+    except connector_service.ConnectorDisabled:
+        raise _CONNECTION_DISABLED
+    # Phase 211 (T-211-13d) — the service-only shape, named. MUST stay above the two clauses
+    # below, both of which would swallow it: `ConnectorNothingToDiscover` IS a `ConnectorError`.
+    except connector_service.ConnectorNothingToDiscover:
+        raise _NOTHING_TO_DISCOVER
+    except connector_service.ConnectorError as exc:
+        # A refusal this service raised about ITS OWN state. It is not a gateway failure and
+        # must not wear a gateway's status: 409 is a conflict with the row as it stands.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason_code": "cannot_refresh_actions", "message": str(exc)},
+        ) from exc
     except Exception as exc:
+        # The REMOTE arm's failure, and only it: the MCP server was contacted and something
+        # about that exchange went wrong.
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"MCP tool discovery failed: {exc}",

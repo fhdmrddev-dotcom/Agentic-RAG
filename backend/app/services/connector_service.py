@@ -190,6 +190,22 @@ class ConnectorSecretUnreadable(ConnectorError):
     """
 
 
+class ConnectorNothingToDiscover(ConnectorError):
+    """Phase 211 (T-211-13d) — a SERVICE-ONLY row has no action list to refresh, yet.
+
+    ⚠ WHY THIS IS ITS OWN CLASS RATHER THAN THE GENERIC `ConnectorError`. The route's blanket
+    `except Exception -> 502` renders a generic refusal as *"MCP tool discovery failed:
+    connection X is not configured with an mcp_server_url"* — **a remote-gateway error naming
+    a shape the row never had**, about a server that was never contacted. A person reading it
+    goes looking for an outage that does not exist.
+
+    ⚠ IT IS AN ERROR-MESSAGE CONTRACT, NOT A DEAD END TO BE DESIGNED AWAY. Nothing in Phase 211
+    gives a service-only row a way to populate tools; OAuth (Phase 215) does. That is exactly
+    why the refusal has to be WORDED: the honest sentence is *"not yet"*, and a 502 says
+    *"something is broken"*.
+    """
+
+
 # ── the resolved credential ──────────────────────────────────────────────────────────────
 @dataclass(frozen=True, repr=False)
 class ResolvedConnection:
@@ -443,18 +459,34 @@ async def resolve_connection(
         # omit it. Two places describing one row, disagreeing — the shape this repo keeps
         # finding.
         #
-        # ⚠ THE RELAXATION IS SCOPED TO THE MCP SHAPE AND NOWHERE ELSE. A capability
-        # connection with no secret is still `ConnectorNotFound`, unchanged, because that is
-        # still true of it.
-        if not row.get("mcp_server_url"):
+        # ⚠ THE RELAXATION IS SCOPED TO THE TWO CREDENTIAL-LESS SHAPES AND NOWHERE ELSE. A
+        # CAPABILITY connection with no secret is still `ConnectorNotFound`, unchanged,
+        # because that is still true of it: an SMTP host, a Jira instance and a Slack
+        # workspace each REQUIRE a credential, so a row without one is absent for the purpose
+        # of sending.
+        #
+        # ⚠ PHASE 211 ADDS THE SECOND CREDENTIAL-LESS SHAPE, for the same reason and with the
+        # same evidence. A SERVICE-ONLY row (CONN-08 — no capability, no `mcp_server_url`, and
+        # no secret until OAuth ships in Phase 215) also has no credential, and refusing it
+        # HERE produced the identical defect the MCP note above records: **404 "no connection"
+        # about a row sitting in the table**, which then makes both `/check` and `/discover`
+        # answer with a sentence that is not true. The named refusals those two routes owe
+        # (T-211-13 / T-211-13d) can only be worded if the row resolves at all.
+        #
+        # ⚠ IT OPENS NO SEND PATH. `_exec_external_action` branches on `mcp_tool_name` and
+        # then on `capability`; a service-only row has NEITHER, so nothing in the executor can
+        # select it. Org scoping (both gates above) and `is_enabled` are unchanged, and there
+        # is no credential on such a row to disclose.
+        if row.get("capability"):
             logger.info(
                 "connector_service: connection %s has no stored secret_ciphertext", connection_id
             )
             raise ConnectorNotFound(f"no connection {connection_id}")
 
         logger.info(
-            "connector_service: resolved MCP connection %s with NO credential — the remote "
-            "server is unauthenticated (no Authorization header will be sent)", connection_id,
+            "connector_service: resolved connection %s with NO credential (mcp_server_url=%s) "
+            "— either an unauthenticated remote server, or a service-only row that has no way "
+            "to be reached yet", connection_id, bool(row.get("mcp_server_url")),
         )
         return ResolvedConnection(
             connection_id=str(row["id"]),
@@ -551,10 +583,38 @@ async def create_connection(
 
     config_data = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else (payload.config or {})
 
+    # Phase 211 — the static action descriptor, WRITTEN AT CREATE TIME.
+    #
+    # ⭐ This is what makes SC#2's *"a connection presents as a service with a named action"*
+    # true for a NEW capability row. It is a WRITE, never a read-time projection: read-time
+    # branching is what D-211-03 rejected, because it makes the same row look like a service
+    # in one surface and like a verb in the next, and every new reader has to re-implement the
+    # branch. Existing rows get theirs from migration 127 §2b.
+    #
+    # ⚠ Imported INSIDE the function, not at module scope. `descriptors.py` reaches the
+    # adapter registry, and the registry is what `test_190_connector_source_fence.py` keeps out
+    # of the cold import graph until a send actually happens — a module-scope import here is
+    # the one edge that could drag the vendor adapters in.
+    if payload.capability:
+        from app.services.connectors.descriptors import static_descriptors_for_capability
+
+        descriptors = static_descriptors_for_capability(payload.capability)
+    else:
+        # A service-only row genuinely HAS no action until OAuth (Phase 215) gives it one.
+        # An empty list is the honest answer; a placeholder action would be a lie a picker
+        # would happily render.
+        descriptors = []
+
     row = {
         "org_id": str(org_id),  # HARD-SET — never from the body (D-14)
         "created_by": str(created_by),  # HARD-SET — never from the body
         "capability": payload.capability,
+        # ⚠ A COLUMN ABSENT FROM THIS DICT IS NEVER WRITTEN, whatever the model declares —
+        # this literal is point 5 of the Phase 211 column lockstep. `.strip()` is belt and
+        # braces: `ServiceId`'s AfterValidator has already normalised it, and it stays here so
+        # a future non-API caller constructing the payload by hand cannot store `' slack'`
+        # beside `'slack'` as two different services.
+        "service_id": payload.service_id.strip(),
         "name": payload.name,
         "config": config_data,
         "secret_ciphertext": ciphertext,
@@ -562,6 +622,11 @@ async def create_connection(
         "last_check_verdict": "not_checked",
         "mcp_server_url": payload.mcp_server_url,
         "tool_grants": payload.tool_grants,
+        # ⚠ `tool_grants` above is UNTOUCHED by the descriptor. A descriptor ADVERTISES an
+        # action; it does not GRANT one. The executor's gate reads `tool_grants` alone and a
+        # missing key DENIES — that asymmetry is the desirable direction and must not be
+        # closed by accident here.
+        "discovered_tools": descriptors,
     }
     result = await aexec(_project(_client(supabase).table(_TABLE).insert(row)))
     created = (result.data or [None])[0]
@@ -739,13 +804,41 @@ async def discover_connection_tools(
     org_id: str,
     supabase: Client | None = None,
 ) -> list[dict]:
-    """Phase 206 (D-206-05) — Discover tools from a remote MCP server and cache them on the row."""
-    resolved = await resolve_connection(connection_id, org_id=org_id)
-    if not resolved.mcp_server_url:
-        raise ConnectorError(f"connection {connection_id} is not configured with an mcp_server_url")
+    """Refresh a connection's action list and cache it on the row — WHATEVER ITS SHAPE.
 
-    from app.services import mcp_client
-    tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
+    Phase 206 (D-206-05) shipped this for the remote-MCP shape only. Phase 211 gives it a
+    second arm, so ONE refresh path serves both reachable shapes and a stale copy self-heals in
+    one click from the same control.
+
+    ── The three shapes, and why each arm is here ──────────────────────────────────────────
+      * **MCP** — ask the server, unchanged. A network call, and the only arm that can fail
+        with a genuine bad gateway.
+      * **CAPABILITY** — write the adapter's own static descriptor. **NO NETWORK CALL HAPPENS
+        AT ALL**, which is exactly why the route must not report a failure here as a 502.
+        This is also what makes a row written before an adapter's `INPUT_SCHEMA` changed
+        refreshable: migration 127 §2b's copy is a snapshot, and this is how it is retaken.
+      * **SERVICE-ONLY** — `ConnectorNothingToDiscover`, worded. See that class.
+
+    ⚠ `tool_grants` IS NEVER TOUCHED BY ANY ARM. A descriptor advertises an action; it does not
+    grant one, and the executor's gate denies on a missing grant key by design.
+    """
+    resolved = await resolve_connection(connection_id, org_id=org_id)
+
+    if resolved.mcp_server_url:
+        from app.services import mcp_client
+        tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
+    elif resolved.capability:
+        # ⚠ Function-local import, for the reason `create_connection` states: `descriptors.py`
+        # reaches the adapter registry, and the source fence keeps that out of the cold import
+        # graph until a send happens.
+        from app.services.connectors.descriptors import static_descriptors_for_capability
+
+        tools = static_descriptors_for_capability(resolved.capability)
+    else:
+        raise ConnectorNothingToDiscover(
+            "this connection names a service but no way to reach it yet, so there is nothing "
+            "to refresh"
+        )
 
     client = _client(supabase)
     # ⚠ `_project` IS NOT OPTIONAL ON A WRITE THAT RUNS ON THE USER-JWT CLIENT, and this call

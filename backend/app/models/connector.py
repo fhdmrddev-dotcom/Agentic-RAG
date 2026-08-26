@@ -48,7 +48,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 # The runtime home of the closed capability set. Imported for the static agreement assert
 # below — this module never calls into the service layer at request time.
@@ -90,6 +90,40 @@ NonEmpty = Annotated[str, Field(min_length=1)]
 # and silently substitutes 465/587. Someone who typed `four sixty five` got a working
 # connection on a port they never chose, with no indication their input was discarded.
 Port = Annotated[int, Field(ge=1, le=65535)]
+
+
+# ── Phase 211 (D-211-01) · the SERVICE identity ──────────────────────────────────────────
+def _normalise_service_id(value: str) -> str:
+    """Strip, then refuse what is left if it is empty — the model half of the DB's `btrim`.
+
+    ⚠ `NonEmpty` alone is NOT enough here and the difference is the whole point. `min_length=1`
+    accepts `'   '`, which migration 127's
+    `CHECK (service_id IS NOT NULL AND length(btrim(service_id)) > 0)` refuses. A model laxer
+    than the database does not merely permit a bad row — it converts a 422 the caller can act
+    on into a `CheckViolationError` surfacing as a 500, which is D-211-04's stated rule read
+    backwards.
+
+    Normalising HERE rather than at the call site means every writer gets the same value: the
+    stored identity is what a lookup key must equal, and `' slack'` and `'slack'` are two
+    services to any exact-match table.
+    """
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError(
+            "service_id must name a service — a blank identity is a row nobody can find, and "
+            "the database refuses it too (connector_connections_has_a_service_identity)"
+        )
+    return stripped
+
+
+# The bound is 64 characters, chosen and stated rather than inherited. It is NEW UNTRUSTED
+# INPUT (T-211-10) reaching a text column, so it gets a ceiling like every other constrained
+# type in this file — and 64 is generous for the thing it holds (`slack`, `jira`, `smtp`,
+# `notion`, a vendor's own product name) while being far too small to be a payload.
+# ⚠ IT IS A LENGTH BOUND AND NOTHING ELSE. There is deliberately no pattern, no enum and no
+# allow-list: D-211-01 makes this FREE TEXT precisely so an unknown service is storable, and
+# a `Literal` here would be migration 116's `capability` mistake moved one column over.
+ServiceId = Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_normalise_service_id)]
 
 
 # ── the capability vocabulary ────────────────────────────────────────────────────────────
@@ -200,6 +234,12 @@ class ConnectorConnectionCreate(_StrictBase):
     """
 
     capability: ConnectorCapability | None = None
+    # Phase 211 (D-211-01) — REQUIRED, ON EVERY SHAPE, and that is the decision this model
+    # takes rather than inherits. The model and migration 127 then agree EXACTLY, which is
+    # D-211-04's rule: a model LAXER than the database yields a 500 where a 422 belongs, and a
+    # model STRICTER than it refuses a row the database would have stored. Making it optional
+    # "for now" would mean the first surface to read it has to branch on absence forever.
+    service_id: ServiceId
     name: NonEmpty
     # WARNING - THIS READ ``ConnectorConfig | dict[str, Any] = Field(default_factory=dict)``
     # FOR THE LENGTH OF ONE PHASE, AND THAT UNION MEMBER IS WHAT SWITCHED WR-05 OFF. A raw
@@ -243,7 +283,43 @@ class ConnectorConnectionCreate(_StrictBase):
 
         The fix is to branch on the SHAPE and validate each one on its own terms, never to
         loosen the shared path.
+
+        ── Phase 211 (D-211-11 / CONN-08): THREE shapes now, and ONE new refusal ───────────
+        The two arms below are byte-unchanged. What is added is an arm at each END, and both
+        additions follow the conclusion above rather than relaxing it:
+
+          * FIRST, a refusal of the AMBIGUOUS body (both a capability and an MCP URL). ⚠ Its
+            POSITION IS LOAD-BEARING: the ambiguous body carries an ``mcp_server_url``, so an
+            arm placed after the MCP branch would never run — that branch returns.
+          * LAST, the SERVICE-ONLY shape (neither), which REPLACES the old blanket refusal
+            that demanded one of the two. It is ACCEPTED, and it deliberately does NOT inherit
+            the capability arm's secret or config requirements: an OAuth-authenticated service
+            has neither until Phase 215, and demanding one would make the shape unusable in
+            the only case it exists for.
+            ⚠ The old sentence is deliberately NOT quoted here or anywhere else in the tree.
+            `grep -rn` over `backend/` is what proves no caller and no test still expects it,
+            and a comment that quotes the string it retired defeats that grep — the same trap
+            this repository has recorded twice before.
+
+        ⚠ Nothing here loosens the CAPABILITY arm. ``_reject_config_capability_mismatch`` and
+        the secret requirement still run for exactly the rows they always ran for.
         """
+        # ── The AMBIGUOUS shape, refused FIRST (D-211-11) ────────────────────────────────
+        # ⚠ WHY THIS IS A REFUSAL AND NOT A PREFERENCE. `phase_types.py` branches on
+        # `mcp_tool_name` FIRST when it executes an external action, so a row carrying both
+        # shapes silently takes the remote-server path and **its capability goes inert** — the
+        # connection does something other than what its own verb says, with nothing anywhere
+        # reporting a conflict. Migration 127's
+        # `connector_connections_shape_is_not_ambiguous` is the same rule at the database (the
+        # door a service-role writer takes); this one is what makes the API answer 422 instead
+        # of surfacing a CheckViolationError as a 500.
+        if self.mcp_server_url and self.capability:
+            raise ValueError(
+                "a connection may carry a capability or an mcp_server_url, never both: the "
+                "executor branches on the tool name first, so the capability on such a row "
+                "would never run. Split it into two connections."
+            )
+
         if self.mcp_server_url:
             # ── MCP shape: a URL is the identity, the config is server-specific ──────────
             # HTTPS only. The credential travels in an Authorization header on every call,
@@ -253,9 +329,19 @@ class ConnectorConnectionCreate(_StrictBase):
                 raise ValueError("mcp_server_url must be an HTTPS URL")
             return self
 
-        # ── Capability shape: exactly the pre-206 contract, restored in full ─────────────
+        # ── SERVICE-ONLY shape (CONN-08 / SC#4): neither, and that is now VALID ──────────
+        # ⚠ THIS REPLACES the old blanket refusal that demanded one of the two shapes. That
+        # sentence is gone from the tree deliberately, not by accident: a test still asserting
+        # it would have been a test pinning the defect.
+        #
+        # A row here names a SERVICE and no way to reach it — an OAuth-authenticated service,
+        # which has neither an adapter nor a remote server until Phase 215. It requires no
+        # secret and no config, because it HAS neither, and the identity field above is what
+        # keeps it from being migration 126's "connection that resolves to nothing": it
+        # resolves to a NAME. What it cannot do is act — `/check` and `/discover` each refuse
+        # it by name rather than with a bare error.
         if not self.capability:
-            raise ValueError("Either capability or mcp_server_url must be provided")
+            return self
 
         # Pydantic has already coerced `config` into one of the union members at the FIELD,
         # which is what re-applies every per-field NonEmpty constraint and what lets WR-05
@@ -275,6 +361,11 @@ class ConnectorConnectionUpdate(_StrictBase):
 
     ``capability`` is absent on purpose: changing it would orphan the config shape and the
     stored secret in one edit. Re-pointing a connection at a different vendor is a new row.
+
+    ⚠ ``service_id`` IS ALSO ABSENT, AND ALSO ON PURPOSE (Phase 211). Editing a connection's
+    identity is CONN-07, which Phase 212 owns TOGETHER WITH the surface that would do it —
+    a catalog that can rename a service but has nowhere to show the rename is half a feature.
+    Adding the field here without that surface would ship an editable column nothing edits.
     """
 
     name: NonEmpty | None = None
@@ -311,6 +402,18 @@ class ConnectorConnectionResponse(_StrictBase):
     id: str
     org_id: str
     capability: ConnectorCapability | None = None
+    # Phase 211 — POINT 3 OF THE FIVE-POINT COLUMN LOCKSTEP. Point 4
+    # (`connector_service._SELECTABLE_COLUMNS`) follows automatically because that constant is
+    # DERIVED from these field names; there is no hand-maintained column list to update.
+    # ⚠ POINT 5 IS NOT IN THIS FILE AND IT IS THE ONE THAT BREAKS EVERYTHING: migration 118
+    # grants `SELECT` on `connector_connections` COLUMN BY COLUMN, so a field added HERE with
+    # no `GRANT SELECT` in a migration makes the projection name a column `authenticated`
+    # cannot read — and PostgREST answers `42501` for EVERY read of the table, which reads as a
+    # total outage rather than as a missing column. Migration 127 §4 carries that grant.
+    # ⚠ REQUIRED, not `str | None`: after migration 127 the database GUARANTEES a non-blank
+    # value on every row, so a None here would mean the row is broken and the honest response
+    # is a loud ValidationError rather than a silent null a client has to branch on.
+    service_id: str
     name: str
     # WARNING - THIS READ ``ConnectorConfig | dict[str, Any] = Field(default_factory=dict)``
     # FOR THE LENGTH OF ONE PHASE, AND THAT UNION MEMBER IS WHAT SWITCHED WR-05 OFF. A raw
@@ -333,6 +436,7 @@ class ConnectorConnectionResponse(_StrictBase):
 
 __all__ = [
     "ConnectorCapability",
+    "ServiceId",
     "SendEmailConfig",
     "CreateTicketConfig",
     "PostMessageConfig",

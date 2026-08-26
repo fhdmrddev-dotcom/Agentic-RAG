@@ -347,6 +347,12 @@ def test_connector_connection_create_mcp_model():
     """ConnectorConnectionCreate accepts mcp_server_url and tool_grants."""
     req = ConnectorConnectionCreate(
         name="GitHub MCP",
+        # Phase 211 (D-211-01) — required on every shape, the MCP one included. ⚠ It is NOT
+        # derived from the URL: D-211-01 rejected URL-derived identity outright, because two
+        # connections can reach the same service (a prod and a sandbox Jira) and a generic
+        # host names no service at all. Migration 127 §2 derives it ONCE, for rows that
+        # predate the column, and nothing downstream ever re-derives it.
+        service_id="github",
         mcp_server_url="https://api.github.com/mcp",
         tool_grants={"github_create_issue": True, "github_delete_repo": False},
         secret="ghp_test123",
@@ -545,6 +551,11 @@ def _grants_row(**overrides) -> dict:
         "id": _GRANTS_CONN_ID,
         "org_id": _GRANTS_ORG_ID,
         "capability": None,
+        # Phase 211 — `ConnectorConnectionResponse.service_id` is REQUIRED, so a stored row
+        # without it fails `_to_response` outright rather than passing a None through. That
+        # strictness is deliberate: after migration 127 the database guarantees a non-blank
+        # value on every row, so a None here would mean the row is broken.
+        "service_id": "deepwiki",
         "name": "DeepWiki (MCP)",
         "config": {"headers": {}},
         "mcp_server_url": "https://mcp.deepwiki.com/mcp",
