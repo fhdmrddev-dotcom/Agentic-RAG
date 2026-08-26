@@ -1168,7 +1168,22 @@ owed, and no `checkpoint:human-verify` install task should appear in any plan.
 
 ---
 
-## Open Questions
+## Open Questions (ALL RESOLVED at plan-phase, 2026-08-26)
+
+> **RESOLVED — Q1:** the class-attribute design was **REJECTED** by the planner; descriptors live in
+> `connectors/descriptors.py` with `inputSchema` DERIVED through a function-body `get_adapter`
+> import, because a module-scope assert in `registry.py` would drag the vendor modules into the cold
+> import graph and turn `test_no_vendor_module_enters_the_import_graph_until_a_send_happens`
+> (`test_190_connector_source_fence.py:426`) RED. **Verified present in the tree.**
+> **RESOLVED — Q2:** adopted (write at migration AND assert agreement in code; staleness window
+> stated in the migration comment) — and hardened at revision iteration 1 into migration 127 §2b's
+> backfill plus the cross-language fence `test_the_sql_backfill_matches_the_python_descriptor`.
+> **RESOLVED — Q3:** adopted — keep the `?capability=` parameter, stop calling it.
+> **RESOLVED — Q4:** out of scope; planted as a seed rather than folded in.
+
+> ⚠ **One correction to this file, found at planning:** the three-letter-acronym fence
+> `test_189_no_egress.py::test_no_mcp_identifiers_in_backend_app` is **RETIRED** (`:249-257` — the
+> docstring says so and the body only asserts `mcp_client is not None`). An executor owes it no effort.
 
 1. **Where do the static descriptors live?**
    - Known: they must be byte-compatible with `discovered_tools` (D-211's discretion), and the

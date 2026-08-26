@@ -42,6 +42,53 @@ Plan: 210-01, 210-02, 210-03 (3/3 complete)
 Status: Phase 210 review round 1 fixes committed (V-1, V-2, V-3 resolved at HEAD 705a7412) — all gates green (tsc 34, count gate 5798, backend unit rot set at 68 baseline), BUS-009 opened to reviewer
 Last activity: 2026-08-26 — Phase 210 review fixes complete (V-1/V-2/V-3 resolved, clean citations channel, dedicated retrieval_error propagation)
 
+---
+
+**Phase: 211 — The Connection Is a Service, Not a Verb — PLANNED (5 plans, 4 waves; plan-checker PASSED).**
+Plan: — (none executed yet). **Next action: `/gsd:execute-phase 211`.**
+Last activity: 2026-08-26 — Phase 211 plan-phase complete: research (1,299 L), VALIDATION.md, 5 plans,
+plan-checker PASSED at iteration 2 (0 blockers / 2 warnings, both applied inline).
+
+⚠ **210 and 211 run alongside and share the `live_connectors` flag.** File fence, agreed with the
+operator (`211-CONTEXT.md` § Integration Points): **211 owns** `models/connector.py`,
+`api/connectors.py`, `connector_service.py`, `mcp_client.py`, `harness/grounding.py`,
+`phase_types.py`, migration 127, all of `components/settings/`. **210 owns** `api/admin.py`,
+`components/admin/`, `scheduler_service.py`, `retrieval_service.py`, `embedding_service.py`.
+A file needed from the other side goes on the bus.
+⚠ **`BUS-009` is OPEN and unanswered — Phase 210's re-review is owed by Claude** (`AGENTS.md §3.1`:
+the reviewer must not have shaped the build).
+
+### Phase 211 — wave structure
+
+| Wave | Plan | Files | Autonomous |
+|---|---|---|---|
+| 1 | `211-01` descriptors + sanitizer + the seven closed-set spellings | 5 | yes |
+| 2 | `211-02` migration 127 + the column lockstep + the wire contract | 10 | **no** — operator pastes the SQL |
+| 3 | `211-03` settings ∥ `211-04` workflows | 5 / 8 | yes / yes |
+| 4 | `211-05` fences, both seam halves, gate knobs, ledger, G-4 | 7 | **no** — G-4 human-verify |
+
+⚠ **No file appears in two plans** — verified mechanically, not asserted.
+⚠ **Migration 127 is applied by PASTING INTO THE SUPABASE SQL EDITOR**, never `supabase db push` /
+`db reset`, then `bash scripts/regenerate-full-schema.sh` (no `--reset`). `full-schema.sql` is
+REGENERATED, never hand-edited. It also carries `GRANT SELECT (service_id)` **in the same migration**
+— its omission is a total 503 on every read of the table, measured 2026-08-25.
+
+### The defect plan-checking caught — recorded because it is this project's signature failure
+
+Revision iteration 1 found the first-draft D-211-12 picker fix created a **closed loop**: migration 127
+backfilled `service_id` but **not** `discovered_tools`; the new gate rendered the picker only when
+`discovered_tools.length > 0`; and that `null` short-circuited the **whole component, including the
+Discover button** — so a legacy row with an empty list could never be populated and became unusable in
+a workflow step. It also regressed the MCP path (a fresh MCP connection with zero tools lost its
+Discover affordance) in a test file the plan had not declared.
+⚠ **No planned test could have caught it:** the new legacy fixture was pre-populated, the seam test was
+backend-only, and `reachability.test.tsx`'s POSITIVE CONTROL 2 asserts the *defect* — it would have
+stayed **green** while SC#2 was false. **A control that stays green while the criterion is false is
+worse than no control.** Remedy shipped is **both** arms: the migration backfills existing rows
+(today's data) **and** the gate splits into card-boundness / list-length / un-gated Refresh (the shape).
+
+---
+
 ## Milestone v3.9 — scope as agreed with the operator (2026-08-26)
 
 **Goal:** A person connects a *service* — not a protocol — sees every tool it offers, grants each
@@ -143,7 +190,23 @@ CLAUDE.md carries a MANDATORY sweep rule; it is honoured by the orchestrator, no
 
 ## Guardrail overrides
 
-None recorded for v3.9 yet.
+**Phase 211 — G-2 / UI-SPEC gate, OVERRIDDEN 2026-08-26 at `/gsd:plan-phase 211`.** The gate fired
+correctly: `ROADMAP.md` marks Phase 211 `**UI hint**: yes` and no `211-UI-SPEC.md` exists. Resolved
+`--skip-ui` **on the operator's explicit call**, on the basis of the phase's own locked
+**D-211-08**: *211 owes NO Stitch pass and NO sketch — it removes an organising axis, it does not
+design a surface; **Phase 212 owes both***. The UI work in 211 is confined to de-organising the verb
+(filters, pickers, form categories) and swapping the data source; **it changes no layout**.
+⚠ **The re-open trigger is Phase 212** — if 212 plans the catalog without a Stitch pass and a sketch,
+this override has been silently inherited rather than honoured. ⚠ And when 212 does run them, the
+design bar is the **shipped** `Aether Intelligence` tokens in `frontend/src/index.css`, **not** the
+Stitch project's design-md — the two disagree, and the shipped side carries the measured WCAG AA work
+(211-CONTEXT.md *Risks* §4).
+
+**Phase 211 — pattern-mapper agent SKIPPED 2026-08-26** (`workflow.pattern_mapper` is `true`, so this
+is a deviation, not a config). `211-RESEARCH.md` §I *"Don't hand-roll"* already delivers a file:line
+analog per problem, plus an Architectural Responsibility Map (§ pre-A) and §K.4's test-file list.
+Spawning it would have re-derived what was already on disk. **No `211-PATTERNS.md` exists** — a plan
+or executor looking for one should read `211-RESEARCH.md` §I instead.
 
 **Carried forward from v3.8:** Phases **207 and 208 ran with no GSD ceremony and no independent
 verification** — recorded as an override at the time, not discovered afterwards. The full v3.6/v3.7
