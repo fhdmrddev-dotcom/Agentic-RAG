@@ -75,3 +75,19 @@ scripts/.sse_after/
 # every agent to read it before answering architecture questions, so a fresh clone must have it.
 graphify-out/graph.json
 graphify-out/cache/
+
+# Local scratch that accumulates from normal operator work — never part of a change.
+# These sat uncommitted and were added on top of every `/code-review ultra` diff.
+supabase/snippets/
+supabase/.temp/
+scripts/_uat111/
+uat-files/
+backend/scripts/115_*.json
+backend/RUN-BACKEND.md
+backend/settings_override.json.migrated
+
+# A stray Windows device-name file created by a `> nul` redirect. Git cannot index it.
+nul
+scripts/.sse_after_run1/
+scripts/_uat111_1/
+scripts/pm-pack/out/
