@@ -35,6 +35,11 @@ import type {
   ConnectorConnection,
   ConnectorConnectionConfig,
 } from "@/lib/api"
+// ⚠ THE TREE'S ONE OWN-GUARD SPELLING, imported rather than re-declared. `SERVICE_TO_SHAPE`
+// is a plain object literal read with a free-text key that arrives from a person's keystrokes
+// and from another tenant's stored row — the exact sink `own()` exists for (T-211-15a). This
+// module is the sixth caller; the helper takes zero imports and is un-cyclable by construction.
+import { own } from "@/components/workflows/ownProperty"
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 1 · THE PANEL CHROME (§11d — the copy table, verbatim)
@@ -66,66 +71,166 @@ export const PANEL_REGION_LABEL_CREATE = "Add a connection"
 export const panelRegionLabelEdit = (name: string): string => `Edit connection: ${name}`
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// 2 · THE CAPABILITY CHOOSER — chosen FIRST, and the rest of the form appears (§3b)
+// 2 · THE SERVICE — named FIRST, and the rest of the form follows (Phase 211 / SC#1)
+//
+// ⚠ WHAT THIS SECTION REPLACED, AND WHY THE REPLACEMENT IS A DELETION RATHER THAN A HIDE.
+// It used to hold a four-entry array that WAS the three-verb category chooser, and which
+// ORGANISED the create flow: you picked a verb and the form appeared. ⚠ THAT CONSTANT'S NAME
+// IS DELIBERATELY NOT SPELLED HERE — the acceptance check for its removal is a `grep -r` over
+// this tree, and prose that quotes the needle makes its own count lie. (Plan 211-02 recorded
+// the same trap firing three times in one migration; this is the fourth.) The suite's two
+// fences compose the identifier from fragments for exactly that reason.
+// `SEED-207` measured the cost of that axis: while two connection models coexist, every
+// downstream surface (node face, service mark, filter, chat mention, catalog entry, picker)
+// must branch, and each new surface pays the branch again. The array is DELETED rather than
+// merely unrendered, because a control whose data still exists is one prop away from coming
+// back — `ConnectionFormPanel.test.tsx`'s source fence asserts the panel no longer spells it.
+//
+// ⚠ THE VERB IS NOT DELETED. `ConnectorCapability` is untouched, `configFromDraft`'s three
+// arms are untouched, and a Slack save still sends `capability: "post_message"`. CONN-05 is
+// "keeps working unchanged": what moved is which fact ORGANISES the flow, not which facts
+// exist. Naming a service is now how a person REACHES a capability.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-export const CAPABILITY_LABEL = "What this connection does"
-
-/** §3b's opening finding, made into a help line: *"every capability needs different facts,
- *  and Slack needs almost none."* The chooser leads because the field set depends on it. */
-export const CAPABILITY_HELP =
-  "Pick this first — each kind of destination needs different facts, and one needs almost none."
+export const SERVICE_LABEL = "Which service this connects to"
 
 /**
- * The MCP shape's chooser label (206.1 item 1 / D-206.1-03).
+ * The help line, and both of its clauses are load-bearing (D-211-02).
  *
- * ⚠ IT NAMES THE CAPABILITY, NOT ONE ACT, and the asymmetry with its three siblings is
- * deliberate. `Send an email` / `Create a Jira ticket` / `Post a Slack message` each name ONE
- * action, because each of those connections can do exactly one thing. An MCP server cannot be
- * described that way: WHICH tools it may run is decided later, per tool, by the grants at the
- * builder seam — so a label promising one action would be promising something the row does not
- * decide.
- *
- * ⚠ It must contain neither `Jira site` nor `SMTP host and port`: the shipped field-set case
- * asserts both strings ABSENT on a non-matching shape, and a chooser label carrying either
- * would make that case pass or fail for a reason it is not about.
- *
- * ⚠ DECLARED ABOVE `CAPABILITY_CHOICES` AND NOT BESIDE ITS SIBLINGS BELOW, because a `const`
- * is NOT hoisted for initialisation — reading it from the array literal before this line runs
- * is a temporal-dead-zone `ReferenceError` at module load, which no type checker reports.
+ * The first says the identity LEADS — what the form asks for next follows from it, which is
+ * the sentence the old chooser's help was making about a verb. The second says the curated
+ * set is a SUGGESTION and not a constraint: a person who does not see their service must be
+ * told, in place, that typing it anyway works. Without that clause the `<datalist>` reads as
+ * a menu, and a menu is the closed set D-211-01 rejected wearing a friendlier control.
  */
-export const CAPABILITY_CHOICE_MCP_LABEL = "Use tools from an MCP server"
+export const SERVICE_HELP =
+  "Name it first — what the form asks for next follows from it. The list is a shortcut, not a limit: type any service, including one nobody here has heard of."
+
+/** A real identity from the list below, so the box shows the SHAPE of the answer (a short
+ *  lowercase name) rather than a sentence describing one. */
+export const SERVICE_PLACEHOLDER = "slack"
 
 /**
- * The chooser's four entries.
+ * The one suggestion that opens the endpoint field.
  *
- * The first three are the closed capability set, in the order mig 116's CHECK constraint and
- * `ConnectorCapability` spell it. ⚠ **The fourth is not a capability at all** — it is the MCP
- * SHAPE (`ConnectionShape`'s `"mcp"` sentinel, declared beside `ConnectionDraft` below), and
- * it is APPENDED LAST precisely so the three capabilities keep their mig-116 order: a member
- * added at the end cannot re-order the ones a person already knows.
+ * ⚠ IT NAMES NO VENDOR AND PROMISES NO ACTION. WHICH tools such a server may run is decided
+ * later, per tool, by the grants at the builder seam — so a label promising one action would
+ * be promising something the row does not decide. (That paragraph is inherited verbatim in
+ * substance from the label this one replaces; it was right about the MCP shape and it is
+ * still right.)
  *
- * ⚠ The shipped docblock read *"a fourth member is a phase, not a field (D-32)"*. **That was
- * right and it is why 206.1 is a phase.** The rule is not superseded — it was OBEYED.
+ * ⚠ It must contain neither `Jira site` nor `SMTP host and port`: the shipped field-set cases
+ * assert both strings ABSENT on a non-matching shape, and a label carrying either would make
+ * those cases pass or fail for a reason they are not about.
+ *
+ * ⚠ DECLARED ABOVE `SERVICE_SUGGESTIONS` AND NOT INSIDE IT, because a `const` is NOT hoisted
+ * for initialisation — reading it from the array literal before this line runs is a
+ * temporal-dead-zone `ReferenceError` at module load, which no type checker reports.
  */
-export const CAPABILITY_CHOICES: ReadonlyArray<{
-  capability: ConnectionShape
+export const SERVICE_CUSTOM_ENDPOINT_LABEL = "A server at an address you provide"
+
+/**
+ * The suggestion list — a PRESENTATION LOOKUP keyed by the free-text identity (D-211-02).
+ *
+ * ⭐ **IT IS A SUGGESTION, NEVER A CONSTRAINT.** It feeds a `<datalist>`, so a value that is
+ * not on it is typed and accepted exactly like one that is. **A miss degrades to the raw
+ * identifier** — never to a placeholder, never to a refusal, and never to a hidden row. That
+ * is what makes adding a service cost ZERO ENGINEERING: a row here, not a migration.
+ *
+ * ⛔ **NO PER-VENDOR BRANCH MAY BE ADDED ANYWHERE.** These are rows in a lookup, not cases in
+ * an `if`; the labels are DATA and nothing reads them to decide behaviour. The moment a
+ * `serviceId === "slack"` comparison enters this tree, migration 116's closed-set mistake has
+ * been moved to a nicer axis, which is precisely what D-211-01 rejected.
+ *
+ * The three identities are the ones **migration 127 backfills onto every pre-existing row**,
+ * derived once from each row's `capability`. **Phase 212 owns this constant's CONTENT** — the
+ * curated catalog, its marks and its starter prompts — and may move it into a table. Phase 211
+ * commits only that identity does not DEPEND on it.
+ */
+export const SERVICE_SUGGESTIONS: ReadonlyArray<{
+  service_id: string
   label: string
 }> = [
-  { capability: "send_email", label: "Send an email" },
-  { capability: "create_ticket", label: "Create a Jira ticket" },
-  { capability: "post_message", label: "Post a Slack message" },
-  { capability: "mcp", label: CAPABILITY_CHOICE_MCP_LABEL },
+  { service_id: "slack", label: "Slack" },
+  { service_id: "jira", label: "Jira" },
+  { service_id: "smtp", label: "Email over SMTP" },
+  { service_id: "custom", label: SERVICE_CUSTOM_ENDPOINT_LABEL },
 ]
 
-/** On EDIT the capability is STATIC TEXT, never a control: `ConnectorConnectionUpdate`
- *  carries no `capability` field on purpose (`api.ts:5590`) — changing it would orphan
- *  both the config shape and the stored credential in one edit. */
-export const CAPABILITY_LOCKED_NOTE =
-  "The kind cannot be changed after it is created — it would orphan both the saved facts and the stored credential. Add a new connection instead."
+/**
+ * Which FIELD SET a known identity asks for. **Presentation only** — it decides which
+ * credential fields are shown and nothing else.
+ *
+ * ⚠ TOTAL BY CONSTRUCTION, AND READ THROUGH `own(...)` — never `MAP[key]`. This is a plain
+ * object literal, so it INHERITS `constructor`, `toString`, `__proto__` and friends: a bare
+ * bracket read does NOT fire its `??` fallback for those names, because the inherited member
+ * is never nullish, and it hands back a FUNCTION typed as `ConnectionShape` (T-211-15a; nine
+ * measured `[Function Object]` sinks in this tree, one of which hard-crashed a node face).
+ * An identity this map does not hold resolves to `"service"`, which is a real shape rather
+ * than an error state.
+ */
+export const SERVICE_TO_SHAPE: Record<string, ConnectionShape> = {
+  slack: "post_message",
+  jira: "create_ticket",
+  smtp: "send_email",
+  custom: "mcp",
+}
 
-export const capabilityLabelOf = (capability: string): string =>
-  CAPABILITY_CHOICES.find((c) => c.capability === capability)?.label ?? capability
+/**
+ * The service-facing label for an identity.
+ *
+ * A hit renders the suggestion's human label; **a MISS renders the raw identifier itself** —
+ * never a placeholder, never a blank, never a refusal (D-211-02). Renamed from
+ * `capabilityLabelOf`, whose two call sites (the edit-mode static block, and this module's
+ * own docblocks) moved with it.
+ *
+ * ⚠ `.find()` over an array rather than a map read: an array has no inherited keys to fall
+ * through, so this reader needs no `own()` guard and gains none.
+ */
+export const serviceLabelOf = (serviceId: string): string =>
+  SERVICE_SUGGESTIONS.find((s) => s.service_id === serviceId)?.label ?? serviceId
+
+/**
+ * The field set a draft asks for, from what the person has actually supplied.
+ *
+ * ⚠ ONE EXPLICIT OVERRIDE, AND IT IS FIRST: an `https://` endpoint selects the remote-server
+ * shape whatever the identity says. That is what keeps a STORED endpoint row in its own shape
+ * on edit — migration 127 backfilled such rows with their HOST as the identity, and the host
+ * is not in the suggestion list. The override reads a POSITIVE fact about the draft (there is
+ * an address, and it is TLS-shaped), never an absence.
+ *
+ * ⚠ It is HTTPS-SHAPED, not merely non-empty. A plaintext address selects nothing, so a
+ * half-typed `http://…` cannot smuggle a person into a shape whose Save the server would then
+ * refuse for a reason the form never named.
+ */
+export function shapeForService(serviceId: string, endpoint: string): ConnectionShape {
+  if (endpoint.trim().toLowerCase().startsWith("https://")) return "mcp"
+  return own(SERVICE_TO_SHAPE, serviceId.trim().toLowerCase()) ?? "service"
+}
+
+/**
+ * On EDIT the service is STATIC TEXT, never a control.
+ *
+ * ⚠ EDITING A CONNECTION'S IDENTITY IS CONN-07, AND PHASE 212 OWNS IT. Plan 211-02
+ * deliberately left `ConnectorConnectionUpdate` without a `service_id` field, so a control
+ * here would compose a body the model silently discards — a change that appears to work and
+ * does not. The same reasoning the shipped note carried about the capability, one axis over:
+ * the field set and the stored credential both hang off it.
+ */
+export const SERVICE_LOCKED_NOTE =
+  "The service cannot be changed after it is created — it would orphan both the saved facts and the stored credential. Add a new connection instead."
+
+/**
+ * Save is off until this reason is gone (the `"service"` shape only).
+ *
+ * ⚠ A DISABLED SAVE IS KINDER THAN A 422, and that is the whole of this predicate's job. The
+ * server's `ServiceId` is `min_length=1` plus an `AfterValidator` that strips and rejects
+ * blank, and the database's `connector_connections_has_a_service_identity` refuses a blank
+ * `btrim` again underneath it — so a blank identity is a certain refusal, and saying so here
+ * costs nothing. Do not describe this as the gate.
+ */
+export const SERVICE_SAVE_DISABLED_REASON =
+  "Save is off until this connection has a name and names a service. Both are asked for above."
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 3 · THE FIELDS, BY CAPABILITY (§3b — EXACTLY 4 / 5 / 3, and nothing else)
@@ -249,13 +354,22 @@ export const MCP_SAVE_DISABLED_REASON =
 /** The field COUNT per SHAPE, as data rather than as prose, so the suite walks the same closed
  *  set the panel renders (§3b: 4 / 5 / 3, plus 206.1's 3 for MCP — asserted, so an extra field
  *  fails loudly — T-190-17-SCOPE).
- *  ⚠ TOTAL over `ConnectionShape`: a fifth member added without a bound count is a TYPE ERROR
- *  here rather than an unasserted field set discovered in a browser. */
+ *  ⚠ TOTAL over `ConnectionShape`: a member added without a bound count is a TYPE ERROR
+ *  here rather than an unasserted field set discovered in a browser. **That rule fired in
+ *  Phase 211 exactly as written**, and `service` below is the fifth member it demanded.
+ *
+ *  ⚠ `service: 1` IS NOT A TYPO, AND IT COUNTS WHAT IT SAYS. These are `connection-field`
+ *  nodes. The service control lives in its OWN always-present slot — the one the three-verb
+ *  chooser occupied, which was likewise never a `connection-field` — so the service shape
+ *  binds exactly one: the Name. There is no credential field, because an identified row with
+ *  no reachable path has nothing to authenticate with until OAuth lands in Phase 215, and a
+ *  password box offered for a credential that cannot yet be used is a lie the DOM holds. */
 export const FIELD_COUNTS: Record<ConnectionShape, number> = {
   send_email: 4,
   create_ticket: 5,
   post_message: 3,
   mcp: 3,
+  service: 1,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -285,8 +399,17 @@ export const FIELD_COUNTS: Record<ConnectionShape, number> = {
  * and the MCP body carries no `capability` key at all — the model's `_validate_connection_shape`
  * returns on `mcp_server_url` before the capability arm, and `"mcp"` is not a member of the
  * server's `ConnectorCapability`.
+ *
+ * ── PHASE 211 ADDS `"service"`, AND IT IS THE THIRD SHAPE RATHER THAN A FIFTH VERB ──
+ * A connection that names a SERVICE and no way to reach it yet: no capability, no endpoint,
+ * no credential. It is CONN-08's row, and until migration 127 the database refused to store
+ * one at all (mig 126's `CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)`).
+ * ⚠ It is where an UNKNOWN identity lands, which is why `shapeForService` is total: a shape
+ * that renders honestly is strictly better than an error state for a service we have simply
+ * not curated yet. `EMPTY_DRAFT` starts here, so the create form has no capability default —
+ * *a default is not a way through a gate*.
  */
-export type ConnectionShape = ConnectorCapability | "mcp"
+export type ConnectionShape = ConnectorCapability | "mcp" | "service"
 
 /**
  * Everything the form holds, flat and all-string.
@@ -297,7 +420,27 @@ export type ConnectionShape = ConnectorCapability | "mcp"
  * on this surface that disagreement is the whole threat (T-190-17-DEST).
  */
 export interface ConnectionDraft {
+  /**
+   * ⚠ PHASE 211 — THIS IS NOW A **DERIVED** FIELD, NEVER A CHOSEN ONE, and that distinction
+   * is what keeps the docblock above's rejection of alternative (a) intact.
+   *
+   * `serviceId` is the connection's IDENTITY (what a person supplies); `capability` is the
+   * FIELD SET that follows from it (what the form renders). They are two different facts, so
+   * this is not the "separate `shape` field beside `capability`" that (a) rejected — the two
+   * cannot disagree about the same thing because they are not about the same thing.
+   *
+   * It is recomputed by `shapeForService` at exactly ONE derivation site in the panel, which
+   * both the service field and the endpoint field call. Nothing else assigns it in create
+   * mode. On EDIT it is still seeded from the ROW by `draftFromConnection`, which is a
+   * positive fact about a stored connection rather than a derivation from a keystroke.
+   */
   capability: ConnectionShape
+  /**
+   * Phase 211 (D-211-01) — the SERVICE this connection reaches, as typed. FREE TEXT, and it
+   * must never become a union: a closed set here would be migration 116's `capability`
+   * mistake moved to a nicer axis (SEED-207). Flat and all-string like every other field.
+   */
+  serviceId: string
   name: string
   /** send_email */
   host: string
@@ -317,7 +460,13 @@ export interface ConnectionDraft {
 }
 
 export const EMPTY_DRAFT: ConnectionDraft = {
-  capability: "send_email",
+  // ⚠ IT USED TO READ `send_email`, AND THAT WAS THE DEFAULT SC#1 EXISTS TO KILL. A create
+  // form that starts pointed at one of the three verbs is a form that can submit a capability
+  // nobody chose — *a default is not a way through a gate* (`phase_types.py`'s preamble
+  // records the same defect from the other end). It now starts in the shape that asserts
+  // nothing: an identity has not been named yet, so no field set is claimed.
+  capability: "service",
+  serviceId: "",
   name: "",
   host: "",
   port: "",
@@ -366,6 +515,12 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     // the server's own validator returns on `mcp_server_url` before it ever looks at the
     // capability arm, so the URL is what the wire will act on.
     capability: connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability),
+    // ⚠ PHASE 211 — READ VERBATIM OFF THE ROW, NEVER DERIVED FROM THE URL OR THE CAPABILITY.
+    // D-211-01 rejected URL-derived identity outright (it breaks for two connections to the
+    // same service, and for a generic SMTP host). Migration 127 derives from a host ONCE, for
+    // rows that predate the column, and nothing downstream re-derives — so a row whose
+    // identity disagrees with its endpoint still reads back its own stored value.
+    serviceId: connection.service_id,
     mcpServerUrl: connection.mcp_server_url ?? "",
     name: connection.name,
     host: text("host"),
@@ -428,6 +583,14 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
   // so this object's KEY SET is the contract — a second key is a 422 no client type can see.
   if (draft.capability === "mcp") {
     return { headers: {} }
+  }
+  // ⚠ PHASE 211 — THE SERVICE ARM NAMES ITS OWN CONDITION, exactly like its four siblings,
+  // rather than leaning on the neutral terminal below. The two produce the same object today;
+  // what differs is that this one is a STATEMENT (an identified row with no reachable path
+  // asserts nothing about a destination) while the terminal is a DEGRADATION (this shape is
+  // not one I know). Collapsing them would make CONN-08's row indistinguishable from a bug.
+  if (draft.capability === "service") {
+    return {}
   }
   if (draft.capability === "send_email") {
     const parsed = Number.parseInt(draft.port.trim(), 10)
@@ -604,6 +767,21 @@ export function destinationFooterOf(draft: ConnectionDraft): DestinationFooter {
     }
   }
 
+  // ⚠ PHASE 211 — THE SERVICE ARM, NAMED. A row that identifies a service and no way to reach
+  // it has NO destination, and that is a fact rather than a gap: the footer says so in the
+  // same words it uses before a person has typed anything, because both are honestly "not yet".
+  // It is spelled out rather than left to the terminal below for the same reason every other
+  // arm is — a positional fallback is how `destinationFactsOf` came to show an MCP connection
+  // sending to Slack's API host on a live screen (206.1 / commit `147f3c57`).
+  if (draft.capability === "service") {
+    return {
+      destination: FOOTER_NOTHING_YET,
+      tags: [],
+      detail: null,
+      refusedReason: null,
+    }
+  }
+
   // The NEUTRAL terminal. The footer NEVER disappears — an absent footer is the state a person
   // could bind through without reading — so it degrades to the WORD rather than to nothing,
   // and it claims no tag, no detail and no verdict about a destination it cannot name.
@@ -613,6 +791,35 @@ export function destinationFooterOf(draft: ConnectionDraft): DestinationFooter {
     detail: null,
     refusedReason: null,
   }
+}
+
+/**
+ * Does this draft carry the facts its shape needs before Save is worth offering?
+ *
+ * ⚠ SCOPE, STATED SO IT IS NOT MISTAKEN FOR A VALIDATOR. This is the CLIENT'S COURTESY and
+ * never the boundary — the server validates every shape again, and the database validates two
+ * of them a third time. It exists so a person is not handed a 422 for a fact the form could
+ * see was missing, and for no other reason.
+ *
+ * ⚠ THE THREE CAPABILITY SHAPES ARE DELIBERATELY UNGATED, byte-for-byte as shipped. Adding a
+ * completeness gate to them would be a behaviour change with no defect behind it, in a phase
+ * whose whole point is to move ONE axis; their refusals already arrive through §4b's machinery
+ * with a cause a person can read.
+ */
+export function draftIsSavable(draft: ConnectionDraft): boolean {
+  if (draft.capability === "service") {
+    // CONN-08's row: an identity and a name, and nothing else. No secret, no config.
+    // ⚠ TRIMMED, because `'   '` is a PRESENT value that this form would happily send and
+    // that the database's `btrim(service_id) <> ''` refuses — the gap between "non-empty
+    // string" and "non-blank string" is exactly where a 500 lives instead of a 422.
+    return draft.name.trim() !== "" && draft.serviceId.trim() !== ""
+  }
+  if (draft.capability === "mcp") {
+    // The shipped courtesy, unchanged and stated in one place rather than two: Save is off
+    // until the address is TLS-shaped. `MCP_SAVE_DISABLED_REASON` is the sentence that says so.
+    return draft.mcpServerUrl.trim().toLowerCase().startsWith("https://")
+  }
+  return true
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
