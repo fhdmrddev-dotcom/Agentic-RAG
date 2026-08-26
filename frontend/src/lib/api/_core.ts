@@ -92,6 +92,13 @@ export type GovernedFeature =
  *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
 export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>
 
+/** Phase 210 (CONN-10 / P-6) — response shape of `GET /features`.
+ *  Carries the GovernedFeature map + infra flags like `scheduler_process_enabled`. */
+export interface FeaturesResponse {
+  features: EffectiveFeatures
+  scheduler_process_enabled?: boolean
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 166 (D-166-06) — the active-org id injected as an `X-Org-Id` header on
 // EVERY authed request. This is a per-device UI HINT, never trusted: the server

@@ -11,7 +11,7 @@
  */
 
 import { API_BASE, ApiError, getAuthHeaders, getAuthToken } from "./_core"
-import type { EffectiveFeatures, GovernedFeature } from "./_core"
+import type { EffectiveFeatures, FeaturesResponse, GovernedFeature } from "./_core"
 import type { BackpressureSignals, OperatorAuditRow, OperatorIdentity } from "./tuner"
 export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
   const headers = await getAuthHeaders()
@@ -19,6 +19,18 @@ export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
   if (res.status === 404) return null
   if (!res.ok) throw new ApiError("Failed to load the operator identity.", res.status)
   return (await res.json()) as OperatorIdentity
+}
+
+/** Phase 210 (CONN-10 / P-6) — read the effective features map PLUS server status flags. */
+export async function getEffectiveFeaturesPayload(): Promise<FeaturesResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/features`, { headers })
+  if (!res.ok) throw new Error("Failed to load feature visibility.")
+  const body = (await res.json()) as FeaturesResponse
+  return {
+    features: body.features ?? {},
+    scheduler_process_enabled: body.scheduler_process_enabled,
+  }
 }
 
 /** Phase 148 (VIS-01 / D-04): the caller's effective feature→visible map from the
@@ -29,17 +41,8 @@ export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
  *  sole security authority — a governed page fetch still returns 403 server-side
  *  regardless of this map (that 403 is the graceful-bounce trigger, not this call). */
 export async function getEffectiveFeatures(): Promise<EffectiveFeatures> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/features`, { headers })
-  // CR-01 fix: NEVER throw ApiError here. A banned user's `GET /features` returns 403
-  // (get_current_user → _is_banned), and an ApiError(403) would dispatch the
-  // FEATURE_FORBIDDEN_EVENT → App.onForbidden → refetchFeatures() → this call again →
-  // an unbounded /features refetch storm. A PLAIN Error keeps the effective-features
-  // read entirely out of the graceful-bounce loop; useEffectiveFeatures catches it and
-  // fails CLOSED to `{}` (every governed feature hidden). The server 403 stays the wall.
-  if (!res.ok) throw new Error("Failed to load feature visibility.")
-  const body = (await res.json()) as { features?: EffectiveFeatures }
-  return body.features ?? {}
+  const payload = await getEffectiveFeaturesPayload()
+  return payload.features
 }
 
 /** Read the four live backpressure/health signals (`GET /admin/backpressure`).

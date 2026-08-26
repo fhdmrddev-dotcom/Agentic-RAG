@@ -144,9 +144,9 @@ class WorkflowScheduleCreate(_ScheduleCadenceMixin):
     interval_seconds: int | None = Field(default=None, ge=MIN_INTERVAL_SECONDS)
     timezone: str = "UTC"
     is_active: bool = True
-    max_tokens_per_run: int = Field(default=50_000, gt=0, le=MAX_TOKENS_CEILING)
+    max_tokens_per_run: int = Field(default=500_000, gt=0, le=MAX_TOKENS_CEILING)
     max_duration_seconds: int = Field(
-        default=600, gt=0, le=MAX_DURATION_CEILING_SECONDS
+        default=1_800, gt=0, le=MAX_DURATION_CEILING_SECONDS
     )
     inputs: dict[str, Any] = Field(default_factory=dict)
 

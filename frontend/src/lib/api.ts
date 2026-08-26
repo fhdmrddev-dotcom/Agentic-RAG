@@ -31,6 +31,7 @@ export type {
   SkillImportResult,
   GovernedFeature,
   EffectiveFeatures,
+  FeaturesResponse,
 } from "./api/_core"
 
 // ── threads ─────────────────────────────────────────────────────────
@@ -290,6 +291,7 @@ export type {
 export {
   getOperatorProbe,
   getEffectiveFeatures,
+  getEffectiveFeaturesPayload,
   getBackpressure,
   getOperatorAudit,
   getPlatformAudit,

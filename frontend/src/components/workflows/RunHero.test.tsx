@@ -272,6 +272,60 @@ describe("RunHero", () => {
     expect(screen.queryByText(/finished/i)).not.toBeInTheDocument()
   })
 
+  it("renders honest token budget exceeded sentence when circuit breaker tripped on tokens", () => {
+    render(
+      <RunHero
+        run={{
+          ...dummyRun,
+          status: "cancelled",
+          metadata: {
+            circuit_breaker: {
+              reason: "token_budget_exceeded",
+              cumulative_tokens: 502100,
+              max_tokens: 500000,
+            },
+          },
+        }}
+        answer={null}
+        files={[]}
+        filesLoading={false}
+        isTerminal={true}
+        failedStepTitle={null}
+        onDownload={vi.fn()}
+        titleOf={(slug) => slug}
+      />
+    )
+    expect(screen.getByText(/Stopped: Token budget exceeded/)).toBeInTheDocument()
+    expect(screen.getByText(/502,100 of 500,000 tokens/)).toBeInTheDocument()
+  })
+
+  it("renders honest duration limit exceeded sentence when circuit breaker tripped on duration", () => {
+    render(
+      <RunHero
+        run={{
+          ...dummyRun,
+          status: "cancelled",
+          metadata: {
+            circuit_breaker: {
+              reason: "duration_budget_exceeded",
+              elapsed_seconds: 1815,
+              max_duration_seconds: 1800,
+            },
+          },
+        }}
+        answer={null}
+        files={[]}
+        filesLoading={false}
+        isTerminal={true}
+        failedStepTitle={null}
+        onDownload={vi.fn()}
+        titleOf={(slug) => slug}
+      />
+    )
+    expect(screen.getByText(/Stopped: Duration limit exceeded/)).toBeInTheDocument()
+    expect(screen.getByText(/1815s of 1800s/)).toBeInTheDocument()
+  })
+
   it("D-16 Totality: unknown status falls back to never-success sentence", () => {
     render(
       <RunHero

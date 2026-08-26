@@ -24,11 +24,12 @@
  * needs, and this product has a written rule against exactly that shape.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Play, Trash2, X } from "lucide-react"
+import { AlertTriangle, Loader2, Play, Trash2, X } from "lucide-react"
 
 import {
   createWorkflowSchedule,
   deleteSchedule,
+  getEffectiveFeaturesPayload,
   listWorkflowSchedules,
   triggerSchedule,
   updateSchedule,
@@ -101,21 +102,28 @@ export function WorkflowScheduleModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [schedulerEnabled, setSchedulerEnabled] = useState<boolean | null>(null)
 
   const [name, setName] = useState("")
   const [kind, setKind] = useState<ScheduleCadenceKind>("cron")
   const [cron, setCron] = useState(CRON_PRESETS[1].expr)
   const [intervalSeconds, setIntervalSeconds] = useState(INTERVAL_CHOICES[2].seconds)
   const [timezone, setTimezone] = useState(localZone)
-  const [maxTokens, setMaxTokens] = useState(50000)
-  const [maxDuration, setMaxDuration] = useState(600)
+  const [maxTokens, setMaxTokens] = useState(500000)
+  const [maxDuration, setMaxDuration] = useState(1800)
   const [kickoff, setKickoff] = useState("")
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await listWorkflowSchedules(workflow.id)
+      const [rows, featuresPayload] = await Promise.all([
+        listWorkflowSchedules(workflow.id),
+        getEffectiveFeaturesPayload().catch(() => null),
+      ])
       setSchedules(rows)
+      if (featuresPayload && typeof featuresPayload.scheduler_process_enabled === "boolean") {
+        setSchedulerEnabled(featuresPayload.scheduler_process_enabled)
+      }
       setLoadFailed(false)
       onChanged?.(rows)
     } catch {
@@ -251,6 +259,23 @@ export function WorkflowScheduleModal({
         </div>
 
         <div className="flex flex-col gap-6 p-6">
+          {schedulerEnabled === false && (
+            <div
+              role="status"
+              data-testid="scheduler-inactive-warning"
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[12px] text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+              <div>
+                <span className="font-semibold text-amber-100">Scheduler daemon is inactive</span>
+                <p className="mt-0.5 leading-relaxed text-amber-200/90">
+                  Automations scheduler daemon is inactive on this installation. Schedules will not execute
+                  automatically on cadence unless the scheduler process is enabled or triggered manually.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ── what already exists ─────────────────────────────────────────────── */}
           <section className="flex flex-col gap-2">
             <h3 className="text-[13px] font-medium text-foreground">Existing schedules</h3>

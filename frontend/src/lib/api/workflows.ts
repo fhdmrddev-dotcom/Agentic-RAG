@@ -660,6 +660,7 @@ export interface WorkflowRunRead {
   /** The raw `workflow_definitions.definition` JSONB of the version that ran. */
   definition: WorkflowDefinitionJSON | null
   phases: WorkflowRunPhase[]
+  metadata?: Record<string, any> | null
 }
 
 /**
