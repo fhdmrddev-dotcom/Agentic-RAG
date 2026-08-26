@@ -1361,6 +1361,10 @@ _EMBEDDING_PORT_NAMES: dict[str, str] = {
     "1234": "lmstudio",
 }
 
+# The port map above may ONLY speak for these hosts. A remote service that happens to listen
+# on 1234 or 11434 is not LM Studio and not Ollama, and naming it so is a false name.
+_LOCAL_EMBEDDING_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", ""})
+
 
 def resolve_effective_embedding_provider(
     user_settings: UserEffectiveSettings | None = None,
@@ -1399,7 +1403,13 @@ def resolve_effective_embedding_provider(
     host = (parsed.hostname or "").lower()
     port = str(parsed.port) if parsed.port else ""
 
-    if port and port in _EMBEDDING_PORT_NAMES:
+    # ⚠ GATED ON LOCALHOST, and the gate is the whole point of the arm. The port map exists
+    # ONLY because `localhost` is the hostname for both local servers. Ungated it claimed any
+    # host on those ports — `https://embed.internal.corp.example.com:1234` came back
+    # `lmstudio` — which is the same false-name failure the docstring forbids two paragraphs
+    # up, on a corporate endpoint instead of on OpenAI. Found by ultrareview (bug_004),
+    # driven RED 2026-08-27.
+    if port and port in _EMBEDDING_PORT_NAMES and host in _LOCAL_EMBEDDING_HOSTS:
         return _EMBEDDING_PORT_NAMES[port]
     for known, name in sorted(_EMBEDDING_HOST_NAMES.items(), key=lambda kv: -len(kv[0])):
         if host == known or host.endswith("." + known):

@@ -94,3 +94,29 @@ def test_no_dedicated_key_falls_back_to_the_llm_endpoint():
         "llm_model": "qwen3:8b",
     })
     assert resolve_effective_embedding_provider(s) == "ollama"
+
+
+# ── ultrareview bug_004 — the port arm was not host-gated ─────────────────────
+# Driven RED 2026-08-27: a REMOTE endpoint on :1234 returned "lmstudio", and on
+# :11434 returned "ollama". The port map exists because localhost is the host for
+# BOTH local servers — it was never meant to claim a corporate hostname, and doing
+# so is the same false-name failure the docstring forbids one paragraph above it.
+@pytest.mark.parametrize("url,must_not_be", [
+    ("https://embed.internal.corp.example.com:1234/v1", "lmstudio"),
+    ("https://embed.acme.corp:11434/v1", "ollama"),
+])
+def test_remote_host_on_a_local_port_is_not_named_after_the_local_server(url, must_not_be):
+    named = resolve_effective_embedding_provider(_settings(url, "some-embed-model"))
+    assert named != must_not_be, f"{url} was named after a local server"
+    assert "corp" in named, f"expected the real host, got {named!r}"
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("http://localhost:1234/v1", "lmstudio"),
+    ("http://127.0.0.1:1234/v1", "lmstudio"),
+    ("http://localhost:11434/v1", "ollama"),
+    ("http://127.0.0.1:11434/v1", "ollama"),
+])
+def test_genuinely_local_servers_still_resolve_by_port(url, expected):
+    """The control: gating the port arm must not break what it was added for."""
+    assert resolve_effective_embedding_provider(_settings(url, "nomic-embed-text")) == expected

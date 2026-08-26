@@ -307,7 +307,7 @@ describe("RunHero", () => {
           status: "cancelled",
           metadata: {
             circuit_breaker: {
-              reason: "duration_budget_exceeded",
+              reason: "max_duration_exceeded",
               elapsed_seconds: 1815,
               max_duration_seconds: 1800,
             },

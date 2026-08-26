@@ -250,6 +250,12 @@ class WorkflowRunRead(BaseModel):
     claimed_at: datetime | None = None
     updated_at: datetime | None = None
     definition: dict[str, Any] | None = None
+    # ⚠ 210 / ultrareview merged_bug_002 — DECLARED, SELECTED AND POPULATED IN LOCKSTEP.
+    # `response_model` drops every key this model does not name, silently. Phase 210 shipped
+    # the honest circuit-breaker sentence in `RunHero.tsx` reading `metadata.circuit_breaker`
+    # while this field did not exist and the query never fetched the column, so the sentence
+    # could not render on any run. Removing any ONE of the three restores that.
+    metadata: dict[str, Any] | None = None
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -652,7 +658,7 @@ async def read_workflow_run(
         supabase.table("workflow_runs")
         .select(
             "id, thread_id, definition_id, status, created_at, updated_at, claimed_at, "
-            "definition_snapshot"
+            "definition_snapshot, metadata"
         )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
@@ -794,6 +800,10 @@ async def read_workflow_run(
         claimed_at=run.get("claimed_at"),
         updated_at=run.get("updated_at"),
         definition=definition,
+        # The third place of the lockstep — see the field's docblock. A jsonb column comes
+        # back as a dict, but a string scalar has been measured on sibling columns in this
+        # tree, so a non-dict is dropped rather than handed to the client as a bare string.
+        metadata=run.get("metadata") if isinstance(run.get("metadata"), dict) else None,
         phases=phases,
     )
 
