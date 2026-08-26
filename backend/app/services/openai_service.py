@@ -1290,24 +1290,11 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
 
 
 def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
-    if user_settings is not None:
-        if user_settings.embedding_api_key:
-            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
-            api_key = user_settings.embedding_api_key
-            base_url = user_settings.embedding_base_url or None
-        else:
-            # No dedicated key — reuse LLM credentials (key + base_url)
-            api_key = user_settings.llm_api_key
-            base_url = user_settings.embedding_base_url or user_settings.llm_base_url or None
-    else:
-        if settings.embedding_api_key:
-            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
-            api_key = settings.embedding_api_key
-            base_url = settings.embedding_base_url or None
-        else:
-            # No dedicated key — reuse LLM credentials (key + base_url)
-            api_key = settings.llm_api_key
-            base_url = settings.embedding_base_url or settings.llm_base_url or None
+    # ⚠ THE ROUTING LIVES IN `resolve_embedding_endpoint`, NOT HERE — because the outage
+    # message names the provider from that SAME call. Two earlier attempts derived the name
+    # from a separate input and both were measured naming an endpoint that was never called
+    # (210-REVIEW W-1, then the SC#10 roster). Resolve once, read twice.
+    api_key, base_url, _dedicated = resolve_embedding_endpoint(user_settings)
 
     kwargs: dict = {"api_key": api_key}
     if base_url:
@@ -1315,107 +1302,111 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     return OpenAI(**kwargs)
 
 
-def resolve_effective_embedding_provider(user_settings: UserEffectiveSettings | None = None) -> str:
-    """Resolve the honest provider name whose endpoint receives the embedding call (RAG-09 / SC#5).
+def resolve_embedding_endpoint(
+    user_settings: UserEffectiveSettings | None = None,
+) -> tuple[str, str | None, bool]:
+    """The ONE resolution of which credentials + endpoint an embedding call uses.
 
-    Matches the exact routing logic in get_embedding_client():
-      1. When user_settings is provided and user_settings.embedding_api_key is set (or user_settings
-         is None and settings.embedding_api_key is set), the request routes to the dedicated
-         embedding provider. Uses user_settings.embedding_provider if set, else infers from base_url/model.
-      2. When NO dedicated embedding key is set, get_embedding_client() reuses the LLM credentials
-         (llm_api_key + llm_base_url). The request routes to the active LLM provider (active_provider,
-         or inferred from llm_base_url / llm_model).
+    ⚠ THIS EXISTS SO A NAME CANNOT DRIFT FROM A ROUTE. ``get_embedding_client`` and
+    ``resolve_effective_embedding_provider`` both call it, so the provider we NAME in an
+    outage message is derived from the very ``base_url`` the client was built with.
+
+    Two prior attempts named the provider from a SEPARATE input and both were measured
+    wrong (210-REVIEW W-1, then the SC#10 roster): ``embedding_provider`` is a stored
+    LABEL that routes nothing, and substring-guessing a base URL missed LM Studio's
+    ``:1234`` while matching Ollama's ``:11434``. The rule that survives: resolve once,
+    read twice.
+
+    Returns ``(api_key, base_url_or_None, dedicated)``. ``base_url`` ``None`` means "the SDK
+    default", which is ``api.openai.com``. ``dedicated`` says whether EMBEDDING credentials
+    were used — the caller needs it, because when they were NOT, the stored
+    ``embedding_provider`` label describes an endpoint that was never contacted.
     """
-    from app.config import _infer_provider_for
+    def _s(v) -> str:
+        # Defensive: every real settings field is a str, but a duck-typed or mocked caller
+        # can hand back anything, and a non-str must never be parsed as a URL.
+        return v if isinstance(v, str) else ""
 
-    if user_settings is not None:
-        if getattr(user_settings, "embedding_api_key", None):
-            # Dedicated embedding key on user_settings
-            emb_prov = (getattr(user_settings, "embedding_provider", "") or "").strip()
-            if emb_prov:
-                return emb_prov
-            emb_base_url = getattr(user_settings, "embedding_base_url", "") or ""
-            if "openrouter" in emb_base_url:
-                return "openrouter"
-            if "ollama" in emb_base_url or ":11434" in emb_base_url:
-                return "ollama"
-            if "deepseek" in emb_base_url:
-                return "deepseek"
-            if "anthropic" in emb_base_url:
-                return "anthropic"
-            if "googleapis" in emb_base_url:
-                return "google"
-            emb_model = getattr(user_settings, "embedding_model", "") or ""
-            if emb_model:
-                inferred = _infer_provider_for(emb_model)
-                if inferred != "ollama" or "ollama" in emb_model:
-                    return inferred
-            return "openai"
-        else:
-            # No dedicated key — reuse LLM credentials (matching get_embedding_client)
-            active_prov = (
-                getattr(user_settings, "active_provider", "")
-                or getattr(user_settings, "llm_provider", "")
-                or ""
-            ).strip()
-            if active_prov:
-                return active_prov
-            llm_base_url = getattr(user_settings, "llm_base_url", "") or ""
-            if "openrouter" in llm_base_url:
-                return "openrouter"
-            if "ollama" in llm_base_url or ":11434" in llm_base_url:
-                return "ollama"
-            if "deepseek" in llm_base_url:
-                return "deepseek"
-            if "anthropic" in llm_base_url:
-                return "anthropic"
-            if "googleapis" in llm_base_url:
-                return "google"
-            llm_model = getattr(user_settings, "llm_model", "") or ""
-            if llm_model:
-                return _infer_provider_for(llm_model)
-            return "openai"
-    else:
-        # user_settings is None -> check app settings
-        if settings.embedding_api_key:
-            emb_base_url = settings.embedding_base_url or ""
-            if "openrouter" in emb_base_url:
-                return "openrouter"
-            if "ollama" in emb_base_url or ":11434" in emb_base_url:
-                return "ollama"
-            if "deepseek" in emb_base_url:
-                return "deepseek"
-            if "anthropic" in emb_base_url:
-                return "anthropic"
-            if "googleapis" in emb_base_url:
-                return "google"
-            if settings.embedding_model:
-                inferred = _infer_provider_for(settings.embedding_model)
-                if inferred != "ollama" or "ollama" in settings.embedding_model:
-                    return inferred
-            return "openai"
-        else:
-            active_prov = (
-                getattr(settings, "active_provider", "")
-                or getattr(settings, "llm_provider", "")
-                or ""
-            ).strip()
-            if active_prov:
-                return active_prov
-            llm_base_url = settings.llm_base_url or ""
-            if "openrouter" in llm_base_url:
-                return "openrouter"
-            if "ollama" in llm_base_url or ":11434" in llm_base_url:
-                return "ollama"
-            if "deepseek" in llm_base_url:
-                return "deepseek"
-            if "anthropic" in llm_base_url:
-                return "anthropic"
-            if "googleapis" in llm_base_url:
-                return "google"
-            if settings.llm_model:
-                return _infer_provider_for(settings.llm_model)
-            return "openai"
+    src = user_settings if user_settings is not None else settings
+    if _s(getattr(src, "embedding_api_key", "")):
+        # Dedicated embedding key — use its own base_url only, never inherit LLM base_url.
+        return _s(src.embedding_api_key), (_s(getattr(src, "embedding_base_url", "")) or None), True
+    # No dedicated key — reuse LLM credentials (key + base_url).
+    return (
+        _s(getattr(src, "llm_api_key", "")),
+        (_s(getattr(src, "embedding_base_url", "")) or _s(getattr(src, "llm_base_url", "")) or None),
+        False,
+    )
+
+
+# Host -> canonical provider name. Ordered longest-first at match time so a more specific
+# host never loses to a shorter one. ⚠ AN ABSENT HOST IS NOT "openai": see below.
+_EMBEDDING_HOST_NAMES: dict[str, str] = {
+    "api.openai.com": "openai",
+    "generativelanguage.googleapis.com": "google",
+    "api.cohere.ai": "cohere",
+    "api.jina.ai": "jina",
+    "api.mistral.ai": "mistral",
+    "api.deepseek.com": "deepseek",
+    "api.anthropic.com": "anthropic",
+    "openrouter.ai": "openrouter",
+    "api.voyageai.com": "voyage",
+}
+
+# Local servers are identified by PORT, because the host is `localhost` for both.
+# ⚠ ``:11434`` (Ollama) was matched and ``:1234`` (LM Studio) was not — that single
+# omission made a shipped first-class preset claim "openai" (SC#10 roster, row 10).
+_EMBEDDING_PORT_NAMES: dict[str, str] = {
+    "11434": "ollama",
+    "1234": "lmstudio",
+}
+
+
+def resolve_effective_embedding_provider(
+    user_settings: UserEffectiveSettings | None = None,
+) -> str:
+    """Name the provider whose endpoint ACTUALLY receives the embedding call (RAG-09 / SC#5).
+
+    Derived from ``resolve_embedding_endpoint`` — the same call that builds the client — so
+    the name and the route cannot disagree.
+
+    ⚠ AN UNRECOGNISED HOST RETURNS THE HOST, NEVER ``"openai"``. A self-hosted
+    OpenAI-compatible endpoint is not OpenAI, and calling it that sends an operator to check
+    the wrong account, which is the exact failure ``BUG-260815-05`` was filed for. The
+    hostname is a TRUE name; a guess is a false one.
+    """
+    from urllib.parse import urlparse
+
+    _, base_url, dedicated = resolve_embedding_endpoint(user_settings)
+
+    if not base_url:
+        # No base_url => the OpenAI SDK's own default endpoint. Only HERE, where no URL
+        # contradicts it, is a stored name the best available answer.
+        src = user_settings if user_settings is not None else settings
+
+        def _t(name: str) -> str:
+            v = getattr(src, name, "")
+            return v.strip() if isinstance(v, str) else ""
+
+        if dedicated:
+            # The label describes the endpoint that WAS contacted.
+            return _t("embedding_provider") or "openai"
+        # ⚠ NOT the label: with no dedicated key the call went out on the LLM's credentials,
+        # so `embedding_provider` describes an endpoint nothing contacted. This is W-1.
+        return _t("active_provider") or _t("llm_provider") or "openai"
+
+    parsed = urlparse(base_url if "//" in base_url else f"//{base_url}")
+    host = (parsed.hostname or "").lower()
+    port = str(parsed.port) if parsed.port else ""
+
+    if port and port in _EMBEDDING_PORT_NAMES:
+        return _EMBEDDING_PORT_NAMES[port]
+    for known, name in sorted(_EMBEDDING_HOST_NAMES.items(), key=lambda kv: -len(kv[0])):
+        if host == known or host.endswith("." + known):
+            return name
+    # Unknown endpoint: the host names it truthfully. Keep the port when there is one, so
+    # two services on one box stay distinguishable.
+    return f"{host}:{port}" if port else (host or "openai")
 
 
 # Per-provider safe max output token defaults (fallback when no model entry exists).

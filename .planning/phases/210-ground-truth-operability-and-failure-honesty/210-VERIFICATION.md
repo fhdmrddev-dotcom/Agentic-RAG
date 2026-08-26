@@ -5,8 +5,8 @@ author: claude (reviewer — did not build)
 builder: gemini
 date: 2026-08-26
 verified_at_head: 7bd77065
-verdict: CLOSED WITH OWED ROWS — 1 of 5 success criteria driven, 4 shipped-but-undriven
-independent_verifier_absent_for: ["SC#5 (W-1 fix)"]
+verdict: CLOSED WITH OWED ROWS — SC#1 driven, SC#5 measured+fixed via the SC#10 roster, SC#2/#3/#4 undriven
+independent_verifier_absent_for: ["SC#5 (W-1 fix)", "the SC#10 fix (reviewer-authored)"]
 ---
 
 # Phase 210 — verification
@@ -26,7 +26,22 @@ with its reason; none is omitted.
 | **#4** | A null-`org_id` user triggers a schedule manually — no 500, no CORS error | ⛔ **NOT DRIVEN** | Depends on #2's row |
 | **#5** | When the embedding provider fails, the answer says the provider failed **and names it** | ⚠ **CODE COMPLETE, NOT OBSERVED** | Fixed across three rounds (V-1/V-2/V-3, then W-1). Never driven against a real outage. See the disclosure below |
 
-**Also owed: SC#10 was never run.** The ROADMAP binds 210 to SC#10 *with the embedding roster*
+## ⚠ SC#10 WAS SUBSEQUENTLY RUN, AND IT FAILED THEN WAS FIXED — see `210-SC10-ROSTER.md`
+
+The paragraph below is preserved as written; it is no longer true. **The roster was driven: 9 presets
+x 2 label states = 18 rows, of which 5 MISNAMED the provider** — `lmstudio`, `cohere`, `jina`,
+`mistral` and a custom endpoint all claimed `openai` when `embedding_provider` was empty, which is the
+default state of every env-configured install. **This reopened W-1** (BUS-010) and refuted the
+reviewer's own earlier downgrade of it. Fixed by making `resolve_embedding_endpoint` the single
+resolution both the client and the name are read from; re-driven **18/18 honest, 0 misname**, guarded
+by `test_210_sc10_embedding_provider_naming.py` (19 cases, driven RED first).
+
+⚠ **That fix is reviewer-authored** (Gemini unavailable, operator instructed continue), so it joins
+SC#5's W-1 fix in having **no independent verifier**. `/code-review ultra` is the gate for both.
+
+**The original paragraph, preserved:**
+
+> **Also owed: SC#10 was never run.** The ROADMAP binds 210 to SC#10 *with the embedding roster*
 (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible — **not** the 8-row chat roster). No row was
 executed. This is the axis where W-1's residual weakness lives: the provider name falls back to
 substring-matching base URLs, so a self-hosted OpenAI-compatible endpoint on a custom domain resolves
@@ -59,6 +74,14 @@ Per-file backend rot distribution unchanged (`test_retrieval_service.py` 15,
    asserted the outage message would name the wrong provider on this install. It would not —
    `_val()` falls back to the env var, a dedicated embedding key is set, and the client really points
    at OpenAI. The structural gap survives; the observable claim does not.
+   ⚠ **AND THEN MY CORRECTION WAS ITSELF TOO GENEROUS.** It downgraded W-1 to *"a latent gap this
+   install does not exhibit"* — true of this install, **wrong about the product**. The SC#10 roster
+   measured the gap reachable in **5 of 9 shipped presets** in the default configuration state.
+   Both the original claim and its over-correction are preserved; the roster is the arbiter.
+5. **The SC#10 fix is reviewer-authored** (Gemini unavailable, operator instructed continue) and has
+   **no independent verifier**, exactly like the W-1 fix in (1). ⚠ Its first cut re-introduced W-1 for
+   the no-dedicated-key path and was caught by **Gemini's** existing tests, not by mine — which is
+   itself an argument for the separation this phase kept having to suspend.
 4. **W-2 — the `phase_types.py` fence crossing — has no operator ruling.** `705a7412` modified a file
    BUS-006 ruled 210 would leave inside 211's fence, and 211 has since committed into that same file.
    Recorded, undecided.
@@ -71,11 +94,12 @@ Per-file backend rot distribution unchanged (`test_retrieval_service.py` 15,
 | Review round 1 | **BLOCKER** — the error citation had no `document_id`; `KeyError` driven at 3 reachable sites |
 | Review round 2 | V-1/V-3 fixed; SC#5 still unmet (W-1); fence crossing (W-2) |
 | W-1 fix | Reviewed and committed; `resolve_effective_embedding_provider` mirrors the real routing |
+| SC#10 roster | **W-1 REOPENED** (BUS-010) — 5 of 18 rows misnamed. Fixed reviewer-side; re-driven 18/18 honest |
 
 ## What closes this phase completely
 
 - [ ] `/code-review ultra` on 210 — the independent gate for SC#5
-- [ ] SC#10 embedding-roster rows (5 providers, blocked ones ⛔ with reasons)
+- [x] ~~SC#10 embedding-roster rows~~ — **DONE**: 18 rows driven, 5 misnames found and fixed, 18/18 after (`210-SC10-ROSTER.md`)
 - [ ] SC#2 / SC#4 driven once a `published`-provenance workflow exists
 - [ ] SC#3 against pre-existing cloud schedule data, or a hand-inserted legacy row
 - [ ] An operator ruling on W-2
