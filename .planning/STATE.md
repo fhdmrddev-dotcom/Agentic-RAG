@@ -32,16 +32,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 211 — the-connection-is-a-service-not-a-verb
-`/gsd:new-milestone`. Phase numbering continues at **210**.
+**Current focus:** Phase 212 — the-catalog-and-its-doors
+Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 212 (the-catalog-and-its-doors) — NOT STARTED
+Phase: 212 (the-catalog-and-its-doors) — IN PROGRESS (discuss-phase complete)
 Plan: —
-Status: 210 ✅ and 211 ✅ both COMPLETE with owed rows. **Three operator-only actions are owed
-before 212 opens** — see "Owed before 212" below.
-Last activity: 2026-08-27 — Phase 211 closed (5/5 plans); migration 127 applied to the live DB
+Status: Phase 212 context gathered & decisions locked in `212-CONTEXT.md` (D-212-01..16). Ready for plan-phase.
+Last activity: 2026-08-27 — Phase 212 discuss-phase completed; BUG-260810-01 folded, SEED-207 marked answered.
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 

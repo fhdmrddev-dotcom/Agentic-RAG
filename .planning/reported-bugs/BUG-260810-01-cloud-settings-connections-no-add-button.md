@@ -4,9 +4,9 @@ title: Settings → Connections shows no "Add connection" button on cloud (local
 reported: 2026-08-10
 surface: Agentic-RAG
 severity: medium
-status: open
+status: folded
 affected_areas: [settings/connections, deployment/cloud-parity, admin/feature-visibility]
-folded_into: null
+folded_into: "212"
 verified_closed_by: null
 related_seeds: [SEED-144, SEED-145, SEED-146]
 re_open_trigger: null
