@@ -59,12 +59,31 @@ Last activity: 2026-08-27 — Phase 211 closed (5/5 plans); migration 127 applie
    to run first; **row 3 (SMTP · `send_email`) is ⛔ BLOCKED** — no such connection exists here
    (the table holds `slack`, `jira`, `mcp.deepwiki.com`).
 
-⚠ **`BUG-260827-01` has `folded_into: null` while affecting 212, 214 AND 215.** A service-only
-connection makes a run say *"the bound connection is for a different capability"* — it has NO
-capability. Independently verified 2026-08-27: `getattr(conn, "capability", cap)`'s default fires
-only on a MISSING attribute, never on `None`, so `phase_types.py:2460` fires on exactly the row
-shape migration 127 exists to permit. **Name its owner at 212's discuss-phase** or three phases
-will each assume another has it.
+✅ **`BUG-260827-01` — CLOSED 2026-08-27 by `/gsd:fast` (`8487ec99`), arm 2 only.** The paragraph
+this replaces asked 212 to *"name its owner or three phases will each assume another has it"*; the
+owner turned out to be the `/gsd:fast` the report itself prescribed, and **212 no longer needs to
+route it.** The guard is split into two arms, the service-only row gets the honest *"names a service
+but no way to reach it yet"*, the `getattr` DEFAULT is KEPT (a connection with no `capability`
+attribute at all still passes) and the guard was NOT widened (a genuinely mismatched row is still
+refused). **The RED was observed firing** — `test_211_service_shape_seam.py` §7 was authored to pin
+today's wrong behaviour on purpose, failed on its source assertion against the fixed source, and was
+rewritten in the same commit → 14 passed. Baseline held: `tests/unit` 68 failed / 2778 passed.
+
+⚠ **TWO THINGS THE `✅` DOES NOT DISCHARGE, and both are live for 212 / 214 / 215:**
+
+- **ARM 1 IS STILL OPEN and is a DIFFERENT failure.** The report measured two reachable paths. Only
+  the definition/API-reachable one (the words) is fixed. **The UI-reachable path —
+  `ConnectionPicker.bind` clears the step's `capability`, a service-only row advertises no action,
+  and the closed-set guard raises a bare `KeyError` at `phase_types.py:~2323`** — is untouched and
+  still stack-trace-shaped on the surface whose whole discipline is not over-claiming. Kept asserted
+  in §7 so it cannot quietly vanish; it is now the report's `re_open_trigger` (OAuth / Phase 215, or
+  the next touch of the closed-set guard). **A phase that reads only the `✅` will ship over it.**
+- **G-5 ON `phase_types.py` IS NOW OWED, NOT HONOURED.** Its ledger row read *honoured by
+  construction (211)* purely because the phase's diff was EMPTY. It is no longer empty, and this was
+  a G-3 fast fix with **no review cycle** — the right instrument for four lines, the wrong one for a
+  2,664-line hot file. Re-derived at the fix's commit: **47 commits / 21 phases / 2664 L, G-5 still
+  FIRES.** The next phase whose `files_modified` names this file owes a refactor recommendation as
+  its FIRST option.
 
 ---
 
