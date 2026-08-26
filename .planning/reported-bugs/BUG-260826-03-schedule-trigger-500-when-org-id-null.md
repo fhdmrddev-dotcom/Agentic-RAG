@@ -45,9 +45,16 @@ true only for the ~30 rows written in the correct shape, and is what makes the b
 cosmetic/́query-shape problem with a re-open trigger; here it takes out an entire launch path. That
 raises its priority independently of this report.
 
-**Confirm with:** `SELECT jsonb_typeof(definition) FROM workflow_definitions WHERE id = '<workflow id>'`
-— observed workflow `ee53ed2c-2040-4daf-828c-4196b8730037`. Pending at time of writing; the
-Coolify traceback is the definitive check.
+✅ **CONFIRMED 2026-08-26.** `SELECT jsonb_typeof(definition) FROM workflow_definitions WHERE id =
+'ee53ed2c-2040-4daf-828c-4196b8730037'` returns **`string`**. The column really does hand
+`scheduler_service.py:107` a `str`, and the bare `model_validate` really is unhandled. This is no
+longer a hypothesis.
+
+**Every OTHER reader of the column already carries the guard** — verified across the tree:
+`harness_engine.py:2472-2475`, `workflow_kickoff.py:234-237`, `api/threads.py:1223-1226` all do
+`if isinstance(x, str): json.loads(x)`, which passes a dict through untouched.
+`api/workflow_runs.py:_coerce_definition` accepts both shapes by design. So the scheduler is the
+**single** unguarded reader, and normalising a row to a proper jsonb object is safe for all of them.
 
 **Consequence for the fix list:** item 2 below (handle the failure honestly) is now the PRIMARY fix
 and should be a `str`-guard mirroring publish's, not merely an exception handler. Items 1 and 3 stay
