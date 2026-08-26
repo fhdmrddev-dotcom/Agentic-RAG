@@ -755,10 +755,12 @@ CREATE TABLE public.connector_connections (
     mcp_server_url text,
     tool_grants jsonb DEFAULT '{}'::jsonb NOT NULL,
     discovered_tools jsonb DEFAULT '[]'::jsonb NOT NULL,
+    service_id text,
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_has_a_service_identity CHECK (((service_id IS NOT NULL) AND (length(btrim(service_id)) > 0))),
     CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
     CONSTRAINT connector_connections_mcp_url_is_https CHECK (((mcp_server_url IS NULL) OR (mcp_server_url ~~ 'https://%'::text))),
-    CONSTRAINT connector_connections_shape_is_one_of_two CHECK (((capability IS NOT NULL) OR (mcp_server_url IS NOT NULL)))
+    CONSTRAINT connector_connections_shape_is_not_ambiguous CHECK ((NOT ((capability IS NOT NULL) AND (mcp_server_url IS NOT NULL))))
 );
 
 
@@ -802,6 +804,13 @@ COMMENT ON COLUMN public.connector_connections.tool_grants IS 'Phase 206 (F-1 / 
 --
 
 COMMENT ON COLUMN public.connector_connections.discovered_tools IS 'Phase 206 (D-206-05): JSONB array of tool schemas discovered from the remote MCP server via tools/list.';
+
+
+--
+-- Name: COLUMN connector_connections.service_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.service_id IS 'Phase 211 (D-211-01): the SERVICE this connection reaches — ''slack'', ''jira'', ''smtp'', ''notion'', anything. FREE TEXT. It is NOT a foreign key, it is NEVER CHECK-constrained against a closed list, and no migration may later close it: a closed set here is migration 116''s `capability` mistake moved to a nicer axis, where every unknown service again becomes invisible or has to squeeze into a known name (SEED-207). The curated "Popular" set (Phase 212) is a PRESENTATION LOOKUP keyed by this value (D-211-02) — a miss degrades to a generic mark, NEVER to a refusal and NEVER to a hidden row, which is what makes adding a service cost a presentation row instead of a migration. The only constraint this column carries is the one in §3: present and non-blank.';
 
 
 --
@@ -2928,6 +2937,13 @@ CREATE INDEX idx_connector_connections_org_capability ON public.connector_connec
 --
 
 CREATE INDEX idx_connector_connections_org_id ON public.connector_connections USING btree (org_id);
+
+
+--
+-- Name: idx_connector_connections_org_service; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_service ON public.connector_connections USING btree (org_id, service_id);
 
 
 --
@@ -6222,6 +6238,23 @@ REVOKE ALL ON public.connector_connections FROM authenticated;
 
 -- One column per line so the OMISSION is visible in a diff. The column that is not
 -- here is `secret_ciphertext`.
+-- ⚠ MEASURED DRIFT, 2026-08-26 (Phase 211). This list had fallen FOUR COLUMNS behind the
+--    live table, and the failure it ships is TOTAL rather than partial. `_SELECTABLE_COLUMNS`
+--    (connector_service.py) is DERIVED from `ConnectorConnectionResponse`'s keys, so every
+--    read projects every response field by name. A greenfield project bootstrapped from
+--    full-schema.sql would therefore name four columns `authenticated` has no grant on and
+--    PostgREST answers `42501 permission denied for table connector_connections` — on EVERY
+--    connector read, including a pre-existing row that has nothing to do with the new column.
+--    It looks like an outage, not a permissions bug. That is migration 118's own lesson,
+--    recorded in this very file, recurring because the mirror is manual.
+--
+--    Three of the four (`mcp_server_url`, `tool_grants`, `discovered_tools`) drifted in at
+--    Phase 206 and were latent for the whole milestone; `service_id` is migration 127's.
+--    Derived from the live table, not retyped:
+--      select column_name from information_schema.column_privileges
+--       where table_name='connector_connections' and grantee='authenticated'
+--         and privilege_type='SELECT';
+--    Compare that set against this block whenever a migration adds a column here.
 GRANT SELECT (
     id,
     org_id,
@@ -6233,7 +6266,11 @@ GRANT SELECT (
     last_checked_at,
     last_check_verdict,
     created_at,
-    updated_at
+    updated_at,
+    mcp_server_url,
+    tool_grants,
+    discovered_tools,
+    service_id
 ) ON public.connector_connections TO authenticated;
 
 -- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit
