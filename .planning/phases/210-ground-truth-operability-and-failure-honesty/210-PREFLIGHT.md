@@ -147,3 +147,99 @@ tasks in one plan, no named contract between them.** Same family as P-3.
 ⚠ Capture failing **filenames from the gate's own persisted JSON before any re-run**, and check
 each against `git diff --numstat`. `GSD_VITEST_MAX_WORKERS=2` on every run — two test-running
 agents is exactly the measured limit.
+
+---
+
+# Round 2 — against the revised plans (HEAD `9a6c6fa3`)
+
+P-1, P-4, P-5, P-6 and P-7 are answered. **P-3 is not closed — it changed shape.**
+
+## R-1 · ⛔ BLOCKING · the `ctx` bridge does not exist in production
+
+The revised 210-03 has `tool_dispatcher` `setattr` the failure state onto `ctx`, and
+`_validate_citations_required` read it off `ctx`, *"avoiding any dependency on `phase_types.py`"*.
+
+**Measured: those are two different objects.**
+
+- The tool handler's `ctx` is a **`ToolContext`**, constructed fresh at
+  **`phase_types.py:537`**, field-by-field out of `getattr(ctx, …)`. It is a copy with **no
+  back-reference** to the harness ctx.
+- The gate's `ctx` is the **harness ctx** — `harness_engine.py:986` calls
+  `run_gates(phase, output, ctx, timing="post")` with the same variable it passed to
+  `_execute_phase(phase, accumulated_outputs, ctx)` at `:948`.
+
+So `setattr(tool_ctx, "retrieval_status", …)` writes onto an object the gate never sees.
+`ToolContext` is a plain `@dataclass` (not frozen, no `__slots__`), so the write **succeeds
+silently** and nothing raises.
+
+⚠ **The plan's own mock-neither test cannot catch this.** Task 3 step 1 creates **one**
+`ToolContext` and passes that same instance as the tool's ctx *and* as the gate's ctx. That is a
+shape production never has. The test passes; the feature fails open; and it fails open silently,
+because the surviving `"0 sources"` arm still renders honestly.
+
+This is P-3 unchanged — a dict-key mismatch translated into an object-identity mismatch. The
+seam the state must cross **is** `phase_types.py:537`, which is why avoiding that file did not
+avoid the problem.
+
+## R-2 · ⛔ `210-01` and `210-02` both edit `_core.ts`, both `wave: 1`, both `depends_on: []`
+
+Both plans list `frontend/src/lib/api/_core.ts`, and both edit the same region: 210-01 widens
+`GovernedFeature`, 210-02 adds `scheduler_process_enabled` to `EffectiveFeatures` (`_core.ts:102`).
+With worktrees enabled, same-wave plans run in parallel.
+
+## R-3 · `EffectiveFeatures` is a `Record` over `GovernedFeature` — which form is intended?
+
+`_core.ts:102` reads `export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>`,
+and `GET /features` builds its payload as a comprehension over `_GOVERNED_FEATURES`
+(`features.py:64-88`). `scheduler_process_enabled` is infra (`config.py:1139`), not a governed
+feature — it has no audience and cannot be flipped.
+
+Putting the key **inside** that map means widening `GovernedFeature`, which then demands an entry
+in the five exhaustive `Record<GovernedFeature, …>` maps, a `DEFAULT_VISIBILITY` entry, and a
+Control Room card for something that is not a kill switch — **and it collides with 210-01, which
+widens the same union in the same wave** (R-2). An intersection type, or a sibling key next to
+`features`, has neither consequence. The plan says *"add optional `scheduler_process_enabled?:
+boolean` to feature/settings response types"* without saying which. ✅ Nothing in the frontend
+iterates the features map, so the sibling/intersection form is safe.
+
+## R-4 · Note only · the SC#3 floor overrides a deliberate low budget
+
+`_schedule_max_tokens` raising any row with `max_tokens_per_run <= 50_000` to `500_000` also
+raises one an operator set low **on purpose**. That is a decision, not a defect — recorded so it
+is not discovered later as a surprise.
+
+## R-5 · ✅ P-1 resolved cleanly
+
+`connectionsCopy.ts` is out of 210-01's `files_modified`. The `liveConnectorsOnFrom` cast keeps
+working unchanged once the union is widened, and 211 retires it. No further action.
+
+---
+
+# Pre-existing backend failures — the exact names, captured on the untouched tree
+
+Run at HEAD `9db6de23`, `backend/venv/Scripts/python.exe -m pytest`. **19 = the 15 + 4 the
+baseline predicted.** Root cause measured: these tests call `async def` functions **without
+awaiting** — `TypeError: cannot unpack non-iterable coroutine object`
+(`test_retrieval_service.py:102`) plus `RuntimeWarning: coroutine 'search_documents' was never
+awaited`. **Rot from an async conversion, not a defect in the code under test.**
+
+`test_retrieval_service.py` (15):
+`TestSearchDocuments::test_calls_embed_texts_with_query` ·
+`::test_calls_supabase_rpc_match_document_chunks` · `::test_returns_empty_list_when_no_chunks_match` ·
+`::test_returns_empty_list_when_rpc_data_is_none` · `::test_joins_results_with_documents_table` ·
+`::test_returns_formatted_results` · `::test_uses_unknown_filename_when_doc_not_found` ·
+`::test_returns_multiple_results` ·
+`TestSearchDocumentsPhase26::test_returns_chunk_index_in_enriched_results` ·
+`::test_returns_avg_similarity_as_second_value` · `::test_returns_zero_avg_sim_when_no_results` ·
+`::test_hybrid_empty_returns_tuple` · `::test_chunk_index_none_when_missing` ·
+`TestEnrichWithFilenamesPhase28::test_enrich_with_filenames_includes_version_number` ·
+`::test_enrich_with_filenames_defaults_version_number_to_1`
+
+`test_111_1_reembed_kickoff.py` (4): `test_model_change_kicks_reembed` ·
+`test_dims_only_change_kicks_reembed` · `test_model_only_change_kicks_without_resize` ·
+`test_no_change_save_does_not_reembed`
+
+⚠ **Two of those 15 are the regression net for 210-03's own T-210-07** —
+`test_returns_empty_list_when_no_chunks_match` and `test_returns_empty_list_when_rpc_data_is_none`
+are exactly the honest-zero-match cases the plan must not turn into false provider errors, and
+**they are red today**. The safety net for the plan's own stated mitigation is already down.
