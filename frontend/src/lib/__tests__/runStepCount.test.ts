@@ -212,7 +212,7 @@ const FMT_ELAPSED_AT_BASE = [
 
 describe("194.1-06 — fmtElapsed moved VERBATIM out of WorkflowRunPage", () => {
   it("the hoisted module contains the base body byte-for-byte", () => {
-    const src = fmtElapsedSource as string
+    const src = (fmtElapsedSource as string).replace(/\r\n/g, "\n")
     expect(src.length).toBeGreaterThan(500)
     // `export ` is the ONLY permitted addition, and it is asserted explicitly so
     // that "verbatim" cannot quietly come to mean "similar".
@@ -220,8 +220,8 @@ describe("194.1-06 — fmtElapsed moved VERBATIM out of WorkflowRunPage", () => 
   })
 
   it("a ONE-CHARACTER change inside the body would be caught (positive control)", () => {
-    const planted = (fmtElapsedSource as string).replace("total < 60", "total < 61")
-    expect(planted).not.toBe(fmtElapsedSource as string)
+    const planted = (fmtElapsedSource as string).replace(/\r\n/g, "\n").replace("total < 60", "total < 61")
+    expect(planted).not.toBe((fmtElapsedSource as string).replace(/\r\n/g, "\n"))
     expect(planted).not.toContain(`export ${FMT_ELAPSED_AT_BASE}`)
   })
 

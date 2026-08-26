@@ -844,6 +844,24 @@ def _unregistered_tools(phase, tool_names: set[str]) -> list[str]:
     always exactly one member of the closed set, and rule 2 can never flag it. D-06 ("a
     workflow containing the external-action node PUBLISHES") stays true by construction.
 
+    ⚠ CORRECTED 2026-08-25 (Phase 206.2 · D-206.2-19) — BOTH CLAIMS IN THE PARAGRAPH ABOVE
+    STOPPED BEING TRUE THE DAY PHASE 206 LANDED, AND THEY ARE LEFT STANDING BECAUSE A
+    DELETED STALE CLAIM LEAVES NO EVIDENCE THAT ANYONE MEASURED IT. Phase 206 added
+    ``tool_name`` / ``tool_args`` to ``ExternalActionPhaseConfig`` and made ``tool_name``
+    OUTRANK ``capability`` inside that SAME D-03 validator, so an MCP step derives
+    ``available_tools = [tool_name]`` — and an MCP tool name is in neither
+    ``EXTERNAL_ACTION_CAPABILITIES`` nor the ``get_tools(None)`` schema list. Rule 2
+    therefore flagged it (driven: ``['ask_question']``), ``api/workflows.py``'s subtraction
+    taxonomy resolved ``unregistered_tool`` to severity ``error``, and
+    ``publish_service.py`` stage 2.6 ``grounding_fidelity`` BLOCKED the publish before the
+    golden run. It cost ``external_action`` a great deal, and D-06 was FALSE for the MCP
+    shape. Nothing caught it because nothing in production could reach the shape — the
+    authoring door that writes ``tool_name`` is Phase 206.2's own work, one phase later.
+
+    THE CORRECTED INVARIANT: on this type ``available_tools`` is always exactly ONE member
+    of {the closed capability set} ∪ {this phase's own ``tool_name``}. The widening below
+    RESTORES that sentence rather than relaxing it.
+
     ``tool_names`` stays the WIDE fidelity set the assembler builds, so
     ``GroundingBundle.tool_names``' documented contract (and the matched-pair assertion in
     ``tests/unit/test_103_grounding_fidelity.py``) is untouched; the narrowing happens
@@ -857,6 +875,47 @@ def _unregistered_tools(phase, tool_names: set[str]) -> list[str]:
     allowed = set(tool_names) - EXTERNAL_ACTION_CAPABILITIES
     if getattr(phase.config, "phase_type", None) == "external_action":
         allowed |= EXTERNAL_ACTION_CAPABILITIES
+        # ── D-206.2-19 · THE MCP SHAPE — WIDENED BY EXACTLY ONE NAME, THE PHASE'S OWN ──
+        #
+        # (a) WHAT WAS MEASURED. ``ExternalActionPhaseConfig``'s D-03 validator derives
+        #     ``available_tools = [tool_name]`` for an MCP step and TOTALLY REPLACES
+        #     whatever the client sent. So the name admitted here is the SAME value the
+        #     list is already derived FROM: the two are equal by construction and NOTHING
+        #     NEW BECOMES REPRESENTABLE. Admitting ``available_tools`` itself instead would
+        #     make rule 2 tautological on this type — the fence for that is control B in
+        #     ``tests/unit/test_103_grounding_fidelity.py``, which drives a config whose
+        #     list DISAGREES with its ``tool_name`` and requires it to be flagged.
+        #
+        # (b) THE TYPE TEST ALREADY SCOPES THIS, AND THAT IS ASSERTED, NOT ASSUMED. This
+        #     sits INSIDE the ``external_action`` arm, so CR-01's measured wire-around — an
+        #     ``llm_agent`` step whitelisting a name it was never offered — stays blocked.
+        #     Two negative controls hold it: the SHIPPED
+        #     ``test_a_capability_on_an_llm_agent_step_still_blocks_publish`` (unedited by
+        #     206.2) for the capability half, and its MCP mirror
+        #     ``test_an_mcp_tool_name_on_an_llm_agent_step_still_blocks_publish``.
+        #
+        # (c) PUBLISHING GRANTS NOTHING — the D-206.2-05 answer, written at the widening's
+        #     own site because that is where a future reader meets the argument. An MCP
+        #     tool is closed by a DIFFERENT and STRONGER mechanism than ``_TOOL_REGISTRY``:
+        #     the PER-TOOL GRANT, enforced at run time in ``phase_types.py`` GATE 6 as
+        #     ``grants.get(tool_name) is True`` — A MISSING KEY DENIES — with a
+        #     ``tool_refused`` audit event on refusal. Admitting a name to a publish-time
+        #     FIDELITY check is not an authorization decision, and this phase adds no
+        #     outbound capability: the egress, the SSRF guard and the dispatch all shipped
+        #     in Phase 206.
+        #
+        # (d) THIS IS A DEFECT ON SHIPPED CODE, NOT A NEW CAPABILITY. Phase 206 introduced
+        #     it in the same commit that made ``tool_name`` outrank ``capability``; see the
+        #     dated correction in the docstring above, which stands BESIDE the two claims
+        #     it falsifies rather than replacing them.
+        #
+        # ⚠ A NON-EMPTY STRING, never truthiness of an arbitrary object. ``phase.config``
+        #   is duck-typed here (both presentations share this function, and control B hands
+        #   it a stub), so a ``str()`` coercion of a non-string would admit a name nobody
+        #   authored.
+        mcp_tool_name = getattr(phase.config, "tool_name", None)
+        if isinstance(mcp_tool_name, str) and mcp_tool_name.strip():
+            allowed.add(mcp_tool_name)
     return [
         tool
         for tool in (getattr(phase.config, "available_tools", None) or [])

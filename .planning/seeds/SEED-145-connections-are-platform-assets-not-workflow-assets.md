@@ -118,3 +118,16 @@ has to be redone once chat is added.
 
 **Do not wire any outbound capability into `_TOOL_REGISTRY` before the approval model is
 decided.** That single change is the cheapest possible way to undo everything CONN-03 bought.
+
+
+---
+
+## ROUTED 2026-08-24 — Connections & Open Platform milestone
+
+Operator decision: *"open a connections milestone from SEED-146 instead of 206."* Phase 206
+(Outbound Action Connectors) is RETIRED from the v3.8 roadmap; this seed is a source for the
+milestone instead. Scope, the binding one-provider-many-capabilities constraint, and the open
+questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
+
+Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
+v3.8 closes (204 running, 205 planned).

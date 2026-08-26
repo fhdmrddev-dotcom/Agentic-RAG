@@ -968,6 +968,44 @@ describe("builderStore — setName writes the name and NEVER the identity key (D
   })
 })
 
+// ── 15. Phase 205 (STATE-01 / D-07) — is_stateful living register toggle ────────
+describe("builderStore — setIsStateful sets is_stateful and arms dirty (Phase 205)", () => {
+  it("toggles meta.is_stateful to true and arms dirty", () => {
+    const store = createBuilderStore(draft())
+    expect(store.getState().dirty).toBe(false)
+    expect(store.getState().meta.is_stateful).toBeUndefined()
+
+    store.getState().setIsStateful(true)
+
+    expect(store.getState().meta.is_stateful).toBe(true)
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("can toggle meta.is_stateful back to false", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setIsStateful(true)
+    expect(store.getState().meta.is_stateful).toBe(true)
+
+    store.getState().setIsStateful(false)
+    expect(store.getState().meta.is_stateful).toBe(false)
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("leaves undo stack untouched (untracked)", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    expect(store.getState().phases).toHaveLength(4)
+
+    store.getState().setIsStateful(true)
+    expect(store.getState().meta.is_stateful).toBe(true)
+
+    store.temporal.getState().undo()
+    // Steps are undone, meta.is_stateful is preserved
+    expect(store.getState().phases).toHaveLength(3)
+    expect(store.getState().meta.is_stateful).toBe(true)
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()

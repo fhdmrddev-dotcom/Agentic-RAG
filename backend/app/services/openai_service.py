@@ -1920,13 +1920,106 @@ def create_adaptive_streaming_chat(
                     # openrouter double-gate — native/xml strategies and every
                     # non-OpenRouter provider stay byte-identical (D-14 RED LINE).
                     kwargs["extra_body"]["provider"] = {"require_parameters": True}
+                    # ── BUG-260825-03 — REQUIRE `tools`, NEVER `parallel_tool_calls`.
+                    #
+                    # ⚠ `require_parameters: True` is exactly the switch OpenRouter's own
+                    #   provider-selection docs name as the cause of
+                    #   `404 No endpoints found that can handle the requested parameters`:
+                    #   without it an endpoint that lacks a parameter simply IGNORES it; with
+                    #   it, that endpoint is EXCLUDED. The flag is kept, because D-129-02 wants
+                    #   it — an upstream that silently drops the tool schema is worse than a
+                    #   refusal. But it applies to EVERY parameter in the body, and
+                    #   `parallel_tool_calls=False` is an OPTIMISATION we merely prefer, not
+                    #   something the answer depends on. Requiring it narrows the endpoint set
+                    #   for no benefit and is a large part of why the set came back empty.
+                    #
+                    # ⚠ SCOPED TO THIS BRANCH. Every non-OpenRouter provider, and OpenRouter
+                    #   under the `native`/`xml` strategies, still sends it exactly as before.
+                    kwargs.pop("parallel_tool_calls", None)
         else:
             # Structured mode: DO NOT pass tools param
             # Tool schemas are injected into system prompt by caller (threads.py)
             pass
     
-    stream = client.chat.completions.create(**kwargs)
+    stream = _create_with_openrouter_routing_retry(client, kwargs, provider)
     return stream, calling_mode
+
+
+#: The OpenRouter-only request keys that express a QUALITY PREFERENCE for which endpoint
+#: serves the call. None of them changes the answer; all of them narrow the candidate set.
+_OPENROUTER_ROUTING_PREFERENCES = ("provider", "plugins")
+
+
+def _is_no_endpoint_404(exc: Exception) -> bool:
+    """OpenRouter's parameter-routing refusal, read from the STRUCTURED body only.
+
+    Deliberately duplicates the predicate shape of
+    ``provider_gateway.errors._has_no_endpoint_signature`` rather than importing it:
+    ``errors`` sits BELOW the gateway in the dependency graph and must never be imported
+    upward into this module. The two are kept in step by
+    ``test_openrouter_routing_404.py``, which asserts they agree on the same exception.
+    """
+    if getattr(exc, "status_code", None) != 404:
+        return False
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    err = body.get("error")
+    if not isinstance(err, dict):
+        return False
+    msg = err.get("message")
+    if not isinstance(msg, str):
+        return False
+    low = msg.lower()
+    return "no endpoints found" in low and "requested parameters" in low
+
+
+def _create_with_openrouter_routing_retry(client, kwargs: dict, provider: str):
+    """Issue the streaming call; on OpenRouter's routing 404, retry ONCE unnarrowed.
+
+    ⚠ BUG-260825-03. The `quality` strategy narrows OpenRouter's routing three ways at
+      once — an `:exacto` model suffix, a `response-healing` plugin, and
+      `provider.require_parameters` — and when the intersection is EMPTY the whole request
+      is refused with a 404 naming a routing doc. All three are QUALITY PREFERENCES; the
+      call is still correct without them. So one retry strips exactly those three and asks
+      again, which lets a tool-capable-but-not-`:exacto` endpoint serve the call.
+
+    ⚠ IF THE RETRY ALSO 404s, THE MODEL GENUINELY HAS NO TOOL-CAPABLE ENDPOINT and the
+      exception propagates — `classify_provider_error` turns it into the NAMED refusal
+      (`no_endpoint_for_parameters`), never a relayed raw 404. We do NOT then retry without
+      `tools`: answering a tool-shaped turn with a tool-less model would silently produce a
+      worse answer, and this project's rule is a named refusal over a quiet degradation.
+
+    ⚠ BOUNDED AND PROVIDER-SCOPED. Exactly one retry, only for `openrouter`, only when we
+      actually applied narrowing, and only on that one signature. Every other provider and
+      every other error is a pass-through — this function is transparent to them.
+    """
+    try:
+        return client.chat.completions.create(**kwargs)
+    except Exception as exc:
+        if (provider or "").lower() != "openrouter" or not _is_no_endpoint_404(exc):
+            raise
+        retry = dict(kwargs)
+        extra = dict(retry.get("extra_body") or {})
+        narrowed = any(k in extra for k in _OPENROUTER_ROUTING_PREFERENCES)
+        model_id = retry.get("model", "")
+        if isinstance(model_id, str) and model_id.endswith(":exacto"):
+            retry["model"] = model_id[: -len(":exacto")]
+            narrowed = True
+        for key in _OPENROUTER_ROUTING_PREFERENCES:
+            extra.pop(key, None)
+        if not narrowed:
+            raise  # nothing to relax — re-raise so the named refusal is the honest answer
+        if extra:
+            retry["extra_body"] = extra
+        else:
+            retry.pop("extra_body", None)
+        logger.warning(
+            "openrouter refused the narrowed routing for %s (no endpoint for the requested "
+            "parameters); retrying once without :exacto / plugins / require_parameters",
+            model_id,
+        )
+        return client.chat.completions.create(**retry)
 
 
 def embed_texts(

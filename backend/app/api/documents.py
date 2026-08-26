@@ -114,7 +114,29 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".epub": "application/epub+zip",
     ".eml":  "message/rfc822",
     ".msg":  "application/vnd.ms-outlook",
+    # ⚠ BUG-260825-01 — `.docx` and `.pdf` WERE ABSENT, AND THAT IS THE OBSERVED SPLIT.
+    #   Measured 2026-08-25 against the real endpoint: a `.docx` announced as
+    #   `application/octet-stream`, `application/zip`, `application/msword` or with NO
+    #   Content-Type at all got a **422 "Unsupported file type"** — as did a `.pdf` announced
+    #   as octet-stream or with none. `.md`, `.csv`, `.pptx` and `.xlsx` all sailed through the
+    #   same announcements BECAUSE THEY WERE ALREADY IN THIS DICT. A client that reports
+    #   octet-stream for binaries therefore fails exactly docx + pdf and succeeds on md, which
+    #   is the operator's report character for character.
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pdf":  "application/pdf",
 }
+
+#: Content-Types that mean "the client did not really know" and may be corrected by extension.
+#: ⚠ `application/msword` and the EMPTY string are here on MEASUREMENT, not on principle — both
+#:   were observed 422-ing a real `.docx` above. Correction stays keyed on the EXTENSION, so a
+#:   genuine legacy `.doc` (ext not in the dict) is still refused rather than mislabelled.
+_UNRELIABLE_MIME_TYPES: tuple[str, ...] = (
+    "text/plain",
+    "application/octet-stream",
+    "application/zip",
+    "application/msword",
+    "",
+)
 
 
 #: Formats whose "no text" case has a CONCRETE cause a person can act on. Anything not
@@ -477,8 +499,26 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             parsed_email = parse_msg_bytes(raw)
         return format_email_text_for_retrieval(parsed_email)
 
-    # plain text, markdown, html — decode as UTF-8
-    return raw.decode("utf-8")
+    # plain text, markdown — decode as UTF-8
+    decoded = raw.decode("utf-8")
+
+    # ── BUG-260825-02 — HTML WAS RETURNED UNCHANGED, TAGS AND ALL.
+    #
+    # ⚠ MEASURED: `extract_text(raw, "text/html")` returned its input BYTE-IDENTICAL, so every
+    #   `<h1>`/`<p>`/`<script>` flowed into the chunk text, into the embeddings, and into
+    #   whatever the agent later quoted to a person. It is a SILENT quality defect — the upload
+    #   succeeds, the chunk count looks sane, nothing errors — which is why nothing caught it.
+    #
+    # ⚠ THE CONVERTER IS THE EMAIL PARSER'S, NOT A SECOND ONE. `html_to_plain_text` is stdlib
+    #   `html.parser` only: it drops `<script>`/`<style>`/`<head>` bodies, turns block tags into
+    #   newlines and unescapes entities. Reaching for `beautifulsoup4` instead would have
+    #   shipped a CLOUD-ONLY `ImportError` — bs4 is installed in the local venv but is NOT
+    #   declared in `backend/requirements.txt`, so the deployed image does not have it.
+    if mime_type == "text/html":
+        from app.services.email_extraction_service import html_to_plain_text  # noqa: PLC0415
+        return html_to_plain_text(decoded)
+
+    return decoded
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -509,7 +549,7 @@ async def upload_document(
     # Browsers / OS often misreport MIME types for these formats — normalise by extension
     filename = file.filename or ""
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if mime_type in ("text/plain", "application/octet-stream", "application/zip") and ext in _EXT_MIME_OVERRIDES:
+    if mime_type in _UNRELIABLE_MIME_TYPES and ext in _EXT_MIME_OVERRIDES:
         mime_type = _EXT_MIME_OVERRIDES[ext]
 
     if mime_type not in ALLOWED_MIME_TYPES:
@@ -1755,6 +1795,27 @@ def ingest_document(
     import logging, traceback
     log = logging.getLogger(__name__)
 
+    # ── BUG-260825-01 — STRIP THE CHARACTERS POSTGRES CANNOT STORE, ONCE, HERE.
+    #
+    # ⚠ MEASURED 2026-08-25 through the real `POST /documents/upload`: a `.txt` and a `.csv`
+    #   carrying a single NUL both reached `status=failed` / `ingestion_step=embedding` with
+    #   `22P05: unsupported Unicode escape sequence — a NUL cannot be converted to text`.
+    #   That is the Phase 203 `.msg` failure exactly, one path over: three other paths in this
+    #   codebase strip NUL (`agent_loop.py`, `tool_dispatcher.py` x2, and the email parser via
+    #   `scrub_text`) and the DOCUMENT path stripped nothing at all.
+    #
+    # ⚠ THIS IS THE FUNNEL, WHICH IS WHY IT IS THE ONLY SITE. `/upload`, `/reingest`,
+    #   `/reextract` and the email-attachment cascade ALL call `ingest_document` — scrubbing at
+    #   `extract_text` instead would miss the PDF/DOCX composer branch, which does not go
+    #   through it. Everything downstream (chunks, embeddings, and the metadata sample, which is
+    #   derived from `text`) reads the scrubbed value.
+    #
+    # ⚠ IT CANNOT SAVE EVERY FILE AND MUST NOT BE READ AS IF IT COULD: a `.docx` carrying a NUL
+    #   dies earlier inside `python-docx` (`Char 0x0 out of allowed range` — XML forbids NUL),
+    #   so no text is ever produced for this to clean. Measured the same day.
+    from app.services.text_sanitize import scrub_text  # noqa: PLC0415
+    text = scrub_text(text)
+
     # Phase 071 D-071-08 — resolve engine lineage tag once, reused for both
     # documents.extractor column and pdf_extraction_runs.engine telemetry.
     # Phase 071.3 Plan 04 (D-071.3-09): EXTRACTOR_PRIMARY env fallback removed;
@@ -2051,7 +2112,9 @@ def ingest_document(
                     att_doc_id = str(uuid4())
                     att_ext = "." + att.filename.rsplit(".", 1)[-1].lower() if "." in att.filename else ""
                     att_mime = att.content_type
-                    if att_mime in ("application/octet-stream", "text/plain") and att_ext in _EXT_MIME_OVERRIDES:
+                    # Same notion of "the sender did not really know" as the upload door above —
+                    # kept on ONE tuple so the two cannot drift into disagreeing about a file.
+                    if att_mime in _UNRELIABLE_MIME_TYPES and att_ext in _EXT_MIME_OVERRIDES:
                         att_mime = _EXT_MIME_OVERRIDES[att_ext]
 
                     if att_mime in ALLOWED_MIME_TYPES:

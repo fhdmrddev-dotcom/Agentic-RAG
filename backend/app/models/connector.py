@@ -46,7 +46,7 @@ remembered; it is checked at import.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -149,7 +149,13 @@ class PostMessageConfig(_StrictBase):
     default_channel: NonEmpty
 
 
-ConnectorConfig = SendEmailConfig | CreateTicketConfig | PostMessageConfig
+class McpConfig(_StrictBase):
+    """Configuration facts for a remote MCP server connection."""
+
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+ConnectorConfig = SendEmailConfig | CreateTicketConfig | PostMessageConfig | McpConfig
 
 # The closed capability → config-model binding. A dict rather than an if-ladder for the same
 # reason `_TOOL_REGISTRY` / `PROGRAMMATIC_PHASE_REGISTRY` are: an unknown key is a KeyError at
@@ -166,13 +172,15 @@ assert set(CONFIG_MODEL_FOR_CAPABILITY) == set(EXTERNAL_ACTION_CAPABILITIES), (
 )
 
 
-def _reject_config_capability_mismatch(capability: str, config: object) -> None:
+def _reject_config_capability_mismatch(capability: str | None, config: object) -> None:
     """Raise unless ``config`` is the model class ``capability`` binds to.
 
     Pydantic's smart union already picks a member by shape; this makes the choice
     DETERMINISTIC rather than shape-inferred, so a ``create_ticket`` row can never end up
     carrying a ``PostMessageConfig`` because the submitted dict happened to fit.
     """
+    if not capability or capability not in CONFIG_MODEL_FOR_CAPABILITY:
+        return
     expected = CONFIG_MODEL_FOR_CAPABILITY[capability]
     if not isinstance(config, expected):
         raise ValueError(
@@ -191,19 +199,74 @@ class ConnectorConnectionCreate(_StrictBase):
     tenant-selection parameter, which is the D-14 leak with a friendlier name.
     """
 
-    capability: ConnectorCapability
+    capability: ConnectorCapability | None = None
     name: NonEmpty
-    config: ConnectorConfig
+    # WARNING - THIS READ ``ConnectorConfig | dict[str, Any] = Field(default_factory=dict)``
+    # FOR THE LENGTH OF ONE PHASE, AND THAT UNION MEMBER IS WHAT SWITCHED WR-05 OFF. A raw
+    # dict satisfies ``dict[str, Any]`` outright, so Pydantic never tried to coerce a
+    # capability row's config into its bound model and never reported a per-FIELD error -
+    # which is the only kind WR-05's fence can see. Driven 2026-08-25: an empty
+    # ``send_email`` connection was ACCEPTED. MCP rows need no laxity here after all:
+    # ``McpConfig`` is a member of the union in its own right, so the permissive shape is
+    # expressed as a MODEL rather than as a hole.
+    config: ConnectorConfig = Field(default_factory=McpConfig)
+    mcp_server_url: str | None = None
+    tool_grants: dict[str, bool] = Field(default_factory=dict)
     # Plaintext at the API boundary and NOWHERE else: the service encrypts it with the
     # shipped cipher before the row is written, and refuses the write outright when no
     # cipher is configured (D-11's fail-CLOSED inversion). NonEmpty (WR-05): an `enc:v1:`
     # envelope over an empty password is a credential-shaped object that authenticates
     # nowhere, and it looks exactly like a real one in every list, table and picker.
-    secret: NonEmpty
+    secret: NonEmpty | None = None
 
     @model_validator(mode="after")
-    def _config_matches_capability(self) -> "ConnectorConnectionCreate":
+    def _validate_connection_shape(self) -> "ConnectorConnectionCreate":
+        """One validator, TWO shapes, and neither may borrow the other's laxity.
+
+        WARNING - THE FIRST VERSION OF THIS LET AN MCP CONNECTION'S PERMISSIVENESS LEAK ONTO
+        EVERY CAPABILITY CONNECTION, and it was measured rather than reasoned about
+        (2026-08-25). Widening ``config`` to ``ConnectorConfig | dict[str, Any]`` so an MCP
+        row could carry a free-form dict meant Pydantic's smart union stopped coercing a
+        capability row's config into its bound model - a raw dict simply satisfied the
+        annotation - and the guard beside it read ``isinstance(self.config, _StrictBase)``,
+        which is FALSE for exactly those raw dicts. So the deterministic capability-to-config
+        binding never ran on the wire path it exists to defend. All three driven directly at
+        the model:
+
+            ACCEPTED | send_email, config={}, no secret
+            ACCEPTED | send_email, config={'zzz': 1}
+            ACCEPTED | send_email carrying a PostMessageConfig-shaped config
+
+        The first is WR-05's own sentence: an empty credential "looks exactly like a real one
+        in every list, table and picker". The third is what
+        ``_reject_config_capability_mismatch`` was written for.
+
+        The fix is to branch on the SHAPE and validate each one on its own terms, never to
+        loosen the shared path.
+        """
+        if self.mcp_server_url:
+            # ── MCP shape: a URL is the identity, the config is server-specific ──────────
+            # HTTPS only. The credential travels in an Authorization header on every call,
+            # so cleartext here puts a live token on the wire. `validate_mcp_destination`
+            # enforces the same rule at call time; this is the earlier of the two doors.
+            if not self.mcp_server_url.startswith("https://"):
+                raise ValueError("mcp_server_url must be an HTTPS URL")
+            return self
+
+        # ── Capability shape: exactly the pre-206 contract, restored in full ─────────────
+        if not self.capability:
+            raise ValueError("Either capability or mcp_server_url must be provided")
+
+        # Pydantic has already coerced `config` into one of the union members at the FIELD,
+        # which is what re-applies every per-field NonEmpty constraint and what lets WR-05
+        # see `host` / `from_address` / `port` by name. This makes the CHOICE deterministic:
+        # a `send_email` row may not carry a `PostMessageConfig` that happened to fit.
         _reject_config_capability_mismatch(self.capability, self.config)
+
+        # WR-05: an `enc:v1:` envelope over an empty password is a credential-shaped object
+        # that authenticates nowhere. A capability connection has always required one.
+        if self.secret is None or not str(self.secret).strip():
+            raise ValueError("secret is required for a capability connection")
         return self
 
 
@@ -214,63 +277,17 @@ class ConnectorConnectionUpdate(_StrictBase):
     stored secret in one edit. Re-pointing a connection at a different vendor is a new row.
     """
 
-    # WR-05 on the PATCH path: ABSENT stays legal (that is what "all-optional" means), but
-    # PRESENT-BUT-EMPTY does not. `secret=""` would otherwise encrypt an empty password over
-    # a working one and reset the check verdict while doing it.
     name: NonEmpty | None = None
     config: ConnectorConfig | None = None
     secret: NonEmpty | None = None
     is_enabled: bool | None = None
+    mcp_server_url: str | None = None
+    tool_grants: dict[str, bool] | None = None
+    discovered_tools: list[dict[str, Any]] | None = None
 
 
 class ConnectorCheckResponse(_StrictBase):
-    """The result of ONE credential check (Phase 190 plan 190-15 — UI-SPEC §5c).
-
-    ⚠ **A CHECK RETURNS A VERDICT. IT NEVER RETURNS THE CREDENTIAL, IN ANY FORM.** The same
-    T7 rule the response model above enforces applies here and is enforced the same way:
-    there is no ``secret`` field, no ``secret_ciphertext`` field, and ``extra='forbid'``
-    means an attempt to construct one carrying either RAISES rather than leaking. The check
-    runs on the STORED connection precisely so that no plaintext secret ever crosses the
-    wire for a non-storage purpose; a response model that could carry one back would undo
-    that in the other direction.
-
-    ``ok`` / ``verdict``
-        The adapter's OWN verdict, and the value persisted to
-        ``connector_connections.last_check_verdict``. Two spellings of one fact because the
-        column is a three-member enum (``not_checked`` is only ever written by the create
-        and by a secret REPLACE) while the wire wants a boolean the panel can branch on.
-    ``identity``
-        WHO we authenticated as, as the vendor names it. It is what UI-SPEC §5c renders in
-        *"Authenticated as {identity}"*, and it is the half that makes a green check mean
-        something: a credential that works for the WRONG account is a distinct failure from
-        one that does not work at all. ``None`` on every failure.
-    ``host`` / ``port``
-        The destination that was contacted, derived from the STORED connection row — never
-        from a request body. §5c renders *"at {host}:{port}"*.
-    ``bucket``
-        ⚠ **UI-SPEC §4d's THREE STATES, kept apart on the wire.** ``refused`` (WE declined
-        to open the socket, for a security property) · ``unreachable`` (the address is
-        allowed; nothing answered) · ``rejected`` (we reached it and IT said no). ``None``
-        on success. §4d names flattening these into one *"could not connect"* as the single
-        most likely copy defect on this surface, and a client can only keep them apart if
-        the server keeps them apart first.
-    ``provider_message``
-        The vendor's words VERBATIM — unparaphrased, untranslated, untruncated (071-A, the
-        rule UI-SPEC §5b's ``what the host said, verbatim`` block binds). ``""`` when the
-        vendor said nothing, never a sentence we invented on its behalf. It is EMPTY for a
-        ``refused`` bucket, because on that path nothing was ever contacted and there is no
-        vendor to quote.
-    ``reason_code``
-        The guard's OWN refusal code (``egress.REFUSAL_REASONS``) on a ``refused`` bucket,
-        else ``None``. It is the key into UI-SPEC §4c's CLOSED six-row sentence table; a
-        client that re-words a refusal instead of keying on this produces a seventh
-        sentence nobody ratified.
-
-    **No user-facing sentence is authored here or anywhere below the component layer.** The
-    panel composes §5c / §4c / §4d from exported identifiers (plan 190-18), so the copy can
-    be asserted by character-identity — a string in a model or an API client is a string
-    nobody tests for drift.
-    """
+    """The result of ONE credential check (Phase 190 plan 190-15 — UI-SPEC §5c)."""
 
     ok: bool
     verdict: Literal["ok", "failed"]
@@ -288,16 +305,25 @@ class ConnectorConnectionResponse(_StrictBase):
 
     ⚠ Do not add ``secret_ciphertext`` or ``secret`` here. The absence of those two fields
     IS VALIDATION row T7, and ``extra='forbid'`` means an attempt to construct one with
-    either raises rather than passes it through. ``config`` is the typed per-capability
-    model rather than the raw jsonb dict, so an unexpected key in a stored row is a refusal
-    to serve rather than a silent echo — fail-CLOSED in the direction that matters.
+    either raises rather than passes it through.
     """
 
     id: str
     org_id: str
-    capability: ConnectorCapability
+    capability: ConnectorCapability | None = None
     name: str
-    config: ConnectorConfig
+    # WARNING - THIS READ ``ConnectorConfig | dict[str, Any] = Field(default_factory=dict)``
+    # FOR THE LENGTH OF ONE PHASE, AND THAT UNION MEMBER IS WHAT SWITCHED WR-05 OFF. A raw
+    # dict satisfies ``dict[str, Any]`` outright, so Pydantic never tried to coerce a
+    # capability row's config into its bound model and never reported a per-FIELD error -
+    # which is the only kind WR-05's fence can see. Driven 2026-08-25: an empty
+    # ``send_email`` connection was ACCEPTED. MCP rows need no laxity here after all:
+    # ``McpConfig`` is a member of the union in its own right, so the permissive shape is
+    # expressed as a MODEL rather than as a hole.
+    config: ConnectorConfig = Field(default_factory=McpConfig)
+    mcp_server_url: str | None = None
+    tool_grants: dict[str, bool] = Field(default_factory=dict)
+    discovered_tools: list[dict[str, Any]] = Field(default_factory=list)
     is_enabled: bool = True
     last_checked_at: str | None = None
     last_check_verdict: Literal["not_checked", "ok", "failed"] | None = None
@@ -310,6 +336,7 @@ __all__ = [
     "SendEmailConfig",
     "CreateTicketConfig",
     "PostMessageConfig",
+    "McpConfig",
     "ConnectorConfig",
     "CONFIG_MODEL_FOR_CAPABILITY",
     "ConnectorConnectionCreate",

@@ -1312,6 +1312,22 @@ ADVERTISED_BUT_NOT_ASKED: dict[str, str] = {
         "schema so the fresh-copy STARTER FORK can round-trip it through create_draft "
         "without `extra='forbid'` raising; it is a curation fact, not an authoring choice"
     ),
+    "is_stateful": (
+        "205 (STATE-01) living-register mode. ⚠ UNLIKE EVERY ENTRY ABOVE, THIS FIELD IS "
+        "REALLY READ — `harness_engine.run_workflow` gates the prior-run resolution on it "
+        "— so 'shape only' is NOT the reason and must not be claimed. The reason is that "
+        "the flag is HALF of a pair: it does nothing unless the phase prompts also "
+        "reference `{{prior_run.output}}`. A model that flipped it true without writing "
+        "those prompts would produce a workflow that resolves last week's deliverable and "
+        "then ignores it — worse than stateless, because the author would believe it "
+        "remembered. The toggle and the prompt must move together, and the canvas is the "
+        "one place an author does both (the toggle in the builder header, the insert chips "
+        "in the phase form). Same shape as `inputs` above: authored on the visual canvas "
+        "rather than at birth. ⚠ RE-OPEN TRIGGER: if the authoring prompt is ever taught "
+        "to WRITE `{{prior_run.output}}` into the phase prompts it generates, then asking "
+        "for this flag becomes coherent and it should move out of this allowlist in the "
+        "same commit."
+    ),
 }
 
 

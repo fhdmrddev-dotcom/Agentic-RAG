@@ -168,12 +168,12 @@ const UPDATING_LABEL = "updating…"
  * a deliberately unpainted control — the `bg-warning` defect 192.2 shipped unguarded.
  */
 const CHIP_BASE =
-  "flex h-8 items-center gap-1.5 rounded border px-2.5 text-[11.5px] whitespace-nowrap transition-colors "
-const CHIP_ON = "border-primary/40 bg-primary/10 text-primary"
+  "flex h-8 items-center gap-1 rounded-md border px-2 text-[11px] whitespace-nowrap transition-colors "
+const CHIP_ON = "border-primary/40 bg-primary/10 text-primary font-medium"
 const CHIP_OFF =
   "border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground"
 
-const NOTE_CLASSES = "text-[11.5px] leading-snug text-muted-foreground"
+const NOTE_CLASSES = "text-[11px] leading-snug text-muted-foreground"
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
 
@@ -244,69 +244,18 @@ export function LibraryToolbar({
   const anythingActive = query.length > 0 || activeChips.length > 0 || projectSelected
 
   return (
-    // ⚠ 200-PORT — ONE ROW, ON ONE BASELINE, WITH THE PROJECT CONTROL PUSHED RIGHT.
-    //
-    // It read `flex flex-wrap items-start gap-x-4 gap-y-3 … py-3`: a wrapping, TOP-aligned bag
-    // in which a 36px button, a two-line search column, a row of pills and a two-line select
-    // column all began at the same y and ended at four different ones. Sketch 200 draws a
-    // single `h-[68px]` band, `items-center`, `justify-between`, on a RAISED surface
-    // (`bg-[#0D1117]` against the canvas's `#060A0F`) — so the instruments read as one strip
-    // and the canvas below reads as content.
-    //
-    // ⚠ `min-h-[68px]` RATHER THAN THE SHEET'S FIXED `h-[68px]`, AND THE DIFFERENCE IS OWED TO
-    // TWO SENTENCES THE SHEET DOES NOT DRAW AND THIS SURFACE MAY NOT DROP: the search field's
-    // D-08 hint and the project select's D-17 starters note. Both are honesty contracts — the
-    // note exists because `?project_folder_id=` narrows only the published feed, a fact that
-    // reads as a BROKEN FILTER if left unsaid (UAT row U6) — and both are REAL DOM TEXT wired
-    // by `aria-describedby`, never a tooltip, because touch has no hover. Fixing the height
-    // would have meant hiding one of them; the band gives instead.
-    //
-    // ⚠ `flex-wrap` SURVIVES for the same reason it was there: below ~1100px the six chips and
-    // the select cannot share a line with the create control at any height, and a `nowrap` row
-    // would put the project filter off-screen rather than under the chips.
     <div
       data-testid="library-toolbar"
-      className="flex min-h-[68px] flex-wrap items-center gap-x-4 gap-y-3 border-b border-border bg-card px-6 py-3"
+      className="flex min-h-[48px] w-full items-center gap-2.5 border-b border-border bg-card px-4 py-2 lg:px-6"
     >
       {/* ── 1 · CREATE LEADS (D-02 / LIB-04 / SC#4) ──────────────────────────────────
           FIRST in DOM order, before search and before the chips. Asserted by
           `compareDocumentPosition`, never by reading this comment. */}
-      {/* ⚠ 199-10 (DES-01) — ONE LINE, ON THE TOOLBAR'S SHARED BASELINE, AND THE ONE
-          AFFIRMATIVE SKIN ON THE ROW.
-
-          Sheet c6 draws the toolbar's controls on ONE shared baseline and gives the create
-          affordance the only filled treatment on it. The shipped control was a two-line
-          DASHED box — the skin of the build-CARD it replaced, which made sense inside a grid
-          of cards and reads as an unfinished placeholder in a toolbar. It is now `h-9`, the
-          same height the search `Input` already renders at, so "one shared baseline" is a
-          property of the markup rather than of a screenshot.
-
-          ⚠ THE SHEET'S OWN PLACEMENT IS REFUSED. c6 puts create LAST on the row, behind an
-          `ml-auto`. D-02 is the structural fix for SC#4 and it says create LEADS; a visual
-          demotion that left DOM order intact would ALSO be a keyboard regression, since this
-          control is index 0 of every focusable node in the toolbar. Both orders are asserted.
-
-          ⚠ `bg-primary` / `text-primary-foreground` are VERIFIED TO RESOLVE against
-          `tailwind.config.js` and `index.css` by this file's suite, not assumed. A Tailwind
-          utility naming a key nobody declared compiles to NOTHING and renders identically to
-          a deliberately unpainted control — the `bg-warning` defect 192.2 shipped unguarded,
-          and 15 of sheet 178's own 18 colour NAMES are in exactly that state here.
-
-          ⚠ THE WORD "colour NAMES" IS DELIBERATE AND THE OBVIOUS SYNONYM IS AVOIDED, for the
-          same reason this file already declines to spell the tooltip attribute above.
-          `librarySubtree.fences.test.ts`'s F6 scoping control is a RAW `source.includes`
-          over this module, and its subject word is a substring of that synonym's plural — so
-          a comment about PAINT reds a fence about a DRAFT's opaque field. Measured, not
-          reasoned about: this paragraph's first draft failed F6 with
-          *"expected [ './LibraryToolbar.tsx', …(4) ] to deeply equal [ './WorkflowCard.tsx', …(3) ]"*.
-          The 187-24 trap, which this subtree has now recorded a fifth time. The right fix is
-          the prose, never the fence: widening F6's measured list to admit a false positive
-          would put a paint comment into a record about data handling. */}
       <button
         type="button"
         data-testid="library-create"
         onClick={onCreate}
-        className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-[12.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
       >
         <span aria-hidden="true">＋</span>
         {CREATE_LABEL}
@@ -319,31 +268,22 @@ export function LibraryToolbar({
           "a control you always open should always be open." The hint below is real DOM
           text wired by `aria-describedby` — the D-08 promise ships where a screen reader
           reaches it, not in a tooltip. */}
-      {/* ⚠ 200-PORT — A FIXED 280px FIELD WITH THE SHEET'S INSET MAGNIFIER.
-          The sheet gives search a `w-[280px]` box and parks a `search` glyph inside it at
-          `left-3`. It read `min-w-[220px] flex-1`, which let the field swallow every pixel the
-          chips did not want — at 1600px it ran to ~700px, wider than the toolbar's other five
-          controls combined, for a field that holds a few words. The glyph is `aria-hidden` and
-          `pointer-events-none`: the field's accessible name is still `SEARCH_LABEL`, and the
-          D-08 hint below is still real DOM text wired by `aria-describedby`. */}
-      <div className="flex w-[280px] min-w-[200px] flex-col gap-1">
-        <div className="relative">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            type="search"
-            data-testid="library-search"
-            aria-label={SEARCH_LABEL}
-            aria-describedby={searchHintId}
-            placeholder={SEARCH_PLACEHOLDER}
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            className="h-9 pl-9"
-          />
-        </div>
-        <span id={searchHintId} data-testid="library-search-hint" className={NOTE_CLASSES}>
+      <div className="relative min-w-[140px] max-w-[280px] flex-1">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          type="search"
+          data-testid="library-search"
+          aria-label={SEARCH_LABEL}
+          aria-describedby={searchHintId}
+          placeholder={SEARCH_PLACEHOLDER}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          className="h-8 pl-8 text-[12px]"
+        />
+        <span id={searchHintId} data-testid="library-search-hint" className="sr-only">
           {SEARCH_HINT}
         </span>
       </div>
@@ -353,7 +293,7 @@ export function LibraryToolbar({
           count is 0 STILL RENDERS — the honest-empty-state rule (`WorkflowSoul`'s D-03
           pattern: the atom is always rendered, never hidden, never fabricated). Hiding it
           would answer "are there any?" by making the question unaskable. */}
-      <div data-testid="library-chips" className="flex flex-wrap items-center gap-1.5">
+      <div data-testid="library-chips" className="flex items-center gap-1 shrink-0">
         {CHIP_ORDER.map((chip) => {
           const word = CHIP_WORDS[chip]
           const active = activeChips.includes(chip)
@@ -371,15 +311,8 @@ export function LibraryToolbar({
               <span className="truncate">{word.label}</span>
               <span
                 data-testid={`library-chip-count-${chip}`}
-                /* ⚠ 200-PORT — the sheet's `font-data-sm` count: mono, 11px, and DIM rather
-                   than merely faded. `text-[9.5px] opacity-70` rendered the number smaller
-                   than any other text in the product and, at 70% of an already-muted
-                   foreground, close to unreadable — on the one atom whose entire job is to be
-                   a legible quantity. The tone now comes from the chip's own text colour on
-                   the active arm and `text-muted-foreground` at rest, so it is a colour
-                   decision rather than a transparency accident. */
                 className={
-                  "font-mono text-[11px] " + (active ? "opacity-80" : "text-muted-foreground")
+                  "font-mono text-[10.5px] " + (active ? "opacity-80" : "text-muted-foreground")
                 }
               >
                 {counts[chip]}
@@ -405,7 +338,7 @@ export function LibraryToolbar({
           data-testid="library-updating"
           data-state="updating"
           aria-live="polite"
-          className={NOTE_CLASSES}
+          className={NOTE_CLASSES + " shrink-0"}
         >
           {UPDATING_LABEL}
         </span>
@@ -417,76 +350,53 @@ export function LibraryToolbar({
           scroll wall (it also returns 200px of width to the grid at 200 workflows).
 
           A NATIVE `<select>`, in both shipped pickers' shape: free a11y, free keyboard
-          type-ahead, no new dependency. Deliberately NOT a command palette — Radix `Select`
-          ships no built-in search, no command-palette package exists in `package.json` today,
-          and 158-B's deferral was costed against adding exactly one. If a filter over the
-          options is wanted later it is a change to THIS ONE CONTROL, not a package.
+          type-ahead, no new dependency. */}
+      <div className="ml-auto flex items-center gap-2 shrink-0">
+        <label className="flex items-center shrink-0">
+          <span className="sr-only">{PROJECT_LABEL}</span>
+          <select
+            data-testid="library-project-select"
+            aria-label={PROJECT_LABEL}
+            value={projectId ?? ""}
+            onChange={(event) => onProjectChange(event.target.value === "" ? null : event.target.value)}
+            {...(projectSelected ? { "aria-describedby": projectNoteId } : {})}
+            className="h-8 rounded-md border border-border bg-card px-2.5 text-[12px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">{PROJECT_ALL_LABEL}</option>
+            {folders.map((folder) => (
+              <option key={folder.id} value={folder.id}>
+                {folder.name}
+              </option>
+            ))}
+            <option value={UNBOUND}>{PROJECT_UNBOUND_LABEL}</option>
+          </select>
 
-          ⚠ The forbidden package is not NAMED here for the same reason the tooltip attribute
-          is not spelled above: T-192-SC's check is a raw count of its name in this file, and
-          prose explaining why it is absent would satisfy the grep that proves it absent. */}
-      {/* ⚠ 200-PORT — RIGHT-ALIGNED, AT THE SHEET'S 160px FLOOR, ON THE SHARED BASELINE.
-          Sketch 200 sets the project control apart from the create/search/chips cluster by
-          pushing it to the far end of the band (`justify-between`, `min-w-[160px] shrink-0`) —
-          it narrows the WHOLE list rather than acting on it, so it does not belong in the
-          instrument cluster. `ml-auto` does that WITHOUT touching DOM order, which matters:
-          create is asserted to be index 0 of every focusable node in this toolbar, and a
-          visual re-order achieved with `order-*` would be a keyboard regression this file's
-          own suite is written to catch. The select itself takes `h-9` so it lands on the same
-          baseline as the create control and the search field. */}
-      <label className="ml-auto flex min-w-[160px] shrink-0 flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {PROJECT_LABEL}
-        </span>
-        <select
-          data-testid="library-project-select"
-          aria-label={PROJECT_LABEL}
-          value={projectId ?? ""}
-          onChange={(event) => onProjectChange(event.target.value === "" ? null : event.target.value)}
-          {...(projectSelected ? { "aria-describedby": projectNoteId } : {})}
-          className="h-9 rounded-md border border-border bg-card px-2 text-[12.5px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="">{PROJECT_ALL_LABEL}</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-          <option value={UNBOUND}>{PROJECT_UNBOUND_LABEL}</option>
-        </select>
+          {/* D-17 — SILENCE HERE IS A UAT FAILURE (row U6), NOT A NEUTRAL DEFAULT.
+              `?project_folder_id=` narrows ONLY `/published` (`db/workflows.py:291-293`), and
+              the three seeded starters carry no project at all (`094_starter_workflows.sql` →
+              0 hits). */}
+          {projectSelected && (
+            <span id={projectNoteId} data-testid="library-project-note" className="sr-only">
+              {PROJECT_STARTERS_NOTE}
+            </span>
+          )}
+        </label>
 
-        {/* D-17 — SILENCE HERE IS A UAT FAILURE (row U6), NOT A NEUTRAL DEFAULT.
-            `?project_folder_id=` narrows ONLY `/published` (`db/workflows.py:291-293`), and
-            the three seeded starters carry no project at all (`094_starter_workflows.sql` →
-            0 hits). Under three labelled shelves that read as "the filter applies to
-            Published"; under 157-B's single flat list it reads as a BROKEN FILTER. A starter
-            having no project is a property of the DATA, not a gap in the filter — so the
-            honest surface states the fact in plain words rather than silently dropping the
-            rows or silently ignoring the selection.
-
-            It is wired to the select by `aria-describedby`, so the reason reaches a screen
-            reader on the control it explains — and it is real DOM text, never a tooltip. */}
-        {projectSelected && (
-          <span id={projectNoteId} data-testid="library-project-note" className={NOTE_CLASSES}>
-            {PROJECT_STARTERS_NOTE}
-          </span>
+        {/* ── 6 · THE WAY OUT (sketch 158's zero-results behaviour) ────────────────────
+            Present whenever a query, any chip, or a project is active, so a user who has
+            filtered down to nothing is never stuck. Absent when nothing is active — a permanent
+            "clear" on an unfiltered list is noise that reports no state. */}
+        {anythingActive && (
+          <button
+            type="button"
+            data-testid="library-clear-all"
+            onClick={onClearAll}
+            className="flex h-8 shrink-0 items-center rounded-md px-1.5 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+          >
+            {CLEAR_FILTERS_LABEL}
+          </button>
         )}
-      </label>
-
-      {/* ── 6 · THE WAY OUT (sketch 158's zero-results behaviour) ────────────────────
-          Present whenever a query, any chip, or a project is active, so a user who has
-          filtered down to nothing is never stuck. Absent when nothing is active — a permanent
-          "clear" on an unfiltered list is noise that reports no state. */}
-      {anythingActive && (
-        <button
-          type="button"
-          data-testid="library-clear-all"
-          onClick={onClearAll}
-          className="self-center rounded-md px-2 py-1 text-[11.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-        >
-          {CLEAR_FILTERS_LABEL}
-        </button>
-      )}
+      </div>
     </div>
   )
 }

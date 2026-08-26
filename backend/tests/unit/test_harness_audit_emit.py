@@ -53,12 +53,13 @@ def test_write_audit_accepts_emit_kinds():
 
     # 9 (059) + 7 emit (069) + 6 judge/publish (070, Phase 102)
     #   + 1 armed action-risk pause (114, Phase 185 / BUG-260731-02)
-    #   + 1 send receipt (117, Phase 190 CONN-02/CONN-03) = 24 total kinds.
+    #   + 1 send receipt (117, Phase 190 CONN-02/CONN-03)
+    #   + 1 circuit-breaker trip (125, Phase 204 SCHED-02) = 25 total kinds.
     # The 069 emit kinds are still all present (the 070, 114 and 117 ALTERs are all
     # additive); this count is bumped in lockstep with the _AUDIT_EVENT_TYPES extension.
     # The guard that keeps the Python set equal to the SQL CHECK — so a kind can never
     # again be emitted while unregistered — is tests/unit/test_audit_event_registration.py.
-    assert len(_AUDIT_EVENT_TYPES) == 24
+    assert len(_AUDIT_EVENT_TYPES) == 25
 
 
 def test_receipt_metadata_shape():

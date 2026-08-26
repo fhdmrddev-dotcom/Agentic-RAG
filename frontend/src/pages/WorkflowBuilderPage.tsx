@@ -150,6 +150,7 @@ import { Play } from "lucide-react"
 import { listConnectorConnections, listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
+import { buildToolReadOnlyMap } from "@/components/workflows/toolReadOnlyMap"
 import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
@@ -768,6 +769,18 @@ export function WorkflowBuilderPage({
   // never a degraded one. ⚠ NAMES ONLY: nothing from `ConnectorConnection.config` is read here,
   // so no host, port or credential can reach the canvas (CONN-03 SC#4).
   const [connectionNames, setConnectionNames] = useState<IdNameMap>({})
+  // Phase 209 (Item 1 fix) — connection id → mcp_server_url | null. Built alongside
+  // `connectionNames` in the same mount fetch; the same PITFALL-1 applies. Stored as
+  // `null` for capability-type connections (no mcp_server_url) so a missing key can mean
+  // "not yet fetched" rather than "not an MCP connection" — that distinction matters for
+  // the mark resolver in `canvasModel.ts`. Only `mcp_server_url` is read (CONN-03 SC#4).
+  const [mcpServerUrls, setMcpServerUrls] = useState<Record<string, string | null>>({})
+  // Phase 209 (Item 2 · SC#2) — connection id → tool name → the SERVER'S OWN
+  // `annotations.readOnlyHint`. Read from the same `listConnectorConnections` response as the
+  // two maps above, so it costs no extra request. An absent connection, an absent tool, or a
+  // tool whose server sent no hint all leave the lookup `undefined`, and the banner FAILS
+  // CLOSED to `CHANGES SOMETHING OUTSIDE` — never "only reads" on silence.
+  const [toolReadOnly, setToolReadOnly] = useState<Record<string, Record<string, boolean>>>({})
   // The persisted draft id as a RENDERED value (null until the first save on a fresh build;
   // pre-seeded for Open/Tweak). The write loop keeps its own synchronous mirror — that is
   // what collapses the first save to exactly one create — and reports the id it minted here
@@ -847,8 +860,15 @@ export function WorkflowBuilderPage({
       // Rejected, for the third time and the same reason: holding the tier until the map is
       // non-empty. Never: a placeholder destination.
       connectionNames,
+      // Phase 209 (Item 1 fix) — needed by `buildPhaseData` in `canvasModel.ts` so the MCP
+      // mark resolves from the bound connection's `mcp_server_url`, not from the phase config
+      // (which never carries that field). Same lifecycle as `connectionNames` beside it.
+      mcpServerUrls,
+      // Phase 209 (Item 2 · SC#2) — the per-tool read/write declaration, so `effectBannerFor`
+      // can resolve `ONLY READS` from the SERVER'S annotation rather than from a name guess.
+      toolReadOnly,
     }),
-    [folderNames, skillNames, templateAsset, connectionNames],
+    [folderNames, skillNames, templateAsset, connectionNames, mcpServerUrls, toolReadOnly],
   )
 
   /**
@@ -1578,8 +1598,19 @@ export function WorkflowBuilderPage({
         const connections = await listConnectorConnections()
         if (cancelled) return
         const map: IdNameMap = {}
-        for (const c of connections) map[c.id] = c.name
+        const urlMap: Record<string, string | null> = {}
+        for (const c of connections) {
+          map[c.id] = c.name
+          // Phase 209 (Item 1 fix) — store null for non-MCP connections so the mark resolver
+          // can distinguish "non-MCP" (null) from "not fetched yet" (missing key).
+          urlMap[c.id] = c.mcp_server_url ?? null
+        }
         setConnectionNames(map)
+        setMcpServerUrls(urlMap)
+        // Phase 209 (Item 2 · SC#2) — the per-tool read/write declaration, built by the ONE
+        // module that owns the explicit-boolean-only rule. Deliberately not inlined here: the
+        // judgement it carries is a safety property and belongs somewhere directly testable.
+        setToolReadOnly(buildToolReadOnlyMap(connections))
       } catch {
         /* non-fatal — every external face falls back to its destination-free sentence */
       }
@@ -2548,6 +2579,33 @@ export function WorkflowBuilderPage({
   ) : null
 
   /**
+   * Phase 205 (STATE-01 / D-07) — Stateful / Living Register mode toggle in builder header.
+   */
+  const isStateful = meta.is_stateful === true
+  const statefulAffordance = canvasEnabled ? (
+    <button
+      type="button"
+      data-testid="builder-stateful-toggle"
+      aria-label="Toggle stateful / living register mode"
+      title="Stateful mode allows recurring runs to read prior deliverable output and produce incremental deltas"
+      onClick={() => {
+        store.getState().setIsStateful(!isStateful)
+        setHasEdited(true)
+      }}
+      className={`flex shrink-0 items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+        isStateful
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-card text-muted-foreground hover:bg-accent/40"
+      }`}
+    >
+      <span aria-hidden="true" className={isStateful ? "text-primary" : "text-muted-foreground"}>
+        {isStateful ? "●" : "○"}
+      </span>
+      <span>Living Register</span>
+    </button>
+  ) : null
+
+  /**
    * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
    * the slug when it does not, the shipped fallback when it has neither.
    *
@@ -2611,6 +2669,7 @@ export function WorkflowBuilderPage({
       </span>
       {kbAffordance}
       {requirementAffordance}
+      {statefulAffordance}
     </>
   )
 
@@ -2856,6 +2915,7 @@ export function WorkflowBuilderPage({
                 },
               })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
+          isStateful={meta.is_stateful === true}
         />
       </div>
     </div>

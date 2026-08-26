@@ -136,6 +136,7 @@ import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/libr
 // state and layout, and declares no card, no filter item and no modal of its own.
 import { RunLogPanel } from "@/components/workflows/history/RunLogPanel"
 import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
+import { WorkflowScheduleModal } from "@/components/workflows/WorkflowScheduleModal"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
 // Phase 192.1-06 (LIB-05 / D-05 / D-34): the identity resolver, reached rather than written.
 // The page owns the LIST — which is the only thing that can answer "what tells this row apart
@@ -298,6 +299,11 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
   const [starters, setStarters] = useState<PublishedWorkflow[]>([])
   const [drafts, setDrafts] = useState<WorkflowDraftRow[]>([])
   const [runFor, setRunFor] = useState<PublishedWorkflow | null>(null)
+  /* Phase 204 (SCHED-01) — which workflow's schedules are open, or null.
+     ⚠ It holds `{id, name}` and NOT a `PublishedWorkflow`, deliberately: the schedule dialog
+     needs a definition id and a name to say, and nothing else. Widening it to the whole row
+     would let a later edit reach for a field the dialog has no business reading. */
+  const [scheduleFor, setScheduleFor] = useState<{ id: string; name: string } | null>(null)
   const [kickoff, setKickoff] = useState("")
   // WR-05: in-flight guard so a double-tap of Run can't create two threads/runs.
   const [runSubmitting, setRunSubmitting] = useState(false)
@@ -1223,6 +1229,11 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
                    that survives a publish) and the name; this page turns that into the log's
                    scope. See `runLogScope`'s docblock for why it is not a definition id. */
                 onRunLog={openRunLog}
+                /* Phase 204 (SCHED-01) — the per-workflow schedules door. Additive, and it
+                   hands up the row's ID rather than its slug: a schedule is a foreign key to
+                   ONE definition version, which is the version that will run unattended. The
+                   card explains the asymmetry with `onRunLog` in its own prop docblock. */
+                onSchedule={setScheduleFor}
                 onOpen={handleOpen}
                 onForkNewVersion={onForkNewVersion}
                 onForkStarter={onForkStarter}
@@ -1295,6 +1306,20 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
           </p>
         )}
       </div>
+
+      {/* ── Schedule modal (204 SCHED-01) ────────────────────────────────────────────
+            Mounted here for the same reason the Run modal is: this page owns the library
+            selection, so it is the only place that knows WHICH workflow a per-row door was
+            opened for. `key` forces fresh modal state between opens, exactly as RunModal's
+            does — a stale cadence form carried across two different workflows is the shape
+            that quietly schedules the wrong thing. */}
+      {scheduleFor && (
+        <WorkflowScheduleModal
+          key={scheduleFor.id}
+          workflow={scheduleFor}
+          onClose={() => setScheduleFor(null)}
+        />
+      )}
 
       {/* ── Run modal (152 WFIN-01/02: scope <select> + staged template + provenance;
             D-LOCK-01/02). `key` forces fresh per-workflow modal state (staged file +

@@ -67,6 +67,7 @@ ErrorKind = Literal[
     "billing",
     "bad_request",
     "reasoning_tools_unsupported",
+    "no_endpoint_for_parameters",
     "server",
     "context_overflow",
     "unknown",
@@ -109,6 +110,47 @@ _REASONING_TOOLS_SIGNATURES = (
     "reasoning_effort to 'none'",
     "/v1/responses",
 )
+
+
+# BUG-260825-03 (OpenRouter): the EXACT substrings of the 404 OpenRouter returns when no
+# provider endpoint behind the chosen model accepts the combination of parameters we sent.
+#
+# ⚠ THIS IS A ROUTING REFUSAL, NOT A MISSING MODEL AND NOT AN AUTH FAILURE, and 404 fell
+#   through `_classify_status` to "unknown" — which is why the person saw the raw provider
+#   payload, routing-doc URL and all, with nothing naming which parameter was refused.
+#
+# ⚠ MATCHED ONLY AGAINST THE STRUCTURED BODY MESSAGE, lower-cased — never `str(exc)`, the
+#   same guard `_has_reasoning_tools_signature` carries (T-175-03-02). BOTH substrings must be
+#   present, so an unrelated 404 whose body happens to say "no endpoints" stays `unknown`.
+_NO_ENDPOINT_SIGNATURES = (
+    "no endpoints found",
+    "requested parameters",
+)
+
+
+def _is_not_found(exc: Exception) -> bool:
+    """True when the exception represents an HTTP 404."""
+    status = getattr(exc, "status_code", None)
+    return isinstance(status, int) and status == 404
+
+
+def _has_no_endpoint_signature(exc: Exception) -> bool:
+    """Detect OpenRouter's parameter-routing refusal from its STRUCTURED body.
+
+    Mirrors :func:`_has_reasoning_tools_signature` exactly. Returns False when there is no
+    structured body, so any 404 lacking the signature stays ``unknown`` (D-14).
+    """
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    err = body.get("error")
+    if not isinstance(err, dict):
+        return False
+    msg = err.get("message")
+    if not isinstance(msg, str):
+        return False
+    low = msg.lower()
+    return all(sig in low for sig in _NO_ENDPOINT_SIGNATURES)
 
 
 def _is_bad_request(exc: Exception) -> bool:
@@ -191,6 +233,11 @@ def classify_provider_error(provider: str, exc: Exception) -> ErrorKind:
     # D-14) and a crafted str(exc) cannot force it (T-175-03-02).
     if _is_bad_request(exc) and _has_reasoning_tools_signature(exc):
         return "reasoning_tools_unsupported"
+    # BUG-260825-03: the OpenRouter parameter-routing 404. NARROW by construction — fires only
+    # on a 404 whose STRUCTURED body carries BOTH signature substrings, so every other 404 keeps
+    # its prior `unknown` classification (D-14) and a crafted str(exc) cannot force it.
+    if _is_not_found(exc) and _has_no_endpoint_signature(exc):
+        return "no_endpoint_for_parameters"
     # isinstance against the typed SDK subclasses FIRST (where importable).
     if _isinstance_any(exc, _OpenAIRateLimitError, _AnthropicRateLimitError):
         # A rate-limit is rate_limit even if a billing code rides along —
@@ -246,6 +293,13 @@ _MESSAGES: dict[str, str] = {
         "*This reasoning model can't use tools on the current endpoint yet, so "
         "it was switched to prompt-based tools automatically. If tool calls keep "
         "failing, pick a non-reasoning OpenAI model in Settings.*"
+    ),
+    "no_endpoint_for_parameters": (
+        "*This model can't be used with tools on OpenRouter — none of the providers "
+        "hosting it accept the tool-calling request this app sends, so the request was "
+        "refused outright rather than answered without tools. Pick a different model, or "
+        "set the OpenRouter tool strategy to \"xml\" in Settings to use prompt-based tools "
+        "with this one.*"
     ),
     "context_overflow": (
         "*The conversation has grown too long for this model's context window. "

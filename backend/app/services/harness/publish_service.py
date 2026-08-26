@@ -311,14 +311,16 @@ async def publish_workflow(
         )
     except Exception as e:  # noqa: BLE001 — a golden-run crash is a structured block, never a 500
         logger.exception("publish: golden run failed for definition %s", definition_id)
+        golden_run_id = getattr(e, "golden_run_id", None)
+        err_msg = f"{type(e).__name__}: {e}" if str(e).strip() else type(e).__name__
         return await _block(
             pool,
-            run_id=None,
+            run_id=golden_run_id,
             user_id=user_id,
             definition_id=definition_id,
             stage="golden_run_error",
-            named_failures=[f"golden run could not complete: {e}"],
-            golden_run_id=None,
+            named_failures=[f"golden run could not complete: {err_msg}"],
+            golden_run_id=golden_run_id,
         )
 
     # The attempt now has a real run_id (the documented receipt-keying choice).
@@ -1067,6 +1069,9 @@ async def _drive_golden_run(
                 final_output = out  # the LAST phase with an output wins (the deliverable)
         _shell_status = "completed"
         return run_id, final_output, terminal_status
+    except Exception as e:
+        setattr(e, "golden_run_id", run_id)
+        raise
     finally:
         try:
             await finalize_run(

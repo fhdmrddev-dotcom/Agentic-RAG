@@ -74,6 +74,7 @@ import { createElement, type ReactNode } from "react"
 
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
 import { phaseGlyph } from "@/lib/phaseGlyph"
+import { ConnectionMarkGlyph, type ConnectionMarkShape } from "@/components/settings/connectionMark"
 
 /**
  * The per-step-type tint that sits BEHIND the floating mark — the whole of this
@@ -110,36 +111,21 @@ export const DEFAULT_TINT = "hsl(220 30% 100% / 0.18)"
 /**
  * The 3D mark, resolved at MODULE scope and returned as a `ReactNode`.
  *
- * Since Phase 127 the soulData value is a fluent-emoji SLUG string rather than a
- * glyph, so `"•"` is the real visual fallback for an unmapped type (the canonical
- * `PhaseSpine.tsx:87-89` render). The resolution deliberately does NOT happen inside
- * a component body: `phaseGlyph()` returns a COMPONENT, and binding a component to a
- * local during render is what `react-hooks/static-components` correctly flags —
- * React cannot preserve state across renders for a type that is recreated. Hoisting
- * the JSX call site into a leaf component does not clear it either (the rule fires in
- * any component body); returning the element from a plain module-scope helper does,
- * and it is also the honest shape — this is a lookup, not a component.
- *
- * The rendered output is byte-identical to the previous inline ternary: the same
- * bundled SVG, the same `h-8 w-8`, the same `"•"` fallback.
- *
- * MODULE SCOPE IS PART OF THE CONTRACT. It was at module scope in `PhaseNode.tsx` for
- * the reason above and it stays at module scope here; calling it from inside a
- * component body is exactly what the lint rule catches.
+ * For `external_action` steps (Phase 209 Item 1), resolves the real service mark from
+ * `connectionMark.tsx`. For all other types, resolves the bundled SVG glyph.
  */
-export function renderPhaseMark(phaseType: string): ReactNode {
+export function renderPhaseMark(
+  phaseType: string,
+  connectionShape?: ConnectionMarkShape | null,
+): ReactNode {
+  if (phaseType === "external_action") {
+    return createElement(ConnectionMarkGlyph, { shape: connectionShape ?? {}, size: "canvas" })
+  }
   const mark = phaseGlyph(phaseType)
   // ⚠ THE SECOND LOOKUP IS GUARDED TOO (188.1-04). `PHASE_GLYPHS` is a plain object
   // literal, so it INHERITS `constructor`, `toString`, `__proto__` and friends and
   // `PHASE_GLYPHS[phaseType] ?? "•"` handed back a FUNCTION for those names rather than
-  // the fallback mark. The header's TOTALITY contract above — *"an unknown `phase_type`
-  // resolves to `DEFAULT_TINT` and to the `"•"` mark rather than throwing"* — was
-  // therefore true of a table MISS and false of an inherited key; the guard is what makes
-  // the sentence true rather than a repetition of it. `phaseGlyph`'s own half of the same
-  // defect is corrected at `lib/phaseGlyph.tsx` in the same commit: guarding only one of
-  // the two would leave this resolver returning `[Function Object]` as a React child.
-  // Both were reached by the WR-04 site-1 falsification in `PhaseNode.test.tsx`, observed
-  // RED before either guard was written.
+  // the fallback mark.
   if (mark) return createElement(mark, { className: "h-8 w-8" })
   return Object.prototype.hasOwnProperty.call(PHASE_GLYPHS, phaseType)
     ? PHASE_GLYPHS[phaseType]

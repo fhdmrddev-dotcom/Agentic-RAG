@@ -498,7 +498,57 @@ async def lifespan(app_instance):
     if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no runs to reconcile
         asyncio.create_task(_reconcile_orphans_periodic())
 
+    # Phase 204 (SCHED-01 / D-204-09 / D-204-11) — the background workflow scheduler.
+    # ADDITIVE and OFF BY DEFAULT (`scheduler_process_enabled`): a box that has never
+    # been told to schedule anything boots byte-identically to before this phase.
+    #
+    # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, with no leader election and no lock held
+    # here. Exactly-once is owned by `db/schedules.claim_due_schedules` — FOR UPDATE
+    # SKIP LOCKED plus the next_run_at advance INSIDE the claiming transaction — which
+    # is a property of the database rather than of whichever worker happened to win an
+    # election. A leader scheme's failure mode is that the leader dies and NOTHING
+    # fires, silently; this one has no such state.
+    #
+    # Same shape as the three sweeps above (background task, best-effort, never blocks
+    # startup) and, like them, skipped in setup mode — a fresh box has no schedules.
+    # The service is parked on `app_instance.state` so shutdown can stop it and so a
+    # test can reach it without importing module globals.
+    _scheduler = None
+    if not _setup_mode and settings.scheduler_process_enabled:
+        try:
+            from app.services.scheduler_service import SchedulerService
+            from app.dependencies import get_redis
+
+            _scheduler = SchedulerService(
+                pool=await get_pg_pool(),
+                redis=get_redis(),
+                poll_interval_seconds=settings.scheduler_poll_interval_seconds,
+                max_claims_per_tick=settings.scheduler_max_claims_per_tick,
+            )
+            _scheduler.start()
+            logger.info(
+                "Workflow scheduler started (poll every %ds, max %d claims/tick)",
+                settings.scheduler_poll_interval_seconds,
+                settings.scheduler_max_claims_per_tick,
+            )
+        except Exception:
+            logger.exception("Workflow scheduler failed to start (app continues)")
+            _scheduler = None
+    app_instance.state.workflow_scheduler = _scheduler
+
     yield
+
+    # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
+    # touch runs. It is the only component that STARTS new work; leaving it ticking
+    # while the producer-cancel loop below tears down live runs would race a fresh
+    # launch against a shutting-down pool. Best-effort — a failed stop never blocks
+    # shutdown.
+    try:
+        _sched = getattr(app_instance.state, "workflow_scheduler", None)
+        if _sched is not None:
+            await _sched.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Workflow scheduler stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
@@ -698,7 +748,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -732,6 +782,8 @@ app.include_router(org.router)  # Phase 166 ADMIN-01/02/04 — org-admin surface
 app.include_router(connectors.router)  # Phase 190 CONN-02/CONN-03 — connector-connection CRUD (Settings → Connections, D-25). Org-WIDE reads (U-02: read + bind), org-admin writes API-ENFORCED via require_org_manage, per-endpoint require_visible("live_connectors") on the writes ONLY (never router-level), 404-not-403 on every cross-org miss
 app.include_router(me_preferences.router)  # Phase 167 VIS-02 — per-user model-default preference (SEED-116 two-layer: operator allowed-set + lock; per-user RLS write, NOT the service-role settings writer)
 app.include_router(model_registry.router)  # Phase 196 AUTH-04/D-01 — the non-operator model-registry union GET /models/registry (NOT operator-gated and NOT under /admin: an author must reach it to pick a model, and /admin/models stays default-deny with no RLS backstop). Six-field ALLOWLIST projection (to_author_row), never a drop-list
+app.include_router(schedules.router)  # Phase 204 SCHED-01 — the schedule's own address space (/schedules): list, patch, delete, trigger. Owner-scoped on every route, 404-not-403 on every miss. `claim_due_schedules` is deliberately unrouted and unimported there (it is owner-AGNOSTIC by construction)
+app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the workflow-anchored half (/workflows/{id}/schedules: create + list). Shares the /workflows prefix with api/workflows.py; no path collides. Registered AFTER workflows.router so the older, more specific routes keep their precedence
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

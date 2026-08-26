@@ -1312,6 +1312,10 @@ const BASELINE = {
   // gate run (`fileIcon.test.tsx 11 41 +30`, `total 4136 · failed 0 ·
   // count gate OK — 82/82`), never hand-counted from `it(` literals.
   "fileIcon.test.tsx": 41,
+  // Added 2026-08-25 in the SAME COMMIT as its TARGETS entry. 55 is read from THIS SCRIPT'S
+  // OWN printed `actual` column, never hand-counted from `it(` literals — and note that this
+  // is an ADD, not a RAISE, so the diff on this file is `+N / -0`.
+  "fileTypeMark.test.tsx": 55,
   "MessageItem.finalOutputs.test.tsx": 11,
   // ── Added in 195-03 task 3, in the SAME COMMIT as their TARGETS entries. ────
   // Both numbers are THIS SCRIPT'S OWN printed `actual` column, on two agreeing
@@ -1616,7 +1620,27 @@ const BASELINE = {
   // plants in production source, each restored with an empty `git diff`: the planted
   // `smtp_password` write, Gate 1 short-circuited off, the effect's disconnected guard
   // deleted, and the `aria-disabled` attribute removed. Recorded in `190-12-SUMMARY.md`.
-  "ConnectionPicker.test.tsx": 20,
+  //
+  // ⚠ RAISED 20 → 58 at 206.2-02, IN THE SAME COMMIT AS THE CASES IT COUNTS. The 38 added
+  // cases pin the picker's SECOND SHAPE: that the MCP read calls `listConnectorConnections()`
+  // with ZERO arguments (the one line SEED-200 is about, asserted as `mock.calls[0]` being
+  // `[]` and not merely as "some call happened"), that neither shape lists the other's rows
+  // from ONE org holding both, that a disabled MCP row is not a choice either, that the two
+  // MCP absences stay TWO SENTENCES with their own `data-empty-reason`, that the repaired
+  // destination ladder names an MCP row's OWN host — with a SYNTHETIC-FIFTH-SHAPE control
+  // asserting both an empty list and the absence of `SLACK_FIXED_DESTINATION`, because "not
+  // Slack" alone would pass on some other wrong host — and TWELVE byte-identity captures
+  // (3 capability fixtures × 4 states) taken from the BASE commit's own component and never
+  // re-captured, each behind a COUNTED `useId` normalization whose per-state replacement
+  // count is measured (2 / 2 / 4 / 1) rather than reasoned about.
+  // ⚠ AGAIN NO `TARGETS` EDIT, and again measured rather than assumed: this file is already
+  // pinned below, so it already RUNS via the `src/components/workflows` directory entry —
+  // the number 58 was read out of THIS SCRIPT'S OWN `actual` column on a full run before
+  // this line was written, never counted by hand off the source.
+  // ⚠ Raising a pin necessarily deletes one line, so a `grep -c '^-[^-]'` expecting 0 on
+  // this file is the wrong check here; exactly one deletion — this pin's old value — is
+  // correct, and more than one is not.
+  "ConnectionPicker.test.tsx": 58,
   // 190-16 (CONN-02 / D-25 / D-26 / D-27) — NET-NEW: the Settings → Connections suite,
   // pinned in THE COMMIT THAT CREATED IT, the rule `ExternalActionSection.test.tsx:12`
   // states verbatim and that `ConnectionPicker.test.tsx` above followed.
@@ -1651,6 +1675,24 @@ const BASELINE = {
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
   "ConnectionsTab.test.tsx": 36,
+  // ── 206.1-01 (item 3, CONN-02 / SC#3) — the per-service mark map's own suite. ──
+  // The number is THIS SCRIPT'S OWN `actual` column across TWO AGREEING RUNS on 2026-08-25
+  // (both printed `connectionMark.test.tsx — 39 new`, total 5511, failed 0) — never a hand
+  // count of `it(` literals, which is unsound under the six `it.each` blocks this suite uses.
+  //
+  // ⚠ IT NEEDED BOTH KNOBS, like `ConnectionsTab.test.tsx` above and for the same reason:
+  // the two existing `src/components/settings/` entries are FILE-LEVEL, so a third file in
+  // that directory is reached by neither. See the TARGETS note for the measurement that
+  // established it (the grand total moved by the FIVE cases added to `ConnectionsTab` and by
+  // NONE of this suite's 39) and for the honest record that the entry landed ONE COMMIT
+  // LATE against the same-commit rule the blocks above state.
+  //
+  // ⚠ THE PIN DIRECTLY ABOVE IS DELIBERATELY LEFT AT 36 THOUGH THAT SUITE NOW REPORTS 41.
+  // The gate's contract is *no per-file DECREASE*, so 41 satisfies a pin of 36, and RAISING
+  // a pin necessarily deletes a line — which this file's own ledger row names as the thing
+  // that makes a `-0` deletion check wrong. ADDING a pin is not RAISING one; this edit is
+  // additions only.
+  "connectionMark.test.tsx": 39,
   // ── 190-17: the add/edit panel's own suite, pinned in the commit that creates it. ──
   // Number read from THIS SCRIPT'S OWN `actual` column across two agreeing runs — never a
   // hand count of `it(` literals, which is unsound under the `it.each` this suite uses for
@@ -2600,7 +2642,13 @@ const BASELINE = {
   //     it names still reds. ⚠ A pin on a characterization suite is the one place where the
   //     count matters most and the count is the least of it — the file's value is that its
   //     lines predate the change they judge.
-  "StepPanelPort.test.tsx": 25,
+  // ⚠ RE-PINNED 25 → 29 by 206.2-03. The four cases stop one shipped LIE: the readiness
+  //   card's `capability` row was pushed whenever an `external_action` step had no
+  //   capability SENTENCE — a lookup into the closed table, and therefore `undefined` for
+  //   every MCP-shaped step forever, however completely configured. Three of the four are
+  //   NON-VACUITY CONTROLS that were already GREEN at their base, which is the point: the
+  //   suppression could otherwise have deleted the row outright and read as a fix.
+  "StepPanelPort.test.tsx": 29,
   "WorkflowCard.baseline.test.tsx": 29,
   // ── ADDED 2026-08-20 in the SAME COMMIT as `RunReceipt.test.tsx`'s own growth ───────────
   //
@@ -2618,6 +2666,44 @@ const BASELINE = {
   // a person to keep waiting; and that an ABSENT status asserts NO finish — never success by
   // default, which is the arm whose first draft was written backwards and corrected in place.
   "RunReceipt.test.tsx": 26,
+  // ── ADDED 206.2-04 (SEED-200 / D-206.2-14) — TWO PINS, AND THE FIRST OF THEM IS A SUITE
+  //    THAT HAS BEEN RUNNING-BUT-UNGUARDED SINCE PHASE 206 ──────────────────────────────
+  //
+  // ⚠ MEASURED AT THIS PLAN'S BASE: `grep -n "Mcp" scripts/vitest-count-gate.cjs` returned
+  // NOTHING, and this script's own printed column read `McpToolPicker.test.tsx  —  12  new`.
+  // So the whole MCP tool surface's component suite could have been DELETED with the gate
+  // green. 188-12's rule verbatim: *an unpinned file is not lightly guarded, it is
+  // UNGUARDED.* It is pinned here, in the same commit as the code that makes it meaningful.
+  //
+  // BOTH KNOBS, AND THE SECOND IS MEASURED RATHER THAN ASSUMED: `src/components/workflows`
+  // is already a `TARGETS` **directory** entry (see the array below), so both files RAN from
+  // the moment they existed — the printed `actual` column IS that proof. **NO `TARGETS` EDIT
+  // ACCOMPANIES THESE PINS**, because this script's own comment at the 189-14 block refuses a
+  // redundant file-level entry beside a directory that already covers it: it would state a
+  // dependency that is not real. Both figures are read from the `actual` column, never
+  // hand-counted from `it(` literals.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THEM:
+  //
+  //   · `McpToolPicker.test.tsx` (29) — the ONE grant predicate mirroring the server's
+  //     `grants.get(tool_name) is True`; the three audience arms (a measured member loses
+  //     BOTH write affordances and gains one sentence carrying both facts; an unmeasured
+  //     caller renders nothing new, asserted as a NODE COUNT against the pre-phase render
+  //     with a non-vacuity control); and above all THE FULL MERGED MAP, asserted by SET
+  //     EQUALITY because `PATCH /grants` is a whole-column REPLACE and a superset check
+  //     would pass the very payload that drops a grant. Plus the in-flight guard, the
+  //     absence of an optimistic flip, and two receipts for two directions.
+  //
+  //   · `McpToolPicker.reachability.test.tsx` (11) — ⚠ THE PIN THAT MATTERS MOST, because
+  //     the thing it guards is a TIER rather than a behaviour. Leg (a) is an import sweep
+  //     and was GREEN AT THIS PHASE'S BASE, AGAINST THE DEFECT. Leg (b) renders the
+  //     PRODUCTION parent and constructs NO component prop at all; its headline is a
+  //     zero-argument call assertion, and it was observed RED against the pre-phase tree
+  //     (5 of 11 red) in the same run that showed all three leg-(a) cases green. A future
+  //     editor who deletes leg (b) has deleted the guard, and the gate would not notice
+  //     unless this file is pinned.
+  "McpToolPicker.test.tsx": 29,
+  "McpToolPicker.reachability.test.tsx": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3066,6 +3152,12 @@ const TARGETS = [
   // 188-11 as this comment used to say — the pinning plan is 188-12), from the printed
   // `actual` column across two agreeing runs.
   "src/lib/phaseState.test.ts",
+  // Added 2026-08-25 in the SAME COMMIT that creates the file — the two-knob trap, again,
+  // and this time pre-empted rather than recorded after the fact. `fileTypeMark.test.tsx`
+  // guards the OFFICIAL file-type marks on the documents surface; unpinned it would be the
+  // `McpToolPicker.test.tsx` state this script already records, where an entire suite can be
+  // deleted with the gate green. FILE-LEVEL for the same reason as its neighbours above.
+  "src/lib/__tests__/fileTypeMark.test.tsx",
   // Added in 188-08, in the SAME COMMIT that creates the file — the fourth occurrence of
   // the SAME two-knob trap, so this comment records the rule rather than the incident:
   //
@@ -3216,6 +3308,36 @@ const TARGETS = [
   // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
   // the file — never before, never after.
   "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
+  // ── Added in 206.1-01 (item 3, the per-service mark map) — the THIRD entry on
+  //    `src/components/settings/`, for the identical reason the two above give: those two
+  //    are FILE-LEVEL, so a THIRD file in that directory is still invisible to the gate.
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN rather than assumed. The gate was run with the
+  // suite already on disk and green (39 passing), and its printed `running: npx vitest run …`
+  // line did NOT contain `connectionMark.test.tsx`: the grand total moved 5467 → 5472, i.e.
+  // by the FIVE cases added to `ConnectionsTab.test.tsx` and by NONE of this suite's 39. A
+  // falsification that does not run has falsified nothing (verification truth 14).
+  //
+  // ⚠ AND THE TIMING RULE ABOVE WAS MISSED BY ONE COMMIT — recorded rather than tidied
+  // away. The blocks above say an entry *"can only land in the commit that creates the file
+  // — never before, never after"*; this one lands one commit after `ae8a2359`, because the
+  // gap was found by reading the gate's own arithmetic at the plan's verification step
+  // rather than at the file's creation. The `never before` half is mechanical (an entry for
+  // a non-existent path makes the gate exit 2); the `never after` half is discipline, and
+  // this is what breaking it looks like. Landing it late is strictly better than leaving
+  // the file unguarded — *"an unpinned file is not a lightly-guarded one, it is an
+  // UNGUARDED one"* (196-05 / 196-07).
+  //
+  // What would be unguarded without it: the whole of SC#3. TWENTY-ONE of the 39 cases are
+  // ABSENCE or NEGATIVE assertions — the two wordmark slugs never imported and the absent
+  // `jira` variant never tried, the coalesced bracket read absent from the source, the
+  // compiles-to-nothing utility absent, an inherited key never resolving to a mark, the
+  // brand marks carrying NO colour utility, the lucide glyphs carrying NO fill utility (a
+  // CSS fill on a lucide root beats its presentation attribute and turns the outline into a
+  // blob), and `capability: null` alone never resolving MCP. Each is the kind that deletes
+  // unnoticed, and three of them guard properties that exist NOWHERE else in the tree: the
+  // ink contract, the wordmark refusal, and the MCP arm's own-condition rule.
+  "src/components/settings/__tests__/connectionMark.test.tsx",
   // ── Added in 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ──────────────
   // The EIGHTH occurrence of the two-knob trap, and the first one that lands on the very
   // file the phase exists to rewrite. Stated as the rule rather than as an incident, for a

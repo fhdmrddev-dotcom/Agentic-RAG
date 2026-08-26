@@ -48,16 +48,23 @@ import connectionsTabSource from "../ConnectionsTab?raw"
 import {
   CONNECTIONS_ADD_CTA,
   CONNECTIONS_BANNER_HEADING,
+  CONNECTIONS_COLUMNS,
+  CONNECTIONS_DENSE_LABEL_CREDENTIAL,
+  CONNECTIONS_DENSE_LABEL_USED_BY,
   CONNECTIONS_EMPTY_BODY,
   CONNECTIONS_EMPTY_HEADING,
   CONNECTIONS_FILTERED_TO_ZERO,
   CONNECTIONS_NON_ADMIN_NOTE,
+  CONNECTION_FIXED_TAG,
   CONNECTION_STATE_WORDS,
+  CREDENTIAL_NO_CHECK_FOR_KIND,
   LIVE_CONNECTORS_FEATURE_KEY,
+  SLACK_FIXED_HOST,
   RECEIPT_DELETED,
   RECEIPT_DISABLED,
   RECEIPT_ENABLED,
   connectionsCountLabel,
+  destinationFactsOf,
   moreActionsLabel,
   usageCountsFrom,
   usedByLabel,
@@ -684,5 +691,961 @@ describe("the container wires the credential check", () => {
     // verdict the database may not have accepted.
     expect(handler).toContain("reload()")
     expect(handler).not.toMatch(/set[A-Z]\w*\(/)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 13 · Phase 206.1-01 (item 3 · SC#3) — every row wears its OWN service's mark
+//
+// ⚠ ADDED, NEVER RE-BASELINED. Every case above this banner is untouched by 206.1: an
+// `<svg>` contributes ZERO textContent, and `renderTab` passes no `panel`, so swapping the
+// three fluent-emoji glyphs for the shared map moved no shipped assertion. If one of the
+// 36 had gone red, that would have been a real finding rather than a licence to edit it.
+//
+// WHY THESE CASES EXIST AT ALL, given `connectionMark.test.tsx` already pins the module:
+// that suite proves the RESOLVER is right. These prove the CALL SITE hands it the whole
+// connection. An MCP row has no capability at all, so a call site passing `capability`
+// alone would send every MCP row to the neutral — a quieter version of the ROADMAP's named
+// *"the MCP row borrows another service's mark"* failure, and invisible to the unit suite.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("SC#3 — the marks reach the row, and they are each their own", () => {
+  /** Four rows: the three capabilities plus the shape that has none. */
+  const FOUR_SHAPES: ConnectorConnection[] = [
+    ...THREE_ROWS,
+    makeConnection({
+      id: "conn-4",
+      name: "DeepWiki MCP",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/mcp",
+      config: { headers: {} },
+      last_checked_at: null,
+      last_check_verdict: "not_checked",
+    }),
+  ]
+
+  /** The row's FIRST `<svg>` is cell 1's mark — the name cell leads every row. */
+  function rowMarkBodies() {
+    return screen.getAllByTestId("connections-row").map((row) => {
+      const svg = row.querySelector("svg")
+      expect(svg).not.toBeNull()
+      return svg!.innerHTML
+    })
+  }
+
+  it("all four rows render a NON-EMPTY mark, and the four are PAIRWISE DISTINCT", () => {
+    renderTab({ connections: FOUR_SHAPES })
+
+    // Non-vacuity control FIRST: without it, zero rows would satisfy every claim below.
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows).toHaveLength(4)
+
+    const bodies = rowMarkBodies()
+    bodies.forEach((body) => expect(body.length).toBeGreaterThan(0))
+    expect(new Set(bodies).size).toBe(4)
+  })
+
+  it("⚠ the MCP row's mark is neither Slack's nor Jira's nor the SMTP one", () => {
+    // The ROADMAP's named failure, asserted where it would actually be seen. This is the
+    // case that fails if the call site ever narrows to `connection.capability`.
+    renderTab({ connections: FOUR_SHAPES })
+    const [smtp, jira, slack, mcp] = rowMarkBodies()
+    expect(mcp).not.toBe(slack)
+    expect(mcp).not.toBe(jira)
+    expect(mcp).not.toBe(smtp)
+  })
+
+  it("the `All` chip wears NO mark; the three state chips (All, Connected, Not connected) render without service marks", () => {
+    // State chips filter by connection readiness rather than capability, so none wear service marks.
+    renderTab({ connections: FOUR_SHAPES })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    expect(chips).toHaveLength(3)
+    expect(chips[0].querySelectorAll("svg")).toHaveLength(0)
+    expect(chips[0].textContent).toContain("All")
+    expect(chips[1].textContent).toContain("Connected")
+    expect(chips[2].textContent).toContain("Not connected")
+    chips.forEach((chip) => expect(chip.querySelectorAll("svg")).toHaveLength(0))
+  })
+
+  it("no secret-shaped needle rides in on the newly inlined SVG bodies (T-190-16-T7)", () => {
+    // Case 12 above scans the THREE-row render. This re-runs the same scan over a render
+    // containing all four marks, so the `logos` path data, gradient ids and titles this
+    // phase inlines are inside the swept markup rather than beside it.
+    const { container } = renderTab({ connections: FOUR_SHAPES })
+    expect(screen.getAllByTestId("connections-row")).toHaveLength(4)
+    const markup = container.innerHTML.toLowerCase()
+    for (const needle of ["secret", "ciphertext", "password", "xoxb-", "api_token", "enc:v1:"]) {
+      expect(markup).not.toContain(needle)
+    }
+  })
+
+  it("the marks come from ONE module — this file imports no icon set directly", () => {
+    // The icon convention's actual prohibition is a SECOND HOME for a mark, not a second
+    // package. A future edit that re-adds a `~icons/...` import here fails this case.
+    expect(connectionsTabSource).not.toContain("~icons/")
+    expect(connectionsTabSource).toContain("ConnectionMarkGlyph")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 14 · Phase 206.1-02 Task 1 — THE WIDE RENDER, PINNED BYTE-FOR-BYTE
+//
+// ⚠ CAPTURED AND COMMITTED BEFORE ONE LINE OF DENSE CODE EXISTS. A baseline only proves
+// something if it PREDATES the change — the `cardFace.ts` precedent, where the
+// characterization pin was committed ONE COMMIT BEFORE the seam existed and then passed
+// with an empty `numstat`. Item 2 of this phase adds a SECOND row shape behind a `dense`
+// prop; the only thing that can prove the FIRST shape did not move while that happened is
+// a record taken while it was the only shape there was.
+//
+// PROVENANCE OF THE IDIOM: there is NO `outerHTML` capture anywhere in the settings suites
+// today (measured — the only `innerHTML` uses here are needle scans), so this is IMPORTED
+// from `frontend/src/components/workflows/PhaseNodeCard.test.tsx:2640-2647` (the capture
+// helper), `:2649-2673` (the capture-rule docblock whose wording is copied below) and
+// `:2792-2825` (the marker rows). It is not extended from a local example, and saying so
+// is what stops a later reader treating it as this file's house style.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => {
+  /** ⚠ A FIXED CLOCK, not a reading of one. `ConnectionRow` renders
+   *  `credentialLabel(connection.last_checked_at, now)`, so a capture taken against
+   *  `Date.now()` is a record of the afternoon it was taken and differs tomorrow.
+   *  `PhaseNodeCard`'s captures are safe only because a subtree fence forbids `Date.now`
+   *  and `Math.random` across that whole tree; THIS file has no such fence, so the
+   *  discipline has to live in the fixture. Both constants below are literals. */
+  const CAPTURE_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+  const CAPTURE_CHECKED_AT = "2026-08-22T12:00:00.000Z"
+
+  /**
+   * Three shapes, each distinct so the baseline says something: a long SMTP destination, a
+   * Slack row (the only shape that carries the `fixed` tag), and a Jira row.
+   *
+   * ⚠ THE CAPTURE SET DELIBERATELY CONTAINS NO MCP-SHAPED ROW, AND THAT ABSENCE IS A
+   * DECISION — this sentence exists so a later phase does not "fix" it. Plan 03 of this
+   * phase introduces `credentialReadingOf`, whose MCP arm returns
+   * `CREDENTIAL_NO_CHECK_FOR_KIND` **unconditionally**: it ignores `last_checked_at`
+   * entirely, by design, because an MCP row can never be checked. So an MCP-shaped
+   * fixture's credential cell renders DIFFERENT TEXT once wave 3 lands, and no choice of
+   * `last_checked_at` avoids it — the arm does not read that field. Pinning that cell here
+   * would make this baseline booby-trapped by its own phase, and the philosophy below (a
+   * diff against this record is a BEHAVIOUR CHANGE, not a test to update) only holds if the
+   * record itself is not. A `create_ticket` row exercises the same five cells, the same
+   * mark slot and the same ⋯, so the pin loses nothing it was measuring: its job is to
+   * prove the WIDE row's shipped markup did not move when the dense branch arrived, not to
+   * enumerate shapes. An MCP row's wide render is pinned by plan 03's own tests instead,
+   * where the change to that cell is the thing under test rather than a collision.
+   */
+  const CAPTURE_ROWS: Record<string, ConnectorConnection> = {
+    SEND_EMAIL: makeConnection({
+      id: "cap-1",
+      name: "Ops mailbox",
+      capability: "send_email",
+      config: {
+        host: "smtp.eu-west.fastmail-business.example.com",
+        port: 465,
+        from_address: "ops@northwind.co",
+        tls: "implicit",
+      },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+    POST_MESSAGE: makeConnection({
+      id: "cap-2",
+      name: "#ops-alerts",
+      capability: "post_message",
+      config: { default_channel: "#ops-alerts" },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+    CREATE_TICKET: makeConnection({
+      id: "cap-3",
+      name: "Northwind Jira",
+      capability: "create_ticket",
+      config: {
+        base_url: "northwind.atlassian.net",
+        project_key: "NW",
+        account_email: "ops@northwind.co",
+      },
+      last_checked_at: CAPTURE_CHECKED_AT,
+      last_check_verdict: "ok",
+    }),
+  }
+
+  /**
+   * ⚠ THE ONE DECLARED NORMALIZATION — declared, and COUNTED, rather than done quietly.
+   *
+   * Radix's `DropdownMenuTrigger` sets `id={useId()}` on the ⋯ button, and React's `useId`
+   * value is a function of HOW MANY components have rendered before it, not of the row's
+   * own markup. Measured while taking these captures: the three rows below printed
+   * `id="radix-_r_p3_"`, `id="radix-_r_pc_"` and `id="radix-_r_pl_"` for markup that is
+   * otherwise character-identical, and that number MOVES when any case is added anywhere
+   * above this block. A case added above is not a behaviour change in the wide row and must
+   * not be able to redden this pin — so the id VALUE is normalized away.
+   *
+   * ⚠ AND THE NORMALIZATION IS ITSELF NON-VACUOUS: the substitution count is returned and
+   * asserted at exactly ONE per row. A ⋯ trigger that stopped rendering yields ZERO
+   * replacements and the case goes red, rather than quietly passing against a shorter
+   * string. Normalizing without counting is how a pin stops watching the thing it names.
+   */
+  const RADIX_ID = /id="radix-[^"]*"/g
+  const RADIX_ID_NORMALIZED = 'id="radix-NORMALIZED"'
+
+  function normalizeRadixIds(html: string): { html: string; replaced: number } {
+    let replaced = 0
+    const out = html.replace(RADIX_ID, () => {
+      replaced += 1
+      return RADIX_ID_NORMALIZED
+    })
+    return { html: out, replaced }
+  }
+
+  /** One render, the row's and the header's `outerHTML`, unmounted — shared by the capture
+   *  and the assertion so both read the DOM the same way
+   *  (`PhaseNodeCard.test.tsx:2640-2647`). */
+  function wideCapture(connection: ConnectorConnection): {
+    row: string
+    header: string
+    rowRadixIds: number
+  } {
+    const rendered = render(
+      <ConnectionsTabView
+        connections={[connection]}
+        usageCounts={{ [connection.id]: 2 }}
+        isOrgAdmin
+        liveConnectorsOn
+        now={CAPTURE_NOW}
+        onOpen={() => {}}
+        {...handlers}
+      />,
+    )
+    const row = normalizeRadixIds(
+      rendered.container.querySelector('[data-testid="connections-row"]')!.outerHTML,
+    )
+    const header = normalizeRadixIds(
+      rendered.container.querySelector('[data-testid="connections-header"]')!.outerHTML,
+    )
+    rendered.unmount()
+    // The header holds no Radix control, so its own replacement count is expected to be 0
+    // and is asserted here rather than carried: an id appearing there would be new surface.
+    expect(header.replaced).toBe(0)
+    return { row: row.html, header: header.html, rowRadixIds: row.replaced }
+  }
+
+  /**
+   * ⚠ THESE LITERALS ARE A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT
+   * of the rendered DOM of the tree as it stands at this commit — `ConnectionsTab.tsx`
+   * unmoved, no `dense` prop in existence — by running `wideCapture` above and pasting what
+   * it printed. Not one attribute here was typed from the source, computed by hand, or
+   * reasoned about. That is the whole point: an expectation records what its author
+   * BELIEVED the geometry to be, and a move that changed the geometry to match that belief
+   * would pass it.
+   *
+   * OBSERVED TWICE on the unchanged tree before it was committed, and the two runs agreed
+   * byte for byte — so it is a baseline rather than one sample of something that might vary.
+   * The clock is a literal (see `CAPTURE_NOW`), which is what makes that stability a
+   * property of the markup rather than of the hour.
+   *
+   * NOT ONE STRING BELOW WAS HAND-EDITED. Hand editing turns a capture back into an
+   * expectation recording what its author believed the change did, and silently masks any
+   * other attribute the edit disturbed.
+   *
+   * A DIFF AGAINST THIS RECORD IS A BEHAVIOUR CHANGE IN THE WIDE ROW — and NOT A TEST TO
+   * UPDATE. Adding the dense shape is supposed to add a second branch, not move the first
+   * one. If this goes red while the dense branch lands, the dense branch is wrong;
+   * re-capturing it to make it green would delete the only evidence anybody has that the
+   * wide row still renders what it rendered.
+   */
+  const WIDE_HTML_BASELINE: Record<string, { row: string; header: string }> = {
+    SEND_EMAIL: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-mail h-4 w-4 flex-none text-muted-foreground\" aria-hidden=\"true\"><path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"></path><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"></rect></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Ops mailbox</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">smtp.eu-west.fastmail-business.example.com:465</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Ops mailbox\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+    POST_MESSAGE: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><path fill=\"#e01e5a\" d=\"M53.841 161.32c0 14.832-11.987 26.82-26.819 26.82S.203 176.152.203 161.32c0-14.831 11.987-26.818 26.82-26.818H53.84zm13.41 0c0-14.831 11.987-26.818 26.819-26.818s26.819 11.987 26.819 26.819v67.047c0 14.832-11.987 26.82-26.82 26.82c-14.83 0-26.818-11.988-26.818-26.82z\"></path><path fill=\"#36c5f0\" d=\"M94.07 53.638c-14.832 0-26.82-11.987-26.82-26.819S79.239 0 94.07 0s26.819 11.987 26.819 26.819v26.82zm0 13.613c14.832 0 26.819 11.987 26.819 26.819s-11.987 26.819-26.82 26.819H26.82C11.987 120.889 0 108.902 0 94.069c0-14.83 11.987-26.818 26.819-26.818z\"></path><path fill=\"#2eb67d\" d=\"M201.55 94.07c0-14.832 11.987-26.82 26.818-26.82s26.82 11.988 26.82 26.82s-11.988 26.819-26.82 26.819H201.55zm-13.41 0c0 14.832-11.988 26.819-26.82 26.819c-14.831 0-26.818-11.987-26.818-26.82V26.82C134.502 11.987 146.489 0 161.32 0s26.819 11.987 26.819 26.819z\"></path><path fill=\"#ecb22e\" d=\"M161.32 201.55c14.832 0 26.82 11.987 26.82 26.818s-11.988 26.82-26.82 26.82c-14.831 0-26.818-11.988-26.818-26.82V201.55zm0-13.41c-14.831 0-26.818-11.988-26.818-26.82c0-14.831 11.987-26.818 26.819-26.818h67.25c14.832 0 26.82 11.987 26.82 26.819s-11.988 26.819-26.82 26.819z\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">#ops-alerts</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">slack.com/api · #ops-alerts</span><span class=\"flex-none rounded border border-border px-1 text-[11px] text-muted-foreground\">fixed</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for #ops-alerts\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+    CREATE_TICKET: {
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><defs><linearGradient id=\"SVGSBI7obaC\" x1=\"98.031%\" x2=\"58.888%\" y1=\".161%\" y2=\"40.766%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient><linearGradient id=\"SVGHifZlbzE\" x1=\"100.665%\" x2=\"55.402%\" y1=\".455%\" y2=\"44.727%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient></defs><path fill=\"#2684ff\" d=\"M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0\"></path><path fill=\"url(#SVGSBI7obaC)\" d=\"M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667\"></path><path fill=\"url(#SVGHifZlbzE)\" d=\"M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Northwind Jira</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">northwind.atlassian.net · NW</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Northwind Jira\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
+    },
+  }
+
+  /**
+   * ── ⚠ 206.1-02 TASK 2 — THE ONE DECLARED DELTA AGAINST THE THREE CAPTURES ABOVE ────────
+   *
+   * ⚠ NOT ONE CHARACTER OF THE THREE CAPTURE LITERALS IS EDITED, AND THAT IS THE WHOLE
+   * DESIGN OF THIS BLOCK. Their own docblock says a diff against them "IS A BEHAVIOUR
+   * CHANGE IN THE WIDE ROW — and NOT A TEST TO UPDATE", and re-capturing them would delete
+   * the only evidence anybody has that the wide row still renders what it rendered.
+   *
+   * ⚠ AND TASK 2 MAKES EXACTLY ONE DELIBERATE CHANGE TO THE WIDE ROW, WHICH IS A REAL
+   * CONFLICT THIS PLAN CONTAINED AND WHICH IS RESOLVED HERE RATHER THAN PAPERED OVER. The
+   * plan requires BOTH that `data-dense` be "always present, both values" on the row
+   * (D-206.1-12 — an absent attribute reads as falsy to every consumer, which is the
+   * "0 is a fact, absence is a different one" trap) AND that this capture "pass UNEDITED".
+   * Those two cannot both be literally true: adding an attribute to the wide row changes
+   * the wide row's DOM by definition.
+   *
+   * The house answer is neither to re-capture nor to abandon the attribute: it is to keep
+   * the captures VERBATIM and declare the delta as a NAMED, SINGULAR, MACHINE-CHECKED
+   * transformation of them. That precedent lives in `PhaseNodeCard.test.tsx` — the same
+   * file this whole capture idiom was imported from — under its own "199-01 Task 2 — THE
+   * ONE DECLARED DELTA" heading, for exactly this situation.
+   *
+   * THE ARITHMETIC CLOSES WITH NO RESIDUAL, which is what separates a declared change from
+   * drift: shipped == captured + exactly this term, at exactly one position, on exactly the
+   * `connections-row` element. All three conditions are ASSERTED below, not asserted in
+   * prose — and the delta is proved REAL (the capture predates the attribute) and SINGULAR
+   * (one anchor occurrence) before it is applied, so a second `data-dense` appearing
+   * anywhere, or the attribute silently vanishing, fails rather than passes.
+   *
+   * ⚠ THE HEADER CAPTURE TAKES NO DELTA AT ALL and is compared verbatim: `data-dense` is a
+   * ROW attribute. A header that acquired one would be new surface and must go red.
+   */
+  const WIDE_DELTA_ANCHOR = ' data-state="ready"'
+  const WIDE_DELTA_TERM = ' data-dense="false"'
+
+  function withDeclaredDelta(captured: string): string {
+    expect(captured).not.toContain("data-dense")
+    expect(captured.split(WIDE_DELTA_ANCHOR)).toHaveLength(2)
+    return captured.replace(WIDE_DELTA_ANCHOR, WIDE_DELTA_ANCHOR + WIDE_DELTA_TERM)
+  }
+
+  for (const key of Object.keys(CAPTURE_ROWS)) {
+    it(`the wide ${key} row renders byte-for-byte what it rendered at 206.1-02's base`, () => {
+      // ── NON-VACUITY FIRST. Byte-identity against an empty capture passes forever. ──
+      expect(WIDE_HTML_BASELINE[key].row.length).toBeGreaterThan(0)
+      expect(WIDE_HTML_BASELINE[key].header.length).toBeGreaterThan(0)
+
+      const actual = wideCapture(CAPTURE_ROWS[key])
+      // The normalization above is non-vacuous: exactly one ⋯ trigger id was replaced.
+      expect(actual.rowRadixIds).toBe(1)
+      expect(actual.row).toBe(withDeclaredDelta(WIDE_HTML_BASELINE[key].row))
+      // ⚠ verbatim — the header takes no delta.
+      expect(actual.header).toBe(WIDE_HTML_BASELINE[key].header)
+    })
+  }
+
+  // ── THE MARKER ROWS ──────────────────────────────────────────────────────────────────
+  // Byte-identity alone is compatible with a row that quietly rendered nothing: an empty
+  // capture equals an empty render forever, and the non-vacuity lines above only prove the
+  // string is non-empty, not that it holds the cells. These say WHAT each capture contains,
+  // so a row that stopped painting a cell is a failure rather than a pass. They read the
+  // COMMITTED baseline strings, never a fresh render — the claim being pinned is about what
+  // was captured. (`PhaseNodeCard.test.tsx:2792-2825`.)
+
+  it("every capture holds all five cells and the ⋯ — D-206.1-13 stated at the baseline", () => {
+    for (const key of Object.keys(WIDE_HTML_BASELINE)) {
+      const html = WIDE_HTML_BASELINE[key].row
+      for (const testId of [
+        "connections-row-name",
+        "connections-row-destination",
+        "connections-row-usedby",
+        "connections-row-credential",
+        "connections-row-state",
+        "connections-row-more",
+      ]) {
+        expect(html).toContain(`data-testid="${testId}"`)
+      }
+    }
+  })
+
+  it("SEND_EMAIL captured the 🔒 destination and NOT the Slack-only `fixed` tag", () => {
+    const html = WIDE_HTML_BASELINE.SEND_EMAIL.row
+    expect(html).toContain("connections-row-destination")
+    expect(html).toContain("🔒")
+    expect(html).not.toContain(CONNECTION_FIXED_TAG)
+  })
+
+  it("POST_MESSAGE captured the `fixed` tag — the one shape that carries it", () => {
+    expect(WIDE_HTML_BASELINE.POST_MESSAGE.row).toContain(CONNECTION_FIXED_TAG)
+  })
+
+  it("CREATE_TICKET captured the author's own word in the name cell", () => {
+    const html = WIDE_HTML_BASELINE.CREATE_TICKET.row
+    expect(html).toContain("connections-row-name")
+    expect(html).toContain("Northwind Jira")
+  })
+
+  it("every captured header holds the five locked column words, in order", () => {
+    for (const key of Object.keys(WIDE_HTML_BASELINE)) {
+      const header = WIDE_HTML_BASELINE[key].header
+      let cursor = -1
+      for (const column of CONNECTIONS_COLUMNS) {
+        const at = header.indexOf(`data-column="${column}"`)
+        expect(at).toBeGreaterThan(cursor)
+        cursor = at
+      }
+    }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 15 · Phase 206.1-02 Task 2 — THE DENSE ROW SHAPE (SC#2a, the SHAPE half)
+//
+// ⚠ THIS BLOCK IS NOT SC#2's PROOF AND MUST NEVER BE RECORDED AS IT (D-206.1-14). Measured
+// in this repo: jsdom returns `scrollWidth 0 / clientWidth 0 / offsetWidth 0` and
+// `getBoundingClientRect().width 0` for every element, so
+// `expect(el.scrollWidth <= el.clientWidth).toBe(true)` PASSES VACUOUSLY on markup that
+// overflows by ~400px in a real browser. No alternative box metric rescues it. What this
+// block can prove is the SHAPE — that both variants exist, that no cell was deleted, that
+// the destination is no longer `nowrap`, and that the wide render did not move. The
+// GEOMETRY half is a real browser, at 1280 and 1536, with a `bodyClientW > 0` control, and
+// it lives in this plan's Task 3.
+//
+// ⚠ MEASURED BEFORE THIS BLOCK WAS WRITTEN: `renderTab` never passes `panel`, so NOT ONE of
+// the shipped cases exercised the dense shape — it had no coverage at all, which is why the
+// helper below drives the REAL condition (`panel && !isMobile`) rather than poking a prop.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("SC#2a — the dense row shape, and the five columns that survive it", () => {
+  /** A fixed clock so `credentialLabel` reads the same in both shapes within one case. */
+  const DENSE_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+
+  /** All four states, so the WCAG 1.4.1 glyph-and-word readings can be compared shape to
+   *  shape rather than sampled. `disabled` outranks the verdict, hence the fourth row. */
+  const FOUR_STATES: ConnectorConnection[] = [
+    makeConnection({
+      id: "st-ready",
+      name: "Ops mailbox",
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "st-not-checked",
+      name: "Northwind Jira",
+      capability: "create_ticket",
+      config: {
+        base_url: "northwind.atlassian.net",
+        project_key: "NW",
+        account_email: "ops@northwind.co",
+      },
+      last_checked_at: null,
+      last_check_verdict: "not_checked",
+    }),
+    makeConnection({
+      id: "st-failed",
+      name: "#ops-alerts",
+      capability: "post_message",
+      config: { default_channel: "#ops-alerts" },
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "failed",
+    }),
+    makeConnection({
+      id: "st-disabled",
+      name: "Retired mailbox",
+      is_enabled: false,
+      last_checked_at: "2026-08-22T12:00:00.000Z",
+      last_check_verdict: "ok",
+    }),
+  ]
+
+  /** ⚠ DENSE IS DRIVEN THROUGH THE REAL CONDITION, never through a prop poke. `dense` is
+   *  the SAME expression that opens the 400px track (`panel && !isMobile`), so a helper
+   *  that set the flag directly could pass while the one condition had quietly forked into
+   *  two. jsdom's `window.innerWidth` is 1024 here, i.e. above the 768 mobile breakpoint,
+   *  which is what makes `panel` alone sufficient. */
+  function renderDense(
+    props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {},
+  ) {
+    return renderTab({
+      now: DENSE_NOW,
+      panel: <div data-testid="fake-panel" />,
+      ...props,
+    })
+  }
+
+  function renderWide(
+    props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {},
+  ) {
+    return renderTab({ now: DENSE_NOW, ...props })
+  }
+
+  /** The six things D-206.1-13 says survive the reflow. Named once so both renders are
+   *  swept by the SAME list — a hand-written second list is how one of them goes missing. */
+  const ROW_TESTIDS = [
+    "connections-row-name",
+    "connections-row-destination",
+    "connections-row-usedby",
+    "connections-row-credential",
+    "connections-row-state",
+    "connections-row-more",
+  ] as const
+
+  it("`data-dense` carries BOTH values — an absent attribute is a different fact from false", () => {
+    // ⚠ The "0 is a fact, absence is a different one" trap: an attribute that is simply
+    // missing in the wide shape would read as falsy to every consumer and would make this
+    // assertion unfalsifiable. Both renders must SPELL it.
+    renderDense()
+    const dense = screen.getAllByTestId("connections-row")
+    expect(dense.length).toBeGreaterThan(0)
+    dense.forEach((row) => expect(row.getAttribute("data-dense")).toBe("true"))
+
+    cleanup()
+    renderWide()
+    const wide = screen.getAllByTestId("connections-row")
+    expect(wide.length).toBeGreaterThan(0)
+    wide.forEach((row) => expect(row.getAttribute("data-dense")).toBe("false"))
+  })
+
+  it("⚠ D-206.1-13 — all five columns AND the ⋯ resolve in BOTH shapes", () => {
+    // Deleting a column is the ROADMAP's NAMED failure mode: "the destination is the one
+    // column a person reads to approve a send, and hiding it is worse than truncating it."
+    // So this is asserted by QUERYING every testid in both renders, never by inspection.
+    // ⚠ `PhaseCard.tsx` — the stacked-identity analog whose markup the dense row copies —
+    // FOLDS A FACT AWAY at higher density. The markup is copied; that decision is not.
+    renderDense({ usageCounts: { "st-ready": 2 } })
+    for (const testId of ROW_TESTIDS) {
+      expect(screen.getAllByTestId(testId).length).toBe(THREE_ROWS.length)
+    }
+
+    cleanup()
+    renderWide({ usageCounts: { "st-ready": 2 } })
+    for (const testId of ROW_TESTIDS) {
+      expect(screen.getAllByTestId(testId).length).toBe(THREE_ROWS.length)
+    }
+  })
+
+  it("⚠ the dense destination carries NO `truncate` — on the cell OR on the value span", () => {
+    // ⚠ THIS IS WHERE SC#2 IS WON OR LOST. `truncate` is `white-space: nowrap`, under which
+    // `scrollWidth` is the FULL un-wrapped text width — so `scrollWidth <= clientWidth` is
+    // UNSATISFIABLE BY WIDENING ALONE, and a dense layout that merely hands the cell more
+    // room fails SC#2 silently. `truncate` ships TWICE today (cell AND inner span), so
+    // removing one leaves the other and the geometry does not move at all.
+    renderDense()
+    const cells = screen.getAllByTestId("connections-row-destination")
+    expect(cells.length).toBeGreaterThan(0)
+    for (const cell of cells) {
+      expect(cell.className.split(/\s+/)).not.toContain("truncate")
+      const span = cell.querySelector("span:not([aria-hidden])")
+      expect(span).not.toBeNull()
+      const tokens = span!.className.split(/\s+/)
+      expect(tokens).not.toContain("truncate")
+      expect(tokens).toContain("whitespace-normal")
+      // ⚠ `break-all`, NOT `break-words`: a URL has no spaces, so `break-words` will not
+      // break it and the cell overflows exactly as before while looking fixed.
+      expect(tokens).toContain("break-all")
+      expect(tokens).not.toContain("break-words")
+    }
+  })
+
+  it("the WIDE destination still truncates — the dense change is ADDITIVE, not a swap", () => {
+    // The mirror of the case above. Without it, deleting `truncate` outright would pass
+    // that one and silently change the shipped wide row (which Task 1's capture also
+    // catches — two independent guards on the same claim, deliberately).
+    renderWide()
+    const cells = screen.getAllByTestId("connections-row-destination")
+    expect(cells.length).toBeGreaterThan(0)
+    for (const cell of cells) {
+      expect(cell.className.split(/\s+/)).toContain("truncate")
+    }
+  })
+
+  it("D-206.1-20 — the five-word HEADER is the ONE thing dense drops", () => {
+    // Stacked cells form no columns, so a five-word header would label a grid that is not
+    // there. `CONNECTIONS_COLUMNS` keeps its character identity in the wide shape.
+    renderDense()
+    expect(screen.queryByTestId("connections-header")).toBeNull()
+
+    cleanup()
+    renderWide()
+    const header = screen.getByTestId("connections-header")
+    expect(
+      Array.from(header.querySelectorAll("[data-column]")).map((el) => el.textContent),
+    ).toEqual([...CONNECTIONS_COLUMNS])
+  })
+
+  it("⚠ the credential cell's textContent is CHARACTER-IDENTICAL in both shapes", () => {
+    // This is what forces the new inline label to be a SIBLING node, outside the testid'd
+    // one: `:640` asserts `.toBe("never checked")` by EXACT EQUALITY and `:641` anchors
+    // `/^checked /` at the start. Putting the label inside would force a re-baseline — of a
+    // pin, on the surface whose whole lesson is that re-baselined pins are not evidence.
+    renderDense({ connections: FOUR_STATES })
+    const dense = screen
+      .getAllByTestId("connections-row-credential")
+      .map((c) => c.textContent)
+
+    cleanup()
+    renderWide({ connections: FOUR_STATES })
+    const wide = screen
+      .getAllByTestId("connections-row-credential")
+      .map((c) => c.textContent)
+
+    expect(dense.length).toBe(FOUR_STATES.length)
+    expect(dense).toEqual(wide)
+    expect(dense[1]).toBe("never checked")
+    expect(dense[0]).toMatch(/^checked /)
+  })
+
+  it("the four state readings are unchanged in dense — glyph AND word, in both shapes", () => {
+    renderDense({ connections: FOUR_STATES })
+    const dense = screen.getAllByTestId("connections-row-state").map((c) => c.textContent)
+
+    cleanup()
+    renderWide({ connections: FOUR_STATES })
+    const wide = screen.getAllByTestId("connections-row-state").map((c) => c.textContent)
+
+    expect(dense).toEqual(wide)
+    expect(dense).toEqual([
+      CONNECTION_STATE_WORDS.ready,
+      CONNECTION_STATE_WORDS.not_checked,
+      CONNECTION_STATE_WORDS.failed,
+      CONNECTION_STATE_WORDS.disabled,
+    ])
+  })
+
+  it("the two inline labels are DERIVED from the column tuple, never re-typed", () => {
+    // Asserted against the imported constants rather than against literals, and then a
+    // second time as an identity — so the header word and the inline label are
+    // STRUCTURALLY unable to disagree rather than merely equal today.
+    expect(CONNECTIONS_DENSE_LABEL_USED_BY).toBe(CONNECTIONS_COLUMNS[2])
+    expect(CONNECTIONS_DENSE_LABEL_CREDENTIAL).toBe(CONNECTIONS_COLUMNS[3])
+
+    // ⚠ SCOPED TO THE ROW, NOT THE CONTAINER — measured: a container-wide `toContain`
+    // passes VACUOUSLY today, because the five-word HEADER already spells both words. The
+    // claim is that the label reaches the ROW once that header is gone, so the row is where
+    // it has to be read.
+    renderDense()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.textContent).toContain(CONNECTIONS_DENSE_LABEL_USED_BY)
+      expect(row.textContent).toContain(CONNECTIONS_DENSE_LABEL_CREDENTIAL)
+    }
+  })
+
+  it("the inline labels are NOT aria-hidden — they read for AT exactly as for the eye", () => {
+    // "Credential checked 3d ago" is the reading, and it is the reading for everyone. A
+    // decorative label would leave a screen reader with a bare relative time and no noun.
+    renderDense()
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      const hidden = Array.from(row.querySelectorAll('[aria-hidden="true"]')).map(
+        (el) => el.textContent ?? "",
+      )
+      for (const label of [CONNECTIONS_DENSE_LABEL_USED_BY, CONNECTIONS_DENSE_LABEL_CREDENTIAL]) {
+        for (const text of hidden) expect(text).not.toContain(label)
+      }
+    }
+  })
+
+  it("ZERO `[title]` nodes in the DENSE render, with a menu AND a sheet open", async () => {
+    // ⚠ The shipped fence (`:505-515`) extended to the new shape. A tooltip is FORBIDDEN
+    // here, and that prohibition is exactly WHY wrapping had to be the answer: the cheap
+    // fix was never available.
+    const user = userEvent.setup({ delay: null })
+    const { container } = renderDense({
+      usageCounts: { "conn-1": 2 },
+      onAdd: vi.fn(),
+      onOpen: vi.fn(),
+    })
+    expect(container.querySelectorAll("[title]")).toHaveLength(0)
+
+    await openRowMenu(user, "Ops mailbox")
+    await user.click(await screen.findByTestId("connections-action-delete"))
+    await screen.findByRole("dialog")
+    expect(document.querySelectorAll("[title]")).toHaveLength(0)
+  })
+
+  it("the ⋯ / receipt either-or survives in dense — one action cell, two occupants", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderDense({ usageCounts: {} })
+    expect(screen.getAllByTestId("connections-row-more").length).toBe(THREE_ROWS.length)
+
+    await openRowMenu(user, "Ops mailbox")
+    await user.click(await screen.findByTestId("connections-action-disable"))
+    const receipt = await screen.findByTestId("connections-receipt")
+    expect(receipt).toHaveTextContent(RECEIPT_DISABLED)
+    // The row that received the write no longer shows its ⋯ — the shipped either-or.
+    expect(screen.getAllByTestId("connections-row-more").length).toBe(THREE_ROWS.length - 1)
+  })
+
+  it("`canWrite` still REMOVES the ⋯ in dense — never renders it inert", () => {
+    // The shipped removed-not-disabled rule, asserted on the second render path. A
+    // `toBeDisabled()` assertion was measured unable to see plant C at 190-16, which is why
+    // this is an absence claim.
+    renderDense({ isOrgAdmin: false })
+    expect(screen.queryAllByTestId("connections-row-more")).toHaveLength(0)
+
+    cleanup()
+    renderDense({ liveConnectorsOn: false })
+    expect(screen.queryAllByTestId("connections-row-more")).toHaveLength(0)
+  })
+
+  it("the source names none of the three things the dense shape refuses (187-24-safe)", () => {
+    // ⚠ THREE SOURCE FENCES, and each is written so the SOURCE FILE never spells the token
+    // it forbids — which is the 187-24 trap, and it fired THREE times inside plan 01 of
+    // this phase and TWICE more inside this one. A fence that greps a file for a needle the
+    // file's own prose must name is a fence that can only go red.
+    //
+    // 1 · The CSS container-query route (D-206.1-12): refused because the Tailwind plugin
+    //     is not installed AND because jsdom evaluates no layout, so a width-driven shape
+    //     would be untestable by this very suite.
+    expect(connectionsTabSource).not.toContain("@container")
+    expect(connectionsTabSource).not.toContain("container-type")
+    expect(connectionsTabSource).not.toContain("tailwindcss/container-queries")
+
+    // 2 · The word-boundary break variant. A URL contains no spaces, so it would never
+    //     break and the cell would overflow exactly as before while looking fixed.
+    expect(connectionsTabSource).not.toContain(`break-${"words"}`)
+
+    // 3 · A `title` tooltip. The rendered-DOM fence above already asserts zero `[title]`
+    //     nodes; this catches an attribute added on a branch no fixture reaches.
+    expect(connectionsTabSource).not.toContain("title=")
+
+    // NON-VACUITY CONTROL — without it, a `?raw` import that silently resolved to the empty
+    // string would satisfy all six claims above forever. (Measured precedent:
+    // `gutterTokens.fences.test.ts` found exactly that failure mode for CSS under vitest.)
+    expect(connectionsTabSource.length).toBeGreaterThan(1000)
+    expect(connectionsTabSource).toContain("data-dense")
+    expect(connectionsTabSource).toContain(`break-${"all"}`)
+  })
+
+  it("no `<table>` primitive in EITHER shape (§15)", () => {
+    const denseRender = renderDense()
+    expect(denseRender.container.querySelector("table")).toBeNull()
+
+    cleanup()
+    const wideRender = renderWide()
+    expect(wideRender.container.querySelector("table")).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ 206.1 · AN MCP ROW ON THE TABLE — REMOVED, NOT DISABLED (D-206.1-19 / AR-05)
+//
+// ⚠ EVERY CLAIM HERE IS ASSERTED IN **BOTH** ROW SHAPES. Plan 02 split this component into
+// two interiors, and `renderTab` still defaults to WIDE — so a change made in one branch and
+// not the other passes any suite that renders only one of them. Both helpers below drive the
+// same props through the SAME one condition that opens the 400px track.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("206.1 · an MCP row's affordances and credential reading, in BOTH shapes", () => {
+  const MCP_NOW = Date.parse("2026-08-25T12:00:00.000Z")
+  const MCP_URL = "https://mcp.deepwiki.com/mcp"
+
+  const MCP_ROW: ConnectorConnection = makeConnection({
+    id: "conn-mcp",
+    name: "DeepWiki",
+    capability: null,
+    config: { headers: {} },
+    mcp_server_url: MCP_URL,
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+  })
+
+  /** A capability row beside it, so every negative below has a POSITIVE CONTROL rendered in
+   *  the same tree rather than in a different test. */
+  const CAPABILITY_ROW: ConnectorConnection = makeConnection({
+    id: "conn-smtp",
+    name: "Ops mailbox",
+    last_checked_at: null,
+    last_check_verdict: "not_checked",
+  })
+
+  const BOTH_ROWS = [MCP_ROW, CAPABILITY_ROW]
+
+  function renderMcpWide(props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {}) {
+    return renderTab({ connections: BOTH_ROWS, now: MCP_NOW, onCheck: vi.fn(), ...props })
+  }
+
+  /** ⚠ DENSE THROUGH THE REAL CONDITION — `panel && !isMobile`, never a prop poke. */
+  function renderMcpDense(props: Partial<React.ComponentProps<typeof ConnectionsTabView>> = {}) {
+    return renderMcpWide({ panel: <div data-testid="fake-panel" />, ...props })
+  }
+
+  const SHAPES = [
+    ["wide", renderMcpWide],
+    ["dense", renderMcpDense],
+  ] as const
+
+  function rowById(id: string): HTMLElement {
+    const row = screen
+      .getAllByTestId("connections-row")
+      .find((r) => within(r).queryByText(id === "conn-mcp" ? "DeepWiki" : "Ops mailbox"))
+    if (!row) throw new Error(`row ${id} not found`)
+    return row
+  }
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's ⋯ offers NO `Check credential`, and a capability row's still does",
+    async (_shape, renderIt) => {
+      const user = userEvent.setup({ delay: null })
+      renderIt()
+
+      // ⚠ REMOVED, NOT DISABLED. The check path is capability-shaped (an SMTP login, a Jira
+      // auth, a Slack `auth.test`) and has no MCP arm, so a rendered control the API refuses
+      // is exactly the defect this surface's rule exists to prevent — and 190-16's plant C
+      // measured that a `toBeDisabled()` assertion cannot see it.
+      await user.click(within(rowById("conn-mcp")).getByTestId("connections-row-more"))
+      expect(screen.queryByTestId("connections-action-check")).not.toBeInTheDocument()
+      // The other three items are untouched: the removal is scoped to the one that cannot work.
+      expect(screen.getByTestId("connections-action-disable")).toBeInTheDocument()
+      expect(screen.getByTestId("connections-action-delete")).toBeInTheDocument()
+      await user.keyboard("{Escape}")
+
+      // POSITIVE CONTROL, in the same tree.
+      await user.click(within(rowById("conn-smtp")).getByTestId("connections-row-more"))
+      expect(screen.getByTestId("connections-action-check")).toBeInTheDocument()
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's credential cell reads `no check for this kind`; a capability row's reads `never checked`",
+    (_shape, renderIt) => {
+      renderIt()
+      expect(
+        within(rowById("conn-mcp")).getByTestId("connections-row-credential").textContent,
+      ).toBe(CREDENTIAL_NO_CHECK_FOR_KIND)
+      // ⚠ EXACT EQUALITY, unchanged from the shipped pin — the dense inline label is a SIBLING
+      // of this node, which is what lets that pin hold in both shapes rather than be
+      // re-baselined.
+      expect(
+        within(rowById("conn-smtp")).getByTestId("connections-row-credential").textContent,
+      ).toBe("never checked")
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row's destination is its OWN host — never Slack's, which is the defect this repair fixed",
+    (_shape, renderIt) => {
+      renderIt()
+      const destination = within(rowById("conn-mcp")).getByTestId("connections-row-destination")
+      expect(destination.textContent).toContain("mcp.deepwiki.com")
+      // Seen on screen in live UAT on 2026-08-25, before `147f3c57`: an MCP row describing
+      // itself as sending to Slack's API host.
+      expect(destination.textContent).not.toContain(SLACK_FIXED_HOST)
+      expect(destination.textContent).not.toContain(CONNECTION_FIXED_TAG)
+    },
+  )
+
+  it.each(SHAPES)(
+    "[%s] an MCP row still reads `◌ Not checked` — AR-03: no fifth state word was invented",
+    (_shape, renderIt) => {
+      renderIt()
+      // Literally true: no check has happened. The WHY is carried by the Credential cell,
+      // at zero cost to the character-identity assertion over `CONNECTION_STATE_WORDS`.
+      expect(within(rowById("conn-mcp")).getByTestId("connections-row-state").textContent).toBe(
+        CONNECTION_STATE_WORDS.not_checked,
+      )
+    },
+  )
+
+  it("⚠ with no `onCheck` at all, NEITHER row offers the item — the shipped guard is not replaced", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: BOTH_ROWS, now: MCP_NOW, onCheck: undefined })
+    await user.click(within(rowById("conn-smtp")).getByTestId("connections-row-more"))
+    expect(screen.queryByTestId("connections-action-check")).not.toBeInTheDocument()
+  })
+
+  it("⚠ `destinationFactsOf` REGRESSION CONTROL — a synthetic fifth shape yields [] and never Slack's host", () => {
+    // SC#4's named subject. The arms are already explicit and the tail already neutral (the
+    // `147f3c57` repair); this is the guard that keeps them so.
+    for (const capability of ["not_a_capability", "send_emails", "constructor", "__proto__", ""]) {
+      const facts = destinationFactsOf(
+        makeConnection({
+          capability: capability as unknown as ConnectorConnection["capability"],
+          config: { default_channel: "#ops" } as unknown as ConnectorConnection["config"],
+          mcp_server_url: null,
+        }),
+      )
+      expect(facts).toEqual([])
+      expect(facts.join(" ")).not.toContain(SLACK_FIXED_HOST)
+    }
+    // POSITIVE CONTROL — the three real shapes and the MCP shape still resolve their own.
+    expect(
+      destinationFactsOf(makeConnection({ capability: "post_message", config: { default_channel: "#ops" } })),
+    ).toContain(SLACK_FIXED_HOST)
+    expect(
+      destinationFactsOf(
+        makeConnection({ capability: null, config: { headers: {} }, mcp_server_url: MCP_URL }),
+      ),
+    ).toEqual(["mcp.deepwiki.com"])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 209 (Item 3) · State-based filter chips and search matching
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("Phase 209 (Item 3) — state-based filter chips and query matcher", () => {
+  const TEST_ROWS: ConnectorConnection[] = [
+    makeConnection({
+      id: "conn-ready-slack",
+      name: "Slack Alerts",
+      capability: "post_message",
+      is_enabled: true,
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "conn-ready-mcp",
+      name: "DeepWiki Search",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/mcp",
+      is_enabled: true,
+      last_check_verdict: "ok",
+    }),
+    makeConnection({
+      id: "conn-failed-jira",
+      name: "Jira Tracker",
+      capability: "create_ticket",
+      is_enabled: true,
+      last_check_verdict: "failed",
+    }),
+    makeConnection({
+      id: "conn-disabled-smtp",
+      name: "Old Mailer",
+      capability: "send_email",
+      is_enabled: false,
+      last_check_verdict: "ok",
+    }),
+  ]
+
+  it("renders state-based filter chips: All, Connected, Not connected", () => {
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    expect(chips).toHaveLength(3)
+    expect(chips[0]).toHaveTextContent("All")
+    expect(chips[1]).toHaveTextContent("Connected")
+    expect(chips[2]).toHaveTextContent("Not connected")
+  })
+
+  it("filtering by Connected shows only ready rows (including MCP)", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[1]) // Connected
+
+    expect(screen.getByText("Slack Alerts")).toBeInTheDocument()
+    expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
+    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
+    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
+  })
+
+  it("filtering by Not connected shows failing, disabled, and unchecked rows", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[2]) // Not connected
+
+    expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
+    expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
+  })
+
+  it("search input matches name, capability, and mcp_server_url without hiding MCP rows", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderTab({ connections: TEST_ROWS })
+    const input = screen.getByTestId("connections-filter-input")
+
+    await user.type(input, "deepwiki")
+    expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
+    expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, "create_ticket")
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
   })
 })

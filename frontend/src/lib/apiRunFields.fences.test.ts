@@ -33,7 +33,7 @@
  * a fence that holds.
  */
 import { describe, it, expect } from "vitest"
-import apiSource from "@/lib/api?raw"
+import { API_SOURCE as apiSource } from "@/lib/apiSource.testutil"
 
 /** The single fixed literal embedded in each of the three cross-reference docblocks. */
 const MARKER = "WR-02-LOOKALIKE-LAST-RUN-STATUS"

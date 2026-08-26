@@ -304,6 +304,8 @@ export interface BuilderStoreState extends TrackedSlice {
    *  see its implementation docblock in the factory below. Writes exactly ONE `meta` key,
    *  and NEVER the key that identity, forks and versioning key off. */
   setName: (name: string) => void
+  /** Phase 205 (STATE-01 / D-07) — Toggle stateful / living register mode. */
+  setIsStateful: (isStateful: boolean) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -824,6 +826,15 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, name }, dirty: true })
+        },
+
+        /**
+         * Phase 205 (STATE-01 / D-07) — write is_stateful toggle on definition meta.
+         */
+        setIsStateful: (isStateful) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          set({ meta: { ...s.meta, is_stateful: isStateful }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

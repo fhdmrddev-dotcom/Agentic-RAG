@@ -185,6 +185,24 @@ _CIPHER_UNAVAILABLE = HTTPException(
 # by wording or by length. See `ConnectorNotFound`'s docstring in the service.
 _NOT_FOUND = HTTPException(status_code=404, detail="Connection not found")
 
+# Phase 209 close / audit B-1 — an MCP connection has NO capability, so there is no adapter to
+# check it with. This is a 409 stating a SHAPE fact, never a 500.
+#
+# ⚠ THE UI GUARD IS NOT THE FENCE. `ConnectionsTab.tsx:698` hid this control from the row menu
+# with `!isMcp`, and `ConnectionFormPanel.tsx` — the SAME control, one file over — never took
+# that decision, so the route was reachable from a shipped button. The route is reachable
+# without any UI at all, so the refusal belongs HERE and the guard there is defence in depth.
+_CHECK_NOT_AVAILABLE_FOR_MCP = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail={
+        "reason_code": "check_not_available_for_mcp",
+        "message": (
+            "This is an MCP connection, so there is no credential check to run. Bind it to a "
+            "step and use Discover tools to confirm the server answers."
+        ),
+    },
+)
+
 # ── the check action's two ADDITIONAL platform reason codes ──────────────────────────────
 # Same rule as `CIPHER_UNAVAILABLE_REASON` above and for the same reason: these are PLATFORM
 # refusals, deliberately NOT members of `egress.REFUSAL_REASONS` (a CLOSED six-row table
@@ -505,6 +523,17 @@ async def check_connection(
 
     capability = connection.capability
     config = dict(connection.config or {})
+
+    # Audit B-1 — refuse the MCP shape HERE, before `_check_destination` and `get_adapter` are
+    # reached. `registry.get_adapter` raises a BARE `KeyError` for anything outside the closed
+    # three-member capability set, and that `KeyError` is not in this route's `except` ladder
+    # below — so an MCP row (whose `capability` is NULL by construction, mig 126) produced an
+    # unhandled 500. Keyed on `mcp_server_url`, the same fact `connectionMark` resolves on, and
+    # never on `capability is None` — a capability-less row that is ALSO not MCP is a different
+    # defect and must not be silently absorbed by this arm.
+    if connection.mcp_server_url:
+        raise _CHECK_NOT_AVAILABLE_FOR_MCP
+
     host, port = _check_destination(capability, config)
 
     # Lazily imported INSIDE the handler, and that is a DECISION rather than an oversight.
@@ -569,3 +598,59 @@ async def check_connection(
         provider_message=provider_message,
         reason_code=reason_code,
     )
+
+
+@router.post(
+    "/connections/{connection_id}/discover",
+    response_model=list[dict],
+    dependencies=[Depends(require_org_manage)],
+    summary="Discover available tools from a remote MCP server",
+)
+async def discover_tools(
+    connection_id: str,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> list[dict]:
+    """Phase 206 (D-206-05) — Discover available tools from the connection's MCP server."""
+    try:
+        return await connector_service.discover_connection_tools(
+            str(connection_id), org_id=str(active_org), supabase=supabase
+        )
+    except connector_service.ConnectorNotFound:
+        raise _NOT_FOUND
+    except connector_service.ConnectorCipherUnavailable:
+        raise _CIPHER_UNAVAILABLE
+    except connector_service.ConnectorSecretNotEncrypted:
+        raise _CREDENTIAL_UNREADABLE
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"MCP tool discovery failed: {exc}",
+        ) from exc
+
+
+@router.patch(
+    "/connections/{connection_id}/grants",
+    response_model=ConnectorConnectionResponse,
+    dependencies=[Depends(require_org_manage)],
+    summary="Update per-tool permission grants for an MCP connection",
+)
+async def update_grants(
+    connection_id: str,
+    tool_grants: dict[str, bool],
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> ConnectorConnectionResponse:
+    """Phase 206 (F-1 / D-206-06) — Update boolean tool permission grants."""
+    try:
+        return await connector_service.update_connection_grants(
+            str(connection_id),
+            org_id=str(active_org),
+            tool_grants=tool_grants,
+            supabase=supabase,
+        )
+    except connector_service.ConnectorNotFound:
+        raise _NOT_FOUND
+

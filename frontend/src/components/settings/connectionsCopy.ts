@@ -79,6 +79,30 @@ export const CONNECTIONS_COLUMNS = [
   "State",
 ] as const
 
+/**
+ * ── THE TWO DENSE INLINE LABELS (206.1-02, item 2 · D-206.1-20) ─────────────────────────
+ *
+ * When the 400px panel opens, the list track drops to ~302px and the row reflows into three
+ * stacked lines. Stacked cells form no aligned columns, so the five-word HEADER above is not
+ * rendered in that shape — it would label a grid that is not there. `Used by` and
+ * `Credential` are the two cells whose reading depends on that header (`2 steps` and
+ * `3d ago` name nothing on their own), so each gains a visible inline label instead.
+ *
+ * ⚠ DERIVED, NEVER RE-TYPED. The dense inline label and the wide column header are THE SAME
+ * WORD, and deriving one from the other is what makes the two shapes structurally unable to
+ * disagree — a re-typed `"Used by"` is a second home for one string, and a later edit to the
+ * header would silently leave the dense label behind. `CONNECTIONS_COLUMNS` is `as const`,
+ * so each constant below carries the literal type rather than `string`.
+ *
+ * ⚠ AND THE LABEL IS RENDERED AS A SIBLING OF THE TESTID'D VALUE NODE, NEVER INSIDE IT.
+ * `ConnectionsTab.test.tsx` asserts `connections-row-credential`'s textContent
+ * `.toBe("never checked")` by EXACT EQUALITY and anchors `/^checked /` at the start. Keeping
+ * the label outside is what keeps the value node character-identical in BOTH shapes, so that
+ * shipped pin holds for dense too instead of being re-baselined.
+ */
+export const CONNECTIONS_DENSE_LABEL_USED_BY = CONNECTIONS_COLUMNS[2]
+export const CONNECTIONS_DENSE_LABEL_CREDENTIAL = CONNECTIONS_COLUMNS[3]
+
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 2 · THE FOUR STATE WORDS (155-C, locked — must read in greyscale)
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -123,13 +147,17 @@ export function connectionStateOf(connection: ConnectorConnection): ConnectionSt
 export const CONNECTIONS_FILTER_PLACEHOLDER = "Filter connections…"
 export const CONNECTIONS_FILTER_LABEL = "Filter connections by name or destination"
 
-/** The chip rail. `null` is the All chip — every other member is a capability, so the rail
- *  can never drift from the closed capability set the backend and mig 116 both hold. */
-export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{ capability: string | null; label: string }> = [
-  { capability: null, label: "All" },
-  { capability: "send_email", label: "Email" },
-  { capability: "create_ticket", label: "Tickets" },
-  { capability: "post_message", label: "Messages" },
+export type ConnectionFilterState = "ready" | "not_connected" | null
+
+/** The chip rail — state-based filtering following Claude.ai Connectors reference.
+ *  `null` is the All chip. Every kind of connection (including MCP) is filterable by state. */
+export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{
+  state: ConnectionFilterState
+  label: string
+}> = [
+  { state: null, label: "All" },
+  { state: "ready", label: "Connected" },
+  { state: "not_connected", label: "Not connected" },
 ]
 
 /**
@@ -143,15 +171,21 @@ export function connectionsCountLabel(shown: number, total: number, filtered: bo
 }
 
 /**
- * Does this row match the typed text? Matches name, destination and detail (§2d) — never
- * the row id, which is a wire value no author ever types, and never any config key whose
- * value could be sensitive: the reader below is an explicit allow-list of destination
- * facts, not a walk of the whole config object.
+ * Does this row match the typed text? Matches name, destination, capability, and MCP URL (§2d) —
+ * never the row id, which is a wire value no author ever types, and never any config key whose
+ * value could be sensitive.
  */
 export function connectionMatchesQuery(connection: ConnectorConnection, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  const haystack = [connection.name, ...destinationFactsOf(connection)].join(" ").toLowerCase()
+  const mcpUrl = typeof connection.mcp_server_url === "string" ? connection.mcp_server_url : ""
+  const cap = typeof connection.capability === "string" ? connection.capability : ""
+  const haystack = [
+    connection.name,
+    cap,
+    mcpUrl,
+    ...destinationFactsOf(connection),
+  ].join(" ").toLowerCase()
   return haystack.includes(q)
 }
 
@@ -177,6 +211,26 @@ export const CONNECTION_FIXED_TAG = "fixed"
  * degrades to an empty cell rather than to a compile error in an unrelated file. This is
  * the same derivation `ConnectionPicker.destinationPartsOf` performs at the builder seam —
  * one mark, one shape, three surfaces (§6d).
+ *
+ * ── ⚠ TWO SPELLINGS OF ONE RULE, RECORDED 2026-08-25 (Phase 206.2 / D-206.2-20) ──
+ * That last sentence understates the situation, and the understatement is the finding. This
+ * function and `ConnectionPicker.destinationPartsOf` are not merely similar: they are TWO
+ * SPELLINGS OF ONE RULE, living in two different component subtrees. The proof is that they
+ * shipped the SAME defect and were repaired one phase apart — a trailing POSITIONAL return
+ * that described every MCP row as sending to Slack, fixed here as 206.1's own SC#4 and, in the
+ * workflows spelling, only when Phase 206.2 made that arm reachable for the first time. One
+ * rule in two places drifts by construction; the only question is which copy is found first.
+ *
+ * ⚠ THIS PHASE DELIBERATELY DOES NOT MERGE THEM, and that is a decision rather than an
+ * oversight. Merging crosses two component subtrees and is a refactor Phase 206.2 was not
+ * scoped for; doing it quietly inside a repair would put an unreviewed cross-subtree
+ * dependency into a governance surface. Recording the drift is the honest first step.
+ *
+ * ⚠ THE BODY BELOW IS UNTOUCHED BY 206.2 — this surface is 206.1's and is verified. Only the
+ * prose above is new, and its twin note landed in the SAME COMMIT: a note in only one of the
+ * two files is exactly the drift the same-commit rule exists to forbid.
+ * RE-OPEN TRIGGER: *the first phase whose `files_modified` names BOTH files, or a third
+ * surface needing the same footer.*
  */
 export function destinationFactsOf(connection: ConnectorConnection): string[] {
   const config = connection.config as unknown as Record<string, unknown>
@@ -190,10 +244,35 @@ export function destinationFactsOf(connection: ConnectorConnection): string[] {
   if (connection.capability === "create_ticket") {
     return [text("base_url"), text("project_key")].filter(Boolean)
   }
-  const channel = text("default_channel")
-  return [SLACK_FIXED_HOST, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
-    Boolean,
-  )
+  // ⚠ AN MCP CONNECTION HAS NO CAPABILITY, AND ITS DESTINATION IS ITS OWN URL. Before this
+  // arm existed the ladder below was POSITIONAL — a trailing `return` rather than a branch —
+  // so every row that was not `send_email` or `create_ticket` was described as sending to
+  // Slack. Seen on screen in live UAT (2026-08-25): a connection pointed at
+  // `https://mcp.deepwiki.com/mcp` rendered its destination as `slack.com/api`.
+  //
+  // That is not a cosmetic slip on this surface. This column is the ONE place a person is
+  // told where their organisation's data is about to go, and a governed send is approved on
+  // the strength of it. A row naming the wrong host is worse than a row naming none.
+  if (connection.mcp_server_url) {
+    const url = connection.mcp_server_url
+    // Host only — the path is the server's business and the host is the fact being approved.
+    // No URL parser: a malformed value must still render SOMETHING true rather than throw,
+    // and the raw string is the truest thing available when it cannot be split.
+    const host = url.replace(/^https?:\/\//, "").split("/")[0]
+    return [host || url].filter(Boolean)
+  }
+
+  // ⚠ EXPLICIT, NOT POSITIONAL. The Slack arm now names the capability it serves, so the next
+  // capability added to the closed set gets an EMPTY destination list — which renders as
+  // "none you can see" — instead of silently inheriting Slack's host.
+  if (connection.capability === "post_message") {
+    const channel = text("default_channel")
+    return [SLACK_FIXED_HOST, channel ? (channel.startsWith("#") ? channel : `#${channel}`) : ""].filter(
+      Boolean,
+    )
+  }
+
+  return []
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -285,6 +364,46 @@ export function credentialLabel(
   const t = Date.parse(lastCheckedAt)
   if (!Number.isFinite(t)) return CREDENTIAL_NEVER_CHECKED
   return `checked ${relativeTime(now - t)}`
+}
+
+/**
+ * 206.1 / AR-05 — the reading for a row that can NEVER be checked.
+ *
+ * ⚠ *NOBODY HAS CHECKED IT* AND *IT CANNOT BE CHECKED* ARE TWO DIFFERENT FACTS. D-206.1-19
+ * REMOVES `Check credential` from an MCP row, because the check path is capability-shaped
+ * (SMTP login / Jira auth / Slack `auth.test`) and has no MCP arm at all. So an MCP row would
+ * read `never checked` for the rest of its life while the affordance that would change that
+ * does not exist — one word standing in for two facts, which is the `runFacts.ts` CR-01 /
+ * `DecisionsList` D-20 defect for the fifth recorded time on this codebase.
+ */
+export const CREDENTIAL_NO_CHECK_FOR_KIND = "no check for this kind"
+
+/**
+ * The credential cell's reading, by SHAPE.
+ *
+ * ⚠ A ROUTER, NOT A SECOND IMPLEMENTATION. `credentialLabel` above is left BYTE-IDENTICAL and
+ * is still the only place a timestamp is read, so every pinned unit call on it — and the wide
+ * row's `outerHTML` byte-identity capture, taken by plan 02 before this function existed —
+ * stays intact rather than being re-baselined. On the surface whose whole lesson is that a
+ * re-baselined pin is not evidence, that is the point.
+ *
+ * ⚠ THE MCP ARM IS UNCONDITIONAL AND IGNORES `last_checked_at` DELIBERATELY. There is no path
+ * that writes one for an MCP row today; if a stale or hand-written value ever appeared, it
+ * still would not be a check of THIS kind, and rendering `checked 3h ago` from it would be the
+ * fabricated-timestamp error `credentialLabel` refuses one line up.
+ *
+ * ⚠ THE SHAPE IS READ FROM `mcp_server_url`, NEVER FROM A MISSING CAPABILITY (D-206.1-11).
+ *
+ * ⚠ THIS IS COPY PLUS ONE PURE DERIVATION ARM — NOT A CAPABILITY. No control, no endpoint,
+ * nothing new reachable. Re-open trigger, recorded rather than left implicit: *`Check
+ * credential` gains an MCP arm*, at which point this string becomes wrong and must go.
+ */
+export function credentialReadingOf(
+  connection: ConnectorConnection,
+  now: number = Date.now(),
+): string {
+  if (connection.mcp_server_url) return CREDENTIAL_NO_CHECK_FOR_KIND
+  return credentialLabel(connection.last_checked_at, now)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════

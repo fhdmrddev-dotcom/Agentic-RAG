@@ -1,0 +1,82 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────────────
+# commit-msg — cap the commit message at CAP content lines.
+#
+# ⚠ WHY THIS EXISTS, measured rather than asserted. On 2026-08-24 a single session wrote
+#   369 lines of commit message across 14 commits — an average of 26, with two at 44 and
+#   43 — after promising to keep them at ~6. The intention did not hold. What DID hold,
+#   in the same session, was a mechanical gate: `check-claude-md-size.cjs` refused an edit
+#   that pushed CLAUDE.md to 118,135 chars and the prose was moved to its detail file
+#   within the minute.
+#
+#   So this is the same shape. A rule nobody enforces is a preference; a rule that
+#   refuses is a rule.
+#
+# ⚠ THE NARRATIVE IS NOT BEING DELETED, IT IS BEING MOVED. Long-form reasoning belongs in
+#   the phase's `SUMMARY.md` — the GSD artifact designed to hold it, read on purpose by
+#   someone who wants it. A commit message is read by everyone scanning `git log`, which
+#   is exactly the wrong place to make them pay for it.
+#
+# Counted: non-empty, non-comment lines, EXCLUDING trailers (Co-Authored-By, Signed-off-by)
+#          — CLAUDE.md REQUIRES the Co-Authored-By trailer, so charging for it would make
+#          the cap unmeetable by its own rules.
+#
+# Skipped: merges, reverts, fixup!/squash! — none of those bodies is authored here.
+#
+# Escape hatch, deliberately WORDED rather than silent:
+#     GSD_LONG_COMMIT="<why this one needs the room>" git commit ...
+#   It prints the reason, so a waved-through commit can never look like a compliant one.
+# ─────────────────────────────────────────────────────────────────────────────────────
+set -e
+
+CAP=12
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+
+SUBJECT=$(sed -n '1p' "$MSG_FILE")
+
+# ── Bodies this hook did not author ──────────────────────────────────────────────────
+case "$SUBJECT" in
+  Merge\ *|Revert\ *|fixup!*|squash!*|amend!*) exit 0 ;;
+esac
+# A merge in progress: git also passes "merge" as $2 in some flows.
+[ "$2" = "merge" ] && exit 0
+
+# ── Count ────────────────────────────────────────────────────────────────────────────
+COUNT=$(
+  grep -v '^#' "$MSG_FILE" \
+    | grep -v '^[[:space:]]*$' \
+    | grep -viE '^(Co-Authored-By|Signed-off-by|Reviewed-by|Reported-by):' \
+    | wc -l | tr -d ' '
+)
+
+[ "$COUNT" -le "$CAP" ] && exit 0
+
+# ── Over the cap ─────────────────────────────────────────────────────────────────────
+if [ -n "$GSD_LONG_COMMIT" ]; then
+  echo ""
+  echo "commit-msg: ALLOWED WITH OVERRIDE — ${COUNT} content lines (cap ${CAP})."
+  echo "  reason: ${GSD_LONG_COMMIT}"
+  echo ""
+  exit 0
+fi
+
+echo "" >&2
+echo "commit-msg REFUSED — ${COUNT} content lines, cap is ${CAP}." >&2
+echo "" >&2
+echo "  Subject: ${SUBJECT}" >&2
+echo "" >&2
+echo "  The detail is not unwanted, it is in the wrong file. Put the reasoning in the" >&2
+echo "  phase's SUMMARY.md, where it is read on purpose. A commit message is read by" >&2
+echo "  everyone scanning git log." >&2
+echo "" >&2
+echo "  Keep in the message: WHAT changed, and any measured surprise." >&2
+echo "  Move to SUMMARY.md: derivations, counterfactuals, tables, superseded claims." >&2
+echo "" >&2
+echo "  Trailers (Co-Authored-By, Signed-off-by) are NOT counted." >&2
+echo "  Merges, reverts and fixup!/squash! are skipped entirely." >&2
+echo "" >&2
+echo "  If this one genuinely needs the room, say why:" >&2
+echo "    GSD_LONG_COMMIT=\"<reason>\" git commit ..." >&2
+echo "" >&2
+exit 1

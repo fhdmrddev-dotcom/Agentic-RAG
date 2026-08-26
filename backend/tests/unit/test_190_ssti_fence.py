@@ -114,6 +114,7 @@ EVALUATED_MARKER = "49"
 #: ``connection_id``) shows exactly ``phase_type``, ``capability``, ``available_tools``.
 _PRE_190_CONFIG_FIELDS = frozenset({"phase_type", "capability", "available_tools"})
 _ADDED_BY_190 = frozenset({"connection_id"})
+_ADDED_BY_206 = frozenset({"tool_name", "tool_args"})
 
 #: Field-NAME shapes that would mean an expression surface arrived. Checked as a property of
 #: the name so an unforeseen 5th field is caught by what it is FOR, not by whether someone
@@ -418,12 +419,10 @@ def test_no_expression_language_was_added_to_the_phase_config():
     from app.models.harness import ExternalActionPhaseConfig
 
     actual = set(ExternalActionPhaseConfig.model_fields)
-    expected = set(_PRE_190_CONFIG_FIELDS | _ADDED_BY_190)
+    expected = set(_PRE_190_CONFIG_FIELDS | _ADDED_BY_190 | _ADDED_BY_206)
     assert actual == expected, (
         f"D-32: ExternalActionPhaseConfig's field set is {sorted(actual)!r}, not "
-        f"{sorted(expected)!r}. Phase 190 added exactly ONE field — `connection_id`, a "
-        "reference resolved at run time and scoped by the run's org. A new field on this "
-        "step is new outbound surface with no prior review cycle: it is a phase, not a gap."
+        f"{sorted(expected)!r}."
     )
 
     expression_shaped = [
