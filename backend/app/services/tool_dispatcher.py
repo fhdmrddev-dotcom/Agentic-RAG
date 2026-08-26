@@ -719,15 +719,22 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         # and it does not reach the phase record the author reads. Returning an explicit
         # unavailable result puts the reason where a person will meet it.
         logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
-        return ToolResult(result=json.dumps({
-            "error": "retrieval_unavailable",
-            "detail": (
-                f"The document search could not run — the search provider returned: {exc}. "
-                "This is NOT a result of zero matches: your documents were never queried. "
-                "Say plainly that document search is unavailable; do not state or imply "
-                "that the knowledge base contains no relevant information."
-            ),
-        }))
+        return ToolResult(
+            result=json.dumps({
+                "error": "retrieval_unavailable",
+                "detail": (
+                    f"The document search could not run — the search provider returned: {exc}. "
+                    "This is NOT a result of zero matches: your documents were never queried. "
+                    "Say plainly that document search is unavailable; do not state or imply "
+                    "that the knowledge base contains no relevant information."
+                ),
+            }),
+            citations=[{
+                "is_error": True,
+                "retrieval_status": "provider_error",
+                "detail": str(exc),
+            }],
+        )
     # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
     # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
     # clip is the in-app guard for bugs / future tool paths (D-05/D-06). Gated on

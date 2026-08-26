@@ -745,7 +745,7 @@ def test_search_documents_provider_failure_is_not_reported_as_zero_results(monke
     # `no relevant documents` is the exact string the SUCCESS path emits on 0 hits
     # (`tool_dispatcher._handle_search_documents`), and the two must never collide.
     assert "no relevant documents" not in out.result.lower()
-    assert out.citations == [] and out.source_refs == []
+    assert len(out.citations) == 1 and out.citations[0]["is_error"] is True and out.source_refs == []
 
 
 def test_search_documents_provider_failure_does_not_raise_into_the_agent_loop(monkeypatch):

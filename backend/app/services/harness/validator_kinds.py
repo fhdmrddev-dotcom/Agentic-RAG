@@ -286,11 +286,24 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
     # ``mode == "presence"`` both Phase-185 conditionals below are False, so the
     # executed lines and the emitted message are exactly what they were.
     if mode in ("presence", "retrieved_and_cited"):
+        raw_citations = output.get("citations") or []
+        # Phase 210 (RAG-09 / BUG-260815-05) — Provider failure honesty.
+        # If any citation carries an error object, report an honest provider outage rather
+        # than blaming model non-compliance or reporting 0 sources.
+        error_cit = next((c for c in raw_citations if isinstance(c, dict) and c.get("is_error")), None)
+        if error_cit:
+            provider = error_cit.get("provider") or "retrieval provider"
+            detail = error_cit.get("detail") or "service unavailable"
+            return GateResult(
+                False,
+                f"citations_required: retrieval failed ({provider}: {detail}) — this is a service outage, not model non-compliance",
+            )
+
         # Phase 185 half (a) — real retrieval evidence, checked FIRST so a step that
         # retrieved nothing gets the honest reason rather than a marker count. The
         # ONE key this half reads is stated in the docstring above, along with the
         # sibling it must never read and why.
-        if mode == "retrieved_and_cited" and not (output.get("citations") or []):
+        if mode == "retrieved_and_cited" and not raw_citations:
             return GateResult(
                 False,
                 "citations_required: nothing was retrieved (0 sources) — this step "
