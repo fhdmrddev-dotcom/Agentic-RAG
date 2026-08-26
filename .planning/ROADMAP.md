@@ -115,7 +115,7 @@ it.*
 | Phase | Name | Goal | Requirements | SC# | Flags |
 |-------|------|------|--------------|-----|-------|
 | 210 | Ground Truth — Operability & Failure Honesty | The install honestly reports and controls its own external-action, scheduling and retrieval state — before anything new is connected to it | CONN-09, CONN-10, CONN-11, RAG-09 | 5 | Closes 5 bugs incl. ⛔ `BUG-260815-05`; **G-5** (`api/admin.py` — 32/12/1733, ⚠ **absent from the ledger at 12 phases**); UI hint; SC#10 **embedding roster** (not the chat roster); no threat model; no migration expected |
-| 211 | The Connection Is a Service, Not a Verb | A connection is created against a service and its actions come from that service's own advertised tools; the three legacy verbs survive as one shape among many and organise nothing | CONN-04, CONN-05, CONN-08 | 4 | ⭐ **PREREQUISITE (`SEED-207`)** — blocks 212 / 214 / 216; **G-5** (`phase_types.py`, `grounding.py`, `models/connector.py`) — the retire IS the refactor; **migration 127** (drop mig 126's CHECK + service identity); widen the `mcp_client` sanitizer (`title` / `outputSchema`); light threat model (CHECK relaxation) |
+| 211 | The Connection Is a Service, Not a Verb | A connection is created against a service and its actions come from that service's own advertised tools; the three legacy verbs survive as one shape among many and organise nothing | CONN-04, CONN-05, CONN-08 | 5 | ⭐ **PREREQUISITE (`SEED-207`)** — blocks 212 / 214 / 216; **G-5** (`phase_types.py`, `grounding.py`, `models/connector.py`) — the retire IS the refactor; **migration 127** (drop mig 126's CHECK + service identity); widen the `mcp_client` sanitizer (`title` / `outputSchema`); light threat model (CHECK relaxation) |
 | 212 | The Catalog and Its Doors | A person finds a service the way they find an app — by mark, name and purpose — and adds one from a Popular row or by pasting a URL, on every install including cloud | CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07 | 5 | **G-2 sketch** (`screenshots/` is the bar); **G-5 ×4** (`ConnectionsTab.tsx`, `ConnectionFormPanel.tsx`, `connectionsCopy.ts`, `connectionFormCopy.ts` — **all four fire**); closes `BUG-260810-01`; **threat model** (custom-URL door = SSRF / egress); fixes `mcp_client.py:220` blocking DNS (D-v2.5-01); UI hint |
 | 213 | Per-Tool Grants and the Approval Moment | Each tool of a connection is granted or denied individually, and a tool whose posture requires approval stops and asks a real person before anything leaves | GRANT-01..05 | 5 | ⭐ **HARD PREREQUISITE for 216**; **G-2 sketch** (grant list + approval moment); ⚠ **G-1 risk** — 2nd consecutive phase on `ConnectionFormPanel.tsx`; **threat model** (the trust boundary of this milestone); SC#10 (pauses a live run); builds on 206.2 `tool_grants` + Phase 085 `ask_user` — **extend, do not regress**; migration likely (posture column) |
 | 214 | A Step Names Its Service and Its Action | An author adds an external step by picking a service and a named action, the step's arguments arrive from whatever launched the run, publish refuses one nothing can satisfy, and every run surface says which service and action it was | STEP-01..06 | 5 | Closes ⛔ `BUG-260826-01` + `-02` + `-05`; **G-2 sketch** (step picker, canvas + run faces); **G-5 ×3** (`ConnectionPicker.tsx`, `ExternalActionSection.tsx`, `phase_types.py`) + `McpToolPicker.tsx` (⚠ **no ledger row of its own**); **threat model** (publish gate + argument provenance); SC#10; ⚠ **launch decision owed on `visual_workflow_canvas`** (cold default `off`) |
@@ -164,12 +164,14 @@ it.*
   3. A user browsing, filtering or picking a connection is never offered `Message` / `Ticket` / `Email` as a category — the verb survives as an attribute of one shape, and organises nothing (CONN-05).
   4. A connection row for a service with **neither a capability nor an MCP URL** saves successfully (CONN-08).
 
-**Plans**: 3 plans in 3 waves (a genuine `depends_on` chain, not three concerns)
+**Plans**: 5 plans in 4 waves — waves 1-2 are a genuine `depends_on` chain, **wave 3 is a genuine PARALLEL pair** (211-03 settings ∥ 211-04 workflows, zero `files_modified` overlap), and 211-05 depends on both
 
 Plans:
 - [ ] 211-01-PLAN.md - one shape: static tool descriptors derived from each adapter's own INPUT_SCHEMA, the sanitizer widened by `title` + `outputSchema`, and all seven closed-set spellings enumerated (incl. migration 116's SQL CHECK, held by nothing executable until now)
-- [ ] 211-02-PLAN.md - migration 127: `service_id` + backfill + the stated replacement guarantee (identity mandatory, the two shapes mutually exclusive) + the column GRANT; the five-point column lockstep and the third arm in `_validate_connection_shape`. [BLOCKING] operator paste + `regenerate-full-schema.sh`
-- [ ] 211-03-PLAN.md - the verb organises nothing: the create flow names a service, every picker reads the tool list rather than the endpoint, the SC#3 negative fence, both count-gate knobs, the seam test that mocks neither side, and the ledger rows
+- [ ] 211-02-PLAN.md - migration 127: `service_id` + backfill + ⭐ the §2b **descriptor backfill** that makes SC#2 true for the two rows that already exist + the stated replacement guarantee + the column GRANT; the five-point column lockstep, the third arm in `_validate_connection_shape`, and the `lib/api/org.ts` wire contract wave 3 compiles against. [BLOCKING] operator paste + `regenerate-full-schema.sh`
+- [ ] 211-03-PLAN.md - the create flow names a SERVICE: the three-verb chooser leaves the source, an unheard-of service saves with no capability key, no per-vendor branch enters the tree (settings only)
+- [ ] 211-04-PLAN.md - ⭐ the pickers read the tool list, never the endpoint: one unscoped read lists every shape, the browse axis goes, and **an empty action list keeps its Refresh control on EVERY shape** — the closed loop plan review caught (workflows only)
+- [ ] 211-05-PLAN.md - the two absences proved: the SC#3 source fence, **both halves of the seam** (backend data + frontend render, each naming the other), both count-gate knobs, five owed ledger rows, and the per-shape G-4 board
 
 **UI hint**: yes
 **Flags**: ⭐ **PREREQUISITE — `SEED-207`.** **G-5, and this phase IS the refactor**: `phase_types.py` (45/20/2621 — fires; the 200-03 extraction was taken, the file stays hot), `harness/grounding.py` (19/6/1311 — fires; `EXTERNAL_ACTION_CAPABILITIES` is the runtime home of the closed set), `models/connector.py`. ⚠ **`capability` is spelled in FOUR places held in agreement by two module-scope `assert`s** — migration 116's `CHECK`, `grounding.EXTERNAL_ACTION_CAPABILITIES`, `ConnectorCapability`, `ExternalActionPhaseConfig.capability`. That machinery is *good engineering of the wrong model*; **do not add a fifth verb**. The industry replacement is **service → (resource, operation)** as free text on the discovered-tool list, with the closed set moving to the **per-tool grant**, which is data and already ships. **Migration 127** (head is 126): drop mig 126's `CHECK`, add service identity. Apply by pasting into the Supabase SQL editor, then `bash scripts/regenerate-full-schema.sh`. **Widen the `mcp_client` sanitizer allow-list** (`mcp_client.py:293-296`) to carry `title` and `outputSchema` — ⚠ **widen the list, never remove it**; a raw passthrough puts server-controlled keys into `discovered_tools` JSONB. `title` feeds Phase 212's catalog label; `outputSchema` feeds Phase 214's argument satisfiability. ⚠ **`annotations` / `readOnlyHint` may be carried but MUST NOT be depended on** — measured absent in the wild, and per spec a hint from an untrusted server may never *widen* a permission. Light threat model (relaxing a `CHECK` is removing a database-level guarantee — say what replaces it). D-14 red line: no new executor.
@@ -268,7 +270,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 210. Ground Truth — Operability & Failure Honesty | 0/? | Not started | - |
-| 211. The Connection Is a Service, Not a Verb | 0/? | Not started | - |
+| 211. The Connection Is a Service, Not a Verb | 0/5 | Not started | - |
 | 212. The Catalog and Its Doors | 0/? | Not started | - |
 | 213. Per-Tool Grants and the Approval Moment | 0/? | Not started | - |
 | 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
@@ -276,7 +278,7 @@ Plans:
 | 216. Connections in Chat, and One File In by Hand | 0/? | Not started | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
-Counts by phase: 210 → 4 · 211 → 3 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
+Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
 
 **Guardrails firing (v3.9):**
 

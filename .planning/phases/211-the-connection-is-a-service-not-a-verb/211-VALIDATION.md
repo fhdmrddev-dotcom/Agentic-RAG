@@ -78,13 +78,19 @@ Phase 196 measured `failed 249` that was entirely REAL (missing mock exports).
 | SC / Decision | Behavior to prove | Test Type | Automated Command | Exists? | Status |
 |---|---|---|---|---|---|
 | **SC#1** | The three-verb `<select>` is gone from the create flow | unit (FE) | `npx vitest run src/components/settings/__tests__/ConnectionFormPanel.test.tsx -t "capability"` | ✅ — **assertion inverts**: `queryByTestId("connection-capability-chooser")` → `toBeNull()` | ⬜ |
-| **SC#1** | Actions offered come from the connection's own advertised tools | unit (FE) | `npx vitest run src/components/workflows/McpToolPicker.reachability.test.tsx` | ✅ 11 cases — ⚠ **needs a legacy-shaped fixture that does not exist today** | ⬜ |
+| **SC#1** | Actions offered come from the connection's own advertised tools | unit (FE) | `npx vitest run src/components/workflows/McpToolPicker.reachability.test.tsx` | ✅ 11 cases — ⚠ **needs a legacy-shaped fixture that does not exist today**; and leg (b) must be RE-POINTED (its `pressMcpShape` helper dies with the shape radiogroup) rather than deleted — claimed by `211-04` Task 3(g) | ⬜ |
+| **D-211-12** | ⚠ **POSITIVE CONTROL 2** (`reachability.test.tsx:192-203`) asserts a bound capability row mounts NO tool picker — it pins the DEFECT and stays green after the phase | unit (FE), **inverted control** | same file | ❌ must INVERT — claimed by `211-04` Task 3(g)(2). ⚠ *A control that stays green while the criterion is false is worse than no control* | ⬜ |
 | **SC#1** | A static descriptor is byte-shaped like a sanitized MCP tool | unit (BE) | `pytest tests/unit/test_211_static_descriptors.py -q` | ❌ **Wave 0** | ⬜ |
 | **SC#1 / D-211-06** | The descriptor's `required` equals the adapter's `INPUT_SCHEMA["required"]`, all three, **derived not retyped** | unit (BE), module-scope assert | same file | ❌ **Wave 0** — the mechanical-agreement assert | ⬜ |
 | **SC#2** | Slack still sends: `ok:true` ⇒ `AdapterResult.ok` | unit (BE) | `pytest tests/unit/test_190_slack_ok_false.py -q` | ✅ 18 — **green untouched** | ⬜ |
 | **SC#2** | Jira / SMTP argument refusals unchanged | unit (BE) | `pytest tests/unit/test_190_jira_adapter.py tests/unit/test_190_smtp_header_injection.py -q` | ✅ 17 + 13 — **green untouched** | ⬜ |
 | **SC#2** | The executor's two-shape branch still refuses an unknown capability | unit (BE) | `pytest tests/unit/test_190_review_fix_executor.py -q` | ✅ 8 — will change; **the refusal case must remain** | ⬜ |
-| **SC#2** | A legacy row **presents** as a service with named actions | integration, **mocks NEITHER side** (`AGENTS.md §3.1`) | new | ❌ **Wave 0** | ⬜ |
+| **SC#2** | A legacy row **presents** as a service with named actions — DATA half | integration, **mocks NEITHER side** (`AGENTS.md §3.1`) | `pytest tests/integration/test_211_service_shape_seam.py -q` | ❌ **Wave 0** — claimed by `211-05` Task 2 | ⬜ |
+| **SC#2 / D-211-12** | ⭐ A legacy row **presents** as a service with named actions — RENDER half. And a row whose action list is **EMPTY** still renders its card, its in-words empty state and a pressable Refresh, on EVERY shape | unit (FE), **renders against the REAL wire shape** | `npx vitest run src/components/workflows/__tests__/connectionCardReachability.test.tsx` | ❌ **Wave 0** — claimed by `211-05` Task 1(b). ⚠ **A backend-only seam test structurally cannot see a render gate** — revision iteration 1 caught a proposed gate that made every pre-existing row unreachable | ⬜ |
+| **SC#2** | Every pre-existing capability row carries a one-element `discovered_tools` naming its own capability, the moment migration 127 lands | integration (DB) | `pytest tests/test_migration_127.py -q` (case 5) | ❌ **Wave 0** — claimed by `211-02` Task 1(b). ⚠ Without the §2b backfill, SC#2 is FALSE for every row that exists today | ⬜ |
+| **SC#2** | The SQL backfill's descriptor JSON equals the Python descriptor | unit (BE), **cross-language source fence, NEVER skips** | `pytest tests/test_migration_127.py -k backfill_matches -q` | ❌ **Wave 0** — claimed by `211-02` Task 1(b) case 6 | ⬜ |
+| **SC#2 / self-heal** | The capability arm of `POST /connections/{id}/discover` refreshes an action list with no network call | integration | `pytest tests/integration/test_211_service_shape_seam.py -q` (case 6) | ❌ **Wave 0** — claimed by `211-05` Task 2(a). ⚠ Its ONLY caller in the product is the Refresh control `211-04` un-gates | ⬜ |
+| **Regression** | An MCP connection with `discovered_tools: []` still shows a clickable Discover control | unit (FE) | `npx vitest run src/components/workflows/McpToolPicker.test.tsx` | ✅ exists at `~:194-215` — **must stay green and must NOT be rewritten** (`211-04` Task 1(d)) | ⬜ |
 | **SC#3** | No `Message`/`Ticket`/`Email` category offered anywhere | unit (FE), **negative fence** | `npx vitest run src/components/settings src/components/workflows -t "category"` | ❌ **Wave 0** — model on the `?raw` cross-language fence at `ExternalActionSection.tsx:38`, don't invent one | ⬜ |
 | **SC#3** | The picker's read is no longer capability-scoped | unit (FE) | `npx vitest run src/components/workflows/ConnectionPicker.test.tsx` | ✅ 47 — will change; assert `listConnectorConnections` called with **no** capability arg | ⬜ |
 | **SC#4** | A row with neither capability nor MCP URL is ACCEPTED by the DB | integration (DB) | `psycopg2` INSERT against `127.0.0.1:54322`, post-migration | ❌ **Wave 0** — ⚠ **must be driven RED BEFORE migration 127** so the green is attributable | ⬜ |
@@ -109,11 +115,17 @@ Phase 196 measured `failed 249` that was entirely REAL (missing mock exports).
 - [ ] A **DB-level** both-shapes-at-once refusal case (D-211-11 / Candidate 3)
 - [ ] A **negative fence** over the three category words in the frontend (SC#3)
 - [ ] A **legacy-shaped connection fixture** — `discovered_tools` present, `mcp_server_url` absent —
-      needed by SC#1's FE cases and by RESEARCH §A.6 / §J.4 / D-211-12
+      needed by SC#1's FE cases and by RESEARCH §A.6 / §J.4 / D-211-12  → `211-04` T1(d), T3(g)
+- [ ] ⭐ A **legacy-shaped connection fixture with an EMPTY `discovered_tools`** — the shape every
+      shipped row carried before migration 127 §2b. ⚠ **A pre-populated synthetic fixture cannot see
+      the closed loop**; this one is the guard.  → `211-04` T1(d) and `211-05` T1(b)
+- [ ] The **§2b descriptor backfill** in migration 127 plus the **cross-language SQL↔Python fence**
+      that holds the two spellings in agreement without a database  → `211-02` T1
 - [ ] The **cross-plan integration test that mocks neither side** (`AGENTS.md §3.1`) — 211 and 210
       share `live_connectors`, and this phase's backend and frontend halves ship in different waves
-- [ ] **Gate bookkeeping:** `settings/` needs **BOTH knobs** for any new test file — the
-      `vitest-count-gate.cjs` pin map **and** the file list at `:3294` / `:3310` / `:3340`
+- [ ] **Gate bookkeeping:** `settings/` and `workflows/__tests__/` each need **BOTH knobs** for any
+      new test file — the `vitest-count-gate.cjs` pin map **and** the file list at `:3294` / `:3310` /
+      `:3340`. Two new files this phase, so four entries.  → `211-05` T1(c)
 
 *Framework install: none — pytest and vitest both ship.*
 
@@ -128,6 +140,8 @@ Phase 196 measured `failed 249` that was entirely REAL (missing mock exports).
 | A pre-existing Jira connection still sends | CONN-05 / SC#2 | Requires a real Jira instance | Same, against the `create_ticket` row. |
 | Browsing / filtering / picking never offers a verb category | CONN-05 / SC#3 | Visual — a fence proves absence in source, not in the rendered UI | Settings → Connections, and the canvas ConnectionPicker. Check chips, tabs, filters, form categories. |
 | `GET /connectors/connections` returns 200 after the new column | D-211-11 | A missing column GRANT presents as a 503 outage | Load Settings → Connections. A 42501 here is the grant, not an outage. |
+| ⭐ A connection whose action list is EMPTY still renders its card, an in-words empty state and a pressable **Refresh** | D-211-12 / SC#2 | The closed loop revision iteration 1 caught — no green automation contradicts a card that renders nothing | Bind the service-only row (per-shape row 5) in a workflow external-action step. Its list is legitimately empty. Card present? Sentence present? Refresh pressable? **If the card renders NOTHING, STOP.** |
+| A pre-existing Slack / Jira connection shows its named action **without anyone pressing anything first** | SC#2 / D-211-03 | Proves migration 127 §2b's backfill took, not merely that the self-heal path exists | Open each row. A press being required means the row is FAILED, not passed-with-a-note. |
 
 ---
 
