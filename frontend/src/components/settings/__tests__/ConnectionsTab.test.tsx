@@ -78,6 +78,10 @@ function makeConnection(overrides: Partial<ConnectorConnection> = {}): Connector
     id: "conn-1",
     org_id: "org-1",
     capability: "send_email",
+    // ⚠ REQUIRED since 211-02 — migration 127's `connector_connections_has_a_service_identity`
+    // guarantees a non-blank value on every row, so a fixture without one models a row the
+    // server cannot produce. The row-level surface reads it in Phase 212, not here.
+    service_id: "smtp",
     name: "Ops mailbox",
     config: { host: "smtp.fastmail.com", port: 465, from_address: "ops@northwind.co", tls: "implicit" },
     is_enabled: true,
