@@ -131,6 +131,8 @@ from app.models.connector import (
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
     ConnectorConnectionUpdate,
+    McpDiscoverRequest,
+    McpDiscoverResponse,
 )
 from app.security.egress import (
     EgressRefused,
@@ -153,6 +155,8 @@ __all__ = [
     "ConnectorConnectionCreate",
     "ConnectorConnectionUpdate",
     "ConnectorConnectionResponse",
+    "McpDiscoverRequest",
+    "McpDiscoverResponse",
 ]
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
@@ -731,4 +735,47 @@ async def update_grants(
         )
     except connector_service.ConnectorNotFound:
         raise _NOT_FOUND
+
+
+@router.post(
+    "/discover-tools",
+    response_model=McpDiscoverResponse,
+    dependencies=[Depends(require_visible("live_connectors")), Depends(require_org_manage)],
+    summary="Probe an arbitrary MCP server endpoint to discover tools before saving",
+)
+async def discover_tools_from_url(
+    payload: McpDiscoverRequest,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+) -> McpDiscoverResponse:
+    """Pre-save interactive MCP tool discovery (CONN-06 / SEC-1).
+
+    Opens a socket to the operator-supplied URL after egress validation and returns
+    sanitized discovered tools (name, title, description, inputSchema, outputSchema).
+    Protected by require_visible('live_connectors') and require_org_manage.
+    """
+    from app.services.mcp_client import list_tools, McpClientError
+
+    try:
+        tools = await list_tools(
+            server_url=payload.mcp_server_url,
+            secret=payload.secret,
+            timeout=payload.timeout,
+        )
+        return McpDiscoverResponse(
+            server_url=payload.mcp_server_url,
+            tools=tools,
+            count=len(tools),
+        )
+    except EgressRefused as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Connection refused by security policy: {exc.reason_code} ({exc.detail})",
+        ) from exc
+    except McpClientError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"MCP server probe failed: {exc}",
+        ) from exc
+
 

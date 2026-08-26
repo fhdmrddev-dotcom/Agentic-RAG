@@ -434,6 +434,22 @@ class ConnectorConnectionResponse(_StrictBase):
     updated_at: str | None = None
 
 
+class McpDiscoverRequest(_StrictBase):
+    """Pre-save probe request to discover tools from an arbitrary remote MCP server."""
+
+    mcp_server_url: NonEmpty
+    secret: str | None = None
+    timeout: float = Field(default=15.0, ge=1.0, le=60.0)
+
+
+class McpDiscoverResponse(_StrictBase):
+    """Discovered tools returned from pre-save MCP endpoint probe."""
+
+    server_url: str
+    tools: list[dict[str, Any]] = Field(default_factory=list)
+    count: int = 0
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -447,4 +463,6 @@ __all__ = [
     "ConnectorConnectionUpdate",
     "ConnectorConnectionResponse",
     "ConnectorCheckResponse",
+    "McpDiscoverRequest",
+    "McpDiscoverResponse",
 ]
