@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sketch 213 — Per-Tool Grants and the Approval Moment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   TOKENS — COPIED VERBATIM FROM frontend/src/index.css `.dark`, NOT re-picked by eye.
+   That is the difference between this file and the Stitch pass: Stitch invented a palette
+   in the same spirit; this one uses the values that actually ship. Any hex below that is
+   not derived from these channels is a bug in the sketch.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --background: 216 45% 4%;
+  --foreground: 226 60% 97%;
+  --card: 220 30% 7%;
+  --popover: 220 30% 8%;
+  --primary: 239 100% 82%;
+  --primary-foreground: 243 100% 32%;
+  --secondary: 217 27% 12%;
+  --secondary-foreground: 226 60% 97%;
+  --muted: 220 30% 11%;
+  --muted-foreground: 220 16% 65%;
+  --accent: 220 25% 14%;
+  --destructive: 0 72% 51%;
+  --warning: 38 92% 60%;
+  --success: 142 71% 45%;
+  --border: 220 22% 16%;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 28px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.note { color: hsl(var(--muted-foreground)); font-size: 12px; margin: 0 0 20px; max-width: 78ch; line-height: 1.5; }
+.caption { color: hsl(var(--muted-foreground)); font-size: 11px; margin: 0 0 10px; }
+section { margin-bottom: 34px; }
+h2 { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+     color: hsl(var(--muted-foreground)); margin: 0 0 10px; }
+
+/* ── THE SPLIT (D-27 held, widened) ────────────────────────────────────────────────────
+   ⚠ THE ONE CHANGE FROM SHIPPED: `400px` → `clamp(480px,38%,640px)`.
+   `ConnectionsTab.tsx:353` is `minmax(0,1fr) 400px`. 480 is the MEASURED floor at which the
+   three-way control fits ON the row instead of wrapping under the description; 640 stops it
+   eating a wide monitor. The clamp shape is not invented — `ChatLayout.tsx:657` already ships
+   `clamp(300px,30%,420px)` for the workspace panel, so this matches a house pattern rather
+   than introducing one. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) clamp(480px, 38%, 640px);
+  gap: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 560px;
+}
+.list-side { padding: 14px 16px; background: hsl(var(--background)); min-width: 0; }
+.panel-side {
+  border-left: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  display: flex; flex-direction: column; min-width: 0;
+}
+
+/* the connections table behind the panel — REAL rows, so "the list stays visible" is
+   testable rather than asserted. This is the property D-27 chose the panel to protect. */
+.conn-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 6px; border: 1px solid transparent;
+}
+.conn-row + .conn-row { margin-top: 2px; }
+.conn-row.is-open { border-color: hsl(var(--border)); background: hsl(var(--muted)); }
+.conn-name { font-size: 13px; font-weight: 500; }
+.conn-meta { margin-left: auto; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.dot { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.dot.ok { background: hsl(var(--success)); }
+.dot.off { background: hsl(var(--muted-foreground)); }
+
+/* ── PANEL CHROME — mirrors the shipped 16px/18px rhythm (§11a, inherited exception) ──── */
+.panel-head { padding: 16px 18px 12px; border-bottom: 1px solid hsl(var(--border)); }
+.panel-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.panel-sub { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 3px; line-height: 1.45; }
+.panel-body { padding: 14px 18px; overflow-y: auto; flex: 1; }
+.panel-foot {
+  padding: 12px 18px; border-top: 1px solid hsl(var(--border));
+  display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+}
+
+/* the service mark — a square, never a stock logo file in a sketch */
+.mark { width: 18px; height: 18px; border-radius: 5px; background: hsl(var(--secondary));
+        display: grid; place-items: center; font-size: 10px; font-weight: 600;
+        color: hsl(var(--muted-foreground)); flex: none; }
+
+/* ── THE DEFAULT POSTURE (GRANT-02) ──────────────────────────────────────────────────── */
+.default-block {
+  border: 1px solid hsl(var(--border)); border-radius: 8px;
+  background: hsl(var(--muted)); padding: 11px 12px; margin-bottom: 14px;
+}
+.field-label { font-size: 11px; font-weight: 500; color: hsl(var(--foreground)); margin-bottom: 4px; }
+.field-help { font-size: 11px; line-height: 1.45; color: hsl(var(--muted-foreground)); margin: 5px 0 0; }
+
+/* ── THE THREE-WAY CONTROL — ONE component, used by the default AND every row ─────────── */
+.seg { display: inline-flex; border: 1px solid hsl(var(--border)); border-radius: 6px; overflow: hidden; flex: none; }
+.seg button {
+  font: inherit; font-size: 11px; font-weight: 500; line-height: 1;
+  padding: 5px 9px; border: 0; cursor: pointer; white-space: nowrap;
+  background: transparent; color: hsl(var(--muted-foreground));
+}
+.seg button + button { border-left: 1px solid hsl(var(--border)); }
+.seg button[aria-pressed="true"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+/* ⚠ DENY IS THE ONE ARM THAT DOES NOT WEAR THE PRIMARY. A refusal reading as the accent
+   colour is the thing that makes a person mis-click it while scanning 44 rows. */
+.seg button.deny[aria-pressed="true"] { background: hsl(var(--destructive)); color: #fff; }
+
+/* ── SEARCH ──────────────────────────────────────────────────────────────────────────── */
+.search {
+  width: 100%; padding: 7px 10px; font: inherit; font-size: 12px;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border)); border-radius: 6px; margin-bottom: 10px;
+}
+.search::placeholder { color: hsl(var(--muted-foreground)); }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════
+   ⭐ THE ACTION ROW — the load-bearing composition, and the ONE thing this sketch exists
+   to pin. Stitch solved it; this re-expresses it with a corrected colour rule.
+
+   ⚠ THE EDGE MEANS "YOU DECIDED THIS" AND NOTHING ELSE. Stitch coloured the edge BY STATE
+   (green allowed / red denied), which makes one mark do two jobs — and across 44 rows it
+   reads as a barcode and blows the house ceiling of ~3 state colours on screen at once.
+   Here the edge is ALWAYS the primary indigo, whichever way the row was decided, because
+   the STATE is already spelled out in words by the control sitting on the same row.
+       indigo edge = your choice   ·   no edge = inheriting the default
+   One colour, one meaning — and red stays reserved for genuinely destructive actions,
+   where it is still doing real work.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+.rows { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
+.arow {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 12px 10px 12px;
+  border-left: 2px solid transparent;   /* the edge lane — always reserved, so nothing shifts */
+  background: hsl(var(--card));
+}
+.arow + .arow { border-top: 1px solid hsl(var(--border)); }
+.arow.overridden {
+  border-left-color: hsl(var(--primary));
+  background: hsl(var(--primary) / .06);
+}
+.arow-main { min-width: 0; flex: 1; }
+.arow-name { font-size: 12px; font-weight: 500; }
+.arow-desc { font-size: 11px; line-height: 1.45; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+.arow-tags { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+
+.tag {
+  font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground));
+}
+.tag.changes { color: hsl(var(--warning)); border-color: hsl(var(--warning) / .35); }
+.tag.unknown { color: hsl(var(--warning)); border-color: hsl(var(--warning) / .35); }
+.tag.destructive { color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .45); }
+/* ⚠ TEXT-BEARING, never a bare colour and never a tooltip. The shipped panel asserts ZERO
+   `[title]` attributes in its output, so "hover to learn what the edge means" is unavailable
+   to us by contract — the mark has to say its own word. */
+.tag.mine { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .45); }
+
+.linkish {
+  font: inherit; font-size: 10px; background: none; border: 0; padding: 0; cursor: pointer;
+  color: hsl(var(--muted-foreground)); text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ── THE ASK MOMENT ──────────────────────────────────────────────────────────────────── */
+.ask {
+  border: 1px solid hsl(var(--warning) / .4); border-radius: 8px;
+  background: hsl(var(--card)); max-width: 760px; overflow: hidden;
+}
+.ask-head { padding: 13px 16px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--warning) / .07); }
+.ask-headline { font-size: 13px; font-weight: 600; color: hsl(var(--warning)); }
+.ask-sub { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 3px; }
+.ask-body { padding: 14px 16px; }
+.ask-what { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 12px; }
+.args {
+  border: 1px solid hsl(var(--border)); border-radius: 6px;
+  background: hsl(var(--background)); overflow: hidden;
+}
+.arg { display: grid; grid-template-columns: 108px minmax(0,1fr); gap: 12px; padding: 8px 11px; }
+.arg + .arg { border-top: 1px solid hsl(var(--border)); }
+.arg-k { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.arg-v { font-size: 12px; word-break: break-word; }
+.arg-body { white-space: pre-wrap; font-size: 11px; line-height: 1.55; color: hsl(var(--foreground)); }
+.ask-foot {
+  padding: 12px 16px; border-top: 1px solid hsl(var(--border));
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.btn {
+  font: inherit; font-size: 12px; font-weight: 500; padding: 7px 14px;
+  border-radius: 6px; cursor: pointer; border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));
+}
+.btn.primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+/* ⚠ DENY IS FULL-SIZE AND SITS BESIDE APPROVE. The safe answer must never be the small grey
+   one — a person under time pressure clicks the big button, so the big button must not be
+   the only one that is easy. */
+.btn.deny { border-color: hsl(var(--destructive) / .5); color: hsl(var(--destructive)); background: transparent; }
+.always { display: flex; align-items: flex-start; gap: 7px; margin-right: auto; max-width: 46ch; }
+.always input { margin: 2px 0 0; accent-color: hsl(var(--primary)); }
+.always-l { font-size: 11px; line-height: 1.4; }
+.always-n { font-size: 10px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+
+/* ── THE REFUSAL ─────────────────────────────────────────────────────────────────────── */
+.refusal {
+  border: 1px solid hsl(var(--destructive) / .4); border-radius: 8px;
+  background: hsl(var(--destructive) / .06); padding: 12px 14px; max-width: 620px;
+}
+.refusal-h { font-size: 12px; font-weight: 600; color: hsl(var(--destructive)); }
+.refusal-p { font-size: 11px; line-height: 1.5; color: hsl(var(--muted-foreground)); margin: 5px 0 0; }
+</style>
+</head>
+<body>
+
+<h1>Sketch 213 — Per-Tool Grants and the Approval Moment</h1>
+<p class="note">
+  Re-expresses the Stitch pass (<span class="mono">213-stitch-grants/</span>) against the tokens and
+  rhythm that actually ship. Every colour below is copied from <span class="mono">index.css</span>
+  <span class="mono">.dark</span>; every string comes from <span class="mono">COPY.js</span>.
+  Two deliberate departures from Stitch, both argued in the CSS: the override edge is
+  <strong>one colour meaning “you decided this”</strong> rather than a per-state colour, and the
+  panel is <span class="mono">clamp(480px,38%,640px)</span> rather than a fixed 400.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>1 · The grant list, in the panel (GRANT-01 · GRANT-02)</h2>
+  <p class="caption">
+    A — the panel, kept. The connections list stays readable beside it, which is the whole reason
+    D-27 chose a panel over a dialog.
+  </p>
+
+  <div class="split">
+    <div class="list-side">
+      <div style="font-size:11px;color:hsl(var(--muted-foreground));margin-bottom:8px">Connections</div>
+      <div class="conn-row"><span class="dot ok"></span><span class="conn-name">Slack-rag-test</span><span class="conn-meta">1 action</span></div>
+      <div class="conn-row"><span class="dot ok"></span><span class="conn-name">Jira · KAN</span><span class="conn-meta">1 action</span></div>
+      <div class="conn-row"><span class="dot ok"></span><span class="conn-name">Email (SMTP)</span><span class="conn-meta">1 action</span></div>
+      <div class="conn-row"><span class="dot off"></span><span class="conn-name">DeepWiki</span><span class="conn-meta">3 actions</span></div>
+      <div class="conn-row is-open"><span class="dot ok"></span><span class="conn-name">GitHub</span><span class="conn-meta">44 actions</span></div>
+      <div class="conn-row"><span class="dot off"></span><span class="conn-name">Notion</span><span class="conn-meta">not connected</span></div>
+      <p class="field-help" style="margin-top:14px;max-width:44ch">
+        ⚠ The counts are the operator’s real rows. 44 · 3 · 1 · 1 · 1 — the three ones are
+        SEED-214’s lock, not thin adapters.
+      </p>
+    </div>
+
+    <div class="panel-side">
+      <div class="panel-head">
+        <div class="panel-title"><span class="mark">GH</span><span>GitHub</span></div>
+        <div class="panel-sub">Choose what GitHub can do on your behalf.</div>
+      </div>
+
+      <div class="panel-body">
+        <div class="default-block">
+          <div class="field-label">Default for every action</div>
+          <div class="seg" role="group" aria-label="Default for every action">
+            <button type="button" aria-pressed="false">Allow</button>
+            <button type="button" aria-pressed="true">Ask first</button>
+            <button type="button" class="deny" aria-pressed="false">Deny</button>
+          </div>
+          <p class="field-help">Each action follows this until you change that action yourself.</p>
+        </div>
+
+        <input class="search" placeholder="Search 44 actions" />
+
+        <!-- ⚠ THE EMPTY STATE, drawn because the drive script caught it MISSING. `COPY.LIST_EMPTY`
+             was declared and never rendered, which is exactly the gap a copy table exists to
+             expose: a string the build would have had to invent at the keyboard. A 44-row
+             searchable list reaches this state on the first typo. -->
+        <div class="rows" style="padding:14px 12px" hidden data-state="empty">
+          <div class="arow-desc">No action matches that.</div>
+        </div>
+
+        <div class="rows">
+          <!-- inherited: quiet, no edge -->
+          <div class="arow">
+            <div class="arow-main">
+              <div class="arow-name mono">search_code</div>
+              <div class="arow-desc">Search across your repositories.</div>
+              <div class="arow-tags"><span class="tag">Reads</span></div>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="true">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+
+          <!-- OVERRIDDEN: indigo edge + tint + its own word -->
+          <div class="arow overridden">
+            <div class="arow-main">
+              <div class="arow-name mono">read_repository_metadata</div>
+              <div class="arow-desc">Read stars, forks and descriptions.</div>
+              <div class="arow-tags">
+                <span class="tag">Reads</span>
+                <span class="tag mine">You changed this</span>
+                <button class="linkish">Use the default</button>
+              </div>
+            </div>
+            <div class="seg"><button aria-pressed="true">Allow</button><button aria-pressed="false">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+
+          <div class="arow">
+            <div class="arow-main">
+              <div class="arow-name mono">create_issue</div>
+              <div class="arow-desc">Open a new issue.</div>
+              <div class="arow-tags"><span class="tag changes">Changes things</span></div>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="true">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+
+          <!-- ⚠ direction genuinely unknown, said out loud -->
+          <div class="arow">
+            <div class="arow-main">
+              <div class="arow-name mono">list_webhooks</div>
+              <div class="arow-desc">List the webhooks configured on a repository.</div>
+              <div class="arow-tags"><span class="tag unknown">Unknown</span></div>
+              <p class="field-help" style="margin-top:4px">
+                This server does not say whether this action only reads. Treated as if it changes things.
+              </p>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="true">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+
+          <!-- OVERRIDDEN to Deny — the edge is STILL indigo; red is on the control and the tag -->
+          <div class="arow overridden">
+            <div class="arow-main">
+              <div class="arow-name mono">delete_repository</div>
+              <div class="arow-desc">Permanently delete a repository.</div>
+              <div class="arow-tags">
+                <span class="tag destructive">Cannot be undone</span>
+                <span class="tag mine">You changed this</span>
+                <button class="linkish">Use the default</button>
+              </div>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="false">Ask first</button><button class="deny" aria-pressed="true">Deny</button></div>
+          </div>
+
+          <div class="arow">
+            <div class="arow-main">
+              <div class="arow-name mono">create_pull_request</div>
+              <div class="arow-desc">Propose changes by opening a pull request.</div>
+              <div class="arow-tags"><span class="tag changes">Changes things</span></div>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="true">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+
+          <div class="arow">
+            <div class="arow-main">
+              <div class="arow-name mono">merge_pull_request</div>
+              <div class="arow-desc">Merge a pull request into its base branch.</div>
+              <div class="arow-tags"><span class="tag destructive">Cannot be undone</span></div>
+            </div>
+            <div class="seg"><button aria-pressed="false">Allow</button><button aria-pressed="true">Ask first</button><button class="deny" aria-pressed="false">Deny</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-foot">
+        <button class="btn">Cancel</button>
+        <button class="btn primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>2 · The approval moment (GRANT-03)</h2>
+  <p class="caption">
+    The arguments are the hero. No countdown — how long a person takes is unknowable, and a
+    fabricated number is forbidden.
+  </p>
+
+  <div class="ask">
+    <div class="ask-head">
+      <div class="ask-headline">Paused — waiting for you.</div>
+      <div class="ask-sub">Nothing has been sent yet. · Weekly release notes · step 4 of 6</div>
+    </div>
+    <div class="ask-body">
+      <div class="ask-what">
+        <span class="mark">GH</span>
+        <span><span class="mono">create_pull_request</span> on <strong>GitHub</strong></span>
+        <span class="tag changes">Changes things</span>
+      </div>
+
+      <div class="field-label" style="margin-bottom:6px">What it will send</div>
+      <div class="args">
+        <div class="arg"><div class="arg-k">Repository</div><div class="arg-v mono">aether-intelligence/core-engine</div></div>
+        <div class="arg"><div class="arg-k">Branch</div><div class="arg-v mono">release/v2.4.0</div></div>
+        <div class="arg"><div class="arg-k">Title</div><div class="arg-v">Weekly Release Notes: v2.4.0 Performance &amp; Risk Modules</div></div>
+        <div class="arg">
+          <div class="arg-k">Body</div>
+          <div>
+            <div class="arg-body mono"># v2.4.0 Release Highlights
+
+## Bug fixes (22)
+- Fixed race condition in async workflow execution runner.
+- Resolved memory leak in the token counter module during large document ingestion.</div>
+            <button class="linkish" style="margin-top:6px">Show 9 more lines</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ask-foot">
+      <label class="always">
+        <input type="checkbox" />
+        <span>
+          <span class="always-l">Always allow <span class="mono">create_pull_request</span> on this connection</span>
+          <span class="always-n">Changes the setting above, not just this run.</span>
+        </span>
+      </label>
+      <button class="btn deny">Deny</button>
+      <button class="btn primary">Approve once</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>3 · The refusal (GRANT-04)</h2>
+  <p class="caption">It names the grant that would allow it — a refusal that only says “denied” sends the reader hunting.</p>
+  <div class="refusal">
+    <div class="refusal-h"><span class="mono">delete_repository</span> was refused.</div>
+    <p class="refusal-p"><span class="mono">delete_repository</span> is set to Deny on this connection.</p>
+    <p class="refusal-p">Set it to Allow or Ask first to let this run continue.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>4 · Why the edge is one colour — the departure from Stitch, shown</h2>
+  <p class="caption">
+    Left: Stitch’s per-state edge. Right: this sketch. Same six rows, same decisions.
+  </p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:1000px">
+    <div>
+      <div class="caption">Stitch — edge coloured by state</div>
+      <div class="rows">
+        <div class="arow" style="border-left-color:hsl(var(--success));background:hsl(var(--success)/.06)"><div class="arow-main"><div class="arow-name mono">read_repository_metadata</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">search_code</div></div></div>
+        <div class="arow" style="border-left-color:hsl(var(--destructive));background:hsl(var(--destructive)/.06)"><div class="arow-main"><div class="arow-name mono">delete_repository</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">create_issue</div></div></div>
+        <div class="arow" style="border-left-color:hsl(var(--success));background:hsl(var(--success)/.06)"><div class="arow-main"><div class="arow-name mono">create_pull_request</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">list_webhooks</div></div></div>
+      </div>
+      <p class="field-help" style="max-width:42ch">
+        Two jobs on one mark. Across 44 rows it reads as a barcode, and green/red/amber are all
+        on screen at once — past the house ceiling of three.
+      </p>
+    </div>
+    <div>
+      <div class="caption">This sketch — edge means “you decided this”</div>
+      <div class="rows">
+        <div class="arow overridden"><div class="arow-main"><div class="arow-name mono">read_repository_metadata</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">search_code</div></div></div>
+        <div class="arow overridden"><div class="arow-main"><div class="arow-name mono">delete_repository</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">create_issue</div></div></div>
+        <div class="arow overridden"><div class="arow-main"><div class="arow-name mono">create_pull_request</div></div></div>
+        <div class="arow"><div class="arow-main"><div class="arow-name mono">list_webhooks</div></div></div>
+      </div>
+      <p class="field-help" style="max-width:42ch">
+        One mark, one meaning: these three are yours. What each one is set TO is read from the
+        control, in words, on the same row.
+      </p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
