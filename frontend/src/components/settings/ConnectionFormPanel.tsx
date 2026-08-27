@@ -87,7 +87,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { ConnectorApiError, probeMcpServer, updateConnectorGrants } from "@/lib/api"
+import {
+  ConnectorApiError,
+  discoverConnectorTools,
+  probeMcpServer,
+  updateConnectorGrants,
+} from "@/lib/api"
 import type {
   ConnectorCapability,
   ConnectorCheckResult,
@@ -131,6 +136,11 @@ import {
   FIELD_MCP_URL_LABEL,
   FIELD_MCP_URL_PLACEHOLDER,
   FIELD_SECRET_LABEL_NEUTRAL,
+  DISCOVER_FAILED_FALLBACK,
+  REFRESH_ACTIONS_BUSY,
+  REFRESH_ACTIONS_HELP,
+  REFRESH_ACTIONS_LABEL,
+  REFRESH_ACTIONS_NOT_GRANTABLE,
   FOOTER_PREFIX,
   FOOTER_SERVER_NOTE,
   MCP_SAVE_DISABLED_REASON,
@@ -548,15 +558,10 @@ export function ConnectionFormPanel({
     if (mode === "edit" && connection) {
       setDraft(draftFromConnection(connection))
       setToolGrants(connection.tool_grants ?? {})
+      setProbeResult(connection.discovered_tools ?? null)
     } else if (mode === "create" && presetServiceId) {
       const entry = getServiceCatalogEntry(presetServiceId)
-      const isMcpPreset =
-        presetServiceId === "custom_mcp" ||
-        presetServiceId === "mcp" ||
-        presetServiceId === "github" ||
-        presetServiceId === "google" ||
-        presetServiceId === "notion"
-      const shape = shapeForService(presetServiceId, isMcpPreset ? "https://" : "")
+      const shape = shapeForService(presetServiceId)
       setDraft({
         ...EMPTY_DRAFT,
         serviceId: presetServiceId,
@@ -564,11 +569,12 @@ export function ConnectionFormPanel({
         name: entry.isPopular && presetServiceId !== "custom_mcp" ? entry.name : "",
       })
       setToolGrants({})
+      setProbeResult(null)
     } else {
       setDraft(EMPTY_DRAFT)
       setToolGrants({})
+      setProbeResult(null)
     }
-    setProbeResult(null)
     setProbeError(null)
     setReplacing(false)
     setSaveRefusal(null)
@@ -577,16 +583,52 @@ export function ConnectionFormPanel({
     setWriteFailed(false)
   }, [open, mode, connection, presetServiceId])
 
-  async function handleProbeMcp() {
-    if (!draft.mcpServerUrl.trim()) return
+  /**
+   * ⭐ PHASE 212 (D-4) — ONE CONTROL, TWO ENDPOINTS, CHOSEN BY WHETHER THE ROW EXISTS YET.
+   *
+   * ⚠ THE PANEL CALLED `probeMcpServer` UNCONDITIONALLY UNTIL 2026-08-27, AND FOR A SAVED
+   * CONNECTION THAT PATH CANNOT AUTHENTICATE — BY DESIGN, NOT BY ACCIDENT. An edit renders the
+   * token MASKED (*"stored since 27 Aug"*) and leaves `draft.secret` EMPTY, because the stored
+   * value is never returned to a browser. So the probe sent no credential, the remote server
+   * answered `401`, and the operator regenerated tokens repeatedly against a path that had no
+   * way to succeed. `discoverConnectorTools` decrypts the stored secret SERVER-SIDE and
+   * returned 44 tools for the same GitHub row on the same credential.
+   *
+   * ── the rule ────────────────────────────────────────────────────────────────────────────
+   *   the row EXISTS  → `discoverConnectorTools(id)`. Serves ALL THREE shapes (an MCP row is
+   *                     asked over the network, a CAPABILITY row is re-read from its adapter's
+   *                     static descriptor with NO network call, a service-only row answers a
+   *                     worded 409). No secret leaves the browser.
+   *   it is a DRAFT   → `probeMcpServer({url, secret})`. The only case where the browser HAS a
+   *                     secret, and the only case with no row to read one from.
+   *
+   * ⚠ A TYPED SECRET DOES **NOT** SEND AN EXISTING ROW BACK TO THE PROBE, and the first draft
+   * of this fix had it doing so. Probing with a secret the row does not hold reports on a
+   * credential that is not stored — a green result for a token Save might never write. An
+   * existing connection reports on what is STORED; `Check credentials` follows the same rule
+   * on the same row, so the two controls cannot disagree.
+   *
+   * ⚠ THE URL GUARD MOVED INSIDE THE DRAFT ARM. As an unconditional first line it returned
+   * early for every capability row — `mcpServerUrl` is empty on one — which is why Slack, Jira
+   * and SMTP could never refresh even once the server grew an arm for them in Phase 211.
+   */
+  async function handleDiscoverTools() {
+    const savedRow = mode === "edit" && connection?.id ? connection.id : null
+    if (!savedRow && !draft.mcpServerUrl.trim()) return
     setProbing(true)
     setProbeError(null)
     try {
-      const res = await probeMcpServer({
-        mcp_server_url: draft.mcpServerUrl.trim(),
-        secret: draft.secret.trim() || undefined,
-      })
-      setProbeResult(res.tools)
+      let tools: McpDiscoveredTool[] = []
+      if (savedRow) {
+        tools = await discoverConnectorTools(savedRow)
+      } else {
+        const res = await probeMcpServer({
+          mcp_server_url: draft.mcpServerUrl.trim(),
+          secret: draft.secret.trim() || undefined,
+        })
+        tools = res.tools
+      }
+      setProbeResult(tools)
       if (!draft.name.trim()) {
         const suggested = mcpHostOf(draft.mcpServerUrl.trim())
         if (suggested) {
@@ -595,7 +637,7 @@ export function ConnectionFormPanel({
       }
       setToolGrants((prev) => {
         const next = { ...prev }
-        for (const t of res.tools) {
+        for (const t of tools) {
           if (next[t.name] === undefined) {
             next[t.name] = true
           }
@@ -603,7 +645,13 @@ export function ConnectionFormPanel({
         return next
       })
     } catch (err) {
-      setProbeError(err instanceof Error ? err.message : "Failed to discover tools from MCP server")
+      // WARNING: the fallback said "Failed to discover tools from MCP server", and this handler
+      // now serves three shapes - two of which contact no MCP server and one of which contacts
+      // nothing at all. Naming a server that was never involved sends the reader hunting an
+      // outage that does not exist, which is the same misnaming the route's own 502-narrowing
+      // exists to prevent. In practice `err.message` almost always wins now that both clients
+      // carry the server's own words; this is only the last resort.
+      setProbeError(err instanceof Error ? err.message : DISCOVER_FAILED_FALLBACK)
       setProbeResult([])
     } finally {
       setProbing(false)
@@ -896,6 +944,24 @@ export function ConnectionFormPanel({
    */
   const checkCapability: ConnectorCapability | null =
     capability === "mcp" || capability === "service" ? null : capability
+
+  /**
+   * PHASE 212 (D-4b) - the two axes the discovery controls read, derived ONCE.
+   *
+   * `isCapabilityShape` is `checkCapability !== null` said the other way round, and it is
+   * deliberately expressed as a DERIVATION of it rather than as a second `=== ` chain: the two
+   * must never disagree about which shapes have an adapter behind them, and a second chain is
+   * how they would. It is exactly the set `discover_connection_tools` serves from a static
+   * descriptor - `post_message`, `create_ticket`, `send_email`.
+   *
+   * WARNING: `grantsArePersisted` MIRRORS `handleSave`, WHICH WRITES `tool_grants` ONLY ON THE
+   * `mcp` SHAPE. It is not a style choice: rendering the "Granted" checkbox on a capability
+   * action would offer a switch that Save drops on the floor, which is the class of lie this
+   * surface's own §14 names as a failure condition. If `handleSave` ever grows a second arm,
+   * this constant is the one line that must move with it.
+   */
+  const isCapabilityShape = checkCapability !== null
+  const grantsArePersisted = capability === "mcp"
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.
@@ -1281,7 +1347,7 @@ export function ConnectionFormPanel({
                   <button
                     type="button"
                     disabled={probing || !draft.mcpServerUrl.trim()}
-                    onClick={() => void handleProbeMcp()}
+                    onClick={() => void handleDiscoverTools()}
                     data-testid="connection-probe-mcp-btn"
                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
                   >
@@ -1291,57 +1357,106 @@ export function ConnectionFormPanel({
                 )}
               </div>
             </Field>
+          </>
+        )}
 
-            {probeError && (
+        {/* -- PHASE 212 (D-4b) -- THE CAPABILITY SHAPE'S REFRESH, FOUND BY THE OPERATOR.
+               "for the old connections like JIRA and email and slack it does not show
+               discover tools, it is only showing check credentials." Correct, and the same
+               defect family as D-4: `discover_connection_tools` has served the capability
+               shape since Phase 211 -- re-reading the adapter's own static descriptor with NO
+               network call -- and nothing ever rendered a control for it.
+
+               WARNING: EDIT MODE AND A SAVED ROW ONLY, because the endpoint reads a row by id.
+               A capability DRAFT has nothing to refresh from yet, so no control is offered
+               rather than one that would 404 -- the 185 rule: an affordance unable to act is
+               REMOVED, never disabled. The `mcp` shape keeps its own button beside the URL
+               field, where it also serves the pre-save probe. */}
+        {isCapabilityShape && mode === "edit" && connection?.id && !readOnly && (
+          <div className="mb-3.5">
+            <button
+              type="button"
+              disabled={probing}
+              onClick={() => void handleDiscoverTools()}
+              data-testid="connection-refresh-actions-btn"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+              aria-describedby={`${fieldId}-refresh-actions-help`}
+            >
+              {probing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+              {probing ? REFRESH_ACTIONS_BUSY : REFRESH_ACTIONS_LABEL}
+            </button>
+            <p
+              id={`${fieldId}-refresh-actions-help`}
+              className="mt-1 text-[11px] leading-snug text-muted-foreground"
+            >
+              {REFRESH_ACTIONS_HELP}
+            </p>
+          </div>
+        )}
+
+        {/* WARNING: LIFTED OUT OF THE `mcp` ARM. These two nodes were nested inside it, so a
+             capability refresh could return a descriptor and a failure could return a worded
+             reason and NEITHER could render. The list is shape-aware below; the error is not,
+             because a reason is a reason whatever asked for it. */}
+        {probeError && (
+          <p
+            role="status"
+            data-testid="connection-probe-error"
+            className="mb-3 text-[11px] leading-snug text-destructive"
+          >
+            {probeError}
+          </p>
+        )}
+
+        {probeResult && probeResult.length > 0 && (
+          <div data-testid="connection-discovered-tools" className="mb-3.5 rounded-md border border-border/70 bg-card p-2.5">
+            <div className="mb-1.5 text-[11px] font-medium text-foreground">
+              Discovered tools ({probeResult.length})
+            </div>
+            <div className="max-h-48 divide-y divide-border/40 overflow-y-auto pr-1">
+              {probeResult.map((tool) => (
+                <div key={tool.name} className="py-1.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] font-semibold text-foreground">
+                      {tool.name}
+                    </span>
+                    {/* WARNING: `grantsArePersisted`, NOT `!readOnly` alone. `handleSave`
+                         writes `tool_grants` only on the `mcp` shape, so a checkbox beside a
+                         capability action would offer a switch Save silently drops. */}
+                    {!readOnly && grantsArePersisted && (
+                      <label className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={toolGrants[tool.name] !== false}
+                          onChange={(e) =>
+                            setToolGrants((prev) => ({
+                              ...prev,
+                              [tool.name]: e.target.checked,
+                            }))
+                          }
+                          className="rounded border-border text-primary focus:ring-primary"
+                        />
+                        Granted
+                      </label>
+                    )}
+                  </div>
+                  {tool.description && (
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
+                      {tool.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {!grantsArePersisted && (
               <p
-                role="status"
-                data-testid="connection-probe-error"
-                className="mb-3 text-[11px] leading-snug text-destructive"
+                data-testid="connection-actions-not-grantable"
+                className="mt-2 border-t border-border/40 pt-2 text-[11px] leading-snug text-muted-foreground"
               >
-                {probeError}
+                {REFRESH_ACTIONS_NOT_GRANTABLE}
               </p>
             )}
-
-            {probeResult && probeResult.length > 0 && (
-              <div data-testid="connection-discovered-tools" className="mb-3.5 rounded-md border border-border/70 bg-card p-2.5">
-                <div className="mb-1.5 text-[11px] font-medium text-foreground">
-                  Discovered tools ({probeResult.length})
-                </div>
-                <div className="max-h-48 divide-y divide-border/40 overflow-y-auto pr-1">
-                  {probeResult.map((tool) => (
-                    <div key={tool.name} className="py-1.5 first:pt-0 last:pb-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[11px] font-semibold text-foreground">
-                          {tool.name}
-                        </span>
-                        {!readOnly && (
-                          <label className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
-                            <input
-                              type="checkbox"
-                              checked={toolGrants[tool.name] !== false}
-                              onChange={(e) =>
-                                setToolGrants((prev) => ({
-                                  ...prev,
-                                  [tool.name]: e.target.checked,
-                                }))
-                              }
-                              className="rounded border-border text-primary focus:ring-primary"
-                            />
-                            Granted
-                          </label>
-                        )}
-                      </div>
-                      {tool.description && (
-                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
-                          {tool.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         {capability === "post_message" && (

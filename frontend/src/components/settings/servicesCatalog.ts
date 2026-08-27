@@ -209,3 +209,21 @@ export function getServiceCatalogEntry(serviceId: string | null | undefined): Ca
     category: "custom",
   }
 }
+
+/**
+ * Phase 212 (D-5) — the CURATED half of the lookup: a real catalog hit, or `null`.
+ *
+ * ⚠ THIS EXISTS BECAUSE `getServiceCatalogEntry` CANNOT ANSWER THE QUESTION D-5 ASKS.
+ * That function is TOTAL by design — an uncurated identity falls through to a synthesized
+ * entry whose `markKey` is `"mcp"`, which is right for drawing a mark and catastrophic for
+ * deriving a SHAPE: keyed on it, every unknown `service_id` would become an MCP row and the
+ * service-only shape (CONN-08) would stop existing. So a shape derivation asks THIS, which
+ * distinguishes *"the catalog says MCP"* from *"the catalog has never heard of it"*.
+ */
+export function getCuratedServiceEntry(
+  serviceId: string | null | undefined,
+): CatalogServiceEntry | null {
+  const normalized = (serviceId || "").trim().toLowerCase()
+  if (!normalized) return null
+  return SERVICES_BY_ID.get(normalized) ?? null
+}

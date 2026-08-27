@@ -496,7 +496,7 @@ describe("the focus restore (§3a / §12)", () => {
     // ⚠ 211 — a create form saves once it has BOTH facts. Save is off before that, which is
     // the point of the new reason node; this case is about the focus restore, so it supplies
     // them rather than asserting the refusal a dedicated case already owns.
-    await chooseService(user, "notion")
+    await chooseService(user, "my_custom_wiki")
     await user.type(screen.getByLabelText("Name"), "The team wiki")
     await user.click(screen.getByTestId("connection-form-save"))
     expect(onCreate).toHaveBeenCalledTimes(1)
@@ -667,7 +667,7 @@ describe("the per-capability field sets (§3b / D-32 / T-190-17-SCOPE)", () => {
   it("⭐ CONN-08 — a service NOBODY here has heard of binds Name and the Service, and nothing else", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
-    await chooseService(user, "notion")
+    await chooseService(user, "a-service-nobody-here-has-heard-of")
 
     // The service shape's bound count, read from the module rather than retyped.
     expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.service)
@@ -679,6 +679,58 @@ describe("the per-capability field sets (§3b / D-32 / T-190-17-SCOPE)", () => {
     expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("Jira site")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("Channel")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-5 — curated Popular MCP services (github, notion, google) reveal MCP URL and Access token fields", async () => {
+    const user = userEvent.setup({ delay: null })
+    // ⚠ `cleanup()` INSIDE THE LOOP, and its absence is what made the first draft of this case
+    // fail: three `renderPanel()` calls with no unmount leave three panels in one document, so
+    // `getByLabelText` throws `found multiple elements` — a failure that reads exactly like the
+    // defect under test and is not it. Same idiom as the four sibling loops in this file.
+    for (const serviceId of ["github", "notion", "google"]) {
+      renderPanel()
+      await chooseService(user, serviceId)
+
+      expect(screen.getByLabelText("MCP server URL")).toBeInTheDocument()
+      expect(screen.getByTestId("connection-probe-mcp-btn")).toBeInTheDocument()
+      expect(screen.getByLabelText("Access token")).toBeInTheDocument()
+      // The MCP shape's bound count, read from the module rather than retyped — this is the
+      // half that proves the field set SWAPPED rather than merely gained a node.
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.mcp)
+      cleanup()
+    }
+  })
+
+  it("⭐ D-5's NEGATIVE CONTROL — an UNCURATED identity still binds the service shape, so the catalog did not swallow CONN-08", async () => {
+    // ⚠ THIS CASE IS THE ONE THAT COULD HAVE BEEN GOT WRONG. `getServiceCatalogEntry` is TOTAL
+    // and synthesizes a fallback entry carrying `markKey: "mcp"`, so a shape derivation keyed
+    // on IT would turn every unknown `service_id` into an MCP row and delete the service-only
+    // shape outright. Without this control, that regression passes every other case in the file.
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseService(user, "a-service-nobody-here-has-heard-of")
+
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.service)
+    expect(screen.queryByLabelText("MCP server URL")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-probe-mcp-btn")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-5 — the three ADAPTER-BACKED identities are NOT swept into the MCP shape by the catalog arm", async () => {
+    // `slack`, `jira` and `smtp` are catalog entries too. They must keep their capability field
+    // sets — an adapter-backed row silently becoming an MCP row is a credential pointed at the
+    // wrong wire, which is why `SERVICE_TO_SHAPE` is read BEFORE the catalog.
+    const user = userEvent.setup({ delay: null })
+    for (const [serviceId, shape] of [
+      ["slack", "post_message"],
+      ["jira", "create_ticket"],
+      ["smtp", "send_email"],
+    ] as const) {
+      renderPanel()
+      await chooseService(user, serviceId)
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[shape])
+      expect(screen.queryByLabelText("MCP server URL")).not.toBeInTheDocument()
+      cleanup()
+    }
   })
 
   it("⚠ the suggestion list is a SUGGESTION — its options are a `<datalist>`, never a closed control", () => {
@@ -1809,20 +1861,24 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
     expect(FORM_COPY.serviceLabelOf("slack")).toBe(
       FORM_COPY.SERVICE_SUGGESTIONS.find((s) => s.service_id === "slack")!.label,
     )
+    // Catalog services return their human labels
+    expect(FORM_COPY.serviceLabelOf("notion")).toBe("Notion")
+    expect(FORM_COPY.serviceLabelOf("github")).toBe("GitHub")
     // D-211-02: a miss degrades. It is a SUGGESTION list, so an unknown identity reads back
     // as itself rather than as "unknown", and never as a refusal.
-    expect(FORM_COPY.serviceLabelOf("notion")).toBe("notion")
     expect(FORM_COPY.serviceLabelOf("a-service-nobody-here-has-heard-of")).toBe(
       "a-service-nobody-here-has-heard-of",
     )
   })
 
-  it("⚠ `shapeForService` is TOTAL — an unknown identity, and a PROTOTYPE key, both resolve to the service shape", () => {
+  it("⚠ `shapeForService` is TOTAL — catalog MCP services resolve to mcp, an unknown identity and PROTOTYPE keys resolve to service", () => {
     expect(FORM_COPY.shapeForService("smtp", "")).toBe("send_email")
     expect(FORM_COPY.shapeForService("jira", "")).toBe("create_ticket")
     expect(FORM_COPY.shapeForService("slack", "")).toBe("post_message")
     expect(FORM_COPY.shapeForService("custom", "")).toBe("mcp")
-    expect(FORM_COPY.shapeForService("notion", "")).toBe("service")
+    expect(FORM_COPY.shapeForService("notion", "")).toBe("mcp")
+    expect(FORM_COPY.shapeForService("github", "")).toBe("mcp")
+    expect(FORM_COPY.shapeForService("a-service-nobody-here-has-heard-of", "")).toBe("service")
     expect(FORM_COPY.shapeForService("", "")).toBe("service")
     // ⚠ T-211-15a — an inherited key is TRUTHY on a bracket read and would hand back a
     // FUNCTION typed as `ConnectionShape`. The map must be read through `own(MAP, key)`.
@@ -1834,7 +1890,7 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
   it("the ONE explicit override — an `https://` endpoint selects the remote-server shape", () => {
     expect(FORM_COPY.shapeForService("mcp.deepwiki.com", ACCEPTED_MCP_URL)).toBe("mcp")
     // And it is HTTPS-shaped, not merely non-empty: a plaintext address selects nothing.
-    expect(FORM_COPY.shapeForService("notion", "http://mcp.example.com/mcp")).toBe("service")
+    expect(FORM_COPY.shapeForService("a-service-nobody-here-has-heard-of", "http://mcp.example.com/mcp")).toBe("service")
   })
 
   it("`FIELD_COUNTS` is TOTAL over all FIVE shapes and binds MCP at exactly 3", () => {
@@ -1861,7 +1917,7 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
   })
 
   it("the validity arm — a service draft is savable on a name and an identity, with NO secret and NO config", () => {
-    const named = draftOfShape("service", { name: "The team wiki", serviceId: "notion" })
+    const named = draftOfShape("service", { name: "The team wiki", serviceId: "my_custom_wiki" })
     expect(FORM_COPY.draftIsSavable(named)).toBe(true)
     // …and it composed nothing to authenticate with, which is what makes that true.
     expect(FORM_COPY.configFromDraft(named)).toEqual({})
@@ -1869,7 +1925,7 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
     // Either half missing, and it is not savable — blank-but-present is what the server's
     // `btrim` refuses, so a whitespace identity must fail here too.
     expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "x", serviceId: "" }))).toBe(false)
-    expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "", serviceId: "notion" }))).toBe(false)
+    expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "", serviceId: "my_custom_wiki" }))).toBe(false)
     expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "x", serviceId: "   " }))).toBe(false)
   })
 })
@@ -1929,7 +1985,7 @@ describe("206.1 · LADDER 1 — `configFromDraft` names its arms (SC#4)", () => 
 
   it("⭐ a `service` draft composes an EMPTY config and NO capability key (CONN-08 / D-211-02)", () => {
     const config = FORM_COPY.configFromDraft(
-      draftOfShape("service", { serviceId: "notion", channel: "#ops", host: "smtp.fastmail.com" }),
+      draftOfShape("service", { serviceId: "my_custom_wiki", channel: "#ops", host: "smtp.fastmail.com" }),
     ) as unknown as Record<string, unknown>
     // ⚠ KEY SET. An identified row with no reachable path asserts NOTHING about a
     // destination — and it must not inherit a neighbouring shape's facts on the way out.
@@ -1998,7 +2054,7 @@ describe("206.1 · LADDER 2 — `destinationFooterOf` names its arms (SC#4)", ()
 
   it("a `service` draft's footer degrades to the WORD — it names no destination it does not have", () => {
     const footer = FORM_COPY.destinationFooterOf(
-      draftOfShape("service", { serviceId: "notion", host: "smtp.fastmail.com", port: "465" }),
+      draftOfShape("service", { serviceId: "my_custom_wiki", host: "smtp.fastmail.com", port: "465" }),
     )
     expect(footer.destination).toBe(FOOTER_NOTHING_YET)
     expect(footer.tags).toEqual([])
@@ -2089,7 +2145,7 @@ describe("206.1 · `draftFromConnection` — the EDIT shape (D-206.1-22, a live 
 
   it("⚠ a capability-less row with NO url edits as the SERVICE shape — the third shape, read back", () => {
     const draft = FORM_COPY.draftFromConnection(
-      makeConnection({ capability: null, mcp_server_url: null, service_id: "notion" }),
+      makeConnection({ capability: null, mcp_server_url: null, service_id: "my_custom_wiki" }),
     )
     expect(draft.capability).toBe("service")
   })
@@ -2498,14 +2554,14 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     const user = userEvent.setup({ delay: null })
     const onCreate = vi.fn().mockResolvedValue(undefined)
     renderPanel({ onCreate })
-    await chooseService(user, "notion")
-    await user.type(screen.getByLabelText("Name"), "Notion (the team wiki)")
+    await chooseService(user, "my_custom_wiki")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
     await user.click(screen.getByTestId("connection-form-save"))
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
 
     const body = onCreate.mock.calls[0][0] as Record<string, unknown>
     expect(Object.keys(body).sort()).toEqual(["config", "name", "service_id"])
-    expect(body.service_id).toBe("notion")
+    expect(body.service_id).toBe("my_custom_wiki")
     // ⚠ KEY ABSENCE, never a value comparison — `capability: null` is a PRESENT value and a
     // different thing from absence, and only absence is what the server's shape arm reads.
     expect(body).not.toHaveProperty("capability")
@@ -2517,7 +2573,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     const user = userEvent.setup({ delay: null })
     // Four identities the lookup does not hold, including two one character from a real
     // one, plus a prototype key — the shape a `MAP[key]` read would let through.
-    for (const identity of ["notion", "slac", "smtpx", "constructor"]) {
+    for (const identity of ["my_custom_wiki", "slac", "smtpx", "constructor"]) {
       const onCreate = vi.fn().mockResolvedValue(undefined)
       renderPanel({ onCreate })
       await chooseService(user, identity)
@@ -2646,7 +2702,7 @@ describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => 
     expect(describedBy).toContain("service-save-disabled-reason")
 
     // Both facts supplied, and the reason node is REMOVED rather than emptied.
-    await chooseService(user, "notion")
+    await chooseService(user, "my_custom_wiki")
     await user.type(screen.getByLabelText("Name"), "The team wiki")
     expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
     expect(
@@ -2905,8 +2961,8 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
   })
 })
 
-describe("Phase 212 · interactive pre-save discovery in MCP mode", () => {
-  it("probes MCP server and renders discovered tools list with auto-populated name", async () => {
+describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
+  it("probes MCP server and renders discovered tools list with auto-populated name in create mode", async () => {
     const user = userEvent.setup({ delay: null })
     const mockProbe = vi.fn().mockResolvedValue({
       server_url: "https://mcp.github.com",
@@ -2932,6 +2988,131 @@ describe("Phase 212 · interactive pre-save discovery in MCP mode", () => {
     expect(screen.getByText("Discovered tools (2)")).toBeInTheDocument()
     expect(screen.getByText("github_search")).toBeInTheDocument()
     expect(screen.getByText("github_issue")).toBeInTheDocument()
+    expect(mockProbe).toHaveBeenCalledWith({
+      mcp_server_url: "https://mcp.github.com/v1",
+      secret: undefined,
+    })
+  })
+
+  it("⭐ D-4 — in edit mode, Discover tools calls `discoverConnectorTools(connection.id)` to decrypt stored credential server-side", async () => {
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "add_issue_comment", description: "Add issue comment", inputSchema: {} },
+      { name: "create_pull_request", description: "Create PR", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    const connection = makeMcpConnection({ id: "conn_github_123", service_id: "github" })
+    renderPanel({ mode: "edit", connection })
+
+    const probeBtn = screen.getByTestId("connection-probe-mcp-btn")
+    expect(probeBtn).toBeInTheDocument()
+    await user.click(probeBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    })
+    expect(mockDiscover).toHaveBeenCalledWith("conn_github_123")
+    expect(mockProbe).not.toHaveBeenCalled()
+    expect(screen.getByText("Discovered tools (2)")).toBeInTheDocument()
+    expect(screen.getByText("add_issue_comment")).toBeInTheDocument()
+  })
+
+  it("⭐ D-4 — a TYPED secret does NOT send an existing row back to the probe: a saved row always reports on what is STORED", async () => {
+    // ⚠ THE FIRST DRAFT OF THE D-4 FIX GATED ON `!draft.secret.trim()`, so typing a replacement
+    // token sent an EXISTING connection back to `probeMcpServer`. That reports on a credential
+    // the row does not hold — a green result for a token Save might never write — and it is a
+    // different verdict from the one `Check credentials` gives for the same row one control
+    // over. Two controls on one row that can disagree about the same credential is the defect.
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "add_issue_comment", description: "Add issue comment", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    renderPanel({ mode: "edit", connection: makeMcpConnection({ id: "conn-mcp-typed" }) })
+
+    // Replace the stored secret, then discover WITHOUT saving.
+    await user.click(screen.getByTestId("connection-secret-replace"))
+    await user.type(screen.getByLabelText("Access token"), "ghp_a_freshly_typed_token")
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+
+    await waitFor(() => expect(mockDiscover).toHaveBeenCalledWith("conn-mcp-typed"))
+    expect(mockProbe).not.toHaveBeenCalled()
+  })
+
+  it("⭐ D-4b — a CAPABILITY row in edit mode offers `Refresh actions`, and it calls the SAVED-ROW endpoint", async () => {
+    // ⚠ THE OPERATOR FOUND THIS BY DRIVING, AFTER D-4 WAS ALREADY FIXED: "for the old
+    // connections like JIRA and email and slack it does not show discover tools, it is only
+    // showing check credentials." `discover_connection_tools` has served the capability shape
+    // since Phase 211 — from the adapter's static descriptor, with NO network call — and no
+    // control was ever rendered for it, so the arm was unreachable from the UI.
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    // The default fixture IS a capability row: `send_email`, no `mcp_server_url`.
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-1" }) })
+
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+
+    await waitFor(() => expect(mockDiscover).toHaveBeenCalledWith("conn-smtp-1"))
+    // ⚠ AND NOT THE PROBE. A capability row has an EMPTY `mcpServerUrl`, so the probe would
+    // have been a 422 about a field this shape does not have.
+    expect(mockProbe).not.toHaveBeenCalled()
+    expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    expect(screen.getByText("send_email")).toBeInTheDocument()
+  })
+
+  it("⭐ D-4b — a capability row's actions render WITHOUT a Granted checkbox, because `handleSave` would drop it", async () => {
+    const user = userEvent.setup({ delay: null })
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-2" }) })
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    // ⚠ ABSENCE, and the note that explains the absence. `handleSave` writes `tool_grants`
+    // only on the `mcp` shape, so a checkbox here is a switch Save silently drops — the 185
+    // rule that an affordance unable to act is REMOVED, never rendered inert.
+    const list = screen.getByTestId("connection-discovered-tools")
+    expect(within(list).queryByRole("checkbox")).not.toBeInTheDocument()
+    expect(screen.getByTestId("connection-actions-not-grantable")).toBeInTheDocument()
+  })
+
+  it("⭐ D-4b — a capability DRAFT offers NO refresh control, because there is no row to refresh from", () => {
+    // Removed rather than disabled: the endpoint reads a row by id, and a draft has none.
+    renderPanel({ mode: "create" })
+    expect(screen.queryByTestId("connection-refresh-actions-btn")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-4b — a discovery REFUSAL renders on a capability row, which it could not while the error node lived inside the `mcp` arm", async () => {
+    const user = userEvent.setup({ delay: null })
+    // The route's real worded 409 for a shape with nothing to reach — carried by the client
+    // since this phase, and previously replaced by the fixed string "Failed to discover tools".
+    vi.spyOn(api, "discoverConnectorTools").mockRejectedValue(
+      new api.ConnectorApiError(
+        "This connection names a service but no way to reach it yet, so there are no actions to list.",
+        409,
+        "nothing_to_discover_yet",
+      ),
+    )
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-3" }) })
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+
+    const node = await screen.findByTestId("connection-probe-error")
+    expect(node).toHaveTextContent("no way to reach it yet")
   })
 
   it("pre-fills form when opened with presetServiceId from catalog", () => {

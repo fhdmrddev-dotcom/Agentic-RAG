@@ -68,8 +68,20 @@ import { describe, expect, it } from "vitest"
  *  *"Ticket"*, and only the POSITION tells them apart from ordinary prose. */
 const CATEGORY_WORD = /\b(messages?|tickets?|e-?mails?)\b/i
 
-/** Leg A — an identifier that DECLARES itself to be a set of selectable things. */
-const SELECTABLE_SET_NAME = /(OPTIONS|CHOICES|TABS|CHIPS|FILTERS|SEGMENTS|CATEGORIES)/
+/** Leg A — an identifier that DECLARES itself to be a set of selectable things.
+ *
+ *  ⚠ `SERVICES` WAS ADDED 2026-08-27, AND ITS ABSENCE HAD JUST COST REAL COVERAGE. Phase 212
+ *  made `SERVICE_SUGGESTIONS` derive its rows from `servicesCatalog.ts` instead of holding
+ *  three literals, which moved the one label this fence exempts into a file whose declarations
+ *  — `POPULAR_SERVICES`, `CATALOG_SERVICES` — matched NEITHER leg: not this name test, and not
+ *  the structural test either, because the catalog keys its labels `name:` and the structural
+ *  count reads only `label:`/`title:`. The result was silent: §3's absence still PASSED, over a
+ *  file it could no longer see. The §2 non-vacuity control is the only thing that caught it.
+ *
+ *  ⚠ MEASURED BLAST RADIUS, not assumed — the anchored declaration grep over both trees returns
+ *  exactly three names: `POPULAR_SERVICES`, `CATALOG_SERVICES`, and `SERVICES_BY_ID` (a `new
+ *  Map(...)` whose body carries no string-literal label, so it contributes nothing). */
+const SELECTABLE_SET_NAME = /(OPTIONS|CHOICES|TABS|CHIPS|FILTERS|SEGMENTS|CATEGORIES|SERVICES)/
 
 /** A top-level declaration head, anchored at column 0 (module scope, never a nested one). */
 const TOP_LEVEL_DECL =
@@ -111,7 +123,28 @@ export interface Offender {
  *  RE-OPEN TRIGGER: *a second entry ever being added to this list, or the list growing a
  *  reader that branches on its labels.* Either turns a suggestion into a taxonomy. */
 const EXEMPT_DECLARATIONS: ReadonlyArray<{ file: RegExp; declaration: string }> = [
-  { file: /connectionFormCopy\.ts$/, declaration: "SERVICE_SUGGESTIONS" },
+  // ⚠ THE EXEMPTION FOLLOWED ITS TARGET. Until 2026-08-27 this read
+  // `{ connectionFormCopy.ts, SERVICE_SUGGESTIONS }`, because that list held the literal
+  // `{ service_id: "smtp", label: "Email over SMTP" }`. Phase 212 made the list DERIVE its rows
+  // from the catalog — one name per service, which is what the catalog is for — so the label
+  // now lives in `servicesCatalog.ts` as `name: "Email (SMTP)"` and the old entry exempted a
+  // declaration that no longer offends. An exemption whose target has moved is exactly the
+  // "hole with a comment over it" this block's own §2 control exists to refuse.
+  //
+  // The REASONING is unchanged and still correct: this is a SERVICE IDENTITY in a catalog of
+  // service identities beside Slack, Jira and GitHub — it names a PROTOCOL a person recognises,
+  // not a verb category they are made to choose between before they may see a connection.
+  //
+  // RE-OPEN TRIGGER: *the catalog growing a reader that branches on these names*, or a name
+  // being added that is a verb rather than a product. Either turns a catalog into a taxonomy.
+  //
+  // ⚠ ONE ENTRY, AND `CATALOG_SERVICES` DELIBERATELY IS NOT A SECOND. It is declared as
+  // `[...POPULAR_SERVICES, {...}]`, so the SMTP string literal lives in exactly ONE block body
+  // and only that block ever offends — the first draft of this move exempted both and the §2
+  // control failed at `toHaveLength(2)`, which is the control doing its job on the exemption
+  // list itself. An exemption for a declaration that does not offend is the same hole in the
+  // other direction.
+  { file: /servicesCatalog\.ts$/, declaration: "POPULAR_SERVICES" },
 ]
 
 function isExempt(file: string, declaration: string): boolean {
@@ -412,7 +445,16 @@ describe("211-05 · the verb fence is FALSIFIED before it is trusted (T-211-24)"
     // A blanket "ignore anything containing SMTP" would be a hole. There is exactly one
     // exemption, it names one declaration in one file, and §2 proves it is load-bearing.
     expect(EXEMPT_DECLARATIONS).toHaveLength(1)
-    expect(EXEMPT_DECLARATIONS[0].declaration).toBe("SERVICE_SUGGESTIONS")
+    // ⚠ IT MOVED, IT DID NOT MULTIPLY. Phase 212 derived `SERVICE_SUGGESTIONS` from the
+    // catalog, taking the one offending literal with it — so the exemption names the catalog's
+    // `POPULAR_SERVICES` now and the list is still exactly one row wide.
+    expect(EXEMPT_DECLARATIONS[0].declaration).toBe("POPULAR_SERVICES")
+    expect(EXEMPT_DECLARATIONS[0].file.test("/src/components/settings/servicesCatalog.ts")).toBe(
+      true,
+    )
+    // …and it is not a blanket over the file: a sibling declaration in the same file is NOT
+    // exempt, which is what stops "one row wide" from quietly becoming "one file wide".
+    expect(EXEMPT_DECLARATIONS[0].declaration).not.toBe("CATALOG_SERVICES")
   })
 })
 
@@ -481,19 +523,37 @@ describe("211-05 · the walk is NON-VACUOUS on two independent floors", () => {
     )
   })
 
-  it("⚠ the ONE exemption is LOAD-BEARING — the entry really would fire without it", () => {
+  it("⚠ the exemptions are LOAD-BEARING — the catalog entry really would fire without them", () => {
     // An exemption whose target no longer fires is a hole with a comment over it. Re-derive
     // it here rather than trusting the comment: strip the exemption and the offender appears.
-    const path = "/src/components/settings/connectionFormCopy.ts"
+    //
+    // ⚠ THIS CONTROL IS THE ONLY THING THAT CAUGHT THE 2026-08-27 COVERAGE LOSS. Phase 212
+    // moved the exempted label from `connectionFormCopy.ts` into `servicesCatalog.ts`, and §3's
+    // absence assertion went on passing over a file the matcher could no longer reach. A fence
+    // that cannot fail is not a fence — which is precisely what this case is for.
+    const path = "/src/components/settings/servicesCatalog.ts"
     const source = SURFACE[path]
     expect(typeof source).toBe("string")
     // Same file, a name the exemption does not match → the exemption cannot apply.
     const unexempt = categoryOffenders("not-the-exempt-file.ts", source)
-    expect(unexempt.map((o) => o.text)).toContain(
-      'SERVICE_SUGGESTIONS · label: "Email over SMTP"',
-    )
-    // And it is the ONLY thing that entry contributes — the exemption is one row wide.
+    const texts = unexempt.map((o) => o.text)
+    expect(texts).toContain('POPULAR_SERVICES · name: "Email (SMTP)"')
+    // ⚠ AND THE SMTP ROW IS THE ONLY OFFENDER IN THE CATALOG. If a future catalog row adds a
+    // second, this number moves and the addition is READ rather than absorbed: that is the
+    // difference between an exemption and a blanket.
     expect(unexempt).toHaveLength(1)
+  })
+
+  it("⚠ and with the exemptions APPLIED the catalog contributes nothing — the exemption is a row, not a blanket", () => {
+    // The other half of the pair. Without this, an exemption that swallowed the whole file
+    // would satisfy the case above just as well as one that swallows a single row.
+    const path = "/src/components/settings/servicesCatalog.ts"
+    expect(categoryOffenders(path, SURFACE[path])).toHaveLength(0)
+    // ⭐ And the catalog really WAS reached — the declarations resolve as selectable sets, which
+    // is the property that silently stopped holding when the label moved here.
+    expect(selectableDeclarations("not-the-exempt-file.ts", SURFACE[path])).toContain(
+      "CATALOG_SERVICES",
+    )
   })
 })
 

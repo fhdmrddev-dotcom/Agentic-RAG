@@ -243,7 +243,17 @@ export async function checkConnectorConnection(id: string): Promise<ConnectorChe
   return res.json() as Promise<ConnectorCheckResult>
 }
 
-/** Phase 206 (D-206-05) — Discover tools from a remote MCP server connection. */
+/** Phase 206 (D-206-05) / Phase 211 — Refresh a SAVED connection's action list, whatever its
+ *  shape. The route serves all three arms: an MCP row is asked over the network, a capability
+ *  row is re-read from its adapter's static descriptor with NO network call, and a
+ *  service-only row answers `409 nothing_to_discover_yet`.
+ *
+ *  ⚠ IT SENDS NO BODY, AND THAT IS THE SECURITY PROPERTY — the same one
+ *  `checkConnectorConnection` carries. The server decrypts the STORED secret itself, so no
+ *  plaintext credential crosses the wire. This is why it, and not `probeMcpServer`, is the
+ *  path an EXISTING connection must use: a saved row renders its token MASKED and
+ *  `draft.secret` is empty by design, so the probe could never authenticate for one.
+ */
 export async function discoverConnectorTools(id: string): Promise<McpDiscoveredTool[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/connectors/connections/${id}/discover`, {
@@ -251,11 +261,16 @@ export async function discoverConnectorTools(id: string): Promise<McpDiscoveredT
     headers,
   })
   if (!res.ok) {
-    throw new ConnectorApiError(
-      "Failed to discover tools",
-      res.status,
-      await readConnectorReasonCode(res),
-    )
+    // ⚠ CARRY THE SERVER'S OWN WORDS — the identical defect `probeMcpServer` carried until
+    // 2026-08-27, still standing here one function later because that fix was applied to the
+    // call site that had been driven rather than to the family. This route computes THREE
+    // distinct worded reasons — `nothing_to_discover_yet`, `cannot_refresh_actions`, and the
+    // remote arm's `MCP tool discovery failed: <what the host said>` — and every one of them
+    // was replaced by the fixed string "Failed to discover tools", which names nothing and
+    // sends the reader looking for an outage that may not exist.
+    // ⚠ The body can be read ONCE, so the code and the message come from a single parse.
+    const { reasonCode, message } = await readConnectorFailure(res)
+    throw new ConnectorApiError(message ?? "Failed to discover tools", res.status, reasonCode)
   }
   return res.json() as Promise<McpDiscoveredTool[]>
 }

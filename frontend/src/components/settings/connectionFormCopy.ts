@@ -40,6 +40,14 @@ import type {
 // and from another tenant's stored row — the exact sink `own()` exists for (T-211-15a). This
 // module is the sixth caller; the helper takes zero imports and is un-cyclable by construction.
 import { own } from "@/components/workflows/ownProperty"
+// Phase 212 — the presentation catalog is the ONE place a service is described. Declared HERE
+// with the other imports and not mid-file: an `import` wedged between a docblock and the const
+// it documents silently re-points that docblock at the import (it landed on
+// `SERVICE_CUSTOM_ENDPOINT_LABEL`'s TDZ note, which is about something else entirely).
+import {
+  CATALOG_SERVICES,
+  getCuratedServiceEntry,
+} from "@/components/settings/servicesCatalog"
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 1 · THE PANEL CHROME (§11d — the copy table, verbatim)
@@ -151,9 +159,10 @@ export const SERVICE_SUGGESTIONS: ReadonlyArray<{
   service_id: string
   label: string
 }> = [
-  { service_id: "slack", label: "Slack" },
-  { service_id: "jira", label: "Jira" },
-  { service_id: "smtp", label: "Email over SMTP" },
+  ...CATALOG_SERVICES.map((s) => ({
+    service_id: s.serviceId,
+    label: s.name,
+  })),
   { service_id: "custom", label: SERVICE_CUSTOM_ENDPOINT_LABEL },
 ]
 
@@ -177,6 +186,23 @@ export const SERVICE_TO_SHAPE: Record<string, ConnectionShape> = {
   custom_mcp: "mcp",
   mcp: "mcp",
 }
+
+// ⚠ THIS MAP IS DELIBERATELY *NOT* GENERATED FROM `CATALOG_SERVICES`, and D-5 was briefly
+// fixed twice — once here by spreading a catalog-derived `Object.fromEntries(...)` in, and
+// once in `shapeForService` below. ONE mechanism was kept, and this is the one that went:
+//
+//   * `Object.fromEntries` is typed `{[k: string]: any}`, so the spread ERASED the
+//     `Record<string, ConnectionShape>` annotation on every catalog-derived value — a
+//     mistyped shape string would have compiled clean, in the map whose whole job is to be
+//     total over five shapes.
+//   * It spread AFTER the literal keys, so a future catalog row could silently override
+//     `custom` / `custom_mcp` / `mcp` — order-fragility in a lookup nobody re-reads.
+//   * It re-encoded markKey→shape as an inline ternary chain, which is a SECOND copy of the
+//     knowledge the four literal rows above already hold. Two places to remember a service
+//     is one more than D-5 existed to remove.
+//
+// What stays here is exactly what a catalog CANNOT know: which identities have a FIRST-PARTY
+// ADAPTER behind them. `shapeForService` reads this first and the catalog second.
 
 /**
  * The service-facing label for an identity.
@@ -207,7 +233,40 @@ export const serviceLabelOf = (serviceId: string): string =>
  */
 export function shapeForService(serviceId: string, endpoint: string = ""): ConnectionShape {
   if ((endpoint || "").trim().toLowerCase().startsWith("https://")) return "mcp"
-  return own(SERVICE_TO_SHAPE, (serviceId || "").trim().toLowerCase()) ?? "service"
+
+  // 1 · An identity with a FIRST-PARTY ADAPTER behind it keeps its capability field set.
+  //     This arm is read FIRST and its three rows are the reason: `slack` is a catalog entry
+  //     whose `markKey` is `"slack"`, but `jira` and `smtp` would BOTH satisfy arm 2's shape
+  //     test on a future catalog edit, and an adapter-backed row silently becoming an MCP row
+  //     is a credential pointed at the wrong wire.
+  const explicit = own(SERVICE_TO_SHAPE, (serviceId || "").trim().toLowerCase())
+  if (explicit) return explicit
+
+  // 2 · Phase 212 (D-5) — OTHERWISE THE CATALOG'S OWN SHAPE DECIDES, AND THAT IS THE WHOLE FIX.
+  //
+  // ⚠ THIS FUNCTION USED TO END AT ARM 1, AND THREE OF SEVEN `isPopular` SERVICES WERE
+  // UNUSABLE BECAUSE OF IT. `github`, `notion` and `google` ship in `POPULAR_SERVICES` with
+  // `markKey: "mcp"`, and none of them is a key of `SERVICE_TO_SHAPE` — so they resolved to
+  // `"service"`, whose field set is Name and NOTHING ELSE. The card rendered, the panel
+  // opened, and there was no field to type a URL or a token into. Driven 2026-08-27: typing
+  // `github` offered one field; typing `custom_mcp` offered three.
+  //
+  // ⚠ AND IT IS WHY SC#3 PASSED WHILE BEING FALSE — verification confirmed the Popular row
+  // RENDERED and never clicked through to a form. Rendering a card is not connecting a service.
+  //
+  // Keyed on SHAPE, adding a Popular service now costs a catalog row instead of a code branch,
+  // which is exactly what migration 127's `service_id` COMMENT already promises.
+  //
+  // ⚠ `getCuratedServiceEntry`, NOT `getServiceCatalogEntry`. The total lookup synthesizes a
+  // fallback entry carrying `markKey: "mcp"` for ANY unknown identity, so keyed on it every
+  // uncurated `service_id` would become an MCP row and the `"service"` shape would cease to
+  // exist. A MISS must still fall through to arm 3 — that is CONN-08's whole row.
+  const curated = getCuratedServiceEntry(serviceId)
+  if (curated?.markKey === "mcp") return "mcp"
+
+  // 3 · An identity nothing knows about names a service and no way to reach it yet. A real
+  //     shape, not an error state — Phase 215's OAuth is what gives it a way through.
+  return "service"
 }
 
 /**
@@ -966,3 +1025,45 @@ export const PANEL_OFF_FOOTER = "read-only · will not send"
 export const PANEL_SAVE_FAILED = "Couldn’t save that — try again."
 
 export const PANEL_SAVING = "Saving…"
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// PHASE 212 (D-4b) — REFRESHING A SAVED CONNECTION'S ACTION LIST
+//
+// ⚠ THE OPERATOR FOUND THIS BY DRIVING, AFTER D-4 WAS ALREADY FIXED: *"for the old
+// connections like JIRA and email and slack it does not show discover tools, it is only
+// showing check credentials."* They were right, and it is the SAME defect family as D-4 — a
+// working endpoint with no button on it. `discover_connection_tools` grew a CAPABILITY arm in
+// Phase 211 that re-reads the adapter's own static descriptor with NO network call, precisely
+// so a row saved before an adapter's `INPUT_SCHEMA` changed can self-heal in one click. The
+// control for it was never drawn, so the arm has never been reachable from the UI.
+//
+// ⚠ THE TWO CONTROLS DO DIFFERENT THINGS AND THE COPY MUST NOT BLUR THEM. `Check credentials`
+// contacts the vendor with the stored secret and writes a verdict. This one asks *what can
+// this connection DO* — over the network for MCP, from a local descriptor for a capability.
+// A capability refresh contacts nothing, so its label must not promise a round trip.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+export const REFRESH_ACTIONS_LABEL = "Refresh actions"
+export const REFRESH_ACTIONS_BUSY = "Refreshing..."
+
+/** Why the control is here at all, on a shape that contacts nothing. */
+export const REFRESH_ACTIONS_HELP =
+  "Re-reads what this connection can do. It contacts nothing and sends nothing — the list comes from this app's own description of the service."
+
+/** ⚠ A CAPABILITY ROW'S ACTIONS ARE NOT GRANTABLE HERE, AND SAYING SO IS THE HONEST HALF.
+ *  `handleSave` writes `tool_grants` only on the `mcp` shape, so rendering a "Granted" checkbox
+ *  beside a capability action would offer a switch Save does not persist — the 185 rule that a
+ *  write affordance unable to act is REMOVED, not disabled. Reachability, not permission, is
+ *  what this list reports for these shapes. */
+export const REFRESH_ACTIONS_NOT_GRANTABLE =
+  "These are the actions this service publishes. Which of them a workflow step may use is decided at the step, not here."
+
+/** The LAST-RESORT discovery failure sentence, for a thrown value that is not an `Error`.
+ *
+ *  ⚠ IT MUST NOT NAME A SERVER. It replaced *"Failed to discover tools from MCP server"* on a
+ *  handler that now serves three shapes — a capability refresh contacts NOTHING, so naming an
+ *  MCP server there sends the reader hunting an outage that does not exist. Both API clients
+ *  now carry the server's own words, so this is genuinely a last resort rather than the string
+ *  operators used to see. */
+export const DISCOVER_FAILED_FALLBACK =
+  "Could not read this connection's actions. Nothing was changed."
