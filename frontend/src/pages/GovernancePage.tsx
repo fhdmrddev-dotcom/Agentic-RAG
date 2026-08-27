@@ -268,7 +268,19 @@ export function GovernancePage() {
   return (
     <div className="h-full overflow-hidden grid" style={{ gridTemplateColumns: selectedDoc || selectedUnresolvable ? "minmax(0,1fr) 430px" : "minmax(0,1fr)" }}>
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-5">
+        {/* ⚠ THE SAME MEASURE AS SETTINGS (`max-w-6xl`), 2026-08-28 — operator: *"make
+            governance also full width… in the future this governance will be merged with
+            other settings, this is a future milestone"*.
+
+            Matched to Settings rather than left unconstrained, and the reason is that
+            merge: two pages destined to become ONE page should already share a measure, or
+            the merge inherits a seam it then has to reconcile. Settings moved 3xl → 6xl the
+            same day, so this adopts the width it will land inside rather than a third one.
+
+            ⚠ It was one of TWO pages still at `max-w-3xl`; the app carries four widths
+            across six pages and there is no convention. This narrows that to three and does
+            NOT claim to have standardised anything — see `SEED-216`. */}
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-5">
           {/* Counter header — distinct from "Library Health" (D-119-1). */}
           <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
