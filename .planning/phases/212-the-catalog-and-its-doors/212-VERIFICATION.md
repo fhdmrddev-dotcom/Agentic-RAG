@@ -6,7 +6,7 @@ builder: gemini
 reviewer: claude
 verified_at: 2026-08-27
 tree_state: verified at `ac159cc7` (phase executed through `8eeaeb6b`)
-verdict: COMPLETE WITH OWED ROWS
+verdict: SHIPPED WITH TWO SC-LEVEL DEFECTS OPEN
 ---
 
 # Phase 212 — verification
@@ -46,8 +46,8 @@ added in §3.
 |---|---|---|
 | 1 | searchable list of services, each with mark, name, one-line purpose | ✅ **DRIVEN** |
 | 2 | `All / Connected / Not connected`, no filter describing what a connector can *do* | ✅ **DRIVEN** |
-| 3 | **on a cloud install**, connect a Popular service in one click, from the same list | ⚠ **DRIVEN LOCALLY ONLY — the cloud half is UNVERIFIED** |
-| 4 | paste an MCP URL, tools discovered and **become grantable**, no code changed | ⚠ **PARTIAL — discovery was BROKEN and is now fixed; "grantable" is UNVERIFIED** |
+| 3 | **on a cloud install**, connect a Popular service in one click, from the same list | ⛔ **FAILS — 3 of 7 Popular services have no configurable form (§9, D-5)**, and the cloud half is unverified |
+| 4 | paste an MCP URL, tools discovered and **become grantable**, no code changed | ⛔ **PARTIAL — three defects fixed (§3, §9 D-1..D-3); a SAVED connection still cannot discover (§9, D-4)** |
 | 5 | edit preserves per-tool grants; delete removes cleanly | ⚠ **EDIT HALF DRIVEN; delete NOT executed** |
 
 ### SC#1 — driven
@@ -270,3 +270,82 @@ All nine from `212-PREFLIGHT.md`, checked in code rather than read from summarie
   the route's own code produces. The root defect was reproduced and fixed **in the venv**, against
   the real remote server; the `503`'s origin was never identified and is not explained by the
   regression fixed in §3.
+
+
+---
+
+## 9 · ⛔ Defects found by DRIVING, after the phase was first closed
+
+**Recorded 2026-08-27, during a live operator session.** The phase had already been marked
+complete on green gates; **every defect below was invisible to all of them.** They are numbered in
+the order they were found, because each one hid the next.
+
+⚠ **The unifying cause of D-1, D-2 and D-3 is one habit: a test that MOCKS THE THING UNDER TEST.**
+Each defect had a passing test sitting directly on top of it. A mock proves the caller is
+self-consistent; it cannot prove the wire is right.
+
+### D-1 — SNI lost on the IP pin ✅ FIXED (`ac159cc7`)
+See §3. Broke **all** MCP discovery, including Phase 206's shipped path.
+Hidden by a test that monkeypatched `_post` away and asserted only that `server_hostname` was
+*handed* to it — while its docstring claimed *"and SNI"*.
+
+### D-2 — `list_tools` rejected the route's own keyword ✅ FIXED (`474ef7ea`)
+`connectors.py:760` calls `list_tools(server_url=, secret=, timeout=)`. The module wrapper omitted
+`timeout`, so **`POST /connectors/discover-tools` had never once succeeded**:
+`TypeError: list_tools() got an unexpected keyword argument 'timeout'`, observed in the operator's
+uvicorn traceback. `McpClient.list_tools` accepted it all along.
+Hidden by `test_212_discover_seam.py:88`, whose stub **invented the missing parameter**
+(`mock_list_tools(server_url, secret=None, timeout=None)`).
+
+### D-3 — the upstream reason was computed, sent, then discarded ✅ FIXED (`724f9b9f`)
+`probeMcpServer` threw a hardcoded `"Failed to probe MCP server"`. `readConnectorReasonCode` only
+read an **object** detail with `reason_code`, so this route's **plain-string** details were dropped.
+After the fix the operator immediately got two distinct, actionable upstream messages
+(`HTTP 401: bad request: missing required Authorization header` from GitHub;
+`{"error":"invalid_token"…}` from Notion). Same family as `BUG-260815-06`.
+
+### D-4 — ⛔ OPEN — a SAVED MCP connection can never discover its tools
+`ConnectionFormPanel` imports **only** `probeMcpServer`, the **pre-save** probe. It never calls
+`discoverConnectorTools(id)` — the Phase 206 endpoint that decrypts the stored secret server-side.
+
+In edit mode `draft.secret` is empty **by design** (*"never rendered back to any browser once
+saved"*), so the probe posts `secret: undefined` and the remote server sees no `Authorization`
+header. **Measured:** `Notion` and `GitHub` both have `secret_ciphertext` stored, and both probes
+still failed with *missing Authorization*. The operator regenerated both tokens — which of course
+changed nothing, because no token was being sent at all.
+
+**Consequence:** the pre-save probe is the only wired path, and it structurally cannot authenticate
+for a connection that already exists. This is the second half of SC#4's *"become grantable"*.
+
+### D-5 — ⛔ OPEN — three Popular services have no configurable form
+The form reveals fields by service id. Driven in the browser, on a fresh Add panel:
+
+| service typed | fields offered |
+|---|---|
+| `slack` | Name · **Channel** · **Bot token** |
+| `custom_mcp` | Name · **MCP server URL** · **Access token** |
+| **`github`** | Name — **and nothing else** |
+| **`notion`** | Name — **and nothing else** |
+
+`servicesCatalog.ts` ships `github`, `notion` and `google` as `isPopular: true` with
+`markKey: "mcp"`, but MCP fields render only for the literal id `custom_mcp`, and credential fields
+only for the three legacy capability shapes. **So `Connect` on GitHub or Notion opens a panel with
+nothing to fill and nothing to save — 3 of the 7 Popular services are decorative.**
+
+⚠ **This is SC#3 failing, not polish.** *"connects one of the curated Popular services in one
+click"* is false for three of them.
+
+⚠ **AND IT IS A HOLE IN MY OWN VERIFICATION, not only in the build.** §2 recorded SC#3 as driven
+locally on the evidence that the Popular row **rendered**. I never clicked through to a configurable
+form. Rendering a card is not connecting a service, and the criterion says *connects*.
+
+### Operator workaround, until D-4 and D-5 are fixed
+Use service **`custom_mcp`**, paste the URL and the token, and click **Discover tools while still on
+the create form** — before saving.
+
+### Disposition
+G-7 fires (2 rounds used) and both open defects are **larger than a G-3 fast fix**: D-4 needs the
+panel to choose between two endpoints with different response shapes; D-5 needs the form's
+field-reveal keyed on catalog **shape** rather than on three hard-coded ids. Neither is a patch.
+**They are carried into Phase 213**, which owns the connection detail screen (`BUS-019`) and is
+where the grant surface D-4 feeds will be built.

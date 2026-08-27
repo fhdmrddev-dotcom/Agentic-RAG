@@ -126,7 +126,7 @@ it.*
 
 - [ ] **Phase 210: Ground Truth — Operability & Failure Honesty** — kill-switch visible and effective, a schedule cannot be silently accepted on a scheduler-off install, a null-`org_id` manual trigger works, and an embedding-provider failure is named as one (CONN-09, CONN-10, CONN-11, RAG-09)
 - [ ] **Phase 211: The Connection Is a Service, Not a Verb** — service-shaped connections whose actions come from advertised tools; the three verbs demoted to an attribute; the OAuth-shaped row can exist (CONN-04, CONN-05, CONN-08) ⭐ PREREQUISITE
-- [x] **Phase 212: The Catalog and Its Doors** — searchable service catalog with marks and purposes, state-only filters, a Popular row, the paste-a-URL door, and edit/delete that keeps grants (CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07)
+- [~] **Phase 212: The Catalog and Its Doors** — searchable service catalog with marks and purposes, state-only filters, a Popular row, the paste-a-URL door, and edit/delete that keeps grants (CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07)
 - [ ] **Phase 213: Per-Tool Grants and the Approval Moment** — one list of reads and writes, an inheritable default posture, a run that pauses and names service/tool/arguments, a refusal that names its grant, and an audit receipt per call (GRANT-01..05) ⭐ HARD PREREQUISITE for 216
 - [ ] **Phase 214: A Step Names Its Service and Its Action** — service→action picking with no URL and no hand-written JSON, arguments that arrive from every launch path, a publish that refuses the unsatisfiable, honest step identity and failure on the run surfaces, and a describe door bound to the author's real vocabulary (STEP-01..06)
 - [ ] **Phase 215: BYO OAuth** — customer-registered client id/secret, an authorization-code consent that works self-hosted, silent refresh, a plainly-stated revoked state, and secrets unreadable at rest (OAUTH-01..03)
@@ -276,7 +276,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 210. Ground Truth — Operability & Failure Honesty | 3/3 | ✅ Complete (1/5 SC driven; 4 owed — see 210-VERIFICATION.md) | 2026-08-26 |
 | 211. The Connection Is a Service, Not a Verb | 5/5 | ✅ Complete (mig 127 applied; UAT rows + schema regen owed — see 211-05-SUMMARY.md) | 2026-08-27 |
-| 212. The Catalog and Its Doors | 7/7 | ✅ Complete (2 gap-closure rounds) | 2026-08-27 |
+| 212. The Catalog and Its Doors | 7/7 | ⛔ Shipped, 2 SC-level defects OPEN (D-4, D-5 → 213) | 2026-08-27 |
 | 213. Per-Tool Grants and the Approval Moment | 0/? | Not started | - |
 | 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
 | 215. BYO OAuth | 0/? | Not started | - |

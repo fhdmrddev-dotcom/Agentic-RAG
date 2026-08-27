@@ -40,7 +40,7 @@ Phase numbering continues at **210**.
 Phase: 213 (per-tool-grants-and-the-approval-moment) — NOT STARTED. ⭐ **CLAUDE-BUILT**
 (AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
 Plan: —
-Status: **Phase 212 ✅ COMPLETE WITH OWED ROWS**, closed 2026-08-27. 7 plans / 6 waves + 2
+Status: ⛔ **Phase 212 SHIPPED WITH TWO SC-LEVEL DEFECTS OPEN** (D-4, D-5 — see §9 of the verification). Closed 2026-08-27, then RE-OPENED the same day by a live operator drive. 7 plans / 6 waves + 2
 gap-closure rounds, then a reviewer driven check. Full record:
 `.planning/phases/212-the-catalog-and-its-doors/212-VERIFICATION.md`.
 Last activity: 2026-08-27 — reviewer driven check + `ac159cc7`.
@@ -78,6 +78,36 @@ only its (genuine victim-naming) confirmation sheet was read and cancelled.
 phase even closed; `SettingsPage.tsx` and `ModelPillRow.tsx` were claimed and never written. Five rows
 added with sections. `SettingsPage.tsx`'s re-open trigger did **not** fire — the row closes a blind
 spot, it does not discharge the trigger.
+
+⛔ **FIVE DEFECTS WERE FOUND BY DRIVING, AFTER THE PHASE WAS FIRST CLOSED ON GREEN GATES.** Three
+fixed, two OPEN. Full record: §9 of `212-VERIFICATION.md`.
+
+- **D-1 SNI lost on the IP pin** ✅ `ac159cc7` — broke ALL MCP discovery, incl. Phase 206's shipped path.
+- **D-2 `list_tools` rejected the route's own `timeout` kwarg** ✅ `474ef7ea` — `POST /discover-tools`
+  had **never once succeeded**.
+- **D-3 the upstream reason was computed, sent, then discarded** ✅ `724f9b9f`.
+- ⛔ **D-4 OPEN — a SAVED MCP connection can never discover its tools.** The panel imports only
+  `probeMcpServer` (pre-save) and never `discoverConnectorTools(id)`. In edit mode `draft.secret` is
+  empty BY DESIGN, so the probe sends no credential. Measured: Notion and GitHub both hold
+  `secret_ciphertext` and both still failed *missing Authorization*; the operator regenerated both
+  tokens, which changed nothing because no token was ever sent.
+- ⛔ **D-5 OPEN — 3 of 7 Popular services have NO configurable form.** Driven: typing `github` or
+  `notion` reveals only Name; `custom_mcp` reveals URL + token; `slack` reveals Channel + Bot token.
+  Field reveal is keyed on three hard-coded ids, not on catalog shape. **This is SC#3 failing.**
+
+⚠ **D-5 IS ALSO A HOLE IN MY OWN VERIFICATION.** I recorded SC#3 as driven because the Popular row
+RENDERED. I never clicked through to a configurable form. Rendering a card is not connecting a
+service, and the criterion says *connects*.
+
+⚠ **THE UNIFYING CAUSE OF D-1..D-3 IS ONE HABIT: a test that MOCKS THE THING UNDER TEST.** Each had a
+passing test sitting directly on top of it — one stub even INVENTED the parameter the real function
+lacked. 2,796 passing tests saw none of it.
+
+**Operator workaround** until D-4/D-5 land: use service `custom_mcp`, paste URL + token, and click
+**Discover tools BEFORE saving**.
+
+**D-4 and D-5 are carried into Phase 213** — larger than a G-3 fast fix, and 213 owns the connection
+detail screen (`BUS-019`) where the grant surface D-4 feeds will live.
 
 ## Owed after 212
 
