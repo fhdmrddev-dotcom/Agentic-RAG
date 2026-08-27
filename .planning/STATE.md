@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-27T18:48:00.000Z"
-last_activity: 2026-08-27 -- Phase 213 complete across all 5 waves; 173 backend pytest green, vitest count gate OK 119/119 (5865 tests).
+last_updated: "2026-08-28T00:00:00.000Z"
+last_activity: 2026-08-28 -- Phase 213 CLOSED after gap-closure round 1 + the driven check (6 real runs); SC#3 PARTIAL, three findings recorded. Cloud parity owed on migration 128.
 progress:
   total_phases: 14
-  completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
-  percent: 36
+  completed_phases: 6
+  total_plans: 22
+  completed_plans: 22
+  percent: 43
 ---
 
 # Project State
@@ -32,13 +32,66 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 213 ✅ **CLOSED** (all 5 waves executed, 10 BUILD-CONTRACT invariants verified, all gates passed) — ready for Phase 214.
+**Current focus:** Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 213 (per-tool-grants-and-the-approval-moment) — **COMPLETE** (5/5 plans across 5 waves).
-Plan: 213-05 ✅ executed. Next: Phase 214.
+Phase: 213 (per-tool-grants-and-the-approval-moment) — **CLOSED 2026-08-28, DRIVEN, with three
+findings recorded rather than fixed.** 5 plans / 5 waves + **gap-closure round 1** (`213-06`) +
+`213-07` + four operator-driven fix commits. Next: Phase 214.
+
+⛔ **IT WAS CLOSED ONCE ON GREEN GATES AND THE POST-FLIGHT REFUSED IT.** At `93fc2f521` every gate
+was green and **the approval moment did not exist** — Gate 5.5 refused on `deny` and fell through on
+`ask`, so a tool needing approval dispatched exactly like Allow, and the whole ask/refusal vocabulary
+shipped consumed by nothing. ⚠ **`ask` being inert made the MCP path MORE permissive than pre-213**,
+because the Gate-6 check it replaced read `grants.get(tool) is True` — *a missing key denied*. The
+fix (`d359bd2b`) puts fail-closed back **in the gate** instead of resting on a column default.
+
+✅ **THE DRIVEN CHECK RAN 2026-08-28 — six real workflow runs, live DB, live `mcp.deepwiki.com`
+(`raw_status: 200`), nothing mocked, every verdict read from `workflow_phases` / `harness_audit`.**
+Full record: `213-SUMMARY.md` §3. **SC#1 ✅ · SC#2 ✅ · SC#3 ⚠ PARTIAL · SC#4 ✅ · SC#5 ✅.**
+
+⭐ **BUG-260827-02's run half is CLOSED and was DRIVEN, not reasoned:** a **Slack** step — the
+capability shape, which before this phase consulted **no grant at all** — was stopped by Gate 5.5
+with `tool_refused / posture_denied` *after a person had already approved it* at the armed
+checkpoint. Nothing was sent to Slack, Jira or SMTP: the run was driven with its grant set to `deny`
+first, so the send was refused by the gate under test. Every mutation was reverted and **the revert
+verified** against Postgres.
+
+⚠ **THREE FINDINGS FROM THE DRIVE — recorded, NOT routed into another round (G-7: every ROADMAP
+success criterion bar SC#3's service-naming is verified, and a fourth round would be cleanup of the
+third).**
+
+1. ⚠ **SC#3's "service" is named in NEITHER shape.** `_external_action_clause`
+   (`grounding.py:1283`) fills the service slot from `config.capability`. An **MCP** row carries
+   `capability = None` → the clause is omitted by design (*"never draw a name the system cannot
+   know"*), so GitHub / DeepWiki / Notion pauses name no service. A **capability** row carries the
+   same value in both slots → **`It will run "post_message" through post_message.`** — a tautology.
+   The service a person needs is *Slack*, which sits on the connection row and is not resolved
+   because the composer is pure. **Driven verbatim on both shapes.** → **route to 214.**
+2. ⚠ **The override marker overclaims — "You changed this" on rows nobody changed.**
+   `isOverridden` is keyed on **key presence** (`ConnectionGrantsList.tsx:29`), and migration 128 §3
+   backfills an explicit key onto every capability row. Slack's `post_message` shows the marker and
+   **no person can have set it** — the control was unreachable for that shape until `09bfcb95f`, the
+   same day.
+3. ⚠ **The `approval_required` arm is UNREACHABLE from a workflow, and the drive proved it rather
+   than assuming it.** A step authored `action_risk_armed: false` still emitted
+   `action_risk_pending` — the armed checkpoint is structural on `external_action`
+   (`models/harness.py:475`). Gate 5.5's unarmed-`ask` refusal is the fail-closed floor **for Phase
+   216's chat path** and cannot be exercised by anything the product ships today. It is right, and it
+   is untestable from the product until 216.
+
+▪ Minor, recorded: the human *"Do not run it"* writes **no audit event of its own** (approve writes
+`validator_ask_user_approved`; the decline lives only inside `run_failed`'s reason prose) · the
+Unknown-direction help sentence is MCP-voiced (*"This server does not say…"*) on a capability row
+that has no server · a run whose only phase `failed` on a refusal still reports `run_completed`
+(the Phase-200 family, in the harness's D-17 mapping, not in anything 213 wrote).
+
+⚠ **CLOUD PARITY IS OWED — migration 128 is applied to the LOCAL DB only.** Everything above is
+local. `128_connector_connection_posture.sql` must be pasted into the cloud SQL editor **in the same
+operation** as the backend deploy: the column carries the fail-closed default, and code that reads
+`default_approval_posture` against a column that does not exist is an outage.
 
 ✅ **The owed G-2 sketch SHIPPED** (`ebf52284`) —
 `.planning/sketches/213-grants-and-the-approval-moment/` is the acceptance bar: 66 assertions,
