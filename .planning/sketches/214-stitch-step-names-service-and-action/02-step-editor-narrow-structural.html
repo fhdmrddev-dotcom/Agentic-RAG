@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Workflow Step Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#0b0664",
+                        "tertiary": "#4ee478",
+                        "surface-container-highest": "#303540",
+                        "on-surface": "#dee2f1",
+                        "on-secondary": "#3b0091",
+                        "on-error": "#690005",
+                        "surface-dim": "#0e131e",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "outline-variant": "#464651",
+                        "on-tertiary-container": "#004c1e",
+                        "outline": "#918f9c",
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-secondary-container": "#c3abff",
+                        "on-primary": "#242478",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#dee2f1",
+                        "surface-variant": "#303540",
+                        "surface-tint": "#c1c1ff",
+                        "surface-bright": "#343945",
+                        "surface-container-lowest": "#090e18",
+                        "inverse-surface": "#dee2f1",
+                        "on-surface-variant": "#c7c5d3",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#4be176",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "error": "#ffb4ab",
+                        "tertiary-container": "#26c760",
+                        "surface-container-low": "#171c26",
+                        "surface-container-high": "#252a35",
+                        "secondary": "#d0bcff",
+                        "primary-container": "#a3a5ff",
+                        "inverse-on-surface": "#2b303c",
+                        "on-tertiary": "#003915",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "inverse-primary": "#5355a9",
+                        "on-tertiary-fixed": "#002109",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "secondary-container": "#571ac2",
+                        "surface-container": "#1b202a",
+                        "surface": "#0e131e",
+                        "background": "#0e131e",
+                        "on-primary-container": "#353789",
+                        "on-secondary-fixed": "#23005c",
+                        "primary-fixed": "#e1e0ff",
+                        "primary": "#c3c4ff",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "secondary-fixed": "#e9ddff",
+                        "brand-bg": "#080B11",
+                        "brand-canvas": "#060A0F",
+                        "brand-panel": "#0D1117",
+                        "brand-border": "#212631",
+                        "brand-text-primary": "#F4F6FE",
+                        "brand-text-secondary": "#9AA3B5",
+                        "brand-accent": "#A3A5FF",
+                        "brand-hover": "#151B24"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for panel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #212631;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464651;
+        }
+    </style>
+</head>
+<body class="bg-brand-canvas text-brand-text-primary font-body antialiased h-screen overflow-hidden flex selection:bg-brand-accent selection:text-on-primary-container">
+<!-- Top Navigation -->
+<header class="h-16 fixed top-0 right-0 left-64 z-10 border-b border-brand-border/50 bg-[#060A0F] flex items-center justify-between px-8 w-full transition-all">
+<div class="flex items-center gap-4">
+<span class="font-headline font-medium text-[15px] text-brand-text-secondary">Vendor Outreach Flow</span>
+<span class="material-symbols-outlined text-brand-text-secondary text-sm">chevron_right</span>
+<span class="font-headline font-medium text-[15px] text-brand-text-primary">Send an email</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex items-center justify-center w-8 h-8 rounded hover:bg-brand-hover">
+<span class="material-symbols-outlined">play_arrow</span>
+</button>
+<button class="text-brand-text-secondary hover:text-brand-text-primary transition-colors flex items-center justify-center w-8 h-8 rounded hover:bg-brand-hover">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded font-label text-[13px] font-medium tracking-wide transition-colors hover:opacity-90 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">save</span>
+                Save Step
+            </button>
+</div>
+</header>
+<!-- Main Canvas Area -->
+<main class="flex-1 flex mt-16 ml-64 relative bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#0A0E17] to-brand-canvas">
+<!-- Pseudo Canvas Background Pattern (Subtle grid) -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 24px 24px;"></div>
+<!-- Canvas Mockup (Left edge context) -->
+<div class="flex-1 p-8 relative overflow-hidden">
+<!-- A mockup node connecting to the right panel -->
+<div class="absolute right-0 top-32 flex items-center">
+<div class="w-16 h-[2px] bg-brand-border/80 relative">
+<div class="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-brand-accent shadow-[0_0_8px_rgba(163,165,255,0.4)]"></div>
+</div>
+<div class="bg-brand-panel border border-brand-accent/30 rounded-lg p-4 w-64 shadow-xl -ml-2 z-10 flex flex-col gap-2 transform translate-x-4 opacity-50 pointer-events-none">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-[#ea4335]/10 flex items-center justify-center text-[#ea4335]">
+<span class="material-symbols-outlined text-[14px]">mail</span>
+</div>
+<span class="font-headline text-[13px] text-brand-text-primary">Send an email</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Docked Step Editor Panel -->
+<aside class="w-[440px] bg-brand-panel border-l border-brand-border flex flex-col h-full relative z-20 shadow-2xl">
+<!-- Panel Header -->
+<div class="px-6 py-5 border-b border-brand-border/50 flex flex-col gap-3 shrink-0 bg-surface-container-lowest">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#ea4335]/10 flex items-center justify-center text-[#ea4335] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+<span class="material-symbols-outlined text-[18px]">mail</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline text-[14px] font-semibold text-brand-text-primary">Send an email</span>
+<span class="font-label text-[11px] text-brand-text-secondary flex items-center gap-1">
+                                Gmail <span class="w-1 h-1 rounded-full bg-brand-border inline-block"></span> Standard Action
+                            </span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-hover transition-colors">
+<span class="material-symbols-outlined text-[18px]">help</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-hover transition-colors">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Panel Content / Argument List -->
+<div class="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6">
+<!-- "To" Argument (Prior step value / Pill) -->
+<div class="flex flex-col gap-2 group">
+<div class="flex items-center justify-between">
+<label class="font-label text-[12px] font-medium text-brand-text-primary flex items-center gap-2">
+                            To
+                        </label>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[14px] text-brand-text-secondary cursor-pointer hover:text-brand-text-primary">settings</span>
+</div>
+</div>
+<div class="bg-[#0A0E17] border border-brand-border rounded px-3 py-2 flex items-center gap-2">
+<div class="bg-surface-container-highest border border-outline-variant/50 rounded-full px-2.5 py-1 flex items-center gap-1.5 cursor-pointer hover:bg-surface-bright transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[12px] text-tertiary">data_object</span>
+<span class="font-label text-[12px] font-medium text-on-surface">procurement@aether.ai</span>
+</div>
+</div>
+</div>
+<!-- "Subject" Argument (Provided at run-time) -->
+<div class="flex flex-col gap-2 group">
+<div class="flex items-center justify-between">
+<label class="font-label text-[12px] font-medium text-brand-text-primary flex items-center gap-2">
+                            Subject
+                        </label>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-brand-text-secondary cursor-pointer hover:text-brand-text-primary">settings</span>
+</div>
+</div>
+<div class="bg-brand-hover/30 border border-brand-border border-dashed rounded px-3 py-2 flex items-center gap-3">
+<div class="w-5 h-5 rounded-sm bg-brand-accent/10 flex items-center justify-center text-brand-accent shrink-0">
+<span class="material-symbols-outlined text-[14px]">play_arrow</span>
+</div>
+<span class="font-label text-[13px] text-brand-accent italic flex-1 truncate">Provided at run-time</span>
+</div>
+</div>
+<!-- "Body" Argument (Prior step value / Pill) -->
+<div class="flex flex-col gap-2 group">
+<div class="flex items-center justify-between">
+<label class="font-label text-[12px] font-medium text-brand-text-primary flex items-center gap-2">
+                            Body
+                        </label>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[14px] text-brand-text-secondary cursor-pointer hover:text-brand-text-primary">settings</span>
+</div>
+</div>
+<div class="bg-[#0A0E17] border border-brand-border rounded px-3 py-2 min-h-[80px] flex items-start gap-2 relative">
+<div class="bg-surface-container-highest border border-outline-variant/50 rounded-full px-2.5 py-1 flex items-center gap-1.5 cursor-pointer hover:bg-surface-bright transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[12px] text-tertiary">data_object</span>
+<span class="font-label text-[12px] font-medium text-on-surface">Draft the summary</span>
+</div>
+<div class="w-[1px] h-4 bg-brand-accent animate-pulse mt-1 ml-1"></div>
+</div>
+</div>
+<!-- "Cc" Argument (Unfinished Required - Calm state) -->
+<div class="flex flex-col gap-2 group">
+<div class="flex items-center justify-between">
+<label class="font-label text-[12px] font-medium text-brand-text-primary flex items-center gap-2">
+                            Cc
+                        </label>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[14px] text-brand-text-secondary cursor-pointer hover:text-brand-text-primary">settings</span>
+</div>
+</div>
+<div class="bg-[#0A0E17] border border-brand-border rounded px-3 py-2 flex items-center justify-between cursor-text">
+<span class="font-label text-[13px] text-brand-text-secondary/70">Type value or select source</span>
+<span class="text-[10px] uppercase tracking-wider text-brand-text-secondary bg-surface-container-highest px-1.5 py-0.5 rounded font-bold">Required</span>
+</div>
+</div>
+<!-- "Reply to" Argument (Standard Input Box) -->
+<div class="flex flex-col gap-2 group">
+<div class="flex items-center justify-between">
+<label class="font-label text-[12px] font-medium text-brand-text-primary flex items-center gap-2">
+                            Reply to
+                        </label>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[14px] text-brand-text-secondary cursor-pointer hover:text-brand-text-primary">settings</span>
+</div>
+</div>
+<input class="w-full bg-[#0A0E17] border border-brand-border rounded px-3 py-2 font-mono text-[13px] text-brand-text-primary focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent placeholder:text-brand-text-secondary/50 placeholder:font-body" placeholder="e.g. support@aether.ai" type="text" value="support@aether.ai"/>
+</div>
+</div>
+</aside>
+</main>
+<!-- Side Navigation -->
+<nav class="h-screen w-64 fixed left-0 top-0 flex flex-col bg-[#080B11] border-r border-[#212631]/50 z-20 shadow-xl">
+<!-- Logo/Brand -->
+<div class="px-6 py-6 flex items-center gap-3 shrink-0">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-accent to-on-primary-container flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-white filled text-[18px]">auto_awesome</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline text-lg font-bold text-[#F4F6FE] tracking-tight leading-none">Aether</span>
+<span class="font-label text-[10px] text-brand-accent uppercase tracking-widest mt-1 font-semibold">Deep Midnight</span>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-4 mb-6">
+<button class="w-full bg-brand-panel border border-brand-border hover:border-brand-accent/50 text-brand-text-primary flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-200 group">
+<span class="material-symbols-outlined text-[18px] group-hover:text-brand-accent transition-colors">add</span>
+<span class="font-label text-[13px] font-semibold">New Workflow</span>
+</button>
+</div>
+<!-- Main Nav Links -->
+<div class="flex flex-col flex-1 px-3 gap-1 overflow-y-auto">
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 rounded-lg gap-3 transition-colors hover:bg-[#151B24] hover:text-[#F4F6FE]" href="#">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="font-body text-[14px]">Chat</span>
+</a>
+<!-- Active State (Workflows) -->
+<a class="text-[#A3A5FF] bg-[#A3A5FF]/10 flex items-center px-4 py-3 rounded-lg gap-3 transition-colors font-medium border-l-2 border-[#635BFF] translate-x-1 relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-[#635BFF]/10 before:to-transparent before:rounded-r-lg" href="#">
+<span class="material-symbols-outlined text-[20px] filled z-10 relative">account_tree</span>
+<span class="font-body text-[14px] z-10 relative">Workflows</span>
+</a>
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 rounded-lg gap-3 transition-colors hover:bg-[#151B24] hover:text-[#F4F6FE]" href="#">
+<span class="material-symbols-outlined text-[20px]">database</span>
+<span class="font-body text-[14px]">Knowledge</span>
+</a>
+</div>
+<!-- Footer Nav Links -->
+<div class="px-3 py-4 border-t border-brand-border/50 flex flex-col gap-1 shrink-0 bg-[#080B11]/90 backdrop-blur-sm">
+<a class="text-[#9AA3B5] flex items-center px-4 py-2.5 rounded-lg gap-3 transition-colors hover:bg-[#151B24] hover:text-[#F4F6FE]" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+<span class="font-body text-[13px]">Settings</span>
+</a>
+<a class="text-[#9AA3B5] flex items-center px-4 py-2.5 rounded-lg gap-3 transition-colors hover:bg-[#151B24] hover:text-[#F4F6FE]" href="#">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+<span class="font-body text-[13px]">Documentation</span>
+</a>
+</div>
+</nav>
+</body></html>
