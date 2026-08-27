@@ -4,7 +4,7 @@ milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
 last_updated: "2026-08-27T15:20:00.000Z"
-last_activity: 2026-08-27 -- Phase 212 CLOSED. All 5 driven defects fixed (4aa28090) and operator-confirmed; two findings routed to 213 (74cf0577)
+last_activity: 2026-08-27 -- Phase 213 CONTEXT captured (0daf820b). 16 decisions; G-5 re-derived on 7 files (3 stale); registers written back
 progress:
   total_phases: 14
   completed_phases: 4
@@ -37,9 +37,42 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 213 (per-tool-grants-and-the-approval-moment) — NOT STARTED. ⭐ **CLAUDE-BUILT**
-(AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
-Plan: — (⭐ **an owed G-2 sketch comes BEFORE discuss-phase** — see the layout note below)
+Phase: 213 (per-tool-grants-and-the-approval-moment) — **CONTEXT CAPTURED**, not yet planned.
+⭐ **CLAUDE-BUILT** (AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
+Plan: — (next action: `/gsd:plan-phase 213`)
+
+✅ **The owed G-2 sketch SHIPPED** (`ebf52284`) —
+`.planning/sketches/213-grants-and-the-approval-moment/` is the acceptance bar: 66 assertions,
+`BUILD-CONTRACT.generated.md` emitted *from* the running sketch, operator picks recorded
+(Layout A, the panel stays at `clamp(480px,38%,640px)`).
+
+✅ **Context captured** (`0daf820b`) — `213-CONTEXT.md` + `213-DISCUSSION-LOG.md`, 16 decisions
+(D-213-00..16). Three that a planner must not re-derive:
+
+- ⚠ **An absent `tool_grants` key flips from DENY to INHERIT.** GRANT-02 requires it; the safety
+  moves one level up — a connection's `default_posture` has an **"Ask first" floor** and reaches
+  Allow only by a deliberate act. Nothing is armed by a row merely existing.
+- ⚠ **Migration 128 grandfathers PER SHAPE.** MCP rows are gated today (absent = denied);
+  capability rows are **not gated at all** (`BUG-260827-02`). One uniform backfill breaks one of
+  the two populations — deny-everything breaks every shipped external_action workflow silently.
+- ⚠ **Measured, not assumed:** `ChatLayout.launch.test.tsx:502` asserts `WorkspacePanel` mounts
+  **only** in the chat branch, so `PendingAskCard` does not exist on `WorkflowRunPage` — a
+  library-launched run that pauses has nowhere to be answered. Same shape as the Phase 194
+  Stop-control finding.
+
+⚠ **G-5 fires on SEVEN files in this blast radius. All seven were re-derived; THREE cells were
+stale** (`ConnectionFormPanel.tsx` 2009→**2124** L, `connectionFormCopy.ts` 968→**1069** L,
+`models/connector.py` 3→**4** phases), and `phase_types.py`'s obligation reads **OWED** since
+`BUG-260827-01` closed. **Gate 6 sits at line 2511 of that 2,664-line file**, so D-213-00 takes the
+refactor by construction: the gate leaves into `backend/app/services/connectors/grants.py` on the
+`human_input.py` precedent, and the 44-row grant list is a new component, not new lines in
+`ConnectionFormPanel.tsx`.
+
+**Registers swept AND written back** (not merely noted): `BUG-260827-02` → `status: folded`,
+`folded_into: 213`. `BUG-260826-01` / `-02` / `-05` → `folded_into: 214` (until now only ROADMAP
+prose pointed at them). `SEED-214` → `status: partially-folded`, with the unlock/filling split
+recorded and triggers 2–4 named as still live. `SEED-188` (prompt injection) left planted with
+**216** as its trigger — 213 ships no read path.
 Status: ✅ **Phase 212 CLOSED 2026-08-27**, all five driven defects fixed and operator-confirmed.
 It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
 the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
