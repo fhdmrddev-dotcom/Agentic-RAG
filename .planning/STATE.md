@@ -37,9 +37,9 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 213 (per-tool-grants-and-the-approval-moment) — **CONTEXT CAPTURED**, not yet planned.
-⭐ **CLAUDE-BUILT** (AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
-Plan: — (next action: `/gsd:plan-phase 213`)
+Phase: 213 (per-tool-grants-and-the-approval-moment) — **PLANNED** (5 plans in 5 waves).
+⭐ **CLAUDE-BUILT / GEMINI-EXECUTED ON OPERATOR INSTRUCTION** (AGENTS.md §3.1 / BUS-024).
+Plan: 213-01 (next action: `/gsd:execute-phase 213` or `213-01-PLAN.md`)
 
 ✅ **The owed G-2 sketch SHIPPED** (`ebf52284`) —
 `.planning/sketches/213-grants-and-the-approval-moment/` is the acceptance bar: 66 assertions,
