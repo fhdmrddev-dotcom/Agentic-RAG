@@ -69,6 +69,7 @@ import {
   moreActionsLabel,
   usageCountsFrom,
   usedByLabel,
+  connectionStateOf,
 } from "../connectionsCopy"
 import type { ConnectorConnection, PublishedWorkflow } from "@/lib/api"
 
@@ -723,6 +724,14 @@ describe("SC#3 — the marks reach the row, and they are each their own", () => 
       id: "conn-4",
       name: "DeepWiki MCP",
       capability: null,
+      // ⚠ ITS OWN IDENTITY, 2026-08-28. This inherited `makeConnection`'s default
+      // `service_id: "smtp"` while being an MCP row — a combination the server cannot
+      // produce (an SMTP identity implies the `send_email` capability, and this row has
+      // none). It was inert until `connectionMark` learned to let a KNOWN identity outrank
+      // the transport for capability-less rows; then the fixture resolved to the mail glyph
+      // and this suite's own distinctness assertion caught it. The fixture was wrong, not
+      // the ladder — and an uncurated hostname is what a real custom-MCP row carries.
+      service_id: "mcp.deepwiki.com",
       mcp_server_url: "https://mcp.deepwiki.com/mcp",
       config: { headers: {} },
       last_checked_at: null,
@@ -1827,5 +1836,56 @@ describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-
 
     const withTitle = container.querySelectorAll("[title]")
     expect(withTitle.length).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// An MCP row's evidence is its DISCOVERY — operator-driven, 2026-08-28
+//
+// Reported: a GitHub connection that had just discovered its tools still read
+// "◌ Not checked". That was not a stale badge, it was a PERMANENT one:
+// `POST /connections/{id}/check` refuses an MCP row with a 409 by design
+// (`check_not_available_for_mcp`), so `last_check_verdict` can NEVER become "ok" on this
+// shape. Every MCP connection ever made was pinned to "Not checked" for life.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("connectionStateOf — an MCP row reads its discovery", () => {
+  const mcpRow = (over: Partial<ConnectorConnection> = {}): ConnectorConnection =>
+    ({
+      id: "c1",
+      is_enabled: true,
+      last_check_verdict: "not_checked",
+      mcp_server_url: "https://mcp.example.com/mcp",
+      discovered_tools: [{ name: "search_code" }],
+      ...over,
+    }) as ConnectorConnection
+
+  it("a discovered MCP connection is READY — the server answered, and that is the evidence", () => {
+    expect(connectionStateOf(mcpRow())).toBe("ready")
+  })
+
+  it("⚠ an EMPTY discovery is NOT evidence — absence read as success is the old defect", () => {
+    expect(connectionStateOf(mcpRow({ discovered_tools: [] }))).toBe("not_checked")
+    expect(connectionStateOf(mcpRow({ discovered_tools: undefined }))).toBe("not_checked")
+  })
+
+  it("NEGATIVE CONTROL — discovery does NOT outrank a real failure or a disable", () => {
+    // Without this, the new arm could paint a disabled or failing row green, which is the
+    // over-claim `is_enabled` is deliberately ordered first to prevent.
+    expect(connectionStateOf(mcpRow({ is_enabled: false }))).toBe("disabled")
+    expect(connectionStateOf(mcpRow({ last_check_verdict: "failed" }))).toBe("failed")
+  })
+
+  it("NEGATIVE CONTROL — a CAPABILITY row is untouched by the new arm", () => {
+    // It has no `mcp_server_url`, so its ladder is byte-identical to what shipped: an
+    // unchecked Slack row is still "not_checked" no matter what it has discovered.
+    const slack = {
+      id: "c2",
+      is_enabled: true,
+      last_check_verdict: "not_checked",
+      capability: "post_message",
+      discovered_tools: [{ name: "post_message" }],
+    } as unknown as ConnectorConnection
+    expect(connectionStateOf(slack)).toBe("not_checked")
   })
 })

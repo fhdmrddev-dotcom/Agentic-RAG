@@ -202,6 +202,41 @@ export const CONNECTION_MARK_KEYS: readonly string[] = Object.keys(MARKS)
  * Resolve a connection's mark. TOTAL over any input — it always returns an entry and NEVER null.
  */
 export function connectionMark(shape: ConnectionMarkShape | null | undefined): ConnectionMarkEntry {
+  // ── 0 · A KNOWN VENDOR IDENTITY WINS OVER THE TRANSPORT ────────────────────────────────
+  //
+  // ⚠ ADDED 2026-08-28, OPERATOR-DRIVEN: *"GitHub is still showing MCP logo, notion and
+  // others"*. The eight vendor marks landed and the CATALOG rows drew them, while every
+  // CONNECTED row still drew the plug — because `ConnectionsTab.tsx:1033` passes the whole
+  // connection (`shape={connection}`), a GitHub connection HAS an `mcp_server_url`, and the
+  // URL arm below answered before the `service_id` lookup was ever reached. The marks were
+  // correct and unreachable, which is the worst of both.
+  //
+  // THE RULE, NARROWED SO IT DOES NOT UNDO D-206.1-11: only a KNOWN vendor wins. An identity
+  // this map has never heard of does NOT win — it falls through and the transport speaks for
+  // it, which is exactly what "MCP identifies itself, it does not fall off the end of a
+  // ladder" asks for. `custom_mcp` is in the map and points AT `MCP_MARK`, so the custom-URL
+  // door is unaffected by construction rather than by a special case.
+  //
+  // ⚠ AND IT IS NARROWED TWICE, NOT ONCE — the second narrowing was MEASURED, not foreseen.
+  // A first cut let a known `service_id` outrank EVERYTHING, and `ConnectionsTab.test.tsx`'s
+  // four-shape row went from four distinct marks to ONE: its fixtures carry the default
+  // `service_id: "smtp"` while overriding only `capability`, so all four resolved to the mail
+  // glyph. That fixture models a row the server cannot produce — but it proved the ordering
+  // was wrong in a way that matters: **a capability is the ADAPTER fact, and the adapter
+  // decides the wire.** An identity must never outrank it.
+  //
+  // So arm 0 fires only when there is NO capability to outrank — which is exactly the shape
+  // the operator reported: an MCP-backed vendor has `capability: null` and a URL. A
+  // capability row never reaches here, and its ladder is byte-identical to what shipped.
+  const identity = shape?.service_id
+  const hasCapability = typeof shape?.capability === "string" && shape.capability.trim().length > 0
+  if (!hasCapability && typeof identity === "string" && identity.trim().length > 0) {
+    const key = identity.trim().toLowerCase()
+    if (Object.prototype.hasOwnProperty.call(SERVICE_MARKS, key)) {
+      return SERVICE_MARKS[key]
+    }
+  }
+
   const url = shape?.mcp_server_url
   if (typeof url === "string" && url.trim().length > 0) return MCP_MARK
 

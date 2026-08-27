@@ -137,6 +137,37 @@ export function connectionStateOf(connection: ConnectorConnection): ConnectionSt
   if (!connection.is_enabled) return "disabled"
   if (connection.last_check_verdict === "failed") return "failed"
   if (connection.last_check_verdict === "ok") return "ready"
+
+  // ── An MCP row's evidence is its DISCOVERY, because it has no credential check ─────────
+  //
+  // ⚠ ADDED 2026-08-28, OPERATOR-DRIVEN: a GitHub connection that had just discovered its
+  // tools still read "◌ Not checked". That was not a stale badge — it was a PERMANENT one.
+  // `POST /connections/{id}/check` refuses an MCP row outright with a 409
+  // (`check_not_available_for_mcp`, `api/connectors.py:200`) because there is no adapter and
+  // no credential to check, so `last_check_verdict` can NEVER become `"ok"` on this shape.
+  // Every MCP connection ever created was pinned to "Not checked" for life, however well it
+  // worked.
+  //
+  // The refusal names the remedy itself — *"Bind it to a step and use Discover tools to
+  // confirm the server answers."* So discovery IS this shape's check, and a non-empty
+  // `discovered_tools` is the record that the server answered. Reading it here makes the
+  // badge mean the same thing on both shapes: *we reached this, and it responded*.
+  //
+  // ⚠ IT IS HISTORICAL EVIDENCE, AND SO IS THE OTHER ARM. `last_check_verdict === "ok"` is
+  // also a past tense — the two-day-old-verdict rule (`test_190_connector_check.py`) exists
+  // precisely because a verdict does not describe now. This arm claims no more than that arm
+  // does, which is the only reason it may share the same word.
+  //
+  // ⚠ AN EMPTY LIST IS NOT EVIDENCE. A row whose discovery returned nothing, or which has
+  // never discovered, stays "not_checked" — absence read as success is the `destinationFactsOf`
+  // defect this file's own history records.
+  if (
+    (connection.mcp_server_url ?? "").trim().length > 0 &&
+    (connection.discovered_tools?.length ?? 0) > 0
+  ) {
+    return "ready"
+  }
+
   return "not_checked"
 }
 

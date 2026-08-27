@@ -491,3 +491,52 @@ describe("SEED-215 — a vendor shows its OWN mark, not the neutral plug", () =>
     expect(connectionMark({ capability: "send_email" }).key).toBe("send_email")
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 6 · Identity beats transport — operator-driven, 2026-08-28
+//
+// *"GitHub is still showing MCP logo, notion and others"*. The eight marks landed and the
+// CATALOG rows drew them, while every CONNECTED row drew the plug: `ConnectionsTab.tsx:1033`
+// passes the whole connection, a GitHub connection HAS an `mcp_server_url`, and the URL arm
+// answered before the `service_id` lookup was reached. Correct marks, unreachable.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("a known vendor's mark survives its transport", () => {
+  it.each(["github", "notion", "google", "figma", "linear", "sentry", "intercom", "miro"])(
+    "a CONNECTED %s row — service_id AND mcp_server_url — still draws the vendor",
+    (serviceId) => {
+      // The exact shape `ConnectionsTab` passes for a configured row.
+      const entry = connectionMark({
+        service_id: serviceId,
+        capability: null,
+        mcp_server_url: "https://mcp.example.com/mcp",
+      })
+      expect(entry.key).toBe(serviceId)
+      expect(bodyOf({ service_id: serviceId, mcp_server_url: "https://x/mcp" })).not.toBe(
+        bodyOf(MCP),
+      )
+    },
+  )
+
+  it("⚠ custom_mcp keeps the MCP mark even though it wins the identity arm", () => {
+    // It is IN the map and points AT `MCP_MARK`, so the custom-URL door is unaffected by
+    // construction rather than by a special case — which is why no `custom_mcp` branch exists.
+    expect(connectionMark({ service_id: "custom_mcp", mcp_server_url: "https://x/mcp" }).key)
+      .toBe("mcp")
+  })
+
+  it("⚠ an UNKNOWN identity does NOT win — the transport still speaks for it (D-206.1-11)", () => {
+    // The narrowing that keeps "MCP identifies itself, it does not fall off the end of a
+    // ladder" true. Only a KNOWN vendor outranks the URL; anything else falls through.
+    expect(
+      connectionMark({
+        service_id: "a-service-nobody-here-has-heard-of",
+        mcp_server_url: "https://x/mcp",
+      }).key,
+    ).toBe("mcp")
+  })
+
+  it("NEGATIVE CONTROL — with no service_id at all the URL still answers", () => {
+    expect(connectionMark({ mcp_server_url: "https://x/mcp" }).key).toBe("mcp")
+  })
+})
