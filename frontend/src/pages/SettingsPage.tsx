@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
  * `TabsList` for why the default reads as a hole rather than a selection on a card.
  */
 const SETTINGS_TAB_CLASS =
-  "text-[13px] data-[state=active]:bg-accent data-[state=active]:text-foreground"
+  "flex-1 text-[13px] data-[state=active]:bg-accent data-[state=active]:text-foreground"
 import { getSettings, updateSettings, getReembedProgress, getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
@@ -916,10 +916,13 @@ export function SettingsPage() {
               the first pass missed: an `inline-flex` list HUGS ITS CONTENT, so the strip
               ended after "Audit Log" while the panel beneath it ran the full width — the
               two cards were the same colour and border and still visibly different objects.
-              `justify-start` keeps the labels left-aligned against the panel's own heading
-              rather than stretching them across the row, so the two cards share an edge
-              instead of merely sharing a style. */}
-          <TabsList className="mb-6 flex h-auto w-full justify-start gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
+              ⚠ AND THE TRIGGERS STRETCH — `flex-1` on each, no `justify-*` on the list. The
+              first cut left them left-aligned, which matched the panel's edge but left a
+              gap of empty card after "Audit Log": the strip was full-width while its
+              CONTENT was not, which reads as an unfinished row rather than a deliberate
+              one. Equal shares fill the row end to end and keep every label the same
+              target size, so no tab is easier to hit than its neighbour. */}
+          <TabsList className="mb-6 flex h-auto w-full gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
             <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>
             {/* D-04: display-only relabel via the term-map (Search by default, the
                 shipped "Search & Retrieval" under the reveal). value="1" — the tab
