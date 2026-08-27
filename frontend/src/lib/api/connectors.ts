@@ -28,6 +28,34 @@ export class ConnectorApiError extends ApiError {
  *  and a plain string `detail` for the ones that do not. A body carrying no code yields
  *  `null`, which the component renders as its generic branch — never as a fabricated code
  *  that would key into the closed §4c map and print the wrong sentence. */
+/** One parse of the error body, yielding BOTH the keyable reason code and a human message.
+ *
+ *  FastAPI's `detail` is either a plain string (`raise HTTPException(detail="…")`, which is
+ *  what `POST /connectors/discover-tools` uses for its 422 and 502) or an object carrying
+ *  `reason_code` + `message` (the connector CRUD refusals). Only the second shape was ever
+ *  read, so every string detail was silently dropped — see `probeMcpServer`. */
+async function readConnectorFailure(
+  res: Response,
+): Promise<{ reasonCode: string | null; message: string | null }> {
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    const detail = body?.detail
+    if (typeof detail === "string" && detail.trim()) {
+      return { reasonCode: null, message: detail.trim() }
+    }
+    if (detail && typeof detail === "object") {
+      const d = detail as { reason_code?: unknown; message?: unknown }
+      return {
+        reasonCode: typeof d.reason_code === "string" ? d.reason_code : null,
+        message: typeof d.message === "string" && d.message.trim() ? d.message.trim() : null,
+      }
+    }
+  } catch {
+    // A non-JSON body (a proxy's HTML 502, an empty 204) carries neither.
+  }
+  return { reasonCode: null, message: null }
+}
+
 async function readConnectorReasonCode(res: Response): Promise<string | null> {
   try {
     const body = (await res.json()) as { detail?: unknown }
@@ -253,11 +281,17 @@ export async function probeMcpServer(payload: McpProbeRequest): Promise<McpProbe
     body: JSON.stringify(payload),
   })
   if (!res.ok) {
-    throw new ConnectorApiError(
-      "Failed to probe MCP server",
-      res.status,
-      await readConnectorReasonCode(res),
-    )
+    // ⚠ CARRY THE SERVER'S OWN WORDS. This threw a hardcoded "Failed to probe MCP server"
+    // until 2026-08-27 and DISCARDED the detail, so a real refusal from the remote server
+    // reached the operator as a fixed string that named nothing. Measured during the
+    // operator's own GitHub attempt: the route answered `502` with
+    // `MCP tool discovery failed: MCP server responded with HTTP 401: ...` — the precise,
+    // actionable half was computed, sent, and thrown away one line before it was rendered.
+    // `ConnectionFormPanel` renders `err.message`, so this is the whole fix.
+    // Same family as `BUG-260815-06`. ⚠ The body can only be read ONCE, so the reason code
+    // and the message come from a single parse rather than two.
+    const { reasonCode, message } = await readConnectorFailure(res)
+    throw new ConnectorApiError(message ?? "Failed to probe MCP server", res.status, reasonCode)
   }
   return res.json() as Promise<McpProbeResponse>
 }
