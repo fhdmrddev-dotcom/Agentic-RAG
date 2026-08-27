@@ -910,8 +910,16 @@ export function SettingsPage() {
               `bg-background`, and in Deep Midnight `--background` is 4% against `--card` 7%
               — on a card container that reads as a HOLE punched in the surface. `--accent`
               (14%) sits above the card, so the selected tab reads as RAISED, which is what
-              selection should look like. Measured off the tokens, not guessed. */}
-          <TabsList className="mb-6 h-auto rounded-lg border border-border bg-card p-1 shadow-sm">
+              selection should look like. Measured off the tokens, not guessed.
+
+              ⚠ AND `flex w-full` OVERRIDES THE PRIMITIVE'S `inline-flex`, which is the half
+              the first pass missed: an `inline-flex` list HUGS ITS CONTENT, so the strip
+              ended after "Audit Log" while the panel beneath it ran the full width — the
+              two cards were the same colour and border and still visibly different objects.
+              `justify-start` keeps the labels left-aligned against the panel's own heading
+              rather than stretching them across the row, so the two cards share an edge
+              instead of merely sharing a style. */}
+          <TabsList className="mb-6 flex h-auto w-full justify-start gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
             <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>
             {/* D-04: display-only relabel via the term-map (Search by default, the
                 shipped "Search & Retrieval" under the reveal). value="1" — the tab
