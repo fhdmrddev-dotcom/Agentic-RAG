@@ -5942,3 +5942,52 @@ Phases touched: 190, 211, 212.
 Phases touched: 190, 206.1, 211.
 
 **Disposition: honoured by construction (211).** Connector persistence and decryption service.
+
+
+## frontend/src/pages/SettingsPage.tsx
+
+**Added 2026-08-27, at Phase 212's close, by the reviewer's driven check.** Measured **34 commits /
+21 phases / 1426 lines** — it FIRES G-5 and had **no row for the project's entire life**, so the
+guardrail could never fire on it at any count.
+
+⚠ **Its recorded re-open trigger did NOT fire.** Phase 196's D-22 left this file *named-only by
+decision*, with the trigger *"the next phase whose `files_modified` names either of them"*. **Phase
+212 never named it.** `212-05-02`'s must_have nevertheless claimed to add a row for it, and the row
+was **not written** — measured at 212's close with a fixed-string match returning `0`. This row
+therefore closes a known blind spot; it does **not** discharge the trigger, and the next phase that
+actually modifies this file still owes the refactor recommendation G-5 asks for.
+
+**Seam, un-taken:** the file is the Settings shell that mounts every tab (`ConnectionsTab`,
+`ModelRegistryTab`, the model pickers). The obvious cut is tab registration out of the page.
+
+## frontend/src/components/settings/ModelPillRow.tsx
+
+**Added 2026-08-27, same pass, same reason.** Measured **4 commits / 3 phases / 141 lines** — fires
+G-5 exactly at threshold. The D-22 pair to `SettingsPage.tsx` above; the same "claimed but not
+written" note applies.
+
+## frontend/src/components/settings/servicesCatalog.ts
+
+Created by Phase 212 (`212-02`). **2 / 1 / 211.** The curated presentation lookup keyed on
+`service_id` — the one migration 127's `service_id` COMMENT names verbatim: *"The curated 'Popular'
+set (Phase 212) is a PRESENTATION LOOKUP keyed by this value (D-211-02) — a miss degrades to a
+generic mark, NEVER to a refusal and NEVER to a hidden row."*
+
+⚠ **The totality guarantee is the invariant.** `getServiceCatalogEntry` must never throw and never
+return null; an unknown `service_id` (including a bare hostname such as `mcp.deepwiki.com`) resolves
+to a dynamic fallback entry. A future change that narrows this to a closed set re-introduces
+migration 116's `capability` mistake on a nicer axis.
+
+## frontend/src/components/settings/catalogCopy.ts
+
+Created by Phase 212 (`212-02`). **1 / 1 / 22.** Catalog vocabulary — headings, the three state
+filter labels, search placeholder, empty states, and `PROVENANCE_ADDED_BY_URL`.
+
+⚠ **`PROVENANCE_ADDED_BY_URL` is load-bearing and belongs beside the NAME, never in the State
+cell.** Sketch 203 §3 exists because the Stitch pass rendered `Uncurated` *as a state*, which made a
+connected service unreadable as connected. Provenance and connection state are two axes.
+
+## frontend/src/components/settings/connectionRefusalCopy.ts
+
+**1 / 1 / 567** — one phase, but 567 lines, and it had no row from creation until 2026-08-27.
+Refusal vocabulary for the connections surface.
