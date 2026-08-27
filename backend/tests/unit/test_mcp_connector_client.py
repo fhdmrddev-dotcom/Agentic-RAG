@@ -681,28 +681,45 @@ async def test_update_connection_grants_REPLACES_the_whole_tool_grants_column():
 
 
 @pytest.mark.asyncio
-async def test_update_connection_grants_coerces_every_value_to_a_real_boolean():
-    """F-1 — `bool(v)` on the way in, asserted with `is True` / `is False`, never truthiness.
+async def test_update_connection_grants_refuses_every_value_that_is_not_a_real_boolean():
+    """F-1 — only a value GATE 6 can read reaches the column. ⚠ AMENDED 2026-08-27 (S-1).
 
-    This matters because the two ends of the grant disagree about what "granted" means:
-    `phase_types.py` GATE 6 requires `grants.get(tool_name) is True`, while the client's
-    `isToolGranted` (`McpToolPicker.tsx`) accepts any truthy value. **The sanitizer is what
-    makes them agree** — without it, a stored `1` or `"yes"` reads GRANTED in the UI and
-    DENIED at run time, which is the worst of both.
+    ── THE PROPERTY IS UNCHANGED; THE DISPOSITION IS ──────────────────────────────────────
+    This test shipped as `..._coerces_every_value_to_a_real_boolean`, and its reasoning is
+    kept verbatim below because it is still correct and is the reason the sanitizer exists:
 
-    All three coercions in ONE drive, as a table, so a partial fix cannot pass.
+      > the two ends of the grant disagree about what "granted" means: `phase_types.py`
+      > GATE 6 requires `grants.get(tool_name) is True`, while the client's `isToolGranted`
+      > (`McpToolPicker.tsx`) accepts any truthy value. **The sanitizer is what makes them
+      > agree** — without it, a stored `1` or `"yes"` reads GRANTED in the UI and DENIED at
+      > run time, which is the worst of both.
+
+    What changed is what happens to a value the sanitizer cannot express. `bool(v)` made
+    them agree by MAPPING the unknown onto a legal value — and `bool("deny")` is `True`, so
+    under Phase 213's posture map that maps a person's **Deny** onto an **Allow**. Measured
+    on the coercing version, 2026-08-27:
+
+        {"delete_repository": "deny", "search_code": "ask"}
+            ->  {'delete_repository': True, 'search_code': True}
+
+    So the sanitizer now REFUSES the unknown instead. `1` / `"yes"` / `0` were only ever
+    reachable from a direct service caller — the routers type the body `dict[str, bool]`,
+    so Pydantic has already normalised anything arriving over HTTP.
+
+    All three refusals in ONE drive, as a table, so a partial fix cannot pass.
     """
-    _, rec = await _drive_grant_write({"t_int": 1, "t_str": "yes", "t_zero": 0})
-    grants = rec.updates[0]["tool_grants"]
+    from app.services import connector_service
 
-    for tool, expected in (("t_int", True), ("t_str", True), ("t_zero", False)):
-        value = grants[tool]
-        assert value is expected, (
-            f"F-1: {tool!r} reached the column as {value!r} ({type(value).__name__}), not "
-            f"the boolean {expected!r}. GATE 6 compares with `is True`, so a truthy "
-            f"non-boolean reads GRANTED in the UI and DENIED at run time."
+    for tool, value in (("t_int", 1), ("t_str", "yes"), ("t_zero", 0)):
+        with pytest.raises(ValueError) as excinfo:
+            await _drive_grant_write({tool: value})
+        message = str(excinfo.value)
+        assert tool in message and repr(value) in message, (
+            f"F-1/S-1: {tool!r}={value!r} must be REFUSED by name and by value so a caller "
+            f"can find it. GATE 6 compares with `is True`, so a truthy non-boolean would "
+            f"read GRANTED in the UI and DENIED at run time — and coercing it onto `True` "
+            f"would store a permission nobody granted. Got: {message!r}"
         )
-    assert set(grants) == {"t_int", "t_str", "t_zero"}, grants
 
 
 @pytest.mark.asyncio
@@ -1206,3 +1223,99 @@ def test_the_sanitizer_source_is_an_allow_list_and_not_a_deny_list():
             f"`{key}` is no longer a named string key in mcp_client.py — the emitted object "
             "must stay an explicit per-key dict literal"
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 213 pre-flight (S-1) — the sanitizer must REFUSE what it cannot express, never
+# coerce it onto the permissive value.
+#
+# ⚠ READ THE TEST ABOVE FIRST. `bool(v)` is NOT a careless line: F-1 added it because the
+# two ends of the grant disagree — GATE 6 wants `is True`, `isToolGranted` accepts any
+# truthy value — and coercion is what made them agree. The property it defends is
+# **"only a value the gate can read ever reaches the column."**
+#
+# What changes here is the DISPOSITION of a value the sanitizer cannot express, not that
+# property. `bool("deny") is True`, so under D-213-05's posture map — where the legal
+# values become "allow" / "ask" / "deny" — a Deny a person set would be stored as an ALLOW,
+# silently, with no error anywhere. Coercion is safe only while every input is already
+# boolean-shaped; the moment a THIRD state exists it becomes a fail-OPEN.
+#
+# So the sanitizer refuses instead. When Phase 213 widens the value type and forgets these
+# two call sites, the write goes RED at the seam rather than writing `True` — which is the
+# Phase 204 defect class (`inputs` vs `metadata`, read failed open, 106 tests green).
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("posture", ["deny", "ask", "allow"])
+async def test_update_connection_grants_REFUSES_a_posture_string_rather_than_coercing_it(posture):
+    """S-1 — a non-boolean grant value is REFUSED, and the refusal names the value.
+
+    The positive control is the point: `bool("deny")` is `True`, so the coercing version of
+    this sanitizer stores a person's **Deny** as an **Allow**. Driven for all three of
+    D-213-05's posture words so a partial fix cannot pass.
+    """
+    from app.services import connector_service
+
+    with pytest.raises(ValueError) as excinfo:
+        await _drive_grant_write({"delete_repository": posture})
+
+    message = str(excinfo.value)
+    assert "delete_repository" in message, (
+        f"S-1: the refusal must name the offending TOOL so a caller can find it; got {message!r}"
+    )
+    assert posture in message, (
+        f"S-1: the refusal must name the offending VALUE; got {message!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_refusal_writes_NOTHING():
+    """S-1 — the refusal happens BEFORE the write, so a bad value cannot land partially.
+
+    A sanitizer that refused after building the payload would still have replaced the
+    whole column (see the D-206.2-16 REPLACE test above) — so "refused" has to mean
+    "the row is untouched", not "the error arrived after the damage".
+    """
+    from app.services import connector_service
+
+    rec = _GrantsRecorder()
+    client = _FakeGrantsClient(rec, [_grants_row(tool_grants={"a": True})])
+
+    with pytest.raises(ValueError):
+        await connector_service.update_connection_grants(
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"a": True, "b": "deny"}, supabase=client
+        )
+
+    assert rec.updates == [], (
+        f"S-1: the refusal must precede the write, but `.update()` was called with "
+        f"{rec.updates!r} — a whole-column REPLACE already ran with a corrupted value."
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_connection_still_REFUSES_a_posture_string_on_the_patch_path():
+    """S-1 — the SECOND coercion site (`update_connection`) carries the same rule.
+
+    ⚠ There are TWO sanitizers, not one (`connector_service.py:761` on the PATCH path and
+    `:880` on the grants path). Fixing one and leaving the other is the shape this test
+    exists to catch — a partial fix that passes the grants tests above.
+    """
+    from app.services import connector_service
+
+    assert connector_service._sanitize_tool_grants is not None
+    with pytest.raises(ValueError) as excinfo:
+        connector_service._sanitize_tool_grants({"send_email": "ask"})
+    assert "send_email" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_still_accepts_real_booleans():
+    """S-1 NEGATIVE CONTROL — the shipped contract is untouched.
+
+    Without this, a sanitizer that refused EVERYTHING would pass every assertion above.
+    """
+    _, rec = await _drive_grant_write({"search_code": True, "delete_repository": False})
+    grants = rec.updates[0]["tool_grants"]
+    assert grants["search_code"] is True, grants
+    assert grants["delete_repository"] is False, grants

@@ -284,6 +284,61 @@ class ResolvedConnection:
 
 
 # ── plumbing ─────────────────────────────────────────────────────────────────────────────
+#: The legal grant values, as data. **Phase 213 (D-213-05) widens this to the posture map**
+#: ``{"allow", "ask", "deny"}``; when it does, this set and `_sanitize_tool_grants`'s
+#: annotation are the two things that change, and every caller is already routed through
+#: them. Declared here rather than inline so the widening is ONE edit with no second
+#: spelling to fall out of agreement with it.
+_LEGAL_GRANT_VALUES: frozenset[bool] = frozenset({True, False})
+
+
+def _sanitize_tool_grants(tool_grants: dict) -> dict[str, bool]:
+    """THE one grant-value sanitizer. **Both** write paths go through it.
+
+    ── WHAT THIS DEFENDS, WHICH IS NOT WHAT IT LOOKS LIKE ────────────────────────────────
+    F-1 introduced a `bool(v)` coercion here for a real reason, and the reason survives:
+    **the two ends of a grant disagree about what "granted" means.** ``phase_types.py``
+    GATE 6 requires ``grants.get(tool_name) is True``, while the client's ``isToolGranted``
+    (``McpToolPicker.tsx``) accepts any truthy value — so a stored ``1`` or ``"yes"`` would
+    read GRANTED in the UI and DENIED at run time. The property that fixes it is
+    **"only a value the gate can read ever reaches the column"**, and that property is
+    unchanged here.
+
+    ⚠ WHAT CHANGED IS THE DISPOSITION OF A VALUE WE CANNOT EXPRESS — refuse, never coerce.
+    ``bool("deny")`` is ``True``. Coercion is safe only while every legal value is already
+    boolean-shaped; the moment a THIRD state exists it becomes a **fail-OPEN**, and the
+    measured shape of that failure is::
+
+        {"delete_repository": "deny", "search_code": "ask"}
+            →  {"delete_repository": True, "search_code": True}      # driven 2026-08-27
+
+    i.e. a **Deny a person set is stored as an Allow**, silently, with nothing anywhere
+    reporting it. That is why this refuses rather than coerces: when Phase 213 widens the
+    value type and forgets a call site, the write goes RED **at the seam** instead of
+    writing `True`. This is the Phase 204 defect class — ``inputs`` vs ``metadata``, the
+    read failed open, and 106 tests were green.
+
+    ⚠ THE REFUSAL PRECEDES THE WRITE, and that is load-bearing rather than tidy: the grants
+    write is a whole-column REPLACE (D-206.2-16), so a sanitizer that raised *after*
+    building the payload would already have wiped every other grant on the connection.
+
+    Raises ``ValueError`` — mapped to a 422 by both routers, per the WR-02 convention.
+    """
+    clean: dict[str, bool] = {}
+    for key, value in tool_grants.items():
+        # `is` membership, never `==`: `1 == True` in Python, so an `==` test would let the
+        # exact non-boolean this function exists to refuse walk straight through.
+        if not any(value is legal for legal in _LEGAL_GRANT_VALUES):
+            raise ValueError(
+                f"tool grant {str(key)!r} has the value {value!r} "
+                f"({type(value).__name__}), which is not one of "
+                f"{sorted(map(str, _LEGAL_GRANT_VALUES))}. Refused rather than coerced: "
+                f"bool({value!r}) would silently store a permission nobody granted."
+            )
+        clean[str(key)] = value
+    return clean
+
+
 def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
 
@@ -758,7 +813,7 @@ async def update_connection(
         changes["mcp_server_url"] = payload.mcp_server_url
 
     if "tool_grants" in submitted and payload.tool_grants is not None:
-        changes["tool_grants"] = {str(k): bool(v) for k, v in payload.tool_grants.items()}
+        changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)
 
     if "discovered_tools" in submitted and payload.discovered_tools is not None:
         changes["discovered_tools"] = payload.discovered_tools
@@ -876,8 +931,10 @@ async def update_connection_grants(
 ) -> ConnectorConnectionResponse:
     """Phase 206 (F-1 / D-206-06) — Update per-tool boolean grants on an MCP connection."""
     client = _client(supabase)
-    # F-1: strictly enforce boolean map { [tool_name]: boolean }
-    sanitized_grants = {str(k): bool(v) for k, v in tool_grants.items()}
+    # F-1: strictly enforce the legal grant map { [tool_name]: <legal value> }. ⚠ This runs
+    # BEFORE the update is built — the write is a whole-column REPLACE (D-206.2-16), so a
+    # refusal that arrived afterwards would already have wiped every other grant.
+    sanitized_grants = _sanitize_tool_grants(tool_grants)
     result = await aexec(
         _project(
             client.table(_TABLE)

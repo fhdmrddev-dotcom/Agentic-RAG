@@ -78,27 +78,54 @@ individually correct and individually green** — `204-03` wrote `workflow_runs.
 `workflow_runs.metadata`, the read failed OPEN, and the spend cap disarmed silently with **106 tests
 green**. Every seam below is named with the **exact key on both sides**.
 
-### ⛔ S-1 — the posture value vocabulary crosses five layers, and `bool()` coercion is shipped in two of them
+### ✅ S-1 — **FIXED 2026-08-27, before planning** (commit below). Kept here because the finding's first framing was WRONG and the correction is the useful part.
 
-D-213-05 changes `tool_grants` from `Record<string, boolean>` to a posture map. **The literal
-strings must be identical on every side, and two shipped call sites will silently destroy them:**
+D-213-05 changes `tool_grants` from `Record<string, boolean>` to a posture map, and two shipped call
+sites coerced with `bool(v)`:
 
 ```
 backend/app/services/connector_service.py:761   changes["tool_grants"] = {str(k): bool(v) for k, v in payload.tool_grants.items()}
 backend/app/services/connector_service.py:880   sanitized_grants       = {str(k): bool(v) for k, v in tool_grants.items()}
 ```
 
-`bool("deny")` is **`True`**. Left in place, every posture a person sets becomes `true` — a **Deny
-written by a human is stored as an Allow**, with no error anywhere. This is the phase's fail-open,
-and it is two lines.
+**Driven on the coercing version, 2026-08-27** — not reasoned about:
 
-Full type surface to move in one commit — enumerated so nothing is found by a runtime error:
+```
+{"delete_repository": "deny", "search_code": "ask"}
+    ->  {'delete_repository': True, 'search_code': True}
+```
+
+A **Deny on `delete_repository` stored as an Allow**, silently.
+
+⚠ **THIS FILE FIRST CALLED THAT LINE "the phase's fail-open", AS THOUGH IT WERE CARELESS. IT IS NOT,
+AND THE ORIGINAL WORDING IS CORRECTED RATHER THAN QUIETLY DROPPED.** `bool(v)` was added by F-1 for a
+real reason, with a test naming it: **the two ends of a grant disagree** — GATE 6 requires
+`grants.get(tool_name) is True` while `isToolGranted` accepts any truthy value — so a stored `1` or
+`"yes"` would read GRANTED in the UI and DENIED at run time. Coercion is what made them agree. The
+property it defends — *only a value the gate can read ever reaches the column* — is correct and is
+**unchanged** by the fix.
+
+**What changed is the disposition of a value the sanitizer cannot express: refuse, never coerce.**
+Both sites now call one `_sanitize_tool_grants`, which raises `ValueError` (→ 422) naming the tool
+and the value. So when Phase 213 widens the value type and forgets a call site, **the write goes RED
+at the seam** instead of writing `True`. The legal set is declared as data (`_LEGAL_GRANT_VALUES`),
+so D-213-05's widening is one edit.
+
+▪ Two details worth not rediscovering: the refusal **precedes** the write, because the grants write
+is a whole-column REPLACE (D-206.2-16) — a refusal arriving afterwards would already have wiped every
+other grant. And `PATCH /connections/{id}/grants` **had no `ValueError` handler**, so a refusal would
+have surfaced as a 500; it now maps to 422 like `update_connection` does.
+
+⚠ **Still owed by the phase:** the rest of the type surface below. The sanitizer refuses loudly, but
+it does not migrate anything.
+
+Full type surface still to move in one commit — enumerated so nothing is found by a runtime error:
 
 | layer | site |
 |---|---|
 | Pydantic | `backend/app/models/connector.py:254, 376, 428` — `dict[str, bool]` ×3 |
 | service dataclass | `backend/app/services/connector_service.py:240` |
-| service coercion | `:315-316`, `:499`, `:544`, `:624`, **`:761`**, **`:880`** |
+| service coercion | `:315-316`, `:499`, `:544`, `:624` — ✅ `:761` / `:880` now route through `_sanitize_tool_grants` |
 | API signature | `backend/app/api/connectors.py:723, 733` — `tool_grants: dict[str, bool]` |
 | the gate | `backend/app/services/harness/phase_types.py:2517-2518` — `grants.get(tool_name) is True` |
 | TS types | `frontend/src/lib/api/org.ts:500, 524, 539` — `Record<string, boolean>` ×3 |

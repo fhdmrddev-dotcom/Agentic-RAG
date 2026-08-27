@@ -725,7 +725,15 @@ async def update_grants(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ) -> ConnectorConnectionResponse:
-    """Phase 206 (F-1 / D-206-06) — Update boolean tool permission grants."""
+    """Phase 206 (F-1 / D-206-06) — Update boolean tool permission grants.
+
+    ⚠ S-1 (2026-08-27): `_sanitize_tool_grants` REFUSES a value it cannot express rather
+    than coercing it onto the permissive one, so this path can now raise `ValueError`. It is
+    mapped to a 422 here per the WR-02 convention used by `update_connection` above —
+    without the mapping a refused grant surfaces as a 500, which reads as our fault rather
+    than as a rejected body. Ownership is settled by the `org_id`-scoped write, so the 422
+    leaks nothing.
+    """
     try:
         return await connector_service.update_connection_grants(
             str(connection_id),
@@ -735,6 +743,10 @@ async def update_grants(
         )
     except connector_service.ConnectorNotFound:
         raise _NOT_FOUND
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.post(
