@@ -172,6 +172,36 @@ export function connectionStateOf(connection: ConnectorConnection): ConnectionSt
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// 2b · THE POPULAR STRIP'S TWO ACTIONS (operator-driven, 2026-08-28)
+//
+// The strip used to render a single hard-coded "Connect" inline in JSX, because it never
+// consulted `connections` — so an already-connected service invited you to connect it again
+// and `onAdd` opened an empty CREATE form. Both words live here now, for the reason every
+// other string on this surface does: a sentence inline in JSX is one nobody can test for
+// drift (§11d).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The unconfigured action. Unchanged word — it was never the wrong one, only wrongly shown. */
+export const POPULAR_CONNECT = "Connect"
+
+/** The configured action. NOT "Connect" — the row exists, so the honest verb is to open it.
+ *  It matches the directory's own affordance one section down rather than inventing a third
+ *  vocabulary for the same act. */
+export const POPULAR_MANAGE = "Manage"
+
+/**
+ * How many connections this service already has.
+ *
+ * ⚠ IT COUNTS, rather than saying a bare "Connected", because D-212-03 allows several rows
+ * per service ("Prod Jira", "Sandbox Jira") and a person with two needs to know the Manage
+ * button opens ONE of them. Singular and plural are both spelled — an "1 connections" is the
+ * kind of small lie this surface's copy rules exist to prevent.
+ */
+export function popularConnectedLabel(count: number): string {
+  return count === 1 ? "1 connection" : `${count} connections`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
 // 3 · THE FILTER BAR + THE LIVE COUNT (UI-SPEC §2d — load-bearing, not decoration)
 // ═══════════════════════════════════════════════════════════════════════════════════════
 

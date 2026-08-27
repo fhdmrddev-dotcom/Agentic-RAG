@@ -156,6 +156,9 @@ import {
   CONNECTIONS_WRITE_FAILED,
   CONNECTION_FIXED_TAG,
   CONNECTION_STATE_WORDS,
+  POPULAR_CONNECT,
+  POPULAR_MANAGE,
+  popularConnectedLabel,
   DELETE_CANCEL_LABEL,
   DISABLE_CANCEL_LABEL,
   RECEIPT_CHECKED,
@@ -304,6 +307,33 @@ export function ConnectionsTabView({
     return list
   }, [connections, catalogServices])
 
+  /**
+   * The configured rows for each service identity.
+   *
+   * ⚠ OPERATOR-DRIVEN, 2026-08-28: *"the applications in the popular section … still showing
+   * connect and when I press connect it is opening a new form empty even though those
+   * applications are already connected"*. The Popular strip mapped `catalogServices` and
+   * consulted `connections` NOWHERE, so it could only ever say "Connect" — and `onAdd`
+   * opens a CREATE panel, which is why the form came up empty. The directory below it had
+   * been reading this fact correctly the whole time (`configuredServiceIds`), so the two
+   * halves of one screen disagreed about whether GitHub was connected.
+   *
+   * Keyed on `service_id` and holding a LIST, not a boolean: D-212-03 allows several
+   * connections per service ("Prod Jira", "Sandbox Jira"), and a boolean would force the
+   * card to pick one arbitrarily the day a second arrives.
+   */
+  const configuredByService = useMemo(() => {
+    const map = new Map<string, ConnectorConnection[]>()
+    for (const conn of connections ?? []) {
+      const key = (conn.service_id || "").trim().toLowerCase()
+      if (!key) continue
+      const list = map.get(key)
+      if (list) list.push(conn)
+      else map.set(key, [conn])
+    }
+    return map
+  }, [connections])
+
   const total = allItems?.length ?? 0
 
   const filteredItems = useMemo<DisplayItem[] | null>(() => {
@@ -391,26 +421,55 @@ export function ConnectionsTabView({
                 .slice(0, 3)
                 .map((entry) => {
                   const shape = shapeForService(entry.serviceId)
+                  // The fact the strip used to ignore. `configured[0]` is the row a
+                  // "Manage" click opens; the count carries the rest (D-212-03).
+                  const configured = configuredByService.get(entry.serviceId.toLowerCase()) ?? []
+                  const isConfigured = configured.length > 0
                   return (
                     <div
                       key={entry.serviceId}
                       data-testid="connections-popular-card"
+                      data-configured={isConfigured ? "true" : "false"}
                       className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-sm transition-colors hover:border-border/80"
                     >
                       <div className="flex min-w-0 items-center gap-2.5">
                         <ConnectionMarkGlyph shape={{ service_id: entry.serviceId, capability: shape }} size="row" />
-                        <span className="truncate text-[13px] font-medium text-foreground">{entry.name}</span>
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-[13px] font-medium text-foreground">{entry.name}</span>
+                          {isConfigured && (
+                            <span
+                              data-testid="connections-popular-configured"
+                              className="truncate text-[11px] text-muted-foreground"
+                            >
+                              {popularConnectedLabel(configured.length)}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {canWrite && onAdd && (
-                        <button
-                          type="button"
-                          onClick={() => onAdd(entry.serviceId)}
-                          data-testid="connections-popular-connect"
-                          className="inline-flex flex-none items-center rounded-md border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        >
-                          Connect
-                        </button>
-                      )}
+                      {canWrite &&
+                        (isConfigured ? (
+                          onOpen && (
+                            <button
+                              type="button"
+                              onClick={() => onOpen(configured[0])}
+                              data-testid="connections-popular-manage"
+                              className="inline-flex flex-none items-center rounded-md border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            >
+                              {POPULAR_MANAGE}
+                            </button>
+                          )
+                        ) : (
+                          onAdd && (
+                            <button
+                              type="button"
+                              onClick={() => onAdd(entry.serviceId)}
+                              data-testid="connections-popular-connect"
+                              className="inline-flex flex-none items-center rounded-md border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            >
+                              {POPULAR_CONNECT}
+                            </button>
+                          )
+                        ))}
                     </div>
                   )
                 })}

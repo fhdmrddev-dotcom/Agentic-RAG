@@ -1889,3 +1889,84 @@ describe("connectionStateOf — an MCP row reads its discovery", () => {
     expect(connectionStateOf(slack)).toBe("not_checked")
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// The Popular strip reads the connections it used to ignore — operator-driven, 2026-08-28
+//
+// Reported: *"the applications in the popular section … still showing connect and when I
+// press connect it is opening a new form empty even though those applications are already
+// connected"*. The strip mapped `catalogServices` and consulted `connections` NOWHERE, so
+// it could only say "Connect", and `onAdd` opens a CREATE panel — hence the empty form.
+// The directory below it had been reading this correctly all along, so one screen
+// disagreed with itself about whether GitHub was connected.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("the Popular strip knows what is already connected", () => {
+  const githubRow = (over: Partial<ConnectorConnection> = {}): ConnectorConnection =>
+    makeConnection({
+      id: "conn-gh",
+      name: "GitHub",
+      capability: null,
+      service_id: "github",
+      mcp_server_url: "https://mcp.github.com/mcp",
+      ...over,
+    })
+
+  function popularCardFor(name: string) {
+    return screen
+      .getAllByTestId("connections-popular-card")
+      .find((card) => within(card).queryByText(name))
+  }
+
+  it("a CONNECTED popular service offers Manage, not Connect", () => {
+    renderTab({
+      connections: [githubRow()],
+      catalogServices: CATALOG_SERVICES,
+      onOpen: vi.fn(),
+      onAdd: vi.fn(),
+    })
+    const card = popularCardFor("GitHub")
+    expect(card).toBeDefined()
+    expect(within(card!).queryByTestId("connections-popular-connect")).toBeNull()
+    expect(within(card!).getByTestId("connections-popular-manage")).toBeInTheDocument()
+  })
+
+  it("Manage opens the EXISTING row — it does not open an empty create form", () => {
+    // The half the operator actually felt. `onAdd` is asserted NOT called, because calling it
+    // is precisely what produced the blank panel.
+    const onOpen = vi.fn()
+    const onAdd = vi.fn()
+    const row = githubRow()
+    renderTab({ connections: [row], onOpen, onAdd, catalogServices: CATALOG_SERVICES })
+
+    within(popularCardFor("GitHub")!).getByTestId("connections-popular-manage").click()
+
+    expect(onOpen).toHaveBeenCalledWith(row)
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
+  it("it says HOW MANY, because a service may hold several (D-212-03)", () => {
+    renderTab({
+      connections: [githubRow(), githubRow({ id: "conn-gh-2", name: "GitHub CI" })],
+      catalogServices: CATALOG_SERVICES,
+    })
+    expect(
+      within(popularCardFor("GitHub")!).getByTestId("connections-popular-configured"),
+    ).toHaveTextContent("2 connections")
+  })
+
+  it("NEGATIVE CONTROL — an UNCONFIGURED popular service still offers Connect", () => {
+    // Without this, hiding Connect unconditionally would pass every assertion above and
+    // leave nobody able to connect anything.
+    renderTab({
+      connections: [],
+      catalogServices: CATALOG_SERVICES,
+      onOpen: vi.fn(),
+      onAdd: vi.fn(),
+    })
+    const card = popularCardFor("GitHub")
+    expect(card).toBeDefined()
+    expect(within(card!).getByTestId("connections-popular-connect")).toBeInTheDocument()
+    expect(within(card!).queryByTestId("connections-popular-configured")).toBeNull()
+  })
+})
