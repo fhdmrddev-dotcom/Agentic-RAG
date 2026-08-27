@@ -278,12 +278,43 @@ export function ConnectionsTabView({
    *  halves are render-only mirrors of a server gate, and BOTH gates are real. */
   const canWrite = isOrgAdmin && liveConnectorsOn
 
+  /**
+   * The configured rows for each service identity — THE one place this surface decides
+   * whether a service is connected.
+   *
+   * ⚠ OPERATOR-DRIVEN, 2026-08-28: *"the applications in the popular section … still showing
+   * connect and when I press connect it is opening a new form empty even though those
+   * applications are already connected"*. The Popular strip consulted `connections` NOWHERE,
+   * so it could only say "Connect" while the directory beneath it — reading the same rows —
+   * knew perfectly well the service was configured. One screen, two answers.
+   *
+   * Keyed on `service_id` and holding a LIST, not a boolean: D-212-03 allows several
+   * connections per service ("Prod Jira", "Sandbox Jira"), and a boolean would force a card
+   * to pick one arbitrarily the day a second arrives. The directory's `configuredServiceIds`
+   * is now this map's KEYS rather than a second walk of the same array.
+   */
+  const configuredByService = useMemo(() => {
+    const map = new Map<string, ConnectorConnection[]>()
+    for (const conn of connections ?? []) {
+      const key = (conn.service_id || "").trim().toLowerCase()
+      if (!key) continue
+      const list = map.get(key)
+      if (list) list.push(conn)
+      else map.set(key, [conn])
+    }
+    return map
+  }, [connections])
+
   // Merge configured DB connection rows with unconfigured catalog services
   const allItems = useMemo<DisplayItem[] | null>(() => {
     if (connections === null) return null
-    const configuredServiceIds = new Set(
-      connections.map((c) => (c.service_id || "").trim().toLowerCase()).filter(Boolean),
-    )
+    // ⚠ DERIVED FROM THE MAP, NOT REBUILT FROM `connections`. Both spellings existed for a
+    // few minutes on 2026-08-28 — a Set here and a Map for the Popular strip, each walking
+    // `connections` and lowercasing `service_id` independently. That is the SAME defect
+    // shape as every bug driven on this surface today: one fact, two derivations, free to
+    // disagree. Keys of the map ARE the configured identities, so there is nothing to keep
+    // in agreement.
+    const configuredServiceIds = new Set(configuredByService.keys())
     const list: DisplayItem[] = connections.map((conn) => {
       const entry = getServiceCatalogEntry(conn.service_id)
       return {
@@ -306,33 +337,6 @@ export function ConnectionsTabView({
     }
     return list
   }, [connections, catalogServices])
-
-  /**
-   * The configured rows for each service identity.
-   *
-   * ⚠ OPERATOR-DRIVEN, 2026-08-28: *"the applications in the popular section … still showing
-   * connect and when I press connect it is opening a new form empty even though those
-   * applications are already connected"*. The Popular strip mapped `catalogServices` and
-   * consulted `connections` NOWHERE, so it could only ever say "Connect" — and `onAdd`
-   * opens a CREATE panel, which is why the form came up empty. The directory below it had
-   * been reading this fact correctly the whole time (`configuredServiceIds`), so the two
-   * halves of one screen disagreed about whether GitHub was connected.
-   *
-   * Keyed on `service_id` and holding a LIST, not a boolean: D-212-03 allows several
-   * connections per service ("Prod Jira", "Sandbox Jira"), and a boolean would force the
-   * card to pick one arbitrarily the day a second arrives.
-   */
-  const configuredByService = useMemo(() => {
-    const map = new Map<string, ConnectorConnection[]>()
-    for (const conn of connections ?? []) {
-      const key = (conn.service_id || "").trim().toLowerCase()
-      if (!key) continue
-      const list = map.get(key)
-      if (list) list.push(conn)
-      else map.set(key, [conn])
-    }
-    return map
-  }, [connections])
 
   const total = allItems?.length ?? 0
 

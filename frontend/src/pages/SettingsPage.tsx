@@ -5,6 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+
+/**
+ * The Settings tab trigger, spelled ONCE.
+ *
+ * Seven labels share it so they cannot drift from each other — the same reason every string
+ * on the Connections surface lives in a copy module rather than inline. `text-[13px]` is the
+ * type scale the panels and cards on this page already use (`ConnectionsTab`'s rows, the
+ * Popular cards); the primitive's default `text-sm` is 14px and was the visible mismatch.
+ *
+ * `data-[state=active]:bg-accent` overrides the primitive's `bg-background` — see the note on
+ * `TabsList` for why the default reads as a hole rather than a selection on a card.
+ */
+const SETTINGS_TAB_CLASS =
+  "text-[13px] data-[state=active]:bg-accent data-[state=active]:text-foreground"
 import { getSettings, updateSettings, getReembedProgress, getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
@@ -881,13 +895,29 @@ export function SettingsPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="0">AI Model</TabsTrigger>
+          {/* ── The tab strip wears the same container as the cards below it ────────────
+              ⚠ OPERATOR-DRIVEN, 2026-08-28: *"can you make tab labels as same with the page
+              itself or the card of the connection itself container"*. The strip sat on a
+              bare `bg-muted` pill while every panel under it is a bordered `bg-card` — two
+              visual systems on one page.
+
+              ⚠ STYLED HERE, NOT IN `components/ui/tabs.tsx`. That primitive is shared by
+              EIGHT surfaces (Skill Studio, the Control Room, …); restyling it to match this
+              page would silently redress all of them. The card treatment is a fact about
+              THIS page, so it is applied where that fact is true.
+
+              ⚠ THE ACTIVE STATE IS INVERTED ON PURPOSE. The primitive marks active with
+              `bg-background`, and in Deep Midnight `--background` is 4% against `--card` 7%
+              — on a card container that reads as a HOLE punched in the surface. `--accent`
+              (14%) sits above the card, so the selected tab reads as RAISED, which is what
+              selection should look like. Measured off the tokens, not guessed. */}
+          <TabsList className="mb-6 h-auto rounded-lg border border-border bg-card p-1 shadow-sm">
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>
             {/* D-04: display-only relabel via the term-map (Search by default, the
                 shipped "Search & Retrieval" under the reveal). value="1" — the tab
                 ROUTING key — is unchanged (D-02a / no contract break). */}
-            <TabsTrigger value="1">{retrievalTabLabel}</TabsTrigger>
-            <TabsTrigger value="2">Integrations</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="1">{retrievalTabLabel}</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="2">Integrations</TabsTrigger>
             {/* Phase 190-16 (CONN-02 / D-25 / UI-SPEC §2a, U-01) — Connections.
                 ROUTING KEY "5" is the next FREE key, deliberately: appending renumbers
                 nothing, so every user's persisted `settings_active_tab` keeps pointing at
@@ -897,9 +927,9 @@ export function SettingsPage() {
                 ⚠ THE REVERSIBLE HALF (U-01): if the operator later prefers this tab LAST,
                 move ONLY this line. The routing key stays "5" either way — do NOT
                 renumber, exactly as the retrieval relabel above records for value="1". */}
-            <TabsTrigger value="5">Connections</TabsTrigger>
-            <TabsTrigger value="3">Memory</TabsTrigger>
-            <TabsTrigger value="4">Audit Log</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="5">Connections</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>
           </TabsList>
 
           {/* Tab 0: AI Model */}
