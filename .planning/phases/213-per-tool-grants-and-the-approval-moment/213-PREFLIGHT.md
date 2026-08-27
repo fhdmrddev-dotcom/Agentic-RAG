@@ -268,7 +268,40 @@ for the rest of the project's life.
 
 ▪ `src/pages/WorkflowRunPage.test.tsx` **is** pinned (`:3244`), so run-page work is watched.
 
-### ▪ GATE-2 — re-derive the gate totals; do not quote this file's or CLAUDE.md's
+### ⚠ GATE-2a — the baseline, and a trap I walked into while measuring it
+
+**Measured 2026-08-27, quiet box, at `d9a8076b`:**
+
+```
+total 5857  ·  failed 0  ·  pinned total 5217
+count gate OK — 118/118 pinned files present, no per-file decrease, 0 failing.
+```
+
+⚠ **THE FIRST RUN OF THAT GATE, ON THE SAME COMMIT, REPORTED `COUNT GATE VIOLATED` WITH 123
+FAILURES.** Recorded because the mechanism is worth more than the number:
+
+| file | failures |
+|---|---|
+| `src/pages/WorkflowsPage.test.tsx` | 29 |
+| `src/components/workflows/WorkflowCanvas.test.tsx` | 26 |
+| `src/components/workflows/library/WorkflowCard.test.tsx` | 22 |
+| `src/components/workflows/WorkflowCanvas.editing.test.tsx` | 19 |
+| `src/pages/WorkflowBuilderPage.session.test.tsx` | 17 |
+| `src/components/settings/__tests__/ConnectionFormPanel.test.tsx` | 7 |
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | 3 |
+
+**120 of the 123 were `STACK_TRACE_ERROR`.** The cause was neither the tree nor the cap — which was
+already `2`. **I had started `npx tsc --noEmit` in parallel to measure the typecheck baseline, and
+the CPU contention from OUTSIDE vitest produced the timeouts.** Re-run alone, same commit, no edits:
+**123 → 0**.
+
+**So: never run the typecheck and the count gate concurrently**, and never let a red gate with that
+signature start a defect hunt before a quiet re-run. ⚠ This does **not** refute `SEED-171` (whose
+finding is that the cap fails to explain flake in five *named* suites — five of these seven are not
+in that set), and `STACK_TRACE_ERROR` remains **not** a reliable tell for *"not a real defect"*:
+`196-08` measured `failed 249` where every one was a genuine missing mock.
+
+### ▪ GATE-2b — re-derive the gate totals; do not quote this file's or CLAUDE.md's
 
 `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, **from the repo root**, verdict line
 read **verbatim**. The contract is *no per-file DECREASE* and *zero failing*, **never a fixed grand
