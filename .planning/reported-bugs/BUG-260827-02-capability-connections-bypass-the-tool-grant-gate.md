@@ -4,10 +4,10 @@ title: Slack, Jira and SMTP connections bypass the tool-grant gate entirely — 
 reported: 2026-08-27
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/connectors, backend/harness, security/egress, frontend/settings]
 folded_into: 213
-verified_closed_by: null
+verified_closed_by: "213 Gate 5.5 (backend, 93fc2f52) + the UI half 2026-08-28"
 related_seeds: [SEED-146, SEED-205, SEED-207, SEED-214]
 re_open_trigger: null
 reproduces_on:
@@ -15,6 +15,29 @@ reproduces_on:
   commit: 4aa28090
   date: 2026-08-27
 ---
+
+> ✅ **CLOSED 2026-08-28 — BOTH HALVES.**
+>
+> **Backend** (Phase 213, `93fc2f52`): Gate 5.5 sits between Gate 5 and the shape fork, so a
+> capability send consults `tool_grants` exactly as an MCP send does. The MCP-only nesting
+> this report names is gone.
+>
+> **UI** (2026-08-28): the report's second half — *"`handleSave` writes `tool_grants` only
+> when the shape is `mcp`, so a capability connection's grants are neither writable from the
+> UI nor read at execution"* — is closed too. Both frontend gates (`handleSave`'s create and
+> edit arms, and `grantsArePersisted`) dropped their `capability === "mcp"` test.
+>
+> ⚠ **Nothing in the backend ever required them**, which is what made this a UI defect rather
+> than a missing feature: `PATCH /connections/{id}/grants` carries no shape guard,
+> `update_connection_grants` has no shape branch, and `create_connection` already stored
+> `static_descriptors_for_capability` into `discovered_tools` for every capability row.
+>
+> ⚠ **Phase 212's D-4b removal of the Granted checkbox is now SUPERSEDED, and its test with
+> it.** This report already said that removal was *"the honest rendering of this bug, NOT a
+> fix for it, and it must not be read as one"* — so the test asserting the absence has been
+> rewritten to assert the control is present and persists. Asserting the old absence today
+> would pin the defect in place.
+
 
 # BUG-260827-02: capability connections bypass the tool-grant gate
 

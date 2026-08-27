@@ -1067,8 +1067,14 @@ export const REFRESH_ACTIONS_HELP =
  *  beside a capability action would offer a switch Save does not persist — the 185 rule that a
  *  write affordance unable to act is REMOVED, not disabled. Reachability, not permission, is
  *  what this list reports for these shapes. */
-export const REFRESH_ACTIONS_NOT_GRANTABLE =
-  "These are the actions this service publishes. Which of them a workflow step may use is decided at the step, not here."
+// ⚠ `REFRESH_ACTIONS_NOT_GRANTABLE` WAS REMOVED 2026-08-28, and it is recorded rather than
+// silently deleted because it was TRUE when written and became a LIE without being touched.
+// It read: *"These are the actions this service publishes. Which of them a workflow step may
+// use is decided at the step, not here."* That was Phase 212 D-4b's honest rendering of
+// `BUG-260827-02` — a capability row's postures really were dropped at Save, so the note
+// explained an absence. Now that they persist, the sentence asserts the opposite of what the
+// screen does, and its render condition (`capability === "service"`) is unreachable anyway: a
+// service-only row has `descriptors = []`, so the list it sat under never renders.
 
 /** The LAST-RESORT discovery failure sentence, for a thrown value that is not an `Error`.
  *

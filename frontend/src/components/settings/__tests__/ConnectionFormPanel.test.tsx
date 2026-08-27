@@ -3099,7 +3099,22 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     expect(screen.getByText("send_email")).toBeInTheDocument()
   })
 
-  it("⭐ D-4b — a capability row's actions render WITHOUT a Granted checkbox, because `handleSave` would drop it", async () => {
+  it("⭐ a capability row's actions ARE grantable — the D-4b absence is CLOSED, not preserved", async () => {
+    // ── SUPERSEDES Phase 212's D-4b assertion, 2026-08-28 ────────────────────────────────
+    // The test this replaces asserted an ABSENCE and a note explaining it:
+    //
+    //   "a capability row's actions render WITHOUT a Granted checkbox, because `handleSave`
+    //    would drop it … an affordance unable to act is REMOVED, never rendered inert."
+    //
+    // ⚠ THAT WAS THE HONEST RENDERING OF `BUG-260827-02`, NEVER A FIX FOR IT, and the bug
+    // report says so in as many words. The absence was correct only while `handleSave` and
+    // `grantsArePersisted` both gated on the `mcp` shape. Both gates are gone: the backend
+    // never required them (no shape guard on `PATCH /grants`, no shape branch in
+    // `update_connection_grants`, and `create_connection` already stores
+    // `static_descriptors_for_capability` into `discovered_tools`).
+    //
+    // So the property flips from "the control is absent" to "the control is present AND it
+    // persists". Asserting the old absence today would pin the defect in place.
     const user = userEvent.setup({ delay: null })
     vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
       { name: "send_email", description: "Send an email", inputSchema: {} },
@@ -3110,12 +3125,14 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
       expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
     )
 
-    // ⚠ ABSENCE, and the note that explains the absence. `handleSave` writes `tool_grants`
-    // only on the `mcp` shape, so a checkbox here is a switch Save silently drops — the 185
-    // rule that an affordance unable to act is REMOVED, never rendered inert.
-    const list = screen.getByTestId("connection-discovered-tools")
-    expect(within(list).queryByRole("checkbox")).not.toBeInTheDocument()
-    expect(screen.getByTestId("connection-actions-not-grantable")).toBeInTheDocument()
+    // The three-arm posture control is REACHABLE and ENABLED on a capability row.
+    const row = screen.getByTestId("action-row-send_email")
+    const deny = within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY })
+    expect(deny).toBeEnabled()
+
+    // …and the note that explained the absence is GONE, because it now says the opposite of
+    // what the screen does.
+    expect(screen.queryByTestId("connection-actions-not-grantable")).toBeNull()
   })
 
   it("⭐ D-4b — a capability DRAFT offers NO refresh control, because there is no row to refresh from", () => {
@@ -3190,6 +3207,36 @@ describe("213-07 · a permission change is written BEFORE the parent reloads", (
     // banner — that is its documented behaviour, not a defect, and pinning the banner here
     // would be testing the wrong thing. What must hold is that the grant write ran FIRST:
     // it rejected, so `onUpdate` — and the `reload()` inside it — was never reached.
+    await waitFor(() => expect(screen.getByTestId("connection-form-save")).toBeEnabled())
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it("⭐ a CAPABILITY row's posture change is written too — no shape gate (BUG-260827-02)", async () => {
+    // The UI half of BUG-260827-02, pinned as a WRITE rather than as an enabled control.
+    // `handleSave` gated the grants write on `draft.capability === "mcp"`, so a Slack, Jira or
+    // SMTP posture was accepted by the screen and dropped on the floor — *"a switch Save
+    // drops is a lie"*.
+    //
+    // Same mechanism as the ordering test above: `updateConnectorGrants` is the REAL function
+    // and jsdom has no `fetch`, so it rejects. Reaching it at all is the property — under the
+    // old shape gate it was never called, `onUpdate` ran, and this would be green for the
+    // wrong reason. `onUpdate` NOT being called is what proves the write was attempted.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-3" }), onUpdate })
+
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    const row = screen.getByTestId("action-row-send_email")
+    await user.click(within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }))
+    await user.click(screen.getByTestId("connection-form-save"))
+
     await waitFor(() => expect(screen.getByTestId("connection-form-save")).toBeEnabled())
     expect(onUpdate).not.toHaveBeenCalled()
   })

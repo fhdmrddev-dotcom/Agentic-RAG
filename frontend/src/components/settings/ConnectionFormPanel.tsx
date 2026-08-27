@@ -142,7 +142,6 @@ import {
   REFRESH_ACTIONS_BUSY,
   REFRESH_ACTIONS_HELP,
   REFRESH_ACTIONS_LABEL,
-  REFRESH_ACTIONS_NOT_GRANTABLE,
   FOOTER_PREFIX,
   FOOTER_SERVER_NOTE,
   MCP_SAVE_DISABLED_REASON,
@@ -907,7 +906,10 @@ export function ConnectionFormPanel({
           body.secret = draft.secret
         }
         const created = await onCreate?.(body)
-        if (created && typeof created === "object" && "id" in created && draft.capability === "mcp" && Object.keys(toolGrants).length > 0) {
+        // ⚠ SHAPE GATE REMOVED HERE TOO — a capability connection created with a posture
+        // already set would otherwise arrive with none of it, and the person would have to
+        // set it a second time on a screen that had already accepted it once.
+        if (created && typeof created === "object" && "id" in created && Object.keys(toolGrants).length > 0) {
           try {
             await updateConnectorGrants(created.id, toolGrants)
           } catch {
@@ -957,7 +959,11 @@ export function ConnectionFormPanel({
         // plain rename — a person editing a connection's NAME could be stopped by a
         // permission they never touched. The diff is against the baseline captured at seed
         // time, so "unchanged" means unchanged since this panel opened.
-        if (draft.capability === "mcp" && grantsChanged) {
+        // ⚠ NO SHAPE GATE (2026-08-28, closing the UI half of BUG-260827-02). This read
+        // `draft.capability === "mcp"`, so a Slack/Jira/SMTP posture change was silently
+        // discarded at Save. `grantsChanged` is the only condition, and it is about whether
+        // the PERSON changed something — never about which wire the connection uses.
+        if (grantsChanged) {
           await updateConnectorGrants(connection.id, toolGrants)
         }
         await onUpdate?.(connection.id, body)
@@ -1031,7 +1037,30 @@ export function ConnectionFormPanel({
    * this constant is the one line that must move with it.
    */
   const isCapabilityShape = checkCapability !== null
-  const grantsArePersisted = capability === "mcp"
+
+  /**
+   * Can a posture set on this screen actually be SAVED?
+   *
+   * ⚠ THIS READ `capability === "mcp"` UNTIL 2026-08-28, AND THAT WAS THE UI HALF OF
+   * `BUG-260827-02`. The old comment beside it argued the constant must MIRROR `handleSave`,
+   * *"which writes `tool_grants` ONLY ON THE `mcp` SHAPE"* — correct as a mirror, and it
+   * mirrored a defect. A Slack, Jira or SMTP connection rendered the full three-arm posture
+   * control and Save dropped every click on the floor, which the bug report names as the
+   * class of lie this surface must not tell.
+   *
+   * ⚠ NOTHING IN THE BACKEND EVER REQUIRED THE MCP SHAPE. Measured 2026-08-28:
+   * `PATCH /connections/{id}/grants` carries no shape guard, `update_connection_grants` has
+   * no shape branch, and `create_connection` already stores `static_descriptors_for_capability`
+   * into `discovered_tools` for every capability row. Gate 5.5 reads
+   * `tool_name or capability` as the grant key, so the key a capability row needs is the one
+   * its descriptor already advertises. The restriction lived entirely in these two lines.
+   *
+   * `"service"` is excluded and that is NOT a leftover: a service-only row genuinely has no
+   * action until Phase 215's OAuth gives it one, so `descriptors = []` and there is nothing
+   * to grant. Excluding it states a fact about the row; excluding the three capabilities
+   * stated a fact about our own save path.
+   */
+  const grantsArePersisted = capability !== "service"
 
   /** Did the person actually touch a permission on this panel? See `initialGrantsRef`. */
   const grantsChanged =
@@ -1506,14 +1535,6 @@ export function ConnectionFormPanel({
               grantsArePersisted={grantsArePersisted}
               connectionName={draft.name || draft.serviceId}
             />
-            {!grantsArePersisted && (
-              <p
-                data-testid="connection-actions-not-grantable"
-                className="mt-2 border-t border-border/40 pt-2 text-[11px] leading-snug text-muted-foreground"
-              >
-                {REFRESH_ACTIONS_NOT_GRANTABLE}
-              </p>
-            )}
           </div>
         )}
 
