@@ -310,14 +310,11 @@ export function ConnectionsTabView({
     if (allItems === null) return null
     const q = query.trim().toLowerCase()
     return allItems.filter((item) => {
-      // 1. State filtering
+      // 1. State filtering: "Connected" = configured connections; "Not connected" = unconfigured services (SC#2)
       if (filterState === "ready") {
         if (item.kind !== "configured") return false
-        if (connectionStateOf(item.connection) !== "ready") return false
       } else if (filterState === "not_connected") {
-        if (item.kind === "configured" && connectionStateOf(item.connection) === "ready") {
-          return false
-        }
+        if (item.kind === "configured") return false
       }
 
       // 2. Query filtering

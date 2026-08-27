@@ -1535,7 +1535,7 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
     expect(chips[2]).toHaveTextContent("Not connected")
   })
 
-  it("filtering by Connected shows only ready rows (including MCP)", async () => {
+  it("filtering by Connected shows configured connections", async () => {
     const user = userEvent.setup({ delay: null })
     renderTab({ connections: TEST_ROWS })
     const chips = screen.getAllByTestId("connections-filter-chip")
@@ -1543,11 +1543,11 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
 
     expect(screen.getByText("Slack Alerts")).toBeInTheDocument()
     expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
-    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
-    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
   })
 
-  it("filtering by Not connected shows failing, disabled, and unchecked rows", async () => {
+  it("filtering by Not connected hides configured connections when rendered without catalog services", async () => {
     const user = userEvent.setup({ delay: null })
     renderTab({ connections: TEST_ROWS })
     const chips = screen.getAllByTestId("connections-filter-chip")
@@ -1555,8 +1555,8 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
 
     expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
     expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
-    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
-    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
+    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
+    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
   })
 
   it("search input matches name, capability, and mcp_server_url without hiding MCP rows", async () => {
@@ -1670,7 +1670,7 @@ describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-
     expect(onAdd).toHaveBeenCalledWith("notion")
   })
 
-  it("filtering by Not connected displays all unconfigured catalog services", async () => {
+  it("filtering by Not connected displays all unconfigured catalog services and hides all configured connections (SC#2)", async () => {
     const user = userEvent.setup({ delay: null })
     render(
       <ConnectionsTabView
@@ -1691,18 +1691,26 @@ describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-
     expect(screen.getByText("Notion")).toBeInTheDocument()
     expect(screen.getByText("Google Workspace")).toBeInTheDocument()
 
-    // Ready connection from THREE_ROWS (Ops mailbox is ready) is hidden
+    // Configured connections from THREE_ROWS are all hidden under Not connected
     expect(screen.queryByText("Ops mailbox")).not.toBeInTheDocument()
-
-    // Failed connection (#ops-alerts) is shown under Not connected
-    expect(screen.getByText("#ops-alerts")).toBeInTheDocument()
+    expect(screen.queryByText("#ops-alerts")).not.toBeInTheDocument()
+    expect(screen.queryByText("ENG Jira")).not.toBeInTheDocument()
   })
 
-  it("filtering by Connected hides unconfigured catalog services and shows only ready connections", async () => {
+  it("filtering by Connected shows configured connections (including MCP/unchecked) and hides unconfigured catalog services", async () => {
     const user = userEvent.setup({ delay: null })
+    const mcpRow = makeConnection({
+      id: "conn-deepwiki",
+      service_id: "mcp.deepwiki.com",
+      name: "DeepWiki",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/sse",
+      last_check_verdict: null,
+    })
+
     render(
       <ConnectionsTabView
-        connections={THREE_ROWS}
+        connections={[...THREE_ROWS, mcpRow]}
         catalogServices={CATALOG_SERVICES}
         usageCounts={{}}
         isOrgAdmin
@@ -1714,8 +1722,10 @@ describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-
     const chips = screen.getAllByTestId("connections-filter-chip")
     await user.click(chips[1]) // Connected
 
-    // Ready connection from THREE_ROWS (Ops mailbox) is visible
+    // Configured connections (including DeepWiki MCP) are visible
     expect(screen.getByText("Ops mailbox")).toBeInTheDocument()
+    expect(screen.getByText("#ops-alerts")).toBeInTheDocument()
+    expect(screen.getByText("DeepWiki")).toBeInTheDocument()
 
     // Unconfigured catalog services are hidden
     expect(screen.queryByText("GitHub")).not.toBeInTheDocument()

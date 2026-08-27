@@ -167,7 +167,7 @@ export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{
  */
 export function connectionsCountLabel(shown: number, total: number, filtered: boolean): string {
   if (filtered) return `${shown} of ${total}`
-  return `${total} ${total === 1 ? "connection" : "connections"}`
+  return `${total} ${total === 1 ? "service" : "services"}`
 }
 
 /**
@@ -570,4 +570,4 @@ export const CONNECTIONS_BANNER_OPERATOR_LINE = `${CONNECTIONS_BANNER_OPERATOR_P
 export const CONNECTIONS_SECTION_TITLE = "Connections"
 
 export const CONNECTIONS_SECTION_DESCRIPTION =
-  "The real destinations your organisation's workflows may send to. A step sends nothing until a person approves it in the run."
+  "Services you can connect, and what they let the agent do for you. A step sends nothing until a person approves it in the run."
