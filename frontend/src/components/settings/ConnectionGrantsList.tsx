@@ -59,6 +59,18 @@ export function ConnectionGrantsList({
     })
   }, [tools, search])
 
+  /** Does ANY action on this connection have an unknown direction?
+   *
+   *  ⚠ Derived from `tools`, NOT from `filteredTools`: the sentence explains a property of
+   *  the SERVER, and that property does not change because someone typed in the search box.
+   *  Keying it to the filter would make the explanation flicker in and out while a person
+   *  narrows a 44-row list — the same "is it still true?" jitter the reserved edge lane
+   *  exists to prevent one grain down. */
+  const anyUnknownDirection = useMemo(
+    () => tools.some((tool) => tool.readOnlyHint == null),
+    [tools],
+  )
+
   return (
     <div data-testid="connection-grants-list" className="flex flex-col gap-3">
       {/* ── 1. The Connection-Level Default Posture Control (GRANT-02) ── */}
@@ -119,6 +131,30 @@ export function ConnectionGrantsList({
         <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
           {GRANTS_COPY.DEFAULT_POSTURE_HELP}
         </p>
+
+        {/* ── The "Unknown" explanation, ONCE ─────────────────────────────────────────────
+            ⚠ OPERATOR-DRIVEN, 2026-08-27: this sentence used to render INSIDE EVERY
+            unknown row. `readOnlyHint` is measured ABSENT on the one server we can reach,
+            so on a 44-tool connection nearly every row is Unknown and the same sentence was
+            printed ~44 times — *"directing the user is good but contaminating the UI is
+            not"*.
+
+            The split is by GRAIN, not by taste: the **tag** is a fact about ONE action and
+            stays on its row; the **explanation** is a fact about the SERVER and belongs
+            once, beside the other line that explains how this screen works.
+
+            Invariant #7 still holds — an unknown direction still "explains itself in real
+            DOM text". What changed is that it explains itself ONCE, which is what the
+            amended test now pins (and it asserts the count, so a regression to per-row
+            cannot pass). */}
+        {anyUnknownDirection && (
+          <p
+            data-testid="grants-unknown-direction-help"
+            className="mt-1 text-[11px] leading-snug text-muted-foreground"
+          >
+            {GRANTS_COPY.DIRECTION_UNKNOWN_HELP}
+          </p>
+        )}
       </div>
 
       {/* ── 2. Search Input ── */}
@@ -220,12 +256,6 @@ export function ConnectionGrantsList({
                     )}
                   </div>
 
-                  {/* Unknown direction explanation */}
-                  {isUnknown && (
-                    <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
-                      {GRANTS_COPY.DIRECTION_UNKNOWN_HELP}
-                    </p>
-                  )}
                 </div>
 
                 {/* Tri-state Segmented Posture Control for this tool */}

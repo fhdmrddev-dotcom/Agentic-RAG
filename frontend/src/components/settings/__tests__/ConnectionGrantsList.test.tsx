@@ -132,9 +132,40 @@ describe("ConnectionGrantsList Component (BUILD-CONTRACT §3 Invariants)", () =>
       />,
     )
 
+    // The TAG is a fact about ONE action, so it stays on the row.
     const webhookRow = screen.getByTestId("action-row-list_webhooks")
     expect(webhookRow).toHaveTextContent(GRANTS_COPY.DIRECTION_UNKNOWN)
-    expect(webhookRow).toHaveTextContent(GRANTS_COPY.DIRECTION_UNKNOWN_HELP)
+
+    // ⚠ AMENDED 2026-08-27, OPERATOR-DRIVEN. The EXPLANATION is a fact about the SERVER,
+    // and it used to render inside every unknown row: *"directing the user is good but
+    // contaminating the UI is not"*. `readOnlyHint` is measured ABSENT on the one server we
+    // can reach, so on a 44-tool connection this sentence was printed ~44 times.
+    //
+    // The invariant is UNCHANGED — an unknown direction still explains itself in real DOM
+    // text. What is pinned now is that it does so ONCE, and the COUNT is asserted so a
+    // regression back to per-row cannot pass. That is a stronger test than the one it
+    // replaces, which would have been satisfied by either shape.
+    expect(webhookRow).not.toHaveTextContent(GRANTS_COPY.DIRECTION_UNKNOWN_HELP)
+    expect(screen.getAllByTestId("grants-unknown-direction-help")).toHaveLength(1)
+    expect(screen.getByTestId("grants-unknown-direction-help")).toHaveTextContent(
+      GRANTS_COPY.DIRECTION_UNKNOWN_HELP,
+    )
+  })
+
+  it("the unknown-direction explanation is ABSENT when every action states its direction", () => {
+    // NEGATIVE CONTROL. Without it, a sentence rendered unconditionally would satisfy every
+    // assertion above while telling a person their server is silent when it is not.
+    render(
+      <ConnectionGrantsList
+        tools={mockTools.filter((t) => t.readOnlyHint != null)}
+        toolGrants={{}}
+        defaultPosture="ask"
+        onChangeDefaultPosture={vi.fn()}
+        onChangeToolGrant={vi.fn()}
+        onResetToolGrant={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId("grants-unknown-direction-help")).toBeNull()
   })
 
   it("Invariant 8: zero [title] attributes in the rendered output", () => {

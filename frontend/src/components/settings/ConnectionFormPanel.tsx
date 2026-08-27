@@ -507,6 +507,28 @@ function saveRefusalFrom(error: unknown): SaveRefusal {
   return { kind: "generic" }
 }
 
+/** Collapse `tool_grants`'s two accepted spellings onto one, for comparison only.
+ *
+ *  `tool_grants` carries posture strings today and still reads the legacy booleans
+ *  (`grants.py::resolve_effective_posture` maps `true -> "allow"`, `false -> "deny"`), so
+ *  `{"x": true}` and `{"x": "allow"}` are the SAME permission. Comparing the raw objects
+ *  would report a change nobody made and fire a write on every save of an unmigrated row.
+ *
+ *  ⚠ COMPARISON ONLY — this never reaches the wire. The value SENT is `toolGrants` as the
+ *  person left it, and the server's `_sanitize_tool_grants` is the thing that decides what
+ *  is legal. Normalizing on the way out would make this function a second, quieter
+ *  sanitizer, and two sanitizers disagreeing is how a permission ships wrong. */
+function normalizeGrants(
+  grants: Record<string, ToolGrantPosture | boolean>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const key of Object.keys(grants).sort()) {
+    const raw = grants[key]
+    out[key] = raw === true ? "allow" : raw === false ? "deny" : String(raw)
+  }
+  return out
+}
+
 export function ConnectionFormPanel({
   open,
   mode,
@@ -549,6 +571,15 @@ export function ConnectionFormPanel({
   const canWrite = isOrgAdmin && liveConnectorsOn
   const readOnly = !canWrite
 
+  /** The grants as they were when this panel opened, normalized and stringified.
+   *
+   *  Exists so the save path can tell "the person changed a permission" from "the person
+   *  renamed the connection", which is the difference between a write that must happen and
+   *  a network call that must not. Normalized because `tool_grants` accepts both the legacy
+   *  booleans and the posture strings, and `{"x": true}` and `{"x": "allow"}` are the SAME
+   *  permission — a raw compare would report a change nobody made. */
+  const initialGrantsRef = useRef<string>("{}")
+
   const seededKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!open) {
@@ -562,6 +593,9 @@ export function ConnectionFormPanel({
       setDraft(draftFromConnection(connection))
       setDefaultPosture(connection.default_approval_posture ?? "ask")
       setToolGrants(connection.tool_grants ?? {})
+      // ⚠ The baseline the save path diffs against — see `grantsChanged`. Captured HERE,
+      // beside the seeding it mirrors, so the two can never drift apart.
+      initialGrantsRef.current = JSON.stringify(normalizeGrants(connection.tool_grants ?? {}))
       setProbeResult(connection.discovered_tools ?? null)
     } else if (mode === "create" && presetServiceId) {
       const entry = getServiceCatalogEntry(presetServiceId)
@@ -888,14 +922,45 @@ export function ConnectionFormPanel({
         }
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
         if (replacing && draft.secret !== "") body.secret = draft.secret
-        await onUpdate?.(connection.id, body)
-        if (draft.capability === "mcp") {
-          try {
-            await updateConnectorGrants(connection.id, toolGrants)
-          } catch {
-            // non-fatal
-          }
+
+        // ⚠ OPERATOR-DRIVEN ORDERING FIX, 2026-08-27 — THE GRANTS ARE WRITTEN **BEFORE**
+        // `onUpdate`, AND THE ORDER IS THE WHOLE FIX.
+        //
+        // Reported: *"when I change any permission for tools, it is not reflecting directly
+        // once I click save. When I navigate to another connection and go back, changes are
+        // reflected again."*
+        //
+        // `onUpdate` is `ConnectionsTab.handleUpdate`, which does
+        // `updateConnectorConnection(...)` and then `reload()`. With the grants write AFTER
+        // it, the refetch that `reload()` kicks off captured the row as it was BEFORE the
+        // grants landed — so the parent's `connections` kept the old `tool_grants`, the
+        // panel re-seeded from that stale object on its next open, and the change only
+        // appeared once something else forced a refetch. Nothing was lost; the write always
+        // succeeded. The DISPLAY was reading a list that had been refreshed too early.
+        //
+        // Writing grants first makes the single `reload()` inside `onUpdate` the LAST thing
+        // that happens, so it observes both writes. No second reload, no refetch-after-close
+        // race, and no optimistic local patch that could disagree with the server.
+        //
+        // ⚠ AND THE `try/catch` THAT WRAPPED THIS IS GONE, DELIBERATELY. It swallowed the
+        // failure as *"non-fatal"* and let `onClose()` run, so a permission write that the
+        // server REFUSED — a 422 from `_sanitize_tool_grants`, a 403, a dropped
+        // connection — closed the panel looking exactly like success. A silently dropped
+        // permission change is the same class of lie as a switch Save drops on the floor,
+        // and it is worse here because the person believes they have restricted something.
+        // Unwrapped, it reaches `handleSave`'s own `catch` → `setSaveRefusal(...)`, which
+        // is the mechanism every other refusal on this panel already uses: the panel stays
+        // open and says why.
+        //
+        // ⚠ AND IT ONLY RUNS WHEN A PERMISSION ACTUALLY CHANGED. Writing unconditionally
+        // put a network call on every save and, worse, let a refused grant write block a
+        // plain rename — a person editing a connection's NAME could be stopped by a
+        // permission they never touched. The diff is against the baseline captured at seed
+        // time, so "unchanged" means unchanged since this panel opened.
+        if (draft.capability === "mcp" && grantsChanged) {
+          await updateConnectorGrants(connection.id, toolGrants)
         }
+        await onUpdate?.(connection.id, body)
       }
       onClose()
     } catch (error) {
@@ -967,6 +1032,10 @@ export function ConnectionFormPanel({
    */
   const isCapabilityShape = checkCapability !== null
   const grantsArePersisted = capability === "mcp"
+
+  /** Did the person actually touch a permission on this panel? See `initialGrantsRef`. */
+  const grantsChanged =
+    JSON.stringify(normalizeGrants(toolGrants)) !== initialGrantsRef.current
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.

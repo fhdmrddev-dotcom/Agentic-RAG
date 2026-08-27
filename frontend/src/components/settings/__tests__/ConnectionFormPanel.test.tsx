@@ -3124,3 +3124,65 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     expect(screen.getByDisplayValue("Slack")).toBeInTheDocument()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 213-07 · THE SAVE ORDERING — operator-driven, 2026-08-27
+//
+// Reported: *"when I change any permission for tools, it is not reflecting directly once I
+// click save. When I navigate to another connection and go back, changes are reflected."*
+//
+// CAUSE: `onUpdate` is `ConnectionsTab.handleUpdate`, which calls `reload()`. With the
+// grants write AFTER it, the refetch captured the row BEFORE the grants landed, so the
+// parent's list kept the old `tool_grants` and the panel re-seeded from that stale object.
+//
+// ⚠ HOW THIS PINS IT WITHOUT MOCKING THE API. `updateConnectorGrants` is the REAL function
+// here (this file mocks no modules) and there is no `fetch` in jsdom, so it REJECTS. That
+// makes the ordering observable through props alone: written FIRST, its rejection means
+// `onUpdate` is never reached. If a future edit puts it back after `onUpdate`, `onUpdate`
+// runs and this test goes red — which is the regression it exists to catch.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+describe("213-07 · a permission change is written BEFORE the parent reloads", () => {
+  const withTools = () =>
+    makeMcpConnection({
+      discovered_tools: [
+        { name: "search_code", description: "Search", readOnlyHint: true },
+        { name: "create_issue", description: "Create", readOnlyHint: false },
+      ],
+      tool_grants: { search_code: "allow" },
+    } as Partial<ConnectorConnection>)
+
+  it("writes the grants first, so a failed grant write never lets a stale reload run", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: withTools(), onUpdate })
+
+    // Change a permission — `create_issue` from its inherited default to Deny.
+    const row = screen.getByTestId("action-row-create_issue")
+    await user.click(within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }))
+
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    // ⚠ THE ASSERTION IS ON ORDERING, NOT ON THE REFUSAL UI. `saveRefusalFrom` keys off the
+    // SERVER's own reason code, so a bare network rejection may carry none and render no
+    // banner — that is its documented behaviour, not a defect, and pinning the banner here
+    // would be testing the wrong thing. What must hold is that the grant write ran FIRST:
+    // it rejected, so `onUpdate` — and the `reload()` inside it — was never reached.
+    await waitFor(() => expect(screen.getByTestId("connection-form-save")).toBeEnabled())
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it("NEGATIVE CONTROL — an untouched permission set does not write grants at all", async () => {
+    // Without this, "grants are written first" would be satisfied by writing them on EVERY
+    // save — which is what the first draft of this fix did, and it let a refused grant write
+    // block a plain rename. Here nothing about the permissions changed, so the grant write
+    // must not happen and `onUpdate` must be reached normally.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: withTools(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("connection-save-refusal")).toBeNull()
+  })
+})
