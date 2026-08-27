@@ -1482,12 +1482,10 @@ export function ConnectionFormPanel({
         >
           {orgSharedLine(orgName?.trim() || ORG_SHARED_FALLBACK_NAME)}
         </p>
-      </div>
 
-      {/* ── The ALWAYS-ON 🔒 destination footer (§3c). Never conditional, never collapsible,
-             never hover-revealed, never behind an “advanced” disclosure — it lives in the
-             footer region so it stays on screen while the body scrolls. ── */}
-      <div className="border-t border-border px-[18px] py-4">
+        {/* ── The ALWAYS-ON 🔒 destination footer, notices, and action buttons (§3c).
+               Flows sequentially right after the form fields for user-friendly interaction. ── */}
+        <div className="mt-4 border-t border-border pt-4">
         {/* ═══════════════════════════════════════════════════════════════════════════
             190-18 · THE REFUSALS AND THE CHECK MOMENTS.
             They live in the FOOTER region, beside the controls they are about, so a
@@ -1916,6 +1914,7 @@ export function ConnectionFormPanel({
             </button>
           )}
         </div>
+      </div>
       </div>
 
       {/* ── §2g's two sheets. The SAME copy the table row renders (`connectionsCopy`), so
