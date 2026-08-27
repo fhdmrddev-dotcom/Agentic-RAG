@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: minor
 status: open
 affected_areas: [frontend/panel, backend/harness, streaming]
-folded_into: null
+folded_into: 214
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

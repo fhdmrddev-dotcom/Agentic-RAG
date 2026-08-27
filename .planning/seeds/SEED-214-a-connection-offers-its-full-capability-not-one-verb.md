@@ -1,7 +1,7 @@
 ---
 id: SEED-214
 title: A connection offers the FULL capability the service publishes, not one hand-written verb — break the 1:1 lock between a connection and its single action
-status: planted
+status: partially-folded
 planted: 2026-08-27
 planted_by: Claude, 2026-08-27, from the operator's question at Phase 212's close — "each connection that we are going to have the full capability that it is offering, how to achieve this"
 surface: Agentic-RAG
@@ -25,6 +25,17 @@ re_open_trigger: >
   Atlassian Rovo reachable); (4) a generic OpenAPI/REST tool ingester is proposed — this seed is its
   prerequisite, not its sibling.
 ---
+
+> ⚠ **ROUTING, 2026-08-27 (Phase 213 discuss-phase).** The **UNLOCK half is FOLDED into Phase 213**
+> as `D-213-01` / `D-213-02`: `static_descriptors_for_capability` becomes able to return **N**
+> descriptors, and a capability connection's list stays **derived from the adapter registry**
+> (`discovered_tools` remains the MCP shape's home — a stored copy of a derived fact goes stale).
+> **The FILLING half stays planted and unanswered** — growing an adapter's action set, adopting an
+> MCP server for a thin-adapter service, or building an OpenAPI ingester are all still open, and the
+> roadmap fences them out of 213 explicitly (*"per-service work which must FOLLOW the approval
+> model, never accompany it"*). Re-open triggers **2, 3 and 4 below remain live**; trigger **1 is
+> discharged by Phase 213**.
+
 
 # SEED-214 — a connection should offer everything the service does
 

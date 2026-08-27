@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: blocking
 status: open
 affected_areas: [backend/connectors, backend/harness, frontend/workflows, frontend/chat]
-folded_into: null
+folded_into: 214
 verified_closed_by: null
 related_seeds: [SEED-164]
 re_open_trigger: null

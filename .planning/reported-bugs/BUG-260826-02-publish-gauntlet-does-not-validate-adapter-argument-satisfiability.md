@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: major
 status: open
 affected_areas: [backend/harness, backend/connectors, publish-gauntlet]
-folded_into: null
+folded_into: 214
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

@@ -4,9 +4,9 @@ title: Slack, Jira and SMTP connections bypass the tool-grant gate entirely — 
 reported: 2026-08-27
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/connectors, backend/harness, security/egress, frontend/settings]
-folded_into: null
+folded_into: 213
 verified_closed_by: null
 related_seeds: [SEED-146, SEED-205, SEED-207, SEED-214]
 re_open_trigger: null
