@@ -4,12 +4,12 @@ milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
 last_updated: "2026-08-27T03:33:00.000Z"
-last_activity: 2026-08-27 -- Phase 212 execution complete across 5 plans (4 waves)
+last_activity: 2026-08-27 -- Phase 212 VERIFIED and closed with owed rows (reviewer driven check + ac159cc7)
 progress:
   total_phases: 14
   completed_phases: 3
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 15
+  completed_plans: 15
   percent: 21
 ---
 
@@ -32,15 +32,69 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 212 complete — ready for Phase 213 planning / Phase 212 review
+**Current focus:** Phase 212 ✅ VERIFIED and closed with owed rows — ready for Phase 213
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 212 (the-catalog-and-its-doors) — ✅ GAP CLOSURE ROUND 2 COMPLETE (7 plans across 6 waves)
-Plan: 212-01 .. 212-07
-Status: Phase 212 fully executed including Gap Closure Round 2 (Plan 212-07). SC#2 filter partition verified (All 13 = Connected 2 + Not connected 11), count label updated to "{N} services", description aligned with service catalog axis, and drawer action section placed sequentially right after form fields. Count gate 118/118 OK, tsc 34 baseline, rot set 68 baseline.
-Last activity: 2026-08-27 — Phase 212 Gap Closure Round 2 complete. Ready for reviewer re-drive.
+Phase: 213 (per-tool-grants-and-the-approval-moment) — NOT STARTED. ⭐ **CLAUDE-BUILT**
+(AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
+Plan: —
+Status: **Phase 212 ✅ COMPLETE WITH OWED ROWS**, closed 2026-08-27. 7 plans / 6 waves + 2
+gap-closure rounds, then a reviewer driven check. Full record:
+`.planning/phases/212-the-catalog-and-its-doors/212-VERIFICATION.md`.
+Last activity: 2026-08-27 — reviewer driven check + `ac159cc7`.
+
+**Gates at close** (verbatim, re-derived): tsc **34** (baseline held) · count gate **OK, 118/118
+pinned, total 5847, failed 0** (116→118: both new suites pinned, the preflight GATE-1 fix) ·
+backend **68 failed / 2795 passed** (rot set unchanged) · CLAUDE.md **86,274 / 57.5%** ·
+`check-deploy-drift.sh` **PASS**. **No migrations** — no cloud DB parity owed from 212.
+
+⛔ **A BLOCKING REGRESSION WAS FOUND BY DRIVING AND FIXED AT CLOSE — `ac159cc7`.** 212-01's IP-literal
+pin set a `Host:` header but **never set SNI**, so TLS cert verification targeted the IP literal and
+**ALL MCP discovery broke**, including Phase **206**'s already-shipped `/connections/{id}/discover`.
+Driven against the real `https://mcp.deepwiki.com/mcp`: before → `CERTIFICATE_VERIFY_FAILED, IP
+address mismatch`; after → `200`, 3 tools. ⚠ `egress.py:53` warns about exactly this in writing.
+⚠ **The existing pin mocked `_post` AWAY and asserted only that `server_hostname` was HANDED to it** —
+it passed while the wire was wrong, and its docstring claimed "and SNI". The new pin reads the real
+`httpx.Request`. ⚠ **Reviewer-authored: NO independent verifier. `/code-review ultra` is the gate.**
+
+⚠ **SC#3's CLOUD HALF IS UNVERIFIED, and it is the half `BUG-260810-01` was filed for.** Everything
+was driven on LOCAL, on an install whose `live_connectors` is flipped to `everyone` against a cold
+default of `off`. The bug stays **`folded`, never `closed`**, `verified_closed_by: null`, and now
+carries a `re_open_trigger` saying so.
+
+⚠ **SC#4 IS PARTIAL.** Discovery is fixed but was never driven end to end through the UI, and
+*"become grantable"* was never observed — **the connection panel exposes no grant surface at all**.
+That is the same absence recorded on `BUS-019`: **212 shipped no connection detail screen**, which
+**213's stated dependency assumes it did**. Size that at 213's discuss-phase.
+
+⚠ **SC#5's edit half passes on a fragile mechanism.** Grants survive a rename because the panel
+re-sends the same map — each save issues TWO writes (`PATCH …/{id}` **and** `PATCH …/{id}/grants`).
+An edit path that omits the second would silently clear grants. The delete was **never executed**;
+only its (genuine victim-naming) confirmation sheet was read and cancelled.
+
+⚠ **`57838680` — the ledger rows `212-05` claimed were four-stale-and-two-missing.** Stale before the
+phase even closed; `SettingsPage.tsx` and `ModelPillRow.tsx` were claimed and never written. Five rows
+added with sections. `SettingsPage.tsx`'s re-open trigger did **not** fire — the row closes a blind
+spot, it does not discharge the trigger.
+
+## Owed after 212
+
+1. ⚠ **Cloud drive of SC#3** — the Add affordance + one-click Popular connect on cloud.
+2. ⚠ **SC#4 end to end in the UI** — partly blocked on 213's grant surface.
+3. ⚠ **`/code-review ultra`** on `ac159cc7`, plus the still-owed `review-210-211-base` for 210/211.
+4. ▪ The panel renders the browser's raw `"Failed to fetch"` as its error state.
+5. ▪ The discover-tools seam is pinned backend-only; `McpProbeResponse` is unchecked. Defer to 213.
+6. ✅ **211's UAT row 3 is UNBLOCKED** — a real Gmail SMTP connection now exists and verified
+   (`verdict: ok`, `smtp.gmail.com:587`, `starttls`).
+
+⚠ **OPERATOR RULING 2026-08-27 (`BUS-018`): CONNECTIONS ARE PER USER, NOT PER ORGANIZATION.** Today
+`connector_connections` is org-scoped with `org:manage` on every write, so one admin's account serves
+everyone. This must be decided **before 213 fixes the grant grain** — `SEED-146` warns the table shape
+must not be committed a third time, and 215's OAuth migration is the once-only commit.
+⚠ **STILL UNANSWERED: an unattended run has no user session** — whose credential runs a workflow
+scheduled at 03:00? Put it to the operator at 213's discuss-phase.
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 
