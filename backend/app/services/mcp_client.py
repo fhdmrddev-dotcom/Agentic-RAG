@@ -406,8 +406,24 @@ class McpClient:
 default_mcp_client = McpClient()
 
 
-async def list_tools(server_url: str, secret: str | None = None) -> list[dict[str, Any]]:
-    return await default_mcp_client.list_tools(server_url, secret=secret)
+async def list_tools(
+    server_url: str,
+    secret: str | None = None,
+    timeout: float = DEFAULT_DISCOVERY_TIMEOUT,
+) -> list[dict[str, Any]]:
+    """⚠ `timeout` is NOT optional decoration — `connectors.py:760` passes it by keyword.
+
+    It was missing here until 2026-08-27 and `POST /connectors/discover-tools` raised
+    `TypeError: list_tools() got an unexpected keyword argument 'timeout'` on EVERY call, so
+    that route had never once succeeded. `McpClient.list_tools` accepted `timeout` the whole
+    time; only this module-level wrapper dropped it.
+
+    ⚠ `test_212_discover_seam.py:88` did not catch it because it monkeypatches this function
+    away with `mock_list_tools(server_url, secret=None, timeout=None)` — a stub whose
+    signature INVENTED the parameter the real function lacked. A mock that does not match the
+    thing it replaces proves only that the caller is self-consistent.
+    """
+    return await default_mcp_client.list_tools(server_url, secret=secret, timeout=timeout)
 
 
 async def call_tool(

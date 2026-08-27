@@ -202,3 +202,27 @@ async def test_mcp_sets_sni_hostname_on_the_actual_request(monkeypatch):
         )
         assert "93.184.216.34" in str(request.url), "URL must still be pinned to the IP literal"
         assert request.headers.get("Host") == "mcp.atlassian.com"
+
+
+def test_module_list_tools_accepts_the_exact_keywords_the_route_passes():
+    """⚠ SIGNATURE PIN — the route calls `list_tools(server_url=, secret=, timeout=)`.
+
+    `connectors.py:760` passes all three BY KEYWORD. The module wrapper omitted `timeout`
+    until 2026-08-27, so `POST /connectors/discover-tools` raised
+    `TypeError: list_tools() got an unexpected keyword argument 'timeout'` on every call and
+    that route had NEVER succeeded — observed in the operator's own uvicorn traceback.
+
+    ⚠ `test_212_discover_seam.py` did not catch it: it monkeypatches `list_tools` away with a
+    stub declaring `timeout=None`, a parameter the real function did not have. This test
+    therefore inspects the REAL signature instead of trusting a stub — no mocking, no network.
+    """
+    import inspect
+    from app.services import mcp_client as mod
+
+    sig = inspect.signature(mod.list_tools)
+    for kw in ("server_url", "secret", "timeout"):
+        assert kw in sig.parameters, (
+            f"list_tools must accept {kw!r} by keyword — connectors.py:760 passes it"
+        )
+    # binding with the route's exact call shape must not raise
+    sig.bind(server_url="https://mcp.example.com/mcp", secret=None, timeout=15.0)
