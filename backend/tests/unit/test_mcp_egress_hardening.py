@@ -147,3 +147,58 @@ async def test_mcp_redirect_raises_egress_refusal():
         )
 
     assert "redirects forbidden" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_mcp_sets_sni_hostname_on_the_actual_request(monkeypatch):
+    """⚠ REGRESSION PIN — the pinned request must carry `sni_hostname`, ON THE WIRE.
+
+    Phase 212 shipped the IP-literal pin without it and BROKE ALL MCP DISCOVERY, including
+    Phase 206's already-shipped `/connections/{id}/discover`. Driven 2026-08-27 against the
+    real `https://mcp.deepwiki.com/mcp`:
+        before -> ConnectError [SSL: CERTIFICATE_VERIFY_FAILED] IP address mismatch
+        after  -> HTTP 200, 3 tools
+    A `Host:` header is NOT a substitute: SNI rides the TLS ClientHello, which is sent before
+    any header exists.
+
+    ⚠ WHY THE EXISTING PIN ABOVE DID NOT CATCH IT: `test_mcp_pinned_ip_rewrites_transport_and
+    _preserves_host` monkeypatches `_post` AWAY and asserts only that `server_hostname` was
+    HANDED to it. `_post` then never used it, and the assertion still passed — its docstring
+    says "and SNI" while nothing reads the wire. This test therefore asserts on the real
+    `httpx.Request` via a MockTransport, so the effect is pinned rather than the plumbing.
+    """
+    client = McpClient()
+
+    pinned_mock = PinnedDestination(
+        ip="93.184.216.34",
+        hostname="mcp.atlassian.com",
+        port=443,
+        scheme="https",
+    )
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: pinned_mock)
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"tools": []}})
+
+    real_init = httpx.AsyncClient.__init__
+
+    def patched_init(self, *args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", patched_init)
+    # `_post` passes `extensions=` to `client.post`, so MockTransport sees the real Request.
+
+    await client._send_jsonrpc("https://mcp.atlassian.com/v1/mcp", "tools/list")
+
+    assert seen, "no request reached the transport"
+    for request in seen:
+        assert request.extensions.get("sni_hostname") == "mcp.atlassian.com", (
+            "every pinned request must carry sni_hostname, or TLS verification targets the IP "
+            "literal and every real HTTPS MCP server fails CERTIFICATE_VERIFY_FAILED"
+        )
+        assert "93.184.216.34" in str(request.url), "URL must still be pinned to the IP literal"
+        assert request.headers.get("Host") == "mcp.atlassian.com"

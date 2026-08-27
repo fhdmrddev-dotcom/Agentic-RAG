@@ -130,11 +130,23 @@ class McpClient:
         server_hostname: str | None = None,
     ) -> dict[str, Any] | None:
         """One POST, with transport errors, bounded decoding, and HTTP status handled in one place."""
+        # ⚠ SNI IS TLS-LAYER AND THE `Host:` HEADER IS NOT A SUBSTITUTE FOR IT. `_send_jsonrpc`
+        # rewrites the URL to the pinned IP literal (the DNS-rebinding TOCTOU fix), which points
+        # certificate HOSTNAME verification at an address no certificate carries. `Host:` is sent
+        # AFTER the handshake and cannot help — the TLS `ClientHello` has already gone out.
+        # `egress.py:53,660-663` states the same rule for the sibling path and measures the
+        # httpcore extension as present in this venv (httpx 0.28.1).
+        # Driven 2026-08-27 against `https://mcp.deepwiki.com/mcp`, pinned to its real IP:
+        #   without this line -> ConnectError [SSL: CERTIFICATE_VERIFY_FAILED] IP address mismatch
+        #   with it           -> HTTP 200 and the real tools/list result
+        # `server_hostname` was already threaded here from `_send_jsonrpc` and then went UNUSED,
+        # so the plumbing existed and only the last step was missing.
         try:
             response = await client.post(
                 server_url,
                 json=payload,
                 headers=headers,
+                extensions={"sni_hostname": server_hostname} if server_hostname else {},
             )
         except httpx.RequestError as exc:
             logger.warning("mcp_client: request to %r failed: %s", server_url, exc)

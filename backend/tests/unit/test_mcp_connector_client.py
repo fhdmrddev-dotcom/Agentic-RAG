@@ -139,7 +139,7 @@ async def test_mcp_client_list_tools(monkeypatch):
 
     seen_methods: list[str] = []
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         seen_methods.append(json["method"])
         if json["method"] == "initialize":
             return httpx.Response(
@@ -187,7 +187,7 @@ async def test_mcp_client_call_tool(monkeypatch):
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         # WARNING - THIS ASSERTED `json["method"] == "tools/call"` ON EVERY POST, WHICH IS
         # WHY ADDING THE SPEC-REQUIRED HANDSHAKE TURNED IT RED. The fixture modelled a server
         # that needs no `initialize`; no such MCP server exists. Routing by method is what
@@ -232,7 +232,7 @@ async def test_mcp_client_protocol_error(monkeypatch):
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200, json={"jsonrpc": "2.0", "id": 0, "result": {}},
@@ -283,7 +283,7 @@ async def test_mcp_client_reads_the_streamable_http_sse_transport(monkeypatch):
         "\n"
     )
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         assert "text/event-stream" in headers.get("Accept", ""), (
             "the client must ASK for the transport it can read"
         )
@@ -318,7 +318,7 @@ async def test_mcp_client_refuses_an_event_stream_with_no_json_frame(monkeypatch
     every real server."""
     monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200, json={"jsonrpc": "2.0", "id": 0, "result": {}},
@@ -857,7 +857,7 @@ async def test_list_tools_forwards_annotations_and_omits_them_when_absent(monkey
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200,
@@ -917,7 +917,7 @@ def _tools_list_transport(raw_tools: list, session_id: str = "sess-211"):
     copy of it in each would drift.
     """
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200,
