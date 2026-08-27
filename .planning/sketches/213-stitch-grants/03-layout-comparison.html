@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Layout Comparison: GitHub Actions</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-container-lowest": "#090e18",
+                        "inverse-primary": "#5355a9",
+                        "on-error": "#690005",
+                        "surface-variant": "#303540",
+                        "on-tertiary-container": "#004c1e",
+                        "on-tertiary-fixed": "#002109",
+                        "on-error-container": "#ffdad6",
+                        "surface-bright": "#343945",
+                        "secondary": "#d0bcff",
+                        "surface-tint": "#c1c1ff",
+                        "outline": "#918f9c",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-container": "#1b202a",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "primary": "#c3c4ff",
+                        "on-secondary": "#3b0091",
+                        "tertiary-container": "#26c760",
+                        "primary-container": "#a3a5ff",
+                        "on-tertiary": "#003915",
+                        "on-surface": "#dee2f1",
+                        "on-primary-container": "#353789",
+                        "background": "#0e131e",
+                        "secondary-fixed": "#e9ddff",
+                        "on-secondary-container": "#c3abff",
+                        "surface-container-highest": "#303540",
+                        "surface-container-high": "#252a35",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "on-surface-variant": "#c7c5d3",
+                        "secondary-container": "#571ac2",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "tertiary": "#4ee478",
+                        "on-background": "#dee2f1",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "tertiary-fixed": "#6bfe8f",
+                        "primary-fixed": "#e1e0ff",
+                        "inverse-surface": "#dee2f1",
+                        "error": "#ffb4ab",
+                        "on-primary": "#242478",
+                        "surface-container-low": "#171c26",
+                        "error-container": "#93000a",
+                        "inverse-on-surface": "#2b303c",
+                        "outline-variant": "#464651",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-dim": "#0e131e",
+                        "surface": "#0e131e"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderColor: {
+                        DEFAULT: '#212631',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: #0e131e; color: #dee2f1; }
+        .border-base { border-color: #212631; }
+        .bg-card { background-color: #0D1117; }
+    </style>
+</head>
+<body class="font-body min-h-screen flex flex-col md:flex-row gap-8 p-8 overflow-x-hidden antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Layout A: Narrow Panel -->
+<div class="flex-1 flex flex-col gap-4">
+<h2 class="font-headline font-bold text-xl text-primary mb-2">Layout A (The Narrow Panel)</h2>
+<div class="flex-1 border border-base rounded-lg overflow-hidden flex relative bg-surface-container-low min-h-[600px]">
+<!-- Background Context (Simulated Table) -->
+<div class="flex-1 p-6 opacity-40 grayscale pointer-events-none">
+<div class="font-headline font-bold text-lg mb-6 text-on-surface">Connections</div>
+<div class="flex flex-col gap-3">
+<div class="h-10 border-b border-base flex items-center justify-between">
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+</div>
+<div class="h-10 border-b border-base flex items-center justify-between">
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+<div class="w-1/4 h-4 bg-surface-variant rounded"></div>
+</div>
+</div>
+</div>
+<!-- Narrow Panel -->
+<div class="w-[400px] border-l border-base bg-card flex flex-col absolute right-0 top-0 bottom-0 shadow-2xl">
+<!-- Header -->
+<div class="p-4 border-b border-base">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-on-surface-variant text-xl">folder</span>
+<h3 class="font-headline font-bold text-lg text-on-surface">GitHub</h3>
+</div>
+<div class="flex flex-col gap-2 mb-4 text-sm">
+<span class="text-on-surface-variant">Default Posture</span>
+<div class="flex items-center justify-between bg-surface-container p-2 rounded border border-base">
+<span class="text-on-surface">Every action asks first</span>
+<span class="material-symbols-outlined text-outline text-sm">expand_more</span>
+</div>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-sm">search</span>
+<input class="w-full bg-surface-container border border-base rounded pl-9 pr-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-on-surface placeholder:text-outline-variant" placeholder="Search actions..." type="text"/>
+</div>
+</div>
+<!-- Action List (Cramped) -->
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+<!-- Action Row 1 -->
+<div class="border-b border-base border-opacity-50 pb-4">
+<div class="font-mono text-xs text-primary mb-1">search_code</div>
+<div class="text-xs text-on-surface-variant mb-3 line-clamp-2">Searches code across all repositories in the organization.</div>
+<div class="flex rounded border border-base text-xs overflow-hidden">
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1 text-center bg-primary-container text-on-primary-container border-r border-base font-medium">Ask</button>
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors">Deny</button>
+</div>
+</div>
+<!-- Action Row 2 -->
+<div class="border-b border-base border-opacity-50 pb-4">
+<div class="font-mono text-xs text-primary mb-1">create_repo</div>
+<div class="text-xs text-on-surface-variant mb-3 line-clamp-2">Creates a new repository for the authenticated user.</div>
+<div class="flex rounded border border-base text-xs overflow-hidden">
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1 text-center bg-primary-container text-on-primary-container border-r border-base font-medium">Ask</button>
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors">Deny</button>
+</div>
+</div>
+<!-- Action Row 3 -->
+<div class="pb-4">
+<div class="font-mono text-xs text-primary mb-1">delete_repo</div>
+<div class="text-xs text-on-surface-variant mb-3 line-clamp-2">Deletes a repository. This requires admin access.</div>
+<div class="flex rounded border border-base text-xs overflow-hidden">
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Ask</button>
+<button class="flex-1 py-1 text-center bg-error-container text-on-error-container font-medium">Deny</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="text-sm text-outline-variant font-medium text-center">Costs context-at-a-glance for dense navigation.</div>
+</div>
+<!-- Layout B: Full Detail -->
+<div class="flex-1 flex flex-col gap-4">
+<h2 class="font-headline font-bold text-xl text-primary mb-2">Layout B (The Full Detail Screen)</h2>
+<div class="flex-1 border border-base rounded-lg bg-card flex flex-col min-h-[600px]">
+<!-- Header -->
+<div class="p-6 border-b border-base flex justify-between items-start">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl">folder</span>
+<h3 class="font-headline font-bold text-2xl text-on-surface">GitHub</h3>
+</div>
+<div class="text-sm text-on-surface-variant flex items-center gap-2">
+<span>Default Posture:</span>
+<div class="inline-flex items-center gap-1 bg-surface-container px-2 py-1 rounded border border-base cursor-pointer hover:bg-surface-variant transition-colors">
+<span class="text-on-surface">Every action asks first</span>
+<span class="material-symbols-outlined text-outline text-sm">expand_more</span>
+</div>
+</div>
+</div>
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-sm">search</span>
+<input class="w-full bg-surface-container border border-base rounded pl-9 pr-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors text-on-surface placeholder:text-outline-variant" placeholder="Search actions..." type="text"/>
+</div>
+</div>
+<!-- Action List (Spacious) -->
+<div class="flex-1 p-6 flex flex-col gap-6">
+<!-- Headers -->
+<div class="grid grid-cols-12 gap-4 text-xs font-medium text-outline uppercase tracking-wider pb-2 border-b border-base">
+<div class="col-span-3">Action Name</div>
+<div class="col-span-5">Description</div>
+<div class="col-span-4 text-right pr-2">Permission</div>
+</div>
+<!-- Action Row 1 -->
+<div class="grid grid-cols-12 gap-4 items-center group">
+<div class="col-span-3 font-mono text-sm text-primary">search_code</div>
+<div class="col-span-5 text-sm text-on-surface-variant">Searches code across all repositories in the organization.</div>
+<div class="col-span-4 flex justify-end">
+<div class="flex rounded border border-base text-sm overflow-hidden w-64">
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1.5 text-center bg-primary-container text-on-primary-container border-r border-base font-medium">Ask first</button>
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors">Deny</button>
+</div>
+</div>
+</div>
+<!-- Action Row 2 -->
+<div class="grid grid-cols-12 gap-4 items-center group">
+<div class="col-span-3 font-mono text-sm text-primary">create_repo</div>
+<div class="col-span-5 text-sm text-on-surface-variant">Creates a new repository for the authenticated user. Includes template setup options.</div>
+<div class="col-span-4 flex justify-end">
+<div class="flex rounded border border-base text-sm overflow-hidden w-64">
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1.5 text-center bg-primary-container text-on-primary-container border-r border-base font-medium">Ask first</button>
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors">Deny</button>
+</div>
+</div>
+</div>
+<!-- Action Row 3 -->
+<div class="grid grid-cols-12 gap-4 items-center group">
+<div class="col-span-3 font-mono text-sm text-primary">delete_repo</div>
+<div class="col-span-5 text-sm text-on-surface-variant">Deletes a repository. This requires administrative privileges and cannot be undone.</div>
+<div class="col-span-4 flex justify-end">
+<div class="flex rounded border border-base text-sm overflow-hidden w-64">
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Allow</button>
+<button class="flex-1 py-1.5 text-center bg-surface-container-low text-on-surface hover:bg-surface-variant transition-colors border-r border-base">Ask first</button>
+<button class="flex-1 py-1.5 text-center bg-error-container text-on-error-container font-medium">Denied</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="text-sm text-outline-variant font-medium text-center">Costs situational awareness for row-level detail.</div>
+</div>
+</body></html>

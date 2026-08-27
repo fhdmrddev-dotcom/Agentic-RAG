@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GitHub Connection - Permission Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#e9ddff",
+                        "surface": "#0e131e",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-container-low": "#171c26",
+                        "on-secondary": "#3b0091",
+                        "tertiary-fixed": "#6bfe8f",
+                        "surface-container-lowest": "#090e18",
+                        "on-secondary-container": "#c3abff",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#c1c1ff",
+                        "on-tertiary": "#003915",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "tertiary": "#4ee478",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-variant": "#303540",
+                        "tertiary-container": "#26c760",
+                        "inverse-primary": "#5355a9",
+                        "on-primary": "#242478",
+                        "primary-container": "#a3a5ff",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "primary": "#c3c4ff",
+                        "outline-variant": "#464651",
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "surface-container-highest": "#303540",
+                        "secondary": "#d0bcff",
+                        "primary-fixed": "#e1e0ff",
+                        "inverse-surface": "#dee2f1",
+                        "surface-container": "#1b202a",
+                        "outline": "#918f9c",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#0e131e",
+                        "secondary-container": "#571ac2",
+                        "on-tertiary-container": "#004c1e",
+                        "on-primary-container": "#353789",
+                        "on-tertiary-fixed": "#002109",
+                        "on-background": "#dee2f1",
+                        "surface-container-high": "#252a35",
+                        "background": "#0e131e",
+                        "surface-bright": "#343945",
+                        "on-surface": "#dee2f1",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#23005c",
+                        "on-primary-fixed": "#0b0664",
+                        "inverse-on-surface": "#2b303c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    "fontSize": {}
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); font-family: theme('fontFamily.body'); }
+        h1, h2, h3, h4, h5, h6 { font-family: theme('fontFamily.headline'); }
+        .mono-text { font-family: theme('fontFamily.mono'); }
+        
+        /* Custom scrollbar for high-density list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: theme('colors.surface');
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant');
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline');
+        }
+
+        /* 3-state toggle base styles */
+        .toggle-btn {
+            @apply px-3 py-1 text-xs font-medium border border-transparent rounded-full transition-colors duration-200;
+        }
+        .toggle-btn-muted {
+            @apply text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high;
+        }
+        
+        /* Inherited state */
+        .state-ask {
+            @apply border-outline-variant bg-surface-container-low text-on-surface;
+        }
+        /* Overridden state - Allowed */
+        .state-allowed {
+            @apply border-tertiary/30 bg-tertiary-container/10 text-tertiary shadow-[0_0_8px_rgba(78,228,120,0.1)];
+        }
+        /* Overridden state - Denied */
+        .state-denied {
+            @apply border-error/30 bg-error-container/10 text-error shadow-[0_0_8px_rgba(255,180,171,0.1)];
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 antialiased">
+<!-- Main Centered Surface -->
+<main class="w-full max-w-4xl bg-[#0D1117] border border-[#212631] rounded-lg flex flex-col h-[870px] shadow-2xl overflow-hidden">
+<!-- Header & Global Control (Sticky) -->
+<header class="flex-none p-6 border-b border-[#212631] bg-surface z-10">
+<div class="flex items-start justify-between mb-6">
+<div>
+<h1 class="text-2xl font-bold font-headline tracking-tight text-on-surface flex items-center gap-3">
+<span class="material-symbols-outlined text-[#A3A5FF]" style="font-variation-settings: 'FILL' 1;">integration_instructions</span>
+                        GitHub Connection
+                    </h1>
+<p class="text-sm text-on-surface-variant mt-1">Manage agent permissions and posture for this integration.</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Global Posture Card -->
+<div class="bg-surface-container-low border border-[#212631] rounded p-4 flex items-center justify-between">
+<div>
+<h2 class="text-sm font-semibold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">policy</span>
+                        Global Default Posture
+                    </h2>
+<p class="text-xs text-on-surface-variant mt-1">Every action asks first unless explicitly overridden below.</p>
+</div>
+<!-- Global Control Segmented Button -->
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask shadow-sm">Ask first</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Search Bar -->
+<div class="mt-6 relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full bg-[#0D1117] border border-[#212631] rounded pl-10 pr-4 py-2 text-sm text-on-surface placeholder:text-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all outline-none" placeholder="Search 44 actions..." type="text"/>
+</div>
+</header>
+<!-- Action List (Scrollable) -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 pt-2 bg-[#0D1117]">
+<div class="flex flex-col gap-2">
+<!-- Row 1: Inherited (Subtle) -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">search_code</span>
+</div>
+<p class="text-sm text-on-surface-variant">Allows the agent to search through your repositories</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 2: Overridden Allowed (Highlight) -->
+<div class="flex items-center justify-between p-3 border border-tertiary/10 bg-tertiary-container/5 rounded relative overflow-hidden group">
+<!-- Subtle indicator line for overridden state -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary/50"></div>
+<div class="flex flex-col gap-1 pr-6 pl-2">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface font-medium">read_repository_metadata</span>
+<span class="material-symbols-outlined text-[14px] text-tertiary" title="Explicitly Allowed">check_circle</span>
+</div>
+<p class="text-sm text-on-surface-variant">Read basic metadata about repositories (stars, forks, description)</p>
+</div>
+<div class="flex bg-surface-container border border-[#212631] rounded-full p-1">
+<button class="toggle-btn state-allowed">Allowed</button>
+<button class="toggle-btn toggle-btn-muted">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 3: Inherited -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">create_issue</span>
+</div>
+<p class="text-sm text-on-surface-variant">Open new issues in repositories</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 4: Unknown Direction -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">list_webhooks</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-bright text-on-surface-variant border border-outline-variant">Direction: Unknown</span>
+</div>
+<p class="text-sm text-on-surface-variant">List configured webhooks for a repository</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 5: Overridden Denied (Destructive) -->
+<div class="flex items-center justify-between p-3 border border-error/10 bg-error-container/5 rounded relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-error/50"></div>
+<div class="flex flex-col gap-1 pr-6 pl-2">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-error font-medium">delete_repository</span>
+<span class="material-symbols-outlined text-[14px] text-error" title="Explicitly Denied">block</span>
+</div>
+<p class="text-sm text-on-surface-variant">Permanently delete a repository (Destructive)</p>
+</div>
+<div class="flex bg-surface-container border border-[#212631] rounded-full p-1">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn toggle-btn-muted">Ask</button>
+<button class="toggle-btn state-denied">Denied</button>
+</div>
+</div>
+<!-- Row 6: Inherited -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">read_commit_history</span>
+</div>
+<p class="text-sm text-on-surface-variant">Read commit history and diffs</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 7: Overridden Allowed -->
+<div class="flex items-center justify-between p-3 border border-tertiary/10 bg-tertiary-container/5 rounded relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary/50"></div>
+<div class="flex flex-col gap-1 pr-6 pl-2">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface font-medium">create_pull_request</span>
+<span class="material-symbols-outlined text-[14px] text-tertiary" title="Explicitly Allowed">check_circle</span>
+</div>
+<p class="text-sm text-on-surface-variant">Propose changes by creating a pull request</p>
+</div>
+<div class="flex bg-surface-container border border-[#212631] rounded-full p-1">
+<button class="toggle-btn state-allowed">Allowed</button>
+<button class="toggle-btn toggle-btn-muted">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 8: Inherited -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">comment_on_issue</span>
+</div>
+<p class="text-sm text-on-surface-variant">Add comments to existing issues or PRs</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Row 9: Inherited -->
+<div class="flex items-center justify-between p-3 border border-transparent border-b-[#212631] hover:bg-surface-container-lowest transition-colors group">
+<div class="flex flex-col gap-1 pr-6">
+<div class="flex items-center gap-2">
+<span class="text-xs mono-text text-on-surface-variant group-hover:text-on-surface transition-colors">manage_labels</span>
+</div>
+<p class="text-sm text-on-surface-variant">Add or remove labels from issues</p>
+</div>
+<div class="flex bg-surface-container-lowest border border-[#212631] rounded-full p-1 opacity-70 group-hover:opacity-100 transition-opacity">
+<button class="toggle-btn toggle-btn-muted">Allowed</button>
+<button class="toggle-btn state-ask">Ask</button>
+<button class="toggle-btn toggle-btn-muted">Denied</button>
+</div>
+</div>
+<!-- Padding at bottom for scroll visibility -->
+<div class="h-4 w-full"></div>
+</div>
+</div>
+<!-- Footer / Action Area -->
+<footer class="flex-none p-4 border-t border-[#212631] bg-surface-container-lowest flex justify-end gap-3 z-10">
+<button class="px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface border border-[#212631] rounded transition-colors bg-surface hover:bg-surface-container-low">
+                Cancel
+            </button>
+<button class="px-4 py-2 text-sm font-medium text-surface bg-[#A3A5FF] hover:bg-[#c1c1ff] rounded transition-colors">
+                Save Changes
+            </button>
+</footer>
+</main>
+</body></html>
