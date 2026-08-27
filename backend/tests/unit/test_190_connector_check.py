@@ -388,6 +388,15 @@ async def test_a_FAILED_verdict_does_NOT_block_a_RUN(monkeypatch):
         # The stale verdict rides along on the resolved object too, so an executor that
         # wanted to consult it would not even need a second read.
         last_check_verdict="failed",
+        # ⚠ 213-06: a GRANTED capability. Gate 5.5 (Phase 213) now sits between the
+        # resolve and the dispatch, and a connection carrying no posture data at all
+        # resolves to `ask` — which, on an UNARMED drive like this one, fails closed.
+        # A real row cannot be in that state: migration 128 §3 backfills every capability
+        # row to `{capability: 'allow'}`. This fixture predates the column, so it is
+        # brought up to the shape a migrated row actually has. The property under test —
+        # that dispatch is REACHED — is unchanged.
+        tool_grants={"post_message": "allow"},
+        default_approval_posture="deny",
     )
 
     async def _resolver(*_a, **_kw):

@@ -497,14 +497,19 @@ async def test_exec_external_action_mcp_permission_denied_emits_audit(monkeypatc
 
     result = await _exec_external_action(phase, {}, ctx)
     assert "failure" in result
-    assert "refused: permission not granted" in result["failure"]
+    # ⚠ AMENDED by plan 213-06 (GRANT-04 / D-213-16). This drive sets an EXPLICIT deny,
+    # so the reason is `posture_denied` — distinguishable in the ledger from a tool nobody
+    # ever granted (`not_granted`) and from one needing an approval nothing could ask for
+    # (`approval_required`). The old single `permission_denied` collapsed all three.
+    assert "refused: posture_denied" in result["failure"], result["failure"]
+    assert "is set to Deny on this connection" in result["text"], result["text"]
 
     # Verify F-3: Outbound permission refusal emitted tool_refused audit event
     assert mock_audit.called
     call_kwargs = mock_audit.call_args.kwargs
     assert call_kwargs["event_type"] == "tool_refused"
     assert call_kwargs["metadata"]["tool_name"] == "jira_create_issue"
-    assert call_kwargs["metadata"]["reason"] == "permission_denied"
+    assert call_kwargs["metadata"]["reason"] == "posture_denied"
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════

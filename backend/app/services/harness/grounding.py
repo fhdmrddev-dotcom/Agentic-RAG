@@ -1231,11 +1231,66 @@ def _approval_sentence(phase, total_phases: int) -> str:
     the Phase-103 optional display name; the slug is the always-present fallback).
     """
     label = getattr(phase, "name", None) or phase.slug
-    return (
+    sentence = (
         f'Step {phase.phase_index + 1} of {total_phases}, "{label}", is about to run. '
         f"This step is marked as needing your approval first. "
         f"The run is waiting here and will not continue until you answer."
     )
+    return sentence + _external_action_clause(phase)
+
+
+def _external_action_clause(phase) -> str:
+    """Phase 213 (SC#3 / GRANT-03, plan 213-06) — what the step will actually SEND.
+
+    SC#3 requires the pause to show a person *"the service, the tool and the exact
+    arguments"*. The sentence above states POSITION, IDENTITY and CONSEQUENCE and names
+    none of the three, so a person was being asked to approve a step without being told
+    what it would do.
+
+    ⚠ APPENDED, NEVER PREPENDED. The shipped 185 assertions read the sentence with
+    ``.startswith(...)`` (``test_185_engine_attachment.py:249``, ``:525``); prepending
+    would break both. ``test_the_clause_is_APPENDED_...`` pins the ordering rather than
+    trusting this note.
+
+    ⚠ COMPOSED FROM ``phase.config`` ALONE, so this function stays PURE — no pool, no
+    clock, no connection lookup. The engine calls it before Gate 5 has resolved anything,
+    and making the engine resolve a connection early would duplicate that gate and add I/O
+    to a composer whose purity the module header asserts.
+
+    ⚠ NAME ONLY WHAT IS KNOWN. An MCP row carries ``capability = None``, so the service is
+    simply not named rather than rendered as ``None`` or guessed from the tool's spelling.
+    Same rule that keeps an SMTP connection on the neutral mark instead of borrowing
+    Gmail's: *never draw a name the system cannot know*.
+
+    ⚠ THE ARGUMENTS ARE SHOWN HERE AND RECORDED NOWHERE. D-213-14 settled that asymmetry —
+    ``_write_send_receipt``'s D-08 metadata carries the capability, the connection id, the
+    host and (213) the tool name, and never the request body. Showing a person what is
+    about to leave, once, in the moment, is the whole point of the pause; writing it into a
+    queryable ledger forever is a different act. This function must never become the source
+    of an audit field.
+
+    The honesty rules are unchanged: it says nothing about the quality of what is about to
+    happen, and never the words *approved*, *safe* or *proven*.
+    """
+    config = getattr(phase, "config", None)
+    if getattr(config, "phase_type", None) != "external_action":
+        return ""
+
+    tool = getattr(config, "tool_name", None) or getattr(config, "capability", None)
+    if not tool:
+        return ""
+
+    service = getattr(config, "capability", None)
+    where = f" through {service}" if service else ""
+    clause = f' It will run "{tool}"{where}.'
+
+    args = getattr(config, "tool_args", None)
+    if isinstance(args, dict) and args:
+        # Sorted so the sentence is stable across runs — an approval prompt that reorders
+        # itself between a restart and its re-subscribe would read as a different request.
+        rendered = ", ".join(f"{k}: {args[k]}" for k in sorted(args))
+        clause += f" What it will send — {rendered}."
+    return clause
 
 
 def effective_phase(phase, *, total_phases: int):

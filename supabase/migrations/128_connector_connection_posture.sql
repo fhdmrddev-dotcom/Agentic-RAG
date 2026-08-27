@@ -17,8 +17,29 @@
 --   with NO `--reset`, and commit this migration together with the regenerated
 --   `supabase/full-schema.sql`. Never hand-edit that file.
 --
---   The whole file is RE-PASTE-SAFE: `ADD COLUMN IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`
---   before every `ADD CONSTRAINT`, and all backfills carry idempotent transformations.
+--   §1, §2 and §4 are RE-PASTE-SAFE: `ADD COLUMN IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`
+--   before every `ADD CONSTRAINT`, and a `GRANT` that is idempotent by definition.
+--
+--   ⚠ CORRECTED 2026-08-27 (plan 213-06) — THIS HEADER CLAIMED "The whole file is
+--   RE-PASTE-SAFE" AND §3 IS NOT. The original wording is kept above rather than quietly
+--   swapped, because a false safety claim is worse than no claim: it INVITES the re-paste.
+--   §3 is idempotent in the arithmetic sense — running it twice on an UNTOUCHED database
+--   yields the same rows — and DESTRUCTIVE in the operator sense: it overwrites
+--   `tool_grants` wholesale, so on a database where people have since set postures it
+--   RESETS EVERY ONE of them and returns the connection default to `deny`. The MCP arm has
+--   the same property; its `WHERE value = 'true' OR value = '"allow"'` silently drops any
+--   `ask` or `deny` a person chose.
+--
+--   The §3 guard below makes that structural rather than a warning: both backfills now skip
+--   any row that has already been migrated. The project rule `never re-execute an applied
+--   migration` still stands and is the real protection — this is the belt to its braces.
+--
+--   ⚠ AND THE GUARD'S OWN RESIDUAL IS STATED RATHER THAN LEFT TO BE FOUND: it keys on
+--   `default_approval_posture = 'ask'` plus the absence of any string-valued grant, so ONE
+--   case still slips through — a connection a person has deliberately set BACK to `ask`
+--   while overriding no individual tool. A re-paste would return that row to `deny`. It is
+--   narrow, it fails CLOSED (toward refusing, never toward sending), and naming it is worth
+--   more than a guard that claims to be total and is not.
 
 -- ================================================================================================
 -- §1 — the column
@@ -53,13 +74,28 @@ UPDATE public.connector_connections
          ),
          '{}'::jsonb
        )
- WHERE mcp_server_url IS NOT NULL;
+ WHERE mcp_server_url IS NOT NULL
+   -- ⚠ RE-PASTE GUARD (213-06): only rows still carrying the PRE-213 shape. A row whose
+   -- grants are already posture strings, or whose default is already set, has been migrated
+   -- and its postures are now a person's decisions — not this migration's to overwrite.
+   AND default_approval_posture = 'ask'
+   AND NOT EXISTS (
+         SELECT 1 FROM jsonb_each(COALESCE(tool_grants, '{}'::jsonb))
+          WHERE jsonb_typeof(value) = 'string'
+       );
 
 -- Capability rows: default_approval_posture = 'deny', tool_grants = {capability: 'allow'}
 UPDATE public.connector_connections
    SET default_approval_posture = 'deny',
        tool_grants = jsonb_build_object(capability, 'allow')
- WHERE capability IS NOT NULL;
+ WHERE capability IS NOT NULL
+   -- ⚠ RE-PASTE GUARD (213-06) — see the MCP arm above. Without it a re-paste discards
+   -- every per-tool posture set on a capability connection since the migration ran.
+   AND default_approval_posture = 'ask'
+   AND NOT EXISTS (
+         SELECT 1 FROM jsonb_each(COALESCE(tool_grants, '{}'::jsonb))
+          WHERE jsonb_typeof(value) = 'string'
+       );
 
 -- ================================================================================================
 -- §4 — column-level SELECT grant (SEC-2, D-213-08)

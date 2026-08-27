@@ -2516,12 +2516,27 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # Evaluated BEFORE the shape fork (Gate 6/7) to close BUG-260827-02.
     effective_tool_name = getattr(phase.config, "tool_name", None) or capability
     posture = resolve_effective_posture(connection, effective_tool_name)
-    if posture == "deny":
+    grants = getattr(connection, "tool_grants", None) or {}
+    was_explicitly_set = isinstance(grants, dict) and effective_tool_name in grants
+
+    async def _refuse(reason: str, because: str):
+        """One refusal composer, three reasons (D-213-16 / GRANT-04, plan 213-06).
+
+        ⚠ THE WORDS MIRROR ``grantsVocabulary.ts`` §"The refusal (GRANT-04)" AND ARE NOT
+        IMPORTED FROM IT. D-213-15 chose two homes deliberately — the backend owns the run
+        sentence so it reaches chat, the run page, the panel AND the ledger without four
+        renderers agreeing, while the frontend vocabulary owns the settings screen. The
+        cost of two homes is drift, so ``test_213_approval_moment.py`` pins the two in
+        agreement rather than trusting this comment.
+
+        ⚠ ONE audit KIND, three ``reason`` VALUES. Adding a kind would need
+        ``_AUDIT_EVENT_TYPES`` and a migration CHECK edited in the SAME commit
+        (BUG-260731-02), and there is nothing here that ``tool_refused`` does not already
+        describe.
+        """
         logger.warning(
-            "213 GRANT-02: tool %r is DENIED on connection %s (grants: %s, default: %s) — refusing",
-            effective_tool_name,
-            connection_id,
-            getattr(connection, "tool_grants", None),
+            "213 GRANT-04: tool %r refused on connection %s (%s; grants: %s, default: %s)",
+            effective_tool_name, connection_id, reason, grants,
             getattr(connection, "default_approval_posture", None),
         )
         pool = getattr(ctx, "pool", None)
@@ -2537,16 +2552,60 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
                         "phase": slug,
                         "connection_id": str(connection_id),
                         "tool_name": effective_tool_name,
-                        "reason": "permission_denied",
+                        "reason": reason,
                     },
                 )
             except Exception as exc:
                 logger.warning("213: failed to write tool_refused audit event: %s", exc)
 
         return {
-            "text": f"Tool execution refused: Tool '{effective_tool_name}' is not granted permission on connection '{getattr(connection, 'name', connection_id)}'.",
-            "failure": f"tool '{effective_tool_name}' refused: permission not granted",
+            # REFUSED_HEADLINE + (REFUSED_BECAUSE_DENIED | REFUSED_BECAUSE_UNGRANTED) +
+            # REFUSED_NEXT — the sketch's words, which name the grant that stopped this and
+            # the change that would let it through. The sentence this replaced said
+            # "is not granted permission on connection X": it named no grant and offered no
+            # next step, which is the BUG-260815-06 class GRANT-04 exists to close.
+            "text": (
+                f"{effective_tool_name} was refused. {because} "
+                f"Set it to Allow or Ask first to let this run continue."
+            ),
+            "failure": f"tool '{effective_tool_name}' refused: {reason}",
         }
+
+    if posture == "deny":
+        if was_explicitly_set:
+            return await _refuse(
+                "posture_denied",
+                f"{effective_tool_name} is set to Deny on this connection.",
+            )
+        return await _refuse(
+            "not_granted",
+            f"{effective_tool_name} has never been allowed on this connection.",
+        )
+
+    if posture == "ask" and not getattr(phase, "action_risk_armed", False):
+        # ── SC#3 · "nothing leaves until they answer" — the FAIL-CLOSED half ─────────
+        #
+        # ⚠ THIS IS NOT A SECOND PAUSE, AND IT MUST NOT BECOME ONE. D-213-09 chose
+        # "two triggers, ONE pause" and rejected a distinct grant-approval pause by name,
+        # because an armed step whose tool is also "Ask first" would then ask twice.
+        #
+        # On a workflow `external_action` the armed checkpoint has ALREADY asked: the body
+        # runs only when `_resolve_failure_with_ask_user` returned None
+        # (`harness_engine.py:930`), i.e. a person approved. So `armed` ⇒ proceed, and this
+        # arm never fires there.
+        #
+        # It fires where NOTHING asked — the Phase 216 chat path, and any future unarmed
+        # caller. ⚠ Without it `ask` means SEND: Gate 5.5 refused only on `deny` and fell
+        # through otherwise, and migration 128 §1 makes `'ask'` the default for every NEW
+        # connection, so a row with no grant configured at all dispatched. Pre-213 that same
+        # row was REFUSED, because the Gate 6 check this replaced read
+        # `grants.get(tool) is True` — a MISSING KEY DENIES. This restores that property to
+        # the GATE rather than leaving it resting on a column default.
+        return await _refuse(
+            "approval_required",
+            f"{effective_tool_name} needs a person's approval on this connection, "
+            f"and nothing here can ask one.",
+        )
 
     # ── GATE 6 · MCP Tool Dispatch (Phase 206 / CONN-02 / D-206-06) ───────────────────
     if getattr(connection, "mcp_server_url", None):

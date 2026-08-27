@@ -165,7 +165,10 @@ async def test_end_to_end_denied_tool_fails_gate55_and_emits_tool_refused(monkey
 
     outcome = await _exec_external_action(phase, {}, ctx)
 
-    assert "is not granted permission" in outcome.get("text", "")
+    # ⚠ AMENDED by plan 213-06 (GRANT-04). SC#4 requires the refusal to NAME THE GRANT
+    # that would allow it; "is not granted permission" named none and offered no next step.
+    assert "is set to Deny on this connection" in outcome.get("text", ""), outcome
+    assert "Set it to Allow or Ask first" in outcome.get("text", ""), outcome
     assert not mcp_called
 
     # Assert tool_refused audit event written with tool_name

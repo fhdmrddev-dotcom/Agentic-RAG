@@ -192,7 +192,13 @@ async def test_gate55_mcp_explicit_deny_refuses_and_audits():
         res = await _exec_external_action(phase, {}, ctx)
 
         assert "failure" in res
-        assert "permission not granted" in res["failure"]
+        # ⚠ AMENDED by plan 213-06 (GRANT-04 / D-213-16). The old assertion read
+        # "permission not granted" — the mechanism-naming voice the sketch replaced. The
+        # refusal now names the GRANT that stopped it and the change that would let it
+        # through, and the `failure` carries the machine reason rather than prose.
+        assert "posture_denied" in res["failure"], res["failure"]
+        assert "is set to Deny on this connection" in res["text"], res["text"]
+        assert "Set it to Allow or Ask first" in res["text"], res["text"]
         assert "jira_delete_issue" in res["text"]
 
         # Verify tool_refused audit event
@@ -306,7 +312,15 @@ async def test_gate55_capability_shape_posture_enforced_sec1():
         res = await _exec_external_action(phase, {}, ctx)
 
         assert "failure" in res
-        assert "permission not granted" in res["failure"]
+        # ⚠ AMENDED by plan 213-06 (GRANT-04 / D-213-16), and this drive is the
+        # `not_granted` case rather than `posture_denied`: `tool_grants` is EMPTY and the
+        # connection default is `deny`, so nobody ever GRANTED this tool rather than
+        # someone DENYING it. Asserting the other reason here would quietly erase the very
+        # distinction this fixture creates — and D-213-16 exists so the ledger can answer
+        # "did a person deny this, or did a setting?".
+        assert "not_granted" in res["failure"], res["failure"]
+        assert "has never been allowed on this connection" in res["text"], res["text"]
+        assert "Set it to Allow or Ask first" in res["text"], res["text"]
         assert "post_message" in res["text"]
         # Adapter send must NEVER be called
         mock_adapter_get.assert_not_called()
