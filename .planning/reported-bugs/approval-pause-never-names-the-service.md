@@ -4,9 +4,9 @@ title: The approval pause names the tool and the arguments but never the SERVICE
 reported: 2026-08-28
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, workflows/approval, connections]
-folded_into: null
+folded_into: 214
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

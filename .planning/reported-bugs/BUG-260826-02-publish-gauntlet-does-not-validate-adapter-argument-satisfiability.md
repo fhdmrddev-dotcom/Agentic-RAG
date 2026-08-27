@@ -4,7 +4,7 @@ title: The publish gauntlet does not check that an external_action's required ad
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, backend/connectors, publish-gauntlet]
 folded_into: 214
 verified_closed_by: null

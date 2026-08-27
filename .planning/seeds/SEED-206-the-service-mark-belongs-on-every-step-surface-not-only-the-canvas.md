@@ -3,7 +3,8 @@ seed_id: SEED-206
 title: "A step that calls Slack wears SLACK'S mark — on the SPINE and the run surfaces too, not only the canvas. And 'any official application logo' has a measured hole: the operator's own example, ClickUp, is absent from the installed collection."
 created: 2026-08-26
 planted_during: conversation with the operator, 2026-08-26, while Gemini executed Phase 209
-status: planted
+status: folded            # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- SC#4's second half; see folded_into.
+folded_into: 214
 priority: medium
 surface: Agentic-RAG
 relates_to:

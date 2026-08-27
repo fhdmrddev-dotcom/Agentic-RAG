@@ -4,7 +4,7 @@ title: A failed external_action phase shows "Failure reason not captured by the 
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/panel, backend/harness, streaming]
 folded_into: 214
 verified_closed_by: null
