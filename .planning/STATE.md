@@ -106,8 +106,17 @@ lacked. 2,796 passing tests saw none of it.
 **Operator workaround** until D-4/D-5 land: use service `custom_mcp`, paste URL + token, and click
 **Discover tools BEFORE saving**.
 
-**D-4 and D-5 are carried into Phase 213** — larger than a G-3 fast fix, and 213 owns the connection
-detail screen (`BUS-019`) where the grant surface D-4 feeds will live.
+⭐ **OPERATOR RULING 2026-08-27 — D-4 AND D-5 ARE FIXED IN 212, NOT DEFERRED TO 213.** This
+supersedes the earlier 'carried to 213' note and `BUS-021`'s closing paragraph. Gemini has the work
+on **`BUS-022`**; **213 must not start until both land.** Session handoff, written at ~68% context:
+**`.planning/phases/212-the-catalog-and-its-doors/212-HANDOFF.md`** — read it FIRST in a new session.
+
+⚠ **D-4 IS PROVEN, NOT INFERRED, AND THE OPERATOR'S GITHUB CONNECTION ACTUALLY WORKS.**
+`discover_connection_tools(id, org)` against their real stored credential returned **44 tools**, now
+cached on the row (`GitHub 44 · DeepWiki 3 · Notion 0`). The credential, decryption, egress path and
+remote server are all fine — **only the button asks the wrong endpoint.** ⚠ Notion's `0` is NOT our
+bug: it answers `403 restricted_resource "Endpoint unavailable."`
+⚠ I retracted D-4 once on partial evidence and reinstated it; it is settled, do not re-litigate.
 
 ## Owed after 212
 
