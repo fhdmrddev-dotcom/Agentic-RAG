@@ -89,6 +89,28 @@ import { Mail, Plug } from "lucide-react"
 import SlackIcon from "~icons/logos/slack-icon"
 import JiraIcon from "~icons/logos/jira"
 import McpIcon from "~icons/logos/model-context-protocol-icon"
+// ── Phase 213 follow-up (SEED-215) — the eight vendors that were drawing the neutral plug.
+// ⚠ EVERY SLUG IS THE `-icon` SQUARE MARK, NOT THE WORDMARK, and that is not a style
+// preference — measured against the installed `@iconify-json/logos@1.2.13` on 2026-08-27:
+//   logos:github    512x139  ratio 3.68 │ logos:notion  512x178  2.88
+//   logos:google    512x168  ratio 3.05 │ logos:linear  512x128  4.00
+//   logos:sentry    512x113  ratio 4.53 │ logos:intercom 512x130 3.94
+//   logos:miro      512x188  ratio 2.72
+// In an `h-4 w-4` box `preserveAspectRatio` defaults to `xMidYMid meet`, so any of those
+// letterboxes to a ~4px-tall unreadable strip — the same trap this file already records for
+// `logos:slack`. ⚠ `logos:google-icon` DOES exist (256x262, ratio 0.98) despite not being
+// in the first page of a prefix search; do not conclude from a truncated grep that it does not.
+// ⚠ AND `figma` BREAKS THE `-icon` HABIT: there is NO `logos:figma-icon`. Plain `logos:figma`
+// IS the mark, and it is PORTRAIT (256x384, ratio 0.67) — it renders narrower than its
+// neighbours rather than letterboxed, which is correct and is the brand's real shape.
+import GithubIcon from "~icons/logos/github-icon"
+import NotionIcon from "~icons/logos/notion-icon"
+import GoogleIcon from "~icons/logos/google-icon"
+import FigmaIcon from "~icons/logos/figma"
+import LinearIcon from "~icons/logos/linear-icon"
+import SentryIcon from "~icons/logos/sentry-icon"
+import IntercomIcon from "~icons/logos/intercom-icon"
+import MiroIcon from "~icons/logos/miro-icon"
 
 import { cn } from "@/lib/utils"
 
@@ -149,6 +171,26 @@ const SERVICE_MARKS: Record<string, ConnectionMarkEntry> = {
   smtp: { key: "smtp", Mark: Mail, ink: "stroke" },
   mcp: MCP_MARK,
   custom_mcp: MCP_MARK,
+
+  // ── SEED-215 — a vendor shows its OWN mark, which is this module's opening sentence.
+  // Eight catalog services were resolving to the neutral plug for no reason other than an
+  // absent map entry: the package was already installed and the slugs already present.
+  github: { key: "github", Mark: GithubIcon, ink: "self" },
+  notion: { key: "notion", Mark: NotionIcon, ink: "self" },
+  google: { key: "google", Mark: GoogleIcon, ink: "self" },
+  figma: { key: "figma", Mark: FigmaIcon, ink: "self" },
+  linear: { key: "linear", Mark: LinearIcon, ink: "self" },
+  sentry: { key: "sentry", Mark: SentryIcon, ink: "self" },
+  miro: { key: "miro", Mark: MiroIcon, ink: "self" },
+
+  // ⚠ INTERCOM TAKES `fill`, AND IT IS THE ONLY ONE OF THE EIGHT THAT DOES. Measured: its
+  // body has ONE drawable element with ZERO `fill=` attributes and no `currentColor`, so it
+  // inherits the SVG default `fill: black` and is effectively INVISIBLE on Deep Midnight
+  // (`--card: 220 30% 7%`). That is byte-for-byte the mechanic this file already documents
+  // for the MCP mark: the slug resolves, the body is real, every test is green, and the
+  // person sees NOTHING. The import fence structurally cannot catch it — only the
+  // resolved-but-INVISIBLE assertion in the suite can.
+  intercom: { key: "intercom", Mark: IntercomIcon, ink: "fill" },
 }
 
 /**

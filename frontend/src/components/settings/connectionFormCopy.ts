@@ -258,11 +258,23 @@ export function shapeForService(serviceId: string, endpoint: string = ""): Conne
   // which is exactly what migration 127's `service_id` COMMENT already promises.
   //
   // ⚠ `getCuratedServiceEntry`, NOT `getServiceCatalogEntry`. The total lookup synthesizes a
-  // fallback entry carrying `markKey: "mcp"` for ANY unknown identity, so keyed on it every
-  // uncurated `service_id` would become an MCP row and the `"service"` shape would cease to
-  // exist. A MISS must still fall through to arm 3 — that is CONN-08's whole row.
+  // fallback entry for ANY unknown identity, so keyed on that every uncurated `service_id`
+  // would become an MCP row and the `"service"` shape would cease to exist. A MISS must still
+  // fall through to arm 3 — that is CONN-08's whole row.
+  //
+  // ⚠ READS `shape`, NOT `markKey`, SINCE 2026-08-27 (SEED-215) — AND THE OLD SPELLING IS
+  // NAMED HERE BECAUSE IT BROKE THIS EXACT ARM. `markKey === "mcp"` worked only while every
+  // MCP-backed vendor happened to be drawing the generic MCP plug. Giving `github`, `notion`
+  // and `google` their OWN logos — a purely VISUAL change, in another file, with no intent to
+  // touch behaviour — made all three miss this test and fall to arm 3's `"service"` shape,
+  // whose field set is Name and nothing else. That is the D-5 defect this arm was written to
+  // fix, reintroduced by a logo.
+  //
+  // The lesson is the one the catalog now encodes in its types: *what a service DRAWS* and
+  // *what a service TALKS TO* are two facts, and a column serving both will eventually be
+  // changed for one reason and break the other.
   const curated = getCuratedServiceEntry(serviceId)
-  if (curated?.markKey === "mcp") return "mcp"
+  if (curated?.shape === "mcp") return "mcp"
 
   // 3 · An identity nothing knows about names a service and no way to reach it yet. A real
   //     shape, not an error state — Phase 215's OAuth is what gives it a way through.

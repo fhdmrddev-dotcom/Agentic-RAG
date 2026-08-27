@@ -376,14 +376,118 @@ describe("source fences over the module's own text", () => {
     expect(markSource).not.toContain("logos/jira-icon")
   })
 
-  it("exactly THREE brand imports and ONE lucide import — one home, not per-component", () => {
-    expect((markSource.match(/~icons\/logos\//g) ?? []).length).toBe(3)
+  it("every brand import lives in THIS module — one home, not per-component", () => {
+    // ⚠ AMENDED (SEED-215): this asserted `.toBe(3)` and now reads 11, because the eight
+    // vendors that were drawing the neutral plug gained their own marks. The number is NOT
+    // the property — "one home" is — and a bare count rots on every service added, which is
+    // this repo's most-repeated defect. So the count is asserted against the map it tracks
+    // rather than against a literal, and the fence that actually protects the render is the
+    // wordmark one below.
+    const brandImports = (markSource.match(/~icons\/logos\//g) ?? []).length
+    expect(brandImports).toBe(11)
     expect((markSource.match(/from "lucide-react"/g) ?? []).length).toBe(1)
+  })
+
+  it("⚠ NO WORDMARK SLUG IS EVER IMPORTED — the difference between a mark and a smear", () => {
+    // NET-NEW (SEED-215), and it guards the trap that actually bites. Measured against the
+    // installed `@iconify-json/logos@1.2.13`: the bare vendor names are 2.7:1 to 4.5:1
+    // WORDMARKS, and in an `h-4 w-4` box `preserveAspectRatio: xMidYMid meet` letterboxes
+    // them to a ~4px-tall unreadable strip. They RESOLVE, they BUILD, and every other
+    // assertion in this file passes — only their aspect ratio is wrong, which no import
+    // fence and no body check can see.
+    //
+    // ⚠ `figma` is deliberately ABSENT from this list: there is no `logos:figma-icon`, and
+    // plain `logos:figma` IS the square-ish mark (256x384). Listing it here would forbid the
+    // only correct spelling.
+    for (const wordmark of [
+      "logos/github",
+      "logos/notion",
+      "logos/google",
+      "logos/linear",
+      "logos/sentry",
+      "logos/intercom",
+      "logos/miro",
+      "logos/slack",
+      "logos/model-context-protocol",
+    ]) {
+      // The bare name followed by end-of-import — `-icon` variants must still pass.
+      expect(markSource).not.toMatch(new RegExp(`~icons/${wordmark}"`))
+    }
   })
 
   it("no class that compiles to NOTHING — the bg-warning defect", () => {
     // `--muted-foreground-dim` has no Tailwind key outside `components/panel/*`, so the
     // utility would emit no CSS and ship looking intentional (Phase 192.2's measured find).
     expect(markSource).not.toContain("text-muted-foreground-dim")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 5 · SEED-215 — the eight vendors that used to draw the neutral plug
+//
+// The package was already installed and every slug already present; the only thing missing
+// was eight map entries. These assertions are the three the import fence CANNOT make:
+// resolved-but-EMPTY, resolved-but-IDENTICAL, and resolved-but-INVISIBLE.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("SEED-215 — a vendor shows its OWN mark, not the neutral plug", () => {
+  const VENDORS = [
+    "github",
+    "notion",
+    "google",
+    "figma",
+    "linear",
+    "sentry",
+    "intercom",
+    "miro",
+  ] as const
+
+  it.each(VENDORS)("%s resolves its own entry, not the neutral", (serviceId) => {
+    const entry = connectionMark({ service_id: serviceId })
+    expect(entry.key).toBe(serviceId)
+    expect(isRenderableComponent(entry.Mark)).toBe(true)
+  })
+
+  it.each(VENDORS)("%s renders a NON-EMPTY body", (serviceId) => {
+    // resolved-but-EMPTY. `unplugin-icons` makes a bad slug a transform-time hard error, so
+    // the import is the fence for EXISTENCE — but a slug that resolves to nothing drawable
+    // builds, passes a type check, and renders a blank box.
+    expect(bodyOf({ service_id: serviceId }).length).toBeGreaterThan(0)
+  })
+
+  it("all eight are PAIRWISE DISTINCT, and none is the neutral plug", () => {
+    // resolved-but-IDENTICAL. A copy-paste mapping two vendors to one import satisfies every
+    // case above — this is the only assertion that fails on it.
+    const bodies = VENDORS.map((id) => bodyOf({ service_id: id }))
+    expect(new Set(bodies).size).toBe(VENDORS.length)
+    for (const body of bodies) expect(body).not.toBe(bodyOf(UNMAPPED))
+  })
+
+  it("⚠ intercom takes the `fill` ink — without it the mark is INVISIBLE, not absent", () => {
+    // resolved-but-INVISIBLE, and it is the reason this block exists rather than trusting a
+    // green build. Measured on `@iconify-json/logos@1.2.13`: `logos:intercom-icon` has ONE
+    // drawable element, ZERO `fill=` attributes and no `currentColor`, so it inherits the
+    // SVG default `fill: black` and disappears on Deep Midnight (`--card: 220 30% 7%`).
+    // Identical mechanic to the MCP mark, which this module already inks the same way.
+    expect(connectionMark({ service_id: "intercom" }).ink).toBe("fill")
+    expect(glyphClass({ service_id: "intercom" }, "row")).toContain("fill-current")
+  })
+
+  it("POSITIVE CONTROL — the other seven carry their own fills and take `self`", () => {
+    // Without this, inking EVERYTHING `fill` would pass the assertion above while flattening
+    // Google's four brand colours and Slack's into one flat block.
+    for (const id of VENDORS.filter((v) => v !== "intercom")) {
+      expect(connectionMark({ service_id: id }).ink).toBe("self")
+      expect(glyphClass({ service_id: id }, "row")).not.toContain("fill-current")
+    }
+  })
+
+  it("⚠ custom_mcp and smtp are NOT part of this — both are correctly vendorless", () => {
+    // The FINDING that must not be "fixed": a custom MCP server has no vendor, so the MCP
+    // mark IS its identity; and `logos` carries no SMTP mark at all (`smtp`, `email` and
+    // `envelope` each return zero), so borrowing Gmail's for a Fastmail connection would be
+    // the ROADMAP's own named "a logo is approximated" failure.
+    expect(connectionMark({ service_id: "custom_mcp" }).key).toBe("mcp")
+    expect(connectionMark({ capability: "send_email" }).key).toBe("send_email")
   })
 })

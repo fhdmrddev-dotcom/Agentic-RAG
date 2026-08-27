@@ -1,7 +1,7 @@
 ---
 id: SEED-215
 title: Eight catalog services draw the GENERIC MCP plug instead of their own official logo — the icon convention is honoured for providers/models and unhonoured for services
-status: planted
+status: shipped
 planted: 2026-08-27
 planted_by: Claude, 2026-08-27, from the operator's standing direction — "add official logos for all applications, models and anything in the app that has an official icon"
 surface: Agentic-RAG
@@ -26,6 +26,15 @@ re_open_trigger: >
   The moment Phase 213's tree is committed and its gates are green. This is a /gsd:quick-sized
   change (2 source files + 1 test file) and needs no phase of its own.
 ---
+
+> ✅ **SHIPPED 2026-08-27.** All eight vendors carry their own mark; `intercom` took the
+> `fill` ink as predicted. **The prediction that mattered was the one this seed did NOT
+> make:** flipping the marks silently broke `shapeForService`, which keyed the connection
+> SHAPE off `markKey === "mcp"` — so `github`, `notion` and `google` fell to the `"service"`
+> shape whose form is Name and nothing else. That is Phase 212's D-5 defect, reintroduced by
+> a logo. The catalog now carries `shape` beside `markKey` so *what a service draws* and
+> *what it talks to* are separate facts, and a regression test pins both together.
+
 
 # SEED-215 — a vendor should show its own mark, and eight of them do not
 

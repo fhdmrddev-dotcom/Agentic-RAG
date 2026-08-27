@@ -21,7 +21,25 @@ export interface CatalogServiceEntry {
   name: string
   tagline: string
   description: string
+  /** Which mark to DRAW. A presentation fact and nothing else. */
   markKey: string
+  /**
+   * Which WIRE this service reaches over — the shape `shapeForService` resolves.
+   *
+   * ⚠ SEPARATED FROM `markKey` ON 2026-08-27 (SEED-215), AND THE REASON IS A DEFECT THAT WAS
+   * REINTRODUCED BY EXACTLY THIS CONFLATION. Phase 212's D-5 keyed the shape on
+   * `markKey === "mcp"`, which worked only while every MCP-backed vendor happened to be
+   * drawing the generic MCP plug. The moment `github`, `notion` and `google` were given
+   * their OWN logos, all three fell through to the `"service"` shape — whose field set is
+   * Name and NOTHING ELSE — so the panel opened with nowhere to type a URL or a token. That
+   * is byte-for-byte the defect D-5 was written to fix, caused by a purely visual change.
+   *
+   * The two facts were never the same fact: `markKey` answers *what do I draw*, `shape`
+   * answers *what does this talk to*. A vendor can have its own logo AND speak MCP, which is
+   * the normal case rather than the exception. This file already warned that keying a SHAPE
+   * on `markKey` is "catastrophic"; the warning was right and pointed at the wrong column.
+   */
+  shape?: "mcp"
   isPopular: boolean
   category: ServiceCategory
   defaultHost?: string
@@ -49,7 +67,8 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     name: "GitHub",
     tagline: "Track code changes and manage pull requests.",
     description: "Integrate with GitHub to inspect pull requests, manage issues, and trigger actions through MCP.",
-    markKey: "mcp",
+    markKey: "github",
+    shape: "mcp",
     isPopular: true,
     category: "developer",
     defaultHost: "api.github.com",
@@ -63,7 +82,8 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     name: "Notion",
     tagline: "Organise notes and collaborate on documents.",
     description: "Query Notion pages, sync documentation databases, and append notes to engineering wikis.",
-    markKey: "mcp",
+    markKey: "notion",
+    shape: "mcp",
     isPopular: true,
     category: "productivity",
     defaultHost: "api.notion.com",
@@ -105,7 +125,8 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     name: "Google Workspace",
     tagline: "Document collaboration and drive assets.",
     description: "Access shared Google Drive files, search documents, and read team collaboration resources.",
-    markKey: "mcp",
+    markKey: "google",
+    shape: "mcp",
     isPopular: true,
     category: "productivity",
     defaultHost: "googleapis.com",
@@ -120,6 +141,7 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     tagline: "Connect any Model Context Protocol compliant server.",
     description: "Paste the URL of any remote MCP server to discover and grant its published tools with egress safety.",
     markKey: "mcp",
+    shape: "mcp",
     isPopular: true,
     category: "custom",
     defaultHost: "mcp.internal.server",
@@ -137,7 +159,8 @@ export const CATALOG_SERVICES: CatalogServiceEntry[] = [
     name: "Figma",
     tagline: "Design interfaces and prototype user flows.",
     description: "Access Figma files, inspect design components, and sync assets across product and design workflows.",
-    markKey: "mcp",
+    markKey: "figma",
+    shape: "mcp",
     isPopular: false,
     category: "productivity",
     defaultHost: "api.figma.com",
@@ -147,7 +170,8 @@ export const CATALOG_SERVICES: CatalogServiceEntry[] = [
     name: "Linear",
     tagline: "Plan projects and manage developer workflows.",
     description: "Sync development issues, manage sprint cycles, and track project roadmap milestones with Linear.",
-    markKey: "mcp",
+    markKey: "linear",
+    shape: "mcp",
     isPopular: false,
     category: "developer",
     defaultHost: "api.linear.app",
@@ -157,7 +181,8 @@ export const CATALOG_SERVICES: CatalogServiceEntry[] = [
     name: "Sentry",
     tagline: "Monitor errors and watch releases.",
     description: "Query crash reports, monitor exception trends, and inspect release health across application services.",
-    markKey: "mcp",
+    markKey: "sentry",
+    shape: "mcp",
     isPopular: false,
     category: "developer",
     defaultHost: "sentry.io",
@@ -167,7 +192,8 @@ export const CATALOG_SERVICES: CatalogServiceEntry[] = [
     name: "Intercom",
     tagline: "Chat with customers and manage support tickets.",
     description: "Search customer support conversations, retrieve user feedback, and manage customer communications.",
-    markKey: "mcp",
+    markKey: "intercom",
+    shape: "mcp",
     isPopular: false,
     category: "communication",
     defaultHost: "api.intercom.io",
@@ -177,7 +203,8 @@ export const CATALOG_SERVICES: CatalogServiceEntry[] = [
     name: "Miro",
     tagline: "Sketch ideas on a shared whiteboard.",
     description: "Collaborate visually on architecture diagrams, journey maps, and real-time team whiteboards.",
-    markKey: "mcp",
+    markKey: "miro",
+    shape: "mcp",
     isPopular: false,
     category: "collaboration",
     defaultHost: "api.miro.com",

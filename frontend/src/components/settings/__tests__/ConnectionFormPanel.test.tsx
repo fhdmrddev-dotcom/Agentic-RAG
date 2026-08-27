@@ -91,6 +91,7 @@ import * as FORM_COPY from "../connectionFormCopy"
 import * as CONNECTIONS_COPY from "../connectionsCopy"
 import * as REFUSAL_COPY from "../connectionRefusalCopy"
 import { GRANTS_COPY } from "../grantsVocabulary"
+import { connectionMark } from "../connectionMark"
 import {
   CHECK_FAILURE_SENTENCE,
   CHECK_INFLIGHT_BODY,
@@ -1886,6 +1887,28 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
     for (const key of PROTOTYPE_KEYS) {
       expect(FORM_COPY.shapeForService(key, "")).toBe("service")
     }
+  })
+
+  it("⚠ SEED-215 — a vendor's own LOGO does not change its WIRE. The two are separate facts.", () => {
+    // THE REGRESSION THIS EXISTS FOR, and it is not hypothetical: it happened.
+    // `shapeForService` arm 2 used to read `curated?.markKey === "mcp"`, which worked only
+    // while every MCP-backed vendor happened to be drawing the generic MCP plug. Giving
+    // `github`, `notion` and `google` their OWN marks — a purely visual change, in another
+    // file — made all three miss that test and resolve to the `"service"` shape, whose field
+    // set is Name and NOTHING ELSE. The panel opened with nowhere to type a URL or a token:
+    // byte-for-byte Phase 212's D-5 defect, caused by a logo.
+    //
+    // The catalog now carries `shape` beside `markKey`, and this pins that they are read
+    // independently. It fails the moment someone keys a wire off a picture again.
+    for (const vendor of ["github", "notion", "google", "figma", "linear", "sentry", "intercom", "miro"]) {
+      expect(FORM_COPY.shapeForService(vendor, "")).toBe("mcp")
+      // …AND the mark is the vendor's own, not the plug. Asserting only the shape would pass
+      // on a revert of the logos; asserting only the mark would pass on a revert of `shape`.
+      expect(connectionMark({ service_id: vendor }).key).toBe(vendor)
+    }
+    // The adapter-backed three are untouched by any of it — arm 1 still answers first.
+    expect(FORM_COPY.shapeForService("slack", "")).toBe("post_message")
+    expect(connectionMark({ service_id: "slack" }).key).toBe("slack")
   })
 
   it("the ONE explicit override — an `https://` endpoint selects the remote-server shape", () => {
