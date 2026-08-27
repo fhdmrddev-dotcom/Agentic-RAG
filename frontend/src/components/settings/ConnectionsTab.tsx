@@ -107,7 +107,12 @@ import type {
   ConnectorConnectionUpdate,
 } from "@/lib/api"
 import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
-import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
+import {
+  CATALOG_SERVICES,
+  getServiceCatalogEntry,
+  type CatalogServiceEntry,
+} from "@/components/settings/servicesCatalog"
+import { shapeForService } from "@/components/settings/connectionFormCopy"
 import { PROVENANCE_ADDED_BY_URL } from "@/components/settings/catalogCopy"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import {
@@ -176,14 +181,6 @@ import {
   type ConnectionStateKind,
 } from "@/components/settings/connectionsCopy"
 
-// ── The marks moved OUT of this file in 206.1-01 (item 3 · D-206.1-08) ───────────────
-//    They now live in `connectionMark.tsx`, which is the ONE home for the map, the
-//    own-property guard, the named neutral, the slug verification and the ink contract.
-//    That module's map is still MODULE-PRIVATE for the reason this file's deleted comment
-//    gave: handing a mark map out lets a caller bypass the own-property guard, and an
-//    inherited key read that way is the `[Function Object]` React child that hard-crashed a
-//    node face before 188.1-04. Only the keys and the resolver cross the boundary.
-
 const MOBILE_BREAKPOINT = 768
 
 /** Inline mobile hook — the project convention, declared per-file rather than shared
@@ -219,6 +216,8 @@ const STATE_TONE: Record<ConnectionStateKind, string> = {
 export interface ConnectionsTabViewProps {
   /** Every connection in the caller's org. `null` while the read is in flight. */
   connections: ConnectorConnection[] | null
+  /** Available service catalog entries. Defaults to CATALOG_SERVICES. */
+  catalogServices?: CatalogServiceEntry[]
   /** The read failed. Populated ≠ empty ≠ loading ≠ error — four different facts. */
   readFailed?: boolean
   /** `connection_id` → how many published steps the CALLER CAN SEE reference it. */
@@ -235,8 +234,8 @@ export interface ConnectionsTabViewProps {
    *  disabling it — the shipped 185 rule, and the reason the suite drives both directions.
    *  Absent ⇒ the menu item is REMOVED, never rendered inert. */
   onCheck?: (connection: ConnectorConnection) => Promise<void>
-  /** Absent until plan 190-17 lands the add/edit panel. Absent ⇒ no Add affordance. */
-  onAdd?: () => void
+  /** Absent until plan 190-17 lands the add/edit panel. Accepts optional presetServiceId. */
+  onAdd?: (presetServiceId?: string) => void
   /** Absent until plan 190-17. Absent ⇒ the name is text, not a control. */
   onOpen?: (connection: ConnectorConnection) => void
   /** Injected by the suite so relative times are deterministic. */
@@ -248,8 +247,13 @@ export interface ConnectionsTabViewProps {
   panel?: React.ReactNode
 }
 
+type DisplayItem =
+  | { kind: "configured"; id: string; connection: ConnectorConnection; isPopular: boolean }
+  | { kind: "catalog"; id: string; entry: CatalogServiceEntry; isPopular: boolean }
+
 export function ConnectionsTabView({
   connections,
+  catalogServices = [],
   readFailed = false,
   usageCounts,
   isOrgAdmin,
@@ -271,46 +275,80 @@ export function ConnectionsTabView({
    *  halves are render-only mirrors of a server gate, and BOTH gates are real. */
   const canWrite = isOrgAdmin && liveConnectorsOn
 
-  const total = connections?.length ?? 0
-  const filtered = useMemo(() => {
+  // Merge configured DB connection rows with unconfigured catalog services
+  const allItems = useMemo<DisplayItem[] | null>(() => {
     if (connections === null) return null
-    return connections.filter((row) => {
-      if (filterState === "ready") {
-        if (connectionStateOf(row) !== "ready") return false
-      } else if (filterState === "not_connected") {
-        if (connectionStateOf(row) === "ready") return false
+    const configuredServiceIds = new Set(
+      connections.map((c) => (c.service_id || "").trim().toLowerCase()).filter(Boolean),
+    )
+    const list: DisplayItem[] = connections.map((conn) => {
+      const entry = getServiceCatalogEntry(conn.service_id)
+      return {
+        kind: "configured",
+        id: conn.id,
+        connection: conn,
+        isPopular: entry.isPopular,
       }
-      return connectionMatchesQuery(row, query)
     })
-  }, [connections, filterState, query])
+
+    for (const cat of catalogServices) {
+      if (!configuredServiceIds.has(cat.serviceId.toLowerCase())) {
+        list.push({
+          kind: "catalog",
+          id: `catalog:${cat.serviceId}`,
+          entry: cat,
+          isPopular: cat.isPopular,
+        })
+      }
+    }
+    return list
+  }, [connections, catalogServices])
+
+  const total = allItems?.length ?? 0
+
+  const filteredItems = useMemo<DisplayItem[] | null>(() => {
+    if (allItems === null) return null
+    const q = query.trim().toLowerCase()
+    return allItems.filter((item) => {
+      // 1. State filtering
+      if (filterState === "ready") {
+        if (item.kind !== "configured") return false
+        if (connectionStateOf(item.connection) !== "ready") return false
+      } else if (filterState === "not_connected") {
+        if (item.kind === "configured" && connectionStateOf(item.connection) === "ready") {
+          return false
+        }
+      }
+
+      // 2. Query filtering
+      if (q) {
+        if (item.kind === "configured") {
+          const matchesBase = connectionMatchesQuery(item.connection, query)
+          const entry = getServiceCatalogEntry(item.connection.service_id)
+          const matchesTagline = entry.tagline?.toLowerCase().includes(q) ?? false
+          if (!matchesBase && !matchesTagline) return false
+        } else {
+          const entry = item.entry
+          const matchesName = entry.name.toLowerCase().includes(q)
+          const matchesId = entry.serviceId.toLowerCase().includes(q)
+          const matchesTagline = entry.tagline.toLowerCase().includes(q)
+          const matchesDesc = entry.description.toLowerCase().includes(q)
+          const matchesHost = entry.defaultHost?.toLowerCase().includes(q) ?? false
+          if (!matchesName && !matchesId && !matchesTagline && !matchesDesc && !matchesHost) {
+            return false
+          }
+        }
+      }
+
+      return true
+    })
+  }, [allItems, filterState, query])
 
   const isFiltering = query.trim() !== "" || filterState !== null
 
-  /** ⚠ THE ONE CONDITION, ONE HOME, TWO CONSEQUENCES (D-206.1-12). This is the SAME
-   *  expression that opens the 400px track below — assigned to a const rather than written
-   *  twice, because the whole point is that the row cannot reflow at a different moment
-   *  from the track that squeezes it. When it is true the list column drops from ~718px to
-   *  ~302px, and the wide five-column row does not fit in 302px by any budgeting: four of
-   *  its cells are constitutionally unable to shrink (`w-24` + `w-32` + `w-36` + `w-8` =
-   *  400px) and the row's structural overhead claims another 88px.
-   *
-   *  ⚠ THE CSS CONTAINER-QUERY ROUTE IS REFUSED AND NOT REVISITED (D-206.1-12). Tailwind's
-   *  plugin for it is not installed (it would be a second new dependency in a phase that
-   *  already carries one), and jsdom evaluates no layout at all — so a shape driven by the
-   *  element's own measured width would be untestable by the very suite that has to pin it.
-   *  ⚠ The plugin name and the at-rule are DESCRIBED here and deliberately not SPELLED: the
-   *  acceptance sweep greps this file's own source for both and expects zero, so naming
-   *  them in the comment that forbids them turns the guard red on itself. That is the
-   *  187-24 trap, which fired three times inside plan 01 of this phase alone. */
   const dense = Boolean(panel) && !isMobile
 
   return (
-    // ── The 400px right-side PUSH/SPLIT track (D-27, sketch 156-A — locked; the shipped
-    //    shape is `WorkflowBuilderPage.tsx:1833-1836` and `ClassificationRulesPage:139-144`).
-    //    THE LIST STAYS VISIBLE AND IS NEVER COVERED — that is the whole reason A won over a
-    //    dialog: when a check fails the honest next action is to look at the list, and a
-    //    dialog scrims it away. Below 768px the panel becomes a bottom sheet, so the track
-    //    collapses to one column rather than leaving a 400px hole. ──
     <div
       data-testid="connections-split"
       className="grid min-h-0 min-w-0 gap-4 motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
@@ -318,237 +356,527 @@ export function ConnectionsTabView({
         gridTemplateColumns: dense ? "minmax(0,1fr) 400px" : "minmax(0,1fr)",
       }}
     >
-    <section aria-label="Connections" data-testid="connections-tab" className="min-w-0">
-      {/* ── The platform-wide truth, told ONCE, above the card and never on a row (D-26).
-             At 24 rows a per-row notice is 24 identical amber lines — sketch 155's own
-             `tell it` control produced exactly that finding. ── */}
-      {!liveConnectorsOn && (
-        <div
-          data-testid="connections-off-banner"
-          className="mb-4 flex items-start gap-2.5 rounded-[10px] border border-warning/30 bg-warning/10 px-3.5 py-3"
-        >
-          <span aria-hidden="true" className="mt-px text-[13px] leading-none text-warning">
-            {CONNECTIONS_BANNER_GLYPH}
-          </span>
-          <div className="min-w-0">
-            <div className="text-[13px] font-medium text-foreground">
-              {CONNECTIONS_BANNER_HEADING}
-            </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              {CONNECTIONS_BANNER_BODY}
-            </p>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              {CONNECTIONS_BANNER_OPERATOR_PREFIX}
-              <code className="font-mono text-[11px] text-warning">
-                {CONNECTIONS_BANNER_OPERATOR_FLAG}
-              </code>
-              {CONNECTIONS_BANNER_OPERATOR_SUFFIX}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── The filter bar + the live count (§2d). C won a 24-row drive, not a taste
-             vote: the bar is mandatory and the count is load-bearing. ── */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <label htmlFor={searchId} className="relative inline-flex items-center">
-          <Search
-            className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground/60"
-            aria-hidden="true"
-          />
-          <input
-            id={searchId}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={CONNECTIONS_FILTER_PLACEHOLDER}
-            aria-label={CONNECTIONS_FILTER_LABEL}
-            data-testid="connections-filter-input"
-            className="w-60 rounded-md border border-border bg-card py-1.5 pl-8 pr-3 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
-          />
-        </label>
-
-        {CONNECTIONS_FILTER_CHIPS.map((chip) => {
-          const on = filterState === chip.state
-          return (
-            <button
-              key={chip.label}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setFilterState(chip.state)}
-              data-testid="connections-filter-chip"
-              data-state-filter={chip.state ?? "all"}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                on
-                  ? "border-primary/40 bg-primary/15 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {chip.label}
-            </button>
-          )
-        })}
-
-        <span className="flex-1" />
-
-        <span
-          data-testid="connections-count"
-          className="whitespace-nowrap font-mono text-[11px] text-muted-foreground"
-        >
-          {connectionsCountLabel(filtered?.length ?? 0, total, isFiltering)}
-        </span>
-
-        {/* U-02 + D-26: REMOVED, never disabled. `--primary` is spent here and on three
-            other sites only (§11c) — the selected row bar, the focused input border and
-            the active filter chip. */}
-        {canWrite && onAdd && (
-          <button
-            type="button"
-            onClick={onAdd}
-            data-testid="connections-add"
-            className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+      <section aria-label="Connections" data-testid="connections-tab" className="min-w-0">
+        {/* Platform-wide truth */}
+        {!liveConnectorsOn && (
+          <div
+            data-testid="connections-off-banner"
+            className="mb-4 flex items-start gap-2.5 rounded-[10px] border border-warning/30 bg-warning/10 px-3.5 py-3"
           >
-            {CONNECTIONS_ADD_CTA}
-          </button>
+            <span aria-hidden="true" className="mt-px text-[13px] leading-none text-warning">
+              {CONNECTIONS_BANNER_GLYPH}
+            </span>
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-foreground">
+                {CONNECTIONS_BANNER_HEADING}
+              </div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                {CONNECTIONS_BANNER_BODY}
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                {CONNECTIONS_BANNER_OPERATOR_PREFIX}
+                <code className="font-mono text-[11px] text-warning">
+                  {CONNECTIONS_BANNER_OPERATOR_FLAG}
+                </code>
+                {CONNECTIONS_BANNER_OPERATOR_SUFFIX}
+              </p>
+            </div>
+          </div>
         )}
-      </div>
 
-      {/* U-02's one line, at the foot of the table header, where the button is not. */}
-      {!isOrgAdmin && (
-        <p
-          data-testid="connections-non-admin-note"
-          className="mb-2 text-[11px] leading-snug text-muted-foreground"
-        >
-          {CONNECTIONS_NON_ADMIN_NOTE}
-        </p>
-      )}
-
-      {readFailed ? (
-        <div
-          role="alert"
-          data-testid="connections-read-failed"
-          className="rounded-[10px] border border-destructive/30 bg-card px-4 py-6 text-[13px] text-destructive"
-        >
-          {CONNECTIONS_READ_FAILED}
-        </div>
-      ) : connections === null ? (
-        <div
-          aria-busy="true"
-          data-testid="connections-loading"
-          className="rounded-[10px] border border-border bg-card px-4 py-6 text-[13px] text-muted-foreground opacity-40"
-        >
-          {CONNECTIONS_LOADING}
-        </div>
-      ) : filtered !== null && filtered.length === 0 ? (
-        isFiltering ? (
-          /* Filtered to zero — a statement about the FILTER. §2d's named risk is
-             conflating this with the empty state below; they are different facts and
-             the suite asserts the two strings are not equal. */
-          <div
-            data-testid="connections-filtered-empty"
-            className="rounded-[10px] border border-dashed border-border bg-card/40 px-4 py-10 text-center text-[13px] text-muted-foreground"
-          >
-            {CONNECTIONS_FILTERED_TO_ZERO}
+        {/* Popular Cards Row (per Screenshot 2026-08-24 202011.png & SC#3) */}
+        {!dense && !isFiltering && catalogServices.length > 0 && (
+          <div data-testid="connections-popular-section" className="mb-6">
+            <h3 className="mb-2.5 text-[13px] font-medium text-foreground">Popular</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {catalogServices
+                .filter((s) => s.isPopular)
+                .slice(0, 3)
+                .map((entry) => {
+                  const shape = shapeForService(entry.serviceId)
+                  return (
+                    <div
+                      key={entry.serviceId}
+                      data-testid="connections-popular-card"
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-sm transition-colors hover:border-border/80"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <ConnectionMarkGlyph shape={{ service_id: entry.serviceId, capability: shape }} size="row" />
+                        <span className="truncate text-[13px] font-medium text-foreground">{entry.name}</span>
+                      </div>
+                      {canWrite && onAdd && (
+                        <button
+                          type="button"
+                          onClick={() => onAdd(entry.serviceId)}
+                          data-testid="connections-popular-connect"
+                          className="inline-flex flex-none items-center rounded-md border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
           </div>
-        ) : (
-          /* Genuinely empty — the 155-C block. The second sentence is the armed-checkpoint
-             promise told at the moment a person first meets the concept; do not trim it. */
-          <div
-            data-testid="connections-empty"
-            className="flex flex-col items-center justify-center rounded-[10px] border border-dashed border-border bg-card/40 px-6 py-12 text-center"
-          >
-            <div aria-hidden="true" className="text-[13px] text-muted-foreground">
-              {CONNECTIONS_EMPTY_GLYPH}
-            </div>
-            <div className="mt-3 text-[13px] font-medium text-foreground">
-              {CONNECTIONS_EMPTY_HEADING}
-            </div>
-            <p className="mt-2 max-w-md text-[13px] leading-relaxed text-muted-foreground">
-              {CONNECTIONS_EMPTY_BODY}
-            </p>
-            {canWrite && onAdd && (
+        )}
+
+        {/* Filter bar + live count */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <label htmlFor={searchId} className="relative inline-flex items-center">
+            <Search
+              className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground/60"
+              aria-hidden="true"
+            />
+            <input
+              id={searchId}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={CONNECTIONS_FILTER_PLACEHOLDER}
+              aria-label={CONNECTIONS_FILTER_LABEL}
+              data-testid="connections-filter-input"
+              className="w-60 rounded-md border border-border bg-card py-1.5 pl-8 pr-3 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
+            />
+          </label>
+
+          {CONNECTIONS_FILTER_CHIPS.map((chip) => {
+            const on = filterState === chip.state
+            return (
               <button
+                key={chip.label}
                 type="button"
-                onClick={onAdd}
-                data-testid="connections-add-empty"
-                className="mt-5 inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                {CONNECTIONS_ADD_CTA}
-              </button>
-            )}
-          </div>
-        )
-      ) : (
-        <div className="overflow-hidden rounded-[10px] border border-border">
-          {/* The five columns ARE the contract (155-C, locked). Rendered by mapping the
-              tuple so the header can never drift from the order the suite asserts.
-
-              ⚠ AND IT IS THE ONE THING THE DENSE SHAPE DROPS — D-206.1-20, which is the
-              deliberate counterpart to D-206.1-13's "no cell is ever dropped". In the dense
-              shape the cells no longer form five aligned columns, so a five-word header
-              would be labelling a grid that is not there. `CONNECTIONS_COLUMNS` stays
-              exported and stays rendered HERE with its character identity intact; the two
-              cells that lose their heading (`Used by`, `Credential`) get a visible inline
-              label instead, DERIVED from this same tuple so the two shapes are structurally
-              unable to disagree about the word. */}
-          {!dense && (
-          <div
-            data-testid="connections-header"
-            className="flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2"
-          >
-            {CONNECTIONS_COLUMNS.map((column, index) => (
-              <div
-                key={column}
-                data-column={column}
+                aria-pressed={on}
+                onClick={() => setFilterState(chip.state)}
+                data-testid="connections-filter-chip"
+                data-state-filter={chip.state ?? "all"}
                 className={cn(
-                  "text-[11px] font-medium text-muted-foreground",
-                  index === 0 && "flex-[2] min-w-0",
-                  index === 1 && "flex-[2] min-w-0",
-                  index === 2 && "w-24 flex-none",
-                  index === 3 && "w-32 flex-none",
-                  index === 4 && "w-36 flex-none",
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                  on
+                    ? "border-primary/40 bg-primary/15 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground",
                 )}
               >
-                {column}
-              </div>
-            ))}
-            <div className="w-8 flex-none" aria-hidden="true" />
-          </div>
+                {chip.label}
+              </button>
+            )
+          })}
+
+          <span className="flex-1" />
+
+          <span
+            data-testid="connections-count"
+            className="whitespace-nowrap font-mono text-[11px] text-muted-foreground"
+          >
+            {connectionsCountLabel(filteredItems?.length ?? 0, total, isFiltering)}
+          </span>
+
+          {canWrite && onAdd && (
+            <button
+              type="button"
+              onClick={() => onAdd()}
+              data-testid="connections-add"
+              className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {CONNECTIONS_ADD_CTA}
+            </button>
           )}
-
-          <div className="divide-y divide-border/60">
-            {(filtered ?? []).map((row) => (
-              <ConnectionRow
-                key={row.id}
-                connection={row}
-                usedBy={usageCounts[row.id] ?? 0}
-                canWrite={canWrite}
-                onDelete={onDelete}
-                onSetEnabled={onSetEnabled}
-                onCheck={onCheck}
-                onOpen={onOpen}
-                now={now}
-                dense={dense}
-              />
-            ))}
-          </div>
         </div>
-      )}
 
-      {/* The `Used by` read's real scope, said ONCE. See `usageCountsFrom`'s docblock:
-          `GET /workflows/published` is OWNER-scoped, so the count is a floor. */}
-      <p className="mt-2 px-0.5 text-[11px] leading-snug text-muted-foreground">
-        {CONNECTIONS_USED_BY_SCOPE_NOTE}
-      </p>
-    </section>
+        {!isOrgAdmin && (
+          <p
+            data-testid="connections-non-admin-note"
+            className="mb-2 text-[11px] leading-snug text-muted-foreground"
+          >
+            {CONNECTIONS_NON_ADMIN_NOTE}
+          </p>
+        )}
+
+        {readFailed ? (
+          <div
+            role="alert"
+            data-testid="connections-read-failed"
+            className="rounded-[10px] border border-destructive/30 bg-card px-4 py-6 text-[13px] text-destructive"
+          >
+            {CONNECTIONS_READ_FAILED}
+          </div>
+        ) : connections === null ? (
+          <div
+            aria-busy="true"
+            data-testid="connections-loading"
+            className="rounded-[10px] border border-border bg-card px-4 py-6 text-[13px] text-muted-foreground opacity-40"
+          >
+            {CONNECTIONS_LOADING}
+          </div>
+        ) : filteredItems !== null && filteredItems.length === 0 ? (
+          isFiltering ? (
+            <div
+              data-testid="connections-filtered-empty"
+              className="rounded-[10px] border border-dashed border-border bg-card/40 px-4 py-10 text-center text-[13px] text-muted-foreground"
+            >
+              {CONNECTIONS_FILTERED_TO_ZERO}
+            </div>
+          ) : (
+            <div
+              data-testid="connections-empty"
+              className="flex flex-col items-center justify-center rounded-[10px] border border-dashed border-border bg-card/40 px-6 py-12 text-center"
+            >
+              <div aria-hidden="true" className="text-[13px] text-muted-foreground">
+                {CONNECTIONS_EMPTY_GLYPH}
+              </div>
+              <div className="mt-3 text-[13px] font-medium text-foreground">
+                {CONNECTIONS_EMPTY_HEADING}
+              </div>
+              <p className="mt-2 max-w-md text-[13px] leading-relaxed text-muted-foreground">
+                {CONNECTIONS_EMPTY_BODY}
+              </p>
+              {canWrite && onAdd && (
+                <button
+                  type="button"
+                  onClick={() => onAdd()}
+                  data-testid="connections-add-empty"
+                  className="mt-5 inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  {CONNECTIONS_ADD_CTA}
+                </button>
+              )}
+            </div>
+          )
+        ) : (
+          <div className="overflow-hidden rounded-[10px] border border-border">
+            {!dense && (
+              <div
+                data-testid="connections-header"
+                className="flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2"
+              >
+                {CONNECTIONS_COLUMNS.map((column, index) => (
+                  <div
+                    key={column}
+                    data-column={column}
+                    className={cn(
+                      "text-[11px] font-medium text-muted-foreground",
+                      index === 0 && "flex-[2] min-w-0",
+                      index === 1 && "flex-[2] min-w-0",
+                      index === 2 && "w-24 flex-none",
+                      index === 3 && "w-32 flex-none",
+                      index === 4 && "w-36 flex-none",
+                    )}
+                  >
+                    {column}
+                  </div>
+                ))}
+                <div className="w-8 flex-none" aria-hidden="true" />
+              </div>
+            )}
+
+            <div className="divide-y divide-border/60">
+              {(() => {
+                if (!filteredItems) return null
+                const shouldGroup =
+                  !isFiltering &&
+                  filteredItems.some((it) => it.isPopular) &&
+                  filteredItems.some((it) => !it.isPopular)
+
+                if (shouldGroup) {
+                  const popular = filteredItems.filter((it) => it.isPopular)
+                  const others = filteredItems.filter((it) => !it.isPopular)
+
+                  return (
+                    <>
+                      <div
+                        data-testid="connections-group-popular"
+                        className="grouphd border-t border-border/40 bg-muted/15 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                      >
+                        Popular
+                      </div>
+                      {popular.map((item) =>
+                        item.kind === "configured" ? (
+                          <ConnectionRow
+                            key={item.id}
+                            connection={item.connection}
+                            usedBy={usageCounts[item.connection.id] ?? 0}
+                            canWrite={canWrite}
+                            onDelete={onDelete}
+                            onSetEnabled={onSetEnabled}
+                            onCheck={onCheck}
+                            onOpen={onOpen}
+                            now={now}
+                            dense={dense}
+                          />
+                        ) : (
+                          <CatalogServiceRow
+                            key={item.id}
+                            entry={item.entry}
+                            canWrite={canWrite}
+                            onAdd={onAdd}
+                            dense={dense}
+                          />
+                        ),
+                      )}
+                      <div
+                        data-testid="connections-group-all"
+                        className="grouphd border-t border-border/40 bg-muted/15 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                      >
+                        All services
+                      </div>
+                      {others.map((item) =>
+                        item.kind === "configured" ? (
+                          <ConnectionRow
+                            key={item.id}
+                            connection={item.connection}
+                            usedBy={usageCounts[item.connection.id] ?? 0}
+                            canWrite={canWrite}
+                            onDelete={onDelete}
+                            onSetEnabled={onSetEnabled}
+                            onCheck={onCheck}
+                            onOpen={onOpen}
+                            now={now}
+                            dense={dense}
+                          />
+                        ) : (
+                          <CatalogServiceRow
+                            key={item.id}
+                            entry={item.entry}
+                            canWrite={canWrite}
+                            onAdd={onAdd}
+                            dense={dense}
+                          />
+                        ),
+                      )}
+                    </>
+                  )
+                }
+
+                return filteredItems.map((item) =>
+                  item.kind === "configured" ? (
+                    <ConnectionRow
+                      key={item.id}
+                      connection={item.connection}
+                      usedBy={usageCounts[item.connection.id] ?? 0}
+                      canWrite={canWrite}
+                      onDelete={onDelete}
+                      onSetEnabled={onSetEnabled}
+                      onCheck={onCheck}
+                      onOpen={onOpen}
+                      now={now}
+                      dense={dense}
+                    />
+                  ) : (
+                    <CatalogServiceRow
+                      key={item.id}
+                      entry={item.entry}
+                      canWrite={canWrite}
+                      onAdd={onAdd}
+                      dense={dense}
+                    />
+                  ),
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-2 px-0.5 text-[11px] leading-snug text-muted-foreground">
+          {CONNECTIONS_USED_BY_SCOPE_NOTE}
+        </p>
+      </section>
       {panel}
     </div>
   )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// One row + its graded destructive guards (§2g — 146–148, locked)
+// One unconfigured catalog service row (§2 — browsable catalog & 1-click Connect)
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+function CatalogServiceRow({
+  entry,
+  canWrite,
+  onAdd,
+  dense = false,
+}: {
+  entry: CatalogServiceEntry
+  canWrite: boolean
+  onAdd?: (presetServiceId?: string) => void
+  dense?: boolean
+}) {
+  const shape = shapeForService(entry.serviceId)
+  const isAddedByUrl = entry.serviceId === "custom_mcp"
+  const destination = entry.defaultHost || "—"
+
+  const nameNode = onAdd ? (
+    <button
+      type="button"
+      onClick={() => onAdd(entry.serviceId)}
+      data-testid="connections-row-name"
+      className={cn(
+        "truncate text-left text-[13px] font-medium text-foreground hover:underline",
+        dense && "min-w-0 flex-1",
+      )}
+    >
+      {entry.name}
+    </button>
+  ) : (
+    <span
+      data-testid="connections-row-name"
+      className={cn(
+        "truncate text-[13px] font-medium text-foreground",
+        dense && "min-w-0 flex-1",
+      )}
+    >
+      {entry.name}
+    </span>
+  )
+
+  const connectButton = canWrite && onAdd && (
+    <button
+      type="button"
+      onClick={() => onAdd(entry.serviceId)}
+      data-testid="connections-catalog-connect"
+      className={cn(
+        "inline-flex items-center rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground",
+        dense && "px-2 py-0.5",
+      )}
+    >
+      Connect
+    </button>
+  )
+
+  return (
+    <div
+      data-testid="connections-row"
+      data-state="not_connected"
+      data-catalog="true"
+      data-dense={dense ? "true" : "false"}
+      className={cn(
+        dense
+          ? "flex flex-col gap-1.5 px-3.5 py-3"
+          : "flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3",
+      )}
+    >
+      {dense ? (
+        <>
+          <div className="flex items-center gap-2">
+            <ConnectionMarkGlyph shape={{ service_id: entry.serviceId, capability: shape }} size="row" />
+            {nameNode}
+            <div className="flex min-w-[2rem] flex-none items-center justify-end">
+              {connectButton}
+            </div>
+          </div>
+
+          <div
+            data-testid="connections-row-destination"
+            className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
+          >
+            <span aria-hidden="true" className="flex-none">
+              🔒
+            </span>
+            <span className="min-w-0 whitespace-normal break-all">{destination}</span>
+          </div>
+
+          <div className="truncate text-[11px] text-muted-foreground">
+            {entry.tagline}
+          </div>
+
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+            <span
+              data-testid="connections-row-state"
+              className="inline-flex items-center text-[11px] font-medium text-muted-foreground"
+            >
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full border border-muted-foreground/60 bg-transparent flex-none" />
+              Not connected
+            </span>
+
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-muted-foreground">{CONNECTIONS_DENSE_LABEL_USED_BY}</span>
+              <span data-testid="connections-row-usedby" className="text-muted-foreground">
+                —
+              </span>
+            </span>
+
+            <span className="inline-flex items-baseline gap-1">
+              <span className="text-muted-foreground">{CONNECTIONS_DENSE_LABEL_CREDENTIAL}</span>
+              <span
+                data-testid="connections-row-credential"
+                className="font-mono text-muted-foreground"
+              >
+                Not set
+              </span>
+            </span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex min-w-0 flex-[2] flex-col gap-0.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <ConnectionMarkGlyph shape={{ service_id: entry.serviceId, capability: shape }} size="row" />
+              {nameNode}
+              {isAddedByUrl && (
+                <span
+                  data-testid="connection-provenance-tag"
+                  className="rounded border border-border px-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+                >
+                  {PROVENANCE_ADDED_BY_URL}
+                </span>
+              )}
+            </div>
+            {entry.tagline && (
+              <span
+                data-testid="connection-tagline"
+                className="truncate text-[11px] text-muted-foreground"
+              >
+                {entry.tagline}
+              </span>
+            )}
+          </div>
+
+          {/* 2 · Sends to */}
+          <div
+            data-testid="connections-row-destination"
+            className="flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground"
+          >
+            <span aria-hidden="true">🔒</span>
+            <span className="truncate">{destination}</span>
+          </div>
+
+          {/* 3 · Used by */}
+          <div
+            data-testid="connections-row-usedby"
+            className="w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground"
+          >
+            —
+          </div>
+
+          {/* 4 · Credential */}
+          <div
+            data-testid="connections-row-credential"
+            className="w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground"
+          >
+            Not set
+          </div>
+
+          {/* 5 · State */}
+          <div className="w-36 flex-none flex items-center gap-1.5 text-[11px]">
+            <span
+              data-testid="connections-row-state"
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"
+            >
+              <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground/60 bg-transparent flex-none" />
+              Not connected
+            </span>
+          </div>
+
+          <div className="w-8 flex-none flex items-center justify-end">
+            {connectButton}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// One configured connection row + its graded destructive guards (§2g — 146–148, locked)
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
 type ConfirmKind = "delete" | "disable" | null
@@ -572,15 +900,6 @@ function ConnectionRow({
   onCheck?: (connection: ConnectorConnection) => Promise<void>
   onOpen?: (connection: ConnectorConnection) => void
   now?: number
-  /** The three-line shape for the ~302px track the open panel leaves behind (D-206.1-12).
-   *  ⚠ ABSENT OR FALSE ⇒ THE SHIPPED WIDE FIVE-COLUMN ROW, BYTE-IDENTICAL — that is what
-   *  the `outerHTML` capture in this file's suite exists to prove, and it is why the wide
-   *  branch below is not restructured to share more with the dense one than it already
-   *  does. (Every prop on this surface states what its ABSENCE means; see
-   *  `ConnectionsTabViewProps.onCheck`.)
-   *  ⚠ It changes the SHAPE and never the CONTENT: all five cells and the action cell
-   *  render in both (D-206.1-13). The only thing dense drops is the column HEADER, which is
-   *  not a cell (D-206.1-20). */
   dense?: boolean
 }) {
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
@@ -596,9 +915,6 @@ function ConnectionRow({
   const isAddedByUrl = Boolean(connection.mcp_server_url) && !catalogEntry.isPopular
   const tagline = catalogEntry.tagline
 
-  /** One write, its receipt, and a retry on failure — the `UsersAndAccess.tsx:224-238`
-   *  idiom. The RECEIPT is transient (062-A: a receipt, never a toast); the persistent
-   *  state chip beside it is the CONSEQUENCE, and they are deliberately separate. */
   async function runWrite(fn: () => Promise<void>, recorded: string) {
     if (busy) return
     setBusy(true)
@@ -615,17 +931,6 @@ function ConnectionRow({
     }
   }
 
-  // ── THE CELLS ARE BUILT ONCE AND PLACED BY THE SHAPE (the `FileRow.tsx:156-176` habit) ──
-  //    Every cell renders in BOTH shapes; what a shape changes is the container structure
-  //    and the class strings. Omission is never a density decision here — D-206.1-13, and
-  //    the ROADMAP's named failure mode: "the destination is the one column a person reads
-  //    to approve a send, and HIDING it is worse than truncating it."
-  //    ⚠ `PhaseCard.tsx:445-456` is the stacked-identity analog whose MARKUP the dense
-  //    branch copies. Its other half — folding a fact away at higher density — is exactly
-  //    what D-206.1-13 forbids, and is deliberately NOT copied.
-
-  /** The author's own word. Identical in both shapes: a control when the panel can be
-   *  opened, plain text when it cannot. */
   const nameNode = onOpen ? (
     <button
       type="button"
@@ -650,9 +955,6 @@ function ConnectionRow({
     </span>
   )
 
-  /** Actions + receipt — the shipped either/or, byte-identical in both shapes. At most
-   *  three primary actions at rest (§2f): Add is page-level, the name opens the panel, and
-   *  everything else lives in the ⋯. */
   const actionContent = receipt ? (
     <span
       data-testid="connections-receipt"
@@ -668,9 +970,6 @@ function ConnectionRow({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            // §12: an EXPLICIT accessible name carrying the row's own name. Radix
-            // supplies none for a glyph child, and 24 nodes announcing as "more" is
-            // the failure this rule exists to prevent.
             aria-label={moreActionsLabel(connection.name)}
             data-testid="connections-row-more"
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -745,7 +1044,9 @@ function ConnectionRow({
             data-testid="connections-row-destination"
             className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
           >
-            <span aria-hidden="true" className="flex-none">🔒</span>
+            <span aria-hidden="true" className="flex-none">
+              🔒
+            </span>
             <span className="min-w-0 whitespace-normal break-all">{facts.join(" · ")}</span>
             {isSlack && (
               <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">
@@ -782,188 +1083,176 @@ function ConnectionRow({
         </>
       ) : (
         <>
-      <div className="flex min-w-0 flex-[2] flex-col gap-0.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <ConnectionMarkGlyph shape={connection} size="row" />
-          {nameNode}
-          {isAddedByUrl && (
-            <span
-              data-testid="connection-provenance-tag"
-              className="rounded border border-border px-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
-            >
-              {PROVENANCE_ADDED_BY_URL}
-            </span>
-          )}
-        </div>
-        {tagline && (
-          <span
-            data-testid="connection-tagline"
-            className="truncate text-[11px] text-muted-foreground"
-          >
-            {tagline}
-          </span>
-        )}
-      </div>
-
-      {/* 2 · Sends to — 024-A's always-on 🔒 endpoint footer, applied to a destination. */}
-      <div
-        data-testid="connections-row-destination"
-        className="flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground"
-      >
-        <span aria-hidden="true">🔒</span>
-        <span className="truncate">{facts.join(" · ")}</span>
-        {isSlack && (
-          <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">
-            {CONNECTION_FIXED_TAG}
-          </span>
-        )}
-      </div>
-
-      {/* 3 · Used by — the count that names the victims a delete would create. */}
-      <div
-        data-testid="connections-row-usedby"
-        className="w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground"
-      >
-        {usedByLabel(usedBy)}
-      </div>
-
-      {/* 4 · Credential — a reading of `last_checked_at`, never a fabricated time. */}
-      <div
-        data-testid="connections-row-credential"
-        className="w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground"
-      >
-        {credentialReadingOf(connection, now)}
-      </div>
-
-      {/* 5 · State — glyph AND word, so it reads in greyscale (WCAG 1.4.1). */}
-      <div className="w-36 flex-none flex items-center gap-1.5 text-[11px]">
-        <span
-          data-testid="connections-row-state"
-          className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", STATE_TONE[state])}
-        >
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full flex-none",
-              state === "ready"
-                ? "bg-success"
-                : state === "disabled"
-                  ? "bg-muted-foreground"
-                  : "bg-warning",
+          <div className="flex min-w-0 flex-[2] flex-col gap-0.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <ConnectionMarkGlyph shape={connection} size="row" />
+              {nameNode}
+              {isAddedByUrl && (
+                <span
+                  data-testid="connection-provenance-tag"
+                  className="rounded border border-border px-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+                >
+                  {PROVENANCE_ADDED_BY_URL}
+                </span>
+              )}
+            </div>
+            {tagline && (
+              <span
+                data-testid="connection-tagline"
+                className="truncate text-[11px] text-muted-foreground"
+              >
+                {tagline}
+              </span>
             )}
-            aria-hidden="true"
-          />
-          {CONNECTION_STATE_WORDS[state]}
-        </span>
-      </div>
+          </div>
 
-      {/* Actions + receipt. At most three primary actions at rest (§2f): Add is
-          page-level, the name opens the panel, and everything else lives in the ⋯. */}
-      <div className="flex w-8 flex-none items-center justify-end">
-        {actionContent}
-      </div>
+          {/* 2 · Sends to */}
+          <div
+            data-testid="connections-row-destination"
+            className="flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground"
+          >
+            <span aria-hidden="true">🔒</span>
+            <span className="truncate">{facts.join(" · ")}</span>
+            {isSlack && (
+              <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">
+                {CONNECTION_FIXED_TAG}
+              </span>
+            )}
+          </div>
+
+          {/* 3 · Used by */}
+          <div
+            data-testid="connections-row-usedby"
+            className="w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground"
+          >
+            {usedByLabel(usedBy)}
+          </div>
+
+          {/* 4 · Credential */}
+          <div
+            data-testid="connections-row-credential"
+            className="w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground"
+          >
+            {credentialReadingOf(connection, now)}
+          </div>
+
+          {/* 5 · State */}
+          <div className="w-36 flex-none flex items-center gap-1.5 text-[11px]">
+            <span
+              data-testid="connections-row-state"
+              className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", STATE_TONE[state])}
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full flex-none",
+                  state === "ready"
+                    ? "bg-success"
+                    : state === "disabled"
+                      ? "bg-muted-foreground"
+                      : state === "failed"
+                        ? "bg-destructive"
+                        : "bg-warning",
+                )}
+                aria-hidden="true"
+              />
+              {CONNECTION_STATE_WORDS[state]}
+            </span>
+          </div>
+
+          <div className="flex w-8 flex-none items-center justify-end">{actionContent}</div>
         </>
       )}
 
-      {failed && (
-        <div className="w-full text-right text-[11px] text-destructive" role="status">
-          {CONNECTIONS_WRITE_FAILED}
-        </div>
+      {/* ── §2g's GRADED CONFIRMATION SHEETS ── */}
+      {confirm && (
+        <>
+          <Sheet open={confirm === "delete"} onOpenChange={(o) => !o && setConfirm(null)}>
+            <SheetContent side="bottom" className="mx-auto max-w-lg">
+              <SheetHeader>
+                <SheetTitle>{deleteSheetTitle(connection.name)}</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-4">
+                <p data-testid="connections-delete-body" className="text-[13px] leading-relaxed text-foreground">
+                  {deleteSheetBody(usedBy)}
+                </p>
+                {failed && (
+                  <p role="alert" className="mt-2 text-[13px] text-destructive">
+                    {CONNECTIONS_WRITE_FAILED}
+                  </p>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {DELETE_CANCEL_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="connections-confirm-delete"
+                    onClick={() =>
+                      void runWrite(async () => {
+                        await onDelete(connection)
+                      }, RECEIPT_DELETED)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  >
+                    {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {deleteConfirmLabel(connection.name)}
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={confirm === "disable"} onOpenChange={(o) => !o && setConfirm(null)}>
+            <SheetContent side="bottom" className="mx-auto max-w-lg">
+              <SheetHeader>
+                <SheetTitle>{disableSheetTitle(connection.name)}</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-4">
+                <p data-testid="connections-disable-body" className="text-[13px] leading-relaxed text-foreground">
+                  {disableSheetBody(usedBy)}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {DISABLE_CANCEL_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="connections-confirm-disable"
+                    onClick={() =>
+                      void runWrite(
+                        () => onSetEnabled(connection, false),
+                        RECEIPT_DISABLED,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  >
+                    {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {disableConfirmLabel(connection.name)}
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </>
       )}
-
-      {/* ── Delete: the victim-naming sheet, ALWAYS. The victim is named in the BUTTON
-             LABEL, not only in the prose above it (the 064-B shape). ── */}
-      <Sheet open={confirm === "delete"} onOpenChange={(open) => !open && setConfirm(null)}>
-        <SheetContent side="bottom" className="mx-auto max-w-lg">
-          <SheetHeader>
-            <SheetTitle>{deleteSheetTitle(connection.name)}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-4">
-            <p className="text-[13px] leading-relaxed text-foreground">{deleteSheetBody(usedBy)}</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirm(null)}
-                className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {DELETE_CANCEL_LABEL}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                data-testid="connections-confirm-delete"
-                onClick={() => void runWrite(() => onDelete(connection), RECEIPT_DELETED)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
-              >
-                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-                {deleteConfirmLabel(connection.name)}
-              </button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Disable WITH victims: the same sheet, graded by the count. ── */}
-      <Sheet open={confirm === "disable"} onOpenChange={(open) => !open && setConfirm(null)}>
-        <SheetContent side="bottom" className="mx-auto max-w-lg">
-          <SheetHeader>
-            <SheetTitle>{disableSheetTitle(connection.name)}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-4">
-            <p className="text-[13px] leading-relaxed text-foreground">{disableSheetBody(usedBy)}</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirm(null)}
-                className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                {DISABLE_CANCEL_LABEL}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                data-testid="connections-confirm-disable"
-                onClick={() => void runWrite(() => onSetEnabled(connection, false), RECEIPT_DISABLED)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
-              >
-                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-                {disableConfirmLabel(connection.name)}
-              </button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-
     </div>
   )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// The connected container — the three reads and the two writes
+// The stateful container — handles fetching, mutations, and panel wiring
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-/**
- * Settings → Connections.
- *
- * THREE READS, all already shipped, and 190-16 adds no endpoint:
- *   1. `listConnectorConnections()` — org-WIDE by design (plan 190-09 decision 2: the
- *      reads are deliberately NOT feature-gated, so this tab renders a real table under
- *      the OFF banner rather than 403-ing into a dead page).
- *   2. `listPublishedWorkflows()` — the `Used by` counts, computed in the browser from the
- *      `definition` this response already returns inline. See `usageCountsFrom` for the
- *      corpus measurement and for why the count is a caller-scoped FLOOR.
- *   3. `getEffectiveFeatures()` — `live_connectors`. Fails CLOSED (an absent key reads as
- *      off), which on this surface is the honest direction: claiming sending is off when
- *      we cannot tell is the non-over-claiming error.
- *
- * `useOrgOptional()` rather than `useOrg()`: a leaf read that must not throw outside a
- * provider (the `TechnicalNamesProvider` idiom `OrgProvider.tsx:8-12` records), so the tab
- * degrades to non-admin rather than crashing the whole Settings page.
- */
-/** Every settled read carries the KEY it answered, so a result for a previous org (or for
- *  a previous reload) is not a result at all — the surface reads `loading` again by
- *  DERIVATION. This is `ConnectionPicker.tsx:177-201`'s idiom, and it is not merely tidy:
- *  it is what lets the effect body hold NO synchronous `setState`, which is the cascading
- *  render `react-hooks/set-state-in-effect` exists to stop. */
 type ConnectionsRead =
   | { kind: "loading"; key: string }
   | { kind: "ready"; key: string; rows: ConnectorConnection[] }
@@ -971,12 +1260,10 @@ type ConnectionsRead =
 
 export function ConnectionsTab() {
   const org = useOrgOptional()
-  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({})
-  const [liveConnectorsOn, setLiveConnectorsOn] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
+  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({})
+  const [liveConnectorsOn, setLiveConnectorsOn] = useState<boolean>(false)
 
-  /** Re-fetch after every write — the roster's chips come from the SERVER's new truth, so
-   *  nothing here is flipped optimistically (the 068-A rule). */
   const reload = useCallback(() => setReloadNonce((n) => n + 1), [])
 
   const requestKey = `${org?.activeOrgId ?? ""}::${reloadNonce}`
@@ -1005,9 +1292,6 @@ export function ConnectionsTab() {
         if (!cancelled) setUsageCounts(usageCountsFrom(rows))
       })
       .catch(() => {
-        // A failed usage read must never look like "nothing depends on this": the counts
-        // stay empty and `usedByLabel` renders `none you can see`, which is true of a
-        // read that did not answer as much as of one that answered zero.
         if (!cancelled) setUsageCounts({})
       })
     return () => {
@@ -1045,13 +1329,6 @@ export function ConnectionsTab() {
     [reload],
   )
 
-  /** The check writes `last_check_verdict` and `last_checked_at` server-side, so the row's
-   *  Credential chip comes from the SERVER's new truth — re-fetched, never flipped
-   *  optimistically (the 068-A rule this container already follows for the other two
-   *  writes). The returned result is deliberately DISCARDED here: §5c's headline and §4d's
-   *  three refusal states are the add/edit panel's surface (plan 190-18), and rendering a
-   *  second, shorter version of them on the table row is how one closed sentence table
-   *  becomes two. What the table shows is the chip, which is the persisted verdict. */
   const handleCheck = useCallback(
     async (connection: ConnectorConnection) => {
       await checkConnectorConnection(connection.id)
@@ -1060,15 +1337,6 @@ export function ConnectionsTab() {
     [reload],
   )
 
-  /**
-   * Plan 190-18 — the PANEL's check. Same endpoint, same re-fetch, but the RESULT is handed
-   * back rather than discarded: §5c's headline and §4d's three outcome shapes are the panel's
-   * surface, and they are keyed off `bucket` + `reason_code` on this very object.
-   *
-   * ⚠ The re-fetch that follows hands the panel a NEW object for the SAME row. The panel's
-   * seed effect keys on `connection?.id` for exactly that reason — see its own note — so a
-   * check never discards what the person has typed.
-   */
   const handlePanelCheck = useCallback(
     async (connection: ConnectorConnection) => {
       const result = await checkConnectorConnection(connection.id)
@@ -1078,10 +1346,10 @@ export function ConnectionsTab() {
     [reload],
   )
 
-  /** Plan 190-17 — the add/edit panel's open/close seam. `null` is CLOSED; the panel is
-   *  passed as a node only while open, so the 400px grid track opens with it. */
   const [panelState, setPanelState] = useState<
-    { mode: "create"; connection: null } | { mode: "edit"; connection: ConnectorConnection } | null
+    | { mode: "create"; connection: null; presetServiceId?: string | null }
+    | { mode: "edit"; connection: ConnectorConnection; presetServiceId?: null }
+    | null
   >(null)
 
   const handleCreate = useCallback(
@@ -1101,16 +1369,12 @@ export function ConnectionsTab() {
   )
 
   const isOrgAdmin = org?.canManage === true
-
-  /** The active org's own name, for §3e's org-shared line. Read off the SHIPPED
-   *  `OrgValue.orgs` membership list (`OrgProvider.tsx:46`) rather than fetched — the
-   *  provider already holds it. Unresolved ⇒ `null`, and the panel falls back to a
-   *  name-free wording of the SAME sentence rather than rendering a blank. */
   const orgName = org?.orgs.find((m) => m.org_id === org.activeOrgId)?.name ?? null
 
   return (
     <ConnectionsTabView
       connections={read.kind === "ready" ? read.rows : read.kind === "error" ? [] : null}
+      catalogServices={CATALOG_SERVICES}
       readFailed={read.kind === "error"}
       usageCounts={usageCounts}
       isOrgAdmin={isOrgAdmin}
@@ -1118,27 +1382,27 @@ export function ConnectionsTab() {
       onDelete={handleDelete}
       onSetEnabled={handleSetEnabled}
       onCheck={handleCheck}
-      // The Add button opens the panel in CREATE mode; a row's name opens it in EDIT mode.
-      // For a non-admin `onOpen` still fires — the panel opens READ-ONLY (U-02), because
-      // a member may legitimately want to see WHERE a connection they can bind sends.
-      onAdd={() => setPanelState({ mode: "create", connection: null })}
-      onOpen={(connection) => setPanelState({ mode: "edit", connection })}
+      onAdd={(presetServiceId) =>
+        setPanelState({
+          mode: "create",
+          connection: null,
+          presetServiceId: typeof presetServiceId === "string" ? presetServiceId : null,
+        })
+      }
+      onOpen={(connection) => setPanelState({ mode: "edit", connection, presetServiceId: null })}
       panel={
         panelState ? (
           <ConnectionFormPanel
             open
             mode={panelState.mode}
             connection={panelState.connection}
+            presetServiceId={panelState.presetServiceId ?? null}
             isOrgAdmin={isOrgAdmin}
             liveConnectorsOn={liveConnectorsOn}
             orgName={orgName}
             onClose={() => setPanelState(null)}
             onCreate={handleCreate}
             onUpdate={handleUpdate}
-            // Plan 190-18 — §5c's check and §2g's graded guards, on the row being edited.
-            // The panel REMOVES each of these unless a write is genuinely possible; passing
-            // them unconditionally keeps that decision in ONE place (the panel) rather than
-            // splitting it across two files, which is how the two halves drift.
             onCheck={handlePanelCheck}
             onDelete={handleDelete}
             onSetEnabled={handleSetEnabled}

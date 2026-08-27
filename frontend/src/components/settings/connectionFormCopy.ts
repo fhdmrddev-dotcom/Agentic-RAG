@@ -205,9 +205,9 @@ export const serviceLabelOf = (serviceId: string): string =>
  * half-typed `http://…` cannot smuggle a person into a shape whose Save the server would then
  * refuse for a reason the form never named.
  */
-export function shapeForService(serviceId: string, endpoint: string): ConnectionShape {
-  if (endpoint.trim().toLowerCase().startsWith("https://")) return "mcp"
-  return own(SERVICE_TO_SHAPE, serviceId.trim().toLowerCase()) ?? "service"
+export function shapeForService(serviceId: string, endpoint: string = ""): ConnectionShape {
+  if ((endpoint || "").trim().toLowerCase().startsWith("https://")) return "mcp"
+  return own(SERVICE_TO_SHAPE, (serviceId || "").trim().toLowerCase()) ?? "service"
 }
 
 /**

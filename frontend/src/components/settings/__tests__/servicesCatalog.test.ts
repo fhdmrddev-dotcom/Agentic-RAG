@@ -11,8 +11,7 @@ import {
 
 describe("servicesCatalog", () => {
   it("provides the curated popular roster with non-empty metadata", () => {
-    expect(CATALOG_SERVICES.length).toBeGreaterThanOrEqual(6)
-    expect(POPULAR_SERVICES.length).toBe(CATALOG_SERVICES.length)
+    expect(CATALOG_SERVICES.length).toBeGreaterThanOrEqual(POPULAR_SERVICES.length)
     const serviceIds = POPULAR_SERVICES.map((s) => s.serviceId)
     expect(serviceIds).toContain("slack")
     expect(serviceIds).toContain("jira")

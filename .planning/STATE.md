@@ -37,10 +37,10 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 212 (the-catalog-and-its-doors) — ✅ COMPLETE (5 plans across 4 waves)
-Plan: 212-01 .. 212-05
-Status: Phase 212 fully executed and verified. All 4 waves committed (7a694693, f0e53da5, b917b9dc, 46af07c2). Count gate 118/118 OK, tsc 34 baseline, rot set 68 baseline.
-Last activity: 2026-08-27 — Phase 212 execution complete. Ready for reviewer post-phase gate.
+Phase: 212 (the-catalog-and-its-doors) — ✅ GAP CLOSURE ROUND 1 COMPLETE (6 plans across 5 waves)
+Plan: 212-01 .. 212-06
+Status: Phase 212 fully executed including Gap Closure Round 1 (Plan 212-06). Catalog merged into unified Connections tab table with unconfigured rows, Popular cards row restored per Screenshot 2026-08-24 202011.png, one-click Connect preset wiring active. Count gate 118/118 OK, tsc 34 baseline, rot set 68 baseline.
+Last activity: 2026-08-27 — Phase 212 Gap Closure Round 1 complete. Ready for reviewer re-drive.
 
 ## ⚠ Owed before 212 — all three are OPERATOR-ONLY
 

@@ -42,6 +42,7 @@ import { render, screen, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ConnectionsTabView } from "../ConnectionsTab"
+import { CATALOG_SERVICES } from "../servicesCatalog"
 // The container's SOURCE via Vite's `?raw` loader — the shipped house idiom for a fence the
 // rendered DOM cannot express (`ConnectionPicker.test.tsx:31`, `CanvasToolbar.test.tsx:32`).
 import connectionsTabSource from "../ConnectionsTab?raw"
@@ -122,6 +123,7 @@ function renderTab(
   return render(
     <ConnectionsTabView
       connections={THREE_ROWS}
+      catalogServices={[]}
       usageCounts={{}}
       isOrgAdmin
       liveConnectorsOn
@@ -1570,5 +1572,250 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
     await user.type(input, "create_ticket")
     expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
     expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 212 (Gap Closure) — browsable catalog, group headers, and one-click Connect
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-click Connect", () => {
+  it("renders browsable catalog of services with Popular and All services group headers when connections = []", () => {
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    // Table header rendered, not empty state block
+    expect(screen.getByTestId("connections-header")).toBeInTheDocument()
+    expect(screen.queryByTestId("connections-empty")).toBeNull()
+
+    // Group headers per Sketch 203 Section 4
+    expect(screen.getByTestId("connections-group-popular")).toHaveTextContent("Popular")
+    expect(screen.getByTestId("connections-group-all")).toHaveTextContent("All services")
+
+    // Curated popular services present (in cards and table)
+    expect(screen.getAllByText("Slack").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("GitHub").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Notion").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Jira").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Email (SMTP)").length).toBeGreaterThanOrEqual(1)
+
+    // Curated other services present
+    expect(screen.getByText("Figma")).toBeInTheDocument()
+    expect(screen.getByText("Linear")).toBeInTheDocument()
+    expect(screen.getByText("Sentry")).toBeInTheDocument()
+  })
+
+  it("unconfigured catalog rows render Mark, Name, Tagline, default host with 🔒, —, Not set, Not connected, and Connect button", () => {
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // GitHub row
+    const githubButtons = screen.getAllByRole("button", { name: "GitHub" })
+    expect(githubButtons.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Track code changes and manage pull requests.")).toBeInTheDocument()
+    expect(screen.getByText("api.github.com")).toBeInTheDocument()
+
+    // Connect button
+    const connectButtons = screen.getAllByTestId("connections-catalog-connect")
+    expect(connectButtons.length).toBeGreaterThan(0)
+    expect(connectButtons[0]).toHaveTextContent("Connect")
+
+    // State word & indicator
+    const stateChips = screen.getAllByTestId("connections-row-state")
+    expect(stateChips[0]).toHaveTextContent("Not connected")
+  })
+
+  it("clicking Connect button or service name on an unconfigured catalog service invokes onAdd with the preset serviceId", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // Find GitHub row's Connect button in the table
+    const githubRow = screen.getAllByRole("button", { name: "GitHub" })[0].closest('[data-testid="connections-row"]') as HTMLElement
+    const githubConnect = within(githubRow).getByTestId("connections-catalog-connect")
+    await user.click(githubConnect)
+    expect(onAdd).toHaveBeenCalledWith("github")
+
+    // Click Notion name in the table
+    const notionButtons = screen.getAllByRole("button", { name: "Notion" })
+    await user.click(notionButtons[0])
+    expect(onAdd).toHaveBeenCalledWith("notion")
+  })
+
+  it("filtering by Not connected displays all unconfigured catalog services", async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <ConnectionsTabView
+        connections={THREE_ROWS}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[2]) // Not connected
+
+    // Unconfigured services appear
+    expect(screen.getByText("GitHub")).toBeInTheDocument()
+    expect(screen.getByText("Notion")).toBeInTheDocument()
+    expect(screen.getByText("Google Workspace")).toBeInTheDocument()
+
+    // Ready connection from THREE_ROWS (Ops mailbox is ready) is hidden
+    expect(screen.queryByText("Ops mailbox")).not.toBeInTheDocument()
+
+    // Failed connection (#ops-alerts) is shown under Not connected
+    expect(screen.getByText("#ops-alerts")).toBeInTheDocument()
+  })
+
+  it("filtering by Connected hides unconfigured catalog services and shows only ready connections", async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <ConnectionsTabView
+        connections={THREE_ROWS}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[1]) // Connected
+
+    // Ready connection from THREE_ROWS (Ops mailbox) is visible
+    expect(screen.getByText("Ops mailbox")).toBeInTheDocument()
+
+    // Unconfigured catalog services are hidden
+    expect(screen.queryByText("GitHub")).not.toBeInTheDocument()
+    expect(screen.queryByText("Notion")).not.toBeInTheDocument()
+  })
+
+  it("searching for a catalog service filters to the matching service row", async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const input = screen.getByTestId("connections-filter-input")
+    await user.type(input, "Figma")
+
+    expect(screen.getByText("Figma")).toBeInTheDocument()
+    expect(screen.queryByText("Linear")).not.toBeInTheDocument()
+    expect(screen.queryByText("Slack")).not.toBeInTheDocument()
+  })
+
+  it("when a service is already connected in the database, it renders as a configured row without duplicating", () => {
+    const customSlackRow = makeConnection({
+      id: "conn-slack-custom",
+      service_id: "slack",
+      name: "Team Slack Channel",
+      capability: "post_message",
+      config: { default_channel: "#general" },
+      last_check_verdict: "ok",
+    })
+
+    render(
+      <ConnectionsTabView
+        connections={[customSlackRow]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    // Configured row appears
+    expect(screen.getByText("Team Slack Channel")).toBeInTheDocument()
+
+    // Unconfigured Slack row does NOT duplicate
+    expect(screen.queryByText("Post updates and read channels in your workspace.")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Slack" })).toBeNull()
+  })
+
+  it("renders Popular cards row above the filter bar per Screenshot 2026-08-24 202011.png and lets user connect from card", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // Popular card section exists
+    const popularSection = screen.getByTestId("connections-popular-section")
+    expect(popularSection).toBeInTheDocument()
+    expect(within(popularSection).getByText("Popular")).toBeInTheDocument()
+
+    // Cards exist inside
+    const cards = within(popularSection).getAllByTestId("connections-popular-card")
+    expect(cards.length).toBe(3)
+
+    // Clicking connect on a popular card triggers onAdd with service ID
+    const firstCard = cards[0]
+    const cardConnect = within(firstCard).getByTestId("connections-popular-connect")
+    await user.click(cardConnect)
+    expect(onAdd).toHaveBeenCalled()
+  })
+
+  it("renders ZERO elements carrying a title attribute across full catalog render", () => {
+    const { container } = render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const withTitle = container.querySelectorAll("[title]")
+    expect(withTitle.length).toBe(0)
   })
 })

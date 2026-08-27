@@ -24,6 +24,7 @@ export interface CatalogServiceEntry {
   markKey: string
   isPopular: boolean
   category: ServiceCategory
+  defaultHost?: string
   fieldTemplates?: ServiceFieldTemplate[]
   starterPrompts?: string[]
 }
@@ -37,9 +38,38 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     markKey: "slack",
     isPopular: true,
     category: "communication",
+    defaultHost: "hooks.slack.com",
     starterPrompts: [
       "Post daily incident summaries to #alerts",
       "Broadcast critical build status updates",
+    ],
+  },
+  {
+    serviceId: "github",
+    name: "GitHub",
+    tagline: "Track code changes and manage pull requests.",
+    description: "Integrate with GitHub to inspect pull requests, manage issues, and trigger actions through MCP.",
+    markKey: "mcp",
+    isPopular: true,
+    category: "developer",
+    defaultHost: "api.github.com",
+    starterPrompts: [
+      "Query open pull requests for review",
+      "Search repository commits for regression analysis",
+    ],
+  },
+  {
+    serviceId: "notion",
+    name: "Notion",
+    tagline: "Organise notes and collaborate on documents.",
+    description: "Query Notion pages, sync documentation databases, and append notes to engineering wikis.",
+    markKey: "mcp",
+    isPopular: true,
+    category: "productivity",
+    defaultHost: "api.notion.com",
+    starterPrompts: [
+      "Search engineering runbooks and SOPs",
+      "Append retrospective notes to project board",
     ],
   },
   {
@@ -50,6 +80,7 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     markKey: "jira",
     isPopular: true,
     category: "productivity",
+    defaultHost: "acme.atlassian.net",
     starterPrompts: [
       "Raise a high-priority bug ticket with error logs",
       "Summarize open sprint issues for standup",
@@ -63,22 +94,10 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     markKey: "smtp",
     isPopular: true,
     category: "communication",
+    defaultHost: "smtp.fastmail.com",
     starterPrompts: [
       "Email executive summary to stakeholders",
       "Send alert notifications on workflow failure",
-    ],
-  },
-  {
-    serviceId: "github",
-    name: "GitHub",
-    tagline: "Source repository operations, pull requests, and issues.",
-    description: "Integrate with GitHub to inspect pull requests, manage issues, and trigger actions through MCP.",
-    markKey: "mcp",
-    isPopular: true,
-    category: "developer",
-    starterPrompts: [
-      "Query open pull requests for review",
-      "Search repository commits for regression analysis",
     ],
   },
   {
@@ -89,22 +108,10 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     markKey: "mcp",
     isPopular: true,
     category: "productivity",
+    defaultHost: "googleapis.com",
     starterPrompts: [
       "Summarize shared team documentation",
       "Search team drive for architectural specs",
-    ],
-  },
-  {
-    serviceId: "notion",
-    name: "Notion",
-    tagline: "Team knowledge base and documentation workspace.",
-    description: "Query Notion pages, sync documentation databases, and append notes to engineering wikis.",
-    markKey: "mcp",
-    isPopular: true,
-    category: "productivity",
-    starterPrompts: [
-      "Search engineering runbooks and SOPs",
-      "Append retrospective notes to project board",
     ],
   },
   {
@@ -115,6 +122,7 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     markKey: "mcp",
     isPopular: true,
     category: "custom",
+    defaultHost: "mcp.internal.server",
     starterPrompts: [
       "Discover published tools from enterprise servers",
       "Connect private domain MCP endpoints",
@@ -122,7 +130,59 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
   },
 ]
 
-export const CATALOG_SERVICES: CatalogServiceEntry[] = [...POPULAR_SERVICES]
+export const CATALOG_SERVICES: CatalogServiceEntry[] = [
+  ...POPULAR_SERVICES,
+  {
+    serviceId: "figma",
+    name: "Figma",
+    tagline: "Design interfaces and prototype user flows.",
+    description: "Access Figma files, inspect design components, and sync assets across product and design workflows.",
+    markKey: "mcp",
+    isPopular: false,
+    category: "productivity",
+    defaultHost: "api.figma.com",
+  },
+  {
+    serviceId: "linear",
+    name: "Linear",
+    tagline: "Plan projects and manage developer workflows.",
+    description: "Sync development issues, manage sprint cycles, and track project roadmap milestones with Linear.",
+    markKey: "mcp",
+    isPopular: false,
+    category: "developer",
+    defaultHost: "api.linear.app",
+  },
+  {
+    serviceId: "sentry",
+    name: "Sentry",
+    tagline: "Monitor errors and watch releases.",
+    description: "Query crash reports, monitor exception trends, and inspect release health across application services.",
+    markKey: "mcp",
+    isPopular: false,
+    category: "developer",
+    defaultHost: "sentry.io",
+  },
+  {
+    serviceId: "intercom",
+    name: "Intercom",
+    tagline: "Chat with customers and manage support tickets.",
+    description: "Search customer support conversations, retrieve user feedback, and manage customer communications.",
+    markKey: "mcp",
+    isPopular: false,
+    category: "communication",
+    defaultHost: "api.intercom.io",
+  },
+  {
+    serviceId: "miro",
+    name: "Miro",
+    tagline: "Sketch ideas on a shared whiteboard.",
+    description: "Collaborate visually on architecture diagrams, journey maps, and real-time team whiteboards.",
+    markKey: "mcp",
+    isPopular: false,
+    category: "collaboration",
+    defaultHost: "api.miro.com",
+  },
+]
 
 const SERVICES_BY_ID = new Map<string, CatalogServiceEntry>(
   CATALOG_SERVICES.map((entry) => [entry.serviceId.toLowerCase(), entry]),
