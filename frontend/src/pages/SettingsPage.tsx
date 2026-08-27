@@ -872,7 +872,25 @@ export function SettingsPage() {
           if (body) await commitSearchSave(body)
         }}
       />
-      <div className="max-w-3xl w-full mx-auto space-y-8">
+      {/* ── The page measure ────────────────────────────────────────────────────────────
+          ⚠ OPERATOR-DRIVEN, 2026-08-28: *"why did we make it narrow… we have to maintain
+          consistency in all the pages"*. Measured first, and the honest answer is that
+          THERE WAS NO CONVENTION TO BREAK — the app carries four widths across six pages:
+          Settings and Governance at `max-w-3xl` (768px), Knowledge Health at `max-w-6xl`
+          (1152px), and Skills / Ingestion / Skill Studio unconstrained.
+
+          `3xl` was not wrong in principle — a narrow measure is what keeps form labels and
+          help text readable. It was wrong for the CONNECTIONS tab, which carries a
+          five-column table (Connection · Sends to · Used by · Credential · State) inside a
+          width meant for a single-column form.
+
+          ⚠ `6xl` RATHER THAN UNCONSTRAINED, and rather than a new number: it is a width the
+          app ALREADY uses, so this adopts a precedent instead of inventing a fourth measure
+          for the same problem. Dropping the constraint entirely would give the table room
+          at the cost of running the AI Model and Memory forms edge-to-edge on a wide
+          monitor — paragraphs at full screen width are the readability problem a measure
+          exists to prevent, and those tabs have no table to justify paying it. */}
+      <div className="max-w-6xl w-full mx-auto space-y-8">
 
         {/* Header — no global Save button */}
         <div className="flex items-start justify-between">
