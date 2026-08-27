@@ -4,7 +4,7 @@ milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
 last_updated: "2026-08-28T00:00:00.000Z"
-last_activity: 2026-08-28 -- Phase 213 CLOSED after gap-closure round 1 + the driven check (6 real runs); SC#3 PARTIAL, three findings recorded. Cloud parity owed on migration 128.
+last_activity: 2026-08-28 -- Phase 214 context captured (21 decisions). G-5 fires on TEN files, SIX cells stale. Registers written back. G-2 sketch owed before planning.
 progress:
   total_phases: 14
   completed_phases: 6
@@ -32,10 +32,59 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
+**Current focus:** Phase **214** — context captured 2026-08-28, **sketch owed before planning**. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
 Phase numbering continues at **210**.
 
 ## Current Position
+
+Phase: **214 (a-step-names-its-service-and-its-action) — CONTEXT CAPTURED 2026-08-28**
+(`50c923822`). 0 plans. **Next: `/gsd:sketch 214`, NOT `/gsd:plan-phase 214`** — G-2 is owed on the
+step picker with its argument fields and on the canvas + run node faces, and 213 set the precedent
+that the sketch also settles the panel-width question the operator raised while driving 212.
+
+⚠ **G-5 FIRES ON TEN FILES AND SIX LEDGER CELLS WERE MEASURED STALE** (re-derived from git, not
+copied): `ConnectionPicker.tsx` 5/3/651 → **6/4/706** · `ExternalActionSection.tsx` 4/3/498 →
+**6/4/176** (211-04 *shrank* it) · `McpToolPicker.tsx` 3/3/645 → **4/4/645** — and the ROADMAP said
+this file had **no row at all** · `phase_types.py` 47/21/2664 → **49/22/2733**, obligation **OWED** ·
+`grounding.py` 19/6/1311 → **20/7/1366** · `doorVocabulary.ts` 4/3/341 → **5/3/364**. Also firing:
+`PhaseFormPanel.tsx`, `publish_service.py`, `PhaseCard.tsx`, `WorkflowRunPage.tsx`.
+**D-214-00 takes the leaf cut** — argument resolution + the satisfiability predicate leave into
+`backend/app/services/connectors/args.py` on 213's `grants.py` precedent, for a mechanical reason:
+**the publish gate and the executor must use the SAME predicate**, and two copies drift into a
+workflow that publishes and then fails, which is `BUG-260826-02` restated.
+
+⚠ **A DEFECT THIS PHASE WOULD OTHERWISE CREATE, found while discussing rather than after shipping.**
+`_external_action_clause` (`grounding.py:1279-1293`) renders `config.tool_args` into the approval
+pause's *"What it will send"*. Under D-214-01's source picker, `tool_args` holds **only the FIXED
+values** — so the pause would name the constants and **silently omit exactly the arguments that
+vary**. D-214-15 composes the sentence AFTER resolution instead. D-213-14 is untouched: shown once,
+never written to the ledger.
+
+⭐ **Three decisions a planner must not re-derive:**
+- **STEP-01 is already HALF-BUILT.** 211-04 deleted the two radiogroups and shipped *one question,
+  then one question*. What remains is the **arguments** — specifically deleting
+  `MCP_TOOL_ARGS_LABEL = "Tool Arguments (JSON)"` (`McpToolPicker.tsx:68`), and **no JSON escape
+  hatch replaces it anywhere**, because that box under another name is the surface SC#1 forbids.
+- **`descriptors.py:169` already emits `inputSchema` for BOTH shapes** — one field renderer, one
+  source, no branch. It is the single most load-bearing asset in the phase.
+- **The upstream binding stores a phase SLUG and passes that phase's WHOLE output.** No dotted
+  paths, no `{{ }}`, no `output_key` sub-picker — `output_keys` is unverified author-declared text,
+  so a sub-picker could offer a key that never arrives, which is `BUG-260826-01`'s shape one level up.
+
+⚠ **`visual_workflow_canvas` FLIPS to `everyone` in this phase (D-214-19)** — it is a
+`_GOVERNED_FEATURES` cold default + a `feature_visibility` JSONB merge, **not a migration**, and
+deploy-artifact parity applies in the same commit. **`live_connectors` does NOT flip** — separate
+armed decision. ⚠ **Any live drive of SC#2 / SC#4 needs BOTH flags, and each row must say which
+flag state it ran under.**
+
+**Registers swept AND WRITTEN BACK** (not merely noted): `BUG-260828-01` → `folded` / `214` — it read
+`folded_into: null` while STATE and the ROADMAP both routed it here. `BUG-260826-01`/`-02`/`-05` →
+`status: folded`. `SEED-206` + `SEED-208` → `folded` / `214`. **`BUG-260815-06` fired a SECOND time
+and was declined a second time**; the 197 trigger is preserved verbatim beside the new one, because
+two declines is the signal. `BUG-260823-04` recorded **reviewed-not-folded**. `SEED-199` and
+`SEED-214`'s *filling* half stay deferred by the roadmap's own fence.
+
+---
 
 Phase: 213 (per-tool-grants-and-the-approval-moment) — **CLOSED 2026-08-28, DRIVEN, with three
 findings recorded rather than fixed.** 5 plans / 5 waves + **gap-closure round 1** (`213-06`) +
