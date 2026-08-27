@@ -101,6 +101,7 @@ from app.models.user_settings import (
 )
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
+from app.services.connectors.grants import resolve_effective_posture
 from app.services.connectors.protocol import AdapterError
 from app.services.connectors.registry import get_adapter
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
@@ -2145,13 +2146,13 @@ def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
 
 
 async def _write_send_receipt(
-    ctx, phase, *, capability: str, connection_id: str, host: str, raw_status: int | None
+    ctx, phase, *, capability: str, connection_id: str, host: str, raw_status: int | None, tool_name: str | None = None
 ) -> None:
     """The ONE ``external_action_sent`` receipt (migration 117 — the literal it added).
 
-    ⚠ **WHAT IT MAY CARRY IS FIXED BY D-08**: the capability, the connection id and the
-    destination HOST. Never the credential, never the request body, never the recipient's
-    address. A receipt is a record that something left the app, not a copy of what left.
+    ⚠ **WHAT IT MAY CARRY IS FIXED BY D-08 / D-213-14**: the capability, the connection id,
+    the destination HOST, and tool_name. Never the credential, never the request body, never the
+    recipient's address. A receipt is a record that something left the app, not a copy of what left.
 
     Best-effort, deliberately: the send has ALREADY HAPPENED by the time this runs, and a
     failed receipt write must not turn a delivered message into a failed phase. It is logged
@@ -2162,19 +2163,22 @@ async def _write_send_receipt(
         return
     user_id = (getattr(ctx, "current_user", None) or {}).get("id")
     try:
+        metadata = {
+            "capability": capability,
+            "connection_id": str(connection_id),
+            "destination_host": host,
+            "raw_status": raw_status,
+            "phase": getattr(phase, "slug", None),
+            "phase_index": getattr(phase, "phase_index", None),
+        }
+        if tool_name is not None:
+            metadata["tool_name"] = str(tool_name)
         await write_audit(
             pool,
             getattr(ctx, "run_id", None),
             user_id=user_id,
             event_type="external_action_sent",
-            metadata={
-                "capability": capability,
-                "connection_id": str(connection_id),
-                "destination_host": host,
-                "raw_status": raw_status,
-                "phase": getattr(phase, "slug", None),
-                "phase_index": getattr(phase, "phase_index", None),
-            },
+            metadata=metadata,
         )
     except Exception:  # noqa: BLE001 — a receipt write must never undo a send that happened
         logger.warning(
@@ -2508,43 +2512,47 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
             )
             return _record("the bound connection is for a different capability")
 
+    # ── GATE 5.5 · Tool Posture & Grants Check (Phase 213 / GRANT-02 / D-213-00 / SEC-1) ─
+    # Evaluated BEFORE the shape fork (Gate 6/7) to close BUG-260827-02.
+    effective_tool_name = getattr(phase.config, "tool_name", None) or capability
+    posture = resolve_effective_posture(connection, effective_tool_name)
+    if posture == "deny":
+        logger.warning(
+            "213 GRANT-02: tool %r is DENIED on connection %s (grants: %s, default: %s) — refusing",
+            effective_tool_name,
+            connection_id,
+            getattr(connection, "tool_grants", None),
+            getattr(connection, "default_approval_posture", None),
+        )
+        pool = getattr(ctx, "pool", None)
+        user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+        if pool is not None:
+            try:
+                await write_audit(
+                    pool,
+                    getattr(ctx, "run_id", None),
+                    user_id=user_id,
+                    event_type="tool_refused",
+                    metadata={
+                        "phase": slug,
+                        "connection_id": str(connection_id),
+                        "tool_name": effective_tool_name,
+                        "reason": "permission_denied",
+                    },
+                )
+            except Exception as exc:
+                logger.warning("213: failed to write tool_refused audit event: %s", exc)
+
+        return {
+            "text": f"Tool execution refused: Tool '{effective_tool_name}' is not granted permission on connection '{getattr(connection, 'name', connection_id)}'.",
+            "failure": f"tool '{effective_tool_name}' refused: permission not granted",
+        }
+
     # ── GATE 6 · MCP Tool Dispatch (Phase 206 / CONN-02 / D-206-06) ───────────────────
     if getattr(connection, "mcp_server_url", None):
         tool_name = getattr(phase.config, "tool_name", None)
         if not tool_name:
             return _record("no tool_name specified for MCP connection")
-
-        grants = getattr(connection, "tool_grants", {}) or {}
-        is_granted = grants.get(tool_name) is True
-
-        if not is_granted:
-            logger.warning(
-                "206 F-3: MCP tool %r is NOT granted on connection %s (grants: %s) — refusing",
-                tool_name, connection_id, grants,
-            )
-            pool = getattr(ctx, "pool", None)
-            user_id = (getattr(ctx, "current_user", None) or {}).get("id")
-            if pool is not None:
-                try:
-                    await write_audit(
-                        pool,
-                        getattr(ctx, "run_id", None),
-                        user_id=user_id,
-                        event_type="tool_refused",
-                        metadata={
-                            "phase": slug,
-                            "connection_id": str(connection_id),
-                            "tool_name": tool_name,
-                            "reason": "permission_denied",
-                        },
-                    )
-                except Exception as exc:
-                    logger.warning("206: failed to write tool_refused audit event: %s", exc)
-
-            return {
-                "text": f"Tool execution refused: Tool '{tool_name}' is not granted permission on connection '{getattr(connection, 'name', connection_id)}'.",
-                "failure": f"tool '{tool_name}' refused: permission not granted",
-            }
 
         tool_args = getattr(phase.config, "tool_args", None) or {}
         final_args = dict(tool_args) if isinstance(tool_args, dict) else {}
@@ -2578,6 +2586,7 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
             connection_id=str(connection_id),
             host=connection.mcp_server_url,
             raw_status=200,
+            tool_name=tool_name,
         )
         logger.info(
             "206 CONN-02: external_action phase %r performed tool %r via connection %s",
@@ -2621,6 +2630,7 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         connection_id=str(connection_id),
         host=host,
         raw_status=getattr(result, "raw_status", None),
+        tool_name=capability,
     )
     logger.info(
         "190 CONN-02: external_action phase %r performed %r via connection %s (host=%s)",

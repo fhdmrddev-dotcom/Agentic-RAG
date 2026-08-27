@@ -223,6 +223,9 @@ def _reject_config_capability_mismatch(capability: str | None, config: object) -
         )
 
 
+ToolGrantPosture = Literal["allow", "ask", "deny"]
+
+
 # ── the CRUD trio ────────────────────────────────────────────────────────────────────────
 class ConnectorConnectionCreate(_StrictBase):
     """A new connection. ``secret`` is WRITE-ONLY plaintext — it is never echoed back.
@@ -251,7 +254,8 @@ class ConnectorConnectionCreate(_StrictBase):
     # expressed as a MODEL rather than as a hole.
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
-    tool_grants: dict[str, bool] = Field(default_factory=dict)
+    default_approval_posture: ToolGrantPosture = "ask"
+    tool_grants: dict[str, ToolGrantPosture] = Field(default_factory=dict)
     # Plaintext at the API boundary and NOWHERE else: the service encrypts it with the
     # shipped cipher before the row is written, and refuses the write outright when no
     # cipher is configured (D-11's fail-CLOSED inversion). NonEmpty (WR-05): an `enc:v1:`
@@ -373,7 +377,8 @@ class ConnectorConnectionUpdate(_StrictBase):
     secret: NonEmpty | None = None
     is_enabled: bool | None = None
     mcp_server_url: str | None = None
-    tool_grants: dict[str, bool] | None = None
+    default_approval_posture: ToolGrantPosture | None = None
+    tool_grants: dict[str, ToolGrantPosture] | None = None
     discovered_tools: list[dict[str, Any]] | None = None
 
 
@@ -425,7 +430,8 @@ class ConnectorConnectionResponse(_StrictBase):
     # expressed as a MODEL rather than as a hole.
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
-    tool_grants: dict[str, bool] = Field(default_factory=dict)
+    default_approval_posture: ToolGrantPosture = "ask"
+    tool_grants: dict[str, ToolGrantPosture] = Field(default_factory=dict)
     discovered_tools: list[dict[str, Any]] = Field(default_factory=list)
     is_enabled: bool = True
     last_checked_at: str | None = None
@@ -453,6 +459,7 @@ class McpDiscoverResponse(_StrictBase):
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
+    "ToolGrantPosture",
     "SendEmailConfig",
     "CreateTicketConfig",
     "PostMessageConfig",
@@ -466,3 +473,4 @@ __all__ = [
     "McpDiscoverRequest",
     "McpDiscoverResponse",
 ]
+

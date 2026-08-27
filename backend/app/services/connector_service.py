@@ -237,7 +237,8 @@ class ResolvedConnection:
     # a native send with a missing credential — see the resolver's own block.
     secret_ciphertext: str | None
     mcp_server_url: str | None = None
-    tool_grants: dict[str, bool] = field(default_factory=dict)
+    default_approval_posture: str = "ask"
+    tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
 
     @property
@@ -289,10 +290,10 @@ class ResolvedConnection:
 #: annotation are the two things that change, and every caller is already routed through
 #: them. Declared here rather than inline so the widening is ONE edit with no second
 #: spelling to fall out of agreement with it.
-_LEGAL_GRANT_VALUES: frozenset[bool] = frozenset({True, False})
+_LEGAL_GRANT_VALUES: frozenset[str] = frozenset({"allow", "ask", "deny"})
 
 
-def _sanitize_tool_grants(tool_grants: dict) -> dict[str, bool]:
+def _sanitize_tool_grants(tool_grants: dict) -> dict[str, str]:
     """THE one grant-value sanitizer. **Both** write paths go through it.
 
     ── WHAT THIS DEFENDS, WHICH IS NOT WHAT IT LOOKS LIKE ────────────────────────────────
@@ -324,16 +325,14 @@ def _sanitize_tool_grants(tool_grants: dict) -> dict[str, bool]:
 
     Raises ``ValueError`` — mapped to a 422 by both routers, per the WR-02 convention.
     """
-    clean: dict[str, bool] = {}
+    clean: dict[str, str] = {}
     for key, value in tool_grants.items():
-        # `is` membership, never `==`: `1 == True` in Python, so an `==` test would let the
-        # exact non-boolean this function exists to refuse walk straight through.
-        if not any(value is legal for legal in _LEGAL_GRANT_VALUES):
+        if not isinstance(value, str) or value not in _LEGAL_GRANT_VALUES:
             raise ValueError(
                 f"tool grant {str(key)!r} has the value {value!r} "
                 f"({type(value).__name__}), which is not one of "
-                f"{sorted(map(str, _LEGAL_GRANT_VALUES))}. Refused rather than coerced: "
-                f"bool({value!r}) would silently store a permission nobody granted."
+                f"{sorted(_LEGAL_GRANT_VALUES)}. Refused rather than coerced: "
+                f"only 'allow', 'ask', or 'deny' are valid approval postures."
             )
         clean[str(key)] = value
     return clean
@@ -373,6 +372,8 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["discovered_tools"] = []
     if d.get("config") is None:
         d["config"] = {}
+    if d.get("default_approval_posture") is None:
+        d["default_approval_posture"] = "ask"
     return ConnectorConnectionResponse.model_validate(d)
 
 
@@ -551,6 +552,7 @@ async def resolve_connection(
             config=dict(row.get("config") or {}),
             secret_ciphertext=None,
             mcp_server_url=row.get("mcp_server_url"),
+            default_approval_posture=str(row.get("default_approval_posture") or "ask"),
             tool_grants=dict(row.get("tool_grants") or {}),
             discovered_tools=list(row.get("discovered_tools") or []),
         )
@@ -596,6 +598,7 @@ async def resolve_connection(
         config=dict(row.get("config") or {}),
         secret_ciphertext=raw,
         mcp_server_url=row.get("mcp_server_url"),
+        default_approval_posture=str(row.get("default_approval_posture") or "ask"),
         tool_grants=dict(row.get("tool_grants") or {}),
         discovered_tools=list(row.get("discovered_tools") or []),
     )
@@ -676,7 +679,8 @@ async def create_connection(
         "is_enabled": True,
         "last_check_verdict": "not_checked",
         "mcp_server_url": payload.mcp_server_url,
-        "tool_grants": payload.tool_grants,
+        "default_approval_posture": getattr(payload, "default_approval_posture", "ask") or "ask",
+        "tool_grants": _sanitize_tool_grants(payload.tool_grants) if payload.tool_grants else {},
         # ⚠ `tool_grants` above is UNTOUCHED by the descriptor. A descriptor ADVERTISES an
         # action; it does not GRANT one. The executor's gate reads `tool_grants` alone and a
         # missing key DENIES — that asymmetry is the desirable direction and must not be
@@ -812,6 +816,9 @@ async def update_connection(
     if "mcp_server_url" in submitted and payload.mcp_server_url is not None:
         changes["mcp_server_url"] = payload.mcp_server_url
 
+    if "default_approval_posture" in submitted and payload.default_approval_posture is not None:
+        changes["default_approval_posture"] = payload.default_approval_posture
+
     if "tool_grants" in submitted and payload.tool_grants is not None:
         changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)
 
@@ -926,10 +933,10 @@ async def discover_connection_tools(
 async def update_connection_grants(
     connection_id: str,
     org_id: str,
-    tool_grants: dict[str, bool],
+    tool_grants: dict[str, str],
     supabase: Client | None = None,
 ) -> ConnectorConnectionResponse:
-    """Phase 206 (F-1 / D-206-06) — Update per-tool boolean grants on an MCP connection."""
+    """Phase 213 (GRANT-01) — Update per-tool approval posture grants on a connection."""
     client = _client(supabase)
     # F-1: strictly enforce the legal grant map { [tool_name]: <legal value> }. ⚠ This runs
     # BEFORE the update is built — the write is a whole-column REPLACE (D-206.2-16), so a

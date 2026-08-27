@@ -100,8 +100,10 @@ import type {
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
   McpDiscoveredTool,
+  ToolGrantPosture,
 } from "@/lib/api"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
+import { ConnectionGrantsList } from "@/components/settings/ConnectionGrantsList"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   EMPTY_DRAFT,
@@ -539,7 +541,8 @@ export function ConnectionFormPanel({
   const [probing, setProbing] = useState(false)
   const [probeResult, setProbeResult] = useState<McpDiscoveredTool[] | null>(null)
   const [probeError, setProbeError] = useState<string | null>(null)
-  const [toolGrants, setToolGrants] = useState<Record<string, boolean>>({})
+  const [defaultPosture, setDefaultPosture] = useState<ToolGrantPosture>("ask")
+  const [toolGrants, setToolGrants] = useState<Record<string, ToolGrantPosture | boolean>>({})
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
    *  halves mirror a REAL server gate, and neither is the gate itself. */
@@ -557,6 +560,7 @@ export function ConnectionFormPanel({
     seededKeyRef.current = key
     if (mode === "edit" && connection) {
       setDraft(draftFromConnection(connection))
+      setDefaultPosture(connection.default_approval_posture ?? "ask")
       setToolGrants(connection.tool_grants ?? {})
       setProbeResult(connection.discovered_tools ?? null)
     } else if (mode === "create" && presetServiceId) {
@@ -568,10 +572,12 @@ export function ConnectionFormPanel({
         capability: shape,
         name: entry.isPopular && presetServiceId !== "custom_mcp" ? entry.name : "",
       })
+      setDefaultPosture("ask")
       setToolGrants({})
       setProbeResult(null)
     } else {
       setDraft(EMPTY_DRAFT)
+      setDefaultPosture("ask")
       setToolGrants({})
       setProbeResult(null)
     }
@@ -841,6 +847,7 @@ export function ConnectionFormPanel({
         // The `else if` is what makes "never both" structural rather than merely intended.
         if (draft.capability === "mcp") {
           body.mcp_server_url = draft.mcpServerUrl.trim()
+          body.default_approval_posture = defaultPosture
         } else if (
           draft.capability === "send_email" ||
           draft.capability === "create_ticket" ||
@@ -877,16 +884,14 @@ export function ConnectionFormPanel({
         const body: ConnectorConnectionUpdate = {
           name: draft.name.trim(),
           config: configFromDraft(draft),
+          default_approval_posture: defaultPosture,
         }
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
         if (replacing && draft.secret !== "") body.secret = draft.secret
         await onUpdate?.(connection.id, body)
-        if (draft.capability === "mcp" && Object.keys(toolGrants).length > 0) {
+        if (draft.capability === "mcp") {
           try {
-            await updateConnectorGrants(connection.id, {
-              ...(connection.tool_grants || {}),
-              ...toolGrants,
-            })
+            await updateConnectorGrants(connection.id, toolGrants)
           } catch {
             // non-fatal
           }
@@ -1409,45 +1414,29 @@ export function ConnectionFormPanel({
         )}
 
         {probeResult && probeResult.length > 0 && (
-          <div data-testid="connection-discovered-tools" className="mb-3.5 rounded-md border border-border/70 bg-card p-2.5">
-            <div className="mb-1.5 text-[11px] font-medium text-foreground">
-              Discovered tools ({probeResult.length})
-            </div>
-            <div className="max-h-48 divide-y divide-border/40 overflow-y-auto pr-1">
-              {probeResult.map((tool) => (
-                <div key={tool.name} className="py-1.5 first:pt-0 last:pb-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[11px] font-semibold text-foreground">
-                      {tool.name}
-                    </span>
-                    {/* WARNING: `grantsArePersisted`, NOT `!readOnly` alone. `handleSave`
-                         writes `tool_grants` only on the `mcp` shape, so a checkbox beside a
-                         capability action would offer a switch Save silently drops. */}
-                    {!readOnly && grantsArePersisted && (
-                      <label className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={toolGrants[tool.name] !== false}
-                          onChange={(e) =>
-                            setToolGrants((prev) => ({
-                              ...prev,
-                              [tool.name]: e.target.checked,
-                            }))
-                          }
-                          className="rounded border-border text-primary focus:ring-primary"
-                        />
-                        Granted
-                      </label>
-                    )}
-                  </div>
-                  {tool.description && (
-                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
-                      {tool.description}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
+          <div data-testid="connection-discovered-tools" className="mb-3.5">
+            <ConnectionGrantsList
+              tools={probeResult}
+              toolGrants={toolGrants}
+              defaultPosture={defaultPosture}
+              onChangeDefaultPosture={setDefaultPosture}
+              onChangeToolGrant={(toolName, posture) => {
+                setToolGrants((prev) => ({
+                  ...prev,
+                  [toolName]: posture,
+                }))
+              }}
+              onResetToolGrant={(toolName) => {
+                setToolGrants((prev) => {
+                  const next = { ...prev }
+                  delete next[toolName]
+                  return next
+                })
+              }}
+              readOnly={readOnly}
+              grantsArePersisted={grantsArePersisted}
+              connectionName={draft.name || draft.serviceId}
+            />
             {!grantsArePersisted && (
               <p
                 data-testid="connection-actions-not-grantable"

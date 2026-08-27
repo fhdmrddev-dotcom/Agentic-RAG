@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { discoverConnectorTools, updateConnectorGrants } from "@/lib/api"
-import type { ConnectorConnection, McpDiscoveredTool } from "@/lib/api"
+import type { ConnectorConnection, McpDiscoveredTool, ToolGrantPosture } from "@/lib/api"
 // ⚠ `useOrgOptional`, NEVER `useOrg` — the latter THROWS outside a provider and six shipped
 // suites mount this component's ancestors without one. `canManage` decides RENDERING ONLY;
 // `require_org_manage` plus an RLS policy in both USING and WITH CHECK are the wall.
@@ -155,14 +155,13 @@ export type McpGrantAudience = "admin" | "member" | "probing" | "no-provider"
 
 /** Check whether a tool is granted permission strictly per F-1 / F-2. */
 export function isToolGranted(
-  grants: Record<string, boolean> | undefined | null,
+  grants: Record<string, ToolGrantPosture | boolean> | undefined | null,
   toolName: string | null | undefined,
 ): boolean {
   if (!grants || !toolName) return false
-  return (
-    Object.prototype.hasOwnProperty.call(grants, toolName) &&
-    Boolean(grants[toolName])
-  )
+  if (!Object.prototype.hasOwnProperty.call(grants, toolName)) return false
+  const val = grants[toolName]
+  return val === "allow" || val === true
 }
 
 /**
@@ -309,7 +308,8 @@ export function McpToolPicker({
     if (grantBusy) return
     const id = connection?.id
     if (!id || !toolName) return
-    const next = !isToolGranted(connection?.tool_grants, toolName)
+    const currentlyGranted = isToolGranted(connection?.tool_grants, toolName)
+    const next: ToolGrantPosture = currentlyGranted ? "deny" : "allow"
     setGrantBusy(true)
     setGrantFailed(false)
     try {
@@ -317,7 +317,7 @@ export function McpToolPicker({
         ...(connection?.tool_grants ?? {}),
         [toolName]: next,
       })
-      setGrantReceipt(next ? MCP_GRANT_RECEIPT_ALLOWED : MCP_GRANT_RECEIPT_DENIED)
+      setGrantReceipt(next === "allow" ? MCP_GRANT_RECEIPT_ALLOWED : MCP_GRANT_RECEIPT_DENIED)
       window.setTimeout(() => setGrantReceipt(null), 4000)
       if (onConnectionUpdated) onConnectionUpdated(row)
     } catch {

@@ -445,6 +445,10 @@ export interface McpDiscoveredTool {
    */
   outputSchema?: Record<string, unknown>
   /**
+   * Phase 213 (GRANT-01) — tool read-only annotation if declared by server.
+   */
+  readOnlyHint?: boolean
+  /**
    * Phase 209 (SC#2) — the tool's own MCP `annotations` object, forwarded verbatim by
    * `mcp_client.py`'s sanitizer when the server sends one.
    *
@@ -473,6 +477,8 @@ export interface McpDiscoveredTool {
  *  `last_check_verdict` is a QUALITY HINT the picker renders (UI-SPEC §6d), never an
  *  authorization boundary — mig 116 says so in the column's own COMMENT. A `failed`
  *  connection is still listed and still bindable. */
+export type ToolGrantPosture = "allow" | "ask" | "deny"
+
 export interface ConnectorConnection {
   id: string
   org_id: string
@@ -497,7 +503,8 @@ export interface ConnectorConnection {
   config: ConnectorConnectionConfig
   is_enabled: boolean
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture | boolean>
   discovered_tools?: McpDiscoveredTool[]
   last_checked_at?: string | null
   last_check_verdict?: "not_checked" | "ok" | "failed" | null
@@ -521,7 +528,8 @@ export interface ConnectorConnectionCreate {
   name: string
   config?: ConnectorConnectionConfig
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture>
   /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
    *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
   secret?: string
@@ -536,7 +544,8 @@ export interface ConnectorConnectionUpdate {
   secret?: string
   is_enabled?: boolean
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture>
   discovered_tools?: McpDiscoveredTool[]
 }
 

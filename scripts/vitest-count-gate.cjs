@@ -2760,6 +2760,8 @@ const BASELINE = {
   // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
   "servicesCatalog.test.ts": 3,
   "apiBarrel.test.ts": 3,
+  // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
+  "ConnectionGrantsList.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3768,6 +3770,8 @@ const TARGETS = [
   // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
   "src/components/settings/__tests__/servicesCatalog.test.ts",
   "src/lib/__tests__/apiBarrel.test.ts",
+  // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
+  "src/components/settings/__tests__/ConnectionGrantsList.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

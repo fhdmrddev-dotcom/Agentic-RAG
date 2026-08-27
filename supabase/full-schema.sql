@@ -756,7 +756,9 @@ CREATE TABLE public.connector_connections (
     tool_grants jsonb DEFAULT '{}'::jsonb NOT NULL,
     discovered_tools jsonb DEFAULT '[]'::jsonb NOT NULL,
     service_id text,
+    default_approval_posture text DEFAULT 'ask'::text NOT NULL,
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_default_posture_check CHECK ((default_approval_posture = ANY (ARRAY['allow'::text, 'ask'::text, 'deny'::text]))),
     CONSTRAINT connector_connections_has_a_service_identity CHECK (((service_id IS NOT NULL) AND (length(btrim(service_id)) > 0))),
     CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
     CONSTRAINT connector_connections_mcp_url_is_https CHECK (((mcp_server_url IS NULL) OR (mcp_server_url ~~ 'https://%'::text))),
@@ -811,6 +813,13 @@ COMMENT ON COLUMN public.connector_connections.discovered_tools IS 'Phase 206 (D
 --
 
 COMMENT ON COLUMN public.connector_connections.service_id IS 'Phase 211 (D-211-01): the SERVICE this connection reaches — ''slack'', ''jira'', ''smtp'', ''notion'', anything. FREE TEXT. It is NOT a foreign key, it is NEVER CHECK-constrained against a closed list, and no migration may later close it: a closed set here is migration 116''s `capability` mistake moved to a nicer axis, where every unknown service again becomes invisible or has to squeeze into a known name (SEED-207). The curated "Popular" set (Phase 212) is a PRESENTATION LOOKUP keyed by this value (D-211-02) — a miss degrades to a generic mark, NEVER to a refusal and NEVER to a hidden row, which is what makes adding a service cost a presentation row instead of a migration. The only constraint this column carries is the one in §3: present and non-blank.';
+
+
+--
+-- Name: COLUMN connector_connections.default_approval_posture; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.default_approval_posture IS 'Phase 213 (D-213-06, D-213-08): The connection-level default approval posture (''allow'', ''ask'', ''deny''). Newly discovered or unconfigured tools inherit this posture until explicitly overridden in tool_grants.';
 
 
 --

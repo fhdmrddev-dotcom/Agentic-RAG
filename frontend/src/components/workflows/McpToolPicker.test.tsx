@@ -50,7 +50,7 @@ import {
   MCP_GRANT_GRANTED_LABEL,
   MCP_GRANT_DENIED_LABEL,
 } from "./McpToolPicker"
-import type { ConnectorConnection, McpConnectionConfig } from "@/lib/api"
+import type { ConnectorConnection, McpConnectionConfig, ToolGrantPosture } from "@/lib/api"
 import type { OrgValue } from "@/providers/OrgProvider"
 import {
   MCP_GRANT_ADMIN_ONLY_NOTE,
@@ -98,9 +98,10 @@ const mockMcpConnection: ConnectorConnection = {
   config: {} as McpConnectionConfig,
   is_enabled: true,
   mcp_server_url: "https://mcp.atlassian.com/v1",
+  default_approval_posture: "ask",
   tool_grants: {
-    jira_create_issue: true,
-    jira_delete_issue: false,
+    jira_create_issue: "allow",
+    jira_delete_issue: "deny",
   },
   discovered_tools: [
     {
@@ -415,9 +416,9 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
       "jira_delete_issue",
     ])
     expect(payload).toStrictEqual({
-      jira_create_issue: true,
-      jira_delete_issue: false,
-      confluence_search: true,
+      jira_create_issue: "allow",
+      jira_delete_issue: "deny",
+      confluence_search: "allow",
     })
   })
 
@@ -426,13 +427,13 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
     const { rerender } = renderPicker()
     rerender(
       <McpToolPicker
-        connection={{ ...mockMcpConnection, tool_grants: { late_arrival: true } }}
+        connection={{ ...mockMcpConnection, tool_grants: { late_arrival: "allow" } }}
         toolName={deniedTool}
       />,
     )
     fireEvent.click(screen.getByTestId("mcp-grant-toggle"))
     await waitFor(() => expect(mockUpdateGrants).toHaveBeenCalledTimes(1))
-    const [, payload] = mockUpdateGrants.mock.calls[0] as [string, Record<string, boolean>]
+    const [, payload] = mockUpdateGrants.mock.calls[0] as [string, Record<string, ToolGrantPosture>]
     expect(Object.keys(payload).sort()).toStrictEqual(["confluence_search", "late_arrival"])
   })
 
@@ -522,7 +523,7 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
     expect(screen.getByTestId("mcp-grant-toggle")).toHaveAttribute("aria-checked", "false")
     rerender(
       <McpToolPicker
-        connection={{ ...mockMcpConnection, tool_grants: { [deniedTool]: true } }}
+        connection={{ ...mockMcpConnection, tool_grants: { [deniedTool]: "allow" } }}
         toolName={deniedTool}
       />,
     )
@@ -575,6 +576,7 @@ const legacyConnection: ConnectorConnection = {
   config: {} as McpConnectionConfig,
   is_enabled: true,
   mcp_server_url: null,
+  default_approval_posture: "ask",
   tool_grants: {},
   discovered_tools: [],
 }

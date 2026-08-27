@@ -90,6 +90,7 @@ import {
 import * as FORM_COPY from "../connectionFormCopy"
 import * as CONNECTIONS_COPY from "../connectionsCopy"
 import * as REFUSAL_COPY from "../connectionRefusalCopy"
+import { GRANTS_COPY } from "../grantsVocabulary"
 import {
   CHECK_FAILURE_SENTENCE,
   CHECK_INFLIGHT_BODY,
@@ -567,8 +568,8 @@ describe("the push/split container (§3a / D-27)", () => {
     for (let node: HTMLElement | null = rows[0]; node; node = node.parentElement) {
       expect(node.getAttribute("aria-hidden")).not.toBe("true")
     }
-    // And the track really is the 400px split, not a full-width takeover.
-    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).toContain("400px")
+    // And the track really is the clamp(480px, 38%, 640px) split, not a full-width takeover.
+    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).toContain("clamp(480px, 38%, 640px)")
   })
 })
 
@@ -600,9 +601,9 @@ describe("375px (§3a / §12)", () => {
     )
 
     expect(screen.getByTestId("connection-form-panel").getAttribute("data-layout")).toBe("sheet")
-    // No 400px track beside a 375px viewport — that is the horizontal overflow, expressed
+    // No split track beside a 375px viewport — that is the horizontal overflow, expressed
     // as the thing that would CAUSE it rather than as a geometry jsdom cannot measure.
-    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).not.toContain("400px")
+    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).not.toContain("clamp")
   })
 
   it("the tallest content — the OFF notice — sits inside the panel's scroll container, so it stays reachable", () => {
@@ -2490,6 +2491,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     // `connector_connections_has_a_service_identity` agree exactly.
     expect(Object.keys(body).sort()).toEqual([
       "config",
+      "default_approval_posture",
       "mcp_server_url",
       "name",
       "service_id",
@@ -2515,6 +2517,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     })
     expect(Object.keys(withSecret).sort()).toEqual([
       "config",
+      "default_approval_posture",
       "mcp_server_url",
       "name",
       "secret",
@@ -2791,6 +2794,7 @@ describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live de
     const [, body] = onUpdate.mock.calls[0]
     expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
       "config",
+      "default_approval_posture",
       "mcp_server_url",
       "name",
     ])
@@ -2985,7 +2989,7 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
     })
-    expect(screen.getByText("Discovered tools (2)")).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
     expect(screen.getByText("github_search")).toBeInTheDocument()
     expect(screen.getByText("github_issue")).toBeInTheDocument()
     expect(mockProbe).toHaveBeenCalledWith({
@@ -3016,7 +3020,7 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     })
     expect(mockDiscover).toHaveBeenCalledWith("conn_github_123")
     expect(mockProbe).not.toHaveBeenCalled()
-    expect(screen.getByText("Discovered tools (2)")).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
     expect(screen.getByText("add_issue_comment")).toBeInTheDocument()
   })
 

@@ -350,7 +350,7 @@ export function ConnectionsTabView({
       data-testid="connections-split"
       className="grid min-h-0 min-w-0 gap-4 motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
       style={{
-        gridTemplateColumns: dense ? "minmax(0,1fr) 400px" : "minmax(0,1fr)",
+        gridTemplateColumns: dense ? "minmax(0,1fr) clamp(480px, 38%, 640px)" : "minmax(0,1fr)",
       }}
     >
       <section aria-label="Connections" data-testid="connections-tab" className="min-w-0">

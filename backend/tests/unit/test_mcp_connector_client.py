@@ -354,12 +354,14 @@ def test_connector_connection_create_mcp_model():
         # predate the column, and nothing downstream ever re-derives it.
         service_id="github",
         mcp_server_url="https://api.github.com/mcp",
-        tool_grants={"github_create_issue": True, "github_delete_repo": False},
+        default_approval_posture="ask",
+        tool_grants={"github_create_issue": "allow", "github_delete_repo": "deny"},
         secret="ghp_test123",
     )
     assert req.mcp_server_url == "https://api.github.com/mcp"
-    assert req.tool_grants["github_create_issue"] is True
-    assert req.tool_grants["github_delete_repo"] is False
+    assert req.default_approval_posture == "ask"
+    assert req.tool_grants["github_create_issue"] == "allow"
+    assert req.tool_grants["github_delete_repo"] == "deny"
 
 
 def test_external_action_phase_config_mcp_fields():
@@ -655,70 +657,37 @@ async def _drive_grant_write(sent: dict, *, rows: list[dict] | None = None):
 async def test_update_connection_grants_REPLACES_the_whole_tool_grants_column():
     """D-206.2-16 — **the headline. The endpoint REPLACES; it does not merge.**
 
-    Seeded with a stored `{"a": True}` and sent `{"b": True}`, the payload handed to
-    `.update()` carries `tool_grants` == `{"b": True}` — **`"a"` IS GONE**. Asserted by SET
+    Seeded with a stored `{"a": "allow"}` and sent `{"b": "allow"}`, the payload handed to
+    `.update()` carries `tool_grants` == `{"b": "allow"}` — **`"a"` IS GONE**. Asserted by SET
     EQUALITY on the payload's keys, so a partial fix that happened to keep one key cannot
     pass.
-
-    This is the measurement the UI's obligation rests on: a per-tool toggle that sends
-    `{[tool]: next}` alone silently revokes every other tool on the connection, and because
-    `phase_types.py` GATE 6 reads `grants.get(tool_name) is True` — a MISSING KEY DENIES —
-    the revocation surfaces later as a `tool_refused` on a workflow nobody edited.
     """
     result, rec = await _drive_grant_write(
-        {"b": True}, rows=[_grants_row(tool_grants={"a": True})]
+        {"b": "allow"}, rows=[_grants_row(tool_grants={"a": "allow"})]
     )
     payload = rec.updates[0]
 
     assert set(payload["tool_grants"].keys()) == {"b"}, (
         f"D-206.2-16: the grant write is a whole-column REPLACE and the payload is "
         f"{payload['tool_grants']!r}. A `{{[tool]: next}}` payload from the UI WIPES every "
-        f"other grant on the connection — the stored {{'a': True}} is not merged, it is "
+        f"other grant on the connection — the stored {{'a': 'allow'}} is not merged, it is "
         f"gone. The UI must send the FULL MERGED MAP derived from the server-owned value."
     )
     # And the response the UI would refresh from carries the replaced column, not the old one.
-    assert result.tool_grants == {"b": True}, result.tool_grants
+    assert result.tool_grants == {"b": "allow"}, result.tool_grants
 
 
 @pytest.mark.asyncio
-async def test_update_connection_grants_refuses_every_value_that_is_not_a_real_boolean():
-    """F-1 — only a value GATE 6 can read reaches the column. ⚠ AMENDED 2026-08-27 (S-1).
-
-    ── THE PROPERTY IS UNCHANGED; THE DISPOSITION IS ──────────────────────────────────────
-    This test shipped as `..._coerces_every_value_to_a_real_boolean`, and its reasoning is
-    kept verbatim below because it is still correct and is the reason the sanitizer exists:
-
-      > the two ends of the grant disagree about what "granted" means: `phase_types.py`
-      > GATE 6 requires `grants.get(tool_name) is True`, while the client's `isToolGranted`
-      > (`McpToolPicker.tsx`) accepts any truthy value. **The sanitizer is what makes them
-      > agree** — without it, a stored `1` or `"yes"` reads GRANTED in the UI and DENIED at
-      > run time, which is the worst of both.
-
-    What changed is what happens to a value the sanitizer cannot express. `bool(v)` made
-    them agree by MAPPING the unknown onto a legal value — and `bool("deny")` is `True`, so
-    under Phase 213's posture map that maps a person's **Deny** onto an **Allow**. Measured
-    on the coercing version, 2026-08-27:
-
-        {"delete_repository": "deny", "search_code": "ask"}
-            ->  {'delete_repository': True, 'search_code': True}
-
-    So the sanitizer now REFUSES the unknown instead. `1` / `"yes"` / `0` were only ever
-    reachable from a direct service caller — the routers type the body `dict[str, bool]`,
-    so Pydantic has already normalised anything arriving over HTTP.
-
-    All three refusals in ONE drive, as a table, so a partial fix cannot pass.
-    """
+async def test_update_connection_grants_refuses_every_value_that_is_not_a_legal_posture():
+    """F-1 / D-213-05 — only a value in {'allow', 'ask', 'deny'} reaches the column."""
     from app.services import connector_service
 
-    for tool, value in (("t_int", 1), ("t_str", "yes"), ("t_zero", 0)):
+    for tool, value in (("t_int", 1), ("t_str", "yes"), ("t_zero", 0), ("t_bool_true", True), ("t_bool_false", False)):
         with pytest.raises(ValueError) as excinfo:
             await _drive_grant_write({tool: value})
         message = str(excinfo.value)
         assert tool in message and repr(value) in message, (
-            f"F-1/S-1: {tool!r}={value!r} must be REFUSED by name and by value so a caller "
-            f"can find it. GATE 6 compares with `is True`, so a truthy non-boolean would "
-            f"read GRANTED in the UI and DENIED at run time — and coercing it onto `True` "
-            f"would store a permission nobody granted. Got: {message!r}"
+            f"F-1/S-1: {tool!r}={value!r} must be REFUSED by name and by value. Got: {message!r}"
         )
 
 
@@ -726,13 +695,8 @@ async def test_update_connection_grants_refuses_every_value_that_is_not_a_real_b
 async def test_update_connection_grants_is_scoped_by_both_id_and_org_id():
     """D-15 — the write is filtered by `id` AND `org_id`. A write scoped by id alone is a
     CROSS-ORG write.
-
-    Asserted by COLUMN NAME off the recording fake, not by counting `.eq()` calls: two
-    filters on the same column would satisfy a count and would still be a cross-org write.
-    RLS is the second layer and is deliberately NOT simulated here — a test that mocked the
-    policy would prove the mock.
     """
-    _, rec = await _drive_grant_write({"ask_question": True})
+    _, rec = await _drive_grant_write({"ask_question": "allow"})
     columns = [column for column, _ in rec.eqs]
 
     assert "id" in columns and "org_id" in columns, (
@@ -759,7 +723,7 @@ async def test_update_connection_grants_raises_connector_not_found_when_nothing_
 
     with pytest.raises(connector_service.ConnectorNotFound) as exc_info:
         await connector_service.update_connection_grants(
-            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"ask_question": True}, supabase=client
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"ask_question": "allow"}, supabase=client
         )
 
     assert rec.updates, (
@@ -1248,43 +1212,24 @@ def test_the_sanitizer_source_is_an_allow_list_and_not_a_deny_list():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("posture", ["deny", "ask", "allow"])
-async def test_update_connection_grants_REFUSES_a_posture_string_rather_than_coercing_it(posture):
-    """S-1 — a non-boolean grant value is REFUSED, and the refusal names the value.
-
-    The positive control is the point: `bool("deny")` is `True`, so the coercing version of
-    this sanitizer stores a person's **Deny** as an **Allow**. Driven for all three of
-    D-213-05's posture words so a partial fix cannot pass.
-    """
-    from app.services import connector_service
-
-    with pytest.raises(ValueError) as excinfo:
-        await _drive_grant_write({"delete_repository": posture})
-
-    message = str(excinfo.value)
-    assert "delete_repository" in message, (
-        f"S-1: the refusal must name the offending TOOL so a caller can find it; got {message!r}"
-    )
-    assert posture in message, (
-        f"S-1: the refusal must name the offending VALUE; got {message!r}"
-    )
+async def test_update_connection_grants_accepts_posture_strings(posture):
+    """Phase 213 (D-213-05) — grants accept posture strings 'allow', 'ask', and 'deny'."""
+    _, rec = await _drive_grant_write({"delete_repository": posture})
+    grants = rec.updates[0]["tool_grants"]
+    assert grants["delete_repository"] == posture, grants
 
 
 @pytest.mark.asyncio
 async def test_update_connection_grants_refusal_writes_NOTHING():
-    """S-1 — the refusal happens BEFORE the write, so a bad value cannot land partially.
-
-    A sanitizer that refused after building the payload would still have replaced the
-    whole column (see the D-206.2-16 REPLACE test above) — so "refused" has to mean
-    "the row is untouched", not "the error arrived after the damage".
-    """
+    """S-1 — the refusal happens BEFORE the write, so a bad value cannot land partially."""
     from app.services import connector_service
 
     rec = _GrantsRecorder()
-    client = _FakeGrantsClient(rec, [_grants_row(tool_grants={"a": True})])
+    client = _FakeGrantsClient(rec, [_grants_row(tool_grants={"a": "allow"})])
 
     with pytest.raises(ValueError):
         await connector_service.update_connection_grants(
-            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"a": True, "b": "deny"}, supabase=client
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"a": "allow", "b": "invalid_posture"}, supabase=client
         )
 
     assert rec.updates == [], (
@@ -1294,28 +1239,21 @@ async def test_update_connection_grants_refusal_writes_NOTHING():
 
 
 @pytest.mark.asyncio
-async def test_update_connection_still_REFUSES_a_posture_string_on_the_patch_path():
-    """S-1 — the SECOND coercion site (`update_connection`) carries the same rule.
-
-    ⚠ There are TWO sanitizers, not one (`connector_service.py:761` on the PATCH path and
-    `:880` on the grants path). Fixing one and leaving the other is the shape this test
-    exists to catch — a partial fix that passes the grants tests above.
-    """
+async def test_update_connection_still_REFUSES_invalid_posture_on_the_patch_path():
+    """S-1 — the sanitizer on the PATCH path carries the same rule."""
     from app.services import connector_service
 
     assert connector_service._sanitize_tool_grants is not None
     with pytest.raises(ValueError) as excinfo:
-        connector_service._sanitize_tool_grants({"send_email": "ask"})
+        connector_service._sanitize_tool_grants({"send_email": "invalid_posture"})
     assert "send_email" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
-async def test_update_connection_grants_still_accepts_real_booleans():
-    """S-1 NEGATIVE CONTROL — the shipped contract is untouched.
-
-    Without this, a sanitizer that refused EVERYTHING would pass every assertion above.
-    """
-    _, rec = await _drive_grant_write({"search_code": True, "delete_repository": False})
+async def test_update_connection_grants_accepts_all_legal_postures_together():
+    """D-213-05 — all three legal postures can be updated in a single payload."""
+    _, rec = await _drive_grant_write({"search_code": "allow", "delete_repository": "deny", "send_email": "ask"})
     grants = rec.updates[0]["tool_grants"]
-    assert grants["search_code"] is True, grants
-    assert grants["delete_repository"] is False, grants
+    assert grants["search_code"] == "allow", grants
+    assert grants["delete_repository"] == "deny", grants
+    assert grants["send_email"] == "ask", grants

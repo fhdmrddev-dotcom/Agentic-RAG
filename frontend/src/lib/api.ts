@@ -384,6 +384,7 @@ export type {
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
+  ToolGrantPosture,
 } from "./api/org"
 
 // ── connectors ─────────────────────────────────────────────────────────

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-27T15:20:00.000Z"
-last_activity: 2026-08-27 -- Phase 213 CONTEXT captured (0daf820b). 16 decisions; G-5 re-derived on 7 files (3 stale); registers written back
+last_updated: "2026-08-27T18:48:00.000Z"
+last_activity: 2026-08-27 -- Phase 213 complete across all 5 waves; 173 backend pytest green, vitest count gate OK 119/119 (5865 tests).
 progress:
   total_phases: 14
-  completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
-  percent: 29
+  completed_phases: 5
+  total_plans: 20
+  completed_plans: 20
+  percent: 36
 ---
 
 # Project State
@@ -32,14 +32,13 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 212 ✅ **CLOSED** (all five driven defects fixed and operator-confirmed) — ready for Phase 213, which starts with an owed **G-2 sketch**
+**Current focus:** Phase 213 ✅ **CLOSED** (all 5 waves executed, 10 BUILD-CONTRACT invariants verified, all gates passed) — ready for Phase 214.
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 213 (per-tool-grants-and-the-approval-moment) — **PLANNED** (5 plans in 5 waves).
-⭐ **CLAUDE-BUILT / GEMINI-EXECUTED ON OPERATOR INSTRUCTION** (AGENTS.md §3.1 / BUS-024).
-Plan: 213-01 (next action: `/gsd:execute-phase 213` or `213-01-PLAN.md`)
+Phase: 213 (per-tool-grants-and-the-approval-moment) — **COMPLETE** (5/5 plans across 5 waves).
+Plan: 213-05 ✅ executed. Next: Phase 214.
 
 ✅ **The owed G-2 sketch SHIPPED** (`ebf52284`) —
 `.planning/sketches/213-grants-and-the-approval-moment/` is the acceptance bar: 66 assertions,

@@ -11,7 +11,7 @@
  */
 
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
-import type { ConnectorConnection, ConnectorConnectionCreate, ConnectorConnectionUpdate, McpDiscoveredTool } from "./org"
+import type { ConnectorConnection, ConnectorConnectionCreate, ConnectorConnectionUpdate, McpDiscoveredTool, ToolGrantPosture } from "./org"
 export class ConnectorApiError extends ApiError {
   readonly reasonCode: string | null
   constructor(message: string, status: number, reasonCode: string | null) {
@@ -311,10 +311,10 @@ export async function probeMcpServer(payload: McpProbeRequest): Promise<McpProbe
   return res.json() as Promise<McpProbeResponse>
 }
 
-/** Phase 206 (F-1 / D-206-06) — Update boolean per-tool grants on an MCP connection. */
+/** Phase 213 (GRANT-01) — Update per-tool approval posture grants on a connection. */
 export async function updateConnectorGrants(
   id: string,
-  grants: Record<string, boolean>,
+  grants: Record<string, ToolGrantPosture | boolean>,
 ): Promise<ConnectorConnection> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/connectors/connections/${id}/grants`, {
