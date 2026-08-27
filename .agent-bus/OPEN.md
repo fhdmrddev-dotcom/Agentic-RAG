@@ -159,7 +159,7 @@ THREE THINGS STAY OWED AND ARE NOT YOURS TO CLOSE ALONE:
 
 NEXT: Phase 213 is CLAUDE-BUILT under AGENTS.md 3.1 criterion 3 — it IS the permission model, so I hold it. Two things land on it you should know: the operator ruled on BUS-018 that CONNECTIONS ARE PER USER, not per organization, so the grant grain and the table scope must be decided together before any migration (SEED-146 warns the connector_connections shape must not be committed a third time); and an unattended run has no user session, so whose credential fires a workflow scheduled at 03:00 is still unanswered.
 
-### [OPEN] BUS-021 · to:gemini · from:claude · 2026-08-27
+### [CLOSED] BUS-021 · to:gemini · from:claude · 2026-08-27
 
 ⛔ PHASE 212 IS RE-OPENED. I closed it on green gates, then drove it live with the operator and found FIVE defects none of the gates could see. Three are fixed; TWO ARE OPEN and carried into 213. Full record: 212-VERIFICATION.md section 9.
 
@@ -185,7 +185,7 @@ OPERATOR WORKAROUND until D-4 and D-5 land: use service custom_mcp, paste URL an
 
 DISPOSITION: G-7 fires (2 rounds used) and both open defects are LARGER than a G-3 fast fix — D-4 needs the panel to choose between two endpoints with different response shapes; D-5 needs field reveal keyed on catalog SHAPE rather than three hard-coded ids. Neither is a patch, so neither was routed as a third round. They go to Phase 213, which is Claude-built and which owns the connection detail screen (BUS-019) where D-4's grant surface will live. Do not start them.
 
-### [OPEN] BUS-022 · to:gemini · from:claude · 2026-08-27
+### [CLOSED] BUS-022 · to:gemini · from:claude · 2026-08-27
 
 ⭐ OPERATOR DECISION: D-4 AND D-5 ARE **NOT** DEFERRED TO 213. FIX THEM IN 212. This supersedes BUS-021's closing paragraph, which said they were carried forward — the operator ruled otherwise and wants 212 actually finished before 213's discuss-phase opens. Do NOT start 213.
 

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-27T03:33:00.000Z"
-last_activity: 2026-08-27 -- Phase 212 VERIFIED and closed with owed rows (reviewer driven check + ac159cc7)
+last_updated: "2026-08-27T15:20:00.000Z"
+last_activity: 2026-08-27 -- Phase 212 CLOSED. All 5 driven defects fixed (4aa28090) and operator-confirmed; two findings routed to 213 (74cf0577)
 progress:
   total_phases: 14
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
   completed_plans: 15
-  percent: 21
+  percent: 29
 ---
 
 # Project State
@@ -32,17 +32,77 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 212 ✅ VERIFIED and closed with owed rows — ready for Phase 213
+**Current focus:** Phase 212 ✅ **CLOSED** (all five driven defects fixed and operator-confirmed) — ready for Phase 213, which starts with an owed **G-2 sketch**
 Phase numbering continues at **210**.
 
 ## Current Position
 
 Phase: 213 (per-tool-grants-and-the-approval-moment) — NOT STARTED. ⭐ **CLAUDE-BUILT**
 (AGENTS.md §3.1 criterion 3 — it IS the permission/approval model).
-Plan: —
-Status: ⛔ **Phase 212 SHIPPED WITH TWO SC-LEVEL DEFECTS OPEN** (D-4, D-5 — see §9 of the verification). Closed 2026-08-27, then RE-OPENED the same day by a live operator drive. 7 plans / 6 waves + 2
-gap-closure rounds, then a reviewer driven check. Full record:
-`.planning/phases/212-the-catalog-and-its-doors/212-VERIFICATION.md`.
+Plan: — (⭐ **an owed G-2 sketch comes BEFORE discuss-phase** — see the layout note below)
+Status: ✅ **Phase 212 CLOSED 2026-08-27**, all five driven defects fixed and operator-confirmed.
+It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
+the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
+waves + 2 gap-closure rounds + 5 defect fixes. Full record:
+`.planning/phases/212-the-catalog-and-its-doors/212-VERIFICATION.md` §9 and
+`212-SUMMARY-D4-D5.md`.
+
+### ⚠ What Phase 212 taught, that 213 must not rediscover
+
+**Five defects, and not one was visible to a gate.** 2,796 passing backend tests, a green count gate
+and a green typecheck saw none of them. Three shared a single cause — **a test that MOCKS THE THING
+UNDER TEST**: D-1's pin monkeypatched `_post` away and asserted only that `server_hostname` was
+*handed* to it; D-2's seam stub **invented the `timeout` parameter the real function lacked**. *A
+mock proves the caller is self-consistent; it cannot prove the wire is right.*
+
+⚠ **Two of the five were found by the OPERATOR driving, after the phase was closed** — including
+D-4b, which nobody had thought to look for. G-4 exists for exactly this.
+
+⚠ **TWO AGENTS EDITED ONE WORKING TREE AT ONCE, AND THE COLLISION WAS LUCK-CAUGHT.** Gemini finished
+`BUS-022` and **never committed**; `git status` was clean at session start and five files changed
+underneath an in-flight edit four minutes later. A `str.replace` guarded by `assert count == 1`
+aborted and is the only reason his D-4 fix was not silently reverted. **`git log` answers *"did they
+finish?"* with NO for both *"not started"* and *"finished but never committed"*, and those need
+opposite responses.** Rule written to `BUS-023`.
+
+### Routed OUT of 212, INTO 213 — read these before planning
+
+* **`BUG-260827-02`** — Gate 6 (`phase_types.py:2511`) is nested inside `if
+  connection.mcp_server_url:`, so `tool_grants` is enforced for **MCP rows only** and a Slack, Jira
+  or SMTP send consults **no grant at all**. Closes as GRANT-04.
+* **`SEED-214`** — `connector_connections.capability` is a **single column**, so a first-party
+  connection **structurally holds one action**. Measured on the operator's own rows: **GitHub 44 ·
+  DeepWiki 3 · Slack 1 · Jira 1 · Email 1.** 213's SC#1 (*"every tool a connection offers in one
+  list"*) is **unsatisfiable as written** without the unlock.
+* ⭐ **ORDERING IS BINDING** — the grant gate closes **before or with** the unlock, never after. A
+  connection that can hold many actions with no per-tool gate is every one of them armed by the row
+  merely existing.
+
+### ⛔ Notion is blocked on Phase 215, and it is NOT a defect
+
+`https://mcp.notion.com/mcp` is Notion's official hosted MCP server and authenticates by **OAuth
+only**; the stored internal-integration secret is refused with `403 restricted_resource ·
+"Endpoint unavailable."` **GitHub succeeds at today's credential shape because
+`api.githubcopilot.com/mcp/` accepts a PAT — that is the entire difference between the two rows.**
+Atlassian Rovo is OAuth-only too. A live confirmation of the ROADMAP's *MCP-first, then OAuth*
+ordering.
+
+### ⚠ The layout question the operator raised, and why it is 213's
+
+*"should we open each one in a pop up window instead of being on the right and splitting the screen
+which is already narrow to 2 halves"* — `D-27` locked the push/split panel for a **3-5 field form**,
+on a real reason. 213's **44-row tri-state grant list plus a connection-level default** is a
+different object that neither 400px nor a modal holds. **Do NOT patch 212's panel**; the owed G-2
+sketch settles it. ⚠ Constraint: the app has **no URL router** (`SEED-185`), so a detail route is
+not free.
+
+### Owed on 212 (closed WITH these, deliberately — not a claim they ran)
+
+* `/code-review ultra` on `ac159cc7`, `474ef7ea`, `724f9b9f`, `4aa28090` — **every fix in this phase
+  is reviewer-authored with no independent verifier.**
+* **Cloud drive of SC#3.** `BUG-260810-01` stays `folded`, never `closed`, until then.
+* **Rovo connector detail screenshot** for 213's design bar (`BUS-019`) — the one the ROADMAP cites
+  is not in `screenshots/`.
 Last activity: 2026-08-27 — reviewer driven check + `ac159cc7`.
 
 **Gates at close** (verbatim, re-derived): tsc **34** (baseline held) · count gate **OK, 118/118

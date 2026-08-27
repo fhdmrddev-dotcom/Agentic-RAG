@@ -164,3 +164,35 @@ neither a round nor a patch; they are the operator's explicit instruction to fin
 213 fixes the grant grain**; `SEED-146` warns the table shape must not be committed a third time.
 ⚠ **Still unanswered: an unattended run has no user session** — whose credential fires a workflow
 scheduled at 03:00?
+
+---
+
+# ⚠ SUPERSEDED 2026-08-27 — Phase 212 is CLOSED
+
+**Everything above is the state at ~68% context on the morning of 2026-08-27, before D-4 and D-5
+were fixed. It is kept verbatim because its evidence chains are still the record**, but its
+instructions are spent. Do not act on "What to do, in order" — every step is done.
+
+| what that file said was open | now |
+|---|---|
+| D-4 — the working endpoint is not wired to the button | ✅ fixed `4aa28090`, operator-confirmed |
+| D-5 — three Popular services have no configurable form | ✅ fixed `4aa28090`, operator-confirmed |
+| "Wait for Gemini (`BUS-022`). Do not start 213." | `BUS-022` **closed** — he finished and never committed; reconciled into `4aa28090` |
+
+**Three things that file could not know:**
+
+1. **A THIRD defect (D-4b), found by the operator driving:** Slack/Jira/SMTP offered only *Check
+   credentials*. `discover_connection_tools` has served the capability shape since Phase 211 with no
+   network call, and **no control was ever drawn for it.**
+2. **Notion's `0` is now explained and is ⛔ blocked, not broken.** `mcp.notion.com/mcp` is
+   **OAuth-only**; an internal-integration secret cannot call it. Blocked on **Phase 215**, like
+   Atlassian Rovo. GitHub works only because `api.githubcopilot.com/mcp/` accepts a PAT.
+3. ⚠ **Two agents edited this working tree at once and the collision was luck-caught.** See
+   `BUS-023` and `STATE.md`. `git status` clean ≠ nobody is working.
+
+**Read instead:** `212-VERIFICATION.md` (§9 + frontmatter) · `212-SUMMARY-D4-D5.md` ·
+`.planning/STATE.md` → *"What Phase 212 taught, that 213 must not rediscover"*.
+
+**Still owed, unchanged:** `/code-review ultra` on `ac159cc7`, `474ef7ea`, `724f9b9f` **and
+`4aa28090`** · the cloud drive of SC#3 (`BUG-260810-01` stays `folded`) · the Rovo detail screenshot
+(`BUS-019`).

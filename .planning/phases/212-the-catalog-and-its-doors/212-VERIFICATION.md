@@ -5,8 +5,17 @@ phase_name: "The Catalog and Its Doors"
 builder: gemini
 reviewer: claude
 verified_at: 2026-08-27
-tree_state: verified at `ac159cc7` (phase executed through `8eeaeb6b`)
-verdict: SHIPPED WITH TWO SC-LEVEL DEFECTS OPEN
+tree_state: verified at `4aa28090` (phase executed through `8eeaeb6b`; five defects fixed through `ac159cc7`, `474ef7ea`, `724f9b9f`, `4aa28090`)
+verdict: CLOSED — all five driven defects fixed and operator-confirmed 2026-08-27, with owed rows named
+owed:
+  - "/code-review ultra on ac159cc7, 474ef7ea, 724f9b9f, 4aa28090 — no independent verifier"
+  - "cloud drive of SC#3 — BUG-260810-01 stays folded, never closed"
+  - "Rovo connector detail screenshot for 213's design bar (BUS-019)"
+blocked_rows:
+  - "Notion — 403 restricted_resource; mcp.notion.com/mcp is OAuth-only. Blocked on Phase 215."
+routed_out:
+  - "BUG-260827-02 (capability rows bypass the grant gate) → 213 GRANT-04"
+  - "SEED-214 (the 1:1 lock) → 213 SC#1"
 ---
 
 # Phase 212 — verification
@@ -46,8 +55,8 @@ added in §3.
 |---|---|---|
 | 1 | searchable list of services, each with mark, name, one-line purpose | ✅ **DRIVEN** |
 | 2 | `All / Connected / Not connected`, no filter describing what a connector can *do* | ✅ **DRIVEN** |
-| 3 | **on a cloud install**, connect a Popular service in one click, from the same list | ⛔ **FAILS — 3 of 7 Popular services have no configurable form (§9, D-5)**, and the cloud half is unverified |
-| 4 | paste an MCP URL, tools discovered and **become grantable**, no code changed | ⛔ **PARTIAL — three defects fixed (§3, §9 D-1..D-3); a SAVED connection still cannot discover (§9, D-4)** |
+| 3 | **on a cloud install**, connect a Popular service in one click, from the same list | ✅ **LOCAL HALF DRIVEN 2026-08-27** — D-5 fixed (`4aa28090`), operator confirmed a fillable form on every Popular service. ⚠ **the CLOUD half stays unverified** — `BUG-260810-01` stays `folded`, never `closed` |
+| 4 | paste an MCP URL, tools discovered and **become grantable**, no code changed | ✅ **DRIVEN 2026-08-27** — five defects fixed (§9 D-1..D-5). A SAVED connection discovers through the button: **GitHub 44 tools**, measured on the row |
 | 5 | edit preserves per-tool grants; delete removes cleanly | ⚠ **EDIT HALF DRIVEN; delete NOT executed** |
 
 ### SC#1 — driven
@@ -304,7 +313,7 @@ After the fix the operator immediately got two distinct, actionable upstream mes
 (`HTTP 401: bad request: missing required Authorization header` from GitHub;
 `{"error":"invalid_token"…}` from Notion). Same family as `BUG-260815-06`.
 
-### D-4 — ⛔ OPEN — a SAVED MCP connection can never discover its tools
+### D-4 — ✅ FIXED (`4aa28090`), operator-confirmed 2026-08-27 — a SAVED MCP connection can never discover its tools
 `ConnectionFormPanel` imports **only** `probeMcpServer`, the **pre-save** probe. It never calls
 `discoverConnectorTools(id)` — the Phase 206 endpoint that decrypts the stored secret server-side.
 
@@ -317,7 +326,7 @@ changed nothing, because no token was being sent at all.
 **Consequence:** the pre-save probe is the only wired path, and it structurally cannot authenticate
 for a connection that already exists. This is the second half of SC#4's *"become grantable"*.
 
-### D-5 — ⛔ OPEN — three Popular services have no configurable form
+### D-5 — ✅ FIXED (`4aa28090`), operator-confirmed 2026-08-27 — three Popular services have no configurable form
 The form reveals fields by service id. Driven in the browser, on a fresh Add panel:
 
 | service typed | fields offered |
@@ -339,13 +348,81 @@ click"* is false for three of them.
 locally on the evidence that the Popular row **rendered**. I never clicked through to a configurable
 form. Rendering a card is not connecting a service, and the criterion says *connects*.
 
-### Operator workaround, until D-4 and D-5 are fixed
-Use service **`custom_mcp`**, paste the URL and the token, and click **Discover tools while still on
-the create form** — before saving.
+### D-4b — ✅ FIXED (`4aa28090`), operator-confirmed 2026-08-27 — Slack, Jira and SMTP had no refresh at all
 
-### Disposition
-G-7 fires (2 rounds used) and both open defects are **larger than a G-3 fast fix**: D-4 needs the
-panel to choose between two endpoints with different response shapes; D-5 needs the form's
-field-reveal keyed on catalog **shape** rather than on three hard-coded ids. Neither is a patch.
-**They are carried into Phase 213**, which owns the connection detail screen (`BUS-019`) and is
-where the grant surface D-4 feeds will be built.
+⚠ **FOUND BY THE OPERATOR, DRIVING, AFTER D-4 WAS ALREADY FIXED**, in these words: *"for the old
+connections like JIRA and email and slack it does not show discover tools it is only showing check
+credentials."*
+
+Correct, and the **same defect family as D-4 — a working endpoint with no button on it.**
+`discover_connection_tools` has served the capability shape since **Phase 211**, re-reading the
+adapter's own static descriptor with **no network call at all**, precisely so a row saved before an
+adapter's `INPUT_SCHEMA` changed can self-heal in one click. **The control was never drawn, so that
+arm had been unreachable from the UI for its entire life.**
+
+Two structural halves came with the fix:
+
+* **The error and result nodes were nested inside the `mcp` arm.** A capability refresh could return
+  a descriptor and a failure could return a worded reason, and **neither could render.**
+* **No `Granted` checkbox on a capability action.** `handleSave` writes `tool_grants` only on the
+  `mcp` shape, so a checkbox there is a switch Save silently drops. ⚠ **That is the honest rendering
+  of `BUG-260827-02`, NOT a fix for it** — see the disposition below.
+
+### ⛔ Notion returns 0 tools, and it is NOT our defect — measured, not inferred
+
+| connection | `mcp_server_url` | tools |
+|---|---|---|
+| GitHub | `https://api.githubcopilot.com/mcp/` | **44** |
+| DeepWiki | `https://mcp.deepwiki.com/mcp` | 3 |
+| **Notion** | **`https://mcp.notion.com/mcp`** | **0** |
+| Slack · Jira · Email | *(none — capability shape)* | 1 each |
+
+`https://mcp.notion.com/mcp` is Notion's **official hosted remote MCP server, and it authenticates
+by OAuth only.** The stored credential is an internal-integration secret presented as a Bearer
+token, which Notion refuses with `403 restricted_resource · "Endpoint unavailable."` — its wording
+for *"this credential type may not call this endpoint."*
+
+⚠ **It is not a scope problem and not a page-sharing problem, and a better token cannot fix it.**
+GitHub succeeds at today's credential shape because `api.githubcopilot.com/mcp/` **accepts a personal
+access token**; that is the entire difference between the two rows.
+
+**So Notion is ⛔ BLOCKED ON PHASE 215 (BYO OAuth)**, exactly as Atlassian Rovo is. Recorded as a
+blocked row with its reason rather than dropped — *a scoreboard that lists only what passed is not a
+scoreboard.* It is also a live data point confirming the ROADMAP's **MCP-first, then OAuth**
+ordering rationale.
+
+⚠ **And the tool counts above are `SEED-214` in one line: 44 · 3 · 1 · 1 · 1.** The three ones are
+not thin adapters by neglect — `connector_connections.capability` is a SINGLE column, so a
+first-party connection **structurally holds one action.**
+
+### Disposition — ✅ CLOSED 2026-08-27
+
+All five defects fixed and driven. `4aa28090` reconciles the work, `74cf0577` routes what it exposed.
+
+⚠ **G-7 fired (2 rounds used) and this was neither a third round nor a G-3 patch.** It is the
+**operator's explicit instruction** that D-4 and D-5 be fixed *in* 212 rather than carried to 213 —
+which supersedes `BUS-021`'s closing paragraph and the earlier disposition this block replaces.
+
+**Two things this phase surfaced are routed OUT of it, deliberately:**
+
+* **`BUG-260827-02`** — Gate 6 (`phase_types.py:2511`) is nested inside `if
+  connection.mcp_server_url:`, so `tool_grants` is enforced for MCP rows **only** and a capability
+  send consults no grant at all. Folded into **213** (GRANT-04). ⭐ **Ordering is binding: the gate
+  closes before or with `SEED-214`'s unlock, never after.**
+* **`SEED-214`** — the 1:1 lock between a connection and its single action. Its unlock is folded
+  into **213**, because that phase's SC#1 (*"every tool a connection offers in one list"*) is
+  **unsatisfiable as written** while three of the operator's connections hold one action each.
+
+**Still owed on this phase:**
+
+* `/code-review ultra` on `ac159cc7`, `474ef7ea`, `724f9b9f` **and `4aa28090`** — every fix here is
+  reviewer-authored with no independent verifier.
+* **The cloud drive of SC#3.** `BUG-260810-01` stays `folded`, never `closed`, until then.
+* A **Rovo connector detail screenshot** for 213's design bar (`BUS-019`) — the one the ROADMAP
+  cites is not in `screenshots/`.
+
+⚠ **The layout question the operator raised while driving is NOT owed here and must not be patched
+here:** *"should we open each one in a pop up window instead of being on the right and splitting the
+screen which is already narrow to 2 halves."* `D-27` locked the push/split panel for a **3-5 field
+form**; 213's **44-row tri-state grant list** is a different object that neither 400px nor a modal
+holds. It is recorded in 213's flags and settled by that phase's **owed G-2 sketch**.
