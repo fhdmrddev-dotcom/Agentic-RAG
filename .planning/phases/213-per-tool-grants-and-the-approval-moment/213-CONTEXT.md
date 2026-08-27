@@ -70,7 +70,8 @@ this rather than assume it:**
 `ConnectionsTab.tsx`. **Answered by the same two cuts.**
 
 **G-4 (lived-experience UAT)** — operator-defined scenarios are owed at scope time, and ⚠ **must
-cover BOTH surfaces** (see D-213-10): a chat-only drive would miss the run-page gap by construction.
+cover BOTH surfaces AND both breakpoints** (see D-213-10 / R-1..R-3): a chat-only drive, or an
+`lg`-only one, would miss the run-page conditions by construction.
 Every G-4 row must name the sketch file as its reference and be driven by *looking*, never by
 `getElementById`.
 
@@ -178,15 +179,39 @@ Candidate observables are listed under `<failure_modes>` below.
   human, once) **must not key on direction**, because a read is exactly where prompt injection
   enters; run-time (D-19, armed) may.
 
-- **D-213-10: The ask renders on `WorkflowRunPage` too — reachability is a success criterion.**
-  ⚠ **Measured:** `ChatLayout.launch.test.tsx:502` asserts `WorkspacePanel` mounts **ONLY** inside
-  the chat branch, so `PendingAskCard` / `PendingAskStack` **do not exist on `WorkflowRunPage`**. A
-  run launched from the Workflows library that pauses on "Ask first" would have **nowhere to be
-  answered** — and SC#3 says *nothing leaves until they answer*. Reuse `PendingAskStack` rather than
-  inventing a second card.
-  ⚠ `frontend/src/pages/WorkflowRunPage.tsx` is **25 / 8 / 1601** and G-5 **FIRES** — so this lands
-  as a **section component**, never as inline lines.
-  ⚠ This is the shape of the Phase 194 finding where `WorkflowRunPage` had no Stop control at all.
+- **D-213-10: The ask must be REACHABLE wherever a run can pause — and the mount already exists.**
+
+  ⚠ **CORRECTED 2026-08-27 (`213-PREFLIGHT.md` §0 / CORR-1), and the original is kept below rather
+  than overwritten, because the wrong version would have bought a component nobody needed.**
+
+  > **What this decision originally said, and it is FALSE:** *"`ChatLayout.launch.test.tsx:502`
+  > asserts `WorkspacePanel` mounts ONLY inside the chat branch, so `PendingAskCard` /
+  > `PendingAskStack` do not exist on `WorkflowRunPage`… Reuse `PendingAskStack` rather than
+  > inventing a second card."*
+
+  The `ChatLayout` assertion is real; the inference from it was not. **`WorkflowRunPage` renders
+  `PendingAskCard` DIRECTLY, bypassing the panel** — `WorkflowRunPage.tsx:120` (import), `:563`
+  (`useAskUserPrompt(run?.thread_id)`), `:1560-1575` (rendered through `RunSpine`'s `renderAsk`).
+  Phase 200.2 put the ask **inside the spine, at the step it belongs to**, and its own comment calls
+  that placement *"the whole point of it"*.
+
+  **So this decision is: prove the grant ask flows through the mount that exists — do not build a
+  second one.** Three conditions gate it, and all three are checks rather than claims:
+
+  | | condition | where |
+  |---|---|---|
+  | **R-1** | the aside is `hidden … lg:flex` — **below `lg` the ask has no home on this page** | `WorkflowRunPage.tsx:552` |
+  | **R-2** | the card renders **only at `askAnchorSlug`** — first step reading `waiting-for-you`, else first `running`, else the last row | `:962-968` |
+  | **R-3** | asks are fetched by **`run.thread_id`** — a run without one fetches nothing | `:563` |
+
+  ⚠ **R-2 is UNMEASURED and must be driven.** A step paused at the armed action-risk checkpoint is
+  not an `llm_human_input` step; if its reading is not `waiting-for-you` the anchor falls through to
+  `running`, which may or may not be the right row.
+
+  ⚠ `frontend/src/pages/WorkflowRunPage.tsx` is **25 / 8 / 1601** and G-5 **FIRES** — so any change
+  here lands as a **section component**, never as inline lines.
+  ⚠ SC#3 says *nothing leaves until they answer*, so a pause nobody can answer fails the criterion.
+  Compare the Phase 194 finding where `WorkflowRunPage` had no Stop control at all.
 
 - **D-213-11: "Always allow X on this connection" SHIPS — explicit opt-in, with its own receipt.**
   The sketch's `ASK_ALWAYS` + `ASK_ALWAYS_NOTE` ("Changes the setting above, not just this run").
@@ -278,8 +303,8 @@ Candidate observables are listed under `<failure_modes>` below.
    — the backfill did not grandfather (D-213-07).
 2. `GET /connectors/connections` returns 503 / *"Could not load connections"* on a pre-existing row —
    the column grant was forgotten (D-213-08).
-3. A run pauses on "Ask first" and the person cannot find where to answer — the run-page mount was
-   skipped (D-213-10).
+3. A run pauses on "Ask first" and the person cannot find where to answer — the ask did not anchor
+   to the paused step, or the window was below `lg` (D-213-10 / R-1, R-2).
 4. An armed `external_action` whose tool is also "Ask first" asks **twice** — a second pause was
    built instead of a second trigger (D-213-09).
 5. The ledger shows a send with no matching receipt on the MCP arm (D-213-13), or shows arguments
