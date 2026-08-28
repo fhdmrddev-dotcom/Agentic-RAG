@@ -327,3 +327,67 @@ describe("PublishRefusalList — the next action goes somewhere", () => {
     expect(btn.getAttribute("title")).toMatch(/builder/i)
   })
 })
+
+// ── PHASE 214.1-03 TASK 1 (D-214.1-04) — THE `BUG-260828-04` FENCE, COMPONENT-SIDE ────
+//
+// The operator read the BACKEND DIAGNOSTIC on screen during Phase 214's G-4 drive. The
+// gauntlet-side diagnosis (`PublishGauntlet.test.tsx`, same plan) renders the byte-exact
+// live entry and measures that the COMPOSED sentence arrives in full and the diagnostic
+// arrives nowhere — so a classification defect on the publish path is REFUTED at HEAD.
+// These three cases are the fence that keeps it refuted, at the level of the component
+// that owns the claim rather than the modal that mounts it.
+//
+// ⚠ THE ENTRY IS THE LIVE ONE, and its `step_name` is the phase SLUG rather than an
+// authored name — the one documented case where the two coincide (`reachability.py:283`),
+// which is why its diagnostic reads `phase 'act':` and not `step 'act':`. Every other
+// fixture in this file carries an authored name, so this shape was previously untested.
+const LIVE_WIRE_ENTRY: Record<string, unknown> = {
+  code: "ask_undeclared",
+  phase: "act",
+  message:
+    "phase 'act': the required argument 'to' is asked for at launch, but the workflow declares no matching input",
+  step_name: "act",
+  argument: "to",
+  upstream: null,
+}
+
+describe("PublishRefusalList 214.1-03 — the LIVE `BUG-260828-04` entry (D-214.1-04)", () => {
+  it("CLAIMS the live entry and says it in words — the diagnostic reaches no node", () => {
+    render(<PublishRefusalList entries={[LIVE_WIRE_ENTRY]} />)
+    const section = screen.getByTestId("publish-refusals")
+    const text = section.textContent ?? ""
+    // The vocabulary composes it; the test never re-types the sentence.
+    expect(text).toContain(REFUSAL_FOR_KIND.ask_undeclared({ step: "act", arg: "to", upstream: "" }))
+    // …and the server's own string is absent, counted rather than inferred.
+    expect(occurrences(text, String(LIVE_WIRE_ENTRY.message))).toBe(0)
+    expect(occurrences(text, "declares no matching input")).toBe(0)
+    expect(occurrences(text, "but the wor")).toBe(0)
+  })
+
+  it("DECLINE + POSITIVE CONTROL: with no `step_name` nothing is claimed, so the generic path owns it", () => {
+    const noStepName = { ...LIVE_WIRE_ENTRY }
+    delete noStepName.step_name
+    // The predicate declines…
+    expect(isArgumentRefusal(noStepName)).toBe(false)
+    // …and the surface renders NOTHING rather than a sentence with a hole in it, which is
+    // what hands the entry to `PublishGauntlet`'s shipped generic renderer.
+    const { container } = render(<PublishRefusalList entries={[noStepName]} />)
+    expect(screen.queryByTestId("publish-refusals")).not.toBeInTheDocument()
+    expect(container.textContent ?? "").toBe("")
+    // POSITIVE CONTROL — the same entry WITH its `step_name` really is claimed, so the
+    // absence above is caused by the missing field and not by a broken fixture.
+    expect(isArgumentRefusal(LIVE_WIRE_ENTRY)).toBe(true)
+  })
+
+  it("DECLINE + POSITIVE CONTROL: with no `argument` nothing is claimed, so the generic path owns it", () => {
+    const noArgument = { ...LIVE_WIRE_ENTRY }
+    delete noArgument.argument
+    expect(isArgumentRefusal(noArgument)).toBe(false)
+    const { container } = render(<PublishRefusalList entries={[noArgument]} />)
+    expect(screen.queryByTestId("publish-refusals")).not.toBeInTheDocument()
+    expect(container.textContent ?? "").toBe("")
+    // …while `shape_unknown` — the ONE kind that names no argument — is still claimed
+    // without one. That is the arm this decline must not swallow.
+    expect(isArgumentRefusal({ ...noArgument, code: "shape_unknown" })).toBe(true)
+  })
+})

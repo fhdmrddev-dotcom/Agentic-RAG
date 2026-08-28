@@ -70,6 +70,13 @@ from app.services.harness.emitters import resolve_emitter
 from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 
+# 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
+# Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
+# awareness block below feeds it a REMOTE-SERVER-ADVERTISED ``tool_name``. Safe at module
+# top: ``publish_service`` has no app-level module-top imports at all (logging, unicodedata,
+# UUID) and the ``harness`` package ``__init__`` never loads it, so no cycle is closed.
+from app.services.harness.publish_service import _clean_label
+
 # BUG-260730-01 — the ONE home of the citation marker format, read here so the
 # instruction the producer sees and the pattern the gate compiles cannot drift. Safe at
 # module top: ``validator_kinds`` imports only ``harness.validators`` (import-light, and
@@ -263,6 +270,97 @@ def _stateful_framing_block(ctx) -> str:
         "- `[UPDATED]` for items from the prior state whose status, details, or severity have changed.\n"
         "- `[RESOLVED]` or `[CLOSED]` for items from the prior state that are now resolved, completed, or no longer active.\n"
         "Preserve existing unchanged items to maintain continuity in the register."
+    )
+
+
+#: Phase 214.1-03 (``BUG-260828-03`` / D-214.1-05) — how many bound action names the
+#: awareness block will name before it stops. A workflow with more external steps than this
+#: has already told the model everything the sentence can usefully carry, and
+#: ``workflow_authoring``'s length-discipline note binds here: an over-long block is a NUDGE,
+#: and a nudge is not what a fact is for. Re-derived by the length case, never hand-counted.
+_WIRED_SERVICES_MAX_NAMES = 8
+
+
+def _wired_services_block(ctx) -> str:
+    """The services THIS WORKFLOW is wired to, handed over as a fact rather than guessed.
+
+    ``BUG-260828-03``: a ``write-summary`` step wrote *"The requested email could not be sent
+    because no email service is connected to this workspace"* into a delivered summary — while
+    the SMTP connection existed and the VERY NEXT step sent successfully. The false claim
+    reached a recipient AND sat inside the approval sentence a human was asked to approve.
+
+    ⚠ D-214.1-05 — THIS IS A LOOKUP, NOT A PROMPT ASKING THE MODEL TO BEHAVE. Prompting a
+    model not to speculate about system state is already measured insufficient one surface
+    over (STEP-06 enforces its vocabulary on the EMITTED definition rather than by asking).
+    What this function does is remove the occasion to speculate: the connected-service fact is
+    something the system holds, so the model is GIVEN it at the point it was inventing it.
+
+    ⚠ THE LIMIT THIS BUYS, STATED BECAUSE IT IS NARROWER THAN "THE WORKSPACE'S CONNECTIONS".
+    This block is derived PURELY from ``ctx.definition`` — the object the run already holds.
+    It tells the model what THIS WORKFLOW is bound to, which is exactly where the model
+    speculated: it denied a capability its own next step then exercised. It does NOT know
+    about a service no step names. **RE-OPEN TRIGGER**: the first phase that needs the model
+    to know about a connection NO step is bound to must add the connection read — and that
+    read is I/O, at a seam this function is deliberately not at.
+
+    ⛔ NO CONNECTION READ, NO ``connection_id``, NO I/O, NO NEW TRUST BOUNDARY, and therefore
+    no ``run_in_threadpool`` question. ⛔ AND NO POST-HOC CENSOR over generated text —
+    D-214.1-05's scope limit is binding: that is a bigger, more dangerous mechanism and it
+    needs the operator. This function appends a string to a system prompt and touches no
+    output path.
+
+    ⚠ BOTH BINDING ARMS ARE READ, and that is a correction to the plan's interface rather
+    than an embellishment. An ``external_action`` step names EITHER a native ``capability``
+    (the closed ``Literal`` of three — ``send_email`` / ``create_ticket`` / ``post_message``)
+    OR an MCP ``tool_name``. ``BUG-260828-03``'s own step was the NATIVE SMTP ``send_email``
+    arm, so a block reading ``tool_name`` alone would return ``""`` for the exact workflow the
+    bug was reported against.
+
+    ⚠ ``tool_name`` IS A REMOTE-SERVER-ADVERTISED STRING GOING INTO A SYSTEM PROMPT — the
+    prompt-injection class this tree has not faced before (T-214.1-03-01). Every name is put
+    through ``publish_service._clean_label``, the SHIPPED scrubber (Unicode-category scrub of
+    ``Cc``/``Cf``/``Cs``/``Co``/``Zl``/``Zp`` plus every whitespace run, then a 72-char clamp)
+    rather than a second copy of one. No import cycle exists to prevent it: ``publish_service``
+    has no app-level module-top imports and the ``harness`` package ``__init__`` does not load
+    it. A clamp is a BOUND, not immunity — so the block states a FACT and a RULE and grants
+    nothing.
+
+    Returns ``""`` for a ``ctx`` with no definition, a definition whose ``phases`` is not a
+    list, and any definition with no bound ``external_action`` step — so every other
+    workflow's system prompt is BYTE-IDENTICAL by construction rather than by review.
+    """
+    definition = getattr(ctx, "definition", None)
+    phases = getattr(definition, "phases", None)
+    if not isinstance(phases, list):
+        return ""
+
+    names: list[str] = []
+    for phase in phases:
+        config = getattr(phase, "config", None)
+        if getattr(config, "phase_type", None) != "external_action":
+            continue
+        # The MCP arm first: a step naming a tool is bound to THAT, and ``available_tools``
+        # derives from it. The native ``capability`` is the other arm of the same binding.
+        raw = getattr(config, "tool_name", None) or getattr(config, "capability", None)
+        cleaned = _clean_label(raw)
+        # ``_clean_label`` returns None for a missing name, a non-string and one that trims
+        # empty — all three are "this step binds nothing nameable", never a placeholder.
+        if cleaned and cleaned not in names:
+            names.append(cleaned)
+
+    if not names:
+        return ""
+
+    named = sorted(names)[:_WIRED_SERVICES_MAX_NAMES]
+    return (
+        "\n\n## What this workflow is connected to\n"
+        "This workflow is wired to connected services that perform: "
+        + ", ".join(named)
+        + ".\n"
+        "Do not state that a service is unavailable, unconnected, or missing from this "
+        "workspace — you cannot observe that, and a run has already delivered such a claim "
+        "to a real recipient when it was false. If you cannot complete something, say what "
+        "YOU were unable to do, never what the system lacks."
     )
 
 
@@ -706,6 +804,9 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx, with_files=False)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03): '' unless this workflow binds an external action, so
+        # every other run's prompt here is byte-identical.
+        + _wired_services_block(ctx)
         + _retry_suffix(ctx)
     )
     # F8 (092-07): first phase → the user's kickoff question; later phases → prior
@@ -782,6 +883,8 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03) — see llm_single. Same '' arm, same byte-identity.
+        + _wired_services_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -879,6 +982,11 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03) — ⚠ A FOURTH SITE, and the comment eight lines above is
+        # the reason: `llm_batch_agents` carries the same `available_tools` as the single
+        # agent, so a fix on the single-agent path alone would leave every parallel branch
+        # free to invent the same false capability refusal. Same '' arm, same byte-identity.
+        + _wired_services_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -1382,7 +1490,15 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
         # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
         # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
-        system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+        # 214.1-03 (BUG-260828-03): ⚠ THE EASIEST SITE TO MISS — this one composed only
+        # _skill_block + _retry_suffix, and the bug's own `write-summary` step is exactly
+        # this class. '' unless the workflow binds an external action.
+        system_prompt = (
+            phase.config.prompt
+            + _skill_block(phase, ctx, with_files=False)
+            + _wired_services_block(ctx)
+            + _retry_suffix(ctx)
+        )
         user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
         # 101.1-06: spotlight the retrieved evidence as <doc id=…> blocks so the model has
         # REAL source ids to cite; the SAME walk yields the gate's valid set below — one id
