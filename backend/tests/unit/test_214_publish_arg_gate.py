@@ -719,3 +719,480 @@ def test_a_non_external_action_definition_lints_exactly_as_before():
     clean = _definition(_llm_phase(0, "draft"), _llm_phase(1, "review", name="Review it"))
     assert _lint(clean) == []
     assert _lint(clean, tool_schemas={}) == []
+
+
+# ══ 5 · THE PUBLISH PATH — the block, the short circuit, and the provenance ══
+
+_DEF_ID = uuid4()
+_USER = {"id": str(uuid4())}
+_ORG = "4c8b2e10-7d31-4f6a-9b25-1e0a7c3d8f42"
+
+_SNAPSHOT = [
+    {
+        "name": "read_wiki",
+        "inputSchema": {
+            "type": "object",
+            "required": ["repo"],
+            "properties": {"repo": {"type": "string"}},
+        },
+    }
+]
+
+
+def _row(definition_dict) -> dict:
+    return {
+        "id": _DEF_ID,
+        "slug": definition_dict["slug"],
+        "version": definition_dict["version"],
+        "name": definition_dict["name"],
+        "status": "draft",
+        "definition": definition_dict,
+        "created_by": _USER["id"],
+    }
+
+
+def _publish(
+    pool, definition_dict, *, phase_rows=None, snapshot=_SNAPSHOT, extra=None, runner=None
+):
+    """Drive the REAL gauntlet over `definition_dict`, faking only DB edges + the two
+    expensive boundaries — the posture `test_publish_service.py` documents.
+
+    ⚠ NOTHING HERE TOUCHES POSTGRES: `pool` is the shipped recording stand-in and every read
+    is patched. `_drive_golden_run` and `_judge_golden_output` are AsyncMocks, so no model is
+    called by construction; the no-send case below proves the ABSENCE of egress independently,
+    through the shipped fence, rather than trusting this sentence.
+
+    ⚠ `runner` EXISTS FOR EXACTLY ONE CALLER, AND ITS REASON IS MEASURED. `_block_all_http`
+    patches `socket.socket.connect`, and on Windows `asyncio.run` builds a proactor loop whose
+    SELF-PIPE calls exactly that — so the fence intercepts the harness rather than the code
+    under test:
+
+        socket.socket.connect was called - outbound egress attempted
+          ... asyncio/proactor_events.py:787 in _make_self_pipe
+
+    That is the ordering hazard the fence's own docstring warns about ("anything the
+    surrounding test harness builds BEFORE this call is already constructed"). The no-send case
+    therefore builds its loop first and passes `loop.run_until_complete` here.
+    """
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.harness import publish_service
+
+    run_id = uuid4()
+    pool.set_fetchval_result(_ORG)
+    pool.set_fetch_result(list(phase_rows or []))
+
+    drive = AsyncMock(return_value=(run_id, {}, "completed"))
+    patches = [
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=_row(definition_dict))),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+        patch("app.db.workflows.load_run_phases",
+              AsyncMock(return_value=list(phase_rows or []))),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch.object(publish_service, "_drive_golden_run", drive),
+        patch.object(
+            publish_service, "_judge_golden_output",
+            AsyncMock(return_value={"overall_passed": True, "overall_score": 99,
+                                    "summary": "ok", "criteria": []}),
+        ),
+        patch(
+            "app.services.connector_service.resolve_connection",
+            AsyncMock(return_value=SimpleNamespace(discovered_tools=snapshot)),
+        ),
+    ]
+    if extra:
+        patches.extend(extra)
+
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        result = (runner or asyncio.run)(
+            publish_service.publish(
+                definition_id=_DEF_ID,
+                golden_input="the Acme renewal is due on 12 September",
+                user=_USER,
+                pool=pool,
+                redis=None,
+            )
+        )
+    return SimpleNamespace(result=result, run_id=run_id, drive=drive)
+
+
+def test_a_refusal_short_circuits_before_the_golden_run(mock_asyncpg_pool):
+    """D-214-10 — THE OBSERVABLE FORM OF "no model call, no wall-clock" (T-214-05-03).
+
+    `golden_run_id is None` is not bookkeeping: it is the proof that stage 2 returned before
+    `create_workflow_run` ever ran. A gate that refused AFTER the golden run would have spent a
+    real provider call to tell an author their recipient field is empty — which is exactly what
+    `BUG-260826-02` describes happening today, only without the refusal at the end of it.
+    """
+    run = _publish(mock_asyncpg_pool, _definition(_email_phase()))
+
+    assert run.result["published"] is False
+    assert run.result["blocked_stage"] == "lint"
+    assert run.result["golden_run_id"] is None
+    run.drive.assert_not_called()
+
+    codes = [f["code"] for f in run.result["named_failures"]]
+    assert codes == ["no_source", "no_source"], codes
+
+
+def test_the_named_failures_payload_is_the_wire_contract_plan_214_10_reads(mock_asyncpg_pool):
+    """The exact key set, and the exact values. Plan `214-10` composes its sentence from this."""
+    run = _publish(
+        mock_asyncpg_pool,
+        _definition(
+            _email_phase(
+                name="Email the customer",
+                slug="notify-abc123",
+                tool_args={"subject": "Your renewal is due"},
+                arg_sources={"to": {"source": "ask", "ask_key": "who"}},
+            )
+        ),
+    )
+
+    entries = run.result["named_failures"]
+    assert len(entries) == 1, entries
+    entry = entries[0]
+    assert set(entry) == {"code", "phase", "message", "step_name", "argument", "upstream"}
+    assert entry["code"] == "ask_undeclared"
+    assert entry["phase"] == "notify-abc123"
+    assert entry["argument"] == "to"
+    assert entry["upstream"] is None
+    assert entry["step_name"] == "Email the customer", (
+        "sketch 215 #1: the refusal names the step in the AUTHOR'S own words"
+    )
+    assert "notify-abc123" not in entry["step_name"]
+
+
+def test_a_structural_lint_failure_keeps_its_shipped_three_key_payload(mock_asyncpg_pool):
+    """The five new keys are ADDITIVE and SCOPED. A structural refusal must look exactly as it
+    looked before this plan, or every consumer of the other four stages has to change.
+    """
+    bad = _definition(_llm_phase(0, "draft"), _llm_phase(0, "draft-again", name="Again"))
+    run = _publish(mock_asyncpg_pool, bad)
+
+    assert run.result["blocked_stage"] == "lint"
+    assert run.result["named_failures"]
+    for entry in run.result["named_failures"]:
+        assert entry["code"] not in {
+            "no_source", "ask_undeclared", "upstream_unreachable", "shape_unknown",
+            "unrenderable",
+        }
+        assert set(entry) == {"code", "phase", "message"}, (
+            f"a non-argument lint code grew keys: {sorted(entry)!r}"
+        )
+
+
+def test_the_publish_gate_always_supplies_a_map_and_never_the_none_sentinel(mock_asyncpg_pool):
+    """⛔ THE ENFORCING GATE NEVER SAYS "I DID NOT LOOK".
+
+    `tool_schemas=None` is `/validate`'s advisory arm. If publish ever passed it, an MCP step
+    with an unreadable connection would sail through — the fail-open direction T-214-05-01
+    exists to prevent, wearing the disguise of a default argument.
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import reachability
+
+    original = reachability.lint_workflow
+    seen: list = []
+
+    def _spy(definition, **kwargs):
+        seen.append(kwargs.get("tool_schemas", "ABSENT"))
+        return original(definition, **kwargs)
+
+    with patch.object(reachability, "lint_workflow", _spy):
+        _publish(mock_asyncpg_pool, _definition(_mcp_phase()))
+
+    assert seen, "the publish path did not call lint_workflow at all"
+    for supplied in seen:
+        assert supplied is not None and supplied != "ABSENT", (
+            f"publish passed the ADVISORY sentinel to the ENFORCING gate: {supplied!r}"
+        )
+        assert isinstance(supplied, dict)
+
+
+def test_an_unreadable_connection_refuses_rather_than_passes(mock_asyncpg_pool):
+    """T-214-05-01, driven through the real builder: the connection read RAISES (absent,
+    cross-org, disabled — `resolve_connection` collapses them all deliberately), so no schema
+    is knowable and the step is REFUSED. ⚠ The dangerous answer here is an empty list.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    run = _publish(
+        mock_asyncpg_pool,
+        _definition(_mcp_phase()),
+        extra=[
+            patch(
+                "app.services.connector_service.resolve_connection",
+                AsyncMock(side_effect=RuntimeError("connection is gone")),
+            )
+        ],
+    )
+
+    assert run.result["published"] is False
+    assert [f["code"] for f in run.result["named_failures"]] == ["shape_unknown"]
+    assert run.result["named_failures"][0]["argument"] is None
+
+
+def test_the_gate_and_the_executor_obtain_the_same_schema_for_one_bound_tool():
+    """⭐ 3b — THE PROVENANCE CASE. Neither side hand-typed, neither side patched.
+
+    This is the half `test_the_gate_and_the_resolver_agree_on_the_same_input` is structurally
+    incapable of covering: that one proves `f(s) == g(s)`, this one proves `s_gate == s_executor`.
+
+    The GATE's object comes from `publish_service._bound_tool_schemas`, the real production
+    builder, driven over a real definition with the connection read faked at the SERVICE — the
+    same resolver `phase_types` GATE 5 reaches the snapshot through. The EXECUTOR's object
+    comes from the expression GATE 6 evaluates, verbatim.
+
+    ⚠ A SOURCE FENCE RIDES ALONG, because equality today is not the property that has to hold —
+    SINGLE SOURCEHOOD is. The day `publish_service` extracts a schema for itself, these two can
+    start differing silently and this equality would keep passing right up until they did.
+    """
+    import ast
+    import asyncio
+    from pathlib import Path
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.models.harness import WorkflowDefinition
+    from app.services.connectors.args import schema_for_bound_tool
+    from app.services.harness import publish_service
+    from app.services.harness.reachability import _BODY_ARGUMENT_FOR_CAPABILITY
+
+    class _Pool:
+        async def fetchval(self, *a, **k):
+            return _ORG
+
+    definition = WorkflowDefinition.model_validate(_definition(_mcp_phase()))
+
+    with patch(
+        "app.services.connector_service.resolve_connection",
+        AsyncMock(return_value=SimpleNamespace(discovered_tools=_SNAPSHOT)),
+    ):
+        gate_map = asyncio.run(
+            publish_service._bound_tool_schemas(
+                definition, definition_id=_DEF_ID, pool=_Pool()
+            )
+        )
+
+    gate_schema = gate_map[_CONN]["read_wiki"]
+    executor_schema = schema_for_bound_tool(
+        capability=None, tool_name="read_wiki", discovered_tools=_SNAPSHOT
+    )
+    assert gate_schema == executor_schema, (
+        "the publish gate and the executor obtain DIFFERENT schemas for the same bound tool. "
+        "The gate would lint against one shape while the executor projects onto another, and "
+        f"the send would carry an argument object nobody reviewed: {gate_schema!r} != "
+        f"{executor_schema!r}"
+    )
+
+    # ── the NATIVE half, asserted BEHAVIOURALLY: the gate's refusal set for an unsupplied
+    #    send_email step is EXACTLY the accessor's required set minus the body argument the
+    #    executor auto-fills. That can only be true if the gate linted against that schema.
+    native = schema_for_bound_tool(
+        capability="send_email", tool_name=None, discovered_tools=None
+    )
+    expected = set(native["required"]) - {_BODY_ARGUMENT_FOR_CAPABILITY["send_email"]}
+    assert {e.argument for e in _lint(_definition(_email_phase()))} == expected
+
+    # ── the SOURCE fence, by AST rather than by grep.
+    tree = ast.parse(
+        Path(publish_service.__file__).read_text(encoding="utf-8"), publish_service.__file__
+    )
+    attrs = [n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)]
+    consts = [
+        n.slice.value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Subscript)
+        and isinstance(n.slice, ast.Constant)
+        and isinstance(n.slice.value, str)
+    ]
+    assert "INPUT_SCHEMA" not in attrs, (
+        "publish_service reads an adapter's frozen declaration directly — the ONE accessor is "
+        "`args.schema_for_bound_tool`, and a second read is how the gate's schema starts "
+        "differing from the executor's"
+    )
+    assert "inputSchema" not in consts, (
+        "publish_service extracts an inputSchema itself instead of going through the accessor"
+    )
+    # TEETH: the scan really does see this module's attributes and subscripts.
+    assert "config" in attrs and consts
+
+
+def test_the_golden_run_validates_what_it_resolved(mock_asyncpg_pool):
+    """D-214-11 — the check the STATIC gate cannot make: a VALUE.
+
+    The step is statically clean (`to` is `ask` and `who` IS declared in `inputs[]`), so it
+    reaches the golden run. The run then records an intent whose bag carries no `who` at all —
+    the launcher left the field blank — and the resolved object has no recipient. The static
+    gate could never have said this; the golden run just did, and it cost no model call.
+    """
+    phase = _email_phase(
+        tool_args={"subject": "Your renewal is due"},
+        arg_sources={"to": {"source": "ask", "ask_key": "who"},
+                     "subject": {"source": "fixed"}},
+    )
+    definition = _definition(
+        phase, inputs=[{"key": "who", "label": "Who to email", "type": "text"}]
+    )
+
+    rows = [
+        {
+            "id": uuid4(),
+            "slug": "notify",
+            "phase_index": 0,
+            "status": "recorded_not_sent",
+            "output": {
+                "text": "NOT SENT — recorded only.",
+                "recorded_intent": {
+                    "capability": "send_email",
+                    "inputs": {"content": "Your renewal is due on 12 September"},
+                },
+            },
+        }
+    ]
+
+    run = _publish(mock_asyncpg_pool, definition, phase_rows=rows)
+
+    assert run.result["published"] is False, (
+        f"the golden run's resolved object had no recipient and published anyway: {run.result!r}"
+    )
+    assert run.result["blocked_stage"] == "structural_gate"
+    assert run.result["golden_run_id"] == run.run_id, (
+        "the refusal must stay attributable to the run that really happened"
+    )
+    entry = run.result["named_failures"][0]
+    assert entry["code"] == "no_source"
+    assert entry["argument"] == "to"
+    assert entry["step_name"] == "Notify the customer"
+    assert "when the workflow actually ran" in entry["message"]
+
+    # ── THE POSITIVE CONTROL. The identical definition and the identical spine, with the
+    #    launcher's value present in the recorded bag, PUBLISHES. Without this half the case
+    #    above would also pass if the golden-run check refused everything.
+    rows[0]["output"]["recorded_intent"]["inputs"]["who"] = "customer@example.com"
+    ok = _publish(mock_asyncpg_pool, definition, phase_rows=rows)
+    assert ok.result["published"] is True, (
+        f"a fully resolved argument object was refused: {ok.result!r}"
+    )
+
+
+def test_the_golden_run_argument_check_reaches_no_adapter_send(monkeypatch, mock_asyncpg_pool):
+    """⭐ T-214-05-06 / D-16 — PUBLISHING STILL CANNOT FIRE A REAL EMAIL.
+
+    Driven through the SHIPPED no-egress fence (`test_189_no_egress._block_all_http`) rather
+    than a new mock: httpx sync + async, smtplib, urllib and `socket.socket.connect` all raise.
+    On top of that, every registered adapter's `send` is replaced by a raiser — so this fails
+    loudly whether the D-214-11 check reaches the WIRE or merely reaches an adapter that would.
+    """
+    import asyncio
+
+    from tests.unit.test_189_no_egress import _block_all_http
+
+    import app.services.harness.phase_types  # noqa: F401 — populates the adapter registry
+    from app.services.connectors import registry
+
+    reached: list = []
+
+    async def _never_send(*args, **kwargs):
+        reached.append(kwargs.get("capability"))
+        raise AssertionError("an adapter send() was reached during a PUBLISH — D-16 broken")
+
+    for capability in ("send_email", "create_ticket", "post_message"):
+        monkeypatch.setattr(
+            type(registry.get_adapter(capability)), "send", _never_send, raising=True
+        )
+
+    # ⚠ THE LOOP IS BUILT BEFORE THE FENCE. `_block_all_http` patches
+    # `socket.socket.connect` last, and a Windows proactor loop's self-pipe calls exactly
+    # that — measured, and it intercepted the harness rather than the code under test.
+    loop = asyncio.new_event_loop()
+    _block_all_http(monkeypatch)
+
+    rows = [
+        {
+            "id": uuid4(),
+            "slug": "notify",
+            "phase_index": 0,
+            "status": "recorded_not_sent",
+            "output": {
+                "recorded_intent": {
+                    "capability": "send_email",
+                    "inputs": {"to": "a@b.c", "subject": "hi", "content": "body text"},
+                }
+            },
+        }
+    ]
+    definition = _definition(
+        _email_phase(tool_args={"to": "a@b.c", "subject": "Your renewal is due"})
+    )
+
+    try:
+        run = _publish(
+            mock_asyncpg_pool, definition, phase_rows=rows, runner=loop.run_until_complete
+        )
+    finally:
+        loop.close()
+
+    assert run.result["published"] is True, run.result
+    assert reached == [], f"an adapter send() was reached: {reached!r}"
+
+
+def test_the_run_path_never_consults_the_publish_gate():
+    """D-214-12 — NOTHING IS RETROACTIVE. The gate binds the NEXT publish and is not consulted
+    on a run, so an already-published workflow with an unsatisfiable step keeps running (and
+    keeps failing at the send HONESTLY, which is STEP-05's job rather than this gate's).
+
+    Asserted by SOURCE over the run path, because the claim is an ABSENCE and the only honest
+    way to prove one is to look everywhere it could be. ⚠ Refusing to RUN a live row is exactly
+    what CONTEXT rejected — it un-runs live rows without warning.
+    """
+    import ast
+    from pathlib import Path
+
+    import app.api.runs as runs_api
+    import app.services.harness.phase_types as phase_types
+    import app.services.harness_engine as engine
+
+    for module in (engine, phase_types, runs_api):
+        tree = ast.parse(
+            Path(module.__file__).read_text(encoding="utf-8"), module.__file__
+        )
+        names = (
+            {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+            | {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+            | {
+                alias.name
+                for n in ast.walk(tree)
+                if isinstance(n, (ast.Import, ast.ImportFrom))
+                for alias in n.names
+            }
+        )
+        for gate in ("lint_workflow", "unsatisfiable_arguments"):
+            assert gate not in names, (
+                f"{module.__name__} references {gate!r} — the PUBLISH gate has reached the RUN "
+                "path, which would un-run every already-published workflow the gate would now "
+                "refuse (D-214-12)"
+            )
+
+    # TEETH — the same scan DOES find the executor's half of the shared predicate, so a typo in
+    # the walk cannot make this pass by finding nothing at all.
+    tree = ast.parse(
+        Path(phase_types.__file__).read_text(encoding="utf-8"), phase_types.__file__
+    )
+    found = {
+        alias.name
+        for n in ast.walk(tree)
+        if isinstance(n, ast.ImportFrom)
+        for alias in n.names
+    }
+    assert {"resolve_arguments", "schema_for_bound_tool"} <= found, (
+        f"the scan found neither half of the executor's argument path: {sorted(found)!r}"
+    )
