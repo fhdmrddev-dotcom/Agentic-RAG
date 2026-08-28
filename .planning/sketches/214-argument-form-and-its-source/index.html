@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 214 — the argument form and its source</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 46px; }
+
+  /* ── variant chrome ─────────────────────────────────────────────────────────── */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 6px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brandline {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim);
+    margin-right: 10px; letter-spacing: .04em;
+  }
+  .variant-tab {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .variant-tab.active {
+    background: var(--color-primary-dim); border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+  .variant { display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .variant.active { display: block; }
+
+  .sheet { padding: 22px 26px 70px; max-width: 1560px; margin: 0 auto; }
+  .sheet > h2 {
+    font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .sheet > .lede {
+    font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; max-width: 78ch;
+  }
+  .note {
+    font-size: var(--text-xs); color: var(--color-text-dim); margin: 14px 0 0; max-width: 82ch;
+    line-height: 1.6;
+  }
+  .note b { color: var(--color-text-muted); font-weight: 600; }
+
+  /* ── the builder frame: canvas + push panel ─────────────────────────────────── */
+  .builder {
+    display: grid; gap: 0; border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden; background: var(--color-bg-elev1);
+    height: 640px; box-shadow: var(--shadow-lg);
+  }
+  .builder.rail400  { grid-template-columns: minmax(0,1fr) 400px; }
+  .builder.wide     { grid-template-columns: minmax(0,1fr) clamp(480px, 38%, 640px); }
+
+  .canvas {
+    position: relative; background:
+      radial-gradient(circle at 1px 1px, hsl(220 20% 18%) 1px, transparent 0) 0 0/22px 22px,
+      var(--color-bg);
+    padding: 26px; overflow: hidden;
+  }
+  .canvas-hint {
+    position: absolute; bottom: 12px; left: 14px; font-size: 10px;
+    color: var(--color-text-dim); font-family: var(--font-mono);
+  }
+
+  /* canvas nodes — the shipped PhaseNodeCard shape, reduced */
+  .node {
+    width: 246px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); padding: 9px 11px; margin-bottom: 10px;
+    display: flex; gap: 9px; align-items: flex-start; cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .node:hover { border-color: var(--color-primary); }
+  .node.selected {
+    border-color: var(--color-primary); box-shadow: var(--shadow-glow-primary);
+    background: var(--color-surface-hi);
+  }
+  .node.blocked { border-color: var(--color-warning); }
+  .node .well {
+    width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
+    background: var(--color-muted); display: grid; place-items: center;
+  }
+  .node .nname { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .node .nsub {
+    font-size: 10.5px; color: var(--color-text-muted); margin-top: 1px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .edge { width: 2px; height: 16px; background: var(--color-border); margin: 0 0 10px 24px; }
+
+  /* ── the panel ──────────────────────────────────────────────────────────────── */
+  .panel {
+    border-left: 1px solid var(--color-border); background: var(--color-bg-elev1);
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  }
+  .panel-head {
+    padding: 11px 13px; border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-head .ptitle { font-size: 12.5px; font-weight: 600; flex: 1; min-width: 0; }
+  .panel-head .pclose {
+    background: transparent; border: 0; color: var(--color-text-dim); cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 2px 4px;
+  }
+  .panel-body { overflow-y: auto; padding: 12px 13px 30px; min-width: 0; }
+  .panel-track {
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim);
+    padding: 4px 13px; border-top: 1px solid var(--color-border);
+    background: var(--color-bg); letter-spacing: .03em;
+  }
+
+  /* ── the shipped ExternalActionSection frame (SECTION_CLASSES, reduced) ─────── */
+  .xsection {
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    background: hsl(220 30% 11% / 0.4); padding: 8px 10px; margin-bottom: 12px;
+  }
+  .xsection > h3 { font-size: 11px; font-weight: 500; margin: 0 0 8px; }
+
+  .connrow {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    background: var(--color-surface); font-size: 11.5px;
+  }
+  .connrow .cname { font-weight: 600; }
+  .connrow .caction { color: var(--color-text-muted); }
+  .connrow .cchange {
+    margin-left: auto; font-size: 10.5px; color: var(--color-primary);
+    background: none; border: 0; cursor: pointer; padding: 2px 4px;
+  }
+  .connrow .cchange:hover { text-decoration: underline; }
+
+  /* ── the argument form ──────────────────────────────────────────────────────── */
+  .args { margin-top: 12px; }
+  .args-head {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+  }
+  .args-head h4 { font-size: 11px; font-weight: 500; margin: 0; }
+  .args-head .identity {
+    font-size: 10.5px; color: var(--color-text-muted); display: flex; align-items: center; gap: 5px;
+  }
+
+  .arow {
+    /* ⚠ THE GUTTER LANE IS ALWAYS RESERVED — see the 213 precedent. Without it the row
+       shifts when a source is chosen, a jitter no test catches and every eye does. */
+    display: grid; grid-template-columns: 0 minmax(0,1fr); gap: 0 10px;
+    padding: 9px 0; border-top: 1px solid var(--color-border-soft);
+    transition: grid-template-columns var(--dur-base) var(--ease-out);
+  }
+  .arow:first-of-type { border-top: 0; }
+  .gutter-on .arow { grid-template-columns: 118px minmax(0,1fr); }
+
+  .agutter {
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    font-size: 10.5px; color: var(--color-text-muted); padding-top: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .agutter .glyph { flex: none; opacity: .8; }
+  .arow[data-source="none"] .agutter { color: var(--color-warning); }
+
+  .alabel {
+    display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; flex-wrap: wrap;
+  }
+  .alabel .aname { font-size: 11.5px; font-weight: 600; font-family: var(--font-mono); }
+  .alabel .areq {
+    font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--color-text-dim);
+  }
+  .arow[data-required="yes"][data-source="none"] .areq { color: var(--color-warning); }
+  .alabel .adesc {
+    flex-basis: 100%; font-size: 10.5px; color: var(--color-text-dim); line-height: 1.45;
+  }
+
+  /* the inline source control — variant C puts it here, on the label row */
+  .asource-inline { margin-left: auto; }
+
+  .srcpick { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-full); overflow: hidden; }
+  .srcpick button {
+    font: inherit; font-size: 10px; padding: 2px 8px; border: 0; cursor: pointer;
+    background: transparent; color: var(--color-text-muted);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .srcpick button + button { border-left: 1px solid var(--color-border); }
+  .srcpick button:hover { color: var(--color-text); background: var(--color-muted); }
+  .srcpick button[aria-pressed="true"] {
+    background: var(--color-primary-dim); color: var(--color-primary); font-weight: 600;
+  }
+
+  .srcgroup-label {
+    font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--color-text-dim); margin: 6px 0 4px;
+  }
+
+  .field {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); color: var(--color-text); font: inherit;
+    font-size: 11.5px; padding: 6px 8px; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .field:focus { outline: 0; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-dim); }
+  .field::placeholder { color: var(--color-text-dim); }
+  select.field { cursor: pointer; }
+
+  /* the upstream binding, rendered as a CHIP inside the field's own slot —
+     Stitch's find, kept: it says "this comes from there" with no label at all. */
+  .bindslot {
+    background: var(--color-bg); border: 1px dashed var(--color-primary);
+    border-radius: var(--radius-sm); padding: 5px 7px; display: flex; align-items: center;
+    gap: 7px; flex-wrap: wrap;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px;
+    background: var(--color-primary-dim); color: var(--color-primary);
+    border: 1px solid var(--color-primary); border-radius: var(--radius-full);
+    padding: 1px 9px 1px 6px; font-weight: 600;
+  }
+  .bindslot .rest { font-size: 10.5px; color: var(--color-text-dim); }
+
+  .askslot {
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm); padding: 6px 8px;
+  }
+  .askslot input { width: 100%; background: transparent; border: 0; color: var(--color-text); font: inherit; font-size: 11.5px; }
+  .askslot input:focus { outline: 0; }
+  .askhint { font-size: 10px; color: var(--color-text-dim); margin-top: 3px; }
+
+  .presetnote {
+    font-size: 10px; color: var(--color-text-dim); margin-top: 4px;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* the states that are not a filled field */
+  .stateline {
+    font-size: 10.5px; line-height: 1.5; border-radius: var(--radius-sm);
+    padding: 6px 8px; display: flex; gap: 7px; align-items: flex-start;
+  }
+  .stateline.warn { background: var(--color-warning-dim); color: var(--color-warning); }
+  .stateline.dim  { background: var(--color-muted); color: var(--color-text-muted); }
+  .stateline .sx { font-size: 10.5px; }
+  .stateline button {
+    font: inherit; font-size: 10px; margin-left: auto; flex: none; cursor: pointer;
+    background: transparent; border: 1px solid currentColor; color: inherit;
+    border-radius: var(--radius-full); padding: 1px 8px; opacity: .85;
+  }
+  .stateline button:hover { opacity: 1; }
+
+  /* ── comparison + states sections ───────────────────────────────────────────── */
+  .sidebyside { display: grid; grid-template-columns: 400px minmax(0,1fr); gap: 20px; align-items: start; }
+  .sbs-col > h3 {
+    font-size: 12px; margin: 0 0 6px; font-family: var(--font-mono);
+    color: var(--color-text-muted); font-weight: 500;
+  }
+  .sbs-col .panel {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    height: 560px; background: var(--color-bg-elev1);
+  }
+  .sbs-col.wide .panel { max-width: 640px; }
+
+  .statecard {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg-elev1); padding: 14px; margin-bottom: 14px; max-width: 640px;
+  }
+  .statecard > h3 { font-size: 12px; margin: 0 0 2px; }
+  .statecard > .why { font-size: 10.5px; color: var(--color-text-dim); margin: 0 0 10px; line-height: 1.5; }
+
+  /* ── toolbar ────────────────────────────────────────────────────────────────── */
+  #sketch-tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 7px 10px;
+    border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px;
+    align-items: center;
+  }
+  #sketch-tools select, #sketch-tools button {
+    font: inherit; font-size: 11px; background: #1b1b1b; color: #fff;
+    border: 1px solid #444; border-radius: 5px; padding: 2px 6px; cursor: pointer;
+  }
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-muted);
+    border: 1px solid var(--color-border); border-radius: 4px; padding: 0 4px;
+    color: var(--color-text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brandline">SKETCH 214 · argument form + its source</span>
+  <button class="variant-tab active" data-v="a">A · 400px rail (shipped)</button>
+  <button class="variant-tab" data-v="b">B · wide + source gutter</button>
+  <button class="variant-tab" data-v="c">C · wide + inline source</button>
+  <button class="variant-tab" data-v="cmp">§4 both widths, same step</button>
+  <button class="variant-tab" data-v="states">§5 the four hard states</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     VARIANT A — the SHIPPED 400px rail. WorkflowBuilderPage.tsx:2817 ships
+     `minmax(0,1fr) 400px` today. This is the path of least resistance: it changes
+     no width and touches no pinned assertion.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-a" class="variant active">
+<div class="sheet">
+  <h2 data-anno>A · The argument form inside the shipped 400px rail</h2>
+  <p class="lede" data-anno>
+    No width change, no pin to update. The source control sits under each label because there is
+    no room beside it. Watch what happens to the <span class="kbd">body</span> row's chip and to
+    the two-line descriptions.
+  </p>
+
+  <div class="builder rail400">
+    <div class="canvas">
+      <div class="node">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(239 100% 82%)" stroke-width="2" stroke-linecap="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+        </div>
+        <div>
+          <div class="nname">Draft the summary</div>
+          <div class="nsub">Write with the model</div>
+        </div>
+      </div>
+      <div class="edge"></div>
+      <div class="node selected">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        </div>
+        <div>
+          <div class="nname">Email the weekly summary</div>
+          <div class="nsub">Send an email · Aether Mail</div>
+        </div>
+      </div>
+      <div class="canvas-hint" data-anno>canvas — read-only while the panel is open</div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <span class="ptitle">Email the weekly summary</span>
+        <button class="pclose" title="">✕</button>
+      </div>
+      <div class="panel-body">
+
+        <!-- the SHIPPED ExternalActionSection: one question, then one question -->
+        <section class="xsection" data-section="external-action" data-shape="capability">
+          <h3 data-anno>Reaching outside this app</h3>
+          <div class="connrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+            <span class="cname">Aether Mail</span>
+            <span class="caction">· Send an email</span>
+            <button class="cchange">Change</button>
+          </div>
+        </section>
+
+        <!-- ⭐ THE NEW SURFACE — the arguments. No JSON anywhere. -->
+        <div class="args">
+          <div class="args-head">
+            <h4>What this step sends</h4>
+          </div>
+
+          <!-- to · Set here -->
+          <div class="arow" data-arg="to" data-required="yes" data-source="fixed">
+            <div class="agutter"><span class="glyph">✎</span><span>You set this</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">to</span><span class="areq">Required</span>
+                <span class="adesc">A single recipient address, local@domain. Exactly one.</span>
+              </div>
+              <div class="srcgroup-label">Where this comes from</div>
+              <div class="srcpick" role="group" aria-label="Where this comes from">
+                <button aria-pressed="true">Set here</button>
+                <button aria-pressed="false">Asked when this runs</button>
+                <button aria-pressed="false">From an earlier step</button>
+              </div>
+              <div style="margin-top:6px"><input class="field" value="procurement@aether.ai"></div>
+            </div>
+          </div>
+
+          <!-- subject · Asked when this runs -->
+          <div class="arow" data-arg="subject" data-required="yes" data-source="ask">
+            <div class="agutter"><span class="glyph">?</span><span>Asked for as “subject”</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">subject</span><span class="areq">Required</span>
+                <span class="adesc">The subject line. Plain text; a line break is refused.</span>
+              </div>
+              <div class="srcgroup-label">Where this comes from</div>
+              <div class="srcpick" role="group" aria-label="Where this comes from">
+                <button aria-pressed="false">Set here</button>
+                <button aria-pressed="true">Asked when this runs</button>
+                <button aria-pressed="false">From an earlier step</button>
+              </div>
+              <div class="askslot" style="margin-top:6px">
+                <div class="askhint" style="margin:0 0 2px">Ask for it as</div>
+                <input value="subject" aria-label="Ask for it as">
+              </div>
+              <div class="askhint">This becomes a field on every way of starting this workflow.</div>
+            </div>
+          </div>
+
+          <!-- body · From an earlier step, PRE-SET (D-214-03) -->
+          <div class="arow" data-arg="body" data-required="yes" data-source="upstream">
+            <div class="agutter"><span class="glyph">↳</span><span>Whatever “Draft the summary” produced</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">body</span><span class="areq">Required</span>
+                <span class="adesc">The plain-text message body.</span>
+              </div>
+              <div class="srcgroup-label">Where this comes from</div>
+              <div class="srcpick" role="group" aria-label="Where this comes from">
+                <button aria-pressed="false">Set here</button>
+                <button aria-pressed="false">Asked when this runs</button>
+                <button aria-pressed="true">From an earlier step</button>
+              </div>
+              <div class="bindslot" style="margin-top:6px">
+                <span class="chip">↳ Draft the summary</span>
+              </div>
+              <div class="presetnote"><span>✦</span><span>Set for you — change it if that is not what you meant.</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="panel-track" data-anno>panel track — 400px (WorkflowBuilderPage.tsx:2817)</div>
+    </aside>
+  </div>
+
+  <p class="note" data-anno>
+    <b>What to look at.</b> Three rows cost <b>three stacked source pickers</b>, and each one repeats
+    the same three words. The gutter reading is present in the DOM but there is nowhere to put it, so
+    it is drawn above the label instead of beside it — which is the reading you cannot scan down a
+    column. ⚠ <b>The shipped 400px is not a neutral default here:</b> the form it was sized for is
+    <b>D-27's 3–5 field form</b>, and a field-per-argument form is a different object.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     VARIANT B — wide + Stitch's source gutter hoisted into a left column.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-b" class="variant">
+<div class="sheet">
+  <h2 data-anno>B · Wide panel, and the source is a spine you read down</h2>
+  <p class="lede" data-anno>
+    <span class="kbd">clamp(480px, 38%, 640px)</span> — the same track Settings ships since Phase 213
+    (<span class="kbd">ConnectionsTab.tsx:387</span>), so this is a house pattern rather than a bigger
+    magic number. Stitch's <span class="kbd">03</span> found the gutter; this keeps it.
+  </p>
+
+  <div class="builder wide">
+    <div class="canvas">
+      <div class="node">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(239 100% 82%)" stroke-width="2" stroke-linecap="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+        </div>
+        <div><div class="nname">Draft the summary</div><div class="nsub">Write with the model</div></div>
+      </div>
+      <div class="edge"></div>
+      <div class="node selected">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        </div>
+        <div><div class="nname">Email the weekly summary</div><div class="nsub">Send an email · Aether Mail</div></div>
+      </div>
+      <div class="canvas-hint" data-anno>canvas — read-only while the panel is open</div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <span class="ptitle">Email the weekly summary</span>
+        <button class="pclose">✕</button>
+      </div>
+      <div class="panel-body gutter-on">
+
+        <section class="xsection" data-section="external-action" data-shape="capability">
+          <h3 data-anno>Reaching outside this app</h3>
+          <div class="connrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+            <span class="cname">Aether Mail</span>
+            <span class="caction">· Send an email</span>
+            <button class="cchange">Change</button>
+          </div>
+        </section>
+
+        <div class="args">
+          <div class="args-head">
+            <h4>What this step sends</h4>
+            <span class="identity">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+              Send an email · Aether Mail
+            </span>
+          </div>
+
+          <div class="arow" data-arg="to" data-required="yes" data-source="fixed">
+            <div class="agutter"><span class="glyph">✎</span><span>You set this</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">to</span><span class="areq">Required</span>
+                <span class="adesc">A single recipient address, local@domain. Exactly one.</span>
+              </div>
+              <input class="field" value="procurement@aether.ai">
+              <div class="srcpick" style="margin-top:6px" role="group" aria-label="Where this comes from">
+                <button aria-pressed="true">Set here</button>
+                <button aria-pressed="false">Asked when this runs</button>
+                <button aria-pressed="false">From an earlier step</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="arow" data-arg="subject" data-required="yes" data-source="ask">
+            <div class="agutter"><span class="glyph">?</span><span>Asked for as “subject”</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">subject</span><span class="areq">Required</span>
+                <span class="adesc">The subject line. Plain text; a line break is refused.</span>
+              </div>
+              <div class="askslot">
+                <div class="askhint" style="margin:0 0 2px">Ask for it as</div>
+                <input value="subject" aria-label="Ask for it as">
+              </div>
+              <div class="askhint">This becomes a field on every way of starting this workflow.</div>
+              <div class="srcpick" style="margin-top:6px" role="group" aria-label="Where this comes from">
+                <button aria-pressed="false">Set here</button>
+                <button aria-pressed="true">Asked when this runs</button>
+                <button aria-pressed="false">From an earlier step</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="arow" data-arg="body" data-required="yes" data-source="upstream">
+            <div class="agutter"><span class="glyph">↳</span><span>Whatever “Draft the summary” produced</span></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">body</span><span class="areq">Required</span>
+                <span class="adesc">The plain-text message body.</span>
+              </div>
+              <div class="bindslot">
+                <span class="chip">↳ Draft the summary</span>
+                <span class="rest">Which earlier step</span>
+                <select class="field" style="max-width:220px" aria-label="Which earlier step">
+                  <option>— choose an earlier step —</option>
+                  <option selected>Draft the summary</option>
+                  <option>Score the sentiment</option>
+                </select>
+              </div>
+              <div class="presetnote"><span>✦</span><span>Set for you — change it if that is not what you meant.</span></div>
+              <div class="srcpick" style="margin-top:6px" role="group" aria-label="Where this comes from">
+                <button aria-pressed="false">Set here</button>
+                <button aria-pressed="false">Asked when this runs</button>
+                <button aria-pressed="true">From an earlier step</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="panel-track" data-anno>panel track — clamp(480px, 38%, 640px) · the Phase 213 house pattern</div>
+    </aside>
+  </div>
+
+  <p class="note" data-anno>
+    <b>What to look at.</b> The gutter is the whole argument for this variant: <b>three source
+    readings in one column</b>, so “where does each of these come from?” is answered by looking down,
+    not by reading three controls. The cost is honest — the gutter takes 118px, and the canvas gives
+    up ~120px to the panel. ⚠ <b>Whether the canvas can afford that is the fork</b>, and §4 puts both
+    on one screen so it can be judged rather than argued.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     VARIANT C — wide, no gutter column; the source control moves ONTO the label row.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-c" class="variant">
+<div class="sheet">
+  <h2 data-anno>C · Wide panel, source control on the label row, no gutter column</h2>
+  <p class="lede" data-anno>
+    Recovers the gutter's 118px. The three arms sit at the end of the label, and the chosen arm
+    <em>is</em> the reading — so there is one control instead of a control plus a restatement of it.
+  </p>
+
+  <div class="builder wide">
+    <div class="canvas">
+      <div class="node">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(239 100% 82%)" stroke-width="2" stroke-linecap="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+        </div>
+        <div><div class="nname">Draft the summary</div><div class="nsub">Write with the model</div></div>
+      </div>
+      <div class="edge"></div>
+      <div class="node selected">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        </div>
+        <div><div class="nname">Email the weekly summary</div><div class="nsub">Send an email · Aether Mail</div></div>
+      </div>
+      <div class="canvas-hint" data-anno>canvas — read-only while the panel is open</div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <span class="ptitle">Email the weekly summary</span>
+        <button class="pclose">✕</button>
+      </div>
+      <div class="panel-body">
+
+        <section class="xsection" data-section="external-action" data-shape="capability">
+          <h3 data-anno>Reaching outside this app</h3>
+          <div class="connrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+            <span class="cname">Aether Mail</span>
+            <span class="caction">· Send an email</span>
+            <button class="cchange">Change</button>
+          </div>
+        </section>
+
+        <div class="args" id="c-args">
+          <div class="args-head">
+            <h4>What this step sends</h4>
+            <span class="identity">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+              Send an email · Aether Mail
+            </span>
+          </div>
+
+          <div class="arow" data-arg="to" data-required="yes" data-source="fixed">
+            <div class="agutter"></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">to</span><span class="areq">Required</span>
+                <span class="asource-inline">
+                  <span class="srcpick" role="group" aria-label="Where this comes from">
+                    <button aria-pressed="true">Set here</button>
+                    <button aria-pressed="false">Asked when this runs</button>
+                    <button aria-pressed="false">From an earlier step</button>
+                  </span>
+                </span>
+                <span class="adesc">A single recipient address, local@domain. Exactly one.</span>
+              </div>
+              <div class="aslot"><input class="field" value="procurement@aether.ai"></div>
+            </div>
+          </div>
+
+          <div class="arow" data-arg="subject" data-required="yes" data-source="ask">
+            <div class="agutter"></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">subject</span><span class="areq">Required</span>
+                <span class="asource-inline">
+                  <span class="srcpick" role="group" aria-label="Where this comes from">
+                    <button aria-pressed="false">Set here</button>
+                    <button aria-pressed="true">Asked when this runs</button>
+                    <button aria-pressed="false">From an earlier step</button>
+                  </span>
+                </span>
+                <span class="adesc">The subject line. Plain text; a line break is refused.</span>
+              </div>
+              <div class="aslot">
+                <div class="askslot">
+                  <div class="askhint" style="margin:0 0 2px">Ask for it as</div>
+                  <input value="subject" aria-label="Ask for it as">
+                </div>
+                <div class="askhint">This becomes a field on every way of starting this workflow.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="arow" data-arg="body" data-required="yes" data-source="upstream">
+            <div class="agutter"></div>
+            <div>
+              <div class="alabel">
+                <span class="aname">body</span><span class="areq">Required</span>
+                <span class="asource-inline">
+                  <span class="srcpick" role="group" aria-label="Where this comes from">
+                    <button aria-pressed="false">Set here</button>
+                    <button aria-pressed="false">Asked when this runs</button>
+                    <button aria-pressed="true">From an earlier step</button>
+                  </span>
+                </span>
+                <span class="adesc">The plain-text message body.</span>
+              </div>
+              <div class="aslot">
+                <div class="bindslot">
+                  <span class="chip">↳ Draft the summary</span>
+                </div>
+                <div class="presetnote"><span>✦</span><span>Set for you — change it if that is not what you meant.</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <p class="note" data-anno style="margin-top:16px">
+          Every control here is live — press an arm and the slot below changes shape.
+        </p>
+      </div>
+      <div class="panel-track" data-anno>panel track — clamp(480px, 38%, 640px) · no gutter column</div>
+    </aside>
+  </div>
+
+  <p class="note" data-anno>
+    <b>What to look at.</b> One control per row instead of a control <em>and</em> a reading, and the
+    canvas keeps the gutter's 118px. ⚠ <b>The thing C gives up is the scan</b> — with the source only
+    ever shown as a pressed arm, “which of these are asked at launch?” is answered by reading three
+    controls rather than one column. B and C trade exactly that.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §4 — BOTH WIDTHS, SAME STEP, SAME CONTENT. The fork judged by looking.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-cmp" class="variant">
+<div class="sheet">
+  <h2 data-anno>§4 · Both widths, same step, same content</h2>
+  <p class="lede" data-anno>
+    Identical arguments, identical copy. The only difference is the track. ⚠ The operator's standing
+    objection from Phases 212 and 213 is about the <em>narrow</em> rail, and this is the first time
+    the two have been put beside each other on the surface the objection is about.
+  </p>
+
+  <div class="sidebyside">
+    <div class="sbs-col">
+      <h3 data-anno>400px — shipped today</h3>
+      <aside class="panel">
+        <div class="panel-head"><span class="ptitle">Email the weekly summary</span><button class="pclose">✕</button></div>
+        <div class="panel-body">
+          <div class="args">
+            <div class="arow" data-arg="to" data-required="yes" data-source="fixed">
+              <div class="agutter"></div>
+              <div>
+                <div class="alabel"><span class="aname">to</span><span class="areq">Required</span>
+                  <span class="adesc">A single recipient address, local@domain. Exactly one.</span></div>
+                <div class="srcpick" role="group" aria-label="Where this comes from">
+                  <button aria-pressed="true">Set here</button><button aria-pressed="false">Asked when this runs</button><button aria-pressed="false">From an earlier step</button>
+                </div>
+                <div style="margin-top:6px"><input class="field" value="procurement@aether.ai"></div>
+              </div>
+            </div>
+            <div class="arow" data-arg="subject" data-required="yes" data-source="ask">
+              <div class="agutter"></div>
+              <div>
+                <div class="alabel"><span class="aname">subject</span><span class="areq">Required</span>
+                  <span class="adesc">The subject line. Plain text; a line break is refused.</span></div>
+                <div class="srcpick" role="group" aria-label="Where this comes from">
+                  <button aria-pressed="false">Set here</button><button aria-pressed="true">Asked when this runs</button><button aria-pressed="false">From an earlier step</button>
+                </div>
+                <div class="askslot" style="margin-top:6px"><input value="subject" aria-label="Ask for it as"></div>
+              </div>
+            </div>
+            <div class="arow" data-arg="body" data-required="yes" data-source="upstream">
+              <div class="agutter"></div>
+              <div>
+                <div class="alabel"><span class="aname">body</span><span class="areq">Required</span>
+                  <span class="adesc">The plain-text message body.</span></div>
+                <div class="srcpick" role="group" aria-label="Where this comes from">
+                  <button aria-pressed="false">Set here</button><button aria-pressed="false">Asked when this runs</button><button aria-pressed="true">From an earlier step</button>
+                </div>
+                <div class="bindslot" style="margin-top:6px"><span class="chip">↳ Draft the summary</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-track" data-anno>400px</div>
+      </aside>
+    </div>
+
+    <div class="sbs-col wide">
+      <h3 data-anno>clamp(480px, 38%, 640px) — Settings' track since 213</h3>
+      <aside class="panel">
+        <div class="panel-head"><span class="ptitle">Email the weekly summary</span><button class="pclose">✕</button></div>
+        <div class="panel-body gutter-on">
+          <div class="args">
+            <div class="arow" data-arg="to" data-required="yes" data-source="fixed">
+              <div class="agutter"><span class="glyph">✎</span><span>You set this</span></div>
+              <div>
+                <div class="alabel"><span class="aname">to</span><span class="areq">Required</span>
+                  <span class="adesc">A single recipient address, local@domain. Exactly one.</span></div>
+                <input class="field" value="procurement@aether.ai">
+              </div>
+            </div>
+            <div class="arow" data-arg="subject" data-required="yes" data-source="ask">
+              <div class="agutter"><span class="glyph">?</span><span>Asked for as “subject”</span></div>
+              <div>
+                <div class="alabel"><span class="aname">subject</span><span class="areq">Required</span>
+                  <span class="adesc">The subject line. Plain text; a line break is refused.</span></div>
+                <div class="askslot"><input value="subject" aria-label="Ask for it as"></div>
+              </div>
+            </div>
+            <div class="arow" data-arg="body" data-required="yes" data-source="upstream">
+              <div class="agutter"><span class="glyph">↳</span><span>Whatever “Draft the summary” produced</span></div>
+              <div>
+                <div class="alabel"><span class="aname">body</span><span class="areq">Required</span>
+                  <span class="adesc">The plain-text message body.</span></div>
+                <div class="bindslot"><span class="chip">↳ Draft the summary</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-track" data-anno>clamp(480px, 38%, 640px)</div>
+      </aside>
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    ⚠ <b>What this comparison does NOT settle, and must not be read as settling.</b> The 400px column
+    here is drawn without the source gutter, because the gutter does not fit — that is the finding,
+    not a stacked deck. If the eye picks 400px, the consequence is that <b>the gutter is dropped</b>
+    and variant C's inline control is the shape, not B's.
+  </p>
+  <p class="note" data-anno>
+    <b>A pinned assertion is at stake either way.</b> Widening the builder panel touches
+    <span class="kbd">WorkflowBuilderPage.tsx:2817</span> and whatever pins it — the same shape as
+    Phase 213's <span class="kbd">ConnectionFormPanel.test.tsx:571</span>, which pinned 400px and had
+    to be updated in the same commit. <b>Name the pin in the plan; do not discover it in a red gate.</b>
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §5 — THE FOUR HARD STATES. These are the states no layout choice removes.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-states" class="variant">
+<div class="sheet">
+  <h2 data-anno>§5 · The four states that are not a filled field</h2>
+  <p class="lede" data-anno>
+    Each is a decision from <span class="kbd">214-CONTEXT.md</span> made visible. ⚠ <b>None of the
+    four contains a JSON box</b>, and that is the point — SC#1 forbids the surface, and “an advanced
+    escape hatch” is that surface under another name.
+  </p>
+
+  <!-- 1 · nothing supplies this yet -->
+  <div class="statecard">
+    <h3 data-anno>1 · A required argument with no source — what publish refuses (D-214-09)</h3>
+    <p class="why" data-anno>
+      Replaces Stitch's <span class="kbd">REQ</span> marker. The row does not label itself and leave
+      the reader to infer the problem; it names the problem.
+    </p>
+    <div class="args gutter-on">
+      <div class="arow" data-arg="description" data-required="yes" data-source="none">
+        <div class="agutter"><span class="glyph">!</span><span>Nothing supplies this yet</span></div>
+        <div>
+          <div class="alabel"><span class="aname">description</span><span class="areq">Required</span>
+            <span class="adesc">The issue description as plain text.</span></div>
+          <div class="stateline warn"><span class="sx">!</span><span>Nothing supplies this yet</span></div>
+          <div class="srcpick" style="margin-top:6px" role="group" aria-label="Where this comes from">
+            <button aria-pressed="false">Set here</button>
+            <button aria-pressed="false">Asked when this runs</button>
+            <button aria-pressed="false">From an earlier step</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 · unrenderable shape -->
+  <div class="statecard">
+    <h3 data-anno>2 · An argument this form cannot draw a field for (D-214-06)</h3>
+    <p class="why" data-anno>
+      <span class="kbd">push_files</span> on the GitHub MCP server takes <span class="kbd">files</span>
+      as a list of objects. It says so <b>in the author's terms and names itself</b>. Because it is
+      required, the step is unsatisfiable and publish refuses it — <b>and there is still no JSON box</b>.
+    </p>
+    <div class="args gutter-on">
+      <div class="arow" data-arg="files" data-required="yes" data-source="none">
+        <div class="agutter"><span class="glyph">!</span><span>Nothing supplies this yet</span></div>
+        <div>
+          <div class="alabel"><span class="aname">files</span><span class="areq">Required</span></div>
+          <div class="stateline warn">
+            <span class="sx">!</span>
+            <span>“files” is a list of items — this form cannot fill it in.<br>This action cannot be used here yet.</span>
+          </div>
+        </div>
+      </div>
+      <div class="arow" data-arg="signature" data-required="no" data-source="none">
+        <div class="agutter"><span class="glyph">·</span><span>Nothing supplies this yet</span></div>
+        <div>
+          <div class="alabel"><span class="aname">signature</span><span class="areq">Optional</span></div>
+          <div class="stateline dim">
+            <span class="sx">·</span>
+            <span>“signature” is a list of items — this form cannot fill it in.<br>This step can still run — it will be left out.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 · schema unknown -->
+  <div class="statecard">
+    <h3 data-anno>3 · A step bound to an action whose shape we do not have (D-214-07)</h3>
+    <p class="why" data-anno>
+      No fields are invented, no key/value rows, no JSON. ⚠ <b>“Unknown” and “satisfied” must not
+      look the same</b>, so publish refuses this too. The way out is the <b>shipped</b>
+      <span class="kbd">MCP_DISCOVER_BUTTON_LABEL</span>, character for character — two doors onto one
+      act must not acquire two names.
+    </p>
+    <div class="stateline dim">
+      <span class="sx">·</span>
+      <span>We do not know what this action needs.</span>
+      <button>Refresh actions</button>
+    </div>
+  </div>
+
+  <!-- 4 · leftover key -->
+  <div class="statecard">
+    <h3 data-anno>4 · A stored key the action does not accept (D-214-08)</h3>
+    <p class="why" data-anno>
+      Read out of an existing <span class="kbd">tool_args</span> object. ⚠ <b>Never dropped
+      silently</b> — the adapter already fails closed on an undeclared key
+      (<span class="kbd">smtp_adapter.py:337</span>), so a silent drop would hide a step that was
+      <em>already</em> broken, on an outbound path, in a way the author cannot see.
+    </p>
+    <div class="stateline dim">
+      <span class="sx">·</span>
+      <span>“cc” is not something this action accepts.</span>
+      <button>Remove it</button>
+    </div>
+    <p class="why" data-anno style="margin-top:10px">
+      ⭐ <b>This example is real and it is a finding.</b> Stitch drew <span class="kbd">Cc</span> and
+      <span class="kbd">Reply to</span> rows. <span class="kbd">smtp_adapter.INPUT_SCHEMA</span> declares
+      <b>exactly three</b> properties — <span class="kbd">to</span>, <span class="kbd">subject</span>,
+      <span class="kbd">body</span> — under <span class="kbd">additionalProperties: False</span>. A
+      <span class="kbd">cc</span> argument is not merely unsupported; the adapter <b>refuses the whole
+      send</b> if one arrives. A sketch that drew Stitch's five fields would have specified a form the
+      backend structurally cannot accept.
+    </p>
+  </div>
+
+  <!-- 5 · the first step has nothing upstream -->
+  <div class="statecard">
+    <h3 data-anno>5 · The first step — the arm exists, and it says why it is empty</h3>
+    <p class="why" data-anno>
+      ⚠ <b>An arm that is present but has nothing to offer must say so</b>, rather than opening an
+      empty dropdown. The other two arms are unaffected: a first step can still be set here or
+      asked for when it runs.
+    </p>
+    <div class="args gutter-on">
+      <div class="arow" data-arg="text" data-required="yes" data-source="none">
+        <div class="agutter"><span class="glyph">!</span><span>Nothing supplies this yet</span></div>
+        <div>
+          <div class="alabel"><span class="aname">text</span><span class="areq">Required</span>
+            <span class="adesc">The message to post.</span></div>
+          <div class="srcpick" role="group" aria-label="Where this comes from">
+            <button aria-pressed="false">Set here</button>
+            <button aria-pressed="false">Asked when this runs</button>
+            <button aria-pressed="false">From an earlier step</button>
+          </div>
+          <div class="stateline dim" style="margin-top:6px">
+            <span class="sx">·</span><span>This is the first step — nothing runs before it.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<div id="sketch-tools">
+  <select id="theme-switcher" title="theme">
+    <option value="default">Deep Midnight</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button id="tool-gutter">toggle gutter</button>
+</div>
+
+<script src="./COPY.js"></script>
+<script>
+/* ── variant tabs ───────────────────────────────────────────────────────────── */
+document.querySelectorAll(".variant-tab").forEach(function (t) {
+  t.addEventListener("click", function () {
+    document.querySelectorAll(".variant").forEach(function (v) { v.classList.remove("active") })
+    document.querySelectorAll(".variant-tab").forEach(function (x) { x.classList.remove("active") })
+    document.getElementById("variant-" + t.dataset.v).classList.add("active")
+    t.classList.add("active")
+    window.scrollTo(0, 0)
+  })
+})
+
+/* ── the source picker is LIVE: pressing an arm re-shapes the slot below ─────
+   ⚠ THE READINGS COME FROM `COPY`, NOT FROM THE MARKUP. That is what makes the
+   sketch and `drive.cjs` share one table instead of two that drift.            */
+var GLYPH = { fixed: "✎", ask: "?", upstream: "↳", none: "!" }
+
+function slotFor(source, row) {
+  var arg = row.dataset.arg
+  if (source === "fixed")
+    return '<input class="field" placeholder="Type the value">'
+  if (source === "ask")
+    return '<div class="askslot"><div class="askhint" style="margin:0 0 2px">' + COPY.ARG_ASK_KEY_LABEL +
+           '</div><input value="' + arg + '" aria-label="' + COPY.ARG_ASK_KEY_LABEL + '"></div>' +
+           '<div class="askhint">' + COPY.ARG_ASK_KEY_HINT + "</div>"
+  if (source === "upstream")
+    return '<div class="bindslot"><select class="field" style="max-width:230px">' +
+           '<option>' + COPY.ARG_UPSTREAM_NONE_OPTION + '</option>' +
+           '<option selected>Draft the summary</option>' +
+           '<option>Score the sentiment</option></select></div>'
+  return '<div class="stateline warn"><span class="sx">!</span><span>' + COPY.ARG_NO_SOURCE + "</span></div>"
+}
+
+function readingFor(source, row) {
+  if (source === "fixed") return COPY.ARG_READING_FIXED
+  if (source === "ask") return COPY.ARG_READING_ASK(row.dataset.arg)
+  if (source === "upstream") return COPY.ARG_READING_UPSTREAM("Draft the summary")
+  return COPY.ARG_NO_SOURCE
+}
+
+var ARMS = [COPY.ARG_SOURCE_FIXED, COPY.ARG_SOURCE_ASK, COPY.ARG_SOURCE_UPSTREAM]
+var KEYS = ["fixed", "ask", "upstream"]
+
+document.addEventListener("click", function (e) {
+  var btn = e.target.closest(".srcpick button")
+  if (!btn) return
+  var group = btn.closest(".srcpick")
+  var row = btn.closest(".arow")
+  if (!row) return
+
+  var idx = Array.prototype.indexOf.call(group.querySelectorAll("button"), btn)
+  var source = KEYS[idx] || "none"
+
+  group.querySelectorAll("button").forEach(function (b, i) {
+    b.setAttribute("aria-pressed", String(i === idx))
+  })
+  row.dataset.source = source
+
+  var gut = row.querySelector(".agutter")
+  if (gut && gut.children.length) {
+    gut.innerHTML = '<span class="glyph">' + GLYPH[source] + "</span><span>" + readingFor(source, row) + "</span>"
+  }
+
+  /* replace whatever slot follows the control, in either layout */
+  var host = row.querySelector(".aslot")
+  if (host) { host.innerHTML = slotFor(source, row); return }
+  var old = row.querySelectorAll(".bindslot, .askslot, .askhint, .presetnote, .stateline, input.field, .field")
+  var anchor = null
+  old.forEach(function (n) { if (!n.closest(".srcpick")) { anchor = anchor || n; } })
+  if (anchor) {
+    var wrap = document.createElement("div")
+    wrap.style.marginTop = "6px"
+    wrap.innerHTML = slotFor(source, row)
+    old.forEach(function (n) { if (!n.closest(".srcpick")) n.remove() })
+    var ctl = row.querySelector(".srcpick")
+    ctl.parentNode.insertBefore(wrap, ctl.nextSibling)
+  }
+})
+
+/* ── toolbar ────────────────────────────────────────────────────────────────── */
+document.getElementById("theme-switcher").addEventListener("change", function () {
+  document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css"
+})
+document.getElementById("tool-gutter").addEventListener("click", function () {
+  document.querySelectorAll(".panel-body, .args").forEach(function (n) { n.classList.toggle("gutter-on") })
+})
+</script>
+</body>
+</html>

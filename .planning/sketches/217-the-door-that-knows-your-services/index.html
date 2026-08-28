@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 217 — the door that knows your services</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 46px; }
+
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 6px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brandline {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim);
+    margin-right: 10px; letter-spacing: .04em;
+  }
+  .variant-tab {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+  .variant { display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .variant.active { display: block; }
+
+  .sheet { padding: 22px 26px 70px; max-width: 1180px; margin: 0 auto; }
+  .sheet > h2 { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 600; margin: 0 0 4px; }
+  .lede { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; max-width: 80ch; }
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin: 14px 0 0; max-width: 86ch; line-height: 1.6; }
+  .note b { color: var(--color-text-muted); font-weight: 600; }
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-muted);
+    border: 1px solid var(--color-border); border-radius: 4px; padding: 0 4px; color: var(--color-text-muted);
+  }
+  h3.sub { font-size: 12px; margin: 24px 0 8px; color: var(--color-text-muted); font-family: var(--font-mono); font-weight: 500; }
+
+  /* ── the describe door ─────────────────────────────────────────────────────────── */
+  .door {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-bg-elev1); padding: 24px 26px 22px; max-width: 700px;
+    box-shadow: var(--shadow-lg);
+  }
+  .door .strip {
+    font-size: 10.5px; color: var(--color-text-dim); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .door .strip .back { color: var(--color-primary); cursor: pointer; }
+
+  /* ⭐ THE DESCRIPTION *IS* THE SCREEN — Stitch's strongest single decision, kept. */
+  .describe {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text); font-family: var(--font-headline);
+    font-size: var(--text-lg); line-height: 1.5; padding: 15px 16px; min-height: 96px; resize: vertical;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+  .describe:focus { outline: 0; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-dim); }
+  .describe::placeholder { color: var(--color-text-dim); }
+
+  /* the same text, rendered so a span inside it can be marked */
+  .describe-rendered {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); font-family: var(--font-headline);
+    font-size: var(--text-lg); line-height: 1.5; padding: 15px 16px; min-height: 96px;
+  }
+  /* ⚠ THE ANCHOR — a marked span in the AUTHOR'S OWN WORDS. This is the thread Stitch's `09`
+     did not have: the service was named at the top and again at the bottom with nothing
+     joining them, so the refusal read as being about the workflow rather than about
+     something the person wrote. The mark is an UNDERLINE, not a highlight: a filled block
+     behind running text at headline size reads as an error in the sentence. */
+  .anchor {
+    border-bottom: 2px solid var(--color-warning); padding-bottom: 1px;
+    position: relative; cursor: help;
+  }
+  .anchor .anchor-tag {
+    position: absolute; left: 0; top: calc(100% + 4px); white-space: nowrap;
+    font-family: var(--font-sans); font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--color-warning); opacity: 0; transform: translateY(-3px);
+    transition: all var(--dur-fast) var(--ease-out); pointer-events: none;
+  }
+  .anchor:hover .anchor-tag, .door.refusing .anchor .anchor-tag { opacity: 1; transform: translateY(0); }
+
+  /* ── the services picker (D-214-20) ───────────────────────────────────────────── */
+  .services { margin-top: 18px; }
+  .services .slabel { font-size: 11px; font-weight: 500; }
+  .services .shint { font-size: 10.5px; color: var(--color-text-dim); margin-top: 1px; }
+  .schips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+  .schip {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 11.5px;
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    color: var(--color-text-muted); border-radius: var(--radius-full); padding: 4px 11px 4px 8px;
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .schip:hover { border-color: var(--color-primary); color: var(--color-text); }
+  .schip[aria-pressed="true"] {
+    border-color: var(--color-primary); background: var(--color-primary-dim);
+    color: var(--color-primary); font-weight: 600;
+  }
+  .schip .mk { width: 15px; height: 15px; flex: none; display: grid; place-items: center; }
+  .schip .mk[data-ink="stroke"] svg { stroke: currentColor; fill: none; }
+  .schip .cnt { font-size: 10px; opacity: .75; font-weight: 400; }
+  /* ⚠ A CONNECTED SERVICE WITH NO GRANTED TOOL IS NOT SILENTLY ABSENT. It is present, it is
+     not selectable, and it says why — with the way out. The grant grain IS the vocabulary
+     grain, so an ungranted service genuinely has nothing to offer the generator. */
+  .schip[data-grants="none"] { opacity: .62; cursor: default; border-style: dashed; }
+  .schip[data-grants="none"]:hover { border-color: var(--color-border); color: var(--color-text-muted); }
+  .schip .fix {
+    font: inherit; font-size: 10px; margin-left: 3px; cursor: pointer;
+    background: transparent; border: 0; border-bottom: 1px dashed var(--color-primary);
+    color: var(--color-primary); padding: 0;
+  }
+
+  /* ── the refusal ──────────────────────────────────────────────────────────────── */
+  .drefusal {
+    margin-top: 16px; border: 1px solid var(--color-warning); border-radius: var(--radius-md);
+    background: var(--color-warning-dim); padding: 12px 14px;
+    display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .door.refusing .drefusal { display: block; }
+  .drefusal .dr-text { font-size: var(--text-sm); line-height: 1.5; }
+  .drefusal .dr-acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .drefusal button {
+    font: inherit; font-size: 11.5px; padding: 4px 12px; border-radius: var(--radius-full);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+    background: transparent; border: 1px solid var(--color-primary); color: var(--color-primary);
+  }
+  .drefusal button:hover { background: var(--color-primary-dim); }
+
+  /* ── the CTA row ──────────────────────────────────────────────────────────────── */
+  .ctarow { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .cta {
+    font: inherit; font-size: var(--text-sm); font-weight: 600; padding: 8px 18px;
+    border-radius: var(--radius-full); cursor: pointer;
+    background: var(--color-primary); border: 1px solid var(--color-primary); color: hsl(220 40% 8%);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .cta:hover { background: var(--color-primary-strong); }
+  /* ⭐ THE DISABLED CONTROL CARRIES ITS OWN REASON. That is the SHIPPED
+     `DESCRIBE_CTA_REFUSED` shape (`doorVocabulary.ts:364`) — a second arm on one mechanism,
+     never a second mechanism beside it. Never a greyed-out mystery. */
+  .cta[disabled] {
+    background: transparent; border-color: var(--color-border); color: var(--color-text-dim);
+    cursor: not-allowed; font-weight: 500;
+  }
+  .switchline { font-size: 11px; color: var(--color-text-dim); margin-top: 16px; }
+  .switchline a { color: var(--color-primary); text-decoration: none; cursor: pointer; }
+
+  /* ── §3 state grid ────────────────────────────────────────────────────────────── */
+  .states { display: grid; gap: 16px; max-width: 760px; }
+  .statecard { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elev1); padding: 14px 16px; }
+  .statecard > h4 { font-size: 12px; margin: 0 0 3px; }
+  .statecard > .why { font-size: 10.5px; color: var(--color-text-dim); margin: 0 0 11px; line-height: 1.55; }
+
+  /* ── §4 before / after ────────────────────────────────────────────────────────── */
+  .ba { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; max-width: 1000px; }
+  .bacol { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; background: var(--color-bg-elev1); }
+  .bacol.bad { border-color: hsl(0 40% 30%); }
+  .bacol.good { border-color: hsl(142 30% 28%); }
+  .bacol .tag { font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 9px; }
+  .bacol.bad .tag { color: hsl(0 60% 62%); }
+  .bacol.good .tag { color: var(--color-success); }
+  .bacol .demo { font-size: 12.5px; line-height: 1.6; }
+  .bacol .demo .dim { color: var(--color-text-dim); }
+
+  #sketch-tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 7px 10px;
+    border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center;
+  }
+  #sketch-tools:hover { opacity: 1; }
+  #sketch-tools select, #sketch-tools button {
+    font: inherit; font-size: 11px; background: #1b1b1b; color: #fff;
+    border: 1px solid #444; border-radius: 5px; padding: 2px 6px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brandline">SKETCH 217 · the door that knows your services</span>
+  <button class="variant-tab active" data-v="a">A · picker first</button>
+  <button class="variant-tab" data-v="b">B · picker first + the anchor</button>
+  <button class="variant-tab" data-v="states">§3 the four states</button>
+  <button class="variant-tab" data-v="ba">§4 what the picker prevents</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     A — the picker, no anchor. The refusal is honest but floats free.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-a" class="variant active">
+<div class="sheet">
+  <h2 data-anno>A · The author picks their services before the AI drafts</h2>
+  <p class="lede" data-anno>
+    D-214-20. The generator's vocabulary <em>is</em> the ticked set, so <b>a step naming an
+    unconnected service is structurally impossible</b> rather than caught afterwards. ⚠ Post-draft
+    validation alone was rejected: it is a <em>model-behaviour</em> guarantee, and the failure it
+    must prevent is precisely <em>"an invented step that validates and fails at 03:00"</em>.
+  </p>
+
+  <div class="door refusing" id="door-a">
+    <div class="strip" data-anno><span class="back">‹ Change how I start</span><span>⚡ Drafting it for you</span></div>
+
+    <div class="describe-rendered" id="text-a">Every Monday, scan Salesforce for new leads and post a summary to the team channel in Slack.</div>
+
+    <div class="services">
+      <div class="slabel">Services this workflow may use</div>
+      <div class="shint">Only what you tick can appear in the draft.</div>
+      <div class="schips">
+        <button class="schip" aria-pressed="true" data-grants="some" data-service="slack">
+          <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+          Aether Slack <span class="cnt">1 action</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="some" data-service="jira">
+          <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+          Aether Jira <span class="cnt">1 action</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="some" data-service="smtp">
+          <span class="mk" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+          Aether Mail <span class="cnt">1 action</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="some" data-service="github">
+          <span class="mk" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" stroke-width="2" stroke-linecap="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.7A5.2 5.2 0 0 0 19.9 5a4.9 4.9 0 0 0-.1-3.6s-1.1-.4-3.8 1.4a13 13 0 0 0-7 0C6.3 1 5.2 1.4 5.2 1.4A4.9 4.9 0 0 0 5.1 5 5.2 5.2 0 0 0 3.7 8.8c0 5.2 3.2 6.4 6.2 6.7a3.4 3.4 0 0 0-.9 2.6V22"/></svg></span>
+          GitHub <span class="cnt">12 actions</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="none" data-service="deepwiki">
+          <span class="mk" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" stroke-width="2" stroke-linecap="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6.5A2.5 2.5 0 0 0 4 21.5z"/></svg></span>
+          DeepWiki <span class="cnt">Nothing allowed yet</span>
+          <button class="fix">Choose what it can do</button>
+        </button>
+      </div>
+    </div>
+
+    <!-- ⚠ MUST NEVER RENDER AT REST. Gated on the door's `.refusing` state. -->
+    <div class="drefusal" role="status">
+      <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+      <div class="dr-acts">
+        <button>Connect Salesforce</button>
+        <button>Revise the description</button>
+      </div>
+    </div>
+
+    <div class="ctarow">
+      <button class="cta" disabled>Waiting on a connection</button>
+    </div>
+
+    <div class="switchline" data-anno>Need to set citations, checks, or per-step sources yourself? <a>Build it myself ›</a></div>
+  </div>
+
+  <p class="note" data-anno>
+    ⭐ <b>The disabled control carries its own reason.</b> That is not a new idea — it is the shipped
+    <span class="kbd">DESCRIBE_CTA_REFUSED = "Too thin to draft"</span>
+    (<span class="kbd">doorVocabulary.ts:364</span>) with a second arm. Stitch arrived at
+    <em>"Waiting for connection"</em> independently, which is a <b>confirmation, not a
+    discovery</b> — so the new refusal takes the existing shape rather than adding a second
+    mechanism beside it.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>DeepWiki is present, not selectable, and says why.</b> A connected service with no granted
+    tool has genuinely nothing to offer the generator — <b>the grant grain IS the vocabulary
+    grain</b>, which is why STEP-06's stated dependency is Phase 213. Hiding it would leave an
+    author wondering where a connection they made went.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The gap in this variant:</b> "Salesforce" appears in the sentence at the top and again in
+    the refusal at the bottom, <b>with no thread between them</b>. The refusal reads as being about
+    the workflow rather than about <em>something the person wrote</em>. B closes it.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     B — the anchor. The refusal points at the words that caused it.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-b" class="variant">
+<div class="sheet">
+  <h2 data-anno>B · The refusal points at the words that caused it</h2>
+  <p class="lede" data-anno>
+    The one thing the stitch pass did not have. The service name in the author's own sentence is
+    <b>marked</b>, and the refusal below is about <em>that</em>. Hover the marked words, or read the
+    tag that appears while the door is refusing.
+  </p>
+
+  <div class="door refusing" id="door-b">
+    <div class="strip" data-anno><span class="back">‹ Change how I start</span><span>⚡ Drafting it for you</span></div>
+
+    <div class="describe-rendered">Every Monday, scan <span class="anchor" id="anchor-b">Salesforce<span class="anchor-tag">why this stopped</span></span> for new leads and post a summary to the team channel in Slack.</div>
+
+    <div class="services">
+      <div class="slabel">Services this workflow may use</div>
+      <div class="shint">Only what you tick can appear in the draft.</div>
+      <div class="schips">
+        <button class="schip" aria-pressed="true" data-grants="some" data-service="slack">
+          <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+          Aether Slack <span class="cnt">1 action</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="some" data-service="jira">
+          <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+          Aether Jira <span class="cnt">1 action</span>
+        </button>
+        <button class="schip" aria-pressed="false" data-grants="none" data-service="deepwiki">
+          <span class="mk" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" stroke-width="2" stroke-linecap="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6.5A2.5 2.5 0 0 0 4 21.5z"/></svg></span>
+          DeepWiki <span class="cnt">Nothing allowed yet</span>
+          <button class="fix">Choose what it can do</button>
+        </button>
+      </div>
+    </div>
+
+    <div class="drefusal" role="status">
+      <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+      <div class="dr-acts">
+        <button>Connect Salesforce</button>
+        <button>Revise the description</button>
+      </div>
+    </div>
+
+    <div class="ctarow">
+      <button class="cta" disabled>Waiting on a connection</button>
+    </div>
+
+    <div class="switchline" data-anno>Need to set citations, checks, or per-step sources yourself? <a>Build it myself ›</a></div>
+  </div>
+
+  <p class="note" data-anno>
+    ⚠ <b>The mark is an underline, not a highlight.</b> A filled block behind running text at
+    headline size reads as an <em>error in the sentence</em> — and the sentence is not wrong; it
+    names something the account does not have. ⚠ And it spends <b>warning</b>, not
+    <span class="kbd">--color-danger</span>: naming a service you have not connected yet is an
+    ordinary thing to do.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The anchor tag is visible while the door refuses, not only on hover.</b> Hover-only is a
+    tooltip, and a tooltip is a thing a keyboard and a phone never see — the same reason the house
+    fence forbids copy in a <span class="kbd">[title]</span>.
+  </p>
+  <p class="note" data-anno>
+    <b>What B costs.</b> Marking a span in the author's prose means <b>finding the service name in
+    free text</b> — a match, and therefore a thing that can be wrong. ⚠ <b>A mis-anchor is worse
+    than no anchor</b>, because it claims a precision the system does not have. The safe rule: mark
+    only an exact, case-insensitive whole-word match against a name in the catalog, and fall back to
+    variant A's unanchored refusal when there is no unambiguous single match.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §3 — the four states, including the one that must render NOTHING.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-states" class="variant">
+<div class="sheet">
+  <h2 data-anno>§3 · The four states — and the one that must draw nothing at all</h2>
+
+  <div class="states">
+
+    <div class="statecard">
+      <h4 data-anno>1 · At rest ⚠ nothing is refused, and nothing may be</h4>
+      <p class="why" data-anno>
+        ⚠ <b>MECHANICAL, not merely tasteful.</b> An untouched empty box is refused by the same rule,
+        and captioning THAT would put a red sentence on the first screen an author meets
+        <em>before they had done anything at all</em>.
+        <span class="kbd">WorkflowDoorSwitch.baseline.test.tsx</span> pins all six resting states
+        <b>byte for byte</b>, so the resting DOM here is unchanged from what ships.
+      </p>
+      <div class="door" id="door-rest">
+        <div class="describe-rendered" style="color:var(--color-text-dim);font-size:var(--text-md)">Describe the work in a sentence…</div>
+        <div class="services">
+          <div class="slabel">Services this workflow may use</div>
+          <div class="shint">Only what you tick can appear in the draft.</div>
+          <div class="schips">
+            <button class="schip" aria-pressed="false" data-grants="some" data-service="slack">
+              <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+              Aether Slack <span class="cnt">1 action</span>
+            </button>
+            <button class="schip" aria-pressed="false" data-grants="some" data-service="jira">
+              <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+              Aether Jira <span class="cnt">1 action</span>
+            </button>
+          </div>
+        </div>
+        <div class="drefusal" role="status">
+          <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+        </div>
+        <div class="ctarow"><button class="cta" disabled>Too thin to draft</button></div>
+      </div>
+      <p class="note" data-anno>
+        ⭐ The CTA reads the <b>shipped</b> <span class="kbd">DESCRIBE_CTA_REFUSED</span>, unchanged.
+        The new arm does not displace the old one — it joins it.
+      </p>
+    </div>
+
+    <div class="statecard">
+      <h4 data-anno>2 · Ready — the sentence is enough and every service it names is ticked</h4>
+      <p class="why" data-anno>The shipped <span class="kbd">DESCRIBE_CTA</span>, untouched.</p>
+      <div class="door" id="door-ready">
+        <div class="describe-rendered">Every Monday, summarise last week's support tickets and post it to the team channel in Slack.</div>
+        <div class="services">
+          <div class="slabel">Services this workflow may use</div>
+          <div class="shint">Only what you tick can appear in the draft.</div>
+          <div class="schips">
+            <button class="schip" aria-pressed="true" data-grants="some" data-service="slack">
+              <span class="mk" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+              Aether Slack <span class="cnt">1 action</span>
+            </button>
+          </div>
+        </div>
+        <div class="drefusal" role="status">
+          <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+        </div>
+        <div class="ctarow"><button class="cta">Write the first draft</button></div>
+      </div>
+    </div>
+
+    <div class="statecard">
+      <h4 data-anno>3 · Nothing connected at all</h4>
+      <p class="why" data-anno>
+        ⚠ <b>The picker does not vanish when it is empty</b> — an absent control is indistinguishable
+        from a control that does not exist, and this one is the thing the whole screen depends on.
+      </p>
+      <div class="door" id="door-empty">
+        <div class="describe-rendered" style="color:var(--color-text-dim);font-size:var(--text-md)">Describe the work in a sentence…</div>
+        <div class="services">
+          <div class="slabel">Services this workflow may use</div>
+          <div class="shint">Only what you tick can appear in the draft.</div>
+          <div class="schips">
+            <span style="font-size:11.5px;color:var(--color-text-muted);display:inline-flex;gap:8px;align-items:center">
+              You have not connected anything yet.
+              <button class="fix">Connect a service</button>
+            </span>
+          </div>
+        </div>
+        <div class="drefusal" role="status">
+          <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+        </div>
+        <div class="ctarow"><button class="cta" disabled>Too thin to draft</button></div>
+      </div>
+      <p class="note" data-anno>
+        ⚠ <b>The CTA still reads the thinness reason, not the connection one.</b> With an empty box
+        AND nothing connected, the thing standing between the author and a draft is the sentence —
+        a workflow with no external step is perfectly legitimate. <b>Naming the connection here would
+        be a refusal for a reason that is not binding.</b>
+      </p>
+    </div>
+
+    <div class="statecard">
+      <h4 data-anno>4 · Two services named, neither connected</h4>
+      <p class="why" data-anno>
+        ⚠ <b>One refusal per missing service, and the CTA names none of them.</b> The control is one
+        control; naming one of two would be arbitrary, and naming both would put a list on a button.
+      </p>
+      <div class="door refusing" id="door-two">
+        <div class="describe-rendered">Pull the deal stage from <span class="anchor">Salesforce<span class="anchor-tag">why this stopped</span></span> and open a ticket in <span class="anchor">Zendesk<span class="anchor-tag">why this stopped</span></span>.</div>
+        <div class="drefusal" role="status">
+          <div class="dr-text" data-kind="service">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+          <div class="dr-acts"><button>Connect Salesforce</button><button>Revise the description</button></div>
+          <div class="dr-text" data-kind="service" style="margin-top:12px">Zendesk is not connected — connect it in Settings, or describe this step without it.</div>
+          <div class="dr-acts"><button>Connect Zendesk</button><button>Revise the description</button></div>
+        </div>
+        <div class="ctarow"><button class="cta" disabled>Waiting on a connection</button></div>
+      </div>
+    </div>
+
+    <div class="statecard">
+      <h4 data-anno>5 · Both reasons at once — and they do not compete</h4>
+      <p class="why" data-anno>
+        The sentence is too thin AND it names an unconnected service. ⚠ <b>The shipped refusal and
+        the new one are two arms of ONE mechanism</b>, so they coexist on the screen without
+        arguing — and the CTA carries the <b>thinness</b> reason, because that is the one that would
+        still be binding if Salesforce were connected this second.
+      </p>
+      <div class="door refusing" id="door-both">
+        <div class="describe-rendered" style="font-size:var(--text-md)">Salesforce</div>
+        <div class="drefusal" role="status">
+          <div class="dr-text" data-kind="thin">There is nothing here to draft from yet — describe the work in a sentence.</div>
+          <div class="dr-text" data-kind="service" style="margin-top:12px">Salesforce is not connected — connect it in Settings, or describe this step without it.</div>
+          <div class="dr-acts"><button>Connect Salesforce</button><button>Revise the description</button></div>
+        </div>
+        <div class="ctarow"><button class="cta" disabled>Too thin to draft</button></div>
+      </div>
+      <p class="note" data-anno>
+        ⚠ <b>The thinness refusal has no action row, and that is not an omission.</b> Its next action
+        is the box itself — <em>"describe the work in a sentence"</em> is already an instruction the
+        author can carry out where they are standing. A button pointing at the cursor would be
+        ceremony.
+      </p>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §4 — what the picker prevents. The 03:00 failure, and why post-hoc is not enough.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-ba" class="variant">
+<div class="sheet">
+  <h2 data-anno>§4 · What the picker prevents — and why validating afterwards is not enough</h2>
+  <p class="lede" data-anno>
+    The failure SC#5 names in its own words: <em>"an invented step that validates and fails at
+    03:00."</em>
+  </p>
+
+  <div class="ba">
+    <div class="bacol bad">
+      <div class="tag" data-anno>without the picker · validate afterwards</div>
+      <div class="demo">
+        <div>1 · The author writes a sentence naming Salesforce.</div>
+        <div>2 · The model drafts a workflow with a <span class="dim">Salesforce</span> step, because nothing told it not to.</div>
+        <div>3 · A post-draft check finds the step and removes it — <span class="dim">or does not, because it is a model-behaviour guarantee</span>.</div>
+        <div>4 · The workflow publishes.</div>
+        <div>5 · <b>03:00 Monday.</b> The step runs and fails.</div>
+      </div>
+      <p class="note" data-anno style="margin-top:11px">
+        ⚠ <b>Step 3 is the whole problem.</b> A guarantee that depends on the model noticing is not a
+        guarantee — and the step reached step 4 <em>having validated</em>.
+      </p>
+    </div>
+
+    <div class="bacol good">
+      <div class="tag" data-anno>with the picker · structurally impossible</div>
+      <div class="demo">
+        <div>1 · The author writes a sentence naming Salesforce.</div>
+        <div>2 · <b>The generator's vocabulary is the ticked set</b>, and Salesforce is not in it.</div>
+        <div>3 · The door refuses <b>before drafting</b>, names the service, and offers two real next actions.</div>
+        <div>4 · Nothing is drafted, nothing is published, nothing runs at 03:00.</div>
+      </div>
+      <p class="note" data-anno style="margin-top:11px">
+        ⭐ <b>The grant grain is the vocabulary grain.</b> Not merely <em>connected</em> services —
+        <b>granted</b> tools, which is why STEP-06's stated dependency is Phase 213.
+      </p>
+    </div>
+  </div>
+
+  <h3 class="sub" data-anno>What the refusal must contain — the ROADMAP's own test</h3>
+  <p class="note" data-anno style="margin-top:0">
+    <em>"A refusal is only honest if it names the next action."</em> This one names <b>two</b>, and
+    both are real: one leaves for Settings and comes back; one stays here.
+    ⚠ <b>A third arm — connecting the service inline, without leaving the door — was rejected</b>:
+    a connection is a credential, and a credential form on a drafting screen is a new outbound trust
+    surface with no prior review cycle.
+  </p>
+</div>
+</section>
+
+<div id="sketch-tools">
+  <select id="theme-switcher" title="theme">
+    <option value="default">Deep Midnight</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button id="tool-rest">toggle refusing</button>
+</div>
+
+<script src="./COPY.js"></script>
+<script>
+document.querySelectorAll(".variant-tab").forEach(function (t) {
+  t.addEventListener("click", function () {
+    document.querySelectorAll(".variant").forEach(function (v) { v.classList.remove("active") })
+    document.querySelectorAll(".variant-tab").forEach(function (x) { x.classList.remove("active") })
+    document.getElementById("variant-" + t.dataset.v).classList.add("active")
+    t.classList.add("active")
+    window.scrollTo(0, 0)
+  })
+})
+
+/* ── the chips are live, and un-ticking the last one re-refuses. The picker is the control
+      that decides whether a draft is possible, so it has to behave like one. ───────────── */
+document.addEventListener("click", function (e) {
+  var fix = e.target.closest(".schip .fix")
+  if (fix) { e.stopPropagation(); return }
+  var chip = e.target.closest(".schip")
+  if (!chip) return
+  if (chip.dataset.grants === "none") return   // nothing to offer — not selectable
+  chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true")
+
+  var door = chip.closest(".door")
+  if (!door) return
+  var anyOn = door.querySelectorAll('.schip[aria-pressed="true"]').length > 0
+  var cta = door.querySelector(".cta")
+  if (!cta) return
+  if (door.classList.contains("refusing")) {
+    cta.disabled = true
+    cta.textContent = COPY.DOOR_CTA_REFUSED_SERVICE
+  } else {
+    cta.disabled = !anyOn
+    cta.textContent = anyOn ? COPY.SHIPPED_DESCRIBE_CTA : COPY.SHIPPED_DESCRIBE_CTA_REFUSED
+  }
+})
+
+/* ⚠ THE RESTING STATE IS THE ONE WORTH CHECKING BY HAND — the refusal must draw NOTHING. */
+document.getElementById("tool-rest").addEventListener("click", function () {
+  document.querySelectorAll(".door").forEach(function (d) { d.classList.toggle("refusing") })
+})
+
+document.getElementById("theme-switcher").addEventListener("change", function () {
+  document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css"
+})
+</script>
+</body>
+</html>

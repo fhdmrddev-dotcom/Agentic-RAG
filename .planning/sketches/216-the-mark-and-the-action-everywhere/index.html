@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 216 — the mark and the action, everywhere</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 46px; }
+
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 6px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brandline {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim);
+    margin-right: 10px; letter-spacing: .04em;
+  }
+  .variant-tab {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+  .variant { display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .variant.active { display: block; }
+
+  .sheet { padding: 22px 26px 70px; max-width: 1320px; margin: 0 auto; }
+  .sheet > h2 { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 600; margin: 0 0 4px; }
+  .lede { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; max-width: 80ch; }
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin: 14px 0 0; max-width: 86ch; line-height: 1.6; }
+  .note b { color: var(--color-text-muted); font-weight: 600; }
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-muted);
+    border: 1px solid var(--color-border); border-radius: 4px; padding: 0 4px; color: var(--color-text-muted);
+  }
+  h3.sub { font-size: 12px; margin: 24px 0 8px; color: var(--color-text-muted); font-family: var(--font-mono); font-weight: 500; }
+
+  /* ══ ⭐ THE ONE SHARED ELEMENT. Every surface below mounts THIS and nothing else. ══════
+     D-214-16: *"Coverage should be a consequence of one component existing, not a list kept
+     in sync."* Four sizes, one rule set — the size is a modifier, never a fork. */
+  .sid { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .sid .mark {
+    flex: none; display: grid; place-items: center; border-radius: var(--radius-sm);
+  }
+  .sid .action { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+  .sid .dot { color: var(--color-text-dim); }
+  .sid .service { color: var(--color-text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .sid[data-size="xs"] { font-size: 10.5px; gap: 5px; }
+  .sid[data-size="xs"] .mark { width: 14px; height: 14px; }
+  .sid[data-size="sm"] { font-size: 11.5px; }
+  .sid[data-size="sm"] .mark { width: 16px; height: 16px; }
+  .sid[data-size="md"] { font-size: var(--text-sm); gap: 8px; }
+  .sid[data-size="md"] .mark { width: 20px; height: 20px; }
+  .sid[data-size="lg"] { font-size: var(--text-md); gap: 9px; }
+  .sid[data-size="lg"] .mark { width: 24px; height: 24px; }
+
+  /* ⚠ THE INK CONTRACT (connectionMark.tsx). Three inks, one per icon-body mechanic:
+     `self` — the vendor's own fills, size only, never a colour utility.
+     `stroke` — a lucide glyph, stroke: currentColor, NEVER a fill utility.
+     There is no `fill` case in this sketch: the two marks needing it are bundled SVGs. */
+  .sid .mark[data-ink="stroke"] svg { stroke: var(--color-text-muted); fill: none; }
+  .sid .mark[data-ink="self"] svg { /* the vendor's own fills — nothing applied */ }
+
+  /* ── the run spine (WorkflowRunPage · RunSpine) ─────────────────────────────────── */
+  .surface {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-bg-elev1); overflow: hidden; box-shadow: var(--shadow-md);
+  }
+  .surface-head {
+    padding: 9px 14px; border-bottom: 1px solid var(--color-border); background: var(--color-surface);
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-dim);
+  }
+  .surface-body { padding: 14px; }
+
+  .spine { position: relative; padding-left: 4px; }
+  .spine .rail { position: absolute; left: 10px; top: 12px; bottom: 12px; width: 1px; background: hsl(220 16% 45% / .4); }
+  .spine ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+  .srow { display: flex; gap: 12px; }
+  .spip {
+    flex: none; width: 13px; height: 13px; border-radius: var(--radius-full); margin-top: 3px;
+    border: 1px solid var(--color-border); background: var(--color-bg-elev1);
+  }
+  .srow[data-state="done"] .spip { background: var(--color-success); border-color: var(--color-success); }
+  .srow[data-state="running"] .spip { background: var(--color-primary); border-color: var(--color-primary); animation: pulseGlow 1.8s ease-in-out infinite; }
+  .srow[data-state="failed"] .spip { background: var(--color-danger); border-color: var(--color-danger); }
+  .srow[data-state="paused"] .spip { background: var(--color-warning); border-color: var(--color-warning); }
+  .srow[data-state="pending"] .spip { opacity: .4; }
+  .sbody { flex: 1; min-width: 0; }
+  .stitle { font-size: var(--text-sm); font-weight: 600; }
+  .srow[data-state="pending"] .stitle { color: var(--color-text-muted); font-weight: 500; }
+  .sidline { margin-top: 2px; }
+  .selapsed { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); }
+
+  /* ── the failure block ─────────────────────────────────────────────────────────── */
+  .fail {
+    margin-top: 7px; border: 1px solid hsl(0 40% 30%); border-radius: var(--radius-sm);
+    background: hsl(0 72% 51% / .08); padding: 8px 10px;
+  }
+  .fail .flabel {
+    font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: hsl(0 60% 66%); margin-bottom: 3px;
+  }
+  /* ⭐ THE ADAPTER'S OWN WORDS, AT THE SIZE A PERSON NEEDS THEM. */
+  .fail .freason { font-size: 12px; line-height: 1.5; color: var(--color-text); }
+  .fail.sentinel { border-color: var(--color-border); background: var(--color-muted); }
+  .fail.sentinel .flabel { color: var(--color-text-dim); }
+  .fail.sentinel .freason { color: var(--color-text-muted); font-size: 11px; }
+
+  /* ── the approval pause (PendingAskCard) ───────────────────────────────────────── */
+  .ask {
+    border: 1px solid var(--color-warning); border-radius: var(--radius-md);
+    background: var(--color-warning-dim); padding: 13px 15px; max-width: 620px;
+  }
+  .ask .apaused { font-size: var(--text-sm); font-weight: 600; }
+  .ask .anothing { font-size: 11.5px; color: var(--color-text-muted); margin-top: 1px; }
+  .ask .awill { font-size: 12.5px; margin-top: 10px; }
+  .ask .asend-label {
+    font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--color-text-dim); margin: 11px 0 5px;
+  }
+  .argtable { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 3px 12px; font-size: 11.5px; }
+  .argtable dt { font-family: var(--font-mono); color: var(--color-text-muted); }
+  .argtable dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  /* ⚠ THE ARGUMENT THAT VARIES IS RENDERED THE SAME AS THE ONE THAT DOES NOT. Per-argument
+     source annotation was considered and REJECTED under D-214-15 — the sentence is already
+     long, and the pause's question is *what leaves*, not *who chose it*. */
+  .ask .anotrecorded { font-size: 10px; color: var(--color-text-dim); margin-top: 9px; }
+  .ask .arow2 { display: flex; gap: 8px; margin-top: 12px; }
+  .ask button {
+    font: inherit; font-size: 11.5px; padding: 5px 13px; border-radius: var(--radius-full);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .ask .approve { background: var(--color-primary); border: 1px solid var(--color-primary); color: hsl(220 40% 8%); font-weight: 600; }
+  .ask .decline { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .ask .decline:hover { border-color: var(--color-text-muted); color: var(--color-text); }
+
+  /* ── the four-surface grid ─────────────────────────────────────────────────────── */
+  .surfgrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; align-items: start; }
+
+  /* the chat run card */
+  .runcard {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); padding: 10px 12px;
+  }
+  .runcard .rtop { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+  .runcard .rname { font-weight: 600; }
+  .runcard .rsteps { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .runstep { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .runstep .rp { width: 7px; height: 7px; border-radius: var(--radius-full); flex: none; background: var(--color-success); }
+  .runstep[data-state="failed"] .rp { background: var(--color-danger); }
+  .runstep[data-state="pending"] .rp { background: var(--color-border); }
+
+  /* the panel PhaseCard */
+  .phasecard {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); padding: 10px 12px; margin-bottom: 8px;
+  }
+  .phasecard .pctop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .phasecard .pcname { font-size: 12px; font-weight: 600; }
+
+  /* the compact list row */
+  .steplist { display: flex; flex-direction: column; }
+  .steplist .slrow {
+    display: grid; grid-template-columns: 14px minmax(0,1fr) auto; gap: 10px; align-items: center;
+    padding: 7px 2px; border-top: 1px solid var(--color-border-soft); font-size: 11.5px;
+  }
+  .steplist .slrow:first-child { border-top: 0; }
+  .steplist .slp { width: 9px; height: 9px; border-radius: var(--radius-full); justify-self: center; background: var(--color-success); }
+  .steplist .slrow[data-state="failed"] .slp { background: var(--color-danger); }
+  .steplist .slrow[data-state="pending"] .slp { background: var(--color-border); }
+
+  /* ── §4 the mark roster ────────────────────────────────────────────────────────── */
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; max-width: 1100px; }
+  .rcell {
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    background: var(--color-bg-elev1); padding: 9px 11px;
+  }
+  .rcell .rkey { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); margin-top: 5px; }
+
+  /* ── §5 the tautology, before and after ────────────────────────────────────────── */
+  .baline {
+    display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 12px; align-items: baseline;
+    padding: 11px 0; border-top: 1px solid var(--color-border-soft); max-width: 900px;
+  }
+  .baline:first-of-type { border-top: 0; }
+  .baline .balabel { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; }
+  .baline.before .balabel { color: hsl(0 60% 62%); }
+  .baline.after .balabel { color: var(--color-success); }
+  .baline .bademo { font-size: 12.5px; line-height: 1.5; }
+  .baline.before .bademo { color: hsl(0 55% 62%); }
+  .baline .mono { font-family: var(--font-mono); font-size: 11.5px; }
+
+  #sketch-tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 7px 10px;
+    border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center;
+  }
+  #sketch-tools:hover { opacity: 1; }
+  #sketch-tools select, #sketch-tools button {
+    font: inherit; font-size: 11px; background: #1b1b1b; color: #fff;
+    border: 1px solid #444; border-radius: 5px; padding: 2px 6px; cursor: pointer;
+  }
+  .toast {
+    position: fixed; bottom: 60px; right: 14px; z-index: 9999;
+    background: var(--color-surface-hi); border: 1px solid var(--color-primary); color: var(--color-text);
+    font-size: 11.5px; padding: 8px 12px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+    opacity: 0; transform: translateY(6px); transition: all var(--dur-base) var(--ease-out); pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brandline">SKETCH 216 · the mark and the action, everywhere</span>
+  <button class="variant-tab active" data-v="rich">A · rich — mark + action name</button>
+  <button class="variant-tab" data-v="spare">B · spare — mark only</button>
+  <button class="variant-tab" data-v="five">§3 the five surfaces, one element</button>
+  <button class="variant-tab" data-v="marks">§4 the mark roster + the neutral</button>
+  <button class="variant-tab" data-v="clause">§5 the sentence, before and after</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     A — RICH. SC#4 says the mark AND the action's real name.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-rich" class="variant active">
+<div class="sheet">
+  <h2 data-anno>A · Rich — the mark and the action's real name, on the spine</h2>
+  <p class="lede" data-anno>
+    SC#4's words: <em>"a run's spine and run surfaces show the service's mark <b>and the action's
+    real name</b>."</em> ⚠ <b>This variant is not a taste preference — it is the criterion.</b> B is
+    drawn so the cost of the alternative is visible rather than asserted.
+  </p>
+
+  <div style="max-width:760px">
+  <div class="surface">
+    <div class="surface-head" data-anno>WorkflowRunPage · RunSpine</div>
+    <div class="surface-body">
+      <div class="spine">
+        <span class="rail"></span>
+        <ol>
+          <li class="srow" data-state="done">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">Draft the summary</div>
+              <div class="selapsed">12.4s</div>
+            </div>
+          </li>
+
+          <li class="srow" data-state="done">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">Post to the team channel</div>
+              <div class="sidline">
+                <span class="sid" data-size="sm" data-service="slack">
+                  <span class="mark" data-ink="self">
+                    <svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg>
+                  </span>
+                  <span class="action">Post a message</span>
+                  <span class="dot">·</span>
+                  <span class="service">Aether Slack</span>
+                </span>
+              </div>
+              <div class="selapsed">1.1s</div>
+            </div>
+          </li>
+
+          <li class="srow" data-state="failed">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">Escalate to the on-call channel</div>
+              <div class="sidline">
+                <span class="sid" data-size="sm" data-service="slack">
+                  <span class="mark" data-ink="self">
+                    <svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg>
+                  </span>
+                  <span class="action">Post a message</span>
+                  <span class="dot">·</span>
+                  <span class="service">Aether Slack</span>
+                </span>
+              </div>
+              <!-- ⭐ THE STEP'S OWN REASON, AT THE SIZE A PERSON NEEDS IT (BUG-260826-05). -->
+              <div class="fail" data-reason="real">
+                <div class="flabel">Why it stopped</div>
+                <div class="freason">Channel #urgent-feedback-escalations not found or bot lacks permission to post.</div>
+              </div>
+            </div>
+          </li>
+
+          <li class="srow" data-state="pending">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">File the escalation</div>
+              <div class="sidline">
+                <span class="sid" data-size="sm" data-service="jira">
+                  <span class="mark" data-ink="self">
+                    <svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg>
+                  </span>
+                  <span class="action">Create an issue</span>
+                  <span class="dot">·</span>
+                  <span class="service">Aether Jira</span>
+                </span>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <p class="note" data-anno>
+    <b>Three facts on one row, in one glance:</b> which service, what it does there, and whether it
+    worked. ⚠ <b>The failed step's reason is the adapter's own sentence</b> — Slack's, verbatim —
+    not a generic one. That is <span class="kbd">BUG-260826-05</span> closed on the surface that was
+    showing <em>"Failure reason not captured by the backend"</em>.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The step's authored name and the identity line are different things and both are kept.</b>
+    <em>"Escalate to the on-call channel"</em> is what the author called it; <em>Post a message ·
+    Aether Slack</em> is what it actually is. Collapsing them would either lose the author's
+    intent or lose the service — and Phase 187's node-face ladder already ruled that the author's
+    name wins the title and the derived fact takes the subtitle.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     B — SPARE. Drawn so the cost is visible. It FAILS SC#4.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-spare" class="variant">
+<div class="sheet">
+  <h2 data-anno>B · Spare — the mark alone, and what it costs</h2>
+  <p class="lede" data-anno>
+    Stitch's <span class="kbd">11</span>. Prettier and quieter. ⚠ <b>It does not satisfy SC#4</b>,
+    and the reason is visible below rather than argued: the two Slack rows and the Jira row are
+    distinguishable, but <em>what each one does there</em> is gone — and two <b>different</b> Slack
+    actions on one spine become indistinguishable.
+  </p>
+
+  <div style="max-width:760px">
+  <div class="surface">
+    <div class="surface-head" data-anno>WorkflowRunPage · RunSpine — mark only</div>
+    <div class="surface-body">
+      <div class="spine">
+        <span class="rail"></span>
+        <ol>
+          <li class="srow" data-state="done">
+            <span class="spip"></span>
+            <div class="sbody"><div class="stitle">Draft the summary</div><div class="selapsed">12.4s</div></div>
+          </li>
+          <li class="srow" data-state="done">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">Post to the team channel</div>
+              <div class="sidline">
+                <span class="sid" data-size="sm" data-service="slack" data-spare>
+                  <span class="mark" data-ink="self">
+                    <svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg>
+                  </span>
+                </span>
+              </div>
+              <div class="selapsed">1.1s</div>
+            </div>
+          </li>
+          <li class="srow" data-state="done">
+            <span class="spip"></span>
+            <div class="sbody">
+              <div class="stitle">Pin it for the week</div>
+              <div class="sidline">
+                <span class="sid" data-size="sm" data-service="slack" data-spare>
+                  <span class="mark" data-ink="self">
+                    <svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg>
+                  </span>
+                </span>
+              </div>
+              <div class="selapsed">0.4s</div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <p class="note" data-anno>
+    ⚠ <b>Rows two and three are the same mark and different acts.</b> One posted a message to a
+    channel; the other pinned it. On the spare spine they are one symbol twice, and the only way to
+    tell them apart is the author's own step name — which is exactly the thing an author may not
+    have written carefully. ⭐ <b>Rich wins on the criterion, not on taste.</b>
+  </p>
+  <p class="note" data-anno>
+    <b>What B is right about, and what to take from it.</b> The mark alone is genuinely enough at the
+    smallest size, where the action name would wrap or truncate to nothing. §3's chat
+    <span class="kbd">RunCard</span> row uses <span class="kbd">xs</span> and keeps both by
+    <b>truncating the service, never the action</b> — the action is the part that differs between
+    two rows of the same vendor.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §3 — FIVE SURFACES, ONE ELEMENT. D-214-16's real test.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-five" class="variant">
+<div class="sheet">
+  <h2 data-anno>§3 · Five surfaces, one element, four sizes</h2>
+  <p class="lede" data-anno>
+    D-214-16: <em>"coverage should be a consequence of one component existing, not a list kept in
+    sync."</em> ⚠ <span class="kbd">SEED-206</span>'s own warning is <b>"do NOT wait for a catalog —
+    the spine gap is live TODAY on shipped surfaces"</b>, and a partial answer leaves the seed live
+    for the next phase to rediscover. Every identity below is the same markup with a different
+    <span class="kbd">data-size</span>.
+  </p>
+
+  <div class="surfgrid">
+
+    <div>
+      <h3 class="sub" data-anno>1 · panel — PhaseCard (md)</h3>
+      <div class="surface"><div class="surface-body">
+        <div class="phasecard">
+          <div class="pctop">
+            <span class="pcname">Escalate to the on-call channel</span>
+            <span class="selapsed">2.0s</span>
+          </div>
+          <div class="sidline">
+            <span class="sid" data-size="md" data-service="slack">
+              <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+              <span class="action">Post a message</span><span class="dot">·</span><span class="service">Aether Slack</span>
+            </span>
+          </div>
+          <div class="fail" data-reason="real">
+            <div class="flabel">Why it stopped</div>
+            <div class="freason">Channel #urgent-feedback-escalations not found or bot lacks permission to post.</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div>
+      <h3 class="sub" data-anno>2 · chat — RunCard (xs)</h3>
+      <div class="surface"><div class="surface-body">
+        <div class="runcard">
+          <div class="rtop"><span class="rname">Weekly customer sentiment</span><span class="selapsed">· 3 of 4</span></div>
+          <div class="rsteps">
+            <div class="runstep" data-state="done">
+              <span class="rp"></span>
+              <span class="sid" data-size="xs" data-service="slack">
+                <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+                <span class="action">Post a message</span><span class="dot">·</span><span class="service">Aether Slack</span>
+              </span>
+            </div>
+            <div class="runstep" data-state="failed">
+              <span class="rp"></span>
+              <span class="sid" data-size="xs" data-service="jira">
+                <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+                <span class="action">Create an issue</span><span class="dot">·</span><span class="service">Aether Jira</span>
+              </span>
+            </div>
+            <div class="runstep" data-state="pending">
+              <span class="rp"></span>
+              <span class="sid" data-size="xs" data-service="smtp">
+                <span class="mark" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+                <span class="action">Send an email</span><span class="dot">·</span><span class="service">Aether Mail</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <p class="note" data-anno>
+        ⚠ At <span class="kbd">xs</span> the <b>service truncates and the action never does</b> —
+        the action is what differs between two rows of the same vendor.
+      </p>
+    </div>
+
+    <div>
+      <h3 class="sub" data-anno>3 · WorkflowRunPage — RunStepList (sm)</h3>
+      <div class="surface"><div class="surface-body">
+        <div class="steplist">
+          <div class="slrow" data-state="done">
+            <span class="slp"></span>
+            <span class="sid" data-size="sm" data-service="slack">
+              <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+              <span class="action">Post a message</span><span class="dot">·</span><span class="service">Aether Slack</span>
+            </span>
+            <span class="selapsed">1.1s</span>
+          </div>
+          <div class="slrow" data-state="failed">
+            <span class="slp"></span>
+            <span class="sid" data-size="sm" data-service="jira">
+              <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+              <span class="action">Create an issue</span><span class="dot">·</span><span class="service">Aether Jira</span>
+            </span>
+            <span class="selapsed">0.8s</span>
+          </div>
+          <div class="slrow" data-state="pending">
+            <span class="slp"></span>
+            <span class="sid" data-size="sm" data-service="unknown">
+              <span class="mark" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-width="2" stroke-linecap="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></svg></span>
+              <span class="action">Query knowledge base</span><span class="dot">·</span><span class="service">Internal DB</span>
+            </span>
+            <span class="selapsed">—</span>
+          </div>
+        </div>
+      </div></div>
+      <p class="note" data-anno>
+        ⚠ The last row is <b>vendorless on purpose</b>, drawn in the interface's own ink — not a
+        broken image and not a borrowed logo.
+      </p>
+    </div>
+
+    <div>
+      <h3 class="sub" data-anno>4 · run receipt in a thread (sm)</h3>
+      <div class="surface"><div class="surface-body">
+        <div style="font-size:12.5px;line-height:1.6">
+          <div style="display:flex;gap:7px;align-items:center">
+            <span class="sid" data-size="sm" data-service="slack">
+              <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+            </span>
+            <span>Ran Post a message through Aether Slack.</span>
+          </div>
+          <div style="display:flex;gap:7px;align-items:center;margin-top:6px;color:var(--color-text-muted)">
+            <span class="sid" data-size="sm" data-service="jira">
+              <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+            </span>
+            <span>Did not run Create an issue through Aether Jira.</span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <h3 class="sub" data-anno>5 · the approval pause — PendingAskCard (lg)</h3>
+  <p class="note" data-anno style="margin-top:0;margin-bottom:10px">
+    ⭐ <b>This is the defect the phase would otherwise create.</b>
+    <span class="kbd">_external_action_clause</span> renders
+    <span class="kbd">config.tool_args</span> — which under D-214-01 holds <b>only the fixed
+    values</b>. Left alone, the pause would <b>name the constants and silently omit exactly the
+    arguments that vary</b>, which on an approval surface is worse than showing nothing. The
+    sentence below is composed <b>after resolution</b>, from what will actually leave.
+  </p>
+
+  <div class="ask">
+    <div class="apaused">Paused — waiting for you.</div>
+    <div class="anothing">Nothing has been sent yet.</div>
+
+    <div class="awill" style="display:flex;gap:8px;align-items:center">
+      <span class="sid" data-size="lg" data-service="smtp">
+        <span class="mark" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+      </span>
+      <span>It will run Send an email through Aether Mail.</span>
+    </div>
+
+    <div class="asend-label">What it will send</div>
+    <dl class="argtable">
+      <dt>to</dt><dd data-src="fixed">procurement@aether.ai</dd>
+      <dt>subject</dt><dd data-src="ask">Weekly sentiment — week 35</dd>
+      <dt>body</dt><dd data-src="upstream">Escalations rose 12% week over week, driven by three accounts…</dd>
+    </dl>
+
+    <div class="anotrecorded">Shown here only. The record keeps what ran, not what it said.</div>
+
+    <div class="arow2">
+      <button class="approve">Send it</button>
+      <button class="decline">Do not run it</button>
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    ⚠ <b>All three arguments render identically, and that is deliberate.</b>
+    <span class="kbd">to</span> was typed, <span class="kbd">subject</span> was asked for at launch,
+    <span class="kbd">body</span> came from an earlier step — and per-argument source annotation was
+    <b>considered and rejected</b> under D-214-15: the sentence is already long, and the pause's
+    question is <em>what leaves</em>, not <em>who chose it</em>. ⚠ <b>What matters is that all three
+    are HERE.</b> Under <span class="kbd">tool_args</span> only the first would have been.
+  </p>
+  <p class="note" data-anno>
+    ⭐ <b>D-213-14 is untouched and is now said out loud.</b> Shown once, in the moment, never
+    written to the audit ledger — <em>"showing a person what is about to leave is the whole point of
+    the pause; writing it into a queryable ledger forever is a different act."</em> The receipt keeps
+    carrying capability, connection id, host and tool name, and never the body.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §4 — the roster, and the named neutral.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-marks" class="variant">
+<div class="sheet">
+  <h2 data-anno>§4 · The mark roster — a reuse, not a new decision</h2>
+  <p class="lede" data-anno>
+    D-214-17: <span class="kbd">connectionMark.tsx</span> is <em>"the ONE service-to-mark map"</em>
+    and already carries the rule <b>a vendor shows its own mark; a vendorless shape is drawn in the
+    interface's own ink</b> — with every slug verified against the installed
+    <span class="kbd">@iconify-json/logos@1.2.13</span> rather than against any document.
+    ⚠ <b>Do not re-map anything.</b> If the module must serve a non-Settings surface, <b>move or
+    share it — do not fork it.</b>
+  </p>
+
+  <div class="roster">
+    <div class="rcell">
+      <span class="sid" data-size="md" data-service="slack">
+        <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#36C5F0" d="M5.04 15.17a2.52 2.52 0 1 1-2.52-2.52h2.52z"/><path fill="#36C5F0" d="M6.31 15.17a2.52 2.52 0 0 1 5.04 0v6.31a2.52 2.52 0 0 1-5.04 0z"/><path fill="#2EB67D" d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52z"/><path fill="#2EB67D" d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04z"/><path fill="#ECB22E" d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52z"/><path fill="#ECB22E" d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0z"/><path fill="#E01E5A" d="M15.17 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52z"/><path fill="#E01E5A" d="M15.17 17.69a2.52 2.52 0 0 1 0-5.04h6.31a2.52 2.52 0 0 1 0 5.04z"/></svg></span>
+        <span class="action">Post a message</span>
+      </span>
+      <div class="rkey" data-anno>logos:slack-icon · ink self</div>
+    </div>
+    <div class="rcell">
+      <span class="sid" data-size="md" data-service="jira">
+        <span class="mark" data-ink="self"><svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#2684FF" d="M11.53 2 2 11.53a1 1 0 0 0 0 1.41l7.06 7.06 2.47-2.47-5.18-5.29 5.18-5.18z"/><path fill="#0052CC" d="M12.47 22 22 12.47a1 1 0 0 0 0-1.41L14.94 4l-2.47 2.47 5.18 5.29-5.18 5.18z"/></svg></span>
+        <span class="action">Create an issue</span>
+      </span>
+      <div class="rkey" data-anno>logos:jira · ink self</div>
+    </div>
+    <div class="rcell">
+      <span class="sid" data-size="md" data-service="smtp">
+        <span class="mark" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+        <span class="action">Send an email</span>
+      </span>
+      <div class="rkey" data-anno>lucide Mail · ink stroke — SMTP has no vendor</div>
+    </div>
+    <div class="rcell">
+      <span class="sid" data-size="md" data-service="unknown">
+        <span class="mark" data-ink="stroke"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-width="2" stroke-linecap="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></svg></span>
+        <span class="action">Ask the wiki</span>
+      </span>
+      <div class="rkey" data-anno>the NAMED neutral · ink stroke</div>
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    ⚠ <b>SMTP takes the neutral mark, and that is a FINDING rather than a gap.</b>
+    <span class="kbd">logos</span> carries no SMTP mark at all — its only mail-shaped names are
+    <em>vendors</em> (<span class="kbd">google-gmail</span>, <span class="kbd">mailgun</span>…).
+    Borrowing Gmail's mark for a Fastmail SMTP connection would be the ROADMAP's own named
+    <em>"a logo is approximated"</em> failure.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The neutral is NAMED — never nothing, and never another service's mark.</b> That answers
+    <span class="kbd">SEED-206</span>'s measured ClickUp hole: an unmapped service takes the neutral,
+    which is a decision the map makes rather than an absence the render discovers.
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The ink is not a style choice — each arm exists because of a measured property of the icon
+    body.</b> <span class="kbd">self</span>: Slack's four elements and Jira's three carry their own
+    fills, so a colour utility would be inert and a fill utility would flatten four brand colours
+    into one. <span class="kbd">stroke</span>: lucide sets <span class="kbd">fill="none"
+    stroke="currentColor"</span> as <em>presentation attributes</em>, and a CSS rule on the same
+    element <b>beats</b> a presentation attribute — so a fill utility here fills the outline into a
+    solid blob. ⚠ And a third arm exists in the shipped module for bodies with zero fills and no
+    <span class="kbd">currentColor</span>, which inherit <span class="kbd">fill: black</span> and go
+    <b>invisible</b> on Deep Midnight while every test stays green.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §5 — the sentence, before and after. The measured tautology.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-clause" class="variant">
+<div class="sheet">
+  <h2 data-anno>§5 · The approval sentence, before and after</h2>
+  <p class="lede" data-anno>
+    Both lines below were <b>driven verbatim on both shapes</b> at Phase 213's close and recorded as
+    finding 1. This is what D-214-14 changes, and how.
+  </p>
+
+  <div class="baline before">
+    <span class="balabel" data-anno>today · capability row</span>
+    <span class="bademo mono">It will run "post_message" through post_message.</span>
+  </div>
+  <div class="baline before">
+    <span class="balabel" data-anno>today · MCP row</span>
+    <span class="bademo mono">It will run "ask_question".</span>
+  </div>
+  <div class="baline after">
+    <span class="balabel" data-anno>after · capability row</span>
+    <span class="bademo">It will run Post a message through Aether Slack.</span>
+  </div>
+  <div class="baline after">
+    <span class="balabel" data-anno>after · MCP row</span>
+    <span class="bademo">It will run Ask the wiki through DeepWiki.</span>
+  </div>
+  <div class="baline after">
+    <span class="balabel" data-anno>after · service unresolvable</span>
+    <span class="bademo">It will run Post a message.</span>
+  </div>
+
+  <p class="note" data-anno>
+    <b>What was actually wrong.</b> <span class="kbd">_external_action_clause</span> fills the
+    service slot from <span class="kbd">config.capability</span> — the <em>same value</em> it puts
+    in the tool slot on a capability row, producing a tautology; and an MCP row carries
+    <span class="kbd">capability = None</span>, so the clause is omitted entirely and a GitHub,
+    DeepWiki or Notion pause <b>names no service at all</b>. The service a person needs sits on the
+    <b>connection row</b> and was never read.
+  </p>
+  <p class="note" data-anno>
+    <b>The fix keeps the composer pure.</b> D-214-14: the engine already holds a pool and already
+    reads that connection to run the step, so <b>it resolves the display name and hands it to the
+    composer as an argument</b>. ⚠ <b>Rejected: storing the service name on the step config</b> — a
+    stored copy of a derived fact goes stale the moment the connection is renamed, and D-213-02
+    rejected exactly this shape for descriptors (<em>computed never stored</em>).
+  </p>
+  <p class="note" data-anno>
+    ⚠ <b>The last line is the rule that survives.</b> An absent name still omits the service clause
+    — <em>"never draw a name the system cannot know"</em> is preserved, not overridden. The action
+    alone, and the neutral mark. <b>Not "Unknown service".</b>
+  </p>
+
+  <h3 class="sub" data-anno>And the failure sentinel, which must get narrower — never wider</h3>
+  <div style="max-width:760px">
+    <div class="fail" data-reason="real" style="margin-bottom:10px">
+      <div class="flabel">Why it stopped</div>
+      <div class="freason">Channel #urgent-feedback-escalations not found or bot lacks permission to post.</div>
+    </div>
+    <div class="fail sentinel" data-reason="unknown">
+      <div class="flabel">Why it stopped</div>
+      <div class="freason">Failure reason not captured by the backend — surfaced explicitly so the run is never shown as an empty success.</div>
+    </div>
+  </div>
+  <p class="note" data-anno>
+    ⚠ <b>D-214-18 says measure before fixing, and names the run.</b> Read
+    <span class="kbd">workflow_phases.error</span> for that failed phase and compare it against the
+    <span class="kbd">run_failed</span> frame. <b>Column populated</b> ⇒ the defect is in what the
+    event carries; fix the emitter, and <span class="kbd">PhaseCard.tsx:253</span> needs nothing.
+    <b>Column empty too</b> ⇒ the defect is in the executor's failure path.
+    ⚠ <b>Deciding before measuring is how the phase fixes the wrong half.</b>
+  </p>
+  <p class="note" data-anno>
+    ⭐ <b>The sentinel is an honesty mechanism, so its condition narrows and its words do not
+    change.</b> Firing it when the reason IS known trains readers to distrust it — which would cost
+    more than the bug it was built for.
+  </p>
+</div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div id="sketch-tools">
+  <select id="theme-switcher" title="theme">
+    <option value="default">Deep Midnight</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button id="tool-narrow">squeeze to 320px</button>
+</div>
+
+<script src="./COPY.js"></script>
+<script>
+document.querySelectorAll(".variant-tab").forEach(function (t) {
+  t.addEventListener("click", function () {
+    document.querySelectorAll(".variant").forEach(function (v) { v.classList.remove("active") })
+    document.querySelectorAll(".variant-tab").forEach(function (x) { x.classList.remove("active") })
+    document.getElementById("variant-" + t.dataset.v).classList.add("active")
+    t.classList.add("active")
+    window.scrollTo(0, 0)
+  })
+})
+
+/* The pause is live — and the decline writes the receipt's refused line, so both halves of
+   §4's receipt vocabulary are reachable by acting rather than by reading. */
+var toast = document.getElementById("toast")
+var timer = null
+function say(msg) {
+  toast.textContent = msg
+  toast.classList.add("show")
+  clearTimeout(timer)
+  timer = setTimeout(function () { toast.classList.remove("show") }, 2600)
+}
+document.addEventListener("click", function (e) {
+  if (e.target.closest(".ask .approve")) say(COPY.RECEIPT_SENT("Send an email", "Aether Mail"))
+  if (e.target.closest(".ask .decline")) say(COPY.RECEIPT_REFUSED("Send an email", "Aether Mail"))
+})
+
+/* ⚠ SQUEEZE THE SURFACES TO A PHONE-WIDTH COLUMN. The identity has to survive it, and the
+   property under test is which half truncates: the SERVICE may, the ACTION may not. */
+document.getElementById("tool-narrow").addEventListener("click", function () {
+  document.querySelectorAll(".surface, .ask").forEach(function (n) {
+    n.style.maxWidth = n.style.maxWidth === "320px" ? "" : "320px"
+  })
+})
+
+document.getElementById("theme-switcher").addEventListener("change", function () {
+  document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css"
+})
+</script>
+</body>
+</html>

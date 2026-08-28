@@ -2338,3 +2338,34 @@ deliverable type (file / answer / both / neither). **C is ruled out**: it has no
 for the type to change. ⚠ The hero fixes what the column LEADS WITH; it does not by itself end the
 step-name duplication — the per-step **yields** are the proposal for that, and the rendered sketch
 must settle whether they earn it.
+
+### Phase 214 session — a step names its service and its action (2026-08-28)
+
+**Step 4 of the ratified method.** Step 1 (direction) is
+`214-stitch-step-names-service-and-action/` — eleven Stitch screens, four surfaces, base + two
+variants each. ⚠ **The two are never collapsed** (`SEED-155`): Stitch renders zero shipped
+components, and these four re-express the chosen direction against real ones. The stitch README's
+*"What the sketch must now settle"* list IS this decomposition.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 214 | argument-form-and-its-source | How does a step's argument declare where its value comes from — and does the shipped 400px panel survive a field-per-argument form? | *pending* — A 400px rail · B wide + source gutter · C wide + inline source | phase-214, step-01, step-02, arguments, panel-width, acceptance-bar |
+| 215 | publish-refuses-by-name | When publish refuses a step nothing can supply, what does it say — and what must it never say? | *pending* — A considered review · B refused on the canvas | phase-214, step-03, publish, refusal, gauntlet, acceptance-bar |
+| 216 | the-mark-and-the-action-everywhere | Does one shared step-identity element survive five run surfaces at four sizes — and does the approval pause show what actually leaves? | *pending* — A rich · B spare (⚠ B fails SC#4 by construction; it is the counter-example) | phase-214, step-04, step-05, seed-206, approval-pause, acceptance-bar |
+| 217 | the-door-that-knows-your-services | How does the describe door refuse a service the author named but never connected — and does the refusal point at the words that caused it? | *pending* — A picker first · B picker first + the anchor | phase-214, step-06, seed-208, describe-door, acceptance-bar |
+
+**All four are executable acceptance bars**, on the 213 pattern: `COPY.js` (the vocabulary that
+ports) + `index.html` + `drive.cjs` (the contract, executable) + a generated
+`BUILD-CONTRACT.generated.md`. **587 assertions across the four (141 · 129 · 138 · 179), 0 failing.**
+
+⭐ **What the sketches found that Stitch structurally could not.** Stitch drew `Cc` and `Reply to`
+rows for `send_email`. `smtp_adapter.INPUT_SCHEMA` declares **exactly three** properties under
+`additionalProperties: False`, and the adapter **raises on any undeclared key** — so a `cc` field
+would specify a form the backend refuses on every submission, while typechecking, rendering and
+passing every frontend test. That is the whole argument for step 4 existing.
+
+⚠ **One fork is deliberately left open for the operator: the panel track.** Sketch 214 §4 draws
+`400px` (shipped, `WorkflowBuilderPage.tsx:2817`) and `clamp(480px, 38%, 640px)` (Settings' track
+since 213) over byte-identical content. **The consequence is conditional** — 400px drops the source
+gutter and makes variant C the shape; the clamp ships variant B and changes a pinned assertion in
+the same commit.
