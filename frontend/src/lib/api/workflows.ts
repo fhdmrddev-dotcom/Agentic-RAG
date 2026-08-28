@@ -596,6 +596,35 @@ export interface WorkflowRunPhase {
    *  fence sweeping its own RAW source for it at zero occurrences, and this tree has recorded
    *  six times that a comment naming a forbidden token satisfies the grep meant to forbid it. */
   deliverable_text?: string | null
+  /** Phase 214 (STEP-05 / D-214-23) — WHY this step failed, in the adapter's or the gate's own
+   *  words: the step's `output["_failure_reason"]`, written by `fail_phase` on every failure.
+   *
+   *  ⚠ **`null` MEANS NOT RECORDED, AND AN EMPTY STRING IS NEVER SENT.** The server normalises
+   *  whitespace-only to `null`, so absence has exactly one spelling and the panel's
+   *  `reason_unknown` sentinel keeps meaning what it says. **Never `?? ""`** — that is the
+   *  same collapse `step_count`'s `0`-vs-`null` rule forbids twenty lines up, and it is the
+   *  reason `BUG-260826-05` read "reason not captured" while the reason sat in the row.
+   *
+   *  ⚠ Non-null on failed steps only. ⚠ **MODEL / THIRD-PARTY-INFLUENCED CONTENT** — it can
+   *  originate from a vendor's error body. Render it as a text node; the raw-HTML prop is
+   *  deliberately not spelled here (`WorkflowRunPage.tsx` sweeps its own source for it). */
+  failure_reason?: string | null
+  /** Phase 214 (STEP-04 / D-214-16) — the ACTION this step runs, by its wire name, derived
+   *  server-side from the definition that executed (`config.tool_name`). `null` on every phase
+   *  type that is not `external_action`, and on a step that names only a native capability. */
+  tool_name?: string | null
+  /** Phase 214 (STEP-04) — the native capability (`send_email` | `create_ticket` |
+   *  `post_message`). `null` on an MCP step, which carries a `tool_name` and no capability at
+   *  all — an absence that is a FACT, not a gap. */
+  capability?: string | null
+  /** Phase 214 (STEP-04 / D-214-14 / D-213-02) — the SERVICE a person would name: the bound
+   *  connection's display name, resolved server-side at read time. **Computed, never stored.**
+   *
+   *  ⚠ **`null` IS LEGITIMATE and means the connection could not be resolved** (deleted,
+   *  another org's, or none bound). The shared identity element renders the ACTION ALONE for
+   *  it. **Never substitute**: not "Unknown service", not the capability id, not the connection
+   *  id — never draw a name the system cannot know. */
+  service_name?: string | null
 }
 
 /**
