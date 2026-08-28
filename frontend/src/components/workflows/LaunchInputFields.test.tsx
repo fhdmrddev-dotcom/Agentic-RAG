@@ -28,6 +28,10 @@ import { render, screen, fireEvent } from "@testing-library/react"
 import { LaunchInputFields } from "./LaunchInputFields"
 import launchInputFieldsSource from "./LaunchInputFields?raw"
 import { launchInputFields } from "./soulData"
+// Plan 214.1-01 Task 3, on its own line so this file's diff stays additive: the two shipped
+// marks, IMPORTED rather than re-typed, so the cases below compare character-identity against
+// the vocabulary's own constants instead of a second copy of the copy.
+import { ARG_OPTIONAL_MARK, ARG_REQUIRED_MARK } from "./argumentVocabulary"
 
 const noop = () => {}
 
@@ -204,13 +208,85 @@ describe("LaunchInputFields — source fence: it is a leaf", () => {
     expect(codeOf(`const [a, b] = useState(1)`)).toContain("useState")
   })
 
-  it("has exactly ONE import, and it is a TYPE", () => {
+  it("214.1 — renders the SHIPPED required / optional marks, never a new string", () => {
+    render(
+      <LaunchInputFields
+        fields={[
+          { key: "to", label: "Recipient", required: true },
+          { key: "cc", label: "Copy to", required: false },
+        ]}
+        values={{}}
+        onChange={noop}
+      />,
+    )
+    expect(screen.getByTestId("run-field-mark-to")).toHaveTextContent(ARG_REQUIRED_MARK)
+    expect(screen.getByTestId("run-field-mark-cc")).toHaveTextContent(ARG_OPTIONAL_MARK)
+
+    // The two marks are DIFFERENT, so the assertions above cannot both be satisfied by one
+    // string rendered everywhere.
+    expect(ARG_REQUIRED_MARK).not.toBe(ARG_OPTIONAL_MARK)
+  })
+
+  it("214.1 — an ABSENT required reads as required, matching the server default", () => {
+    render(<LaunchInputFields fields={[{ key: "to" }]} values={{}} onChange={noop} />)
+    expect(screen.getByTestId("run-field-mark-to")).toHaveTextContent(ARG_REQUIRED_MARK)
+  })
+
+  it("214.1 — the label arm still wins over the key arm when a mark is present", () => {
+    // The mark is an ADDITION, not a replacement: the two-arm rule above is untouched, and
+    // the first span inside the label is still the label/key reading.
+    render(
+      <LaunchInputFields
+        fields={[{ key: "to", label: "Recipient", required: true }]}
+        values={{}}
+        onChange={noop}
+      />,
+    )
+    const input = screen.getByTestId("run-input-to")
+    const first = input.parentElement?.querySelector("span")
+    expect(first).toHaveTextContent("Recipient")
+    expect(first?.className).not.toMatch(/font-mono/)
+  })
+
+  it("214.1 — still returns null for an empty fields array", () => {
+    const { container } = render(
+      <LaunchInputFields fields={[]} values={{}} onChange={noop} />,
+    )
+    expect(container.innerHTML).toBe("")
+    expect(screen.queryByTestId("run-inputs")).toBeNull()
+  })
+
+  it("214.1 — does NOT block anything: no field is disabled and no control is required", () => {
+    // ⛔ D-214-04's rejected arm, kept rejected. Blocking a launcher's confirm would change
+    // the contract of three shipped doors, and the SMTP adapter plus the publish gate already
+    // fail CLOSED on an empty required argument — so nothing silently succeeds today.
+    render(
+      <LaunchInputFields fields={[{ key: "to", required: true }]} values={{}} onChange={noop} />,
+    )
+    const input = screen.getByTestId("run-input-to") as HTMLInputElement
+    expect(input.disabled).toBe(false)
+    expect(input.required).toBe(false)
+  })
+
+  it("has exactly TWO imports: the type, and the shipped mark vocabulary", () => {
     // ⚠ `\r?\n` — this repo's sources are CRLF and a bare `\n` terminator matches nothing,
     // which would make the assertion pass vacuously.
+    //
+    // ⚠ THIS FENCE READ `exactly ONE import, and it is a TYPE` UNTIL PHASE 214.1-01, and the
+    // widening is stated rather than quietly performed. The property it defends is *"this is a
+    // LEAF"* — no shared state, no client module, no provider — and NOT a permanent import
+    // count. `argumentVocabulary.ts` is itself a `.ts` leaf of pure strings, so importing the
+    // two shipped marks from it keeps the leaf claim exactly and avoids the alternative, which
+    // was a THIRD copy of the words "Required" / "Optional" beside two that already ship.
+    // The negative fences above (no state hook, no api module, no context hook) are UNCHANGED
+    // and are what actually carry the claim.
     const imports = CODE.match(/^import .*?$/gm) ?? []
-    expect(imports).toHaveLength(1)
+    expect(imports).toHaveLength(2)
     expect(imports[0]).toMatch(/^import type \{ EntryInputField \}/)
     expect(CODE).toMatch(/import type \{ EntryInputField \} from "@\/components\/workflows\/soulData"\r?\n/)
+    expect(CODE).toMatch(
+      /import \{[\s\S]*?ARG_REQUIRED_MARK[\s\S]*?\} from "@\/components\/workflows\/argumentVocabulary"/,
+    )
   })
 
   it("carries no runtime `export const` beside the component (react-refresh)", () => {
