@@ -2385,7 +2385,7 @@ into this surface (D-1)** and **the surface is renamed `Library` (D-2, front-end
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 218 | the-library-and-its-tabs | What is the Library's tab set, and which of the reference's surfaces can this app draw honestly? | *pending* — A five tabs · **B four tabs** | seed-224, bus-026, library-health, charts, acceptance-bar |
+| 218 | the-library-and-its-tabs | What is the Library's tab set, and which of the reference's surfaces can this app draw honestly? | **A · five tabs** (operator, 2026-08-28) | seed-224, bus-026, library-health, charts, acceptance-bar |
 
 **124 assertions, 0 failing — and 31+ of them read the LIVE SOURCE TREE**, not the sketch. Three were
 driven RED against planted defects and the file restored md5-identical.

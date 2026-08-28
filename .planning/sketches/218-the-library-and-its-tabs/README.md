@@ -2,7 +2,7 @@
 sketch: 218
 name: the-library-and-its-tabs
 question: "What is the Library's tab set, and which of the reference redesign's surfaces can this app draw honestly?"
-winner: null
+winner: "A"
 tags: [seed-224, bus-026, documents, library-health, retrieval, ingestion, charts, g-2, acceptance-bar]
 ---
 
@@ -44,7 +44,7 @@ The operator's direction, in two parts:
 
 | tab | what it is |
 |---|---|
-| **A · five tabs** | `Documents · Views · Ingestion · Indexing · Health`. The seed's set. |
+| **A · five tabs** ⭐ | `Documents · Views · Ingestion · Indexing · Health`. The seed's set. **CHOSEN by the operator 2026-08-28.** |
 | **B · four tabs** | ⭐ the same, minus `Views`. **The fork this sketch exists to settle.** |
 | **Health** | the charts screen — ring, bars, per-document strip, checked queries |
 | **Indexing** | reference screen 13's composition, with its two invented numbers removed |
@@ -245,3 +245,23 @@ worse than no fence.
   is why a G-4 row must name this file as its reference and be driven **by looking**.
 - **Whether `retrieval_events` is worth a table at all.** The brief measures that the two missing
   facts are keys on an existing jsonb column; a per-query-grain table is a separate, larger question.
+
+---
+
+## ⭐ DECIDED — variant A, the operator, 2026-08-28
+
+> *"First I would prefer A."*
+
+**The five-tab set ships:** `Documents · Views · Ingestion · Indexing · Health`.
+
+⚠ **This overrides the recommendation in §1, and the reasoning there stays on the page rather than
+being deleted.** The sketch argued for B on the grounds that `Views` has no content of its own — the
+sidebar beside it already renders the whole `ViewsGroup`. That argument is not withdrawn; it is
+**outvoted**, and it becomes a *build constraint* rather than a rejected idea:
+
+> **Whoever builds tab 2 must decide where the selection state lives.** With Views in both the
+> sidebar and a tab, selecting a view in one place and not the other is the defect this creates.
+> **One source of truth, two renderings** — never two states.
+
+**Still owed by the operator:** the `Retrieval Score` ruling (§3 of the Health tab — bare as it ships,
+or qualified with what it measures). It is a small call and it does not block planning.
