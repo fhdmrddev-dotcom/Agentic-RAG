@@ -253,6 +253,75 @@ sheet number, so the pair stays unique.
 needs a conversion step (ODA File Converter, free; or the CAD tool's own DXF export) before any
 of L3 applies. Nothing in this repo can open it today.
 
+## ⚠⚠⚠ THE DXF MEASURED 2026-08-28 — THIS SETTLES THE BUSINESS CASE
+
+The operator converted the supplied DWG to DXF (`AC1018` / R2004, 1.0 MB, via cloudconvert)
+and it was read with `ezdxf 1.4.4`. **This is the comparison the whole seed was waiting for.**
+
+⚠ **NOT LIKE-FOR-LIKE, AND THAT IS STATED FIRST SO NOBODY QUOTES IT AS IF IT WERE.** The DXF is
+a *different drawing* from the PDF — a structural/architectural SECTION detail, not the
+residential floor plan. It therefore cannot show how much better DXF is *for that PDF*. What it
+does show is what a DXF **carries as a format**, and that is the question that decides the
+architecture.
+
+| | the PDF (floor plan) | **the DXF (section detail)** |
+|---|---|---|
+| geometry | 2,822 anonymous lines | 1,178 LINE + 56 ARC + 32 LWPOLYLINE + 14 HATCH |
+| **numbers available** | **ONE** (`6`) | **28 DIMENSION entities with computed values** |
+| classification | none | **32 NAMED LAYERS** |
+| countable items | none | **16 INSERT block references** |
+| specification text | none | **36 MULTILEADER + 5 MTEXT** |
+
+**1. Real measurements, not glyphs.** The 28 `DIMENSION` entities return values through
+`get_measurement()`: `108.0, 104.0, 4.0, 12.0, 56.0, 70.5, 272.0, 390.0, 141.0, 249.0, 42.0 …`
+⚠ **Note `text='<>'` on almost all of them** — `<>` is AutoCAD's placeholder meaning *"display
+the measured value"*. **The number is not stored as text at all; it is COMPUTED from the
+geometry.** That is precisely why the PDF has none: plotting resolves `<>` into line-art glyphs
+that `page.get_text()` cannot see as numbers.
+
+**2. Layers classify the geometry — the thing a PDF cannot do.** Wall length is separable from
+handrail, ceiling, door and stair length *by name*:
+
+    Arch_Section_Wall       50 lines    4,678.8 units
+    Arch_Detail_Door        55 lines    2,250.0 units
+    Arch_Section_Ceiling    17 lines    2,449.7 units
+    Struc_Section_Conc     169 lines    3,859.3 units
+    Struc_Section_Steel    133 lines    4,774.2 units
+
+**3. Blocks give COUNTS for free** — `C250x23` ×8, `W250x33` ×2, `STAIR` ×2,
+`outstandingconn1` ×4. Those are **standard steel section designations** (a 250mm channel and a
+250mm wide-flange beam), so this is a steel schedule readable by counting, with no inference.
+
+**4. ⚠ THE SPECIFICATIONS ARE IN THE FILE, AND THIS WAS NOT ANTICIPATED ANYWHERE IN THIS SEED.**
+The multileaders carry what are effectively BOQ line-item descriptions already written by the
+engineer:
+
+> `2"x6" [38x140] WALL FRAMING` · `3/4"[30] O.S.B SHEATHING` · `1/2"[12.5] GYPSUM BOARD` ·
+> `EPDM ROOFING MEMBRANE` · `HSS 1-1/2"x1-1/2" [38x38] RAILING (TYP.)` · `9.5%%C CABLES (TYP.)`
+
+**Material, size and dual imperial/metric units, per element.** The seed assumed wall TYPE would
+have to be inferred from line thickness; on this evidence it is often simply *written down*.
+
+**Two practical notes for whoever implements it:** `d.units == 1` (**inches**) — unit resolution
+is per-file and must never be assumed; and multileader text carries CAD formatting codes
+(`\A1;`, `\W1.15;`, `\P`, `%%C`) that need stripping before use. Both are small, known problems.
+
+### Verdict this produces
+
+**L3 (DXF) is not merely "better" — it is a different class of answer.** The PDF path infers;
+the DXF path reads. Everything the business case needs — measured dimensions, classified
+quantities, item counts, material specs — is present as data.
+
+**Recommended sequencing change:** this seed listed DXF as L3, *after* OCR and full-page vision.
+**It should be FIRST.** It is the cheapest of the three (one MIT library, no per-page cost, no
+model calls, no new infrastructure), the only one that yields *reliable* rather than *advisory*
+output, and it is the one that makes the product promise defensible. OCR (L1) remains needed for
+scans, and full-page vision (L2) for PDF-only clients — but neither should block L3.
+
+⚠ **`ezdxf 1.4.4` was pip-installed into `backend/venv` for THIS EVALUATION ONLY.** It is not in
+`requirements.txt` and is not a committed dependency; adding it is a phase decision, not a
+side effect of a probe.
+
 ## Open questions for whoever picks this up
 
 - Which OCR engine, decided on **real customer drawings**, not on a benchmark corpus.
