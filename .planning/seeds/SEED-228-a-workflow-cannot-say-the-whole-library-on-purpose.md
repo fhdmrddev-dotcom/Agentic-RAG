@@ -5,7 +5,7 @@ status: planted
 planted: 2026-08-28
 planted_by: operator, challenging the 2026-08-04 decision while driving Phase 214.1
 surface: Agentic-RAG
-severity: major
+severity: blocking
 category: design gap / governance
 priority: high
 scope: >
