@@ -17,7 +17,10 @@ import userEvent from "@testing-library/user-event"
 // The component SOURCE, via the same `?raw` loader `PublishGauntlet.test.tsx` reads it with
 // (typechecks under `vite/client`; a `node:fs` spelling would add new `tsc` errors).
 import refusalListSource from "./PublishRefusalList?raw"
-import { PublishRefusalList, isArgumentRefusal, type ArgumentRefusal } from "./PublishRefusalList"
+import { PublishRefusalList } from "./PublishRefusalList"
+// ⚠ The predicate lives in its own pure module — `react-refresh/only-export-components` is
+// an ACTIVE error in this repo, measured at 214-10 rather than assumed.
+import { isArgumentRefusal, type ArgumentRefusal } from "./publishRefusalEntry"
 import {
   ALREADY_PUBLISHED_NOTE,
   REFUSAL_FOR_KIND,

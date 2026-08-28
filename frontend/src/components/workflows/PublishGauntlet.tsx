@@ -51,6 +51,29 @@ import type { DefShape } from "@/components/workflows/soulData"
 // live in the pure verdict module, next to the other sentences a surface says about a
 // check; see that module's docblock for why a component file cannot own them.
 import { blockedSentence } from "@/components/workflows/verdictModel"
+// Phase 214-10 (STEP-03, sketch 215) — the ARGUMENT-GAP refusal, and the ONE thing this
+// file gains from it: an import and a mounted child. Every one of the five sentences, the
+// count line, the two next actions and D-214-12's not-retroactive note live in the leaf and
+// in `publishRefusalVocabulary.ts` — deliberately breaking this file's growth pattern, which
+// has been to render each new refusal shape inline (see the hot-file ledger row).
+//
+// ⚠ `isArgumentRefusal` is the KEY-DETECTION predicate for those five codes, and it is used
+// here for one purpose only: to keep the generic renderer below from printing the SAME
+// failure a second time as a raw diagnostic. Rule 4 is preserved — the detection is per
+// ENTRY, and everything the predicate declines still renders exactly as it shipped. It is a
+// separate pure module from the component because `react-refresh/only-export-components` is
+// an ACTIVE error here (measured at 214-10; same finding as `argumentVocabulary.ts`'s).
+import { PublishRefusalList } from "@/components/workflows/PublishRefusalList"
+import { isArgumentRefusal } from "@/components/workflows/publishRefusalEntry"
+// Sketch 215 #11 — what the golden run says on a passing row. The reader's actual question
+// at this moment is *did it just email my customer?* — and #8's three stage words, which
+// put the spine's state in LANGUAGE rather than only in colour.
+import {
+  GOLDEN_NO_SEND,
+  STAGE_BLOCKED,
+  STAGE_NOT_REACHED,
+  STAGE_PASSED,
+} from "@/components/workflows/publishRefusalVocabulary"
 // Phase 127-02 Task 1 (WUX-03, sketch 051-A) — the engized gauntlet re-skin.
 // The engine chip mirrors RunCard's providerLogo()→Bot fallback (icon-convention
 // §1); the stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3) —
@@ -195,6 +218,17 @@ const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[
  * pulse follows the run.
  */
 const RUNNING_STAGE_INDEX = STAGES.findIndex((s) => s.codes.includes("golden_run_timeout"))
+
+/**
+ * The codes the GOLDEN RUN row itself can refuse with — read off the table's own row rather
+ * than written down a second time (Phase 214-10, sketch 215 #11).
+ *
+ * ⚠ `golden_run_id != null` alone is NOT "the golden run passed": a run that timed out or
+ * errored can still have produced a row, and telling that author *"nothing was sent"* would
+ * be a claim about a run that did not finish its own check. The reassurance is gated on the
+ * row PASSING, and the gate follows the table wherever the row moves.
+ */
+const GOLDEN_RUN_CODES: readonly string[] = STAGES[RUNNING_STAGE_INDEX]?.codes ?? []
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
 function httpStatusForKind(kind: PublishOutcome["kind"]): number {
@@ -476,8 +510,33 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
             : isRunning
               ? "text-amber-600 dark:text-amber-400"
               : "text-muted-foreground"
+        // ── PHASE 214-10 (SKETCH 215 #8): THE SPINE'S STATE, IN WORDS ────────────────
+        //
+        // The strip has carried its state in COLOUR and a ✓ badge alone since 127-02, so a
+        // reader who cannot separate the greens from the reds — or who is being read this
+        // page aloud — gets no state at all, and no test could assert one either.
+        //
+        // ⚠ IT IS EMITTED ONLY WHEN A BLOCK WAS PLACED, AND THAT RESTRAINT IS THE POINT.
+        // At rest `blockedIndex` is -1 and `isPassed` is `!running`, i.e. TRUE for every
+        // node — the ladder is drawn hopefully before anything has run. Writing *"Checked"*
+        // into the DOM there would turn a visual convention into an explicit claim that ten
+        // checks passed when none of them has been attempted. The fail-closed unknown-block
+        // case (`unknownBlock`) is likewise -1 and likewise says nothing: we could not place
+        // the refusal, so we do not name any node's state.
+        const stageState =
+          blockedIndex >= 0
+            ? isBlocked
+              ? STAGE_BLOCKED
+              : isPassed
+                ? STAGE_PASSED
+                : STAGE_NOT_REACHED
+            : undefined
         return (
-          <div key={stage.label} className="flex items-start" title={stage.what}>
+          <div
+            key={stage.label}
+            className="flex items-start"
+            title={stageState ? `${stage.what} — ${stageState}` : stage.what}
+          >
             {/* ── PORTED FROM SKETCH 200 `publish.html` (2026-08-20) ────────────────────
                 The sheet draws the strip as round 32px beads on ONE hairline rule, each with
                 a small ✓ tucked at its lower-right, under an uppercase wide-tracked caption.
@@ -509,7 +568,11 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
                 {running && i === RUNNING_STAGE_INDEX && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
-            <div data-testid="spine-stage" className="flex w-[48px] shrink-0 flex-col items-center gap-2">
+            <div
+              data-testid="spine-stage"
+              data-stage-state={stageState}
+              className="flex w-[48px] shrink-0 flex-col items-center gap-2"
+            >
               <div
                 data-testid="spine-node"
                 className={`relative grid h-8 w-8 place-items-center rounded-full border-2 ${nodeTone} ${
@@ -702,6 +765,21 @@ function GauntletContent({
       : blockedSentence(verdict.blocked_stage)
     : ""
 
+  // ── PHASE 214-10 (STEP-03, sketch 215) — THE CAUSE, AND WHAT THE RUN DID NOT DO ───────
+  //
+  // The entries the argument-gap refusal claims. Derived ONCE and used twice — the cause
+  // block renders them, the generic list below skips them — so the two can never disagree
+  // about which entries were already said in plain words.
+  const argumentRefusals = verdict ? verdict.named_failures.filter(isArgumentRefusal) : []
+  // Everything else, VERBATIM and in order, through the shipped KEY-DETECTION renderer.
+  const genericFailures = verdict ? verdict.named_failures.filter((e) => !isArgumentRefusal(e)) : []
+  // Sketch 215 #11: the golden run ran AND was not the row that stopped. See
+  // `GOLDEN_RUN_CODES` for why the run id alone is not enough to make this claim.
+  const goldenRunPassed =
+    verdict != null &&
+    verdict.golden_run_id != null &&
+    !(verdict.blocked_stage != null && GOLDEN_RUN_CODES.includes(verdict.blocked_stage))
+
   return (
     <div className="w-full">
       {/* Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③): the PREPENDED pub-scale
@@ -717,6 +795,23 @@ function GauntletContent({
       <div data-testid="publish-soul" className="mb-2">
         <WorkflowSoul def={definition} scale="pub" />
       </div>
+
+      {/* ── PHASE 214-10 (STEP-03, sketch 215 #7): THE CAUSE SITS ABOVE THE SPINE ────────
+          A person reads WHAT IS WRONG before they read WHERE IT STOPPED. The spine is a map
+          of the checks; it is not an answer, and putting it first makes an author decode a
+          stage name to reach a sentence they could have read directly — which is
+          `BUG-260815-06` in one line of JSX.
+
+          It renders NOTHING when no entry is one of the five, so every other stage's block
+          is byte-for-byte the surface that shipped. `totalSteps` is passed only when the
+          caller actually holds the definition; absent, the *"the other N are ready"* line is
+          not rendered rather than guessed. */}
+      {argumentRefusals.length > 0 && (
+        <PublishRefusalList
+          entries={verdict?.named_failures ?? []}
+          totalSteps={definition?.phases?.length ?? null}
+        />
+      )}
 
       {/* D0 — 8-stage energy-spine: ABOVE the form (sketch 051-A). The spine is the
           centrepiece of the gauntlet — always visible once the modal opens so the user
@@ -925,13 +1020,34 @@ function GauntletContent({
                 <VerdictFields verdict={verdict} />
               </details>
 
-              {/* named_failures rendered by KEY-DETECTION (any string/unknown → block). */}
-              {verdict.named_failures.length > 0 && (
+              {/* named_failures rendered by KEY-DETECTION (any string/unknown → block).
+                  ⚠ PHASE 214-10 SUBTRACTS EXACTLY ONE THING HERE AND NOTHING ELSE: the
+                  entries the cause block above already said IN PLAIN WORDS are not repeated
+                  as raw diagnostics. Printing the server's own sentence underneath the
+                  author-facing one is how a surface ends up saying the same failure twice,
+                  once honestly and once in machine words. Every OTHER shape — bare string,
+                  judge criterion, summary, interactive phase, structural lint, an unknown
+                  code — is untouched and still renders here, which is rule 4 preserved
+                  rather than narrowed. */}
+              {genericFailures.length > 0 && (
                 <div className="mt-4">
                   <div className="mb-2 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
                     named_failures — what blocked publish
                   </div>
-                  {verdict.named_failures.map((entry, i) => renderFailure(entry, i))}
+                  {genericFailures.map((entry, i) => renderFailure(entry, i))}
+                </div>
+              )}
+
+              {/* ⚠ SKETCH 215 #11 — WHAT THE RUN DID NOT DO, SAID IN THE SAME BREATH AS THE
+                  RESULT. The reader's actual question the moment a golden run is named is
+                  *did it just email my customer?* Leaving it to be inferred from "trial run"
+                  is leaving the most alarming reading available. */}
+              {goldenRunPassed && (
+                <div
+                  data-testid="golden-no-send"
+                  className="mt-4 rounded border border-border bg-card px-3 py-2 text-[12px] leading-relaxed text-muted-foreground"
+                >
+                  {GOLDEN_NO_SEND}
                 </div>
               )}
 
