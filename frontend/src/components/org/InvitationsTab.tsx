@@ -99,7 +99,7 @@ export function InvitationsTab({
   }
 
   return (
-    <section aria-label="Organization invitations" className="mx-auto max-w-3xl px-6 py-6">
+    <section aria-label="Organization invitations" className="mx-auto max-w-6xl w-full px-6 py-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="font-headline text-base font-bold text-foreground">Invitations &amp; Roles</h3>
         <span className="flex-1" />

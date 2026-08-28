@@ -651,40 +651,42 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
           (A11Y-01): a <div> host, not <nav> — the interactive "tablist" role must
           not override a <nav> landmark's implicit "navigation" role
           (jsx-a11y/no-noninteractive-element-to-interactive-role). */}
-      <div
-        role="tablist"
-        aria-label="Control Plane sections"
-        className="flex flex-wrap items-center gap-1 border-b border-border/60 px-6 py-2"
-      >
-        {TABS.map((t) => {
-          const isActive = t.id === activeTab
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setActiveTab(t.id)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
-                isActive
-                  ? "bg-primary/10 font-semibold text-primary"
-                  : t.locked
-                    ? "text-muted-foreground hover:bg-accent/40 hover:text-muted-foreground"
-                    : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
-              )}
-            >
-              {t.locked && <Lock className="h-3 w-3 flex-none" aria-hidden="true" />}
-              {t.label}
-              {/* Audit count-pill — the number of loaded ledger rows (D-08). */}
-              {t.id === "audit" && auditRows.length > 0 && (
-                <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
-                  {auditRows.length}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div className="border-b border-border/60 px-6 py-2">
+        <div
+          role="tablist"
+          aria-label="Control Plane sections"
+          className="mx-auto flex max-w-6xl w-full items-center gap-1.5"
+        >
+          {TABS.map((t) => {
+            const isActive = t.id === activeTab
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors text-center",
+                  isActive
+                    ? "bg-primary/10 font-semibold text-primary"
+                    : t.locked
+                      ? "text-muted-foreground hover:bg-accent/40 hover:text-muted-foreground"
+                      : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                )}
+              >
+                {t.locked && <Lock className="h-3 w-3 flex-none" aria-hidden="true" />}
+                <span>{t.label}</span>
+                {/* Audit count-pill — the number of loaded ledger rows (D-08). */}
+                {t.id === "audit" && auditRows.length > 0 && (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+                    {auditRows.length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -693,7 +695,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             {/* Pinned vitals (063-B): stays pinned on scroll, can go amber/red on a
                 poll, and hosts the ⌥ Technical-names toggle + ↻ Refresh controls. */}
             <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur">
-              <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="mx-auto flex max-w-6xl w-full flex-wrap items-center gap-x-3 gap-y-2">
                 <div className="flex items-center gap-2">
                   <span
                     aria-hidden="true"
@@ -724,7 +726,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             </div>
 
             {/* The 063-B scroll: Health → Active runs → Controls → Activity. */}
-            <div className="mx-auto max-w-4xl space-y-7 px-6 py-6">
+            <div className="mx-auto max-w-6xl w-full space-y-7 px-6 py-6">
               {/* Health detail (the ONE place health lives — D-08). */}
               <HealthSignals signals={signals} showTechnical={showTechnical} />
 
@@ -792,7 +794,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
         ) : activeTab === "users-access" ? (
           // 068-A roster, then the 069-A feature-visibility rows BELOW it (visibility
           // governs WHO — it lives with the roster, never next to the kill-switches).
-          <div className="mx-auto max-w-5xl space-y-8 px-6 py-6">
+          <div className="mx-auto max-w-6xl w-full space-y-8 px-6 py-6">
             <div className="flex items-center">
               <span className="flex-1" />
               <TechnicalNamesToggle
@@ -819,7 +821,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
           // 070-A capability instrument table + the 071-A discovery propose→confirm panel.
           // The shell owns the lazy fetch + write-then-refetch (server = source of truth,
           // no optimistic flip); every recorded write pulses the band marker (062-A).
-          <div className="mx-auto max-w-5xl space-y-8 px-6 py-6">
+          <div className="mx-auto max-w-6xl w-full space-y-8 px-6 py-6">
             <div className="flex items-center">
               <div>
                 <h2 className="font-headline text-lg font-bold text-foreground">Model Registry</h2>

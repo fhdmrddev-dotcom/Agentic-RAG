@@ -400,7 +400,7 @@ export function AuditTab({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-6">
+    <div className="mx-auto max-w-6xl w-full px-6 py-6">
       <div className="rounded-[10px] border border-border bg-card px-4 py-3.5">
         {/* Header: title + source switch + ⌥ Technical names. */}
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
