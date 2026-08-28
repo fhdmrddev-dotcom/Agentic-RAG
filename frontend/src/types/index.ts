@@ -1070,6 +1070,20 @@ export interface Phase {
     | "unknown"
     | "cancelled"
   attempt?: number
+  /** The live-SSE terminal error text — `gate_failed.error` / `run_failed.reason`,
+   *  set by the demux as events arrive.
+   *
+   *  ⚠ **Only available for live-streamed runs (not backfilled from DB).** That sentence is
+   *  kept VERBATIM because it is still true of THIS field — and Phase 214 makes it no longer
+   *  the whole truth, so the correction sits beside it rather than replacing it.
+   *
+   *  ⚠ **PREFER `failureReason` BELOW.** A reconciled or reloaded run has no SSE history, so
+   *  this is empty on every run a person re-opens — while the reason itself has been in the
+   *  row the whole time (`workflow_phases.output._failure_reason`). Reading only this field is
+   *  what fired `PhaseCard`'s `reason_unknown` sentinel on a failure whose reason was known
+   *  (`BUG-260826-05`), and it is **D-v2.5-03** exactly: Realtime is a best-effort HINT, the
+   *  fetch is the source of truth. Read `error ?? failureReason` — live first, then the
+   *  reconciled fact — and treat BOTH being empty as the only honest "not recorded". */
   error?: string
   subAgents: TaskRunIndexItem[]
   pendingAsk: string | null
@@ -1079,6 +1093,41 @@ export interface Phase {
   /** GAP-C (D-11) — the terminal emit failure value (the `phase_substep` failure field).
    *  Renders failed-as-failed via the closed taxonomy. Undefined unless an emit failed. */
   emitFailure?: EmitFailure
+  /** Phase 214 (STEP-05 / D-214-23) — the DB-BACKED failure reason: this step's own
+   *  `workflow_phases.output["_failure_reason"]`, written by `fail_phase` on EVERY failure and
+   *  projected onto both wire models.
+   *
+   *  ⚠ **THE SIBLING OF `error` ABOVE, AND THE ONE THAT SURVIVES A RELOAD.** `error` comes from
+   *  SSE and is empty on any reconciled run; this comes from the fetch. That is why the field
+   *  exists rather than the doc simply being corrected: the existing union member could not
+   *  express a fact the wire had never carried.
+   *
+   *  ⚠ **`undefined` / `null` MEANS NOT RECORDED, AND AN EMPTY STRING IS NEVER SENT.** The
+   *  server normalises a whitespace-only reason to `null` precisely so absence keeps ONE
+   *  spelling. **Never coalesce this field to an empty string** — the forbidden form is
+   *  deliberately NOT spelled here, because the fence that forbids it sweeps `src/` and a
+   *  docblock quoting it would count its own prose (the 187-24 trap, which fired on this exact
+   *  surface while this plan was being written). Collapsing them costs `PhaseCard`'s
+   *  `reason_unknown` sentinel its meaning, which is the `0`-vs-`null` family of defect
+   *  `WorkflowRunPhase.step_count` already documents one wire over. A fence in
+   *  `lib/apiRunFields.fences.test.ts` sweeps `src/` for that collapse at zero occurrences. */
+  failureReason?: string | null
+  /** Phase 214 (STEP-04 / D-214-16) — the ACTION this step runs, by its wire name, derived
+   *  server-side from the definition that executed. `undefined` / `null` on every phase type
+   *  that is not `external_action`. */
+  toolName?: string | null
+  /** Phase 214 (STEP-04) — the native capability (`send_email` | `create_ticket` |
+   *  `post_message`). `null` on an MCP step, which carries a `toolName` and no capability. */
+  capability?: string | null
+  /** Phase 214 (STEP-04 / D-214-14 / D-213-02) — the SERVICE a person would name: the bound
+   *  connection's display name, resolved server-side at READ time and **computed, never
+   *  stored** (a stored copy goes stale on rename).
+   *
+   *  ⚠ **`null` IS A LEGITIMATE VALUE** — the connection was deleted, belongs to another org,
+   *  or none is bound — and the shared identity element renders the ACTION ALONE for it.
+   *  Never substitute a string of your own: never "Unknown service", never the capability id,
+   *  never the connection id. Never draw a name the system cannot know. */
+  serviceName?: string | null
 }
 
 // ────────────────────────────────────────────────────────────────────────────

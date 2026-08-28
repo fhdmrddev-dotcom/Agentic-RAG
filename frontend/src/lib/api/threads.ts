@@ -1272,11 +1272,42 @@ export interface WorkflowPhaseState {
    * recorded** (there is no backfill), and `step_count` distinguishes `0` (a real
    * measurement of nothing) from `null` (this phase type declares no count) — so the arm is
    * `typeof === "number"` and never `?? 0`.
+   *
+   * ── Phase 214 plan 02 (STEP-04 / STEP-05 / D-214-23) — THE SAME MIRROR, WIDENED AGAIN, FOR
+   *    THE SAME REASON, AND FOUND A DIFFERENT WAY ──────────────────────────────────────────
+   *
+   * The four fields below (`failure_reason` / `tool_name` / `capability` / `service_name`) are
+   * added here in the SAME COMMIT as `backend/app/models/thread.py::WorkflowPhaseState`, which
+   * is the whole point: the paragraph above records that `200-02` widened the backend and not
+   * this file, and the panel spent a phase unable to declare fields the wire was sending.
+   *
+   * ⚠ **WHAT IS DIFFERENT THIS TIME IS HOW IT WAS FOUND.** `200-07` caught it by review.
+   * Phase 214 caught the same seam BEFORE writing any code, by a mechanical producer→consumer
+   * derivation that walked `_failure_reason` from its writer to its readers and found the two
+   * hops no plan owned — this mirror, and `StreamsProvider.tsx::reconcilePhases`, which builds
+   * every `Phase` field-by-field so an unmapped field is `undefined` forever with no type error.
+   * ⚠ **And the mirror is now checked by a TEST rather than by this comment**:
+   * `panel/__tests__/PhaseReconcile.test.tsx` drives the real `reconcilePhases` over a real
+   * payload and asserts all four arrive, in BOTH branches, plus a structural fence over the two
+   * `Phase`-returning literals. It was observed RED on unmodified source first.
+   *
+   * ⚠ **STILL A TYPE, NOT A RUNTIME EXPORT** — the property the paragraph above relies on is
+   * unchanged, and it was re-proved by grep over THIS plan's real diff rather than quoted.
+   *
+   * Semantics are stated ONCE, on `WorkflowRunPhase`. The two that bind hardest here:
+   * `failure_reason` is `null` when NOT RECORDED and is never an empty string (so the panel's
+   * `reason_unknown` sentinel keeps its meaning), and `service_name` is `null` when the bound
+   * connection cannot be resolved — the surface then names the ACTION ALONE and never
+   * substitutes a string of its own.
    */
   started_at?: string | null
   completed_at?: string | null
   step_count?: number | null
   step_noun?: string | null
+  failure_reason?: string | null
+  tool_name?: string | null
+  capability?: string | null
+  service_name?: string | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py

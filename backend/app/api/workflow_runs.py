@@ -74,7 +74,12 @@ from app.dependencies import (
 # 484 of 484 `completed` rows, so a second `isinstance(raw, dict)` test anywhere in this
 # module would be dead on every row that matters — silently, because the absent arm renders
 # honestly. There is one door; this module reads through it and never beside it.
-from app.models.thread import declared_phase_measure, phase_output_object
+# 214 (D-214-16) — `step_identity` joins them for the same reason: `slug -> (tool_name,
+# capability, connection_id)` is derived from the definition JSON, and this module and
+# `api/threads.py` ALREADY carry two separately-written copies of the sibling `slug ->
+# phase_type` walk. A third and a fourth is how the run page and the chat panel come to
+# disagree about what a step even IS.
+from app.models.thread import declared_phase_measure, phase_output_object, step_identity
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -185,6 +190,61 @@ class WorkflowRunPhaseRead(BaseModel):
             "truthiness would fold them anyway. The name is `deliverable_text` and NOT "
             "`output_text` on purpose: it argues against a future `output_*` family, "
             "because every other key on that jsonb is internal by default."
+        ),
+    )
+
+    # ── 214 (STEP-04 / STEP-05 / D-214-23) — WHY A STEP FAILED, AND WHAT IT WAS ──────
+    # ⚠ THESE FOUR JOIN THE LOCKSTEP ABOVE, AND THEY ALSO JOIN THE TWO-WIRE-MODEL RULE:
+    # `models/thread.py`'s `WorkflowPhaseState` gains the SAME four in the SAME commit.
+    # `D-200.1-02-A` (the one recorded exception, below) was CONSIDERED and does NOT apply
+    # — nothing renders the failure reason on the chat panel today; `PhaseCard.tsx:253`
+    # fires the `reason_unknown` sentinel instead, which is precisely the disagreement the
+    # rule exists to prevent.
+    #
+    # ⚠ THE PROJECTION ASKS FOR NOTHING NEW. `output` was already selected, and the reason
+    # is read off the SAME single `phase_output_object` parse that already feeds `step_count`
+    # and `deliverable_text` — a third fact off one door, never a second door.
+    failure_reason: str | None = Field(
+        default=None,
+        description=(
+            "Why this step failed, in the adapter's or the gate's OWN words, read from the "
+            "phase's `output[\"_failure_reason\"]` (written by `db/workflows.py::fail_phase` "
+            "on every failure). ⚠ `null` MEANS NOT RECORDED — it is the fact the panel's "
+            "`reason_unknown` sentinel exists to state honestly. **An empty string is NOT a "
+            "synonym for it and is never shipped**: `fail_phase` always writes a non-empty "
+            "reason, so `\"\"` is impossible by construction, and one read anyway is "
+            "normalised to `null` rather than passed through — collapsing the two would cost "
+            "the sentinel its meaning. Non-null on failed steps only."
+        ),
+    )
+    tool_name: str | None = Field(
+        default=None,
+        description=(
+            "The ACTION this step runs, by its wire name — the tool on the bound connection "
+            "(`config.tool_name` in the definition that executed). `null` for every phase "
+            "type that is not `external_action`, and for an external step that names only a "
+            "native capability. Never guessed from the slug."
+        ),
+    )
+    capability: str | None = Field(
+        default=None,
+        description=(
+            "The native capability this step runs (`send_email` | `create_ticket` | "
+            "`post_message`), from the same config. `null` on an MCP step, which carries a "
+            "`tool_name` and no capability at all — that absence is a fact, not a gap."
+        ),
+    )
+    service_name: str | None = Field(
+        default=None,
+        description=(
+            "The SERVICE a person would name — the bound connection row's display `name`, "
+            "resolved at READ time. ⚠ **COMPUTED, NEVER STORED** (D-213-02 / D-214-14): a "
+            "stored copy goes stale the moment the connection is renamed. ⚠ `null` is a "
+            "LEGITIMATE value and means the connection could not be resolved (deleted, "
+            "another org's, or none bound) — the surface then renders the ACTION ALONE. "
+            "**Never a substitute string**: not \"Unknown service\", not the capability id, "
+            "not the connection id. `grounding.py`'s shipped rule, unchanged on a new "
+            "surface: never draw a name the system cannot know."
         ),
     )
 
@@ -760,6 +820,30 @@ async def read_workflow_run(
     phase_rows = (phases_resp.data if phases_resp is not None else None) or []
 
     slug_to_type = _slug_to_phase_type(definition)
+    # ── 214 (D-214-16) — THE SHARED DERIVATION, in the same position as its sibling above.
+    # `_slug_to_phase_type` stays byte-unchanged; this sits BESIDE it rather than re-pointing
+    # it (that refactor is not this phase's), and the SAME function serves `api/threads.py`.
+    identity_by_slug = step_identity(definition)
+    # ── 214 (D-214-14 / D-213-02) — the service NAME, resolved ONCE PER RUN, before the loop.
+    #
+    # ⚠ COMPUTED, NEVER STORED: the step config carries a `connection_id`, and the display
+    # name lives on the connection row, where a rename is immediately true.
+    # ⚠ BEFORE THE LOOP, never inside it — a run holds 1-3 distinct connections across all
+    # its steps, so a per-row resolve would be one query per phase for the same few ids.
+    # ⚠ ONLY `name` CROSSES (T-214-02-01): the projection is named column-by-column, so
+    # nothing on that row travels except the word a person recognises. Migration 118 grants
+    # this table's SELECT column by column, so an ungranted column fails 42501 visibly.
+    # ⚠ `aexec` runs the BLOCKING supabase-py call through `run_in_threadpool` (D-v2.5-01).
+    conn_names: dict[str, str] = {}
+    conn_ids = sorted({cid for (_t, _c, cid) in identity_by_slug.values() if cid})
+    if conn_ids:
+        conn_resp = await aexec(
+            supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
+        )
+        for conn_row in (conn_resp.data if conn_resp is not None else None) or []:
+            conn_name = conn_row.get("name")
+            if isinstance(conn_name, str) and conn_name.strip():
+                conn_names[str(conn_row.get("id"))] = conn_name
     phases = []
     for row in phase_rows:
         # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
@@ -774,6 +858,27 @@ async def read_workflow_run(
         # are one fact on this surface.
         raw_text = obj.get("text") if isinstance(obj, dict) else None
         deliverable_text = raw_text if isinstance(raw_text, str) and raw_text else None
+        # ── 214 (D-214-23) — THE THIRD FACT OFF THE SAME SINGLE PARSE ──
+        # ⚠ THIS IS WHY THE PARSE MATTERS RATHER THAN THE FIELD. 38 of the 43 `failed`
+        # phase rows on the live database store `output` as a jsonb STRING SCALAR, so a
+        # reader written as `row["output"]["_failure_reason"]` finds the reason on 2 of 43
+        # and reads empty on the rest — silently, because the absent arm renders honestly.
+        # Reading off `obj` (already unwrapped by the ONE door) serves both shapes.
+        # ⚠ Whitespace-only and non-`str` normalise to `None` so ABSENT and EMPTY stay one
+        # fact on the wire — see the field's description for why that keeps the panel's
+        # `reason_unknown` sentinel honest.
+        raw_reason = obj.get("_failure_reason") if isinstance(obj, dict) else None
+        failure_reason = (
+            raw_reason if isinstance(raw_reason, str) and raw_reason.strip() else None
+        )
+        # ── 214 (D-214-16) — the step's identity, off the shared derivation + the run's map.
+        # ⚠ A non-`external_action` phase is absent from the mapping and resolves three
+        # `None`s; an unresolvable connection resolves `service_name = None`. Both are FACTS,
+        # and no substitute string is ever emitted for either.
+        tool_name, capability, connection_id = identity_by_slug.get(
+            row["slug"], (None, None, None)
+        )
+        service_name = conn_names.get(connection_id) if connection_id else None
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -785,6 +890,16 @@ async def read_workflow_run(
                 step_count=count,
                 step_noun=noun,
                 deliverable_text=deliverable_text,
+                failure_reason=failure_reason,
+                # ── 214 — POPULATED, not merely declared. A field this loop declares and
+                # never passes ships `null` on every row of every run, and `214-11`'s
+                # `serviceOf` renders the action ALONE on a null service — the HONEST arm —
+                # so the run spine and the step list would lose the service forever with
+                # every typecheck and every seeded-prop case green. That is the
+                # `declared_phase_measure` / Phase 198 shape, one wire over.
+                tool_name=tool_name,
+                capability=capability,
+                service_name=service_name,
             )
         )
 

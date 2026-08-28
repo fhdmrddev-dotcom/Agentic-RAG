@@ -550,6 +550,33 @@ export interface PublishVerdict {
   named_failures: unknown[]
 }
 
+/** Phase 214 (STEP-03) — the OPTIONAL keys a publish-refusal entry may carry, so a refusal can
+ *  name the STEP and the ARGUMENT it is about.
+ *
+ *  ⚠ **`named_failures` STAYS `unknown[]` AND THAT IS DELIBERATE.** It is POLYMORPHIC across
+ *  stages — lint `{code,phase,message}`, judge `{criterion,score,evidence}`, `{summary}`, a
+ *  bare string — and `PublishGauntlet.tsx`'s docblock rule 4 requires KEY DETECTION PER ENTRY,
+ *  never a switch on `blocked_stage`. Narrowing the array to this shape would break every
+ *  other stage's rendering, so this type describes an entry a consumer may DETECT, and the
+ *  array's element type is untouched.
+ *
+ *  ⚠ **ALL THREE KEYS ARE OPTIONAL, and the reason is compatibility rather than laziness.** An
+ *  entry produced before Phase 214, or by any of the other stages, carries none of them and
+ *  **must still render**. A required key here would be a claim about every stage's output that
+ *  nothing enforces.
+ *
+ *  ⚠ TYPE-ONLY — plan `214-10` supplies the values; no call site reads these yet. */
+export interface PublishNamedFailure {
+  /** The AUTHORED name of the step the refusal is about — never its slug, never its index. */
+  step_name?: string
+  /** The argument that could not be proved satisfiable. `null` when the refusal is about the
+   *  step as a whole rather than one of its arguments — a different fact from absent. */
+  argument?: string | null
+  /** The upstream step a `From an earlier step` binding named, when THAT is what failed.
+   *  `null` when the failing arm was `Fixed value` or `Ask at launch`. */
+  upstream?: string | null
+}
+
 /** A lint failure entry (the 5 LOWERCASE `LintError.code` literals:
  *  bad_index / unsatisfiable_skip / orphan_phase / no_terminal / input_unsatisfied). */
 export interface LintError {
@@ -711,6 +738,27 @@ export interface GenerateWorkflowBody {
   project_folder_id?: string | null
   template_asset_id?: string | null
   template_placeholders?: string[]
+  /** Phase 214 (STEP-01 / D-214-13) — the connections the author allows a generated workflow to
+   *  bind an external step to.
+   *
+   *  ⚠ **ABSENT AND EMPTY ARE DIFFERENT FACTS AND MUST NEVER COLLAPSE.**
+   *    · **absent (`undefined`)** — today's UNCONSTRAINED behaviour: the author expressed no
+   *      preference, and generation may bind whatever it legitimately can.
+   *    · **`[]` (empty array)** — the author's DECISION that **no external step may be
+   *      emitted at all**. It is a constraint, not a missing value.
+   *
+   *  Coalescing an absent value to an empty array turns "no preference" into "forbid
+   *  everything"; coalescing an empty array to `undefined` turns "forbid everything" into "no
+   *  preference". ⚠ **Neither forbidden form is SPELLED here**: the fence that refuses them
+   *  sweeps `src/`, and a docblock quoting one would count its own prose — the 187-24 trap,
+   *  which fired on this very field during Phase 214 and is recorded rather than predicted.
+   *  Both are one character of convenience buying a silently wrong outbound decision — the same
+   *  `0`-vs-`null` family this module documents on `WorkflowRunPhase.step_count`. Branch on
+   *  `=== undefined` explicitly. A fence in `lib/apiRunFields.fences.test.ts` sweeps `src/`
+   *  for both collapses at zero occurrences.
+   *
+   *  ⚠ TYPE-ONLY — plan `214-13` supplies the values; no call site sends this yet. */
+  allowed_connection_ids?: string[]
 }
 
 /** The 4 distinguished outcomes of POST /workflows/{id}/publish. A binary

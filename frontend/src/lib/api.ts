@@ -213,6 +213,10 @@ export type {
   GovLowConfidenceItem,
   WorkflowDefinitionJSON,
   PublishVerdict,
+  // Phase 214 (STEP-03) — added to its domain module AND to this list in the SAME commit,
+  // per this file's own rule above. TYPE-ONLY, so `196-08`'s mock-factory failure mode
+  // (a `vi.mock` factory missing a newly-added RUNTIME export) structurally cannot fire.
+  PublishNamedFailure,
   LintError,
   WorkflowDraftRow,
   WorkflowDraftWriteResult,
