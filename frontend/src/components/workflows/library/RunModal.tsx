@@ -58,6 +58,9 @@ import { Upload, Check, X, ChevronDown, Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { launchInputFields, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+// 214-12 (STEP-02): the ONE declared-input field renderer, shared with the chat launch form.
+// The two-arm label rule and the launchInputFields-not-entryInputFields warning live with it.
+import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
 import { RUN_TEMPLATE_LABEL } from "./libraryVocabulary"
 import { useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import type { PublishedWorkflow } from "@/lib/api"
@@ -610,18 +613,14 @@ export function RunModal({
               server merge already exist (`214-16`), so ONE hop is owed, and it is owed —
               not broken. Nothing here asserts that a run receives these values.
 
-              ⚠ TWO ARMS, NEVER THREE — the rule survives the change of medium verbatim. An
-              AUTHORED label is prose a human wrote → body face. A key with no label keeps
-              the mono face it has always had. **Absence renders the KEY, never a fabricated
-              friendly name**: the field for an unlabelled key is labelled with the key.
-
-              ⚠ AND THE LIST IS `launchInputFields`, NOT `entryInputFields`. The latter's last
-              arm falls back to `[{ key: "kickoff_prompt" }]` for a definition that declares
-              nothing — correct as an answer to *"what is declared?"*, wrong as a form: every
-              workflow in the library would have grown a text box beside the kickoff textarea
-              collecting the same fact, and `RESERVED_RUN_INPUT_KEYS`
-              (`backend/app/models/message.py:27`) would have STRIPPED the value on arrival.
-              A field whose value the server discards is `BUG-260826-01` one layer up.
+              ⚠ THE POINTER, 214-12. The FIELD MARKUP AND ITS TWO-ARM RULE HAVE MOVED to
+              `@/components/workflows/LaunchInputFields`. Plan `214-09` named that seam and
+              deliberately left it — *an extraction with one consumer is not an extraction* —
+              and named THIS plan as its re-open trigger; chat became the second consumer, so
+              the extraction was taken. The two-arm rule, the *"absence renders the KEY"*
+              sentence and the *"must be `launchInputFields`, never `entryInputFields`"*
+              warning all travelled WITH the code, because a rule separated from what it
+              governs is a rule nobody applies. Read them there, not here.
 
               ⚠ NO REQUIRED-NESS IS VALIDATED HERE, deliberately. The publish gate (`214-05`)
               already refuses a workflow whose `ask` key is undeclared; a launcher that
@@ -630,29 +629,13 @@ export function RunModal({
 
               ⚠ IT SITS WITH THE FIELDS, NOT IN THE INFO GROUP BELOW. That group is what the
               dialog SAYS about the run; this is what it ASKS. Putting a text box among the
-              ⓘ lines would break the one composition rule this body has. */}
-          {launchFields.length > 0 && (
-            <div data-testid="run-inputs" className="flex flex-col gap-4">
-              {launchFields.map((f) => (
-                <label key={f.key} className="flex flex-col gap-1">
-                  {f.label ? (
-                    <span className="text-[13px] font-medium text-foreground">{f.label}</span>
-                  ) : (
-                    <span className="font-mono text-[13px] font-medium text-foreground">{f.key}</span>
-                  )}
-                  <input
-                    type="text"
-                    data-testid={`run-input-${f.key}`}
-                    value={inputValues[f.key] ?? ""}
-                    onChange={(e) =>
-                      setInputValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                    }
-                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </label>
-              ))}
-            </div>
-          )}
+              ⓘ lines would break the one composition rule this body has. THAT placement is
+              this file's decision and stays here; only the markup left. */}
+          <LaunchInputFields
+            fields={launchFields}
+            values={inputValues}
+            onChange={(key, value) => setInputValues((prev) => ({ ...prev, [key]: value }))}
+          />
           <div className="flex flex-col gap-2">
             {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
                 going to. 188-09 retargeted `doRun` to the run surface, and the modal still

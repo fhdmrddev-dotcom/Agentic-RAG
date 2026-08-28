@@ -24,6 +24,12 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+// Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. The form resolves BEFORE
+// createThread, and the shared field renderer keeps the two-arm label rule in one place.
+// `launchInputFields` — never `entryInputFields`, whose fallback arm draws a box for a key
+// the server strips (see its docblock in soulData.ts).
+import { ChatLaunchForm } from "./ChatLaunchForm"
+import { launchInputFields, type DefShape, type EntryInputField } from "@/components/workflows/soulData"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { useThreads } from "@/hooks/useThreads"
@@ -249,6 +255,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const featuresCtx = useEffectiveFeaturesOptional()
   const canvasEnabled = featuresCtx?.features.visual_workflow_canvas === true
 
+  // ── Phase 214-12 (STEP-02 / D-214-04): the chat launch moment's pending ask.
+  //    Held LOCALLY in the style of the other per-view state above — `doRun` is the only
+  //    writer and the overlay at the bottom of this file is the only reader. `resolve` is the
+  //    awaiting `doRun`'s continuation: confirm hands it the dict, cancel hands it `null`. ──
+  const [launchAsk, setLaunchAsk] = useState<{
+    name: string
+    fields: EntryInputField[]
+    resolve: (values: Record<string, string> | null) => void
+  } | null>(null)
+
   // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
   //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
   //    thread, kicks off a REAL server-side run by REUSING the existing kickoff
@@ -270,10 +286,58 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     async (
       def: PublishedWorkflow,
       kickoff: string,
-      opts?: { templateFile?: File | null; folderId?: string | null },
+      opts?: {
+        templateFile?: File | null
+        folderId?: string | null
+        /** Phase 214-12 — the DECLARED launch inputs, when the caller already collected them. */
+        inputs?: Record<string, string>
+      },
     ) => {
       const templateFile = opts?.templateFile ?? null
       const folderId = opts?.folderId ?? null
+      // ── Phase 214-12 (STEP-02 / D-214-04): ⭐ ONE COLLECTION POINT PER LAUNCH ──────────
+      //
+      //    `doRun` is the launcher for THREE measured doors, not one, and the gate lives HERE
+      //    rather than in each door so a fourth inherits it:
+      //      · the library Run modal (`WorkflowsPage.tsx:1351`), which after plan 214-09 has
+      //        ALREADY collected the values in `RunModal` and passes them in;
+      //      · the builder's Test Run (`WorkflowsPage.tsx:909`), which calls with only two
+      //        arguments and has therefore collected nothing;
+      //      · the chat launch, which is this branch.
+      //
+      //    ⚠ BOTH TERMS ARE LOAD-BEARING AND THE SECOND IS THE WHOLE POINT. Gating on the
+      //    declared list alone would open the form ON TOP OF a library Run that had just
+      //    collected the same values — asking one person twice for one launch and discarding
+      //    what they already typed. A caller that supplied a dict has collected; a caller that
+      //    supplied none has not. `undefined` and `{}` are DIFFERENT FACTS here: an empty dict
+      //    means "collected, and the answer was nothing".
+      //
+      //    ⚠ THE TYPE SYSTEM CANNOT GUARD THE OTHER HALF OF THIS. Under parameter
+      //    CONTRAVARIANCE a narrower `opts` stays assignable to the widened `onLaunch` prop, so
+      //    a build in which this key is silently discarded is a GREEN build. The fence is the
+      //    runtime value assertion in `ChatLayout.launch.test.tsx`, never `tsc`.
+      //
+      //    ⚠ IT RESOLVES BEFORE `createThread`. A cancelled launch creates NOTHING, so the
+      //    WR-04 orphan cleanup below is never entered for a launch nobody started — that path
+      //    exists for a launch that FAILED. And a definition declaring no inputs takes this
+      //    branch not at all: no extra render, no extra await, byte-identical to the shipped
+      //    path.
+      //
+      //    ⛔ THE AGENT FILLS NOTHING. D-214-04 rejected reading the argument out of the
+      //    conversation: an LLM choosing a recipient is a new trust surface and is not
+      //    reproducible between runs. See `ChatLaunchForm.tsx`, whose source is fenced. ──
+      let inputs = opts?.inputs
+      if (opts?.inputs === undefined) {
+        const declared = launchInputFields(def.definition as DefShape | undefined)
+        if (declared.length > 0) {
+          const collected = await new Promise<Record<string, string> | null>((resolve) => {
+            setLaunchAsk({ name: def.name, fields: declared, resolve })
+          })
+          // A cancel resolves null: nothing was created, so there is nothing to clean up.
+          if (collected === null) return
+          inputs = collected
+        }
+      }
       const thread = await createThread(def.name)
       // WR-04: a post-create failure (a template 422 — now a routine step — or a
       // postMessage 409/network error) must NOT strand the created thread shell, or
@@ -291,6 +355,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           workflowDefinitionId: def.id,
           // WFIN-02 (D-01): additive — only when a per-run override was picked (D-06).
           ...(folderId ? { folderId } : {}),
+          // 214-12 (STEP-02): the collected dict rides the option plan 214-16 added, and the
+          // server merges it into create_workflow_run.inputs beside kickoff_prompt/folder_id
+          // (which are RESERVED and stripped out of a launcher's copy). CONDITIONAL for the
+          // same reason the two keys above are: a workflow declaring nothing must post exactly
+          // what it posted before this phase.
+          ...(inputs && Object.keys(inputs).length > 0 ? { inputs } : {}),
         })
       } catch (e) {
         void deleteLaunchThread(thread.id).catch(() => {}) // don't leak the launch shell
@@ -809,6 +879,32 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             <KnowledgeHealthPage />
           )}
         </main>
+      )}
+
+      {/* ── Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. ───────────────────────
+          MOUNTED OUTSIDE THE VIEW SPLIT, DELIBERATELY. A launch is driven from whichever
+          surface the person is standing on, and the ask must outlive the branch that started
+          it — the overlay is `fixed inset-0`, so its position in this flow is structural, not
+          visual. It renders NOTHING until `doRun` sets a pending ask, so every view's render
+          is byte-identical to the shipped one for a workflow that declares no inputs.
+
+          ⚠ CONFIRM AND CANCEL BOTH RESOLVE THE SAME AWAITING PROMISE — one hands over the
+          dict, the other hands over `null` and `doRun` returns before creating anything.
+          Clearing the state and resolving happen together; a resolve without a clear would
+          leave a dialog over a launch that had already moved on. ── */}
+      {launchAsk && (
+        <ChatLaunchForm
+          workflowName={launchAsk.name}
+          fields={launchAsk.fields}
+          onConfirm={(values) => {
+            setLaunchAsk(null)
+            launchAsk.resolve(values)
+          }}
+          onCancel={() => {
+            setLaunchAsk(null)
+            launchAsk.resolve(null)
+          }}
+        />
       )}
     </div>
   )
