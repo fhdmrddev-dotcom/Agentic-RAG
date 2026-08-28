@@ -35,6 +35,10 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
+// ── Phase 214-11 Task 2 (STEP-04 / D-214-16) — the shared identity element, the FIFTH surface.
+// It takes props; this card resolves nothing and reaches for no connection list.
+import { StepIdentity, type StepIdentityProps } from "@/components/workflows/StepIdentity"
+import { stepActionWords, stepMarkShape } from "@/components/workflows/stepActionWords"
 import {
   useAskUserPrompt,
   useViewingThread,
@@ -214,11 +218,51 @@ interface PendingAskCardProps {
    * production caller and it always passes it.
    */
   runIsOver?: boolean
+  /**
+   * Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 5) — the identity of the
+   * step this pause belongs to, RESOLVED BY THE CALLER.
+   *
+   * ⚠ OPTIONAL AND BOTH-OR-NEITHER IN EFFECT: with no `action` nothing renders, so every
+   * existing caller — and every ordinary `ask_user` prompt, which belongs to no external step
+   * — draws exactly the card it drew before these props existed.
+   *
+   * ⚠ `service: null` IS A LEGITIMATE VALUE, not a missing one: the bound connection was
+   * deleted or belongs to another org. `StepIdentity` renders the action alone for it. Never
+   * substitute a string here — never "Unknown service", never the capability id.
+   *
+   * ⚠ THIS CARD RESOLVES NEITHER (D-214-14 / T-214-11-04). `PendingAskStack` and
+   * `WorkflowRunPage` both already hold the run's phase rows, so the answer comes off the same
+   * wire the panel and the run page read — two surfaces that resolved independently would
+   * disagree about one step at one moment.
+   *
+   * ⚠ D-213-14 STANDS: this adds IDENTITY and no receipt field. What is shown here is still
+   * shown once and recorded never.
+   */
+  action?: string | null
+  service?: string | null
+  /**
+   * The mark's structural input — the step's own wire facts. Never a connection lookup.
+   *
+   * ⚠ TYPED THROUGH THE ELEMENT (`StepIdentityProps["shape"]`) RATHER THAN FROM THE MARK
+   * MODULE, deliberately. The rule this plan asserts mechanically is *no panel or chat surface
+   * reaches past the element to the map*, and a direct import — even a type-only one that
+   * erases at build — would make that fence read a hit it has to be argued away. Reaching
+   * through the element is also the honest dependency: this card knows about `StepIdentity`,
+   * and `StepIdentity` knows about the map.
+   */
+  shape?: StepIdentityProps["shape"]
 }
 
 type CardState = "pending" | "answered" | "expired"
 
-export function PendingAskCard({ ask, reconcile, runIsOver = false }: PendingAskCardProps) {
+export function PendingAskCard({
+  ask,
+  reconcile,
+  runIsOver = false,
+  action = null,
+  service = null,
+  shape,
+}: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
   // Normalize to [] so the `.length`/index reads below never throw (a null here
@@ -491,6 +535,23 @@ export function PendingAskCard({ ask, reconcile, runIsOver = false }: PendingAsk
           "not yet saved" so it is never read as the final answer. DRAFT-MISSING
           guard: hide the block entirely when draft is undefined/empty (older
           streams), never an empty DRAFT box (DATA-CONTRACT §6). */}
+      {/* ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 5) — WHAT IS ABOUT
+             TO RUN, AND THROUGH WHAT.
+             Above the question, because at a pause the reader's first question is *what is
+             this about to do* — the prompt beneath then answers *what exactly will it send*.
+             ⚠ Nothing renders when the caller resolved no action: an ordinary `ask_user`
+             prompt belongs to no external step, and drawing a neutral mark beside it would
+             claim a step identity the prompt does not have. */}
+      {action && (
+        <StepIdentity
+          shape={shape ?? {}}
+          action={action}
+          service={service}
+          size="row"
+          className="text-[hsl(var(--muted-foreground-dim))]"
+        />
+      )}
+
       {draft && <DraftBlock draft={draft} />}
 
       <p className="text-sm leading-relaxed text-foreground" id={labelId}>
@@ -623,6 +684,25 @@ export function PendingAskStack() {
   const { data: phases } = usePhases(threadId)
   const runIsOver = workflowLock == null && phases.length > 0
 
+  // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE STACK RESOLVES; THE CARD
+  //    RENDERS.
+  //
+  // ⚠ NO NEW FETCH, NO NEW HOOK, NO NEW STORE SLICE. `phases` is already in hand two lines
+  // up — it is what `runIsOver` is derived from — so this reads the SAME rows the panel's
+  // timeline draws, off the SAME wire. That is what makes the pause and the timeline
+  // structurally incapable of naming one step two ways (T-214-11-04); a lookup of our own
+  // would have been the disagreement's first day.
+  //
+  // ⚠ THE RUNNING EXTERNAL STEP, NOT "AN" EXTERNAL STEP. A run can hold several, and the
+  // prompt belongs to the one that is executing. When none is running the identity is absent
+  // rather than guessed — a wrong service on an approval surface is worse than none, which is
+  // this phase's own opening argument.
+  const pausedStep =
+    phases.find((p) => p.phaseType === "external_action" && p.status === "running") ?? null
+  // ⚠ THROUGH THE SHARED RESOLVER, never a local bracket read. `capability` is author-supplied
+  // JSONB off the wire; `stepActionWords` is total over it and carries the WR-04 own-guard.
+  const pausedAction = stepActionWords(pausedStep?.capability)
+
   if (asks.length === 0) return null
 
   // Newest pinned on top (D-03). created_at is GET-only; fall back to the array
@@ -639,7 +719,14 @@ export function PendingAskStack() {
           key={ask.tool_call_id}
           className="sticky top-0 z-[4]"
         >
-          <PendingAskCard ask={ask} reconcile={reconcile} runIsOver={runIsOver} />
+          <PendingAskCard
+            ask={ask}
+            reconcile={reconcile}
+            runIsOver={runIsOver}
+            action={pausedAction}
+            service={pausedStep?.serviceName ?? null}
+            shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
+          />
         </div>
       ))}
     </div>
