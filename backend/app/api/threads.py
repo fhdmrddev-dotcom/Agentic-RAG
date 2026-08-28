@@ -46,7 +46,7 @@ import redis.asyncio as aioredis
 # buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
 # RedisError subclass, so the specific branch is handled BEFORE the broad except.
 from redis.exceptions import RedisError, ResponseError
-from app.models.message import MessageCreate, MessageResponse
+from app.models.message import RESERVED_RUN_INPUT_KEYS, MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
@@ -947,8 +947,13 @@ async def send_message(
             # new key on the POST *response*, ⛔ no change to the two-rows model, the
             # create-before-spawn ordering, the template-upload sequencing or the orphan
             # cleanup. The amendment is exactly one request field and one dict literal (twice).
+            # ⚠ STRIPPED, not merely out-ranked: `folder_id` is spread CONDITIONALLY below,
+            # so "the reserved keys win" was false whenever the request carried none — the
+            # launcher's value then survived (measured). RESERVED_RUN_INPUT_KEYS is the ONE
+            # frozenset, imported here and by the twin literal.
             inputs={
-                **(body.inputs or {}),
+                **{k: v for k, v in (body.inputs or {}).items()
+                   if k not in RESERVED_RUN_INPUT_KEYS},
                 "kickoff_prompt": body.content,
                 **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
             },

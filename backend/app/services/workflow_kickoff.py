@@ -42,6 +42,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from app.config import settings
+from app.models.message import RESERVED_RUN_INPUT_KEYS
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.harness.scope import (
@@ -517,8 +518,12 @@ async def build_harness_run_context(
         # inputs by NAME (_NON_ACTION_RUN_INPUTS) so a declared key spelled that way could
         # never reach an adapter argument; folder_id is owner-reachability-gated (D-05) and
         # a launcher string must not be able to impersonate it.
+        # ⚠ STRIPPED, exactly as the twin does and for the same measured reason: `folder_id`
+        # is spread CONDITIONALLY, so out-ranking alone left a launcher's value intact on
+        # every request that carried no override. ONE frozenset, imported by both sites.
         inputs={
-            **(body.inputs or {}),
+            **{k: v for k, v in (body.inputs or {}).items()
+               if k not in RESERVED_RUN_INPUT_KEYS},
             "kickoff_prompt": body.content,
             **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
         },

@@ -5,6 +5,28 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+# Phase 214 D-214-04 (STEP-02) — the RUN-SCAFFOLDING keys a launcher may not supply.
+#
+# ⚠ THIS EXISTS BECAUSE "THE RESERVED KEYS ARE SPREAD LAST SO THEY WIN" IS ONLY TRUE WHEN
+# THEY ARE PRESENT, AND `folder_id` IS SPREAD CONDITIONALLY. Measured, not reasoned about:
+# a POST with no `folder_id` and `inputs={"folder_id": "1111..."}` stored
+# `{'folder_id': '1111...', 'kickoff_prompt': ...}` — the launcher's value survived intact,
+# because there was no reserved value to overwrite it. `workflow_runs.inputs["folder_id"]`
+# is read back as the per-run retrieval override on the resume/Continue path, so the
+# precedence rule has to hold in BOTH arms or it is not a rule.
+#
+# The exposure is BOUNDED rather than absent — `harness.scope.resolve_run_scope_root`
+# re-validates the override against `fetch_visible_folders(owner)` on every read, so an
+# unreachable id is dropped and no cross-user scope is possible. It is stripped anyway:
+# defence in depth costs one dict comprehension, and a value that reaches the durable jsonb
+# without passing `MessageCreate.folder_id`'s UUID validation is a second door into a gated
+# field. `kickoff_prompt` is stripped for the same one-rule reason.
+#
+# ONE frozenset, imported by BOTH merge sites (api/threads.py and services/workflow_kickoff.py)
+# — this plan's whole complaint is a fact living in two places, so it does not add a third.
+RESERVED_RUN_INPUT_KEYS: frozenset[str] = frozenset({"kickoff_prompt", "folder_id"})
+
+
 class MessageCreate(BaseModel):
     content: str
     model: str | None = None
