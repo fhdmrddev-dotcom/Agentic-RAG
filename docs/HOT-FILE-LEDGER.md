@@ -6375,3 +6375,127 @@ Separate from its component because `react-refresh/only-export-components` is an
 
 ⚠ **ITS REACHABILITY IS PROVED SOMEWHERE ELSE, DELIBERATELY.** This component's own suite mounts it directly; `frontend/src/pages/WorkflowBuilderPage.declaredInputs.test.tsx` (214.1-02) is the one that walks an EMPTY builder to a PUBLISHED workflow through it while mocking neither the store nor any `@/lib/api` module. A component test can never answer *"could a person get here?"* — that is the whole lesson of the bug this file closes.
 
+
+
+---
+
+# The document space — rows added 2026-08-28 at the `SEED-224` sketch
+
+⚠ **All ten were absent from BOTH this file and CLAUDE.md's table, so a G-5 audit reported the
+entire document surface clean.** `BUS-026` predicted five of them; re-deriving from git found
+**ten**, and corrected one of BUS-026's own figures (`DocumentDetailPanel.tsx` measures **405**
+lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task buckets excluded.
+
+### `frontend/src/components/ingestion/DocumentList.tsx`
+
+**Triple re-derived 2026-08-28: `22 / 12 / 609` — G-5: ⚠ FIRES.** ⚠ **Absent from both registers for its entire life at twelve phases**, alongside `retrieval_service.py` at nine. That is the exact failure Phase 214's close found twenty-five further instances of.
+
+⚠ **THE COLUMN ORDER IS LOAD-BEARING AND IT IS ENFORCED FROM ANOTHER FILE.** The seven columns are fixed — `chevron · Filename · Type · Size · Chunks · Status · Actions` — because `IngestionPage.tsx` sheds columns 3–5 positionally (`[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`) when the 430px detail panel opens or the viewport drops below 768px. **Reordering these columns silently breaks a rule written in a file this one does not import.** Sketch 218 pins the order in `COPY.COLUMNS` and asserts it against this file.
+
+⭐ **It already renders `table_count` and `image_count` as bare counts** (*"3 tables"*, *"5 imgs"*) while `document_tables.headers`/`.rows` and `document_images.description` hold the real content. That is the largest single instance of the buried-capability finding.
+
+**The named seam:** the row is the extraction. Twelve phases of per-row affordances (status, stage, marks, actions, selection) live in one file; a `DocumentRow` with the table owning only ordering and shedding is the cut.
+
+---
+
+### `frontend/src/pages/IngestionPage.tsx`
+
+**Triple re-derived 2026-08-28: `26 / 9 / 601` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
+
+⭐ **IT IS ALREADY NAMED `Documents` EVERYWHERE THE USER CAN SEE.** `ActiveView` carries `"documents"` (there is no router), `nav-items.ts:37` labels it *Documents*, `ChatLayout.tsx:757` mounts it, and its own `<h1>` reads *Documents*. **Only the FILE NAME is stale** — which refutes `BUS-026`'s claim that renaming touches the route and the three-homes navigation contract. The rename `IngestionPage.tsx` → `LibraryPage.tsx` is a file move plus ~8 import sites.
+
+**It is the host the five-tab Library shell lands in** (operator direction 2026-08-28: the page becomes `Library`; Library Health and Governance merge into it). It already owns the push/split grid (`minmax(0,1fr) 430px`), the 288px Folders+Views sidebar with its pinnable rail, and the column-shedding rule above.
+
+**The named seam:** the sidebar, the filter bar and the grid are three independent concerns in one component. With a tab shell arriving, extract the shell first and let each tab own its body — otherwise the tab bar becomes the tenth conditional branch.
+
+---
+
+### `backend/app/services/retrieval_service.py`
+
+**Triple re-derived 2026-08-28: `17 / 9 / 362` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
+
+⚠ **IT COMPUTES A PER-HIT SIMILARITY AND THROWS IT AWAY.** `search_documents` is typed `-> tuple[list[dict], float]`; the caller in `tool_dispatcher.py` writes an audit row carrying `{query_text, document_ids}` and **not the score**. So *"times retrieved"*, *"last question"* and *"last found"* are all answerable today while **"average relevance" is not** — the single gap in the Library's Retrieval section, and it is one key on an existing jsonb column rather than a migration.
+
+⚠ It is also the surface `BUG-260815-05` (folded into Phase 210) touches: the retrieval path **misreports embedding-provider failure**. A Health tab built before that lands would show *"0 searches"* during an outage — inheriting the exact lie it exists to prevent. **That is a sequencing constraint on the document stream, not a defect in it.**
+
+---
+
+### `frontend/src/components/metadata/DocumentDetailPanel.tsx`
+
+**Triple re-derived 2026-08-28: `6 / 5 / 405` — G-5: ⚠ FIRES.** ⚠ Absent at five phases. ⚠ `BUS-026` recorded `393` lines; the re-derivation measured **405** — a small drift, and the reason the recipe is run rather than the figure copied.
+
+⚠ **IT IS A CROSS-SURFACE SHELL, NOT A DOCUMENTS-ONLY COMPONENT.** It reuses `WorkspacePanel`'s sheet shape, which `ChatLayout` mounts — so the panel language already spans **chat, workflow and documents**, and a redesign here is judged against the chat surface too. `GovernancePage` also needs a FULL `Document` to open it, which is why that page holds its own fetch.
+
+Its width is not its own: the 430px track is set by the host grid. The mobile arm is a bottom-sheet rendered internally, so the desktop track is only meaningful ≥768px.
+
+**What sketch 218 adds to it:** a Retrieval section (three arms backed today, one that says *"not recorded yet"*), a read-only Chunks list, extracted tables rendered as tables, and image descriptions — none of which needs schema.
+
+---
+
+### `frontend/src/hooks/useDocuments.ts`
+
+**Triple re-derived 2026-08-28: `8 / 3 / 120` — G-5: ⚠ FIRES, exactly at threshold.** ⚠ Absent at three phases.
+
+⚠ **Realtime is a hint, never a source of truth** (D-v2.5-03): it subscribes to the `documents` table and **reconciles by fetch** on (re)connect. A design that assumes the socket delivered every transition will show a stale stage strip after a reconnect.
+
+`table_count`, `image_count` and `chunk_count` are **server-derived**, not computed here — so a client-side count is always a re-render of a server number, never an independent one.
+
+---
+
+### `frontend/src/pages/KnowledgeHealthPage.tsx`
+
+**Triple re-derived 2026-08-28: `11 / 5 / 571` — G-5: ⚠ FIRES.** ⚠ Absent at five phases.
+
+⚠⚠ **IT IS `ChatLayout`'s POSITIONAL FALLBACK, AND THAT IS THE MOST IMPORTANT FACT ABOUT IT.** `ChatLayout.tsx:879` renders it as the trailing `else` of the view chain, and `App.tsx:98-101` states the consequence in its own words: *"a union member with no branch **silently renders Knowledge Health**"*. **Retiring this page into the Library removes what the app shows when nothing matches** — a mis-route degrades from *wrong page* to *blank screen* unless a replacement fallback ships in the same commit.
+
+⭐ **It already ships the four-tab shell the Library's Health tab absorbs** — `Most Retrieved · Never Retrieved · Stale · Low Confidence`, the last with a `By Document / By Query` sub-tab — plus four stat cards (`Total Docs · Coverage % · Retrieval Score · Active This Month`) and a Coverage Trend chart. It carries the app's **one shipped code-split**, which `WorkflowBuilderPage` mirrors.
+
+⚠ Its `Retrieval Score` tile is the one contested atom of the merge: a real number (derived from similarity thresholds) that **does not say what it measures**. Sketch 218 draws it both ways and leaves the ruling to the operator.
+
+---
+
+### `backend/app/api/knowledge_health.py`
+
+**Triple re-derived 2026-08-28: `10 / 5 / 713` — G-5: ⚠ FIRES.** ⚠ Absent at five phases.
+
+⭐ **IT REFUTES `BUS-026`'s CENTRAL COST CLAIM.** That bus item states *"nothing logs retrieval today"* and concludes a `retrieval_events` table is required. **Retrieval is already logged** — `tool_dispatcher.py:797` writes `audit_log` rows with `action_type="search.query"` — and this module already aggregates them into `most-retrieved` / `never-retrieved` / `retrieval-trend` / `coverage` / `low-confidence` over `WINDOW_DAYS = 30`. The grep in BUS-026 missed it because the table is not named `retrieval_*`.
+
+⚠ **`WINDOW_DAYS = 30` is the ONLY window that exists.** A document absent from a list is *"not retrieved in 30 days"*, never *"never retrieved"*, and any tile labelled with another window is fabricated.
+
+⚠ **Service-role by classified exception** (Phase 163 / TEN-02): `audit_log` RLS is INSERT-only for `authenticated`, so a user-JWT client would silently read an EMPTY audit set and the analytics would break. Every query stays owner-scoped in app code via `.eq("user_id", …)` — that filter is the sole gate, and it must survive any refactor.
+
+**The named seam:** five paginated metric helpers with near-identical shapes, plus a summary that re-invokes two of them. One windowed-aggregate helper parameterised by predicate is the cut.
+
+---
+
+### `backend/app/api/document_governance.py`
+
+**Triple re-derived 2026-08-28: `5 / 3 / 416` — G-5: ⚠ FIRES, exactly at threshold.** ⚠ Absent at three phases.
+
+⚠ **ITS "LOW CONFIDENCE" IS NOT `knowledge_health`'s "LOW CONFIDENCE", AND THE MERGE PUTS THEM SIDE BY SIDE.** This module's cutoff **is the `ConfidenceChip` TIER.MED low cutoff (0.5)** and measures how sure the *extractor* was about a metadata field. `knowledge_health.py`'s is `LOW_CONF_THRESHOLD = 0.38` and measures *average retrieval similarity*. **Two thresholds, two meanings, one pair of words.** Sketch 218 renames them apart — **Unsure metadata** and **Weak matches** — and its `COPY.SIGNAL_RENAMES` map is asserted total so a rename can never become a loss.
+
+It mirrors `_fetch_never_retrieved`'s SQL-level shape and caps its Python scan the same way, so the two modules share a performance profile as well as a vocabulary problem.
+
+---
+
+### `frontend/src/pages/GovernancePage.tsx`
+
+**Triple re-derived 2026-08-28: `4 / 1 / 355` — G-5: no (1 phase).** young (119) — ⚠ **the row exists because the page is being MERGED, not because it is hot.**
+
+**Operator direction 2026-08-28: it merges into the Library.** The evidence is stronger than its row count: its `<h1>` reads **"Document Governance"**, all three signals are document signals, its own docblock calls it *"Library Health, three different lists"*, and **every row is already a pure link-out into `DocumentDetailPanel`** — `this surface never mutates` (D-119-6).
+
+⚠ **IT IS FEATURE-GATED AND `Documents` IS NOT.** `nav-items.ts` gates it behind `governance_health`, and a governed entry **VANISHES** rather than rendering locked. Folding gated signals into an ungated tab **shows them to people the effective-features map currently hides them from**. The gate moves to the merged chips or the tab; **a merge that drops a permission is a leak, not a tidy-up.**
+
+⚠ Its three cards (`Broken relationships`, `Unclassified documents`, `Low-confidence metadata`) are the source of truth for the rename map above — measured from `CARD_META`, never transcribed.
+
+---
+
+### `frontend/src/components/ingestion/DocumentUpload.tsx`
+
+**Triple re-derived 2026-08-28: `10 / 1 / 144` — G-5: no (1 phase).** ⚠ Absent for its entire life.
+
+⛔ **IT REPORTS NO BYTE PROGRESS.** There is no `onUploadProgress` anywhere in the upload path — the component knows only *"Uploading N files…"* and a count. **So every per-file upload percentage in the reference redesign is a number this client cannot compute**, and sketch 218 draws stages instead. If real progress reporting is ever added, that constraint lifts and the fence in the sketch should be revisited rather than deleted.
+
+⚠ **The accepted formats are `.txt .md .pdf .docx .pptx .xlsx .csv .epub`** — measured from the `accept` attribute. **`.msg` is NOT among them**, although a real Outlook message has reached ingestion in this project and failed there on a NUL in the subject. A dropzone advertising a format the input rejects sends the user to a dead end; sketch 218 fences the advertised list against this attribute.
+
+⭐ Upload is currently a **small button in the top-right corner of a folder header** — the operator could not find it, which is what promoted it to a first-class surface in the sketch.
