@@ -895,7 +895,136 @@ async def _run_phase_with_gates(
         # than crashing — it degrades "Step 2 of 5" to "Step 2 of 2", never to a lie
         # about what the step is or what happens next.
         _total = total_phases if total_phases is not None else phase.phase_index + 1
-        sentence = _approval_sentence(phase, _total)
+
+        # ── 214 (D-214-14 / D-214-15) — WHAT THE COMPOSER CANNOT KNOW, RESOLVED HERE ─────
+        # The composer stays PURE (no pool, no clock, no connection lookup), so the two
+        # facts it cannot reach arrive as arguments. This branch is the right caller
+        # because it already holds `pool`, `ctx` and `accumulated_outputs` — nothing new
+        # is threaded through `_run_phase_with_gates`' signature.
+        #
+        #   * the SERVICE — `connector_connections.name`. `BUG-260828-01` measured the
+        #     composer filling that slot from `config.capability`, i.e. the value already
+        #     in the tool slot, so a capability row read the tautology
+        #     `It will run "post_message" through post_message.` and an MCP row
+        #     (`capability is None`) dropped the clause entirely. The name a person needs
+        #     was always on the connection row and was never read.
+        #   * the ARGUMENTS — under D-214-01 `config.tool_args` holds only the FIXED
+        #     values, so rendering it would name the constants and SILENTLY OMIT exactly
+        #     the arguments that vary (`Ask at launch`, `From an earlier step`). The pause
+        #     therefore calls the SAME `args.resolve_arguments` the executor calls; a
+        #     re-derivation here could disagree with the send, and on an approval surface
+        #     that means a person authorising something other than what they read.
+        #
+        # ⚠ NOTHING HERE MAY FAIL THE PAUSE. Every arm degrades: an unresolvable name
+        # omits the service clause (the shipped *never draw a name the system cannot know*
+        # rule) and an unknowable schema falls back to the composer's pre-214 `tool_args`
+        # rendering rather than to a fabricated resolved set. The executor still refuses
+        # at its own named gates; this path only decides what a sentence says.
+        # ⚠ NO AUDIT SURFACE. D-213-14 is unchanged — shown once, recorded never. No new
+        # event type, no receipt field, and `_write_send_receipt` is not touched.
+        _service_name = None
+        _resolved_args = None
+        _cfg = getattr(phase, "config", None)
+        if getattr(_cfg, "phase_type", None) == "external_action":
+            from app.services.connector_service import (
+                ConnectorError,
+                resolve_connection,
+            )
+            from app.services.connectors import args as _args
+
+            _connection = None
+            _connection_id = getattr(_cfg, "connection_id", None)
+            # `org_id` has no default on the resolver (`test_the_resolver_signature_takes_
+            # an_org_id` asserts that mechanically) — pass the RUN's org, as
+            # `phase_types.py` does at its own Gate 5. No org means no scoped lookup and
+            # therefore no name; an UNSCOPED lookup is D-14 with a friendlier name.
+            _org_id = getattr(ctx, "org_id", None)
+            if _connection_id and _org_id:
+                try:
+                    # Awaited directly, not wrapped: `resolve_connection`'s row fetch goes
+                    # through `aexec`, which is already off the event loop (D-v2.5-01).
+                    _connection = await resolve_connection(
+                        str(_connection_id), org_id=str(_org_id)
+                    )
+                    _service_name = getattr(_connection, "name", None) or None
+                except ConnectorError as _exc:
+                    # Disabled, absent, another org's, or a credential this run cannot
+                    # read. Mirrors `phase_types.py`'s refusal posture and adds no new
+                    # one — but here it is not even a refusal: the clause simply omits a
+                    # service it cannot name.
+                    logger.debug(
+                        "214 D-214-14: approval pause for phase %s could not resolve a "
+                        "service name (%s) — the service clause is omitted rather than "
+                        "guessed", getattr(phase, "slug", None), _exc,
+                    )
+
+            if _connection is not None:
+                try:
+                    # ⭐ THE SCHEMA COMES FROM THE ONE ACCESSOR, and its provenance is the
+                    # executor's by construction rather than by assertion. Hand
+                    # `resolve_arguments` a different schema and the pause shows a
+                    # DIFFERENT — usually EMPTY — argument set from the one that leaves.
+                    # ⛔ Do not read the adapter's own frozen declaration and do not index
+                    # the snapshot list by hand. (Neither literal is spelled here: the
+                    # acceptance fence is a grep for exactly those two names, and a fence
+                    # that greps for a literal cannot be described using it — the 187-24
+                    # trap, which this phase's brief records firing four times in wave 1.)
+                    # The snapshot is the one resolved above, so there is no second lookup.
+                    _capability = getattr(_cfg, "capability", None)
+                    _is_mcp = bool(getattr(_connection, "mcp_server_url", None))
+                    _schema = _args.schema_for_bound_tool(
+                        capability=None if _is_mcp else _capability,
+                        tool_name=getattr(_cfg, "tool_name", None) if _is_mcp else None,
+                        discovered_tools=getattr(_connection, "discovered_tools", None),
+                    )
+                    if _schema is None:
+                        # The executor RECORDS rather than sending on this same input.
+                        # ⛔ A `None` schema must NOT become a fabricated resolved set:
+                        # `resolved_args=None` leaves the composer rendering
+                        # `config.tool_args` under its shipped rule, which claims nothing.
+                        logger.debug(
+                            "214 D-214-15: approval pause for phase %s could not learn the "
+                            "bound tool's argument shape — showing the stored arguments "
+                            "rather than a resolved set", getattr(phase, "slug", None),
+                        )
+                    else:
+                        # The executor's OWN input shapes, mirrored per arm rather than
+                        # averaged: the MCP gate passes `accumulated_outputs` and no body
+                        # arg; the native gate passes `{}` and the capability's body field.
+                        # A single "close enough" call here is exactly the pause/send
+                        # disagreement this whole block exists to prevent.
+                        from app.services.harness.phase_types import (
+                            _BODY_ARG_FOR_CAPABILITY,
+                            _external_action_inputs,
+                        )
+
+                        _run_inputs = _external_action_inputs(accumulated_outputs, ctx)
+                        _resolved_args = _args.resolve_arguments(
+                            config=_cfg,
+                            schema=_schema,
+                            upstream_outputs=accumulated_outputs if _is_mcp else {},
+                            run_inputs=_run_inputs,
+                            body_arg=(
+                                None if _is_mcp
+                                else _BODY_ARG_FOR_CAPABILITY.get(_capability)
+                            ),
+                        )
+                except Exception as _exc:  # noqa: BLE001 — see the paragraph below
+                    # ⚠ DELIBERATELY BROAD, AND IT WEAKENS NOTHING. `schema_for_bound_tool`
+                    # lets an UNREGISTERED capability's `KeyError` propagate on purpose (the
+                    # closed set failing closed at a named site) — but that refusal belongs
+                    # to the EXECUTOR, which raises it at its own gate moments later. A
+                    # display-only path that adopted it would turn a prompt into the thing
+                    # that kills the run, one step earlier and at an unnamed site.
+                    logger.debug(
+                        "214: approval pause for phase %s could not resolve its arguments "
+                        "(%s) — showing the stored arguments", getattr(phase, "slug", None),
+                        _exc,
+                    )
+
+        sentence = _approval_sentence(
+            phase, _total, service_name=_service_name, resolved_args=_resolved_args
+        )
 
         # WAITING IS NOT FAILING (Phase 185 / RESEARCH L-5). The ledger records the
         # CONSEQUENCE (the run paused for a person); the RECEIPT is the separate
