@@ -5,7 +5,27 @@ import { providerLogo } from "@/lib/providerLogo"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { RunStatusStrip } from "./RunStatusStrip"
-import { outerBannerLabel } from "@/lib/toolMeta"
+import { outerBannerLabel, toolLabel } from "@/lib/toolMeta"
+// ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE ONE STEP-IDENTITY ELEMENT.
+//
+// ⚠ THE SHAPE THIS SURFACE HANDS IN IS DELIBERATELY EMPTY, AND THAT IS THE HONEST ANSWER
+// RATHER THAN A MISSING ONE. A chat agent's tools run IN PROCESS: `execute_code`,
+// `search_documents` and the rest reach no connection, so there is no service to name and no
+// vendor whose mark could be borrowed. The shared resolver is TOTAL over that input and
+// returns its NAMED neutral, which is exactly D-206.1-10's rule — never nothing, and never
+// another service's mark. ⛔ Passing `{ tool_name: tc.name }` would hit the MCP arm and paint
+// the MCP logo on `execute_code`, which is a lie no map can detect; it is not a shortcut
+// available here.
+//
+// ⚠ THE RESOLVER IS NOT NAMED IN THIS PARAGRAPH ON PURPOSE. This plan greps `components/chat`
+// and `components/panel` for it at ZERO occurrences — the rule being *no surface reaches past
+// the element to the map* — and prose quoting the needle turns that guard into a lie about
+// itself. It did, on the first draft of this comment (the 187-24 trap).
+//
+// ⚠ AND IT RESOLVES NOTHING (T-214-11-04). `toolLabel` is the shipped chat-side name resolver
+// this card's own banner already reads — one home, so the strip and the identity cannot spell
+// one tool two ways.
+import { StepIdentity } from "@/components/workflows/StepIdentity"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { categorizeError } from "@/lib/errorCategories"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -194,6 +214,25 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
       ? lastTool
       : null
 
+  // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 2) — WHAT THIS RUN IS
+  //    DOING RIGHT NOW, said as a step identity.
+  //
+  // ONE identity per card, on the step in flight — not one per tool row. The sketch draws a
+  // per-step list because it is drawing a WORKFLOW run; a chat run's per-tool detail already
+  // has a home in `ToolCallPanel` below, and a mark repeated down that list would be a second
+  // mark on rows that already carry one (icon-convention §1: reuse the seam, don't re-map).
+  //
+  // ⚠ AN UNNAMED TOOL RENDERS NO IDENTITY. `toolLabel` returns the RAW ID for a tool it has no
+  // phrase for, and an id-shaped face is worse than a generic one (PATTERNS §4d's floor) — it
+  // is also how a wire id would reach a run surface, which invariant #4 forbids. Comparing the
+  // resolved phrase against the id is what makes that structural rather than a deny-list: a
+  // tool added tomorrow with no phrase is silently excluded, in the safe direction.
+  const activeToolPhrase = activeTool ? toolLabel(activeTool.name) : null
+  const activeIdentity =
+    activeTool && activeToolPhrase && activeToolPhrase !== activeTool.name
+      ? activeToolPhrase
+      : null
+
   // ---- D-04 unified step count (Phase 095 Plan 02) ----
   // ALL THREE RunCard count sites — the header title, the RunStatusStrip "Step N",
   // and the collapsed-row "N steps" — read this ONE integer so they can never
@@ -332,6 +371,20 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           <div className="font-mono text-xs text-muted-foreground truncate">
             {runSub}
           </div>
+          {/* ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 2) — the step
+                 in flight, said as an identity. `size="chip"` is the sketch's `xs`, which is
+                 this surface's own size and the reason SIZE IS A MODIFIER rather than a fork.
+                 ⚠ Nothing is rendered when no tool is in flight, or when the tool has no
+                 authored phrase — never an empty element, never a raw id. */}
+          {activeIdentity && (
+            <StepIdentity
+              shape={{}}
+              action={activeIdentity}
+              service={null}
+              size="chip"
+              className="mt-0.5 text-muted-foreground"
+            />
+          )}
           {hasStart && (
             <RunStatusStrip
               placement="header"

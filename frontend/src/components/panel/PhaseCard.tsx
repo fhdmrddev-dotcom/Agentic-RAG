@@ -56,11 +56,10 @@ import { countDeclared } from "@/components/workflows/receiptVocabulary"
 // would disagree about the same step at the same moment. Everything below comes off the
 // `Phase` row `StreamsProvider.reconcilePhases` built from the server's own answer.
 import { StepIdentity } from "@/components/workflows/StepIdentity"
-// The action's human phrase for the three native capabilities. ⚠ THE WIRE `toolName` IS AN
-// ID and never reaches the DOM from here (sketch 216 invariant #4) — an unmapped capability
-// falls back to the step's own slug-free heading rather than to a schema token.
-import { EXTERNAL_CAPABILITY_SENTENCES } from "@/components/workflows/phaseVocabulary"
-import { own } from "@/components/workflows/ownProperty"
+// The ONE place a capability becomes a word a person reads. ⚠ SHARED, not local: four
+// surfaces resolve the action, and the first draft of this plan wrote the derivation twice
+// and got the second copy subtly wrong. Read that module's header before changing this.
+import { stepActionWords } from "@/components/workflows/stepActionWords"
 // The failure block's label. `214-03`'s vocabulary is the ONE home for these words.
 import { FAILED_REASON_LABEL } from "@/components/workflows/stepIdentityVocabulary"
 
@@ -379,30 +378,6 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
   }
 }
 
-/**
- * Phase 214-11 Task 1 (STEP-04 · sketch 216 #1 / #4) — the step's ACTION, in words, or `null`.
- *
- * ⚠ **THE WIRE `toolName` IS AN ID AND IS NEVER RETURNED FROM HERE.** Invariant #4 forbids
- * `send_email` / `create_ticket` / `post_message` / `ask_question` / `external_action` on any
- * run surface, and `toolName` is exactly one of those spellings on a native step. So the
- * capability is translated through `phaseVocabulary`'s shipped sentence map, and anything the
- * map does not own resolves to `null` rather than to the id — PATTERNS §4d's floor:
- * *"a name is NEVER fabricated … an id-shaped face is worse than a generic one."*
- *
- * ⚠ `own()` RATHER THAN A BRACKET READ (WR-04, the tree's eighth prototype-key sink). A plain
- * object literal inherits `constructor` / `toString`, and `capability` is author-supplied JSONB
- * reaching us through the wire — a bracket index would return a FUNCTION for those keys, which
- * is never nullish, so the fallback would provably never fire.
- *
- * ⚠ It is a plain module function, NOT exported: `react-refresh/only-export-components` is an
- * ACTIVE error in this repo and this module exports a component.
- */
-function actionWordsOf(phase: Phase): string | null {
-  const cap = phase.capability
-  if (typeof cap !== "string" || cap.trim().length === 0) return null
-  return own(EXTERNAL_CAPABILITY_SENTENCES, cap.trim()) ?? null
-}
-
 export interface PhaseCardProps {
   phase: Phase
   /** Native list position (for the visible "Phase i" ordinal). 0-based. */
@@ -491,13 +466,14 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
   // ALONE for it — never "Unknown service", never the capability id (`stepIdentityVocabulary`'s
   // `STEP_IDENTITY_SERVICE_UNKNOWN`). Substituting anything here would be drawing a name the
   // system cannot know.
-  const actionWords = actionWordsOf(phase)
+  const actionWords = stepActionWords(phase.capability)
   const identity = actionWords
     ? {
         action: actionWords,
         service: phase.serviceName ?? null,
-        // The MARK's structural input — the same two wire facts, handed to the one map. This
-        // card never reads `connectionMark` itself; `StepIdentity` owns that (D-214-17).
+        // The MARK's structural input — the same two wire facts, handed onward. This card
+        // never reads the mark map itself; the element owns that resolution (D-214-17), and
+        // this plan asserts the absence mechanically over this directory.
         shape: { capability: phase.capability ?? null, tool_name: phase.toolName ?? null },
       }
     : null
