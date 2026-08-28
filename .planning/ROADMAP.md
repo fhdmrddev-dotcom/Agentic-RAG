@@ -251,9 +251,9 @@ Plans:
 - [x] 214-07-PLAN.md - the argument editor: a field per declared `inputSchema` property with a three-arm source picker and the widening source gutter; `MCP_TOOL_ARGS_LABEL` and its `<Textarea>` DELETED with nothing replacing them
 - [x] 214-08-PLAN.md - `connectionMark.tsx` moves to `lib/` (D-214-17, no re-mapping) and `StepIdentity` is built — four sizes selected by a Record, both names taken as props
 - [x] 214-09-PLAN.md - `Ask at launch` becomes real fields on the library Run modal and the schedule modal, with the six whole-`innerHTML` captures re-baselined deliberately
-- [ ] 214-10-PLAN.md - the publish refusal surface: five distinct headlines each with a next action, the authored step name and never the slug, above a spine where exactly one stage is blocked
-- [ ] 214-11-PLAN.md - step identity on all five run surfaces asserted PER SURFACE (`SEED-206`), and `classifyFailure`'s condition narrowed while the `reason_unknown` sentence stays byte-identical
-- [ ] 214-12-PLAN.md - one shared launch-field renderer, and chat gains the launch moment it does not have today — resolved BEFORE the thread is created, with the agent filling nothing
+- [x] 214-10-PLAN.md - the publish refusal surface: five distinct headlines each with a next action, the authored step name and never the slug, above a spine where exactly one stage is blocked
+- [x] 214-11-PLAN.md - step identity on all five run surfaces asserted PER SURFACE (`SEED-206`), and `classifyFailure`'s condition narrowed while the `reason_unknown` sentence stays byte-identical
+- [x] 214-12-PLAN.md - one shared launch-field renderer, and chat gains the launch moment it does not have today — resolved BEFORE the thread is created, with the agent filling nothing
 - [ ] 214-13-PLAN.md - STEP-06's describe door: the granted-tools service picker, the whole-word matcher with its unanchored fallback, and the vocabulary constraint ENFORCED on the emitted definition rather than prompted
 - [ ] 214-14-PLAN.md - `visual_workflow_canvas` flips at its COLD default (D-214-19, `live_connectors` does not), the seam list **DERIVED by grep from the tree** rather than recalled, and seven cross-plan seams proven by tests that mock neither side
 - [ ] 214-15-PLAN.md - the ledger re-derived and synced row-with-section, the gate pinned **and paired with per-file deltas** (SEED-171), the registers written, a mitigation→test map for all sixteen threat models, and the G-4 operator drive (blocking)
