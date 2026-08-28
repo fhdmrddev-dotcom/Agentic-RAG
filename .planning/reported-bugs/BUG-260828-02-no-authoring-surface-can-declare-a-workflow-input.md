@@ -3,9 +3,9 @@ id: BUG-260828-02
 title: Nothing can declare a workflow input, so "Asked when this runs" is a dead end for every author
 surface: Agentic-RAG
 severity: blocking
-status: folded
+status: closed
 folded_into: 214.1
-verified_closed_by: null   # ⚠ NOT closed — the LAUNCH half was never driven live
+verified_closed_by: 214.1 # ✅ operator-driven 2026-08-28 18:00 — run inputs carried {topic:"test", to:"fhdmrd@gmail.com"} from a library launch
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas:

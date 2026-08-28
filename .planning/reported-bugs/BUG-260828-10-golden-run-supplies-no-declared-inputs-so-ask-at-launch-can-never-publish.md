@@ -3,7 +3,8 @@ id: BUG-260828-10
 title: The golden run supplies no declared inputs, so any argument sourced "Asked when this runs" can never publish
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
+verified_closed_by: 214.1 # ✅ operator-driven 2026-08-28 18:00 — run inputs carried {topic:"test", to:"fhdmrd@gmail.com"} from a library launch
 folded_into: null
 reported: 2026-08-28
 reported_by: operator, driving Phase 214.1's UAT to the structural gate
@@ -11,7 +12,7 @@ affected_areas:
   - backend/app/services/harness/publish_service.py
   - backend/app/services/harness/reachability.py
   - backend/app/services/connectors/args.py
-re_open_trigger: n/a — open
+re_open_trigger: any publish of a workflow whose argument is sourced `ask` that blocks on `no_source` again
 relates_to:
   - BUG-260826-01 (⚠ this is now ITS blocker — -01 cannot close while this is open)
   - BUG-260828-02 (the authoring half, closed by 214.1 — this is the half nobody had reached)

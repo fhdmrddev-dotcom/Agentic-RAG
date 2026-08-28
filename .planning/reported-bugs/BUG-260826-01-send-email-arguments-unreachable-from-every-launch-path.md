@@ -4,10 +4,10 @@ title: An external_action send_email step can never receive `to` / `subject` fro
 reported: 2026-08-26
 surface: Agentic-RAG
 severity: blocking
-status: folded
+status: closed
 affected_areas: [backend/connectors, backend/harness, frontend/workflows, frontend/chat]
 folded_into: 214
-verified_closed_by: null
+verified_closed_by: 214.1 # ✅ operator-driven 2026-08-28 18:00 — run inputs carried {topic:"test", to:"fhdmrd@gmail.com"} from a library launch
 related_seeds: [SEED-164]
 re_open_trigger: null
 reproduces_on:
