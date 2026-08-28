@@ -128,6 +128,60 @@ numbers and the other gives you a well-informed guess. **This says nothing about
 the library** — for prose, reports, emails and spreadsheets the shipped pipeline is the right
 engine and is not in question.
 
+## ⚠ MEASURED 2026-08-28 with `backend/scripts/probe_drawing_pdf.py`
+
+The probe calls the app's OWN extraction path (`extract_composable`, the one
+`api/documents.py:303` uses) rather than modelling it. **Run against two stand-in
+drawings**, one vector plot and one scan — *stand-ins, not the operator's real file*,
+built only so the probe could be proven before a real drawing is spent on it:
+
+| | vector CAD plot | scan |
+|---|---|---|
+| text (shipped `legacy` engine) | **229 chars** | **0** |
+| text (`pymupdf` engine) | 229 chars — **identical** | 0 |
+| images via the REAL path | 0 | **1** |
+| images via the legacy fallback | 0 | **0** — *disagrees* |
+| tables | camelot 0 · pdfplumber **1** | 0 |
+| vector drawing ops | 10 | 0 |
+
+**The vector plot's entire extracted text, verbatim:**
+
+> `GROUND FLOOR PLAN SCALE 1:100 DRG No. A-1001 REV C A-101 OFFICE 5200 4100 A-102 OFFICE
+> 5200 3600 A-103 STORE 2400 3600 A-104 CORRIDOR 12800 1800 LEGEND --- BLOCKWORK 140mm ===
+> BLOCKWORK 215mm TYP. DOOR 900 x 2100 ALL DIMS IN mm`
+
+**That is the whole finding in one line.** Every number a BOQ needs is present, and not one
+of them is attached to what it measures. `5200 4100` follows `A-102 OFFICE` by adjacency in
+a text stream, not by any structural relation — nothing says those are that room's
+dimensions rather than the next room's, and nothing marks `900 x 2100` as a door type
+rather than a quantity. **The extraction did not fail. It succeeded, and produced something
+from which a confident wrong answer is easy to compute.**
+
+**Four findings the probe added to this seed:**
+
+1. **Both text engines return byte-identical output on the vector plot.** So
+   `extraction_text_engine_pdf: legacy → pymupdf` — proposed in SEED-227's first draft as a
+   cheap improvement for CAD PDFs — **buys nothing here.** ⚠ **A plan that assumed it would
+   was measured wrong before it was written.**
+2. **A scan yields exactly ONE image**, which becomes a 1-2 sentence vision caption. So the
+   drawing is not invisible — it is *summarised*, which is worse, because a caption reads as
+   knowledge. This is SEED-006's ~5% figure-survival meeting a document that is 100% figure.
+3. ⚠ **pdfplumber reports a TABLE (1) in the drawing where camelot reports none.** Ruled
+   lines in geometry are indistinguishable from a ruled table to a line-based detector, so a
+   drawing can inject a fabricated table into the index. Not chased here; recorded because a
+   BOQ built on a phantom table is exactly the failure this seed exists to prevent.
+4. **The legacy fallback and the real path disagree on a scan (0 vs 1 image)** — ⚠ **and
+   this is LATENT, NOT LIVE, which was checked rather than assumed.** `extract_composable`
+   failing or timing out marks the document `failed` and returns (`documents.py:309-320`); it
+   does not fall through with `extracted_doc=None`. Every current caller threads the composed
+   document. **The trap is that `extract_and_store_images`' fallback branch would silently
+   see zero images if a future caller ever omits it.**
+
+⚠ **The stand-ins are NOT representative on one axis and it matters:** the vector fixture
+measures **10** drawing ops where a real AutoCAD plot has thousands. The probe's
+`vector_drawings > 0` heuristic is therefore tuned on a weak sample — **re-check the verdict
+logic against the operator's real file before trusting the classification on anything else.**
+
 ## Open questions for whoever picks this up
 
 - Which OCR engine, decided on **real customer drawings**, not on a benchmark corpus.
