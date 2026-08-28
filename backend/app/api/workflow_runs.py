@@ -188,6 +188,61 @@ class WorkflowRunPhaseRead(BaseModel):
         ),
     )
 
+    # ── 214 (STEP-04 / STEP-05 / D-214-23) — WHY A STEP FAILED, AND WHAT IT WAS ──────
+    # ⚠ THESE FOUR JOIN THE LOCKSTEP ABOVE, AND THEY ALSO JOIN THE TWO-WIRE-MODEL RULE:
+    # `models/thread.py`'s `WorkflowPhaseState` gains the SAME four in the SAME commit.
+    # `D-200.1-02-A` (the one recorded exception, below) was CONSIDERED and does NOT apply
+    # — nothing renders the failure reason on the chat panel today; `PhaseCard.tsx:253`
+    # fires the `reason_unknown` sentinel instead, which is precisely the disagreement the
+    # rule exists to prevent.
+    #
+    # ⚠ THE PROJECTION ASKS FOR NOTHING NEW. `output` was already selected, and the reason
+    # is read off the SAME single `phase_output_object` parse that already feeds `step_count`
+    # and `deliverable_text` — a third fact off one door, never a second door.
+    failure_reason: str | None = Field(
+        default=None,
+        description=(
+            "Why this step failed, in the adapter's or the gate's OWN words, read from the "
+            "phase's `output[\"_failure_reason\"]` (written by `db/workflows.py::fail_phase` "
+            "on every failure). ⚠ `null` MEANS NOT RECORDED — it is the fact the panel's "
+            "`reason_unknown` sentinel exists to state honestly. **An empty string is NOT a "
+            "synonym for it and is never shipped**: `fail_phase` always writes a non-empty "
+            "reason, so `\"\"` is impossible by construction, and one read anyway is "
+            "normalised to `null` rather than passed through — collapsing the two would cost "
+            "the sentinel its meaning. Non-null on failed steps only."
+        ),
+    )
+    tool_name: str | None = Field(
+        default=None,
+        description=(
+            "The ACTION this step runs, by its wire name — the tool on the bound connection "
+            "(`config.tool_name` in the definition that executed). `null` for every phase "
+            "type that is not `external_action`, and for an external step that names only a "
+            "native capability. Never guessed from the slug."
+        ),
+    )
+    capability: str | None = Field(
+        default=None,
+        description=(
+            "The native capability this step runs (`send_email` | `create_ticket` | "
+            "`post_message`), from the same config. `null` on an MCP step, which carries a "
+            "`tool_name` and no capability at all — that absence is a fact, not a gap."
+        ),
+    )
+    service_name: str | None = Field(
+        default=None,
+        description=(
+            "The SERVICE a person would name — the bound connection row's display `name`, "
+            "resolved at READ time. ⚠ **COMPUTED, NEVER STORED** (D-213-02 / D-214-14): a "
+            "stored copy goes stale the moment the connection is renamed. ⚠ `null` is a "
+            "LEGITIMATE value and means the connection could not be resolved (deleted, "
+            "another org's, or none bound) — the surface then renders the ACTION ALONE. "
+            "**Never a substitute string**: not \"Unknown service\", not the capability id, "
+            "not the connection id. `grounding.py`'s shipped rule, unchanged on a new "
+            "surface: never draw a name the system cannot know."
+        ),
+    )
+
 
 # ─── D-200.1-02-A — THE SECOND WIRE MODEL IS DELIBERATELY NOT WIDENED ────────────────────
 #
@@ -774,6 +829,19 @@ async def read_workflow_run(
         # are one fact on this surface.
         raw_text = obj.get("text") if isinstance(obj, dict) else None
         deliverable_text = raw_text if isinstance(raw_text, str) and raw_text else None
+        # ── 214 (D-214-23) — THE THIRD FACT OFF THE SAME SINGLE PARSE ──
+        # ⚠ THIS IS WHY THE PARSE MATTERS RATHER THAN THE FIELD. 38 of the 43 `failed`
+        # phase rows on the live database store `output` as a jsonb STRING SCALAR, so a
+        # reader written as `row["output"]["_failure_reason"]` finds the reason on 2 of 43
+        # and reads empty on the rest — silently, because the absent arm renders honestly.
+        # Reading off `obj` (already unwrapped by the ONE door) serves both shapes.
+        # ⚠ Whitespace-only and non-`str` normalise to `None` so ABSENT and EMPTY stay one
+        # fact on the wire — see the field's description for why that keeps the panel's
+        # `reason_unknown` sentinel honest.
+        raw_reason = obj.get("_failure_reason") if isinstance(obj, dict) else None
+        failure_reason = (
+            raw_reason if isinstance(raw_reason, str) and raw_reason.strip() else None
+        )
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -785,6 +853,7 @@ async def read_workflow_run(
                 step_count=count,
                 step_noun=noun,
                 deliverable_text=deliverable_text,
+                failure_reason=failure_reason,
             )
         )
 

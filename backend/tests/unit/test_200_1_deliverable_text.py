@@ -106,7 +106,15 @@ _PLANTED_INTERNALS = {
     _NEVER_SEEN_KEY: "invented-after-this-plan-shipped",
 }
 
-# The exact key set `WorkflowRunPhaseRead` declares. Nine fields, no more.
+# The exact key set `WorkflowRunPhaseRead` declares.
+#
+# ⚠ NINE UNTIL PHASE 214, THIRTEEN NOW — and the number is recorded rather than relaxed to a
+# superset check, because a set EQUALITY is the whole reason this fence catches a key invented
+# tomorrow. Phase 214 plan 02 (STEP-04 / STEP-05 / D-214-23) added `failure_reason` (why a step
+# failed, from `output["_failure_reason"]` — the fact `BUG-260826-05` proved was captured and
+# projected nowhere) plus the step's identity triple `tool_name` / `capability` /
+# `service_name`. The bound is UNCHANGED in kind: still an allow-list of named keys, still no
+# `output` field on the model, still nothing iterated or filtered off that jsonb.
 _EXPECTED_PHASE_KEYS = {
     "slug",
     "phase_index",
@@ -117,7 +125,16 @@ _EXPECTED_PHASE_KEYS = {
     "step_count",
     "step_noun",
     "deliverable_text",
+    "failure_reason",
+    "tool_name",
+    "capability",
+    "service_name",
 }
+
+# The keys the serializer reads BY NAME off the unwrapped `obj`. One until Phase 214, two now.
+# ⚠ `_failure_reason` is read off the SAME single parse — a third fact through the one door,
+# never a second door. The fence below is what keeps that true.
+_ALLOW_LISTED_OUTPUT_KEYS = {"text", "_failure_reason"}
 
 _DEFINITION_JSON = {
     "slug": "quarterly-report",
@@ -491,26 +508,31 @@ def _keys_read_from_unwrapped_object(source: str) -> set[str]:
     return found
 
 
-def test_serializer_reads_exactly_one_key_by_name():
-    """Over the loop's AST, the ONLY key read off the unwrapped object is ``"text"``.
+def test_serializer_reads_exactly_the_allow_listed_keys_by_name():
+    """Over the loop's AST, the ONLY keys read off the unwrapped object are the allow-listed two.
 
-    This is the ALLOW-LIST expressed as a fence. It fails on a filtered copy, on a second key
-    added without a model field, and on a ``for k in obj`` iteration (which reads no named key
-    and would therefore also fail the set equality in case 2).
+    This is the ALLOW-LIST expressed as a fence. It fails on a filtered copy, on a key added
+    without a model field, and on a ``for k in obj`` iteration (which reads no named key and
+    would therefore also fail the set equality in case 2).
+
+    ⚠ RENAMED AT PHASE 214 (was ``..._exactly_one_key_by_name``). The count moved from one to
+    two — ``_failure_reason`` joined ``text`` — and a fence whose NAME asserts a number it no
+    longer checks is the stale-guard shape this ledger keeps recording. The property did not
+    change: named keys only, off ONE parse.
     """
     source = _loop_source()
     assert "phase_output_object(" in source, "the loop no longer parses through the ONE door"
-    assert _keys_read_from_unwrapped_object(source) == {"text"}
+    assert _keys_read_from_unwrapped_object(source) == _ALLOW_LISTED_OUTPUT_KEYS
 
 
-def test_the_one_key_fence_can_see_a_planted_second_key():
+def test_the_allow_list_fence_can_see_a_planted_extra_key():
     """POSITIVE CONTROL — plant ``obj.get("citations")`` into the REAL loop source; matcher sees it.
 
     Without this, a matcher that silently found nothing (a renamed local, a restructured loop)
     would report a perfectly green fence over an empty set.
     """
     source = _loop_source()
-    assert _keys_read_from_unwrapped_object(source) == {"text"}  # baseline
+    assert _keys_read_from_unwrapped_object(source) == _ALLOW_LISTED_OUTPUT_KEYS  # baseline
 
     # ⚠ THE PLANT IS ANCHORED BY CONTENT AND INDENTED FROM WHAT IT FINDS, never by a quoted
     # literal with a hard-coded indent. The first draft of this control quoted the line at its
@@ -526,7 +548,7 @@ def test_the_one_key_fence_can_see_a_planted_second_key():
         lines[: idx + 1] + [f'{indent}leaked = obj.get("citations")'] + lines[idx + 1 :]
     )
     assert planted != source, "the plant did not land — this control is vacuous"
-    assert _keys_read_from_unwrapped_object(planted) == {"text", "citations"}
+    assert _keys_read_from_unwrapped_object(planted) == _ALLOW_LISTED_OUTPUT_KEYS | {"citations"}
 
 
 def test_no_iteration_over_the_unwrapped_object():
