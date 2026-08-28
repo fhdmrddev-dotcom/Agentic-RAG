@@ -248,9 +248,9 @@ Plans:
 - [x] 214-04-PLAN.md - the panel track widens to `clamp(480px, 38%, 640px)` (D-214-22) with its named pins, the 44px strip newly pinned, and the 900px overflow arithmetic re-run
 - [x] 214-05-PLAN.md - STEP-03's publish gate: five lint codes joining `LINT_CODES` + `/workflows/validate` in one commit, the pre-golden-run block, and the golden run validating resolved arguments while sending nothing
 - [x] 214-06-PLAN.md - the approval pause names the service (D-214-14) and shows the RESOLVED argument object (D-214-15), with the composer still pure and the receipt untouched
-- [ ] 214-07-PLAN.md - the argument editor: a field per declared `inputSchema` property with a three-arm source picker and the widening source gutter; `MCP_TOOL_ARGS_LABEL` and its `<Textarea>` DELETED with nothing replacing them
-- [ ] 214-08-PLAN.md - `connectionMark.tsx` moves to `lib/` (D-214-17, no re-mapping) and `StepIdentity` is built — four sizes selected by a Record, both names taken as props
-- [ ] 214-09-PLAN.md - `Ask at launch` becomes real fields on the library Run modal and the schedule modal, with the six whole-`innerHTML` captures re-baselined deliberately
+- [x] 214-07-PLAN.md - the argument editor: a field per declared `inputSchema` property with a three-arm source picker and the widening source gutter; `MCP_TOOL_ARGS_LABEL` and its `<Textarea>` DELETED with nothing replacing them
+- [x] 214-08-PLAN.md - `connectionMark.tsx` moves to `lib/` (D-214-17, no re-mapping) and `StepIdentity` is built — four sizes selected by a Record, both names taken as props
+- [x] 214-09-PLAN.md - `Ask at launch` becomes real fields on the library Run modal and the schedule modal, with the six whole-`innerHTML` captures re-baselined deliberately
 - [ ] 214-10-PLAN.md - the publish refusal surface: five distinct headlines each with a next action, the authored step name and never the slug, above a spine where exactly one stage is blocked
 - [ ] 214-11-PLAN.md - step identity on all five run surfaces asserted PER SURFACE (`SEED-206`), and `classifyFailure`'s condition narrowed while the `reason_unknown` sentence stays byte-identical
 - [ ] 214-12-PLAN.md - one shared launch-field renderer, and chat gains the launch moment it does not have today — resolved BEFORE the thread is created, with the agent filling nothing
