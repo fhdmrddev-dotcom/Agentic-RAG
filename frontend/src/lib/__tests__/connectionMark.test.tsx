@@ -2,6 +2,17 @@
  * Phase 206.1-01 (item 3 · CONN-02 · SC#3 · D-206.1-08 / -09 / -10 / -11 / -23,
  * UI-SPEC § Surface 3) — the per-service mark map's direct guard.
  *
+ * ⚠ MOVED WITH ITS MODULE IN 214-08 (D-214-16 / D-214-17). Both files left
+ * `components/settings/` for `src/lib/` when the mark's consumer set went from one surface
+ * to six. The relative specifier `../connectionMark` is UNCHANGED and still correct — the
+ * suite sat one directory below its module before the move and still does.
+ *
+ * ⚠ THE MOVE COST THE GATE A KNOB, AND ONLY ONE OF THE TWO. `TARGETS` in
+ * `scripts/vitest-count-gate.cjs` holds a PATH and was repointed in the same commit; the
+ * `BASELINE` pin is keyed by BASENAME and therefore resolved untouched. A pinned file the
+ * gate cannot find fails `N/N pinned files present`, which looks like a red test and is a
+ * path edit — so the array was READ rather than believed.
+ *
  * ── WHY THIS SUITE EXISTS AT ALL, given the import is already a fence ──
  * Measured this phase (RESEARCH §OQ#2b): under `unplugin-icons` with a LOCAL collection an
  * absent slug is a TRANSFORM-TIME HARD ERROR and the suite loads ZERO tests. So *"the slug

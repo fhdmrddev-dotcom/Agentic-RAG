@@ -74,7 +74,7 @@ import { createElement, type ReactNode } from "react"
 
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
 import { phaseGlyph } from "@/lib/phaseGlyph"
-import { ConnectionMarkGlyph, type ConnectionMarkShape } from "@/components/settings/connectionMark"
+import { ConnectionMarkGlyph, type ConnectionMarkShape } from "@/lib/connectionMark"
 
 /**
  * The per-step-type tint that sits BEHIND the floating mark — the whole of this

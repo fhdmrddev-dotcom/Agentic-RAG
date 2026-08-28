@@ -91,7 +91,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { Check, Loader2, MoreHorizontal, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { ConnectionMarkGlyph } from "@/components/settings/connectionMark"
+import { ConnectionMarkGlyph } from "@/lib/connectionMark"
 import {
   getEffectiveFeatures,
   listConnectorConnections,
