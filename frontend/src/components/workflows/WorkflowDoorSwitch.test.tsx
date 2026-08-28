@@ -607,7 +607,14 @@ const SWEPT_SOURCES: { path: string; source: string }[] = [
 const NEEDLES: { id: string; spelling: "plain" | "escaped"; text: string }[] = Object.entries(
   doorVocabulary,
 ).flatMap(([id, value]) => {
-  const plain = value as string
+  // ⚠ A COMPOSED entry is a FUNCTION, not a string, and this sweep is about governed
+  // WORDS in source. Phase 214-03 added three composed ids to this module and the old
+  // `value as string` then called .replace on them, which threw at module scope and took the
+  // WHOLE suite (44 cases) to zero runs — a count-gate decrease, not a visible failure.
+  // Skipping non-strings keeps the needle set honest: a template has no fixed literal to
+  // sweep for, so it contributes no needle rather than a wrong one.
+  if (typeof value !== "string") return []
+  const plain = value
   const escaped = plain.replace(/&/g, "&amp;")
   const rows: { id: string; spelling: "plain" | "escaped"; text: string }[] = [
     { id, spelling: "plain", text: plain },
@@ -648,7 +655,14 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // `doorVocabulary.test.ts` — the two numbers are one fact read from two files, and a count
     // that moved on its own is a table nobody checked.
     // Sketch 200: 23 → 24 (`DESCRIBE_CTA_REFUSED`), same commit, same rule, third time.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(24)
+    // Sketch 217 (214-03): 24 → 36 — twelve flat ids added at once. ⚠ FOURTH TIME, AND THE
+    // FIRST TIME THE TWO NUMBERS MOVED IN DIFFERENT COMMITS: `GOVERNED_ID_COUNT` went to 36
+    // in `doorVocabulary.test.ts`, this half did not, and the arithmetic 24 + 12 = 36 is what
+    // proves the gap is the twelve additions rather than an unexplained drift. The three
+    // COMPOSED ids added in the same commit contribute 0 needles by construction — a function
+    // has no fixed literal to sweep for — so 36 is flat ids only, and `COMPOSED_ID_COUNT` is
+    // the sibling suite’s to hold.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(36)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.

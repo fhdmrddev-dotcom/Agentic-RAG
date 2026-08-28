@@ -204,7 +204,11 @@ function parseSketchTable(markdown: string): {
 /** Extract the members of the exported `ArgumentGapKind` union from the module's own SOURCE
  *  — scoped to the declaration itself, so a docblock mentioning a kind cannot feed it. */
 function parseUnionMembers(source: string): string[] {
-  const decl = /export type ArgumentGapKind =([\s\S]*?)\n\n/.exec(source)
+  // ⚠ The terminator is CRLF-tolerant deliberately. This module is checked out with CRLF
+  // line endings on Windows, so a bare two-linefeed terminator never matched: the extractor
+  // returned an empty array and the equality below could only have passed by both sides being
+  // empty. Measured post-merge, Phase 214 wave 1.
+  const decl = /export type ArgumentGapKind =([\s\S]*?)\r?\n\r?\n/.exec(source)
   if (!decl) return []
   return [...decl[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort()
 }
