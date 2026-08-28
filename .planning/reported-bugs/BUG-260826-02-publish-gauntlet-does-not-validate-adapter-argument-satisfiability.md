@@ -89,3 +89,18 @@ once through the schedule-with-inputs path (BUG-260826-01's workaround) before t
 - `backend/app/services/harness/reachability.py:65-80` — `_KNOWN_RUN_INPUT_KEYS` + `_check_input_contracts`
 - `backend/app/services/connectors/smtp_adapter.py:293-310` — the adapter `INPUT_SCHEMA` nothing consults
 - BUG-260826-01 — the runtime failure this gate would have caught
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — why this stays `folded` and is NOT `closed`
+
+Shipped by `214-05` (the argument-satisfiability lint — five codes, one predicate, two
+registries, plus the golden run checking its own) and rendered by `214-10`
+(`PublishRefusalList` — the refusal is a CAUSE, not a status).
+
+⛔ **`verified_closed_by` stays `null` pending G4-4**, which is the only check that can tell
+whether the refusal names the author's OWN step name and the missing argument rather than a
+gauntlet stage. A lint that fires correctly and refuses illegibly is still this bug.
+
+⚠ **A structural weakness `214-05` found while fixing this and did NOT fix:** `test_182`'s
+lint-drift detector has been blind since Phase 182 — its regex matches only a STRING LITERAL
+first argument to `LintError(`, so any code minted from an expression was invisible to it. The
+five new codes are covered; **the general blindness is `SEED-220`.**

@@ -91,3 +91,22 @@ That is authoring discipline, not a guarantee.
 - `.planning/phases/213-per-tool-grants-and-the-approval-moment/213-SUMMARY.md` §3, finding D-1
 - `backend/app/services/harness/grounding.py:1242-1293` (`_external_action_clause`)
 - ROADMAP Phase 213 SC#3
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — why this stays `folded` and is NOT `closed`
+
+`214-06` reports it fixed on **both** connection shapes — the capability row and the MCP row —
+with the approval composer taking the service it cannot know as a parameter, and with a failing
+connection lookup no longer able to kill the pause. `214-11` carried the identity onto
+`PendingAskCard`.
+
+⛔ **`verified_closed_by` stays `null` pending G4-6**, which asks two things no unit test
+asserts together: that the pause names the SERVICE (not `post_message` twice, not a nameless
+MCP row) and that it lists **all three** arguments including the launch-asked one and the
+upstream one.
+
+⚠ **`T-214-06-03` is PARTIAL and is recorded as an OPEN FINDING rather than a mitigation.**
+`_resolve_failure_with_ask_user`'s governance receipt writes `metadata["finding"] =
+error_message`, and for an ARMED checkpoint that string is the entire approval sentence — so
+D-213-14's *"shown once, recorded never"* holds for `_write_send_receipt` and **fails** for the
+approval receipt. Pre-existing since Phase 187; **this phase WIDENED its content to
+launcher-supplied and LLM-produced text.** It needs an operator decision — see `SEED-223`.
