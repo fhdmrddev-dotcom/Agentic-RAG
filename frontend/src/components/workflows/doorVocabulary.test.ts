@@ -84,13 +84,39 @@ import doorVocabularySource from "./doorVocabulary?raw"
 // `.planning/sketches/164-telling-the-doors-apart/`.** The fix at that point is to move
 // `build.cjs` beside its output, not to weaken this import.
 import buildContractSource from "./__contracts__/doors-copy.generated.md?raw"
+/**
+ * ⚠ 214-03 — THE SECOND GENERATED BAR, AND IT REACHES OUT OF THE PACKAGE ON PURPOSE.
+ *
+ * Sketch 217 has no `build.cjs` writing an in-package copy the way sketch 164's does, so its
+ * contract is read where it lives. Reading a `?raw` file outside the package is a shipped,
+ * green idiom (`ExternalActionSection.test.tsx:59` reads a backend `.py` the same way), and
+ * the WR-08 residual recorded above applies to this import identically:
+ * `/gsd:complete-milestone` archives `.planning/sketches/`. **Re-open trigger: the first
+ * milestone close that archives `.planning/sketches/217-the-door-that-knows-your-services/`.**
+ * The fix at that point is to emit an in-package copy, never to weaken the case below.
+ */
+import sketch217ContractSource from "../../../../.planning/sketches/217-the-door-that-knows-your-services/BUILD-CONTRACT.generated.md?raw"
 
 /**
  * Every governed word the module owns, DERIVED from the module itself rather than
  * hand-listed — so a 22nd id is covered by every property below the moment it is exported,
  * and a DELETED id reds on the count instead of quietly leaving a loop with less to do.
+ *
+ * ⚠ 214-03 — IT IS NOW FILTERED TO STRINGS, because sketch 217 brought this table its first
+ * COMPOSED values. That is a WIDENING of the module, not a weakening of this derivation: the
+ * function-valued exports get their own list below and their own properties, and the case
+ * that used to assert *"every export is a string"* now asserts the two lists PARTITION the
+ * namespace — so a third kind of export still reds rather than slipping between them.
  */
-const ALL_DOOR_WORDS = Object.entries(doorVocabulary) as [string, string][]
+const ALL_DOOR_WORDS = Object.entries(doorVocabulary).filter(
+  ([, value]) => typeof value === "string",
+) as [string, string][]
+
+/** Every COMPOSED (function-valued) export sketch 217 added, derived the same way. */
+const ALL_DOOR_COMPOSED_IDS = Object.entries(doorVocabulary)
+  .filter(([, value]) => typeof value === "function")
+  .map(([id]) => id)
+  .sort()
 
 /**
  * Every id the module owns: 20 from D-11, the 21st D-23 added, and the 22nd from 193.1 (D-28).
@@ -106,11 +132,22 @@ const ALL_DOOR_WORDS = Object.entries(doorVocabulary) as [string, string][]
  * measuring nothing. So the two bars are declared separately, their UNION is asserted to be the
  * module's export set, and the contract case additionally asserts the new id is ABSENT from the
  * parsed contract, so the split cannot silently absorb a future id that should have been in it.
+ *
+ * ⚠ 214-03 — IT ROSE FROM 24 TO 36. Sketch 217 §1 adds TWELVE flat ids: NINE genuinely new
+ * (`SKETCH_217_NEW`) and THREE that are ALIASES of strings this module already exports
+ * (`SKETCH_217_ALIASES`). The aliases are the reason `DECLARED_EQUALITIES` grew from one pair
+ * to four — sketch 217 #2 requires the shipped strings be REPRODUCED, never reworded, and
+ * one literal per sentence in the repository means the new ids must BE the old exports rather
+ * than second copies of their words.
  */
-const GOVERNED_ID_COUNT = 24
+const GOVERNED_ID_COUNT = 36
 
 /** How many of those ids the GENERATED doors-copy contract governs — every one except D-28's. */
 const CONTRACT_ID_COUNT = 21
+
+/** How many COMPOSED values sketch 217 added. They carry every character property below, via
+ *  their RENDERED output, but none of the flat-table set assertions. */
+const COMPOSED_ID_COUNT = 3
 
 /**
  * ⚠ COLUMN D OF THE REGENERATED BUILD CONTRACT, SPELLED AS LITERALS EXACTLY ONCE IN THIS
@@ -178,8 +215,80 @@ const POST_CONTRACT_COPY: Record<string, string> = {
   DESCRIBE_CTA_REFUSED: "Too thin to draft",
 }
 
-/** Both bars together — what the module's export set must equal, exactly. */
-const ALL_GOVERNED_COPY: Record<string, string> = { ...COLUMN_D, ...POST_CONTRACT_COPY }
+/**
+ * ⚠ 214-03 — SKETCH 217 §1's NINE GENUINELY NEW IDS, spelled as literals exactly once (rule
+ * 3) and kept in their OWN object so the one thing this file must not lose stays visible:
+ * which strings each generated acceptance bar can falsify.
+ *
+ * These nine come from `.planning/sketches/217-…/BUILD-CONTRACT.generated.md`, which the
+ * describe below RE-PARSES — so they are contract-bound exactly like `COLUMN_D`, just bound
+ * to a DIFFERENT contract. They are asserted ABSENT from `doors-copy.generated.md` beside the
+ * post-contract set, which is what keeps that older bar honest about its own scope.
+ */
+const SKETCH_217_NEW: Record<string, string> = {
+  SERVICES_LABEL: "Services this workflow may use",
+  SERVICES_HINT: "Only what you tick can appear in the draft.",
+  SERVICE_NO_GRANTS: "Nothing allowed yet",
+  SERVICE_NO_GRANTS_NEXT: "Choose what it can do",
+  SERVICES_EMPTY: "You have not connected anything yet.",
+  SERVICES_EMPTY_NEXT: "Connect a service",
+  DOOR_REFUSAL_REVISE: "Revise the description",
+  DOOR_CTA_REFUSED_SERVICE: "Waiting on a connection",
+  DOOR_REFUSAL_ANCHOR: "why this stopped",
+}
+
+/**
+ * ⚠ SKETCH 217 §1's THREE ALIASES — the shipped strings it REPRODUCES rather than rewords
+ * (#2). They are declared by the id they ALIAS, never by re-typing the words, because a
+ * second literal is the exact drift this module exists to prevent and it is the one failure a
+ * table of correct-looking strings carries invisibly.
+ *
+ * The contract-parse case below resolves each to its target's value and compares against the
+ * contract, so the sketch's own table is still falsified — the words are just not spelled a
+ * second time in this repository to do it.
+ */
+const SKETCH_217_ALIASES: Record<string, string> = {
+  SHIPPED_DESCRIBE_CTA: "DESCRIBE_CTA",
+  SHIPPED_DESCRIBE_CTA_REFUSED: "DESCRIBE_CTA_REFUSED",
+  SHIPPED_DESCRIBE_REFUSAL: "DESCRIBE_REFUSAL",
+}
+
+/**
+ * ⚠ SKETCH 217 §1's THREE COMPOSED VALUES. Each entry binds the contract's `«…»` placeholder
+ * token to the module's NAMED parameter and calls the real function, so the shape is compared
+ * character for character rather than read by eye.
+ */
+const SKETCH_217_COMPOSED: Record<string, { shape: string; render: () => string }> = {
+  SERVICE_ACTIONS: {
+    shape: "«service» actions",
+    render: () => doorVocabulary.SERVICE_ACTIONS({ service: "«service»" }),
+  },
+  DOOR_REFUSAL: {
+    shape:
+      "«service» is not connected — connect it in Settings, or describe this step without it.",
+    render: () => doorVocabulary.DOOR_REFUSAL({ service: "«service»" }),
+  },
+  DOOR_REFUSAL_CONNECT: {
+    shape: "Connect «service»",
+    render: () => doorVocabulary.DOOR_REFUSAL_CONNECT({ service: "«service»" }),
+  },
+}
+
+/** The alias ids resolved to the VALUES their targets carry — derived, never re-typed. */
+const RESOLVED_ALIASES: Record<string, string> = Object.fromEntries(
+  Object.entries(SKETCH_217_ALIASES).map(([id, target]) => [
+    id,
+    (doorVocabulary as unknown as Record<string, string>)[target],
+  ]),
+)
+
+/** All three bars together — what the module's STRING export set must equal, exactly. */
+const ALL_GOVERNED_COPY: Record<string, string> = {
+  ...COLUMN_D,
+  ...POST_CONTRACT_COPY,
+  ...SKETCH_217_NEW,
+  ...RESOLVED_ALIASES,
+}
 
 /**
  * Pairs of ids the contract DELIBERATELY gives the same string.
@@ -189,8 +298,19 @@ const ALL_GOVERNED_COPY: Record<string, string> = { ...COLUMN_D, ...POST_CONTRAC
  * D-23 renames the govern door's label to echo the door's own name, so the collision below is
  * a DECISION. The alternative shape — discovering a red distinctness test and weakening the
  * property until it passes — would have removed a fence instead of declaring an exception.
+ *
+ * ⚠ 214-03 EXTENDED IT AGAIN, from one pair to four, and for a DIFFERENT reason than D-23's.
+ * Sketch 217 §1 reproduces three shipped strings under new ids (#2), and one literal per
+ * sentence in the repository means those ids ALIAS the existing exports. So each new pair is
+ * not a coincidence to tolerate but the mechanism itself: the equality is what proves the
+ * sentence was reproduced rather than re-typed.
  */
-const DECLARED_EQUALITIES: [string, string][] = [["STRIP_LABEL_GOVERN", "DOOR_B_NAME"]]
+const DECLARED_EQUALITIES: [string, string][] = [
+  ["STRIP_LABEL_GOVERN", "DOOR_B_NAME"],
+  ["SHIPPED_DESCRIBE_CTA", "DESCRIBE_CTA"],
+  ["SHIPPED_DESCRIBE_CTA_REFUSED", "DESCRIBE_CTA_REFUSED"],
+  ["SHIPPED_DESCRIBE_REFUSAL", "DESCRIBE_REFUSAL"],
+]
 
 /**
  * Characters that survive an editor badly, and the codepoint each MUST be.
@@ -262,29 +382,49 @@ function parseColumnD(markdown: string): Record<string, string> {
 }
 
 describe("doorVocabulary — the table itself", () => {
-  it(`owns exactly ${GOVERNED_ID_COUNT} ids, and every export is one of them`, () => {
+  it(`owns exactly ${GOVERNED_ID_COUNT} words and ${COMPOSED_ID_COUNT} composers, and nothing else`, () => {
     expect(ALL_DOOR_WORDS).toHaveLength(GOVERNED_ID_COUNT)
-    // …and the module exports NOTHING BUT the words: no helper, no type-carrying const, no
-    // default. A single non-string export here would silently break every loop below.
-    for (const [id, value] of ALL_DOOR_WORDS) {
-      expect(typeof value, `${id} is not a string`).toBe("string")
-    }
+    expect(ALL_DOOR_COMPOSED_IDS).toHaveLength(COMPOSED_ID_COUNT)
+    // …and the module exports NOTHING BUT the words and the composers: no helper, no
+    // type-carrying const, no default. ⚠ 214-03 REPHRASED THIS RATHER THAN RELAXING IT — the
+    // old form asserted every export was a string, which sketch 217's composed values would
+    // have broken. The two lists must PARTITION the namespace, so a THIRD kind of export
+    // still reds instead of slipping between them.
+    expect(ALL_DOOR_WORDS.length + ALL_DOOR_COMPOSED_IDS.length).toBe(
+      Object.keys(doorVocabulary).length,
+    )
     // NON-VACUITY: the derivation really read the module rather than an empty namespace.
     expect(ALL_DOOR_WORDS.map(([id]) => id).includes("STRIP_BACK")).toBe(true)
+    expect(ALL_DOOR_COMPOSED_IDS.includes("DOOR_REFUSAL")).toBe(true)
   })
 
-  it("the module's export set and the UNION of both governed sets are the SAME SET (rule 1)", () => {
+  it("the module's export set and the UNION of ALL THREE governed sets are the SAME SET (rule 1)", () => {
     // A value added to one and not the other is a failure, not a gap — which is what stops
-    // the exact-match loop below from quietly covering twenty-one of twenty-two ids.
+    // the exact-match loop below from quietly covering thirty-five of thirty-six ids.
     expect(Object.keys(ALL_GOVERNED_COPY).sort()).toEqual(ALL_DOOR_WORDS.map(([id]) => id).sort())
     expect(Object.keys(ALL_GOVERNED_COPY)).toHaveLength(GOVERNED_ID_COUNT)
-    // …and the two bars really are DISJOINT, so the spread above cannot be silently shadowing
-    // a contract row with a post-contract literal — which would take a governed word out of
-    // the generated bar's reach while every count below still read 22.
-    const overlap = Object.keys(POST_CONTRACT_COPY).filter((id) => id in COLUMN_D)
-    expect(overlap).toEqual([])
+    // …and the bars really are PAIRWISE DISJOINT, so the spread above cannot be silently
+    // shadowing a contract row with a later literal — which would take a governed word out of
+    // the generated bar's reach while every count below still read 36.
+    const bars: [string, Record<string, string>][] = [
+      ["COLUMN_D", COLUMN_D],
+      ["POST_CONTRACT_COPY", POST_CONTRACT_COPY],
+      ["SKETCH_217_NEW", SKETCH_217_NEW],
+      ["RESOLVED_ALIASES", RESOLVED_ALIASES],
+    ]
+    const overlaps: string[] = []
+    for (let i = 0; i < bars.length; i++) {
+      for (let j = i + 1; j < bars.length; j++) {
+        for (const id of Object.keys(bars[i][1])) {
+          if (id in bars[j][1]) overlaps.push(`${bars[i][0]} ∩ ${bars[j][0]} = ${id}`)
+        }
+      }
+    }
+    expect(overlaps).toEqual([])
     expect(Object.keys(COLUMN_D)).toHaveLength(CONTRACT_ID_COUNT)
-    expect(Object.keys(POST_CONTRACT_COPY).length).toBeGreaterThan(0)
+    expect(Object.keys(POST_CONTRACT_COPY)).toHaveLength(3)
+    expect(Object.keys(SKETCH_217_NEW)).toHaveLength(9)
+    expect(Object.keys(RESOLVED_ALIASES)).toHaveLength(3)
   })
 
   it("every value is non-empty and carries no stray leading or trailing whitespace", () => {
@@ -300,10 +440,15 @@ describe("doorVocabulary — the table itself", () => {
 
   it("the values are PAIRWISE DISTINCT, except for the DECLARED equalities", () => {
     const declared = new Set(DECLARED_EQUALITIES.map(([a, b]) => [a, b].sort().join("::")))
-    // Stated as a decision rather than an accident: exactly ONE pair is deliberately equal,
-    // and it is the D-23 one. A second collision appearing here without a line in the list
-    // above is a bug, not a style question.
-    expect(DECLARED_EQUALITIES).toEqual([["STRIP_LABEL_GOVERN", "DOOR_B_NAME"]])
+    // Stated as a decision rather than an accident: exactly FOUR pairs are deliberately
+    // equal — D-23's, and sketch 217's three reproduced strings. A fifth collision appearing
+    // here without a line in the list above is a bug, not a style question.
+    expect(DECLARED_EQUALITIES).toEqual([
+      ["STRIP_LABEL_GOVERN", "DOOR_B_NAME"],
+      ["SHIPPED_DESCRIBE_CTA", "DESCRIBE_CTA"],
+      ["SHIPPED_DESCRIBE_CTA_REFUSED", "DESCRIBE_CTA_REFUSED"],
+      ["SHIPPED_DESCRIBE_REFUSAL", "DESCRIBE_REFUSAL"],
+    ])
 
     const collisions: string[] = []
     for (let i = 0; i < ALL_DOOR_WORDS.length; i++) {
@@ -405,7 +550,14 @@ describe("doorVocabulary 193-08 — the generated contract IS the acceptance bar
     // from the contract, in BOTH the parsed table and the raw source — an id the generator
     // does emit belongs in COLUMN_D, where a regeneration can falsify it.
     const parsed = parseColumnD(buildContractSource)
-    for (const [id, value] of Object.entries(POST_CONTRACT_COPY)) {
+    // ⚠ 214-03 — SKETCH 217's NINE JOIN THIS CHECK. They come from a THIRD acceptance bar, so
+    // the doors-copy contract must not carry them either; without this the new object would
+    // be one more place to park an id the generator was not meant to see. ⚠ The three ALIASES
+    // are deliberately EXCLUDED: their words ARE in one of the two older bars, which is the
+    // whole point of them being aliases rather than new sentences.
+    const absentFromDoorsCopy = { ...POST_CONTRACT_COPY, ...SKETCH_217_NEW }
+    expect(Object.keys(absentFromDoorsCopy)).toHaveLength(12)
+    for (const [id, value] of Object.entries(absentFromDoorsCopy)) {
       expect(parsed[id], `${id} IS in the generated contract — it belongs in COLUMN_D`).toBeUndefined()
       expect(buildContractSource.includes(value), `${id}'s words are in the contract`).toBe(false)
     }
@@ -442,6 +594,143 @@ describe("doorVocabulary 193-08 — the generated contract IS the acceptance bar
     expect(buildContractSource).toMatch(
       /\*\*Variant D\*\* — \d+ substitution\(s\) matched the real DOM; \*\*zero misses\*\*/,
     )
+  })
+})
+
+describe("⭐ doorVocabulary 214-03 — SKETCH 217's GENERATED CONTRACT IS ITS ACCEPTANCE BAR", () => {
+  /**
+   * Parse sketch 217 §1's two tables. Rows are `| \`ID\` | "value" |`; a COMPOSED row's id
+   * cell carries a `(…)` suffix inside the backticks. §2's three-column invariant table
+   * cannot match — the value cell is required to contain no pipe.
+   */
+  function parseSketchTable(markdown: string): {
+    flat: Record<string, string>
+    composed: Record<string, string>
+  } {
+    const flat: Record<string, string> = {}
+    const composed: Record<string, string> = {}
+    const ROW = /^\|\s*`([A-Z0-9_]+)(\(…\))?`\s*\|\s*"([^"|]*)"\s*\|\s*$/
+    for (const line of markdown.split(/\r?\n/)) {
+      const m = ROW.exec(line)
+      if (!m) continue
+      if (m[2]) composed[m[1]] = m[3]
+      else flat[m[1]] = m[3]
+    }
+    return { flat, composed }
+  }
+
+  it("sketch 217 §1's TWELVE flat ids, re-parsed, equal what this module exports", () => {
+    // NON-VACUITY FIRST — a `?raw` import that resolved to nothing yields the empty string in
+    // some resolvers rather than throwing (the 192.1 E-2 lesson).
+    expect(sketch217ContractSource.length).toBeGreaterThan(2000)
+    expect(sketch217ContractSource).toMatch(/^# BUILD CONTRACT — sketch 217/m)
+    expect(sketch217ContractSource).toMatch(/GENERATED by `node drive\.cjs --emit`/)
+
+    const parsed = parseSketchTable(sketch217ContractSource)
+    expect(Object.keys(parsed.flat)).toHaveLength(12)
+    // The NINE new ids are compared against this suite's own literals; the THREE aliases are
+    // compared against the values their targets carry — so the contract falsifies all twelve
+    // while only nine sentences are spelled a second time in this repository.
+    expect(parsed.flat).toEqual({ ...SKETCH_217_NEW, ...RESOLVED_ALIASES })
+  })
+
+  it("⚠ the three ALIASES really are the SHIPPED strings, reproduced and not reworded (#2)", () => {
+    // D-13 and the 166-C precedent already declined rewording a governed literal, twice. This
+    // is that decision made mechanical: each alias must be the SAME STRING as its target, and
+    // the module must not re-declare the words a second time.
+    for (const [id, target] of Object.entries(SKETCH_217_ALIASES)) {
+      const alias = (doorVocabulary as unknown as Record<string, string>)[id]
+      const shipped = (doorVocabulary as unknown as Record<string, string>)[target]
+      expect(alias, `${id} is not exported`).toBeTypeOf("string")
+      expect(alias, `${id} is not ${target}`).toBe(shipped)
+      // …and the SOURCE really aliases rather than re-typing: the declaration names its
+      // target, and does not open a string literal.
+      expect(doorVocabularySource, `${id} re-declares a literal`).toMatch(
+        new RegExp(`^export const ${id} = ${target}\\s*$`, "m"),
+      )
+    }
+    // ⚠ ONE LITERAL PER SENTENCE IN THE REPOSITORY — the shipped refusal's words appear in
+    // this module exactly once, which is the property an alias exists to preserve and the one
+    // a second copy would silently destroy.
+    const refusalHits = doorVocabularySource.match(/There is nothing here to draft from yet/g) ?? []
+    expect(refusalHits).toHaveLength(1)
+  })
+
+  it("sketch 217 §1's THREE composed shapes are composed byte-exactly", () => {
+    const parsed = parseSketchTable(sketch217ContractSource)
+    expect(Object.keys(parsed.composed)).toHaveLength(COMPOSED_ID_COUNT)
+    const declared = Object.fromEntries(
+      Object.entries(SKETCH_217_COMPOSED).map(([id, spec]) => [id, spec.shape]),
+    )
+    expect(parsed.composed).toEqual(declared)
+    // …and the REAL functions, called with the contract's own placeholder token bound to
+    // their NAMED parameter, reproduce those shapes character for character.
+    for (const [id, spec] of Object.entries(SKETCH_217_COMPOSED)) {
+      expect(spec.render(), `${id} does not compose its governed shape`).toBe(spec.shape)
+    }
+    expect(Object.keys(SKETCH_217_COMPOSED).sort()).toEqual(ALL_DOOR_COMPOSED_IDS)
+  })
+
+  it("POSITIVE CONTROL — the sketch parser really splits composed from flat", () => {
+    const fixture = [
+      "| id | value |",
+      "|---|---|",
+      "| `DEMO_FLAT` | \"flat words\" |",
+      "| `DEMO_COMPOSED(…)` | \"composed «x»\" |",
+      "| 1 | three | cells |",
+    ].join("\n")
+    expect(parseSketchTable(fixture)).toEqual({
+      flat: { DEMO_FLAT: "flat words" },
+      composed: { DEMO_COMPOSED: "composed «x»" },
+    })
+  })
+
+  it("⚠ THE DOOR REFUSAL INTERPOLATES AUTHOR PROSE AND RETURNS A PLAIN STRING (T-214-03-01)", () => {
+    // D-214-21 puts the service name in the author's own words, so untrusted free text
+    // reaches a rendered sentence. The composer returns a `string`; React renders it as a
+    // text child and escapes it. Driven with a markup-shaped name and asserted to come back
+    // as the LITERAL characters — never as parsed markup.
+    const hostile = '<img src=x onerror="alert(1)">'
+    const said = doorVocabulary.DOOR_REFUSAL({ service: hostile })
+    expect(typeof said).toBe("string")
+    expect(said.startsWith(hostile)).toBe(true)
+    expect(said).toBe(
+      `${hostile} is not connected — connect it in Settings, or describe this step without it.`,
+    )
+    // …and the door subtree renders no raw markup anywhere, which is the half a return-type
+    // assertion cannot cover.
+    const modules = import.meta.glob("/src/**/*.{ts,tsx}", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>
+    // NON-VACUITY FIRST — an empty glob makes the absence below free.
+    expect(Object.keys(modules).length).toBeGreaterThan(200)
+    const workflowModules = Object.entries(modules).filter(([path]) =>
+      path.startsWith("/src/components/workflows/"),
+    )
+    expect(workflowModules.length).toBeGreaterThan(50)
+    // ⚠ THE NEEDLE IS THE PROP ASSIGNMENT, NOT THE BARE IDENTIFIER, AND THAT DISTINCTION WAS
+    // MEASURED RATHER THAN ASSUMED. A bare-identifier sweep reds on EIGHT files here — and
+    // every one of them is a DOCBLOCK PROMISING NEVER TO USE IT (`WorkflowDoorSwitch.tsx:36`,
+    // `PhaseNode.tsx:66`, `WorkflowSoul.tsx:24`, and this module's own new section among
+    // them). That is the 187-24 trap seen from the other side: prose naming a forbidden API
+    // makes a `?raw` sweep count the promise as the violation. The shipped fence
+    // (`PhaseNodeCard.test.tsx:525`) anchors on the `=` for exactly this reason, and this one
+    // follows it. ⚠ The needle is still ASSEMBLED AT RUNTIME — this file is inside the glob.
+    const rawHtmlProp = "dangerously" + "SetInnerHTML="
+    const offenders = workflowModules
+      .filter(([path]) => !path.includes(".test."))
+      .filter(([, source]) => source.includes(rawHtmlProp))
+      .map(([path]) => path)
+    expect(offenders).toEqual([])
+    // POSITIVE CONTROL — the needle really matches an assignment, and really spares prose.
+    expect(`<div ${rawHtmlProp}{{ __html: x }} />`.includes(rawHtmlProp)).toBe(true)
+    expect(("never use `dangerously" + "SetInnerHTML`.").includes(rawHtmlProp)).toBe(false)
+    // NON-VACUITY: the door's own render site really was in the swept set.
+    expect(
+      workflowModules.some(([path]) => path.endsWith("/WorkflowDoorSwitch.tsx")),
+    ).toBe(true)
   })
 })
 
@@ -562,6 +851,13 @@ describe("doorVocabulary — the module is a TRUE LEAF (rule 4, D-10 / D-24(b))"
     // Every id the namespace reports is really DECLARED in the source that was loaded, which
     // ties the two subjects of this file together — the runtime table and the raw text. The
     // pattern allows an optional TYPE ANNOTATION, because D-23's agreement fence is one.
+    // ⚠ 214-03 — THE COMPOSERS ARE COVERED TOO, so a function-valued export cannot reach the
+    // namespace without also being declared in the text this suite actually read.
+    for (const id of ALL_DOOR_COMPOSED_IDS) {
+      expect(doorVocabularySource, `${id} is not declared in the loaded source`).toMatch(
+        new RegExp(`^export const ${id} = \\(`, "m"),
+      )
+    }
     for (const [id] of ALL_DOOR_WORDS) {
       expect(doorVocabularySource, `${id} is not declared in the loaded source`).toMatch(
         new RegExp(`^export const ${id}\\b`, "m"),
