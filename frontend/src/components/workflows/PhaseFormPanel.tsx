@@ -27,7 +27,10 @@
  * caption stay at the collapsed reading, enumerated as `FENCED_IN` in this file's suite
  * BEFORE anything moved. The ⓘ is untouched and still needs no toggle.
  *
- * The fixed-width 400px right-side form panel that REFINES one phase of a draft
+ * The `clamp(480px, 38%, 640px)` right-side form panel that REFINES one phase of a draft
+ * (⚠ 214-04 widened the track; this sentence used to call it fixed-width and name the old
+ * pixel figure, which by then was wrong in both halves. The old figure is not re-spelled
+ * here — 214's acceptance is a mechanical grep and a true mention would read as a survivor)
  * by FORM. It is the SECOND column of the Builder's push grid (the parent owns
  * the `gridTemplateColumns` reflow) — it PUSHES the read-only spine graph, it
  * NEVER overlays it. The panel is a grid track (no absolutely-positioned overlay).
@@ -1470,7 +1473,9 @@ export function PhaseFormPanel({
               accent="consequence"
             >
               <OutsideChangeLine capability={asStr(cfg.capability)} />
-              <ExternalActionSection key={phase.slug} capability={asStr(cfg.capability)} toolName={asStr(cfg.tool_name)} onChange={set("capability")} onChangeShape={onChange} onPersist={onPersist} />
+              {/* 214-07 — three DEAD props came off this line on their own recorded re-open
+                  trigger; the argument form below it costs this file nothing (ADR in SUMMARY). */}
+              <ExternalActionSection key={phase.slug} capability={asStr(cfg.capability)} toolName={asStr(cfg.tool_name)} />
             </StepCardSection>
           )}
         </div>

@@ -90,25 +90,28 @@ export interface ExternalActionSectionProps {
    */
   toolName: string
   /**
-   * ⚠ 211-04 — THE THREE WRITE SEAMS BELOW ARE NO LONGER CALLED BY THIS COMPONENT, AND THEY
-   * ARE KEPT DELIBERATELY RATHER THAN LEFT BY OVERSIGHT.
+   * ⚠ 211-04 SHIPPED THREE DEAD WRITE SEAMS HERE — a value write, a multi-key shape patch and
+   * a persist call — AND 214-07 REMOVED THEM, ON THEIR OWN RECORDED TRIGGER RATHER THAN ON A
+   * WHIM. ⚠ THEIR IDENTIFIERS ARE DELIBERATELY NOT SPELLED IN THIS FILE ANY MORE: the phase's
+   * acceptance for the removal is a mechanical grep, and a docblock naming them would read to
+   * that sweep as a survivor (the 187-24 trap, which fired four times in this phase's first
+   * wave). The three names are recorded in `214-07-SUMMARY.md` and in the git history.
    *
-   * The section used to own two writes: a capability NAME (from the deleted radio rows) and
-   * a multi-key shape patch (from the deleted segmented control). Both moved to
-   * `ConnectionPicker`, which is the only child on this surface holding a store reference —
-   * this file's own source fence forbids the four hook names that would let it hold one.
+   * Their docblock read, verbatim: *"They stay in the prop contract because removing them
+   * would edit `PhaseFormPanel.tsx`, which is outside this plan's `files_modified` […]
+   * RE-OPEN TRIGGER: the first phase whose `files_modified` names `PhaseFormPanel.tsx` — at
+   * which point all three come out in one commit, with the panel's call site."*
    *
-   * They stay in the prop contract because removing them would edit `PhaseFormPanel.tsx`,
-   * which is outside this plan's `files_modified` and therefore outside its review. An
-   * unused optional prop is a smaller debt than an unreviewed edit to a 2,800-line panel on
-   * the hot-file ledger.
+   * ⭐ THIS IS THAT PHASE, AND THEY CAME OUT IN THAT COMMIT, WITH THAT CALL SITE. The writes
+   * they used to carry have lived in `ConnectionPicker` since 211-04 — the only child on this
+   * surface holding a store reference — and this component's own source fence forbids the four
+   * hook names that would let it hold one. So the panel's contract gets SMALLER in the same
+   * edit that gives the panel one new line, which is the direction the hot-file ledger's
+   * standing order on that file asks for.
    *
-   * RE-OPEN TRIGGER: *the first phase whose `files_modified` names `PhaseFormPanel.tsx`* —
-   * at which point all three come out in one commit, with the panel's call site.
+   * ⛔ NOTHING REPLACES THEM. A prop re-added here without a caller is the same debt under a
+   * newer date.
    */
-  onChange?: (value: string) => void
-  onChangeShape?: (patch: Record<string, unknown>) => void
-  onPersist?: () => void
 }
 
 const SECTION_CLASSES = "col-span-2 rounded border border-border bg-muted/40 px-2.5 py-2"

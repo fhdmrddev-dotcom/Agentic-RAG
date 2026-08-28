@@ -235,37 +235,61 @@ describe("McpToolPicker Component", () => {
     })
   })
 
-  it("validates and updates JSON arguments", () => {
-    const onChangeArgs = vi.fn()
-    render(
-      <McpToolPicker
-        connection={mockMcpConnection}
-        toolName="jira_create_issue"
-        onChangeArgs={onChangeArgs}
-      />
-    )
+  /**
+   * ⚠ 214-07 — THE TWO CASES THAT USED TO LIVE HERE DROVE THE FREE-FORM ARGUMENTS SURFACE
+   * (`validates and updates JSON arguments` · `shows error message on invalid JSON syntax in
+   * arguments`). THEY ARE REPLACED BY ABSENCE CASES, NOT DELETED.
+   *
+   * ⭐ A REMOVED ASSERTION AND A REMOVED FEATURE LOOK IDENTICAL IN A COUNT. Deleting them
+   * outright would have paid for a deleted surface with a smaller number, which is exactly the
+   * signal the count gate exists to notice — so the deletion is paid for in kind, and this
+   * block asserts MORE than the two it replaces: the two test ids are gone, the parse-error
+   * line is gone, and the whole card carries no free-form control at all.
+   */
+  it("⭐ the free-form arguments surface is GONE — both of its test ids resolve to nothing", () => {
+    render(<McpToolPicker connection={mockMcpConnection} toolName="jira_create_issue" />)
+    // NON-VACUITY FIRST: the card really rendered, with a bound action selected.
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument()
 
-    const textarea = screen.getByTestId("mcp-tool-args")
-    fireEvent.change(textarea, { target: { value: '{"summary": "Test bug"}' } })
-
-    expect(onChangeArgs).toHaveBeenCalledWith({ summary: "Test bug" })
-    expect(screen.queryByTestId("mcp-args-error")).not.toBeInTheDocument()
+    // The ids are assembled at runtime — a fence that spells its own needle counts its own
+    // prose, and this file's docblock above names both (the 187-24 trap).
+    expect(screen.queryByTestId("mcp-tool" + "-args")).toBeNull()
+    expect(screen.queryByTestId("mcp" + "-args-error")).toBeNull()
   })
 
-  it("shows error message on invalid JSON syntax in arguments", () => {
+  it("⛔ and NOTHING replaced it — no free-form control of any kind is on this card", () => {
+    const { container } = render(
+      <McpToolPicker connection={mockMcpConnection} toolName="jira_create_issue" />,
+    )
+    // POSITIVE CONTROL FIRST — the matcher really finds the element it looks for.
+    expect("<text".concat("area id=x/>")).toContain("<text" + "area")
+
+    expect(container.querySelectorAll("text" + "area")).toHaveLength(0)
+    const html = container.innerHTML.toLowerCase()
+    for (const needle of ["<text" + "area", "js" + "on", "tool arg" + "uments", "adv" + "anced"]) {
+      expect(html.includes(needle), needle).toBe(false)
+    }
+    // NON-VACUITY: there really is a card here to be empty of those things.
+    expect(html.length).toBeGreaterThan(200)
+  })
+
+  it("the `onChangeArgs` PROP survives the deletion — only the surface went", () => {
+    // ⚠ The prop is still on the contract and `ConnectionPicker` still passes it; what it
+    // now feeds is `ArgumentEditor`. A component that dropped the prop would have made the
+    // caller's write seam disappear silently, which is a different and worse change.
     const onChangeArgs = vi.fn()
     render(
       <McpToolPicker
         connection={mockMcpConnection}
         toolName="jira_create_issue"
+        toolArgs={{ summary: "Test bug" }}
         onChangeArgs={onChangeArgs}
-      />
+      />,
     )
-
-    const textarea = screen.getByTestId("mcp-tool-args")
-    fireEvent.change(textarea, { target: { value: '{summary: invalid}' } })
-
-    expect(screen.getByTestId("mcp-args-error")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    // ⛔ AND THIS CARD NEVER CALLS IT ANY MORE — the write moved, it did not vanish.
+    expect(onChangeArgs).not.toHaveBeenCalled()
   })
 })
 
@@ -290,7 +314,19 @@ describe("McpToolPicker Component", () => {
  *  compare equal afterwards. The UI-SPEC's evidence row permits a node COUNT or an innerHTML
  *  identity; the count is chosen because a 4 KB single-line capture makes every failure
  *  unreadable, and the non-vacuity case below is what stops the number being a tautology. */
-const BASE_DENIED_NODE_COUNT = 33
+/**
+ * ⚠ 214-07 — RE-BASELINED `33` → `30`, AND THE REASON IS THE ONLY THING THAT MAKES THAT
+ * LEGITIMATE. This pin's contract is *a provider-less render adds ZERO NEW NODES*; it is not
+ * a claim that the card's node count is frozen forever. This plan DELETED three of them — the
+ * wrapper, the label and the free-form control of the arguments surface — deliberately, as
+ * SC#1's whole content, and the count moved DOWN by exactly that.
+ *
+ * ⛔ A PIN RELAXED TO MAKE RED GO GREEN IS A PIN THAT NEVER FAILS AGAIN, so the number is
+ * re-measured rather than widened: it is still an EQUALITY against a constant, the delta is
+ * `-3` and it is attributed, and the non-vacuity case below still proves the number is not a
+ * tautology. A future edit that ADDS a node here is red exactly as before.
+ */
+const BASE_DENIED_NODE_COUNT = 30
 
 const deniedTool = "confluence_search"
 
@@ -717,10 +753,16 @@ describe("211-04 · the grant surface follows the ENFORCEMENT, not the card (Rul
     ]) {
       expect(screen.queryByTestId(id), id).not.toBeInTheDocument()
     }
-    // …and the rest of the chosen-tool surface is UNAFFECTED: the description and the
-    // arguments editor are facts about the tool, not about a permission.
+    // …and the rest of the chosen-tool surface is UNAFFECTED: the description is a fact about
+    // the tool, not about a permission.
+    //
+    // ⚠ 214-07 — THE SECOND ASSERTION HERE NAMED THE ARGUMENTS SURFACE, WHICH THIS PLAN
+    // DELETED. It is replaced rather than dropped: what this case actually owes is *the
+    // non-grant surface survives a `grantsEnforced={false}` render*, and the action `<select>`
+    // carries that property just as well — better, in fact, since it is the control the
+    // arguments now hang off one component over.
     expect(screen.getByTestId("mcp-tool-description")).toBeInTheDocument()
-    expect(screen.getByTestId("mcp-tool-args")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument()
   })
 
   it("NON-VACUITY — the DEFAULT still renders the whole grant surface", () => {

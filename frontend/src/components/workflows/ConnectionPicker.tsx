@@ -56,8 +56,15 @@ import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore 
 import { Label } from "@/components/ui/label"
 import { useBuilderStoreOptional } from "@/components/workflows/BuilderStoreProvider"
 import { useSelectedPhaseSlug } from "@/components/workflows/SelectedPhaseSlugContext"
-import { listConnectorConnections } from "@/lib/api"
+import { nodeTitle } from "@/components/workflows/phaseVocabulary"
+import type { UpstreamPhase } from "@/components/workflows/argumentModel"
+// ⚠ `discoverConnectorTools` IS ALREADY REQUIRED TRANSITIVELY by every suite that mounts this
+// component — `McpToolPicker` imports it from the same module — so naming it here adds no new
+// obligation to any `@/lib/api` mock factory. (Phase 196 measured what happens when that is
+// not true: nine suites threw AT MOUNT and the gate read `failed 249`.)
+import { discoverConnectorTools, listConnectorConnections } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api"
+import { ArgumentEditor } from "./ArgumentEditor"
 import { McpToolPicker } from "./McpToolPicker"
 import { own } from "./ownProperty"
 
@@ -70,7 +77,7 @@ import { own } from "./ownProperty"
  *  send?*, which is the second of the section's two ordered questions. */
 export const CONNECTION_PICKER_LABEL = "Where this sends"
 
-/** State 1. One dim line, no spinner — this is a 400px panel field, not a run surface. */
+/** State 1. One dim line, no spinner — this is a narrow panel field, not a run surface. */
 export const CONNECTION_PICKER_LOADING = "Loading…"
 
 /** State 3's option text. The unbound choice is a real, selectable, named option rather
@@ -148,6 +155,31 @@ export const CONNECTION_PICKER_ALL_DISABLED =
   "Every connection is switched off. Turn one on in Settings → Connections."
 
 const EMPTY_RECORD: Record<string, unknown> = Object.freeze({})
+
+/**
+ * ⭐ 214-07 (D-214-03) — THE CLIENT MIRROR OF `_BODY_ARG_FOR_CAPABILITY`
+ * (`backend/app/services/harness/phase_types.py`), which is where the executor decides which
+ * field an upstream step's text fills when nothing else names it.
+ *
+ * ⚠ IT LIVES HERE, NOT IN THE EDITOR. `ArgumentEditor` is shape-agnostic by design — one
+ * renderer over one `inputSchema`, no capability branch anywhere (D-214-05) — and it is the
+ * CALLER that is allowed to know a connection's shape, exactly as `boundIsRemote` already is.
+ *
+ * ⚠ A MIRROR NEEDS A FENCE, NOT A PROMISE. `ConnectionPicker.test.tsx` reads the backend's own
+ * source and asserts these three pairs are character-identical to the map there — the same
+ * cross-language guard `ExternalActionSection.test.tsx` keeps over `harness.py`'s capability
+ * `Literal`. A fourth capability appearing on one side alone is then a RED TEST rather than a
+ * silently unfilled body field, which is what `BUG-260826-01` looked like from the outside.
+ *
+ * ⛔ AN MCP-SHAPED STEP GETS `null`. The backend derives `body_arg` from the CAPABILITY and
+ * from nothing else, so inventing one for a remote tool would pre-set a field the executor is
+ * never going to fill — a visible promise with no mechanism behind it.
+ */
+const BODY_ARG_FOR_CAPABILITY: Record<string, string> = {
+  send_email: "body",
+  create_ticket: "description",
+  post_message: "text",
+}
 
 /** Slack's API host is a module constant in `backend/app/security/egress.py` (D-02) — one
  *  of the three destinations that is unforgeable by construction, which is why a Slack
@@ -374,6 +406,79 @@ export function ConnectionPicker() {
     }
   }, [toolArgsJson])
 
+  /** 214-07 — `arg_sources`, read exactly as `tool_args` is. ⚠ THE STRING SNAPSHOT IS THE
+   *  POINT: `useSyncExternalStore` compares snapshots by identity, and a fresh object every
+   *  render is an infinite loop. Its twin above is the shipped precedent, not a new idea. */
+  const argSourcesSnapshot = useCallback((): string => {
+    if (store === null || slug === null) return "{}"
+    const phase = store.getState().phases.find((p) => p.slug === slug)
+    const val = (phase?.config as Record<string, unknown> | undefined)?.arg_sources
+    return typeof val === "object" && val !== null ? JSON.stringify(val) : "{}"
+  }, [store, slug])
+  const argSourcesJson = useSyncExternalStore(subscribe, argSourcesSnapshot, argSourcesSnapshot)
+  const argSources = useMemo(() => {
+    try {
+      return JSON.parse(argSourcesJson) as Record<string, unknown>
+    } catch {
+      return EMPTY_RECORD
+    }
+  }, [argSourcesJson])
+
+  /** The step's stored `capability` — the FIRST-PARTY shape's answer to *which action?*, and
+   *  the other half of what `handleSelectTool` writes. Needed here because the argument form
+   *  is derived from the BOUND ACTION's schema and a capability row's action is its
+   *  capability (migration 127 §2b's descriptor advertises exactly that). */
+  const capabilitySnapshot = useCallback((): string => {
+    if (store === null || slug === null) return ""
+    const phase = store.getState().phases.find((p) => p.slug === slug)
+    const val = (phase?.config as Record<string, unknown> | undefined)?.capability
+    return typeof val === "string" ? val : ""
+  }, [store, slug])
+  const capability = useSyncExternalStore(subscribe, capabilitySnapshot, capabilitySnapshot)
+
+  /** Every step that runs BEFORE this one, named by `nodeTitle` — the author's own name for
+   *  it, never its slug (that function's own first floor). ⚠ The store's `phases` array IS
+   *  the run order; `movePhase` / `insertPhaseAt` maintain it, so a positional slice is the
+   *  reachability answer rather than an approximation of one. */
+  const upstreamSnapshot = useCallback((): string => {
+    if (store === null || slug === null) return "[]"
+    const phases = store.getState().phases
+    const index = phases.findIndex((p) => p.slug === slug)
+    if (index <= 0) return "[]"
+    return JSON.stringify(
+      phases.slice(0, index).map((phase) => ({ slug: phase.slug, title: nodeTitle(phase) })),
+    )
+  }, [store, slug])
+  const upstreamJson = useSyncExternalStore(subscribe, upstreamSnapshot, upstreamSnapshot)
+  const upstreamPhases = useMemo(() => {
+    try {
+      return JSON.parse(upstreamJson) as UpstreamPhase[]
+    } catch {
+      return [] as UpstreamPhase[]
+    }
+  }, [upstreamJson])
+
+  /**
+   * THE BOUND ACTION, AND ITS DECLARED SHAPE — the client counterpart of
+   * `args.schema_for_bound_tool`, and deliberately the SAME two arms in the same order.
+   *
+   * ⚠ ONE LIST SERVES BOTH SHAPES, which is the whole reason there is no branch below it: a
+   * first-party connection's action IS its capability, and migration 127 §2b writes a
+   * descriptor into `discovered_tools` under exactly that name. So `tool_name || capability`
+   * resolves against ONE list, and the schema it yields is the same JSON the backend emits
+   * (`descriptors._plain_json` writes it in the MCP sanitizer's own key order, precisely so).
+   *
+   * ⚠ `null` IS NOT `{}`. An action with no schema on the row means *we do not know*, and the
+   * editor says so and offers a refresh; an empty object would mean *this action takes
+   * nothing*, which is a different fact and would render an empty form as if it were finished.
+   */
+  const boundAction = toolName !== "" ? toolName : capability
+  const boundSchema =
+    boundAction === ""
+      ? null
+      : ((bound?.discovered_tools ?? []).find((tool) => tool.name === boundAction)?.inputSchema ??
+        null)
+
   /**
    * ── 211-04 (CONN-05 / D-211-11) · THE ACTION WRITE — EXACTLY ONE KEY, NEVER BOTH ───────
    *
@@ -392,6 +497,13 @@ export function ConnectionPicker() {
    *
    * ⚠ `tool_args` CLEARS WITH `tool_name`, NEVER WITHOUT IT — arguments for a tool that no
    * longer exists are the half-clear `ExternalActionSection`'s AR-05 reasoning refused.
+   *
+   * ⚠ 214-07 — `arg_sources` JOINS IT, IN BOTH CLEARS, AND THE HAZARD IS IDENTICAL. A source
+   * map naming an argument of a tool that no longer exists is the same stale fact one field
+   * over: it would survive onto the next action, be read by `resolve_arguments` against a
+   * schema that never declared those properties, and show the author a form that has already
+   * decided things nobody chose. The two keys are written together and cleared together, or
+   * they are a half-clear with two names.
    */
   const handleSelectTool = useCallback(
     (tool: string) => {
@@ -400,7 +512,7 @@ export function ConnectionPicker() {
         slug,
         boundIsRemote
           ? { tool_name: tool, capability: undefined }
-          : { capability: tool, tool_name: undefined, tool_args: undefined },
+          : { capability: tool, tool_name: undefined, tool_args: undefined, arg_sources: undefined },
       )
       store.getState().flushHistory()
     },
@@ -411,6 +523,17 @@ export function ConnectionPicker() {
     (args: Record<string, unknown>) => {
       if (store === null || slug === null) return
       store.getState().patchConfig(slug, { tool_args: args })
+      store.getState().flushHistory()
+    },
+    [store, slug],
+  )
+
+  /** 214-07 — the source write, the SAME `patchConfig` + `flushHistory` shape as its twin
+   *  above. One home for *what a step sends*, one for *where each part of it comes from*. */
+  const handleChangeSources = useCallback(
+    (sources: Record<string, unknown>) => {
+      if (store === null || slug === null) return
+      store.getState().patchConfig(slug, { arg_sources: sources })
       store.getState().flushHistory()
     },
     [store, slug],
@@ -430,7 +553,7 @@ export function ConnectionPicker() {
    * silent lost update on the column that decides whether egress is permitted.
    *
    * ⚠ THE REJECTED ALTERNATIVE IS A RE-FETCH NONCE, and it is rejected for a measured
-   * reason: it re-issues the WHOLE connection list on every toggle inside a 400px panel
+   * reason: it re-issues the WHOLE connection list on every toggle inside a narrow panel
    * field, and the response IS the row. Re-open trigger: *a second writer of `tool_grants`
    * appearing anywhere in the builder, or the first observed clobber.*
    *
@@ -449,6 +572,31 @@ export function ConnectionPicker() {
           },
     )
   }, [])
+
+  /**
+   * 214-07 (D-214-07) — THE EXISTING RE-DISCOVERY ROUTE, REACHED FROM THE ARGUMENT FORM.
+   *
+   * ⭐ NO NEW ROUTE IS ADDED. `discoverConnectorTools` is the client half of
+   * `connector_service.discover_connection_tools` (`connector_service.py:864` — RE-VERIFIED at
+   * execute time, because PATTERNS flagged the previously-cited line as unchecked and a line
+   * number quoted without checking is how the next reader is misled).
+   *
+   * ⚠ THE RESPONSE IS ADOPTED THROUGH `adoptConnection`, not held locally. The argument form
+   * derives its fields from the BOUND ROW's `discovered_tools`, so a refresh that wrote only a
+   * local list would leave the form still saying it does not know the shape while the picker
+   * above it listed the action — two surfaces disagreeing about one fact.
+   */
+  const handleRediscover = useCallback(async () => {
+    if (bound === undefined) return
+    try {
+      const tools = await discoverConnectorTools(bound.id)
+      adoptConnection({ ...bound, discovered_tools: tools })
+    } catch {
+      // The editor is already saying we do not know what this action needs, and after a
+      // failed refresh that is still exactly true. There is no second sentence to add here
+      // that would be honest and is not already on screen.
+    }
+  }, [bound, adoptConnection])
 
   // THE READ. Gated on the same two nulls the write is, so a provider-less render opens no
   // request at all — see the docblock: this is what keeps two shipped suites unaffected.
@@ -521,6 +669,10 @@ export function ConnectionPicker() {
       capability: undefined,
       tool_name: undefined,
       tool_args: undefined,
+      // ⚠ 214-07 — THE FIFTH KEY, and it is owed here for the reason the fourth is: re-binding
+      // is a moment at which the step's whole action can change, and a source map for an
+      // action that is no longer bound is the AR-05 hazard with a different noun.
+      arg_sources: undefined,
     })
     store.getState().flushHistory()
   }
@@ -696,6 +848,36 @@ export function ConnectionPicker() {
           onChangeArgs={handleChangeArgs}
           onConnectionUpdated={adoptConnection}
           grantsEnforced={boundIsRemote}
+        />
+      )}
+
+      {/* ── ⭐ 214-07 (SC#1 / SC#2 / D-214-01) · WHAT THIS STEP SENDS ───────────────────
+          The third question, and it only exists once the first two are answered: you have
+          chosen a connection, you have chosen one of its actions — here is what that action
+          needs, and where each part of it comes from.
+
+          ⚠ THIS COMPONENT IS THE MOUNT POINT because it is *"the only child on this surface
+          holding a store reference"*. `ArgumentEditor` is a leaf: it reads no context, holds
+          no store and opens no request, and every one of the five facts below is resolved
+          HERE and handed down. That is the same division `McpToolPicker` above already has.
+
+          ⚠ THE GATE IS *AN ACTION IS CHOSEN*, NOT *A SHAPE*. A step with a connection but no
+          action yet has nothing whose arguments could be described, and D-214-07's
+          unknown-shape state is for an action whose shape we lack — NOT for the absence of
+          one. Rendering it earlier would answer a question nobody has asked. */}
+      {bound !== undefined && boundAction !== "" && (
+        <ArgumentEditor
+          schema={boundSchema}
+          toolArgs={toolArgs}
+          argSources={argSources}
+          upstreamPhases={upstreamPhases}
+          // WR-04 — read through `own()`, never a bare bracket read over a plain literal. An
+          // inherited member is never nullish, so a `??` fallback would not fire for
+          // `constructor` / `toString` and the `Object` FUNCTION would reach the pre-set.
+          bodyArgKey={own(BODY_ARG_FOR_CAPABILITY, capability) ?? null}
+          onChangeArgs={handleChangeArgs}
+          onChangeSources={handleChangeSources}
+          onRediscover={handleRediscover}
         />
       )}
     </div>

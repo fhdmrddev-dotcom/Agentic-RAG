@@ -181,17 +181,12 @@ function renderChain(rows: Record<string, unknown>[], capability = "") {
   const view = render(
     <BuilderStoreProvider store={store}>
       <SelectedPhaseSlugProvider slug={SLUG}>
-        <ExternalActionSection
-          capability={capability}
-          toolName=""
-          onChange={(value) => {
-            store.getState().patchConfig(SLUG, { capability: value })
-          }}
-          onChangeShape={(patch) => {
-            store.getState().patchConfig(SLUG, patch)
-          }}
-          onPersist={() => store.getState().flushHistory()}
-        />
+        {/* ⚠ 214-07 — THREE PROPS CAME OFF THIS CALL and their handlers went with them. They
+            had been dead since 211-04 (the section calls none of them; `ConnectionPicker`
+            owns every write on this surface), so what this chain renders is unchanged. The
+            handlers are NOT re-created as no-ops: a stub for a seam that no longer exists
+            would be a fiction this file would then carry forward. */}
+        <ExternalActionSection capability={capability} toolName="" />
       </SelectedPhaseSlugProvider>
     </BuilderStoreProvider>,
   )
