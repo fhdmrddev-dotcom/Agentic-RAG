@@ -91,7 +91,7 @@ import * as FORM_COPY from "../connectionFormCopy"
 import * as CONNECTIONS_COPY from "../connectionsCopy"
 import * as REFUSAL_COPY from "../connectionRefusalCopy"
 import { GRANTS_COPY } from "../grantsVocabulary"
-import { connectionMark } from "../connectionMark"
+import { connectionMark } from "@/lib/connectionMark"
 import {
   CHECK_FAILURE_SENTENCE,
   CHECK_INFLIGHT_BODY,

@@ -1,6 +1,15 @@
 /**
  * Phase 206.1-01 (item 3 · CONN-02 · SC#3 · D-206.1-08 / -09 / -10 / -11 / -23,
- * UI-SPEC § Surface 3) — the ONE service-to-mark map for Settings → Connections.
+ * UI-SPEC § Surface 3) — the ONE service-to-mark map.
+ *
+ * ── ⚠ MOVED TO `lib/` IN 214-08 (D-214-16 / D-214-17) — A RELOCATION, NOTHING ELSE ───
+ * It lived under `components/settings/` serving ONE surface; its consumers are now SIX
+ * (Settings, the builder canvas via `nodePresentation.ts`, four run surfaces via
+ * `StepIdentity.tsx`), which is when a one-surface home stops being true. `lib/` is the
+ * shipped home for a cross-surface resolver — `phaseGlyph.tsx`, `providerLogo.tsx`.
+ * ⚠ ZERO map rows changed; the only functional edit is a fourth `SIZE_CLASS` key.
+ * ⚠ The old FULL path is deliberately unspelled here — the plan greps it to zero and a
+ * docblock quoting the needle reds its own fence (the 187-24 trap, which fired on this edit).
  *
  * ── THE RULE, IN ONE SENTENCE ──
  * A vendor shows its OWN mark; a vendorless shape is drawn in the interface's own ink.
@@ -122,6 +131,11 @@ import { cn } from "@/lib/utils"
  * Iconify components with lucide's `ForwardRefExoticComponent`, and if those ever diverge
  * the widening belongs HERE — `lib/phaseGlyph.tsx` is a `lib/` leaf with other consumers
  * and must not be widened to accommodate a `components/settings/` need.
+ *
+ * ⚠ 214-08 MOVED THIS FILE TO `lib/` AND KEPT THE SENTENCE ABOVE VERBATIM. Its REASON
+ * survives — phaseGlyph has OTHER consumers, so a widening this module needs still belongs
+ * here — and its wording is what `git log -S` finds. Read `components/settings/` as *this
+ * module's own surface*, which became SIX, strengthening the argument rather than ending it.
  */
 export type ConnectionMark = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>
 
@@ -263,10 +277,15 @@ export function connectionMark(shape: ConnectionMarkShape | null | undefined): C
 }
 
 /** Size tokens. The ONLY thing the consuming call sites differ by. */
-const SIZE_CLASS: Record<"row" | "chip" | "canvas", string> = {
+export type ConnectionMarkSize = "row" | "chip" | "canvas" | "spine"
+
+const SIZE_CLASS: Record<ConnectionMarkSize, string> = {
   row: "h-4 w-4 flex-none",
   chip: "h-3 w-3 flex-none",
   canvas: "h-8 w-8 flex-none",
+  // 214-08 — THE FOURTH KEY, WIDENED not branched (sketch 216 #1). 20px is the sketch's `md`
+  // and fills the one gap 12 → 16 → 32 leaves. ⚠ `canvas` stays h-8: a move, not a re-skin.
+  spine: "h-5 w-5 flex-none",
 }
 
 /** Ink tokens, one per body mechanic. `self` adds nothing — see the header for why. */
@@ -287,7 +306,7 @@ export function ConnectionMarkGlyph({
   size,
 }: {
   shape: ConnectionMarkShape
-  size: "row" | "chip" | "canvas"
+  size: ConnectionMarkSize
 }) {
   const { Mark, ink } = connectionMark(shape)
   return <Mark aria-hidden="true" className={cn(SIZE_CLASS[size], INK_CLASS[ink])} />

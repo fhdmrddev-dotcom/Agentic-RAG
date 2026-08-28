@@ -3395,7 +3395,21 @@ const TARGETS = [
   // blob), and `capability: null` alone never resolving MCP. Each is the kind that deletes
   // unnoticed, and three of them guard properties that exist NOWHERE else in the tree: the
   // ink contract, the wordmark refusal, and the MCP arm's own-condition rule.
-  "src/components/settings/__tests__/connectionMark.test.tsx",
+  //
+  // ⚠ REPOINTED IN 214-08 — A PATH KNOB, MOVED WITH ITS FILE. `connectionMark.tsx` and its
+  // suite moved from `components/settings/` to `src/lib/` (D-214-17: the mark is a REUSE, and
+  // its consumer set went from one surface to six). This entry is a PATH, so it does not
+  // follow a `git mv` on its own — and a pinned file the gate cannot FIND fails
+  // `N/N pinned files present`, which reads as a test failure and is a path edit.
+  //
+  // ⚠ THE `BASELINE` KEY NEEDED NO EDIT AND THAT WAS CHECKED RATHER THAN ASSUMED: baseline
+  // keys are BASENAMES (`connectionMark.test.tsx`), matched against the report's own file
+  // names, so the pin of 39 still resolves after the move. TWO knobs, only ONE of which is
+  // location-sensitive — the asymmetry the blocks above describe, seen from the other side.
+  //
+  // ⚠ AND `src/lib` HAS NO DIRECTORY ENTRY ANYWHERE IN THIS ARRAY, so the suite would have
+  // gone UNRUN rather than merely unpinned had this line been deleted instead of repointed.
+  "src/lib/__tests__/connectionMark.test.tsx",
   // ── Added in 211-05 (Task 1(c), SC#3) — the FOURTH entry on `src/components/settings/`,
   //    for the identical reason the three above give: every one of them is FILE-LEVEL, so a
   //    fourth file in that directory is reached by none of them.
