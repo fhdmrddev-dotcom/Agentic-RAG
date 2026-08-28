@@ -35,7 +35,7 @@
  *  - XSS (T-124-05): the describe text + the soul-preview strings render as plain
  *    React text children (auto-escaped). NEVER `dangerouslySetInnerHTML`.
  */
-import { useId, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 // Phase 193-03 (D-05 / D-08): the govern door's header strip lives in its own module now —
@@ -59,6 +59,23 @@ import {
 // ⚠ `STRIP_LABEL_GOVERN` is deliberately ABSENT: it belongs to `DoorHeaderStrip.tsx`, which
 // imports it directly. One id, one consumer — routing it through here would re-create the
 // coupling the 193-03 cut removed.
+import { DescribeServicePicker } from "@/components/workflows/DescribeServicePicker"
+// 214-13 (STEP-06 / sketch 217 §4) — the whole-word catalog match and its unanchored
+// fallback, in its own pure module. What lands in THIS file is one derived value and one
+// ordered precedence check; the matching itself never enters the shell (the G-5 argument
+// recorded in the plan's `<g5_disposition>`).
+import {
+  matchServiceRefusal,
+  type ServiceCatalogEntry,
+} from "@/components/workflows/describeServiceMatch"
+// The KNOWN-SERVICE catalog is Phase 212's shipped presentation registry, read rather than
+// re-typed. ⚠ It is deliberately NOT the author's connection list: the refusal is about a
+// service they have NOT connected, so a catalog built from their connections could never
+// contain the thing being refused.
+import {
+  CATALOG_SERVICES,
+  POPULAR_SERVICES,
+} from "@/components/settings/servicesCatalog"
 import {
   CHOOSER_H1,
   CHOOSER_SUB,
@@ -66,6 +83,11 @@ import {
   DESCRIBE_CTA_REFUSED,
   DESCRIBE_H1,
   DESCRIBE_REFUSAL,
+  DOOR_CTA_REFUSED_SERVICE,
+  DOOR_REFUSAL,
+  DOOR_REFUSAL_ANCHOR,
+  DOOR_REFUSAL_CONNECT,
+  DOOR_REFUSAL_REVISE,
   DOOR_A_DESC,
   DOOR_A_NAME,
   DOOR_A_NOTE,
@@ -87,6 +109,17 @@ import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
 type DoorState = "both" | "describe" | "govern"
+
+/**
+ * 214-13 — the services an author could NAME, derived once at module scope from Phase 212's
+ * shipped catalog. Two arrays, one list: `POPULAR_SERVICES` and `CATALOG_SERVICES` are a
+ * presentation split (which rows the Settings picker features), never a semantic one, so
+ * refusing on one and not the other would make the refusal depend on a layout decision.
+ */
+const KNOWN_SERVICES: readonly ServiceCatalogEntry[] = [
+  ...POPULAR_SERVICES,
+  ...CATALOG_SERVICES,
+].map((s) => ({ id: s.serviceId, name: s.name }))
 
 /**
  * 193.1-08 (D-24) — the held document PLUS its finished reading, or `null` while there is
@@ -166,6 +199,20 @@ export interface WorkflowDoorSwitchProps {
    *  every other handler in it stay owned by `WorkflowsPage` (D-184.1-02). Only
    *  meaningful alongside `inline`. */
   headerLead?: React.ReactNode
+  /**
+   * 214-13 (D-214-21) — where "connect it in Settings" actually GOES.
+   *
+   * ⚠ OPTIONAL, AND THE OPTIONALITY IS `SEED-185` RATHER THAN A DESIGN CHOICE: the app has
+   * no url router, and this shell owns no navigation. ABSENT ⇒ the refusal's connect control
+   * still renders (invariant #5 requires exactly two next actions) and the click is a no-op.
+   * That residual is NAMED in the plan's summary with its owner rather than smoothed over —
+   * the caller that must supply it is `WorkflowsPage.tsx`, which no plan in this phase owns.
+   *
+   * ⛔ IT IS NOT AN INLINE CONNECT FORM. D-214-21 rejected one outright: a credential form on
+   * a drafting screen is a new outbound trust surface with no prior review cycle. This is a
+   * way to LEAVE for Settings, where that surface already exists and was reviewed.
+   */
+  onOpenSettings?: () => void
 }
 
 export function WorkflowDoorSwitch({
@@ -178,11 +225,16 @@ export function WorkflowDoorSwitch({
   registerCanLeave,
   inline,
   headerLead,
+  onOpenSettings,
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
   /** Sketch 200 binds the describe heading to the box as a real `label`, which needs a
    *  stable id. `useId` is the shipped idiom on this surface (`DraftArrivalCard`). */
   const describeBoxId = useId()
+  /** 214-13 — `DOOR_REFUSAL_REVISE` is *"the way to stay"* (sketch 217 #4), so it must land
+   *  the author back in the box rather than merely dismissing a sentence. A ref, not a
+   *  `getElementById`, because the id is `useId`-generated and the node is right here. */
+  const describeBoxRef = useRef<HTMLTextAreaElement | null>(null)
   const [describe, setDescribe] = useState("")
   // Phase 124 CR-01 fix: the loose door's draft CTA (`DESCRIBE_CTA`) hands the typed text to
   // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
@@ -209,6 +261,28 @@ export function WorkflowDoorSwitch({
    * rather than a second one invented for this control.
    */
   const [templateFile, setTemplateFile] = useState<File | null>(null)
+  /**
+   * 214-13 (STEP-06 / D-214-20) — the services the author allows this workflow to use, and
+   * the services they actually HAVE.
+   *
+   * They live beside `describe` / `kbFolderId` / `templateFile` and, like them, are NOT
+   * cleared by `goBoth`: the hand-off is a one-shot and must not re-fire, but a considered
+   * pick is not undone by looking around. That is the shipped rule (`:160-166`), followed
+   * rather than a second one invented for this control.
+   *
+   * ⚠ THE TWO SETS ANSWER DIFFERENT QUESTIONS AND MUST NOT BE COLLAPSED.
+   *   · `allowedConnectionIds` is the GENERATOR'S VOCABULARY — connection row ids, ticked by
+   *     the author, enforced server-side on the emitted definition.
+   *   · `connectedServiceIds` is what the REFUSAL reads — the service identities that exist
+   *     at all. `DOOR_REFUSAL` says *"is not connected"*, and a service the author connected
+   *     but did not tick IS connected; refusing it with those words would make a governed,
+   *     character-asserted sentence say something false.
+   *
+   * `connectedServiceIds` is reported UP by the picker rather than fetched again here: the
+   * picker already holds the answer, and a second read would be a second source to drift.
+   */
+  const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([])
+  const [connectedServiceIds, setConnectedServiceIds] = useState<string[]>([])
   const templateRead = useTemplateRead(templateFile)
   const templateAnswer = completedTemplateAnswer(templateFile, templateRead)
   /**
@@ -244,6 +318,43 @@ export function WorkflowDoorSwitch({
    * would be a second home for one fact.
    */
   const refusingDescribe = describe.length > 0 && describe.trim().length === 0
+
+  /**
+   * ── 214-13 (STEP-06 / D-214-21) — THE SECOND ARM ON THE ONE REFUSAL MECHANISM ─────────
+   *
+   * The author's prose names a service they have not connected. `matchServiceRefusal` owns
+   * the whole decision — whole-word, case-insensitive, and `null` on every doubt — so this
+   * shell holds one derived value and never a matching rule (sketch 217 §4).
+   *
+   * ⚠ IT ADDS NO NEW REFUSAL RULE TO `canDraft` BY WIDENING AN EXISTING TERM; it adds a term,
+   * and the term is stated here in the open. `canDraft` above is deliberately untouched —
+   * see `ctaDisabled` below, which is where the two are composed.
+   *
+   * ⚠ AND IT NEVER RENDERS AT REST (sketch 217 #1). An untouched box names nothing, so
+   * `matchServiceRefusal` returns `null` and every one of the six byte-pinned resting
+   * captures is reached with this value already `null` — the refusal cannot greet anybody.
+   */
+  const serviceRefusal = matchServiceRefusal(describe, KNOWN_SERVICES, connectedServiceIds)
+
+  /**
+   * ⚠ THE PRECEDENCE RULE, AS AN EXPLICIT ORDERED CHECK RATHER THAN AN INCIDENTAL `||`
+   * (sketch 217 §3, stated in `doorVocabulary.ts`'s own section and IMPLEMENTED here).
+   *
+   * THE TWO REASONS DO NOT COMPETE: with a box that is too thin to draft from, the control
+   * reads the THINNESS reason even when the connection reason could also be composed. A
+   * workflow with no external step is perfectly legitimate, so refusing on the connection
+   * there would refuse for a reason that is NOT BINDING — the author could connect every
+   * service in the catalog and still be refused, which teaches them the refusal is noise.
+   *
+   * ⚠ IT IS WRITTEN AS AN ORDERED BRANCH EVEN THOUGH THE TWO ARE CURRENTLY DISJOINT, AND
+   * THE REDUNDANCY IS THE POINT. `refusingDescribe` is true only for a whitespace-only box,
+   * which cannot contain a service name, so today the ordering can never be exercised by a
+   * real keystroke. A future widening of EITHER predicate — a minimum length on one side, a
+   * "nothing connected at all" arm on the other — would make them overlap, and this branch
+   * is what decides the answer then rather than whichever expression happens to be written
+   * first. An `||` here would have no place to record that.
+   */
+  const refusingService = !refusingDescribe && serviceRefusal !== null
 
   // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
   // the govern door later doesn't re-trigger a generate).
@@ -419,6 +530,7 @@ export function WorkflowDoorSwitch({
                 nothing here and would render identically to an arm nobody painted. */}
             <textarea
               id={describeBoxId}
+              ref={describeBoxRef}
               aria-label="business requirement"
               data-testid="describe-box"
               value={describe}
@@ -436,7 +548,18 @@ export function WorkflowDoorSwitch({
               // lets the author grow the box (a describe box you cannot see all of is the
               // complaint behind the whole screen), uses the 2px radius the design system's
               // DEFAULT token carries, and draws the focused border WITHOUT a second ring.
-              className={`w-full resize-y rounded border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card p-4 text-[14px] leading-[1.5] text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-0`}
+              // ⚠ 214-13 — THE TONE TOKEN IS `warning`, NOT `destructive`, AND THE SWAP IS
+              // PLAN 214-03'S RECORDED RULING APPLIED (`doorVocabulary.ts`, "THE COLOUR
+              // RULING"). Sketch 217 #11 says the refusal spends WARNING and never
+              // destructive, and sketches 214 #14 / 215 #9 assert `--destructive` is ABSENT
+              // from the new surfaces; leaving the shipped arm destructive while the new arm
+              // is warning would make ONE mechanism read as TWO severities. `warning`
+              // resolves in `tailwind.config.js:84-86` — it was a missing DECLARATION added
+              // by 192.2 WR-01, not a new colour, so this is a token swap.
+              // ⚠ THE REFUSING SLOTS ARE THE ONLY THING THAT CHANGED. With nothing refused
+              // these three ternaries resolve to the class list that shipped, CHARACTER FOR
+              // CHARACTER, which is what the six byte-pinned resting captures hold.
+              className={`w-full resize-y rounded border ${refusingDescribe || refusingService ? "border-warning" : "border-border"} bg-card p-4 text-[14px] leading-[1.5] text-foreground ${refusingDescribe || refusingService ? "focus:border-warning" : "focus:border-primary"} focus:outline-none focus:ring-0`}
               /* ⚠ TWO TONE SLOTS NOW, NOT THREE, AND THAT IS THE SHEET'S DOING RATHER THAN A
                  WEAKENING. Sketch 200 draws this box `focus:ring-0` — the focused state is the
                  BORDER changing colour, with no second ring behind it — so there is no third
@@ -459,16 +582,100 @@ export function WorkflowDoorSwitch({
                 that resolves in `tailwind.config.js`, verified rather than assumed: fifteen of
                 this sheet family's colour tokens compile to nothing here and would render
                 identically to an arm nobody painted. */}
-            {refusingDescribe && (
+            {/* ── ⚠ 214-13 — ONE BLOCK, TWO ARMS. NEVER TWO BLOCKS ────────────────────────
+                Sketch 217 §3: the new refusal is a SECOND ARM ON ONE MECHANISM, never a
+                second mechanism beside it. Two `{cond && <div data-testid="…">}` siblings
+                would be two mechanisms wearing one name, and the precedence rule would then
+                be enforced by whichever happened to render — which is exactly the thing
+                `refusingService` is computed to decide in the open.
+
+                THE TONE IS `warning` FOR BOTH ARMS (214-03's colour ruling, applied). The
+                shipped `destructive` treatment is gone from this block; a refusal that names
+                a next action is not a destructive event. */}
+            {(refusingDescribe || refusingService) && (
               <div
                 data-testid="describe-refusal"
                 role="status"
-                className="mt-1 flex items-start gap-2 rounded-r border border-l-4 border-destructive/30 border-l-destructive bg-destructive/10 p-4"
+                className="mt-1 flex items-start gap-2 rounded-r border border-l-4 border-warning/30 border-l-warning bg-warning/10 p-4"
               >
-                <span aria-hidden="true" className="mt-[2px] shrink-0 text-destructive">
+                <span aria-hidden="true" className="mt-[2px] shrink-0 text-warning">
                   ⊘
                 </span>
-                <p className="text-[14px] leading-[1.5] text-destructive">{DESCRIBE_REFUSAL}</p>
+                {refusingDescribe ? (
+                  <p className="text-[14px] leading-[1.5] text-warning">{DESCRIBE_REFUSAL}</p>
+                ) : (
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <p
+                      data-testid="describe-refusal-service"
+                      className="text-[14px] leading-[1.5] text-warning"
+                    >
+                      {DOOR_REFUSAL({ service: serviceRefusal!.service })}
+                    </p>
+                    {/* ── THE ANCHOR (sketch 217 #11 / #12), AND ONLY WHERE IT CAN BE ──────
+                        The author's prose is echoed with the matched span marked, so the
+                        refusal points at the words they wrote rather than at a claim about
+                        them. It renders ONLY on `anchor !== null` — §4's fallback — so an
+                        ambiguous or substring-only reading gets the unanchored sentence and
+                        no mark. A mis-anchor is worse than no anchor.
+
+                        ⚠ VISIBLE WHILE REFUSING, NOT ONLY ON HOVER (#12). The tag is a real
+                        text node in the accessibility tree; a mark that needs a pointer is a
+                        mark a keyboard reader never learns exists. There is no `title`, no
+                        `group-hover`, and no `opacity-0`.
+
+                        ⚠ THE ECHO IS PLAIN REACT TEXT CHILDREN (T-124-05, unchanged): the
+                        describe text is untrusted free input and is auto-escaped. NEVER
+                        `dangerouslySetInnerHTML`. */}
+                    {serviceRefusal!.anchor && (
+                      <p
+                        data-testid="describe-refusal-echo"
+                        className="text-[13px] leading-[1.5] text-muted-foreground"
+                      >
+                        {describe.slice(0, serviceRefusal!.anchor!.start)}
+                        <span
+                          data-testid="describe-refusal-anchor"
+                          className="underline decoration-warning decoration-2 underline-offset-2 text-warning"
+                        >
+                          {describe.slice(
+                            serviceRefusal!.anchor!.start,
+                            serviceRefusal!.anchor!.end,
+                          )}
+                        </span>
+                        {describe.slice(serviceRefusal!.anchor!.end)}{" "}
+                        <span
+                          data-testid="describe-refusal-anchor-tag"
+                          className="text-[12px] text-warning"
+                        >
+                          {DOOR_REFUSAL_ANCHOR}
+                        </span>
+                      </p>
+                    )}
+                    {/* ── EXACTLY TWO NEXT ACTIONS (#5) ───────────────────────────────────
+                        `DOOR_REFUSAL_CONNECT` names the service so the author knows which
+                        connection they are about to make; `DOOR_REFUSAL_REVISE` is the way
+                        to STAY, and it lands them back in the box rather than dismissing a
+                        sentence. Offering only the first would make an unrelated detour the
+                        sole way forward out of a screen they are mid-thought on. */}
+                    <div data-testid="describe-refusal-actions" className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        data-testid="describe-refusal-connect"
+                        onClick={() => onOpenSettings?.()}
+                        className="rounded-sm border border-warning/40 px-2.5 py-1 text-[12px] font-medium text-warning hover:bg-warning/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-warning"
+                      >
+                        {DOOR_REFUSAL_CONNECT({ service: serviceRefusal!.service })}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="describe-refusal-revise"
+                        onClick={() => describeBoxRef.current?.focus()}
+                        className="rounded-sm border border-border px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-warning"
+                      >
+                        {DOOR_REFUSAL_REVISE}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE **LOOSE** DOOR ──
@@ -505,7 +712,14 @@ export function WorkflowDoorSwitch({
               <button
                 type="button"
                 data-testid="describe-draft"
-                disabled={!canDraft}
+                /* ⚠ 214-13 — THE CTA IS DISABLED AND NOTHING IS DRAFTED (D-214-21).
+                   D-214-21 rejected *drafting the rest and marking the gap*: a draft
+                   containing a hole is a draft that can be PUBLISHED if the hole is missed,
+                   and STEP-03's gate is a different gate at a different moment. So the
+                   refusal blocks the hand-off outright rather than annotating its output.
+                   `canDraft` itself is untouched — the new term is composed here, in the
+                   open, exactly as the shipped `refusingDescribe` read-back is. */
+                disabled={!canDraft || refusingService}
                 onClick={() => {
                   // Forward the describe text to the EXISTING draft/generate path
                   // (the shell adds no new sink). The govern door (the Builder) owns
@@ -518,17 +732,27 @@ export function WorkflowDoorSwitch({
                   setDoor("govern")
                 }}
                 className={
-                  refusingDescribe
+                  refusingDescribe || refusingService
                     ? "flex cursor-not-allowed items-center gap-1 rounded border border-border bg-muted px-6 py-2 font-mono text-[14px] leading-[1.4] text-muted-foreground"
                     : "rounded bg-primary px-6 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                 }
               >
-                {refusingDescribe && (
+                {(refusingDescribe || refusingService) && (
                   <span aria-hidden="true" className="text-[16px] leading-none">
                     ⊘
                   </span>
                 )}
-                {refusingDescribe ? DESCRIBE_CTA_REFUSED : DESCRIBE_CTA}
+                {/* ⚠ THE ORDERED PRECEDENCE, READ BACK. `refusingDescribe` is asked FIRST —
+                    thinness is the reason that actually blocks the draft, and the connection
+                    reason applies only once there is something to draft FROM. And the
+                    disabled control NAMES NO SERVICE (#3): `DOOR_CTA_REFUSED_SERVICE` is the
+                    reason's second reading, not its detail — the service is named in the
+                    sentence beside it, where there is room to say what to do about it. */}
+                {refusingDescribe
+                  ? DESCRIBE_CTA_REFUSED
+                  : refusingService
+                    ? DOOR_CTA_REFUSED_SERVICE
+                    : DESCRIBE_CTA}
               </button>
             </div>
             {/* ⚠ D-12: the hint is a SENTENCE, not a string. Only the three bold fragments
@@ -564,6 +788,29 @@ export function WorkflowDoorSwitch({
               the knowledge question a labelled block of its own between two rules, rather than
               a select wedged under the box. Its three drawn arms live in that file. */}
           <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
+
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+
+          {/* ── 214-13 (STEP-06 / D-214-20) — WHICH SERVICES THIS WORKFLOW MAY USE ────────
+              Its own labelled section between two rules, immediately after the knowledge
+              question — the same composition sketch 200 gives every other question on this
+              column, and the same shape `DescribeKbPicker` takes one section up. This shell
+              gains a MOUNT and not a surface (the D-187-14 shape); the picker's four arms,
+              its grant grain and its empty state all live in that file.
+
+              ⚠ IT IS A CONTROL, NEVER A GATE. Ticking nothing sends nothing and the server's
+              unconstrained arm is reached, so an author who ignores this section gets
+              today's behaviour exactly (SC#4 — the fast door stays fast).
+
+              ⚠ `onServicesLoaded` IS NOT A SECOND FETCH. The picker already holds the list;
+              the refusal above needs to know which service IDENTITIES exist, and a second
+              read here would be a second source to drift from the one on screen. */}
+          <DescribeServicePicker
+            value={allowedConnectionIds}
+            onChange={setAllowedConnectionIds}
+            onServicesLoaded={setConnectedServiceIds}
+            onOpenSettings={onOpenSettings}
+          />
 
           <div aria-hidden="true" className="h-px w-full bg-border" />
 

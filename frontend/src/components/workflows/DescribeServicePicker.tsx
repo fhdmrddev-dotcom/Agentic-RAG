@@ -51,7 +51,7 @@
  * states, observable through one `hidden`/`aria-hidden` state marker that adds no surface
  * and nothing to the accessibility tree.
  */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { listConnectorConnections } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api"
@@ -183,6 +183,24 @@ export interface DescribeServicePickerProps {
    * worse than the sentence alone.
    */
   onOpenSettings?: () => void
+  /**
+   * The SERVICE IDENTITIES the author has connected, reported up once the read settles.
+   *
+   * ⚠ IT IS NOT A SECOND COPY OF `value`, AND THE TWO ANSWER DIFFERENT QUESTIONS. `value` is
+   * the TICKED set — the generator's vocabulary, connection row ids. This is which services
+   * EXIST at all, which is what the door's refusal reads: `DOOR_REFUSAL` says *"is not
+   * connected"*, and a service the author connected but did not tick IS connected.
+   *
+   * It exists so the door does not issue a SECOND read for a list this component already
+   * holds — a second read would be a second source, and the two would disagree the moment
+   * one of them failed.
+   *
+   * ⚠ IT REPORTS ONLY ON A SETTLED READ. On the `unavailable` arm it reports the EMPTY set,
+   * which is the honest answer to *"which services do we know they have?"* after a failed
+   * ask — and it fails toward MORE refusal, never toward silently drafting a step for a
+   * service nobody could confirm.
+   */
+  onServicesLoaded?: (serviceIds: string[]) => void
 }
 
 export function DescribeServicePicker({
@@ -190,9 +208,17 @@ export function DescribeServicePicker({
   onChange,
   className,
   onOpenSettings,
+  onServicesLoaded,
 }: DescribeServicePickerProps) {
   const [state, setState] = useState<PickerState>("loading")
   const [options, setOptions] = useState<readonly ServiceOption[]>([])
+  /** ⚠ THE CALLBACK IS READ THROUGH A REF, and the reason is measured rather than stylistic:
+   *  a parent-supplied inline callback is a NEW function every render, so naming it in the
+   *  mount effect's dependency list would re-run the READ on every render — turning one
+   *  best-effort request into a loop. The shipped precedent is `useTemplateFirstDraft`'s own
+   *  callback refs, adopted there for exactly this measurement. */
+  const onServicesLoadedRef = useRef(onServicesLoaded)
+  onServicesLoadedRef.current = onServicesLoaded
 
   // ONE best-effort request on mount, in the `cancelled` idiom `DescribeKbPicker` uses. A
   // failure renders the honest "we could not ask" arm and never retries: this is a read
@@ -225,12 +251,20 @@ export function DescribeServicePicker({
         }
         setOptions(rows)
         setState(rows.length > 0 ? "ready" : "none")
+        // The service IDENTITIES, deduplicated and blank-free — the door's refusal reads
+        // this, never `value`. Reported on the SETTLED read only.
+        onServicesLoadedRef.current?.(
+          Array.from(new Set(rows.map((r) => r.serviceId).filter((id) => id.length > 0))),
+        )
       } catch {
         if (cancelled) return
         // NOTHING is invented here: no cached list, no remembered rows, no fabricated
         // connection. Zero rows, and a state that says WHY it is zero.
         setOptions([])
         setState("unavailable")
+        // A failed ask knows of NO service. It fails toward more refusal, never toward
+        // silently drafting a step for a service nobody could confirm.
+        onServicesLoadedRef.current?.([])
       }
     })()
     return () => {
