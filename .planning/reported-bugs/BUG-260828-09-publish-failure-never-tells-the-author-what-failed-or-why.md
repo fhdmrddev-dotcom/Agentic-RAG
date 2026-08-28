@@ -3,14 +3,14 @@ id: BUG-260828-09
 title: A failed publish never tells the author what failed, in which step, or why — the plain sentence exists and is written where nobody looks
 surface: Agentic-RAG
 severity: high
-status: open
-folded_into: null
+status: closed
+folded_into: BUG-260828-09 direct fix (2026-08-28) — no phase; closes Phase 214 SC#6
 reported: 2026-08-28
 reported_by: operator, after three failed publish attempts on one workflow
 affected_areas:
   - frontend/src/components/workflows/PublishGauntlet.tsx
   - backend/app/services/harness/publish_service.py
-re_open_trigger: n/a — open
+re_open_trigger: a publish block that renders no step name, or a `blocked_step` whose face is a slug
 relates_to:
   - BUG-260828-04 (a refusal the author cannot read — same family: the system knows, the author does not)
   - SEED-228 (the two-gate bind that produced these failures)
@@ -76,3 +76,73 @@ plumbing failure — it is produced in one place and rendered in another — not
 The gauntlet's suite asserts that `named_failures` entries render. They do. What is untested is
 whether a person reading the result can name the failing step — and that is not assertable from
 inside jsdom, which is the same blind spot as `BUG-260828-04`.
+
+
+---
+
+# ✅ CLOSED 2026-08-28 — AND THE REPORT'S HYPOTHESIS WAS WRONG IN A WAY THAT MATTERS
+
+**The report guessed `golden_run_error` and a Python exception string. It was measured, and all
+four attempts actually blocked at `structural_gate` with the FALLBACK sentence.** Queried against
+the live database — golden runs `22ad0cf3` (17:46), `1f841ade` (17:12), `c22f4bb2` (17:08),
+`ffa38fa6` (16:55), all on definition `4ddadece` — every one had the identical shape:
+
+```
+0 survey-library  failed   {"_failure_reason": "Phase 1 (survey-library) gate failed after 3 attempt(s): citations_required: …"}
+1 write-summary   pending  {}
+2 act             pending  {}
+
+publish_blocked → named_failures: ["the golden run failed a structural gate"]
+```
+
+## The root cause is ONE WORD, and it is not a copywriting problem
+
+`_drive_golden_run` harvested the deliverable as *the last phase whose output is a dict*. **A
+`pending` phase's `{}` IS a dict.** So the two pending rows overwrote the failed row,
+`_structural_failures` was handed `{}`, returned `[]`, and the caller's `or [...]` fallback
+fired. The good sentence was produced, persisted three separate ways, and then discarded by the
+harvest before anything could render it.
+
+⚠ **The report's framing — "produced in one place, rendered in another" — was exactly right, and
+its diagnosis of WHICH place was wrong.** It named the render site; the defect was upstream of it.
+
+## What shipped
+
+**Backend.** `_deliverable_output` (extracted from the inline loop, empty dicts no longer count,
+reads through the ONE `phase_output_object` unwrap) · `_blocked_step` + `_blocked_step_for_run`
+(the join nothing performed: the failed phase's identity and its cause, with the
+`Phase {n} ({slug}) …:` machine prefix stripped and the raw sentence kept beside it) ·
+`PublishVerdict.blocked_step`, additive and optional, threaded through `_block` and into the
+`publish_blocked` receipt. `named_failures` is **untouched** — rule 4 is not widened.
+
+**Frontend.** `publishBlockedStep.ts` (shape detection + the face ladder) ·
+`PublishBlockedStepCard.tsx` (the card the block now leads with, in `PublishRefusalList`'s slot,
+above the spine) · the wire type · `verdictModel.ts`'s `structural_gate` paragraph, which
+**predicted this fix eleven days early** and is marked false rather than overwritten.
+
+⭐ **Property (1) is honoured by construction, not by care.** The server returns `step_name: null`
+when the author named nothing — it does **not** backfill the slug, which is what the sibling gate
+does and why a shipped receipt reads `"step_name": "act"`. The visible face comes from the shipped
+`phaseVocabulary.nodeTitle`, whose own floor is *"the SLUG NEVER appears in this string."*
+
+## Evidence
+
+- Driven against the operator's REAL rows (not a fixture): fallback no longer fires; `cause` is
+  `citations_required: nothing was retrieved (0 sources) — this step reads your documents and
+  must show where its answer came from`.
+- Backend `tests/unit`: **68 failed / 3110 passed** — rot set exactly at baseline 68, `+18` = the
+  new suite. Count gate: **`count gate OK` — 138/138 pinned · 0 failing** (both new suites pinned).
+  `tsc -p tsconfig.app.json`: **34**, exactly baseline, none in a touched file.
+
+## ⚠ What is NOT proven, and who has to prove it
+
+**jsdom lays nothing out**, so no test in this repo can show that a person reading the result can
+name the failing step — the property the report is actually about, and the same blind spot it
+names. The suites prove the WIRING. **The READING is owed as an operator drive in a browser**, and
+the cheapest row is: re-publish the same workflow and confirm the card leads with a step name
+rather than the stage spine.
+
+⚠ **A `structural_gate` block raised by the D-214-11 argument re-projection fails no phase and so
+still names none** — it falls to the headline that shipped. That is correct, not a gap: there is
+no failing step to name. `BUG-260828-04` (a refusal the author cannot read) is a different defect
+and is untouched here.

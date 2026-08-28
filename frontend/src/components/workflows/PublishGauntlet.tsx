@@ -46,6 +46,7 @@ import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib
 // gauntlet ladder + verdict, which stay byte-behavior-identical (the ladder re-skin
 // is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
+import { PublishBlockedStepCard } from "@/components/workflows/PublishBlockedStepCard"
 import type { DefShape } from "@/components/workflows/soulData"
 // Phase 186-05 (CONCUR-02, D-186-11) — the worded refusal. The map + its total resolver
 // live in the pure verdict module, next to the other sentences a surface says about a
@@ -813,6 +814,27 @@ function GauntletContent({
         />
       )}
 
+      {/* ── BUG-260828-09 — THE SAME SLOT, THE OTHER PRODUCER ───────────────────────────
+          The block directly above claims the argument-gap entries out of `named_failures`;
+          this one claims the step-level failure of the golden RUN. They cannot both render:
+          an argument gap blocks a run before it starts, and this fact only exists for a run
+          that started and then stopped. Same frame and same slot on purpose — two cause
+          blocks that looked like two features would say the surface has two kinds of refusal
+          in it, when it has one kind with two producers.
+
+          It renders NOTHING when the verdict carries no phrasable step cause, so every stage
+          the golden run did not reach is byte-for-byte the surface that shipped. `definition`
+          is passed so the face resolves through `nodeTitle`'s ladder; absent, the card still
+          renders and falls back to the server's name and then to the step's ordinal — never
+          to the slug. */}
+      <PublishBlockedStepCard step={verdict?.blocked_step} definition={definition} />
+
+      {/* THE SPINE IS CONTEXT, AND IT SITS BELOW THE ANSWER — the same reason the refusal
+          list above does. A person reads WHAT IS WRONG before they read WHERE IT STOPPED;
+          putting a ten-row map of the checks first makes an author decode a stage name to
+          reach a sentence they could have read directly, which is `BUG-260828-09` in one
+          line of JSX. */}
+
       {/* D0 — 8-stage energy-spine: ABOVE the form (sketch 051-A). The spine is the
           centrepiece of the gauntlet — always visible once the modal opens so the user
           can see the 8 checks at a glance before and after clicking Publish. */}
@@ -995,7 +1017,16 @@ function GauntletContent({
                       already carries, and nothing joins them on the wire yet — that half of
                       the report is a server change. Claiming a step here would be inventing
                       one. What it can honestly say is WHICH SIDE stopped, and that is the
-                      part that redirects the author. */}
+                      part that redirects the author.
+
+                      ⚠ BUG-260828-09 SHIPPED THAT SERVER CHANGE, AND THIS ARM STILL NAMES NO
+                      STEP — deliberately. `PublishBlockedStepCard` above names it when
+                      `blocked_step` is present; this is the arm that has to be right when it
+                      is ABSENT (a pre-fix server; a `structural_gate` raised by the argument
+                      re-projection, which fails no phase and so names none). A headline that
+                      claimed a step would have to invent one on exactly those paths. The
+                      paragraph above is preserved rather than rewritten because its
+                      prediction — that this was a server change — was correct. */}
                   {isBlock && (
                     <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                       {verdict.blocked_stage === "judge"

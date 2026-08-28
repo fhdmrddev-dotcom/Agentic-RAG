@@ -741,6 +741,32 @@ CLAUDE.md carries a MANDATORY sweep rule; it is honoured by the orchestrator, no
 
 ## Guardrail overrides
 
+**`BUG-260828-09` — G-2, OVERRIDDEN 2026-08-28 on the operator's explicit "proceed".** The gate
+fires correctly: the fix ships a new UI surface (`PublishBlockedStepCard.tsx`) and **no
+operator-approved sketch exists**. The operator was shown the plan naming this as an open question
+— *"approve the override, or sketch first"* — and answered `proceed`.
+
+⚠ **It is a deferral of the gate, not a discharge of it, and it is the SECOND consecutive G-2
+override in this milestone.** 214.1's entry directly below already warned that *"the next UI phase
+in this milestone gets no similar override without a sketch, or this becomes a habit rather than an
+exception."* **That warning has now been overridden once.** A third makes it the rule.
+
+Mitigation, so the override costs as little as possible:
+- **The card is a RE-USE, not an invention.** It occupies `PublishRefusalList`'s existing slot with
+  that component's frame, header register and body scale — the two surfaces are one kind of refusal
+  with two producers, and they can never render together.
+- **The wiring is design-independent.** `PublishVerdict.blocked_step`, the harvest fix, the
+  `_blocked_step` join, `publishBlockedStep.ts`'s face ladder and both test suites survive a full
+  re-skin untouched. A rejected visual costs the card, not the fix.
+- The one thing a sketch would have decided — *what does this card say* — is constrained anyway:
+  the cause sentence is the SERVER'S, verbatim, and `verdictModel.ts`'s red line forbids this
+  client owning a cause vocabulary at all.
+
+⚠ **RE-OPEN TRIGGER: the operator's first look at a failed publish.** The G-4 row that matters is
+one drive — re-publish the failing workflow and read what leads the block. ⚠ **jsdom cannot stand
+in for it**: every `getBoundingClientRect` is zero, so no test in this repo can prove the card is
+readable, which is the same blind spot that let the original defect ship.
+
 **Phase 214.1 — G-2, OVERRIDDEN 2026-08-28 at the operator's explicit authorisation of an
 UNATTENDED build.** The gate fires correctly: 214.1 ships a declared-input authoring UI, `ROADMAP`
 marks it `**UI hint**: yes`, and **no operator-approved sketch exists**. The operator authorised

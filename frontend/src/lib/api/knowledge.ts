@@ -548,6 +548,34 @@ export interface PublishVerdict {
   golden_run_id: string | null
   blocked_stage: string | null
   named_failures: unknown[]
+  /**
+   *  ── BUG-260828-09 — THE JOIN NOTHING PERFORMED, NOW ON THE WIRE ─────────────────────
+   *  Which step of the AUTHOR'S OWN workflow stopped the golden run, and why. `null` on
+   *  every block that cannot name one (a lint block, a judge block, a crash before any
+   *  phase ran) and absent entirely from a pre-fix server, which is why it is optional.
+   *
+   *  ⚠ **IT IS A FIELD OF ITS OWN AND NOT A SIXTH `named_failures` SHAPE.** That array is
+   *  POLYMORPHIC and its consumers must detect shape PER ENTRY, never switch on
+   *  `blocked_stage` (`PublishGauntlet.tsx` docblock rule 4). A refusal that LEADS the
+   *  surface must not be reachable only by a successful shape guess, so the array is
+   *  untouched — every existing entry renders byte-for-byte as it did.
+   *
+   *  ⚠ **`step_name` IS `null` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.** The
+   *  server enforces that at the producer; the visible face is resolved on this side through
+   *  `phaseVocabulary.nodeTitle`. Read it via `publishBlockedStep.blockedStepOf` — this
+   *  declaration is the wire shape, that module is the one consumer contract.
+   *
+   *  `cause` leads; `reason` is the same sentence with its `Phase {n} ({slug}) …:` machine
+   *  prefix intact and belongs in the raw disclosure. When the prefix does not match, `cause`
+   *  IS `reason`, so a surface leading with `cause` can never render empty.
+   */
+  blocked_step?: {
+    step_slug?: string | null
+    step_index?: number | null
+    step_name?: string | null
+    reason?: string | null
+    cause?: string | null
+  } | null
 }
 
 /** Phase 214 (STEP-03) — the OPTIONAL keys a publish-refusal entry may carry, so a refusal can

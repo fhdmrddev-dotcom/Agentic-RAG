@@ -1237,6 +1237,38 @@ class PublishRequest(BaseModel):
     golden_input: str
 
 
+class BlockedStep(BaseModel):
+    """WHICH step of the AUTHOR'S OWN workflow stopped a publish, and why (BUG-260828-09).
+
+    ── WHY THIS IS A FIELD OF ITS OWN AND NOT ANOTHER ``named_failures`` ENTRY ────────────
+    ``named_failures`` is POLYMORPHIC across the gauntlet's stages and its consumers are
+    required to detect shape PER ENTRY, never to switch on ``blocked_stage``
+    (``PublishGauntlet.tsx`` docblock rule 4). Adding a sixth shape to that array would make
+    every consumer's detection set grow, and a refusal that leads the surface is exactly the
+    thing that must not be reachable only by a successful shape guess. So the array is
+    UNTOUCHED — every existing entry renders byte-for-byte as it did — and the step identity
+    rides its own optional field.
+
+    ⚠ **``step_name`` IS ``None`` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.**
+    That is property (1) of the report — *by the author's step name, never a slug or a stage
+    index* — enforced at the producer rather than trusted at the consumer. The client resolves
+    the visible face through ``phaseVocabulary.nodeTitle``, the shipped four-tier ladder whose
+    stated floor is that the slug never appears in its output. ``step_slug`` and ``step_index``
+    are carried for correlation (a run link, a canvas focus), NOT for display.
+
+    ⚠ **``cause`` LEADS AND ``reason`` IS DEMOTED — BOTH ARE SENT.** ``reason`` is the engine's
+    verbatim sentence including its ``Phase {n} ({slug}) …:`` prefix; ``cause`` is that sentence
+    with the prefix removed. When the prefix does not match, ``cause`` IS ``reason``, so a
+    surface leading with ``cause`` can never render empty.
+    """
+
+    step_slug: str | None = None
+    step_index: int | None = None
+    step_name: str | None = None
+    reason: str | None = None
+    cause: str | None = None
+
+
 class PublishVerdict(BaseModel):
     """The D-08 structured verdict. A block names the stage + the failures + the
     golden run id (a real, browsable run); a success carries the published version.
@@ -1247,6 +1279,17 @@ class PublishVerdict(BaseModel):
     golden_run_id: UUID | None = None
     blocked_stage: str | None = None
     named_failures: list = Field(default_factory=list)
+    # ── BUG-260828-09 — THE JOIN NOTHING PERFORMED ───────────────────────────────────────
+    # ``verdictModel.ts``'s ``structural_gate`` docblock records the gap from the client side
+    # verbatim: *"The precise cause lives in `workflow_phases` / `harness_audit` against the
+    # `golden_run_id` the response already carries, and NOTHING joins them today — that is the
+    # report's requirements 1 and 2 and it is a SERVER change."* This field is that change, and
+    # that paragraph is corrected in the same commit.
+    #
+    # ⚠ OPTIONAL, and every stage that cannot name a step sends ``None`` — a lint block, a
+    # judge block, a crash before any phase ran. A ``None`` renders as the surface that
+    # shipped, so no stage gains an empty card it has nothing to put in.
+    blocked_step: BlockedStep | None = None
 
 
 @router.post(

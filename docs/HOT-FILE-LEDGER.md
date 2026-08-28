@@ -6556,3 +6556,43 @@ It mirrors `_fetch_never_retrieved`'s SQL-level shape and caps its Python scan t
 ⚠ **The accepted formats are `.txt .md .pdf .docx .pptx .xlsx .csv .epub`** — measured from the `accept` attribute. **`.msg` is NOT among them**, although a real Outlook message has reached ingestion in this project and failed there on a NUL in the subject. A dropzone advertising a format the input rejects sends the user to a dead end; sketch 218 fences the advertised list against this attribute.
 
 ⭐ Upload is currently a **small button in the top-right corner of a folder header** — the operator could not find it, which is what promoted it to a first-class surface in the sketch.
+
+---
+
+### `frontend/src/components/workflows/verdictModel.ts`
+
+**Triple re-derived 2026-08-28 (`BUG-260828-09`): `6 / 3 / 355` — ⚠ G-5 FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **ABSENT FROM BOTH THE TABLE AND THIS FILE FOR ITS ENTIRE LIFE**, and it crossed the threshold before anyone counted. That is the `phaseStatusMeta.ts` / `FlowEdge.tsx` shape a third time: a file invisible to its own guardrail cannot be told it is due for a look, and this one is the **home of every word the publish surface says about a refusal** — the headline sentence map, the fallback, the degraded-check sentences and the resting-state line.
+
+⭐ **ITS `structural_gate` DOCBLOCK PREDICTED THIS BUG AND NAMED THE FIX, ELEVEN DAYS EARLY.** Written at `BUG-260815-06`, verbatim: *"The precise cause lives in `workflow_phases` / `harness_audit` against the `golden_run_id` the response already carries, and NOTHING joins them today — that is the report's requirements 1 and 2 and it is a SERVER change."* `BUG-260828-09` is that server change. **The paragraph is preserved and marked false rather than overwritten, because the prediction being RIGHT is the finding** — and because it records why the client half alone could not close it.
+
+⚠ **THE HEADLINE SENTENCE IS UNCHANGED, AND THAT IS A DECISION.** It is the arm that must still be correct when `blocked_step` is ABSENT — a pre-fix server, a `structural_gate` raised by the argument re-projection (which fails no phase and so names none), a crash before any phase failed. A headline that named a step would have to invent one on exactly those paths. The better-informed line now sits **above** it; nothing was replaced.
+
+**THE RED LINE THIS FILE DRAWS BINDS ITS NEIGHBOURS.** *"NO CODE TABLE. THIS IS THE RED LINE, NOT A PREFERENCE (D-182-06)"* — no severity derivation, no friendly-message map, no allow-list of finding identifiers. `publishBlockedStep.ts` was authored under that rule and carries no cause table either; its copy test sweeps its own static strings for validator names and stage tokens. **A future "helpful" map from `citations_required` to advice belongs on the server that mints the vocabulary, never here.**
+
+**Named seam, if one is ever taken:** the three sentence maps (`DEGRADED_SENTENCE`, `BLOCKED_SENTENCE`, the resting line) are vocabulary; `groupVerdicts` / `summaryLine` / `isCheckOutstanding` are projection. They are already the only two things in the file and they do not tangle — **so the honest verdict today is that a split would buy nothing**, and the row exists to make the file visible, not to schedule work on it.
+
+---
+
+### `frontend/src/components/workflows/publishBlockedStep.ts`
+
+**Triple at `BUG-260828-09`'s close (2026-08-28): `0 / 0 / 176` — G-5: no (new).** young — the step-face resolver and every word the blocked-step card says.
+
+⭐ **IT DERIVES NO SECOND NAME LADDER, AND THAT IS THE WHOLE POINT OF THE FILE.** The visible step face comes from calling the SHIPPED `phaseVocabulary.nodeTitle`, whose own stated floor is *"the SLUG NEVER appears in this string."* Report property (1) — *by the author's step name, never a slug or a stage index* — is therefore honoured **by construction** rather than by a rule somebody has to keep defending here.
+
+⚠ **WRITING `name ?? slug` IN THIS FILE IS THE ONE FORBIDDEN EDIT.** That exact fallback, one function over on the server (`_golden_run_argument_failures`), is why the shipped argument refusal emitted `"step_name": "act"` — a slug, in the field that promises an authored name, measured on a live `publish_blocked` receipt. `publishBlockedStep.test.ts` fences it with a definition whose slug is a token occurring nowhere else and asserts that token is absent from the output, plus a positive control that drives the forbidden shape through the same assertion so the fence is falsifiable rather than vacuous.
+
+**Four tiers, and none of them is the slug:** the definition phase through `nodeTitle` → the server's `step_name` (when the caller holds no definition) → the step's own ORDINAL as the canvas counts it (never a gauntlet stage index) → a generic noun, so a headline is never rendered around an empty pair of quotes.
+
+---
+
+### `frontend/src/components/workflows/PublishBlockedStepCard.tsx`
+
+**Triple at `BUG-260828-09`'s close (2026-08-28): `0 / 0 / 101` — G-5: no (new).** young — the card a failed publish leads with.
+
+⚠ **G-2 IS OVERRIDDEN, NOT SATISFIED.** No operator-approved sketch exists; the operator authorised the build with the visual veto retained. Recorded under `STATE.md → Guardrail overrides`. The frame is `PublishRefusalList`'s — same slot above the spine, same shell, same header register — because two cause blocks that looked like two different features would tell an author the surface has two kinds of refusal in it, when it has **one kind with two producers**. The wiring is design-independent: the server field, the resolver, the face ladder and the tests all survive a re-skin untouched.
+
+**THE TWO CAUSE BLOCKS CANNOT BOTH RENDER, and it is structural rather than guarded.** `PublishRefusalList` claims the argument-gap entries out of `named_failures` — a gap that blocks a run **before it starts**; this claims the step-level failure of a golden run that **started and then stopped**.
+
+⚠ **jsdom CANNOT PROVE WHAT THIS CARD IS FOR.** Every `getBoundingClientRect` is zero, so no test here can show that a person reading the result can name the failing step — the same blind spot the bug report names as the reason nothing caught the original, and the same one `BUG-260828-04` sits in. The suite proves the WIRING (the sentence arrives verbatim, the slug never does, the card is absent on every path that names no step); the READING is the operator's, in a browser.

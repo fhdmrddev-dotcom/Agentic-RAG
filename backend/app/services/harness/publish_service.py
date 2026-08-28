@@ -337,6 +337,11 @@ async def publish_workflow(
             stage="golden_run_error",
             named_failures=[f"golden run could not complete: {err_msg}"],
             golden_run_id=golden_run_id,
+            # BUG-260828-09: a crash mid-run usually leaves a ``failed`` phase row behind,
+            # and that row knows what the exception class name cannot say. When there is no
+            # such row this is ``None`` and the surface is byte-for-byte what shipped — the
+            # Python exception string is still the only thing we honestly have.
+            blocked_step=await _blocked_step_for_run(pool, golden_run_id, definition),
         )
 
     # The attempt now has a real run_id (the documented receipt-keying choice).
@@ -352,6 +357,13 @@ async def publish_workflow(
     # run never reaches the judge — block at the structural_gate stage with the run id.
     if terminal_status == "failed":
         named = _structural_failures(final_output)
+        # ── BUG-260828-09 — WHICH STEP, AND WHY, INSTEAD OF THE SHAPE OF THE PIPELINE ──
+        # The ``or [...]`` fallback below is what the operator read four times in one sitting.
+        # It fired because the deliverable harvest had already thrown the answer away (see
+        # ``_deliverable_output``); with that repaired, ``named`` now normally carries the
+        # engine's own sentence. ``blocked_step`` is the STRUCTURED half of the same fact —
+        # the step identity a surface needs to say it in the AUTHOR'S vocabulary rather than
+        # in ``Phase 1 (survey-library)``. Both ride the verdict; neither replaces the other.
         return await _block(
             pool,
             run_id=golden_run_id,
@@ -360,6 +372,7 @@ async def publish_workflow(
             stage="structural_gate",
             named_failures=named or ["the golden run failed a structural gate"],
             golden_run_id=golden_run_id,
+            blocked_step=await _blocked_step_for_run(pool, golden_run_id, definition),
         )
 
     # ── D-214-11: the golden run validates the arguments it RESOLVED — AND SENDS NOTHING ──
@@ -514,6 +527,7 @@ async def _block(
     stage: str,
     named_failures: list,
     golden_run_id,
+    blocked_step: dict | None = None,
 ) -> dict:
     """Write a ``publish_blocked`` receipt + return the D-08 structured verdict.
 
@@ -532,6 +546,11 @@ async def _block(
             "blocked_stage": stage,
             "named_failures": named_failures,
             "golden_run_id": str(golden_run_id) if golden_run_id else None,
+            # BUG-260828-09: the receipt carries the answer too. A governance trail that
+            # records only the fallback sentence is a trail that cannot explain a refusal
+            # after the fact — which is how four identical blocks looked like four
+            # different mysteries.
+            "blocked_step": blocked_step,
         },
     )
     return {
@@ -539,6 +558,9 @@ async def _block(
         "blocked_stage": stage,
         "named_failures": named_failures,
         "golden_run_id": golden_run_id,
+        # ⚠ ADDITIVE AND OPTIONAL. Every stage that cannot name a step passes ``None``, and
+        # a ``None`` here renders as the surface that shipped — not as an empty card.
+        "blocked_step": blocked_step,
     }
 
 
@@ -856,6 +878,187 @@ async def _golden_run_argument_failures(
                 }
             )
     return failures
+
+
+#: BUG-260828-09 — THE ONE PREFIX A FAILURE REASON CARRIES, AND ITS SINGLE PRODUCER.
+#:
+#: ``harness_engine`` composes every ``fail_run`` reason as ``Phase {n} ({slug}) <verb>: <cause>``
+#: — ``_route_on_failure`` (``:1200-1203``) writes the *gate failed after k attempt(s)* verb and
+#: ``_resolve_failure_with_ask_user`` (``:1525``) writes the *validation flagged* one. BOTH lead
+#: with an index the author never chose and a SLUG they can see nowhere on the canvas, which is
+#: exactly what ``BUG-260828-09`` property (1) forbids a refusal from leading with.
+#:
+#: ⚠ IT IS KEYED ON THE SLUG WE ALREADY HOLD, NOT ON A GUESSED PATTERN. The slug is interpolated
+#: (``re.escape``-d) from the failed phase row itself, so this can only ever strip a prefix that
+#: names THAT step — never a sentence that merely starts with the word "Phase".
+#:
+#: ⚠ ``[^:]*`` IS LOAD-BEARING AND MUST NOT BECOME ``.*``. The cause routinely contains its own
+#: colon (``citations_required: nothing was retrieved (0 sources) — …``), and a greedy match
+#: would eat the validator's name out of the one sentence this whole fix exists to surface.
+_REASON_PREFIX = r"^Phase\s+\d+\s+\({slug}\)[^:]*:\s*"
+
+
+def _deliverable_output(phases: list) -> dict:
+    """The run's deliverable — the LAST phase that actually PRODUCED something.
+
+    ── BUG-260828-09, AND IT IS MEASURED RATHER THAN REASONED ABOUT ────────────────────
+    The loop this replaces lived inline in ``_drive_golden_run`` and read, in effect,
+    *"the last phase whose output is a dict wins"*. A phase that never ran carries ``{}``
+    — which IS a dict. Measured on the live database 2026-08-28 across all four of the
+    operator's failed publish attempts; every one had the identical shape::
+
+        0 survey-library  failed   {"_failure_reason": "Phase 1 (survey-library) gate failed …"}
+        1 write-summary   pending  {}
+        2 act             pending  {}
+
+    So the two pending rows overwrote the failed row, ``_structural_failures`` was handed
+    ``{}``, it returned ``[]``, and the caller's ``or [...]`` fallback fired — the author
+    read *"the golden run failed a structural gate"* four times while the sentence naming
+    the step, the check and the cause sat one dict key away. **The information volume was
+    never the problem; the one useful sentence was being discarded before it was rendered.**
+
+    THE SELECTION RULE IS OTHERWISE UNCHANGED. On a run whose phases all produced content
+    — every ``completed`` golden run, which is every run that reaches the judge — this
+    returns what the loop it replaces returned, because no empty dict occurs. Only a run
+    that stopped part-way behaves differently, and only in the direction of keeping the
+    fact that it stopped.
+
+    ⚠ IT READS THROUGH ``phase_output_object`` AND NOT THROUGH A LOCAL ``json.loads``. The
+    inline loop carried its own unwrap; ``workflow_phases.output`` has TWO shapes in it
+    (D-200.1-01 — 527 of 588 non-null values are jsonb string scalars) and the read side
+    keeps exactly ONE home. A second copy here is a second copy that rots.
+
+    Total: a nullish list, a row with no output, an unparseable string and a list-valued
+    output all resolve to ``{}`` rather than raising.
+    """
+    from app.models.thread import phase_output_object  # function-local (the ONE unwrap)
+
+    deliverable: dict = {}
+    for row in sorted(phases or [], key=lambda q: (q or {}).get("phase_index", 0)):
+        obj = phase_output_object((row or {}).get("output"))
+        # An EMPTY dict is not a deliverable. That single word is the whole defect.
+        if obj:
+            deliverable = obj
+    return deliverable
+
+
+def _blocked_step(phases: list, definition) -> dict | None:
+    """WHICH step of the author's own workflow stopped the golden run, and WHY.
+
+    ── BUG-260828-09 — THE JOIN NOTHING PERFORMED ─────────────────────────────────────
+    The engine already writes a good sentence naming the step, the check that refused and
+    the consequence. It writes it in three places — ``workflow_phases.output``, a
+    ``run_failed`` ``harness_audit`` row, and an assistant message inside the ephemeral
+    ``[validation] publish golden run — …`` thread — and the publish verdict joined NONE
+    of them, so it was reachable only by querying Postgres. That is how it was found.
+    ``verdictModel.ts``'s ``structural_gate`` docblock states the gap from the client side
+    and calls it *"a SERVER change"*. This is that change.
+
+    Returns ``{step_slug, step_index, step_name, reason, cause}`` for the failed phase, or
+    ``None`` when no phase failed (a judge block, a lint block, a crash before any phase
+    ran) — in which case the surface is byte-for-byte what shipped.
+
+    ⚠ ``step_name`` IS ``None`` WHENEVER THE AUTHOR DID NOT NAME THE STEP, AND IT IS NOT
+    BACKFILLED WITH THE SLUG. The shipped precedent one function over
+    (``_golden_run_argument_failures``) falls back ``name or slug`` and consequently emitted
+    ``"step_name": "act"`` — a slug, in the field that promises an authored name. Property
+    (1) of the report forbids exactly that, so this returns the honest ``None`` and the
+    client resolves the face through ``phaseVocabulary.nodeTitle`` — the four-tier ladder
+    whose stated floor is that the slug never appears in its output. Measured on the live
+    definition: 2 of its 3 phases carry ``name: null``, so the unnamed arm is the ORDINARY
+    case here, not the edge case.
+
+    ⚠ ``cause`` IS THE REASON WITH ITS MACHINE PREFIX REMOVED, AND ``reason`` IS KEPT
+    VERBATIM BESIDE IT. Nothing is discarded: the raw sentence still rides the wire for the
+    disclosure, exactly as the raw verdict does. If the prefix does not match — a reason
+    composed by some future site in another shape — ``cause`` IS ``reason``, so a surface
+    leading with it can never render empty.
+
+    Total: a nullish list, a row with no output, a reason that is not a string and a
+    definition whose phases do not line up with the run's all resolve without raising.
+    """
+    import re
+
+    failed = None
+    for row in sorted(phases or [], key=lambda q: (q or {}).get("phase_index", 0)):
+        if (row or {}).get("status") == "failed":
+            failed = row
+            break
+    if failed is None:
+        return None
+
+    from app.models.thread import phase_output_object  # function-local (the ONE unwrap)
+
+    obj = phase_output_object(failed.get("output")) or {}
+    raw = obj.get("_failure_reason")
+    reason = str(raw).strip() if isinstance(raw, str) and raw.strip() else None
+
+    slug = failed.get("slug")
+    slug = str(slug) if slug else None
+    index = failed.get("phase_index")
+    index = int(index) if isinstance(index, int) else None
+
+    cause = reason
+    if reason and slug:
+        cause = re.sub(_REASON_PREFIX.format(slug=re.escape(slug)), "", reason, count=1).strip()
+        cause = cause or reason  # never hand a surface an empty sentence
+
+    return {
+        "step_slug": slug,
+        "step_index": index,
+        "step_name": _authored_step_name(definition, slug=slug, index=index),
+        "reason": reason,
+        "cause": cause,
+    }
+
+
+async def _blocked_step_for_run(pool, run_id, definition) -> dict | None:
+    """``_blocked_step`` over a run's phase rows — the one I/O half, on the FAILURE PATH ONLY.
+
+    ⚠ IT COSTS ONE READ AND ONLY WHEN A PUBLISH IS ALREADY LOST. A successful publish never
+    reaches either call site, so nothing on the happy path changes shape or timing. The read
+    is the same ``load_run_phases`` the golden run already performs — the same statement, the
+    same index — so no new query shape enters this file (D-214-23: the gap here was always
+    PROJECTION, never SELECTION).
+
+    Best-effort by construction: a read failure returns ``None`` and the refusal falls back to
+    exactly the surface that shipped. A publish decision that has already been made must never
+    become a 500 because the *explanation* could not be loaded.
+    """
+    if run_id is None:
+        return None
+    try:
+        from app.db.workflows import load_run_phases  # function-local
+
+        return _blocked_step(await load_run_phases(pool, run_id), definition)
+    except Exception:  # noqa: BLE001 — an unexplainable block is still an honest block
+        logger.warning(
+            "publish: could not load the failing step for run %s — the refusal still stands",
+            run_id,
+            exc_info=True,
+        )
+        return None
+
+
+def _authored_step_name(definition, *, slug: str | None, index: int | None) -> str | None:
+    """The step's name AS THE AUTHOR WROTE IT, or ``None`` — never the slug.
+
+    Matched on the slug first (stable across a re-order) and on ``phase_index`` only as a
+    fallback, because a run's phase rows and its definition's phase list are the same
+    sequence by construction. ``_clean_label`` bounds it for the same reason every other
+    author-authored string on this path is bounded (T-193.2-01): it reaches a one-line slot
+    and a persisted audit row, and it is an unbounded ``str | None`` at its declaration.
+    """
+    try:
+        for phase in getattr(definition, "phases", None) or []:
+            matched = (slug is not None and getattr(phase, "slug", None) == slug) or (
+                slug is None and index is not None and getattr(phase, "phase_index", None) == index
+            )
+            if matched:
+                return _clean_label(getattr(phase, "name", None))
+    except Exception:  # noqa: BLE001 — a malformed definition never blocks a refusal's cause
+        return None
+    return None
 
 
 def _structural_failures(final_output) -> list:
@@ -1445,18 +1648,12 @@ async def _drive_golden_run(
 
         phases = await load_run_phases(pool, run_id)
         terminal_status = "failed" if any(p.get("status") == "failed" for p in phases) else "completed"
-        final_output: dict = {}
-        for p in sorted(phases, key=lambda q: q.get("phase_index", 0)):
-            out = p.get("output")
-            if isinstance(out, str):
-                import json
-
-                try:
-                    out = json.loads(out)
-                except (ValueError, TypeError):
-                    out = None
-            if isinstance(out, dict):
-                final_output = out  # the LAST phase with an output wins (the deliverable)
+        # ── BUG-260828-09 — THE HARVEST IS AN EXTRACTED, TESTABLE HELPER NOW ─────────
+        # The loop that used to sit inline here accepted a `pending` phase's `{}` as "an
+        # output" and let it OVERWRITE the failed phase's `_failure_reason`. See
+        # `_deliverable_output` for the measurement; the selection rule is unchanged for
+        # every run whose phases all produced something.
+        final_output: dict = _deliverable_output(phases)
         _shell_status = "completed"
         return run_id, final_output, terminal_status
     except Exception as e:

@@ -2909,6 +2909,19 @@ const BASELINE = {
   "describeServiceMatch.test.ts": 15,
   "publishRefusalVocabulary.test.ts": 41,
   "stepIdentityVocabulary.test.ts": 34,
+
+  // ── BUG-260828-09 — BOTH NEEDED ONLY THE SECOND KNOB, AND THAT IS MEASURED ──────────
+  // The gate's own pre-pin run printed both as `— N new` rows, which is proof they were
+  // already EXECUTING: they live under `src/components/workflows`, a DIRECTORY entry in
+  // `TARGETS` below, so no `TARGETS` line is owed. TARGETS decides what RUNS; BASELINE
+  // decides what is GUARDED, and a suite can sit on the wrong side of exactly one of them
+  // — the `WorkflowBuilderPage.declaredInputs.test.tsx` note above is the case that took
+  // the opposite answer ten lines up, which is why this is checked per file and never
+  // inferred from a sibling.
+  //
+  // Counts read from that run's printed rows, not predicted: 13 and 8.
+  "publishBlockedStep.test.ts": 13,
+  "PublishBlockedStepCard.test.tsx": 8,
   // ⭐ ADOPTED rather than created. `RunStepList.tsx` IS in this phase's diff
   // (214-11 mounted the shared step identity in it) and its only suite was
   // unpinned — executed by the directory entry, guarded by nothing. An unpinned
