@@ -328,6 +328,16 @@ interface RunLike {
     // Phase 200.1 (RUN-04) — the fifth field, optional for the same reason: every case in
     // this file that predates the plan omits it, which IS the no-answer shape.
     deliverable_text?: string | null
+    // ── Phase 214-11 — the four `214-02` shipped on `WorkflowRunPhaseRead`, mirrored here for
+    // the same stated reason as their five predecessors: optional, because every case in this
+    // file that predates this plan omits all four, and that omission IS the shape of a step
+    // that reaches nothing outside. ⚠ This local mirror had gone STALE against the wire — the
+    // widening landed in `lib/api/workflows.ts` and this type never followed, so a fixture
+    // carrying real wire fields was a typecheck error while the product handled them fine.
+    capability?: string | null
+    tool_name?: string | null
+    service_name?: string | null
+    failure_reason?: string | null
   }[]
 }
 

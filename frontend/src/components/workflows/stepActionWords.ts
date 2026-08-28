@@ -59,3 +59,33 @@ export function stepActionWords(capability: string | null | undefined): string |
   if (key.length === 0) return null
   return own(EXTERNAL_CAPABILITY_SENTENCES, key) ?? null
 }
+
+/**
+ * The MARK's structural input for a step, from the two wire facts that describe it.
+ *
+ * ⚠ **A CAPABILITY AND A `tool_name` ARE NEVER PASSED TOGETHER, AND THIS WAS MEASURED RED
+ * RATHER THAN REASONED.** `connectionMark`'s ladder tests `tool_name` BEFORE `capability`, so
+ * a shape carrying both resolves to the MCP mark — and `214-02` sets `tool_name` from
+ * `config.tool_name` on NATIVE steps too. Passing the row through verbatim therefore drew the
+ * **MCP logo on every Slack, Jira and SMTP step**: the vendor marks were correct and
+ * unreachable, which is byte-for-byte the defect the mark module's own arm-0 comment records
+ * from the operator's *"GitHub is still showing MCP logo"* report. It was caught by the
+ * positive control in `StepIdentity.coverage.test.tsx` — *a KNOWN vendor really does draw its
+ * own brand fills* — and by nothing else; every absence assertion beside it passed happily
+ * against the wrong mark.
+ *
+ * The rule this encodes is the mark module's own: **a capability is the ADAPTER fact, and the
+ * adapter decides the wire.** A native step names its capability and nothing else; an MCP step
+ * carries no capability and is identified by its tool. A step with neither takes the named
+ * neutral, which is the honest answer rather than a fallback.
+ */
+export function stepMarkShape(
+  capability: string | null | undefined,
+  toolName: string | null | undefined,
+): { capability?: string | null; tool_name?: string | null } {
+  const cap = typeof capability === "string" ? capability.trim() : ""
+  if (cap.length > 0) return { capability: cap }
+  const tool = typeof toolName === "string" ? toolName.trim() : ""
+  if (tool.length > 0) return { tool_name: tool }
+  return {}
+}

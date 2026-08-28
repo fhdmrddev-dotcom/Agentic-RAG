@@ -104,7 +104,7 @@ import { RunSpine } from "@/components/workflows/RunSpine"
 // A TYPE-ONLY import of the element's own prop shape plus the shared capability resolver; this
 // page never reads the mark map, and the components it feeds never resolve anything.
 import type { StepIdentityProps } from "@/components/workflows/StepIdentity"
-import { stepActionWords } from "@/components/workflows/stepActionWords"
+import { stepActionWords, stepMarkShape } from "@/components/workflows/stepActionWords"
 // SEED-190 / the run-surface re-port: the panel's heading is rendered by the HEADER BAND now,
 // not by `RunSpine`, so the two columns' headings share one row. See the header's own note.
 import { SPINE_HEADING } from "@/components/workflows/transcriptVocabulary"
@@ -1024,7 +1024,10 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         // no authored phrase for — read its header before widening this.
         action: stepActionWords(row.capability),
         service: row.service_name ?? null,
-        shape: { capability: row.capability ?? null, tool_name: row.tool_name ?? null },
+        // ⚠ THROUGH THE ONE BUILDER, never the row verbatim — a shape carrying BOTH a
+        // capability and a tool name resolves to the MCP mark, which drew the MCP logo on
+        // every Slack step until a positive control caught it. See `stepMarkShape`'s header.
+        shape: stepMarkShape(row.capability, row.tool_name),
       })
     }
     return m

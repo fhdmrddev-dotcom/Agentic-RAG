@@ -59,7 +59,7 @@ import { StepIdentity } from "@/components/workflows/StepIdentity"
 // The ONE place a capability becomes a word a person reads. ⚠ SHARED, not local: four
 // surfaces resolve the action, and the first draft of this plan wrote the derivation twice
 // and got the second copy subtly wrong. Read that module's header before changing this.
-import { stepActionWords } from "@/components/workflows/stepActionWords"
+import { stepActionWords, stepMarkShape } from "@/components/workflows/stepActionWords"
 // The failure block's label. `214-03`'s vocabulary is the ONE home for these words.
 import { FAILED_REASON_LABEL } from "@/components/workflows/stepIdentityVocabulary"
 
@@ -471,10 +471,12 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
     ? {
         action: actionWords,
         service: phase.serviceName ?? null,
-        // The MARK's structural input — the same two wire facts, handed onward. This card
-        // never reads the mark map itself; the element owns that resolution (D-214-17), and
-        // this plan asserts the absence mechanically over this directory.
-        shape: { capability: phase.capability ?? null, tool_name: phase.toolName ?? null },
+        // The MARK's structural input, through the ONE builder. ⚠ NOT the row passed verbatim:
+        // a shape carrying BOTH a capability and a tool name resolves to the MCP mark, which
+        // drew the MCP logo on every Slack step until a positive control caught it. Read
+        // `stepMarkShape`'s header before changing this. This card never reads the mark map
+        // itself; the element owns that resolution (D-214-17).
+        shape: stepMarkShape(phase.capability, phase.toolName),
       }
     : null
 

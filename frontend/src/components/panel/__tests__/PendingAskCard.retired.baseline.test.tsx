@@ -184,13 +184,13 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * guards. The pin stays EXACT for the reason stated above - a range here would
      * stop catching a `?raw` import that silently resolved elsewhere.
      *
-     * SUPERSEDED IN PLACE A THIRD TIME BY PHASE 214-11 — `650` -> `740`. Every earlier figure
+     * SUPERSEDED IN PLACE A THIRD TIME BY PHASE 214-11 — `650` -> `737`. Every earlier figure
      * is kept above rather than overwritten, so the growth curve stays readable:
      *
      *   SUPERSEDED (194.1-05):  630.
      *   SUPERSEDED (200):       650.
      *
-     * `739` (`wc -l`), i.e. `740` segments. +90, and the CODE change is small and additive:
+     * `736` (`wc -l`), i.e. `737` segments. +87, and the CODE change is small and additive:
      * three optional props (`action` / `service` / `shape`, all defaulting so every existing
      * caller renders byte-identically), one gated `<StepIdentity>` above the question, and a
      * resolution block in `PendingAskStack` that reads the phase rows the stack ALREADY holds
@@ -204,7 +204,7 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * this edit did not disturb what the file actually guards. D-213-14 also stands: this
      * plan added IDENTITY and no receipt field.
      */
-    expect(src.split("\n").length).toBe(740)
+    expect(src.split("\n").length).toBe(737)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

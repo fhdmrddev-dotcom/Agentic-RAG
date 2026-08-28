@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils"
 // ── Phase 214-11 Task 2 (STEP-04 / D-214-16) — the shared identity element, the FIFTH surface.
 // It takes props; this card resolves nothing and reaches for no connection list.
 import { StepIdentity, type StepIdentityProps } from "@/components/workflows/StepIdentity"
-import { stepActionWords } from "@/components/workflows/stepActionWords"
+import { stepActionWords, stepMarkShape } from "@/components/workflows/stepActionWords"
 import {
   useAskUserPrompt,
   useViewingThread,
@@ -725,10 +725,7 @@ export function PendingAskStack() {
             runIsOver={runIsOver}
             action={pausedAction}
             service={pausedStep?.serviceName ?? null}
-            shape={{
-              capability: pausedStep?.capability ?? null,
-              tool_name: pausedStep?.toolName ?? null,
-            }}
+            shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
           />
         </div>
       ))}
