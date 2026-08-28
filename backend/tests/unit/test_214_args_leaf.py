@@ -450,3 +450,301 @@ def test_the_accessor_performs_no_io():
         source = f.read()
     for forbidden in ("resolve_connection", "httpx", "mcp_client", "get_pg_pool", "supabase"):
         assert forbidden not in source, f"args.py reaches for {forbidden!r} — it must stay pure"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Task 3 — the executor's own provenance, and D-214-12's characterization pins
+# ═══════════════════════════════════════════════════════════════════════════════
+
+#: The run-input bag `_external_action_inputs` produces: `ctx.inputs` minus the named
+#: scaffolding, plus `content` from the latest upstream phase's text.
+LEGACY_RESOLVED = {
+    "to": "ops@example.com",
+    "subject": "Renewal summary",
+    "summary": "Renewal ticket",
+    "channel": "C0123",
+    "content": "the upstream drafted text",
+    "stray_key": "must not survive",
+}
+
+#: ⚠ CAPTURED FROM THE PRE-CUT `_adapter_args` AT `bd495af0f`, BEFORE THIS PLAN TOUCHED IT, by
+#: running the shipped function over the bag above. These are MEASUREMENTS, not expectations —
+#: D-214-12 says an already-published workflow's send behaviour must not change, and a pin
+#: written from the new code would prove nothing about the old.
+LEGACY_PINS = {
+    "send_email": {
+        "body": "the upstream drafted text",
+        "subject": "Renewal summary",
+        "to": "ops@example.com",
+    },
+    "create_ticket": {
+        "description": "the upstream drafted text",
+        "summary": "Renewal ticket",
+    },
+    "post_message": {"text": "the upstream drafted text"},
+}
+
+#: The same bag with NO upstream text — the body-field auto-fill has nothing to fill from.
+LEGACY_PINS_WITHOUT_CONTENT = {
+    "send_email": {"subject": "Renewal summary", "to": "ops@example.com"},
+    "create_ticket": {"summary": "Renewal ticket"},
+    "post_message": {},
+}
+
+
+@pytest.mark.parametrize("capability", ["send_email", "create_ticket", "post_message"])
+def test_a_legacy_config_resolves_byte_identically_to_the_pre_cut_projection(capability):
+    """D-214-12 — nothing retroactive, PROVEN rather than asserted.
+
+    Driven through the post-cut source in BOTH shapes an already-published workflow can take:
+    the pre-214 three-positional call, and the production call site's shape with a REAL legacy
+    `ExternalActionPhaseConfig` (empty `tool_args`, no `arg_sources`) and the accessor's schema.
+    """
+    from app.models.harness import ExternalActionPhaseConfig
+    from app.services.harness.phase_types import _adapter_args
+
+    adapter = get_adapter(capability)
+
+    # (a) the pre-214 three-positional shape, which three shipped suites still use
+    assert _adapter_args(adapter, capability, dict(LEGACY_RESOLVED)) == LEGACY_PINS[capability]
+    assert _adapter_args(
+        adapter, capability,
+        {k: v for k, v in LEGACY_RESOLVED.items() if k != "content"},
+    ) == LEGACY_PINS_WITHOUT_CONTENT[capability]
+
+    # (b) the PRODUCTION shape — a real legacy config, and the schema from the one accessor
+    legacy = ExternalActionPhaseConfig(
+        phase_type="external_action",
+        capability=capability,
+        connection_id="11111111-1111-1111-1111-111111111111",
+    )
+    assert legacy.arg_sources == {} and legacy.tool_args == {}
+    assert _adapter_args(
+        adapter, capability, dict(LEGACY_RESOLVED),
+        config=legacy,
+        schema=schema_for_bound_tool(capability=capability, tool_name=None, discovered_tools=None),
+    ) == LEGACY_PINS[capability]
+
+
+@pytest.mark.parametrize("capability", ["send_email", "create_ticket", "post_message"])
+def test_the_native_executor_and_the_gate_obtain_the_SAME_schema_object(capability):
+    """⭐ CONTEXT failure mode #3's quieter half — `s_gate != s_executor`.
+
+    Each side through its OWN production call: the executor reaches the schema by the accessor
+    (asserted structurally below), and the publish gate's `tool_schemas` builder reaches the
+    native arm through `descriptor_for`, a pure function of the registry. Equal by
+    construction, and asserted anyway.
+    """
+    executor_side = schema_for_bound_tool(
+        capability=capability, tool_name=None, discovered_tools=None,
+    )
+    gate_side = descriptor_for(capability)["inputSchema"]
+    assert executor_side == gate_side
+    assert executor_side is not None
+
+
+def test_the_mcp_executor_and_the_gate_read_the_SAME_snapshot_through_the_SAME_accessor():
+    """The MCP arm's provenance is the resolved connection's `discovered_tools` — the same
+    column the publish gate reads off the connection row. One accessor over one snapshot."""
+    snapshot = [{
+        "name": "jira_create_issue",
+        "inputSchema": {"type": "object", "required": ["summary"],
+                        "properties": {"summary": {"type": "string"}}},
+    }]
+    connection = SimpleNamespace(discovered_tools=snapshot)  # what the executor holds
+    row = {"discovered_tools": snapshot}                     # what the gate holds
+
+    executor_side = schema_for_bound_tool(
+        capability=None, tool_name="jira_create_issue",
+        discovered_tools=getattr(connection, "discovered_tools", None),
+    )
+    gate_side = schema_for_bound_tool(
+        capability=None, tool_name="jira_create_issue",
+        discovered_tools=row.get("discovered_tools"),
+    )
+    assert executor_side == gate_side == snapshot[0]["inputSchema"]
+
+
+def test_the_executor_obtains_its_schema_from_the_accessor_at_exactly_two_call_sites():
+    """One per SHAPE. ⚠ A count of one means one shape reads a schema some other way, which is
+    exactly the drift this task exists to close.
+
+    Counted as CALL sites by AST rather than by grep, because the module-top FLAT import (the
+    `grants.py` precedent this plan is required to follow) contributes a third textual
+    occurrence that is not a call — so the plan's literal `grep -c == 2` is unreachable while
+    the property it is asking about is exactly this.
+    """
+    from app.services.harness import phase_types
+
+    with open(phase_types.__file__, "r", encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "schema_for_bound_tool"
+    ]
+    assert len(calls) == 2, (
+        f"phase_types.py calls schema_for_bound_tool {len(calls)} times; expected exactly 2 — "
+        "one for the native shape (GATE 7) and one for the MCP shape (GATE 6)"
+    )
+
+
+def test_the_argument_path_does_not_route_through_the_prompt_text_resolver():
+    """⚠ THE ROADMAP'S CARRIED-FORWARD `{{prior_run.*}}` FLAG, DISCHARGED EXECUTABLY.
+
+    The flag warns that if STEP-02's argument plumbing reused the prompt-text resolver it would
+    inherit that resolver's `llm_emit` gap. Verified rather than repeated: the resolver takes
+    PROMPT TEXT and is called at exactly three sites, each passing `phase.config.prompt`; the
+    `external_action` path does not call it at all; and the argument leaf never names it. A
+    `{{ }}` resolver on the argument path would also be the second, undeclared mechanism
+    D-214-02 refused — `arg_sources` is the declared one.
+    """
+    from app.services.harness import phase_types
+
+    with open(phase_types.__file__, "r", encoding="utf-8") as f:
+        pt_source = f.read()
+    with open(args_mod.__file__, "r", encoding="utf-8") as f:
+        args_source = f.read()
+
+    name = "_interpolate_prior_run" + "_variables"
+    assert pt_source.count(name) == 4, (
+        "the prompt-text resolver's site count moved from its measured 4 (the definition plus "
+        "three prompt-text call sites) — re-verify which caller was added before trusting this"
+    )
+    assert name not in args_source
+
+    tree = ast.parse(pt_source)
+    callers = {
+        fn.name
+        for fn in ast.walk(tree)
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+        for node in ast.walk(fn)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
+    }
+    assert callers == {"_exec_llm_single", "_exec_llm_agent", "_exec_llm_batch_agents"}, callers
+    assert "_exec_external_action" not in callers
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. The seam that mocks NEITHER side — the executor driven end to end
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_an_mcp_step_whose_schema_is_unknowable_RECORDS_and_sends_nothing():
+    """⛔ A `None` schema must NOT fall back to sending `tool_args` raw.
+
+    The publish gate refuses this same case as `shape_unknown`. An executor that SENDS where
+    the gate REFUSES is the D-214-00 drift pointing the dangerous direction — an unreviewed
+    argument object reaching a vendor because nobody could say what the tool accepts. The
+    assertion is therefore BOTH halves: the `_record` shape came back, AND `call_tool` was
+    never reached.
+    """
+    from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
+    from app.services.connector_service import ResolvedConnection
+    from app.services.harness.phase_types import RECORDED_INTENT_KEY, _exec_external_action
+
+    conn = ResolvedConnection(
+        connection_id="conn-mcp-9",
+        org_id="org-1",
+        capability=None,
+        name="Atlassian MCP",
+        config={},
+        secret_ciphertext="enc",
+        mcp_server_url="https://mcp.atlassian.com/v1",
+        default_approval_posture="allow",
+        tool_grants={"jira_create_issue": "allow"},
+        discovered_tools=[],  # the snapshot is EMPTY — the argument shape is not knowable
+    )
+    phase = SimpleNamespace(
+        slug="phase_external",
+        phase_index=1,
+        action_risk_armed=True,
+        config=SimpleNamespace(
+            capability=None,
+            connection_id="conn-mcp-9",
+            tool_name="jira_create_issue",
+            tool_args={"summary": "New Issue"},
+            arg_sources={},
+        ),
+    )
+    ctx = SimpleNamespace(
+        org_id="org-1", run_id="run-9", current_user={"id": "user-1"},
+        pool=MagicMock(), inputs={},
+    )
+
+    with patch("app.services.harness.phase_types.resolve_connection", new_callable=AsyncMock) as mock_res, \
+         patch("app.services.mcp_client.call_tool", new_callable=AsyncMock) as mock_call, \
+         patch("app.services.harness.phase_types.write_audit", new_callable=AsyncMock), \
+         patch("app.services.harness.phase_types.feature_audience", return_value="everyone"), \
+         patch.object(ResolvedConnection, "secret", new_callable=PropertyMock, return_value="t"):
+        mock_res.return_value = conn
+
+        res = await _exec_external_action(phase, {}, ctx)
+
+    mock_call.assert_not_called()
+    assert RECORDED_INTENT_KEY in res, res
+    assert "failure" not in res
+
+
+@pytest.mark.asyncio
+async def test_an_mcp_step_with_a_snapshot_projects_onto_the_declared_schema_and_sends():
+    """The positive control for the case above — without it, the refusal could be measuring an
+    executor that never reaches GATE 6 at all. Also the D-214-00 property on the MCP shape: an
+    UNDECLARED stored `tool_args` key does not reach the vendor."""
+    from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
+    from app.services.connector_service import ResolvedConnection
+    from app.services.harness.phase_types import _exec_external_action
+
+    conn = ResolvedConnection(
+        connection_id="conn-mcp-9",
+        org_id="org-1",
+        capability=None,
+        name="Atlassian MCP",
+        config={},
+        secret_ciphertext="enc",
+        mcp_server_url="https://mcp.atlassian.com/v1",
+        default_approval_posture="allow",
+        tool_grants={"jira_create_issue": "allow"},
+        discovered_tools=[{
+            "name": "jira_create_issue",
+            "inputSchema": {"type": "object", "required": ["summary"],
+                            "properties": {"summary": {"type": "string"}}},
+        }],
+    )
+    phase = SimpleNamespace(
+        slug="phase_external",
+        phase_index=1,
+        action_risk_armed=True,
+        config=SimpleNamespace(
+            capability=None,
+            connection_id="conn-mcp-9",
+            tool_name="jira_create_issue",
+            tool_args={"summary": "New Issue", "assignee": "must not survive"},
+            arg_sources={},
+        ),
+    )
+    ctx = SimpleNamespace(
+        org_id="org-1", run_id="run-9", current_user={"id": "user-1"},
+        pool=MagicMock(), inputs={},
+    )
+
+    with patch("app.services.harness.phase_types.resolve_connection", new_callable=AsyncMock) as mock_res, \
+         patch("app.services.mcp_client.call_tool", new_callable=AsyncMock) as mock_call, \
+         patch("app.services.harness.phase_types.write_audit", new_callable=AsyncMock), \
+         patch("app.services.harness.phase_types.feature_audience", return_value="everyone"), \
+         patch.object(ResolvedConnection, "secret", new_callable=PropertyMock, return_value="t"):
+        mock_res.return_value = conn
+        mock_call.return_value = {"text": "Issue created: PROJ-456", "isError": False}
+
+        res = await _exec_external_action(phase, {}, ctx)
+
+    assert res["text"] == "Issue created: PROJ-456"
+    mock_call.assert_called_once()
+    assert mock_call.call_args.kwargs["arguments"] == {"summary": "New Issue"}, (
+        "an undeclared stored argument reached the vendor: "
+        f"{mock_call.call_args.kwargs['arguments']!r}"
+    )

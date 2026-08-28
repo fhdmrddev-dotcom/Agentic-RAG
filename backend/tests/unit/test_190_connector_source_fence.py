@@ -575,7 +575,15 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # is the property; the number is re-derived here rather than inherited, and the fence
     # firing on a line move is the fence working — it is asserting an exact list, and an exact
     # list that tolerated drift would also tolerate a second importer arriving on a new line.
-    assert module_scope_importers == ["app/services/harness/phase_types.py:106"], (
+    #
+    # ⚠ AND IT MOVED AGAIN, 106 -> 107, at Phase 214 (D-214-00): the argument leaf's flat
+    # module-top import `from app.services.connectors.args import ...` was added one line
+    # above, on the `grants` precedent. THE IMPORTER SET IS UNCHANGED — `args.py` is a strict
+    # leaf whose only non-stdlib import is a DEFERRED `descriptors` inside one function, so it
+    # adds no module-scope registry importer and joins no cycle. The fence fired on the line
+    # move, exactly as the paragraph above says it should, and the number is re-derived here
+    # rather than inherited.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:107"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "

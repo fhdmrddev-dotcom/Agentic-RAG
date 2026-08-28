@@ -397,6 +397,19 @@ async def test_exec_external_action_mcp_granted(monkeypatch):
         secret_ciphertext="enc:v1:fake",
         mcp_server_url="https://mcp.atlassian.com/v1",
         tool_grants={"jira_create_issue": True},
+        # ⚠ ADDED at Phase 214 (D-214-00). The MCP arm now projects its argument object onto
+        # the bound tool's DECLARED schema, obtained through the ONE accessor the publish gate
+        # also uses, so a connection carrying no snapshot has an unknowable argument shape and
+        # RECORDS rather than sending. That refusal is intended — an executor that sends where
+        # the gate refuses is the drift pointing the dangerous way — and a real MCP connection
+        # always carries the snapshot `discover_tools` wrote. Declaring it restores this case
+        # to the DISPATCH it is about; the no-snapshot refusal is covered by
+        # `test_214_args_leaf.py`.
+        discovered_tools=[{
+            "name": "jira_create_issue",
+            "inputSchema": {"type": "object", "required": ["summary"],
+                            "properties": {"summary": {"type": "string"}}},
+        }],
     )
 
     monkeypatch.setattr(

@@ -50,9 +50,14 @@ is what stops the sentence rotting.
 ── D-214-02 · NO EXPRESSION LANGUAGE, AND NO SECOND ONE ──────────────────────────────
 ``arg_sources`` is the declared mechanism for saying where an argument comes from. Nothing
 in this module interpolates, templates or evaluates a string, and nothing here may call
-``_interpolate_prior_run_variables`` (the PROMPT-TEXT resolver in ``phase_types.py``, which
-the ROADMAP's Phase 214 flag warns carries an ``llm_emit`` gap). A ``{{ }}`` resolver on the
-argument path would create the second, undeclared mechanism D-214-02 refused.
+``phase_types.py``'s ``{{prior_run.*}}`` PROMPT-TEXT resolver — the one the ROADMAP's Phase
+214 flag warns carries an ``llm_emit`` gap. That resolver takes prompt text and is called at
+exactly three sites, each passing ``phase.config.prompt``; it never touches ``tool_args``,
+``arg_sources`` or any argument object, and the ``external_action`` path does not call it at
+all. So the argument path gains none of its gap. ⛔ Adding a ``{{ }}`` resolver here would
+create the second, undeclared mechanism D-214-02 refused — and its NAME is deliberately not
+spelled in this file so a one-step grep can prove the absence (the same choice recorded for
+the body-field map above).
 
 ── D-214-12 · NOTHING RETROACTIVE ────────────────────────────────────────────────────
 A config with an EMPTY ``arg_sources`` resolves exactly as ``_adapter_args`` resolved before
