@@ -322,6 +322,64 @@ scans, and full-page vision (L2) for PDF-only clients — but neither should blo
 `requirements.txt` and is not a committed dependency; adding it is a phase decision, not a
 side effect of a probe.
 
+## THE L3 SPIKE RAN END-TO-END 2026-08-28 — `backend/scripts/probe_dxf_takeoff.py`
+
+DXF -> quantities -> matched against the operator's rate sheet -> priced. The rate sheet was
+read **through the app's own `extract_excel_tables`**, not a private parser, so a sheet the
+product cannot read fails the takeoff rather than quietly succeeding beside it.
+
+**Result on the supplied DXF (37 rate lines available):**
+
+    A. COUNTED ITEMS — exact, from INSERT blocks
+       ST-C250   Steel channel C250x23      8 no @   470.00 =  3,760.00
+       ST-STAIR  Steel stair flight         2 no @ 3,850.00 =  7,700.00
+       ST-W250   Steel beam W250x33         2 no @   610.00 =  1,220.00
+       —         block outstandingconn1     4 no      UNPRICED
+                                       counted subtotal:      12,680.00 USD
+
+    B. 28 DIMENSIONS, true values, 1.28 -> 390.00 inches
+    C. 7 specs matched · 3 AMBIGUOUS (escalated) · 8 unmatched, of 18 distinct
+    D. lengths by layer — labelled ORDER-OF-MAGNITUDE, never priced
+
+**A real priced subtotal came out of a CAD file, through the shipped Excel extractor, with no
+OCR, no vision model and no per-page cost.** That is the business case demonstrated rather than
+argued — for its *countable* half.
+
+### ⚠ THE MOST VALUABLE THING THE SPIKE PRODUCED WAS ITS OWN WRONG ANSWER
+
+The first matcher picked the first rate line sharing a token. It printed:
+
+    `1/2"[12.5] GYPSUM BOARD`  ->  CL-GYP "Suspended gypsum ceiling"  @ 31.00/m2
+                      correct  ->  GB-12  "Gypsum board, taped"      @ 18.75/m2
+
+**A 65% overprice, carrying a valid item code, from a real rate sheet, with correct
+arithmetic.** Both lines legitimately contain *"gypsum"*; the drawing said BOARD and the matcher
+chose CEILING. ⚠ **Nothing downstream could have caught it** — no gate, no test, no total that
+looks wrong. It is the exact failure this seed was planted to prevent, and it appeared inside
+the tool built to prove the case.
+
+**The fix is the design rule, not a better regex:** a token matching more than one rate line is
+**AMBIGUOUS and escalates to a human**, never resolved by position in the sheet. On this drawing
+that converts 3 silent wrong prices into 3 explicit questions. ⚠ **A regex was always the wrong
+instrument here** — matching a drawing's words to a priced schedule is a judgement task, and is
+where the LLM belongs in this pipeline, with the rate sheet in context and its uncertainty
+surfaced. **The takeaway is that the matching step, not the extraction step, is where this
+business case will actually be won or lost.**
+
+### What is exact, what is advisory, what needs a person
+
+| | Basis | Trust |
+|---|---|---|
+| Item counts (`INSERT` blocks) | read from the file | **exact** |
+| Dimensions (`DIMENSION`) | computed by the CAD software | **exact** |
+| Specifications (multileader text) | written by the engineer | **exact as text**, ambiguous to price |
+| Which rate line a spec means | matched | ⚠ **judgement — escalate** |
+| Lengths by layer | summed geometry | ⚠ **order-of-magnitude ONLY** — a wall in section is 2+ parallel lines, so raw length OVER-measures |
+| Areas / volumes | not derivable | ⛔ needs a QS: which dimension bounds which element, and what height a wall is |
+
+⚠ **`$INSUNITS` is per-file and must never be assumed** — this drawing is **inches**, and the
+probe REFUSES to convert lengths when a file declares `0` (unitless) rather than guessing mm.
+
 ## Open questions for whoever picks this up
 
 - Which OCR engine, decided on **real customer drawings**, not on a benchmark corpus.
