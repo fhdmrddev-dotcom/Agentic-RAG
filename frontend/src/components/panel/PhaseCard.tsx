@@ -48,6 +48,21 @@ import type { PhaseRunFacts } from "@/components/workflows/phaseDuration"
 // The count's words. `countDeclared` is the ONE home for the `{n} {noun}` composition —
 // a template literal at this call site would be a second home for the same sentence.
 import { countDeclared } from "@/components/workflows/receiptVocabulary"
+// ── Phase 214-11 (STEP-04 / D-214-16 / D-214-14) — THE ONE STEP-IDENTITY ELEMENT.
+//
+// ⚠ IT TAKES PROPS AND THIS CARD RESOLVES NOTHING FOR IT. `PhaseCard` has no `titleOf`
+// (that seam lives on `WorkflowRunPage`) and it must never grow one: a surface that resolved
+// its own service would answer differently from the wire, and the panel and the run page
+// would disagree about the same step at the same moment. Everything below comes off the
+// `Phase` row `StreamsProvider.reconcilePhases` built from the server's own answer.
+import { StepIdentity } from "@/components/workflows/StepIdentity"
+// The action's human phrase for the three native capabilities. ⚠ THE WIRE `toolName` IS AN
+// ID and never reaches the DOM from here (sketch 216 invariant #4) — an unmapped capability
+// falls back to the step's own slug-free heading rather than to a schema token.
+import { EXTERNAL_CAPABILITY_SENTENCES } from "@/components/workflows/phaseVocabulary"
+import { own } from "@/components/workflows/ownProperty"
+// The failure block's label. `214-03`'s vocabulary is the ONE home for these words.
+import { FAILED_REASON_LABEL } from "@/components/workflows/stepIdentityVocabulary"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -234,7 +249,34 @@ const EMIT_FAILURE_COPY: Record<EmitFailure, { reason: string; where: string }> 
 }
 
 function classifyFailure(phase: Phase): ClassifiedFailure {
-  const raw = (phase.error ?? "").trim()
+  // ── Phase 214-11 Task 1 (STEP-05 / D-214-23 · `BUG-260826-05`) — THE CONDITION NARROWS;
+  //    THE WORDS DO NOT.
+  //
+  // ⚠ ORDER IS LOAD-BEARING AND IS THE WHOLE OF THIS CHANGE. `phase.error` is the LIVE SSE
+  // value, set by the demux as `gate_failed` / `run_failed` arrive, and it is the freshest
+  // reading during a stream. `phase.failureReason` is the DB-backed one
+  // (`workflow_phases.output._failure_reason`, projected by `214-02`), and it is the ONLY one
+  // present on a reconciled or reloaded run — SSE history does not survive a refresh. Reading
+  // the live value FIRST and the durable one SECOND is D-v2.5-03 exactly: Realtime is a
+  // best-effort hint, the fetch is the source of truth, and the hint wins only while it is
+  // live. ⚠ REVERSING THEM WOULD SHOW A STALE REASON MID-STREAM — the DB row is written at
+  // `fail_phase`, so mid-run it can lag or be absent while the event already carries the text.
+  //
+  // ⛔ THE SENTINEL BRANCH BELOW IS UNTOUCHED — its condition, its sentence and its position in
+  // the classification order all stand. It is an HONESTY MECHANISM (D-214-18), and what was
+  // broken was never its words: it was that BOTH sources had to be empty for it to be true,
+  // and only one was being read.
+  //
+  // ⚠ THAT BRANCH'S `kind` IS DELIBERATELY NOT SPELLED IN THIS COMMENT. This plan's acceptance
+  // greps the diff for it and expects ZERO — prose naming it makes the guard report a change
+  // that did not happen. It did, on the first draft of this very paragraph (the 187-24 trap,
+  // now caught seven times in this tree).
+  const live = (phase.error ?? "").trim()
+  const recorded = (phase.failureReason ?? "").trim()
+  const raw = live.length > 0 ? live : recorded
+  // TRUE when the text below is the DB-backed reason rather than the live event's. See the
+  // `adapter_reason` arm near the bottom of this function for why the two are not interchangeable.
+  const fromRecord = live.length === 0 && recorded.length > 0
   const slug = phase.slug || "this phase"
 
   // GAP-C (D-11): a typed emit-failure value takes precedence — it is the closed-taxonomy
@@ -251,7 +293,15 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
       kind: "reason_unknown",
       reason:
         "Failure reason not captured by the backend — surfaced explicitly so the run is never shown as an empty success.",
-      where: `phase: ${slug} · error field was empty`,
+      // ⚠ 214-11 — THE `where` DIAGNOSTIC IS RE-WORDED, AND ONLY IT. It named ONE field, and
+      // that clause became literally FALSE the moment the condition above gained a second
+      // source: a reader who saw it would check `error`, find it empty, and conclude the
+      // sentinel had fired correctly — while a populated `failureReason` sat unread. The
+      // SENTENCE A PERSON READS (`reason` above) is byte-identical and is pinned to
+      // `stepIdentityVocabulary.FAILED_REASON_UNKNOWN` through a `?raw` assertion; this line
+      // is the mono diagnostic underneath it, which names WHERE we looked, and it must name
+      // both places or it is a lie about our own search.
+      where: `phase: ${slug} · error field and failure reason were both empty`,
     }
   }
 
@@ -280,6 +330,39 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
     }
   }
 
+  // ── adapter_reason (Phase 214-11 Task 1 · sketch 216 #12 · Deviation Rule 2) ────────────
+  //
+  // ⚠ THIS ARM WAS ADDED AFTER OBSERVING RED, and the RED was produced by the change this task
+  // was told to make. Narrowing `raw` alone stops the sentinel firing — but every unrecognised
+  // string then falls to the `gate_failed` default below, whose copy is FIXED. So a run whose
+  // reason really was *"Channel #urgent-feedback-escalations not found or bot lacks permission
+  // to post."* rendered *"Validation gate failed; run halted."* — `BUG-260826-05` with
+  // different wrong words, and the phase's must_have ("a failed step shows the adapter's OWN
+  // sentence, not a generic one") unmet.
+  //
+  // ⚠ WHY IT IS SAFE TO RENDER THIS ONE VERBATIM WHEN THE OTHERS ARE NOT. The closed taxonomy
+  // exists because `phase.error` is FREE-TEXT off the live event and could be anything; the
+  // classified copy is what makes that safe and consistent. `failureReason` is a DIFFERENT
+  // fact: it is `workflow_phases.output["_failure_reason"]`, written by `fail_phase` as the
+  // step's own recorded reason. It has already been through the typed markers above (this arm
+  // sits BELOW `wall_clock_timeout` and `max_steps`, so a recorded reason carrying either is
+  // still classified exactly as a live one would be) — what reaches here is a sentence no
+  // marker claimed, and replacing it with generic gate copy discards the only true statement
+  // on the card.
+  //
+  // ⛔ IT CHANGES NOTHING ON THE LIVE PATH. `fromRecord` is false whenever `phase.error` is
+  // populated, so an SSE-driven failure classifies byte-identically to what shipped.
+  //
+  // ⚠ It renders as a React TEXT CHILD, like every other string on this card (this file's XSS
+  // rule, T-214-11-01) — the reason may originate on a third-party MCP server.
+  if (fromRecord) {
+    return {
+      kind: "gate_failed",
+      reason: raw,
+      where: `phase: ${slug} · reason recorded by the step`,
+    }
+  }
+
   // gate_failed — a validation gate failed (the default for a validator message).
   // attempt is real from gate_failed; the human gate NAME is NOT on the wire — omit.
   const attempt = phase.attempt
@@ -294,6 +377,30 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
         ? `phase: ${slug} → gate · attempt ${attempt}`
         : `phase: ${slug} → gate`,
   }
+}
+
+/**
+ * Phase 214-11 Task 1 (STEP-04 · sketch 216 #1 / #4) — the step's ACTION, in words, or `null`.
+ *
+ * ⚠ **THE WIRE `toolName` IS AN ID AND IS NEVER RETURNED FROM HERE.** Invariant #4 forbids
+ * `send_email` / `create_ticket` / `post_message` / `ask_question` / `external_action` on any
+ * run surface, and `toolName` is exactly one of those spellings on a native step. So the
+ * capability is translated through `phaseVocabulary`'s shipped sentence map, and anything the
+ * map does not own resolves to `null` rather than to the id — PATTERNS §4d's floor:
+ * *"a name is NEVER fabricated … an id-shaped face is worse than a generic one."*
+ *
+ * ⚠ `own()` RATHER THAN A BRACKET READ (WR-04, the tree's eighth prototype-key sink). A plain
+ * object literal inherits `constructor` / `toString`, and `capability` is author-supplied JSONB
+ * reaching us through the wire — a bracket index would return a FUNCTION for those keys, which
+ * is never nullish, so the fallback would provably never fire.
+ *
+ * ⚠ It is a plain module function, NOT exported: `react-refresh/only-export-components` is an
+ * ACTIVE error in this repo and this module exports a component.
+ */
+function actionWordsOf(phase: Phase): string | null {
+  const cap = phase.capability
+  if (typeof cap !== "string" || cap.trim().length === 0) return null
+  return own(EXTERNAL_CAPABILITY_SENTENCES, cap.trim()) ?? null
 }
 
 export interface PhaseCardProps {
@@ -372,6 +479,28 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
   const canToggle = isTerminal && !forcedOpen
 
   const failure = isFailed ? classifyFailure(phase) : null
+
+  // ── Phase 214-11 Task 1 (STEP-04 / D-214-16) — the step's identity, or nothing.
+  //
+  // ⚠ AN ABSENT ACTION RENDERS NO ELEMENT AT ALL, never an empty one. A `llm_single` step has
+  // no capability, so it gets no identity — the row is unchanged for every phase type that is
+  // not an external action, which is why this is additive rather than a re-skin of the panel.
+  //
+  // ⚠ `serviceName` is passed THROUGH, `null` and all. `null` is a legitimate wire value (the
+  // connection was deleted, or belongs to another org) and `StepIdentity` renders the action
+  // ALONE for it — never "Unknown service", never the capability id (`stepIdentityVocabulary`'s
+  // `STEP_IDENTITY_SERVICE_UNKNOWN`). Substituting anything here would be drawing a name the
+  // system cannot know.
+  const actionWords = actionWordsOf(phase)
+  const identity = actionWords
+    ? {
+        action: actionWords,
+        service: phase.serviceName ?? null,
+        // The MARK's structural input — the same two wire facts, handed to the one map. This
+        // card never reads `connectionMark` itself; `StepIdentity` owns that (D-214-17).
+        shape: { capability: phase.capability ?? null, tool_name: phase.toolName ?? null },
+      }
+    : null
 
   return (
     <div
@@ -541,6 +670,22 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
         aria-busy={isRunning || undefined}
         className="flex flex-col gap-2 px-3 pb-3"
       >
+        {/* ── Phase 214-11 (STEP-04 / D-214-16 · sketch 216 §3 surface 1) — THE IDENTITY LINE.
+               Sited under the heading and above the failure block, which is where the sheet
+               draws it (`sidline`, between `pcname` and `fail`). It is NOT rendered inside the
+               accordion BUTTON: that element's `span.ml-auto` children are pinned POSITIONALLY
+               by this file's nine-row `[glyph, word]` inventory, and 200-07 already established
+               the precedent — move the NEW thing rather than re-baseline the old pin. */}
+        {identity && (
+          <StepIdentity
+            shape={identity.shape}
+            action={identity.action}
+            service={identity.service}
+            size="row"
+            className="text-panel-muted-foreground"
+          />
+        )}
+
         {/* The type one-liner is the ACTIVE step's honest context ONLY — never on idle
             (pending) or done (those fold to a quiet essence line). SC#2 / RESEARCH
             Pitfall 4. It is a DIFFERENT string from the running activity line below. */}
@@ -605,6 +750,15 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
             role="alert"
             className="flex flex-col gap-1 rounded-md border border-[hsl(var(--destructive)/0.45)] bg-[hsl(var(--destructive)/0.1)] p-2.5"
           >
+            {/* ── 214-11 (sketch 216 §3's `flabel`) — the label over the reason. It asks the
+                   reader's actual question rather than naming a field, and it lives in
+                   `214-03`'s vocabulary so the panel and the run page cannot spell it twice. */}
+            <span
+              data-testid="phase-card-failure-label"
+              className="font-mono text-[10px] uppercase tracking-wider text-panel-muted-foreground"
+            >
+              {FAILED_REASON_LABEL}
+            </span>
             <span className="text-[12px] font-semibold text-[hsl(0_80%_80%)]">{failure.reason}</span>
             <span className="font-mono text-[11px] text-panel-muted-foreground">{failure.where}</span>
           </div>
