@@ -4,11 +4,11 @@ milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
 last_updated: "2026-08-28T00:00:00.000Z"
-last_activity: 2026-08-28 -- Phase 214 SKETCHED: four G-2 acceptance bars, 587 assertions, 0 failing. Stitch drew two send_email arguments the adapter structurally refuses. Panel-track fork left open for the operator.
+last_activity: 2026-08-28 -- Phase 214 PLANNED: 16 plans / 5 waves, 3 verification rounds, 6 blockers found and closed. Five of the six were one class -- a value one plan writes and another reads, with the file in the middle owned by no plan.
 progress:
   total_phases: 14
   completed_phases: 6
-  total_plans: 22
+  total_plans: 38
   completed_plans: 22
   percent: 43
 ---
@@ -32,13 +32,110 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase **214** — **sketched 2026-08-28; the G-2 obligation is discharged and planning is unblocked**, with the panel-track fork owed to the operator. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
+**Current focus:** Phase **214** — ✅ **PLANNED 2026-08-28: 16 plans in 5 waves, ready to execute.** The panel-track fork is CLOSED (D-214-22) and the G-2 obligation was discharged at sketch. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: **214 (a-step-names-its-service-and-its-action) — SKETCHED 2026-08-28** (`1d36f4057`).
-0 plans. **Next: `/gsd:plan-phase 214`** — the G-2 obligation is DISCHARGED.
+Phase: **214 (a-step-names-its-service-and-its-action) — PLANNED 2026-08-28** (`4fa3b7f07`).
+**16 plans in 5 waves. Next: `/gsd:execute-phase 214`** — worktrees are ENABLED and wave 1 has four
+genuinely parallel plans with zero `files_modified` overlap. ⚠ Carry `GSD_VITEST_MAX_WORKERS=2`, and
+`bash scripts/bootstrap-worktree.sh "$(pwd)"` as every executor's FIRST action.
+
+⭐ **THREE VERIFICATION ROUNDS FOUND SIX BLOCKERS AND FIVE OF THEM WERE ONE CLASS: a value one plan
+WRITES and another READS, where the file IN THE MIDDLE belonged to NO plan.** That is Phase 204's
+exact signature — one plan wrote `workflow_runs.inputs`, another read `workflow_runs.metadata`, the
+read failed open **silently**, and **106 tests were green** because each wave mocked the other's side.
+⚠ **In every one of the five, the planned tests would have passed**, because each side's suite
+supplies the other side's half. The instrument that found them was not judgement: it was **deriving
+the seam list mechanically** — grep every introduced field for its producer and every consumer, and
+require that every file on the path appears in some plan's `files_modified`.
+
+⚠ **THIS PHASE HAS NO INDEPENDENT REVIEWER** — the ratified Gemini-plans/Claude-reviews pipeline is
+suspended, so the plan-checker was the only adversarial read. The four checks that pipeline earned
+were therefore written INTO the plans as mechanical obligations (cross-plan seam audit, an
+integration test that mocks NEITHER side, reachability of every new surface, a test per threat-model
+mitigation) rather than left as a reviewer's judgement.
+
+**The five seam blockers, each measured rather than reasoned:**
+
+1. ⛔ **SC#2's run-supply wire had NO OWNER — the milestone's blocking defect (`BUG-260826-01`)
+   surviving the phase that exists to close it.** `postMessage` accepts exactly
+   `{model, provider, agentMode, workflowDefinitionId, folderId}` (`lib/api/threads.ts:449-468`) and
+   `threads.py:917` writes `inputs={"kickoff_prompt", "folder_id"}`. **There is no `inputs` channel
+   on the wire**, and neither file was in any of the 15 plans — while `214-12` asserted a path *"via
+   the existing postMessage payload"*. SC#2 would have shipped **one of three** doors (schedule
+   worked). ⚠ `214-14`'s own seam test **passed green over it**, handing `run_inputs` straight to
+   `resolve_arguments` in-process. → new plan **`214-16`**.
+2. ⭐ **AND THE MECHANICAL SWEEP FOUND A SIXTH SITE NOBODY HAD NAMED:
+   `backend/app/services/workflow_kickoff.py:500`** builds a SECOND copy of the run-inputs dict for
+   the live `ctx.inputs`, under an F8 comment reading *"Mirror EXACTLY what was persisted"* **since
+   Phase 092, with nothing checking it**. Widening only `threads.py` would have shipped a workflow
+   whose **first run sees no declared values and whose resumed run sees them all** — reproducing only
+   on resume. It has no ledger row and never has had one.
+3. **The failure reason and step identity never reached the chat panel** — `lib/api/threads.ts`'s
+   client mirror was unwidened and `StreamsProvider::reconcilePhases` builds every `Phase`
+   **field-by-field, not by spread**, so a widened type propagates NOTHING while typechecking
+   cleanly. ⚠ **The file itself carries a comment recording this exact omission happening at
+   `200-02`** — a plan repeated it against a warning written in the file it was editing.
+4. **`WorkflowRunPhaseRead`'s identity fields were WIDENED by a task and POPULATED by none**, and the
+   only assertion was `set(model_fields) >= {...}` — a **declaration** check that "passes unchanged
+   on a field that is `None` on every row for the life of the product". ⚠ **The null arm renders
+   honestly**, so `RunSpine` + `RunStepList` would have shipped serviceless forever with every test
+   green — the `declared_phase_measure` / Phase 198 shape, recorded here for the third time.
+5. **Gate/executor schema provenance was unspecified.** The two agreement tests pass ONE schema
+   object to both predicates, proving `f(s) ≡ g(s)` and **structurally blind to `s_gate ≠ s_executor`**
+   — `BUG-260826-02` restated one level up. Closed by a seventh `args.py` export,
+   `schema_for_bound_tool`, with four call sites, so provenance is identical **by construction**.
+
+⚠ **THE SIXTH BLOCKER WAS A LOCKED DECISION WRITTEN AGAINST A DEAD PREMISE. `D-214-16` NAMED
+`RunTranscript` AS A SURFACE, AND `RunTranscript` HAS NO MOUNT ANYWHERE IN THE PRODUCT** — removed at
+**Phase 200.2** for four measured reasons (it duplicated the run log, operator-reported), its absence
+**pinned** at `WorkflowRunPage.test.tsx:2241-2244`. **Mounting it would have been worse than a no-op:
+that test file sits in the owning plan's own `files_modified`, so an executor was LICENSED to delete
+the pin and silently revert a removal the operator drove.** The operator-approved sketch 216 already
+named five surfaces and excluded it. **Corrected to five surfaces** (operator, 2026-08-28); the
+original is recorded beside the correction in `214-CONTEXT.md`, never overwritten. Re-mounting the
+transcript remains available as its own scoped decision.
+
+⚠ **A SILENT PARSER TRUNCATION, worth more than the three characters it cost.** Three `key_links`
+entries used an em-dash as the YAML block-sequence marker. `yaml.safe_load` **raised**; the SDK's
+lenient parser **did not error — it silently truncated**, collapsing `214-14`'s `key_links` from
+three items to one bare mapping. The links destroyed were exactly the two blocker closures they
+existed to document. Fixed at `4a919eeff`; all 16 plans now parse.
+
+⚠ **THE DECISION-COVERAGE GATE IS VACUOUS ON THIS PHASE AND DID NOT PASS — IT SKIPPED.**
+`check.decision-coverage-plan` returns `"no trackable decisions"` because this phase's ids are
+`D-214-NN` and the gate matches a literal `D-NN`. **Coverage was confirmed by the plan-checker
+instead (25/25 of `D-214-00..24`, by grep), not by the gate.** Recorded so a green-looking gate is
+not later read as evidence.
+
+⚠ **G-5 FIRES ON MORE FILES THAN CONTEXT.md FOUND, and re-derivation turned up more stale cells:**
+`WorkflowDoorSwitch.tsx` reads `13/9/575` and measures **`16/11/817`** on a cell saying *honoured*;
+`RunTranscript.tsx` (`7/3/652`) and `connectionMark.tsx` (`6/3/294`) both read *young* and **now
+fire**. ⚠ **`reachability.py` — the home of this phase's safety-gate predicate — has NO ledger row at
+all**, and neither does `frontend/src/lib/api/threads.ts` (`lib/api.ts`'s row is the *barrel*).
+⚠ **A G-5 obligation now fires on `RunTranscript.tsx`, which no user can reach.**
+
+**Owed at execution, named up front rather than discovered mid-run:** the `400px` → `clamp(480px,
+38%, 640px)` pin at `WorkflowBuilderPage.test.tsx:167` (D-214-22); `WorkflowCanvas.composition.test.tsx:234`'s
+900px overflow arithmetic, written against a 400px panel; `RunModal.test.tsx`'s six whole-`innerHTML`
+captures; and `WorkflowDoorSwitch.baseline.test.tsx`'s six resting captures (the `--destructive`
+colour conflict resolved toward warning for both arms). `LINT_CODES` is a mechanically-enforced
+pairing — new codes join `test_182_severity_codes.py` and `/workflows/validate` in the SAME commit.
+
+**Decisions taken at plan time:** D-214-22 (panel widens, variant B ships) · D-214-23 (D-214-18's
+measurement REFUTED both arms of its own binary — `workflow_phases` has **no `error` column**, the
+run the bug named is **absent from the DB**, and over 43 failed rows the reason IS captured at
+`output._failure_reason`, with **38 of 43 stored as jsonb STRING SCALARS**) · D-214-24 (no RESEARCH.md
+and no VALIDATION.md, as a decision — Phase 213's precedent) · the sketches are the design contract,
+no UI-SPEC.md.
+
+⛔ **STILL OWED AT VERIFICATION:** SC#10's eight-row cross-provider roster (derived from
+`MODEL_CAPABILITIES`, blocked rows ⛔ with a named reason, **never silently omitted**), the three
+other SC#10 axes, and the eight G-4 operator drives — all in `214-UAT.md`. **Every row must declare
+which flag state it ran under**; a live SC#2/SC#4 drive needs BOTH `visual_workflow_canvas` and
+`live_connectors`, and this phase flips only the first.
 
 ✅ **THE OWED G-2 SKETCH SHIPPED — four acceptance bars, `587 assertions, 0 failing`**, each on the
 213 pattern (`COPY.js` + `index.html` + `drive.cjs` + a **generated** `BUILD-CONTRACT.md`):
