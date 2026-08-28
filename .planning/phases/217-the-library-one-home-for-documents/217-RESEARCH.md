@@ -1563,7 +1563,28 @@ rows = [
 
 ---
 
-## Open questions
+## Open questions (RESOLVED)
+
+⚠ **All six were resolved on 2026-08-29, after this document was written** — three by an operator
+ruling and three inside the plans. The originals are kept verbatim below so the recommendation can be
+compared against the decision; **two were decided AGAINST the recommendation and that is marked.**
+
+| # | Resolution | Where |
+|---|---|---|
+| 1 | ✅ **As recommended.** A third state: dimmed / *not reached*; `error_message` carries the reason | **D-217-23** · `217-08` |
+| 2 | ✅ **As recommended.** Two server-derived booleans, `skipped` iff `!applies && count === 0` | **D-217-24** · `217-01`, `217-08` |
+| 3 | ⚠ **DECIDED AGAINST the recommendation.** The ETA ban was scoped to the strip + upload path, but `ReembedStatusCard` is composed **byte-unchanged** — it keeps its bar *and* its `~3 min`. The recommendation to rewrite `:163` to a chunk count was rejected: it edits a shipped 278 L component D-217-16 said to compose unchanged | **D-217-22** · `217-09` |
+| 4 | ✅ **As recommended.** `217-02` measures max + p95 `full_markdown` against the local DB and records both numbers, which set the default page size. Paging ships either way (D-217-05 is locked) | `217-02` |
+| 5 | ✅ **As recommended.** `/queries` lives in its own `backend/app/api/document_queries.py` — one route, one docstring, one auditable rationale, and `documents.py` grows no service-role branch | `217-03` |
+| 6 | ⚠ **DECIDED AGAINST the recommendation.** No fifth ID was minted. `LIB-01..04` landed in `REQUIREMENTS.md` at `b435bb812` (32 → 36), and **SC#5 is tracked in `must_haves` on `217-05` and `217-09` instead** — the register records requirements, and SC#5 is a success criterion. The gap is named in the register rather than papered over with an invented ID | `b435bb812` · `217-05`, `217-09` |
+
+⭐ **A seventh thing was resolved that nobody asked:** `read_path` **prefixes every line with its
+number** (`kb.py:446`). `217-02` gates that behind a `numbered: bool = True` parameter and calls it
+with `numbered=False`, so the reused shape cannot ship numbered prose to a human reader.
+
+---
+
+### The questions as originally written
 
 1. **What does a `failed` document's strip show after the failure point?**
    - Known: `ingestion_step` holds the failure step and is load-bearing for diagnosis
