@@ -1804,6 +1804,28 @@ def _external_action_definition_dict() -> dict:
     `available_tools` is deliberately NOT written here: D-03 DERIVES it from `capability`
     by total replacement, so the value stage 2.6 tests membership on is the one the
     production validator produced.
+
+    ⚠ PHASE 214 (STEP-03) — `tool_args` WAS ADDED HERE, AND ITS ABSENCE WAS NOT A DETAIL.
+    This fixture used to carry NO arguments at all, and the new stage-2 argument gate refuses
+    it — verbatim, on the commit that added the gate and before this line existed:
+
+        blocked_stage='lint' named_failures=[
+          {'code': 'no_source', 'phase': 'notify-the-customer',
+           'message': "step 'Notify the customer': nothing supplies the required argument 'to'"},
+          {'code': 'no_source', 'phase': 'notify-the-customer',
+           'message': "... the required argument 'subject'"}]
+
+    That refusal is CORRECT and is the whole of `BUG-260826-02`: `smtp_adapter.INPUT_SCHEMA`
+    requires `to`, `subject` and `body`, and a step supplying none of them publishes and then
+    dies at the send with `the 'to' recipient must be a string, got NoneType`. The fixture was
+    demonstrating the defect while asserting the opposite. **D-06's claim is unchanged** — an
+    external_action workflow still publishes and its governed step still records — so the
+    repair is to make the step SATISFIABLE, never to weaken the gate.
+
+    `body` is deliberately NOT supplied: it is the capability's BODY ARGUMENT, which the
+    executor auto-fills from the upstream text, so the gate exempts it from `no_source`
+    (D-214-03). Its absence here is therefore a live assertion that the exemption works — add
+    it and this fixture stops covering that arm.
     """
     return {
         "slug": "v20-external-action",
@@ -1815,7 +1837,14 @@ def _external_action_definition_dict() -> dict:
                 "slug": _V20_SLUG,
                 "phase_index": 0,
                 "name": "Notify the customer",
-                "config": {"phase_type": "external_action", "capability": "send_email"},
+                "config": {
+                    "phase_type": "external_action",
+                    "capability": "send_email",
+                    "tool_args": {
+                        "to": "customer@example.com",
+                        "subject": "Your renewal is due",
+                    },
+                },
                 "validators": [],
             }
         ],
@@ -2021,6 +2050,49 @@ def test_v20_an_external_action_workflow_publishes(mock_asyncpg_pool):
 
 _MCP_V20_SLUG = "lookup-deepwiki"
 
+#: Phase 214 (STEP-03) — the MCP fixture now BINDS a connection, and it has to.
+#: `schema_for_bound_tool`'s MCP arm reads the bound connection's discovered-tool snapshot;
+#: a step naming a tool on NO connection has an argument shape nobody can state, which the
+#: publish gate refuses as `shape_unknown` (D-214-10: "unknown" and "satisfied" must not look
+#: the same). Verbatim, before this constant existed:
+#:
+#:     blocked_stage='lint' named_failures=[{'code': 'shape_unknown',
+#:       'phase': 'lookup-deepwiki', 'argument': None,
+#:       'message': "step 'Lookup DeepWiki': the bound action's argument shape is not
+#:                   knowable, so publish cannot tell which arguments it requires"}]
+#:
+#: The refusal is correct and D-206.3-01's claim is unchanged — an MCP external_action
+#: workflow still publishes and its step still records — so the repair is to bind the step to
+#: a connection whose snapshot declares the tool, exactly as plan 214-01 did for four shipped
+#: MCP fixtures. ⚠ The snapshot is DECLARED here rather than derived: hand a fixture the
+#: production accessor's own output and it would only agree with itself.
+_MCP_V20_CONN = "9f3c1a7e-0b52-4c1d-9a44-6f2b8d5e1c70"
+_MCP_V20_ORG = "4c8b2e10-7d31-4f6a-9b25-1e0a7c3d8f42"
+_MCP_V20_SNAPSHOT = [
+    {
+        "name": "read_wiki_structure",
+        "description": "List a repository's wiki structure.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["repo"],
+            "properties": {"repo": {"type": "string"}},
+        },
+    }
+]
+
+
+def _mcp_v20_connection_patch():
+    """`connector_service.resolve_connection` returning the snapshot above.
+
+    Patched at the SERVICE, which is the seam the publish gate reaches the snapshot through —
+    the same resolver `phase_types` GATE 5 uses at run time. Patching the gate's own helper
+    instead would have made the provenance case tautological.
+    """
+    return patch(
+        "app.services.connector_service.resolve_connection",
+        AsyncMock(return_value=SimpleNamespace(discovered_tools=_MCP_V20_SNAPSHOT)),
+    )
+
 
 def _mcp_external_action_definition_dict() -> dict:
     return {
@@ -2036,6 +2108,7 @@ def _mcp_external_action_definition_dict() -> dict:
                 "config": {
                     "phase_type": "external_action",
                     "tool_name": "read_wiki_structure",
+                    "connection_id": _MCP_V20_CONN,
                     "tool_args": {"repo": "facebook/react"},
                 },
                 "validators": [],
@@ -2073,6 +2146,10 @@ def _drive_mcp_v20_publish(pool, *, extra_patches=None):
         [{"id": phase_id, "slug": _MCP_V20_SLUG, "phase_index": 0,
           "status": "pending", "output": {}}]
     )
+    # Phase 214: the argument gate scopes its connection read by the definition's org, read
+    # through `_definition_org_id` (the one extracted read `_resolve_publish_supabase` now
+    # shares). A falsy org means no snapshot, which means `shape_unknown`.
+    pool.set_fetchval_result(_MCP_V20_ORG)
 
     judge = AsyncMock(
         return_value={
@@ -2101,6 +2178,7 @@ def _drive_mcp_v20_publish(pool, *, extra_patches=None):
         patch.object(g, "_skill_registry", lambda *a, **k: []),
         patch.object(publish_service, "_judge_golden_output", judge),
         patch("app.services.ask_user_service.subscribe_for_response", recorder),
+        _mcp_v20_connection_patch(),
     ]
     if extra_patches:
         patches.extend(extra_patches)

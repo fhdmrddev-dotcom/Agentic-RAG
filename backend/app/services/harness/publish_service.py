@@ -173,7 +173,26 @@ async def publish_workflow(
         )
 
     # ── stage 2: structural lint (pure; short-circuits BEFORE the golden run) ─────
-    lint_errors = lint_workflow(definition)
+    #
+    # ── PHASE 214 (STEP-03 / D-214-09 / D-214-10) — WHY THIS IS AN EXTENSION AND NOT A
+    #    SIXTH STAGE, since CONTEXT leaves that to discretion and only *cheap and before the
+    #    golden run* is binding. A sibling stage would have been ~14 lines and equally cheap;
+    #    extending keeps ONE lint stage, ONE `_block` call and ONE `blocked_stage` value, so
+    #    the refusal surface gains no stage to render and sketch 215's invariant #8 (exactly
+    #    one blocked stage) stays trivially true rather than newly-argued. The ordering
+    #    rationale is stage 2.6's, verbatim in shape: this check needs exactly what
+    #    `/validate` needs — the definition and the server-side registries — plus ONE
+    #    connection read for the MCP shape, and nothing whatsoever from a run.
+    #
+    # ⭐ THE PREDICATE IS THE SHARED `args.unsatisfiable_arguments`, the other half of the
+    #    `resolve_arguments` the EXECUTOR sends with (D-214-00). That is the same mechanical
+    #    argument stage 1 already won in this file for `business_requirement_missing`: one
+    #    source, so the gate and the thing it gates cannot disagree. A second copy here would
+    #    publish a workflow that then fails at the send, which is `BUG-260826-02` one level up.
+    tool_schemas = await _bound_tool_schemas(
+        definition, definition_id=definition_id, pool=pool
+    )
+    lint_errors = lint_workflow(definition, tool_schemas=tool_schemas)
     if lint_errors:
         return await _block(
             pool,
@@ -181,10 +200,7 @@ async def publish_workflow(
             user_id=user_id,
             definition_id=definition_id,
             stage="lint",
-            named_failures=[
-                {"code": e.code, "phase": e.phase_slug, "message": e.message}
-                for e in lint_errors
-            ],
+            named_failures=[_lint_named_failure(e) for e in lint_errors],
             golden_run_id=None,
         )
 
@@ -343,6 +359,38 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="structural_gate",
             named_failures=named or ["the golden run failed a structural gate"],
+            golden_run_id=golden_run_id,
+        )
+
+    # ── D-214-11: the golden run validates the arguments it RESOLVED — AND SENDS NOTHING ──
+    #
+    # The static gate above proves each source arm on its own terms; it cannot see a VALUE.
+    # An `ask` argument whose launcher left the field blank, or an `upstream` phase whose
+    # output came back empty, is structurally fine and still unsendable — and the golden run
+    # has just resolved exactly that object. Re-projecting it costs no model call and no
+    # wall-clock: the run already happened.
+    #
+    # ⭐ D-16's NO-SEND LINE IS UNTOUCHED. Nothing here constructs an adapter, and nothing
+    # here calls `send()`. The projection is `args.resolve_arguments` — the same pure function
+    # the executor uses — over the recorded intent the golden run already wrote. Publishing
+    # still cannot fire a real email, and the suite asserts it through the SHIPPED no-egress
+    # fence rather than a new mock.
+    #
+    # ⚠ IT BLOCKS AT `structural_gate` AND MINTS NO NEW `blocked_stage`. A new stage value
+    # would be a stage the refusal surface cannot name (sketch 215 §1 ships four stage words),
+    # and this failure genuinely belongs to the golden run's own gate: the run produced an
+    # argument object its action cannot accept.
+    resolved_arg_failures = await _golden_run_argument_failures(
+        definition, run_id=golden_run_id, pool=pool, tool_schemas=tool_schemas
+    )
+    if resolved_arg_failures:
+        return await _block(
+            pool,
+            run_id=golden_run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="structural_gate",
+            named_failures=resolved_arg_failures,
             golden_run_id=golden_run_id,
         )
 
@@ -513,6 +561,301 @@ async def _safe_audit(pool, run_id, *, user_id, event_type: str, metadata: dict)
             run_id,
             exc_info=True,
         )
+
+
+# ══ Phase 214 (STEP-03 / D-214-09..12) — the argument gate's own helpers ══════════════
+
+
+def _external_action_phases(definition) -> list:
+    """Every ``external_action`` phase of a definition, in ``phase_index`` order."""
+    phases = [
+        p
+        for p in (getattr(definition, "phases", None) or [])
+        if getattr(getattr(p, "config", None), "phase_type", None) == "external_action"
+    ]
+    return sorted(phases, key=lambda p: getattr(p, "phase_index", 0))
+
+
+async def _bound_tool_schemas(definition, *, definition_id: UUID, pool) -> dict:
+    """``{connection_id: {tool_name: inputSchema}}`` for the definition's MCP-shaped steps.
+
+    ⭐ THE ONE THING THE PURE LINT CANNOT DO FOR ITSELF, AND THE REASON IT LIVES HERE.
+    ``reachability.py`` is import-light so ``POST /workflows/validate`` can call
+    ``lint_workflow`` on every canvas keystroke; an MCP step's argument shape lives on the
+    connection's discovered-tool snapshot, which is a READ. So the I/O is done here, once per
+    distinct connection, and handed in.
+
+    ⛔ **THE SCHEMA IS OBTAINED THROUGH ``args.schema_for_bound_tool`` AND NOWHERE ELSE.**
+    That accessor is the same one the executor calls at ``phase_types`` GATE 6/7 and the same
+    one the approval pause calls, so the gate's schema and the executor's schema have
+    IDENTICAL PROVENANCE by construction rather than by assertion. A paired test handing one
+    schema object to both predicates proves ``f(s) == g(s)`` and is blind to
+    ``s_gate != s_executor``; a gate linting against a different schema than the executor
+    resolves against publishes a workflow that then sends an EMPTY argument object, silently.
+    This function must never grow its own extraction.
+
+    ⚠ NATIVE CAPABILITY STEPS ARE NOT READ FOR. Their schema is a pure in-process descriptor
+    lookup that ``reachability`` performs itself through the same accessor, so a workflow whose
+    external steps are all native performs ZERO extra I/O here. That is why the loop is over
+    MCP-shaped phases only, and why this is cheap enough to sit in stage 2.
+
+    ⛔ **AN UNREADABLE CONNECTION YIELDS NO ENTRY, WHICH THE GATE READS AS ``shape_unknown``
+    AND BLOCKS.** Absent, disabled, another org's, or a snapshot that never mentions the tool —
+    every one of them means *we cannot say what this action accepts*, and "unknown" must not
+    look like "satisfied" (D-214-10). ⚠ Returning ``{}`` on a failed read is therefore NOT a
+    silent pass: the map is always supplied, and a missing entry inside a supplied map is a
+    refusal. The ``None`` sentinel (never looked) is reserved for ``/validate``.
+    """
+    from app.services.connectors.args import schema_for_bound_tool  # function-local (Pitfall 4)
+
+    wanted: dict[str, set[str]] = {}
+    for phase in _external_action_phases(definition):
+        config = phase.config
+        tool_name = getattr(config, "tool_name", None)
+        if not tool_name:
+            continue  # a native capability — pure lookup, no connection read needed
+        connection_id = str(getattr(config, "connection_id", None) or "")
+        wanted.setdefault(connection_id, set()).add(str(tool_name))
+
+    if not wanted:
+        return {}
+
+    org_id = await _definition_org_id(pool, definition_id)
+    schemas: dict[str, dict] = {}
+    for connection_id, tool_names in wanted.items():
+        snapshot = await _connection_tool_snapshot(connection_id, org_id)
+        per_tool = {}
+        for tool_name in sorted(tool_names):
+            schema = schema_for_bound_tool(
+                capability=None, tool_name=tool_name, discovered_tools=snapshot
+            )
+            if schema is not None:
+                per_tool[tool_name] = schema
+        schemas[connection_id] = per_tool
+    return schemas
+
+
+async def _connection_tool_snapshot(connection_id: str, org_id) -> list | None:
+    """The bound connection's advertised-tool snapshot, or ``None`` when it cannot be read.
+
+    Resolved through ``connector_service.resolve_connection`` — the SAME resolver the executor
+    reaches the snapshot through at run time (``phase_types`` GATE 5), and the one that owns
+    the D-14 org scoping. A second, hand-written read here would be a second answer to
+    *"which connection is this?"*, which is the class of drift this whole plan exists to close.
+
+    ⚠ EVERY FAILURE DEGRADES TO ``None`` AND THEREFORE TO A REFUSAL — absent, cross-org,
+    disabled, credential-unreadable, or an org that does not resolve at all. This is the
+    fail-CLOSED direction: a publish that cannot establish what an action accepts must not mint
+    a version. It is logged, never raised, because ``publish_workflow`` never raises into the
+    route.
+    """
+    if not connection_id or not org_id:
+        return None
+    from app.services import connector_service  # function-local (Pitfall 4)
+
+    try:
+        resolved = await connector_service.resolve_connection(connection_id, str(org_id))
+    except Exception:  # noqa: BLE001 — an unreadable connection is a REFUSAL, never a raise
+        logger.info(
+            "214 STEP-03: connection %s did not resolve at publish time — its bound tools' "
+            "argument shapes are unknown, so the gate will refuse the steps that use it",
+            connection_id,
+            exc_info=True,
+        )
+        return None
+    return getattr(resolved, "discovered_tools", None)
+
+
+async def _definition_org_id(pool, definition_id: UUID):
+    """``workflow_definitions.org_id`` — the ONE read, shared by every consumer on this path.
+
+    Extracted from ``_resolve_publish_supabase`` (which now calls it) so the argument gate can
+    scope its connection reads WITHOUT constructing a service-role client it has no use for —
+    that would have been a third ``_resolve_publish_supabase`` call per publish, compounding
+    the IN-05 deferral recorded at stage 2.6. One implementation of the read is what keeps the
+    client scope, the grounding scope and the connection scope from ever disagreeing about
+    which tenant a publish is acting for.
+    """
+    return await pool.fetchval(
+        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
+    )
+
+
+def _lint_named_failure(e) -> dict:
+    """One ``named_failures`` entry for a lint error — the wire plan ``214-10`` consumes.
+
+    The shipped three keys for every code, PLUS ``step_name`` / ``argument`` / ``upstream`` for
+    the five argument-gap codes. The extra keys are added ONLY for those codes so the other
+    five stages' payload shape is byte-unchanged.
+
+    ⚠ THE BACKEND COMPOSES NO ENGLISH SENTENCE. D-213-15/-16 put the refusal in this gate;
+    sketch 215 §1 puts the WORDS in ``publishRefusalVocabulary.ts`` and asserts them for
+    character identity — so the wire carries KIND + STEP NAME + ARGUMENT NAME and the client
+    composes. ``message`` stays the diagnostic the other four stages already emit: it is for
+    the log and the audit receipt, not for the author's screen.
+
+    ⚠ ``step_name`` GOES THROUGH ``_clean_label``. It is an unbounded author- or model-authored
+    string that lands in a one-line slot AND in the PERSISTED ``harness_audit.metadata``, which
+    is exactly why ``_LABEL_MAX_CHARS`` and the ``Cf``-inclusive scrub exist — see that
+    constant's own comment for the 22-of-31 measurement that forced the category rule.
+    """
+    from app.services.harness.reachability import ARGUMENT_GAP_CODES  # function-local
+
+    entry = {"code": e.code, "phase": e.phase_slug, "message": e.message}
+    if e.code in ARGUMENT_GAP_CODES:
+        # ⚠ ``_clean_label`` returns None for a missing or empty name. ``reachability`` has
+        # already degraded a nameless phase to its slug (the ONE case where the author's word
+        # and the slug coincide — see that emit site), so this is a scrub, not a fallback.
+        entry["step_name"] = _clean_label(e.step_name)
+        entry["argument"] = e.argument
+        entry["upstream"] = e.upstream
+    return entry
+
+
+def _typed_scalar(value, declared_type: str) -> bool:
+    """Does a RESOLVED value match the property's declared scalar type?
+
+    Narrow on purpose — the four scalar types ``args.renderable_property`` admits, and nothing
+    else. ``bool`` is checked BEFORE ``integer``/``number`` because ``isinstance(True, int)`` is
+    True in Python and a boolean silently passing as an integer is precisely the kind of
+    almost-right value this check exists to catch.
+    """
+    if declared_type == "boolean":
+        return isinstance(value, bool)
+    if isinstance(value, bool):
+        return False
+    if declared_type == "string":
+        return isinstance(value, str)
+    if declared_type == "integer":
+        return isinstance(value, int)
+    if declared_type == "number":
+        return isinstance(value, (int, float))
+    return True  # an enum or an unrecognised type — the static gate already ruled on shape
+
+
+async def _golden_run_argument_failures(
+    definition, *, run_id, pool, tool_schemas
+) -> list:
+    """D-214-11 — validate the arguments the golden run RESOLVED, and send nothing.
+
+    The golden run wrote, per external-action phase, the ``recorded_intent`` it would have
+    acted on (``phase_types`` GATE 1 — D-16 suppresses the SEND only). This re-projects that
+    record through ``args.resolve_arguments`` — the executor's own function, over the same
+    schema obtained from the same accessor — and checks each REQUIRED declared property is
+    present, non-empty, and of the declared scalar type.
+
+    ⚠ WHAT THIS CATCHES THAT THE STATIC GATE CANNOT: a value. The static gate proves an
+    ``ask`` key is DECLARED; whether a person typed anything is a run-time fact. It proves an
+    ``upstream`` phase RUNS FIRST; whether that phase produced text is a run-time fact.
+
+    ⚠ THE VOCABULARY IS THE SAME FIVE AND IS NOT WIDENED HERE. A resolved value that is absent,
+    empty, or of the wrong type all report ``no_source`` — *nothing supplied a usable value* —
+    with the type detail in ``message`` for the log and the receipt. A sixth kind is not this
+    plan's to mint: ``publishRefusalVocabulary.ts`` keys a compiler-enforced ``Record`` on the
+    union, and adding a member is a cross-plan, cross-language change with its own sentence to
+    author. Recorded as a deliberate narrowing rather than left to be inferred.
+
+    ⛔ NOTHING IS SENT AND NO ADAPTER IS CONSTRUCTED. Every call below is pure.
+
+    Returns ``[]`` when the definition has no external-action step at all, so a workflow
+    without one performs no extra read.
+    """
+    phases = _external_action_phases(definition)
+    if not phases:
+        return []
+
+    from app.db.workflows import load_run_phases  # function-local (Pitfall 4)
+    from app.models.thread import phase_output_object
+    from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
+    from app.services.harness.reachability import _BODY_ARGUMENT_FOR_CAPABILITY
+
+    try:
+        rows = await load_run_phases(pool, run_id)
+    except Exception:  # noqa: BLE001 — never raise into the sealed orchestration
+        logger.warning(
+            "214 D-214-11: could not read the golden run's phases for %s — skipping the "
+            "resolved-argument check (the STATIC gate already passed)", run_id, exc_info=True,
+        )
+        return []
+
+    outputs: dict[str, dict] = {}
+    for row in sorted(rows or [], key=lambda r: r.get("phase_index", 0)):
+        parsed = phase_output_object(row.get("output"))
+        if isinstance(parsed, dict):
+            outputs[str(row.get("slug") or "")] = parsed
+
+    failures: list = []
+    for phase in phases:
+        config = phase.config
+        capability = getattr(config, "capability", None)
+        tool_name = getattr(config, "tool_name", None)
+        if tool_name:
+            connection_id = str(getattr(config, "connection_id", None) or "")
+            schema = (tool_schemas or {}).get(connection_id, {}).get(str(tool_name))
+            body_arg = None
+        elif capability:
+            schema = schema_for_bound_tool(
+                capability=capability, tool_name=None, discovered_tools=None
+            )
+            body_arg = _BODY_ARGUMENT_FOR_CAPABILITY.get(capability)
+        else:
+            continue
+
+        properties = (schema or {}).get("properties") or {}
+        required = [n for n in ((schema or {}).get("required") or []) if n in properties]
+        if not required:
+            continue
+
+        recorded = outputs.get(str(getattr(phase, "slug", "")), {}).get("recorded_intent")
+        run_inputs = recorded.get("inputs") if isinstance(recorded, dict) else None
+        # ⚠ NO RECORD IS NOT A FAILURE. A phase that was skipped by a branch, or a golden run
+        # whose spine did not reach it, has resolved nothing to validate — and accusing it
+        # would refuse a publish over a step that never ran.
+        if not isinstance(run_inputs, dict):
+            continue
+
+        # The upstream bag the executor holds: `accumulated_outputs[slug]` is the phase's WHOLE
+        # output dict, keyed by slug and nothing else. Only phases BEFORE this one are visible.
+        upstream_outputs = {
+            slug: out
+            for slug, out in outputs.items()
+            if slug != getattr(phase, "slug", None)
+        }
+        resolved = resolve_arguments(
+            config=config,
+            schema=schema,
+            upstream_outputs=upstream_outputs,
+            run_inputs=run_inputs,
+            body_arg=body_arg,
+        )
+
+        step_name = _clean_label(getattr(phase, "name", None)) or getattr(phase, "slug", None)
+        for name in required:
+            value = resolved.get(name)
+            missing = name not in resolved or value is None or (
+                isinstance(value, str) and not value.strip()
+            )
+            declared_type = properties.get(name, {}).get("type")
+            if missing:
+                reason = "resolved to nothing"
+            elif isinstance(declared_type, str) and not _typed_scalar(value, declared_type):
+                reason = f"resolved to a {type(value).__name__}, not the declared {declared_type}"
+            else:
+                continue
+            failures.append(
+                {
+                    "code": "no_source",
+                    "phase": getattr(phase, "slug", None),
+                    "message": (
+                        f"step {str(step_name or '')!r}: the required argument {name!r} "
+                        f"{reason} when the workflow actually ran"
+                    ),
+                    "step_name": step_name,
+                    "argument": name,
+                    "upstream": None,
+                }
+            )
+    return failures
 
 
 def _structural_failures(final_output) -> list:
@@ -745,9 +1088,10 @@ async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool) -> t
     """
     from app import dependencies as _deps  # function-local (mirrors this module's posture)
 
-    _org_id = await pool.fetchval(
-        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
-    )
+    # Phase 214 — the read moved into ``_definition_org_id`` so the argument gate can scope its
+    # connection reads without constructing a client. The SQL, the parameter and the semantics
+    # are unchanged; what changed is that there is now one implementation of it rather than two.
+    _org_id = await _definition_org_id(pool, definition_id)
     if supabase is not None:
         if not _org_id:
             raise ValueError(
