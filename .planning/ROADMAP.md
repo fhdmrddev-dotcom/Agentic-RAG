@@ -124,6 +124,7 @@ it.*
 | 217 | The Library — One Home for Documents | The document space becomes **Library**: one five-tab home, upload as a real front door, and the facts we already store finally on screen | LIB-01, LIB-02, LIB-03, LIB-04 | 4 | ⭐ **ZERO schema, ZERO backend** — every fact already flows. **G-2 bar: sketch 218** (193 assertions). **G-5 ×5** (`DocumentList` 12ph, `IngestionPage` 9ph, `DocumentDetailPanel` 5ph, `useDocuments` 3ph — rows added `8b99c19b2`). No dependency: **startable now** |
 | 218 | The Library Knows How It Is Used | Library Health **and** Governance retire into the Library's Health tab, and a search that could not run stops looking like a search that found nothing | LIB-05, LIB-06, LIB-07 | 4 | **Depends on 210 (SHIPPED)**. ⚠ Two hazards: `KnowledgeHealthPage` is `ChatLayout`'s **positional fallback**; Governance is **feature-gated** and Documents is not. ⚠ Name collision (`Low Confidence` 0.38 vs 0.5). Migration block **140-149**; may be **zero** — the missing facts are jsonb keys |
 | 219 | A Connected Source Feeds the Library | A person connects a cloud drive once, sees what it would bring in **before** it does, and the Library keeps reading it on a schedule | LIB-08, LIB-09, LIB-10 | 4 | ⭐ **Depends on 215 (OAuth) and 216 (ATTACH-01 — the manual precursor this generalises)**. **Changes the CLAUDE.md manual-upload-only rule in the same commit** (`SEED-142`). ⚠ **threat model MANDATORY** — inbound untrusted content + a new credential scope. Migration in **140-149** |
+| 220 | A Drawing Becomes Quantities — SPIKE | A CAD drawing is read for what it actually contains — counted items, measured dimensions, the engineer's own specifications — and priced against a reference rate sheet, with every uncertain match escalated rather than guessed | TAKEOFF-01..04 (**SEED-226**, outside the 32) | 5 | ⚠ **SPIKE — one drawing, one rate sheet, end to end.** DXF FIRST (`ezdxf`, MIT); OCR + full-page vision stay deferred in SEED-226. ⭐ **The DELIVERABLE is the MATCHING step, not the extraction** — extraction is already proven by `probe_dxf_takeoff.py`. **Depends on 217** (the Library is where a takeoff surfaces). New dependency decision: `ezdxf` into `requirements.txt` + `docs/SANDBOX-PACKAGES.md` same commit. **No migration expected** |
 
 ### Phase Checklist
 
@@ -135,6 +136,7 @@ it.*
 - [ ] **Phase 214.1: An Author Can Declare an Input** — the authoring surface that makes *Asked when this runs* reachable: a declared-input editor, the save path that sends it, a describe door that emits it, and a refusal an author can actually read (closes ⛔ `BUG-260828-02` → ⛔ `BUG-260826-01`; STEP-02, STEP-03)
 - [ ] **Phase 215: BYO OAuth** — customer-registered client id/secret, an authorization-code consent that works self-hosted, silent refresh, a plainly-stated revoked state, and secrets unreadable at rest (OAUTH-01..03)
 - [ ] **Phase 216: Connections in Chat, and One File In by Hand** — add a service to a thread by name, see and remove what is active, tool calls that render with the real mark and name, starter prompts that actually run, and one file pulled in by hand (CHAT-05..07, CAT-04, ATTACH-01)
+- [ ] **Phase 220: A Drawing Becomes Quantities — SPIKE** — a DXF read for counts, dimensions and specifications, matched to a rate sheet with ambiguity escalated to a person and nothing silently priced (TAKEOFF-01..04, `SEED-226`)
 
 ### Phase Details
 
@@ -391,6 +393,29 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 
 ⚠ **THIS PHASE CHANGES A STANDING RULE.** `CLAUDE.md` reads *"Ingestion is manual file upload only — no connectors or automated pipelines"*, marked **dated, not permanent**, with the instruction that whoever ships the first sync connector changes it **in the same commit**. ⚠ **Threat model MANDATORY**: this pulls untrusted external content into the corpus the agent answers from, and adds a credential scope.
 
+#### Phase 220: A Drawing Becomes Quantities — SPIKE
+
+**Goal**: Prove — or kill — the drawing-to-bill-of-quantities business case on ONE real drawing and ONE real rate sheet, end to end, without building a milestone first.
+**Depends on**: **Phase 217** (the Library is the surface a takeoff result lands on). Nothing else.
+**Requirements**: TAKEOFF-01..04 — planted in `SEED-226`, **deliberately outside this milestone's 32**, because this is a spike answering a commercial question, not a mapped product requirement.
+**Success Criteria** (what must be TRUE):
+
+  1. A `.dxf` upload is accepted and its **counted items** (`INSERT` blocks), **measured dimensions** (`DIMENSION`, whose values the CAD software computed) and **specification text** (`MULTILEADER`/`MTEXT`) are extracted and stored (TAKEOFF-01).
+  2. Those items are matched against a reference rate sheet read **through the shipped `extract_excel_tables`** — never a private parser — and a priced result is produced (TAKEOFF-02).
+  3. ⭐ **A match the system is not sure of is ESCALATED, never priced.** An ambiguous line names the candidate rate codes and asks a person (TAKEOFF-03).
+  4. ⚠ **Every output line carries its basis** — `read` (exact) vs `matched` (judgement) vs `inferred` (advisory). A single confident total with no basis is a FAILED phase, not a polished one.
+  5. ⚠ The result says plainly what it **cannot** do: areas and volumes are not derivable from a plan alone, and require a quantity surveyor to say which dimension bounds which element and what height a wall is (TAKEOFF-04).
+  6. `$INSUNITS` is resolved **per file**; a drawing declaring `0` (unitless) is **refused**, never assumed to be millimetres.
+
+**How we'd know this failed** (G-6):
+
+  - A priced line appears whose basis cannot be traced to a block count, a dimension, or an annotation.
+  - An ambiguous match is resolved by position in the rate sheet rather than by a person. ⚠ **This already happened once, inside the spike that proved the case**: `1/2" GYPSUM BOARD` priced as *suspended gypsum ceiling* @ 31.00 instead of *gypsum board* @ 18.75 — a 65% overprice with a valid item code and correct arithmetic, catchable by nothing downstream.
+  - The phase quietly grows OCR or full-page vision. **Both are deferred in `SEED-226` and neither belongs here** — reaching for either means this stopped being a spike.
+  - Layer-summed line lengths are priced as quantities. A wall in section is 2+ parallel lines; raw length OVER-measures.
+
+**Flags**: ⚠ **SPIKE — cap it.** One drawing, one rate sheet, end to end; a second file format is a new phase. ⭐ **The extraction half is ALREADY PROVEN** — `backend/scripts/probe_drawing_pdf.py` and `backend/scripts/probe_dxf_takeoff.py` are committed and produced a real priced subtotal (12,680.00 USD in counted items) from the operator's own DXF. **The deliverable is the MATCHING step**, which the probe showed is where this case is won or lost, and which is an LLM judgement task with the rate sheet in context — never a regex. **New dependency decision**: `ezdxf` (MIT) is currently pip-installed into `backend/venv` for evaluation ONLY; promoting it to `requirements.txt` and `docs/SANDBOX-PACKAGES.md` in the same commit is this phase's call. ⚠ **DWG is NOT DXF** — the operator's `.dwg` needed an external conversion (ODA File Converter / cloudconvert); this phase does **not** ship DWG support. **No migration expected**; storage is jsonb on the existing document row unless the spike proves otherwise. ⚠ **G-4 lived-experience UAT** — the operator is a domain expert here and the acceptance bar is theirs, not a wire format's.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -405,8 +430,10 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 | 217. The Library — One Home for Documents | 0/? | Not started — ⭐ **startable now** (no dependency) | - |
 | 218. The Library Knows How It Is Used | 0/? | Not started — depends on 210 (shipped) + 217 | - |
 | 219. A Connected Source Feeds the Library | 0/? | Not started — depends on **215** + 216 | - |
+| 220. A Drawing Becomes Quantities — SPIKE | 0/? | Not started — depends on 217. Extraction half already proven by two committed probes (`SEED-226`) | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
+⚠ **Phase 220 is a SPIKE and its TAKEOFF-01..04 are deliberately OUTSIDE that 32** — they answer a commercial question seeded in `SEED-226`, and are named here so the 32 is never silently read as 36.
 Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
 
 **Guardrails firing (v3.9):**
