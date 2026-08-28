@@ -389,6 +389,121 @@ ok("C7 · a folder with no vectors renders — and 'never', never 0 or a tick",
   /Uncategorized[\s\S]{0,120}never/.test(SURFACE))
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// §D · THE FRONT DOOR, AND THE BURIED-CAPABILITY AUDIT
+//
+// ⚠ Operator, 2026-08-28: *"I did not see for example where I can upload documents"* and
+// *"we have a lot of things that we can show but it is hidden and buried"*. §D pins both.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const UPLOAD = src("frontend/src/components/ingestion/DocumentUpload.tsx") || ""
+
+// D1 — upload is a first-class surface, not a corner button
+ok("D1 · the sketch draws a full-width dropzone with its own icon and a browse control",
+  /class="dropbig"/.test(SURFACE_HTML) && /Drop files here/.test(SURFACE) && /Choose files/.test(SURFACE))
+ok("D1b · it names the folder the files land in — upload is folder-scoped today",
+  /Add to/.test(SURFACE) && /Engineering/.test(SURFACE))
+
+// D2 — ⚠ the accepted formats are MEASURED from the shipped input, never invented
+const acceptAttr = (UPLOAD.match(/accept="([^"]+)"/) || ["", ""])[1]
+const exts = acceptAttr.split(",").map((x) => x.trim()).filter((x) => x.startsWith("."))
+ok("D2 · the shipped input accepts 8 extensions",
+  exts.length === 8, `measured: ${exts.join(" ") || "(none)"}`)
+ok("D2b · every format the dropzone advertises is one the input actually accepts",
+  exts.every((e) => SURFACE.toUpperCase().includes(e.slice(1).toUpperCase())),
+  exts.filter((e) => !SURFACE.toUpperCase().includes(e.slice(1).toUpperCase())).join(",") || "all listed")
+ok("D2c · ⚠ .msg is NOT accepted today, so the dropzone must not advertise it",
+  !exts.includes(".msg") && !/\bMSG\b/.test(SURFACE),
+  "a dropzone listing a format the input rejects sends the user to a dead end")
+
+// D3 — ⛔ there is NO upload progress to report, so no percentage is drawn
+ok("D3 · the shipped upload path reports no byte progress",
+  !/onUploadProgress|progressEvent/.test(UPLOAD),
+  "if this ever becomes false, a real percentage becomes honest and this fence should be revisited")
+ok("D3b · so the queue shows STAGES, and no upload percentage anywhere",
+  !/\b\d{1,3}%\s*(uploaded|upload)/i.test(SURFACE) &&
+  !(SURFACE_HTML.match(/Upload[^<]{0,20}\d+%/g) || []).length)
+
+// D4 — ⭐ the buried-capability audit is present, and it is a MEASUREMENT
+// ⚠ THIS WALKS THE TREE IN JS RATHER THAN SHELLING OUT TO grep.
+// The first version used `execSync("grep -rl …")`, which printed "The system cannot find the
+// path specified" on this box and returned [] — so the assertion PASSED VACUOUSLY. A fence
+// that reports "zero references" because its search failed is worse than no fence: it
+// manufactures the exact finding it was meant to verify.
+function walk(dir, out) {
+  let entries
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    const full = path.join(dir, e.name)
+    if (e.isDirectory()) { if (e.name !== "node_modules") walk(full, out) }
+    else if (/\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) out.push(full)
+  }
+  return out
+}
+const FE_FILES = walk(path.join(REPO, "frontend", "src"), [])
+ok("D4-control · the frontend tree walk actually found files",
+  FE_FILES.length > 200, `${FE_FILES.length} non-test .ts/.tsx files`)
+function feMentions(needle) {
+  return FE_FILES.filter((f) => {
+    try { return fs.readFileSync(f, "utf8").includes(needle) } catch { return false }
+  }).map((f) => path.relative(REPO, f))
+}
+// positive control for the walker: a column that IS surfaced must be found.
+ok("D4-control2 · the walker finds a column that IS surfaced (table_count)",
+  feMentions("table_count").length > 0, "if this is 0 the walker is broken, not the codebase")
+
+const buried = feMentions("full_markdown")
+ok("D4 · ⭐ documents.full_markdown is stored and has ZERO non-test frontend references",
+  buried.length === 0, `frontend refs: ${buried.join(", ") || "none"}`)
+ok("D4b · …and the schema really does store it",
+  /full_markdown text/.test(src("supabase/full-schema.sql") || ""))
+// ⚠ the audit TABLE is `data-meta` by design — it is analysis about the product, not a
+// product surface — so this asserts against the sketch FILE, not the stripped surface.
+ok("D4c · the sketch names it as a buried capability",
+  HTML.includes("full_markdown"))
+
+const SCHEMA = src("supabase/full-schema.sql") || ""
+ok("D5 · document_tables stores real headers AND rows, not just a count",
+  /headers jsonb/.test(SCHEMA) && /rows jsonb/.test(SCHEMA))
+ok("D5b · document_images stores a written description",
+  /CREATE TABLE public\.document_images[\s\S]{0,400}description text/.test(SCHEMA))
+ok("D5c · the frontend renders only COUNTS of them today",
+  /table_count/.test(src("frontend/src/components/ingestion/DocumentList.tsx") || ""))
+ok("D5d · the sketch RENDERS the buried content — a real table and real descriptions",
+  /class="xtable"/.test(SURFACE_HTML) && /class="figrow"/.test(SURFACE_HTML) &&
+  /Region[\s\S]{0,80}EMEA/.test(SURFACE))
+
+ok("D6 · documents.extractor is stored",
+  /\n    extractor text/.test(SCHEMA))
+ok("D6b · and the sketch names it as unsurfaced", HTML.includes("documents.extractor"))
+ok("D7 · document_chunks carries a per-chunk embedding_model",
+  /CREATE TABLE public\.document_chunks[\s\S]{0,600}embedding_model text/.test(SCHEMA))
+
+// D8 — ⭐ the question list is a GROUP BY over rows already written
+ok("D8 · the question text IS recorded on every search today",
+  /"query_text":\s*args\["query"\]/.test(DISPATCH))
+ok("D8b · the sketch renders the per-document question list",
+  /Questions that found this document/.test(SURFACE))
+ok("D8c · with a count per question — a list without frequency decides nothing",
+  (SURFACE_HTML.match(/class="val">\d+×</g) || []).length >= 4)
+
+// D9 — the library-wide stage cards are an aggregate we can actually produce
+ok("D9 · the pipeline stage cards are drawn",
+  /class="stagecards"/.test(SURFACE_HTML) &&
+  (SURFACE_HTML.match(/class="scard"/g) || []).length === 4)
+// ⚠ tests the RENDERED TEXT, not the raw markup: the bar carries a CSS width (--w:100%)
+// which is not a number shown to anyone. A fence that reads style attributes as content
+// fires on every progress bar in the file.
+ok("D9b · each carries a COUNT of documents, not a percentage",
+  !/\d+%/.test(norm((SURFACE_HTML.match(/<div class="stagecards">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/) || [""])[0])))
+ok("D9c · the idle stage renders 0 and says 'waiting' — never a green tick",
+  /class="ico idle"[\s\S]{0,200}>0<[\s\S]{0,120}waiting/.test(SURFACE_HTML))
+
+// D10 — the richer palette is still OUR tokens, and never colour-only
+ok("D10 · the chart palette uses five state tokens, no invented hex",
+  [".s-primary", ".s-violet", ".s-success", ".s-warning", ".s-danger"].every((c) => HTML.includes(c)))
+ok("D10b · every series colour resolves to a theme variable, never a literal hex",
+  !/\.s-(primary|violet|success|warning|danger|dim)\s*\{\s*background:\s*#/.test(HTML))
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
 // REPORT
 // ═══════════════════════════════════════════════════════════════════════════════════════
 const total = pass + failures.length

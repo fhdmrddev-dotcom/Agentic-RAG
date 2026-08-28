@@ -300,3 +300,47 @@ directly; a further Stitch pass is optional, not blocking.
    the real six with the two conditional ones marked.
 3. **"RETRIEVED (7d)" / "returned by a search in 30 days"** — the shipped window is
    `WINDOW_DAYS = 30`. Any other number on that tile is a fabricated one.
+
+---
+
+## ⭐ THE BURIED-CAPABILITY AUDIT — operator direction, 2026-08-28
+
+> *"I want you to think about what capabilities, what information we can have from our application,
+> because I believe that we have a lot of things that we can show but it is hidden and buried inside
+> and not considered to be surfaced in the UI."*
+
+**That belief is correct, and it is bigger than the redesign.** Measured against
+`supabase/full-schema.sql` and a grep of `frontend/src` — a column with **zero** frontend references
+is stored on every document and shown to nobody.
+
+| Stored today | Where | Surfaced? | What it would give the user |
+|---|---|---|---|
+| **`documents.full_markdown`** | every document | ⛔ **ZERO frontend references** | ⭐ **The reference's "Document Content Viewer", buildable with no new extraction.** The whole parsed text of every file is already in the database. |
+| **`document_tables.headers` + `.rows`** | per table | ⛔ only a count (*"3 tables"*) | The extracted tables **as tables**. We store the real cell data and render a number. |
+| **`document_images.description`** | per image | ⛔ only a count (*"5 imgs"*) | Written descriptions of every figure — what the agent actually reads for an image. |
+| **`documents.extractor`** | every document | ⛔ never shown | Which engine parsed this file. **The single most useful fact when an extraction looks wrong.** |
+| **`document_chunks.embedding_model` + `.embedding_dimensions`** | per chunk | ⛔ never shown | Which chunks are on the old model mid-re-embed — the honest answer to *"is search caught up?"* |
+| `document_tables.page` / `document_images.page` / `.bbox` | per element | ⛔ never shown | Where in the document it came from. |
+| `documents.version_number` / `is_latest` | every document | partly | Version history exists; the panel shows a version table. |
+| `audit_log` `search.query` `metadata.query_text` | per search | ⛔ aggregated only | ⭐ **"Which questions found this document"** — a per-document question list, already stored. |
+
+⚠ **Six of those eight are stored on every single document and reach no screen.** That is not a
+missing feature; it is a rendering gap over data that already exists — the cheapest richness in the
+whole seed, and precisely what the operator suspected.
+
+### ⚠ Two honesty limits found in the same pass
+
+1. **There is no byte-level upload progress.** `DocumentUpload.tsx` reports only
+   `Uploading N files…` — no `onUploadProgress`. So the reference's per-file **85% / 25% / 5%**
+   upload bars would be **fabricated**. Either the upload gains real progress reporting, or the queue
+   shows *stages*, not a percentage. **Drawn as stages.**
+2. **The accepted types are measured, not guessed:**
+   `.txt .md .pdf .docx .pptx .xlsx .csv .epub` — and ⚠ **`.msg` is NOT in the accept list**, though a
+   real `.msg` reached ingestion and failed. The dropzone must state the real set.
+
+### What the reference's screen 07 gives us that IS honest
+
+Its four **stage cards** (*Text Extraction / Cleaning / Chunking / Embedding*, each with a count and a
+state) are a **library-wide** view, not per-file — and a count of documents currently at each
+`ingestion_step` is a real aggregate we can produce today. ⛔ Its **token pie chart** is not: ingestion
+token accounting does not exist.

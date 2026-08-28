@@ -13,11 +13,11 @@ tags: [seed-224, bus-026, documents, library-health, retrieval, ingestion, chart
 ⚠ The two are never collapsed — Stitch renders zero shipped components (`SEED-155`).
 
 ```
-node drive.cjs           # 97 assertions
+node drive.cjs           # 124 assertions
 node drive.cjs --emit    # regenerates BUILD-CONTRACT.generated.md FROM the running sketch
 ```
 
-Current state: **97 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
+Current state: **124 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
 sketch — column order, tab classes, theme lightness, the ingestion steps, the eval FKs. If the repo
 moves, they fail. That is the point.
 
@@ -50,6 +50,8 @@ The operator's direction, in two parts:
 | **Indexing** | reference screen 13's composition, with its two invented numbers removed |
 | **Ingestion** | the dropzone + queue, with the real six-stage strip |
 | **Document detail** | reference screen 15, in the **shipped 430px panel track** |
+| **⭐ upload** | the front door — a full-width dropzone, the library-wide pipeline row, the queue |
+| **⭐ what we hide** | six columns stored on every document that reach no screen |
 | **⚠ findings** | two things only a rendered sketch could catch |
 
 ---
@@ -182,6 +184,56 @@ that arm was present. `B8` now pins both arms.
 | the shipped column order swapped (`Size` before `Type`) | `A2b` — *marked: ["Size","Type","Chunks"]* |
 
 A guard nobody has seen fire is not a guard.
+
+---
+
+---
+
+## 6b · ⭐ The front door, and what we already store and never show
+
+**Two operator observations drove a second pass, and both were right.**
+
+> *"I did not see for example where I can upload documents."*
+
+Today upload is a **small button in the top-right corner of a folder header**. The reference opens on
+a full-width dropzone. The **upload** tab draws it as the front door, with the reference's screen-07
+**stage-card row** above the queue — a count of documents at each stage, which is a real aggregate we
+can produce from the step every document already carries.
+
+⛔ **Its per-file upload percentages are drawn as STAGES, and that is a measurement, not a taste.**
+There is no `onUploadProgress` anywhere in the upload path — the client reports only
+*"Uploading N files…"* — so a percentage bar would be a number nothing can know.
+
+⚠ **The accepted formats are read from the shipped file input**, and that fence caught the sketch's
+own older dropzone advertising `MSG`, which the input rejects. **A dropzone listing a format the
+input refuses sends the user to a dead end** — exactly what the fence exists to prevent.
+
+> *"we have a lot of things that we can show but it is hidden and buried."*
+
+**Measured against the live schema and a walk of `frontend/src` — and true. Six columns are written
+for every document and reach no screen at all:**
+
+| stored today | shown? | what it would give the user |
+|---|---|---|
+| `documents.full_markdown` | ⛔ **zero non-test frontend refs** | ⭐ the whole parsed text of every file — the reference's Content Viewer, with no new extraction |
+| `document_tables.headers` + `.rows` | count only | the extracted tables **as tables** |
+| `document_images.description` | count only | a written description of every figure |
+| `documents.extractor` | ⛔ never | which engine parsed this file — the first thing you want when an extraction looks wrong |
+| `document_chunks.embedding_model` | ⛔ never | which chunks are still on the old model mid-re-embed |
+| the recorded question text | aggregate only | ⭐ **the actual questions that found this document** |
+
+⚠ **None of this needs a migration, an extraction pass, or a provider call.** It is a rendering gap
+over data that already exists — the cheapest richness anywhere in this redesign, and what makes the
+document detail deeper than the reference's.
+
+### ⚠ The fence proving the `full_markdown` claim had to be rewritten, and that is itself a finding
+
+Its first version shelled out to `grep -rl`, which printed *"The system cannot find the path
+specified"* on this box and returned an empty list — so the assertion **passed vacuously,
+manufacturing the very finding it was meant to verify**. It now walks the tree in JS and carries
+**two positive controls**: the walker must find 200+ files, and it must find a column that *is*
+surfaced (`table_count`). A fence that reports "zero references" because its own search failed is
+worse than no fence.
 
 ---
 

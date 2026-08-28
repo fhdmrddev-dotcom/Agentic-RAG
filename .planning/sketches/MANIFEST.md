@@ -2387,7 +2387,7 @@ into this surface (D-1)** and **the surface is renamed `Library` (D-2, front-end
 |---|------|----------------|--------|------|
 | 218 | the-library-and-its-tabs | What is the Library's tab set, and which of the reference's surfaces can this app draw honestly? | *pending* — A five tabs · **B four tabs** | seed-224, bus-026, library-health, charts, acceptance-bar |
 
-**97 assertions, 0 failing — and 31 of them read the LIVE SOURCE TREE**, not the sketch. Three were
+**124 assertions, 0 failing — and 31+ of them read the LIVE SOURCE TREE**, not the sketch. Three were
 driven RED against planted defects and the file restored md5-identical.
 
 ⭐ **What the sketch found that the Stitch pass structurally could not.** The shipped `Tabs` primitive
@@ -2400,3 +2400,17 @@ assumes, and two are conditional — so a fixed 3-segment bar draws a shape the 
 ⚠ **And one finding in the drive script itself:** its SURFACE stripper consumed one closing tag too
 many and silently ate the second tab-bar arm — the remedy the sketch exists to propose — while still
 reading 70/70 green. **A stripper bug looks exactly like a passing suite.**
+
+**Second pass, same day — two operator observations, both measured true.** *"I did not see where I
+can upload documents"*: upload is a small button in a folder header's top-right corner, so the sketch
+gained an **upload** tab drawing it as the front door, with the reference's screen-07 stage-card row
+(an honest aggregate) above the queue. *"We have a lot of things that we can show but it is hidden
+and buried"*: **six columns are written for every document and reach no screen** — the parsed
+markdown of every file has ZERO non-test frontend references, and extracted tables and image
+descriptions are stored in full but rendered as a count. **None of it needs a migration.**
+
+⚠ **A third finding is in the drive script itself, again.** The fence proving the buried-column claim
+first shelled out to `grep -rl`, which failed on this box and returned an empty list — so it **passed
+vacuously, manufacturing the finding it was meant to verify**. It now walks the tree in JS behind two
+positive controls. Final: **124 assertions, 0 failing**, five driven RED against planted defects with
+the file restored md5-identical each time.
