@@ -20,6 +20,9 @@ import type { WorkflowRunPhase, RunStepCitation } from "@/lib/api"
 import { getWorkflowRunPhaseCitations } from "@/lib/api"
 import { CitationCard } from "@/components/chat/CitationCard"
 import { own } from "@/components/workflows/ownProperty"
+// ── Phase 214-11 Task 2b (STEP-04 / D-214-16) — the ONE step-identity element, `size="row"`.
+// It takes props; this component resolves nothing and reaches for no map.
+import { StepIdentity, type StepIdentityProps } from "@/components/workflows/StepIdentity"
 import { phaseRunFacts } from "@/components/workflows/phaseDuration"
 import { OUTCOME_FINISHED, countDeclared } from "@/components/workflows/receiptVocabulary"
 import {
@@ -103,6 +106,18 @@ function resolveFace(reading: string | undefined): Face {
 export interface RunStepListProps {
   phases: readonly WorkflowRunPhase[]
   titleOf: (slug: string) => string
+  /**
+   * Phase 214-11 Task 2b (STEP-04 / D-214-16 / D-214-14) — the step's ACTION and its SERVICE,
+   * resolved by `WorkflowRunPage` in the same shape as `titleOf`, and `null` when there is no
+   * honest answer.
+   *
+   * ⚠ ALL THREE OPTIONAL: an existing caller renders exactly the list it rendered before.
+   * ⚠ THIS COMPONENT RESOLVES NOTHING — no connection list, no store, no fetch (asserted
+   * mechanically). A `null` service is a legitimate reading and renders the action alone.
+   */
+  actionOf?: (slug: string) => string | null
+  serviceOf?: (slug: string) => string | null
+  shapeOf?: (slug: string) => StepIdentityProps["shape"]
   runId: string
   runStatus?: string | null
   liveOf?: (slug: string) => { reading: string; label: string } | undefined
@@ -112,6 +127,9 @@ export interface RunStepListProps {
 export function RunStepList({
   phases,
   titleOf,
+  actionOf,
+  serviceOf,
+  shapeOf,
   runId,
   runStatus,
   liveOf,
@@ -162,6 +180,29 @@ export function RunStepList({
       {phases.map((phase, idx) => {
         const slug = phase.slug
         const stepTitle = titleOf(slug)
+        // ── Phase 214-11 Task 2b (D-214-16 · sketch 216 §3 surface 4) — the step's identity,
+        // computed ONCE per row and rendered in BOTH arms below. The two arms (expandable vs
+        // plain) already duplicate their name slot; deriving this twice would be a third copy
+        // and the place the two arms would eventually disagree.
+        // ⚠ THE ACTION IS THE GATE — `serviceOf` may honestly answer `null`, and keying on the
+        // service would suppress exactly the case the element exists to render.
+        const rowAction = actionOf?.(slug) ?? null
+        const identity = rowAction
+          ? { action: rowAction, service: serviceOf?.(slug) ?? null, shape: shapeOf?.(slug) ?? {} }
+          : null
+        // The row's NAME, as one node. When the step has an identity, the identity IS the name
+        // — the sheet draws one name slot per row, and printing the authored title beside the
+        // action would state the same step twice on one line.
+        const titleNode = identity ? (
+          <StepIdentity
+            shape={identity.shape}
+            action={identity.action}
+            service={identity.service}
+            size="row"
+          />
+        ) : (
+          stepTitle
+        )
         const liveInfo = liveOf ? liveOf(slug) : undefined
         const facts = phaseRunFacts(phase, runStatus, now)
         const isRunTerminal = runStatus !== "active" && runStatus !== "pending"
@@ -218,7 +259,7 @@ export function RunStepList({
                   >
                     {face.glyph}
                   </span>
-                  <span data-testid="step-title" className="truncate text-sm font-medium text-foreground">{stepTitle}</span>
+                  <span data-testid="step-title" className="truncate text-sm font-medium text-foreground">{titleNode}</span>
                   {yieldText && (
                     <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground/80 font-normal">
                       <span aria-hidden="true" className="text-muted-foreground/50 select-none">·</span>
@@ -251,7 +292,7 @@ export function RunStepList({
                   >
                     {face.glyph}
                   </span>
-                  <span data-testid="step-title" className="truncate text-sm font-medium text-foreground">{stepTitle}</span>
+                  <span data-testid="step-title" className="truncate text-sm font-medium text-foreground">{titleNode}</span>
                   {yieldText && (
                     <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground/80 font-normal">
                       <span aria-hidden="true" className="text-muted-foreground/50 select-none">·</span>

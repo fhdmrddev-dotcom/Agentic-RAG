@@ -73,6 +73,9 @@ import {
   type PhaseTimingRow,
 } from "@/components/workflows/phaseDuration"
 import { timeRunning } from "@/components/workflows/receiptVocabulary"
+// ── Phase 214-11 Task 2b (STEP-04 / D-214-16) — the ONE step-identity element, `size="spine"`.
+// It takes props; this component resolves nothing and reaches for no map.
+import { StepIdentity, type StepIdentityProps } from "@/components/workflows/StepIdentity"
 
 /**
  * The page's live reading for one step, structurally declared.
@@ -182,6 +185,21 @@ export interface RunSpineProps {
   phases: readonly PhaseTimingRow[]
   /** The step's human name — the page's, never re-derived here. */
   titleOf: (slug: string) => string
+  /**
+   * Phase 214-11 Task 2b (STEP-04 / D-214-16 / D-214-14) — the step's ACTION and its SERVICE,
+   * resolved by the page exactly as `titleOf` is, and `null` when there is no honest answer.
+   *
+   * ⚠ ALL THREE ARE OPTIONAL so every existing caller renders the spine it rendered before
+   * these props existed — and the identity replaces the title only where one really resolves.
+   *
+   * ⚠ THIS COMPONENT RESOLVES NOTHING. It holds no connection list, reads no store and makes
+   * no fetch (asserted mechanically by this plan). A `null` service is a LEGITIMATE reading —
+   * the connection was deleted or belongs to another org — and the element renders the action
+   * alone for it. Never substitute a name here.
+   */
+  actionOf?: (slug: string) => string | null
+  serviceOf?: (slug: string) => string | null
+  shapeOf?: (slug: string) => StepIdentityProps["shape"]
   /** The page's already-worded live reading per step. */
   liveOf?: (slug: string) => SpineLiveReading | undefined
   /**
@@ -202,6 +220,9 @@ export interface RunSpineProps {
 export function RunSpine({
   phases,
   titleOf,
+  actionOf,
+  serviceOf,
+  shapeOf,
   liveOf,
   renderAsk,
   runStatus,
@@ -261,6 +282,19 @@ export function RunSpine({
           <ol className="relative z-10 flex flex-col gap-5">
             {phases.map((row) => {
               const live = liveOf?.(row.slug)
+              // ── Phase 214-11 Task 2b — the step's identity, entirely from the page.
+              // ⚠ THE ACTION IS THE GATE. `serviceOf` may legitimately answer `null` (the
+              // connection was deleted, or is another org's) and the element renders the action
+              // alone for that — so keying on the service would hide exactly the honest case
+              // the element was built to express.
+              const spineAction = actionOf?.(row.slug) ?? null
+              const identity = spineAction
+                ? {
+                    action: spineAction,
+                    service: serviceOf?.(row.slug) ?? null,
+                    shape: shapeOf?.(row.slug) ?? {},
+                  }
+                : null
               const timing = phaseTiming(row, runStatus, now)
               const face = (live ? own(READING_FACE, live.reading) : undefined) ?? FALLBACK_FACE
               // ⚠ BOTH SOURCES, NOT JUST THE SLICE — the same rule `RunTranscript` keeps, and a
@@ -316,7 +350,27 @@ export function RunSpine({
                           waiting && "text-accent-violet-text",
                         )}
                       >
-                        {titleOf(row.slug)}
+                        {/* ── Phase 214-11 Task 2b (D-214-16 · sketch 216 §3 surface 3) — WHEN
+                               THE STEP HAS AN IDENTITY, THE IDENTITY *IS* THE NAME.
+                               It is rendered INSIDE the shipped `spine-title` element rather
+                               than beside it: the sheet's row draws one name slot, and drawing
+                               the authored title AND the action would state the same step
+                               twice in one line — which is the duplication the 200.2 re-port
+                               removed from this very column. The element and its testid are
+                               untouched, so every structural pin over this row still reads it.
+                               ⚠ A step with no resolvable action keeps the plain title, so
+                               nothing changes for the five phase types that are not external
+                               actions. */}
+                        {identity ? (
+                          <StepIdentity
+                            shape={identity.shape}
+                            action={identity.action}
+                            service={identity.service}
+                            size="spine"
+                          />
+                        ) : (
+                          titleOf(row.slug)
+                        )}
                       </span>
                       {/* ⚠ A TIME ON THE RUNNING STEP ONLY — the sheet prints one, and only on
                           the row in progress. Durations of finished steps live in the run log;

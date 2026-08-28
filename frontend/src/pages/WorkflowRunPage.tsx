@@ -100,6 +100,11 @@ import { StopControl } from "@/components/chat/StopControl"
 //    `RunSpine.tsx`'s docblock for the screenshot-level diff against the sheet. It remains the
 //    right component in CHAT and is untouched there; this page no longer imports it.
 import { RunSpine } from "@/components/workflows/RunSpine"
+// ── Phase 214-11 Task 2b (STEP-04 / D-214-16) — the resolver seam's two new siblings.
+// A TYPE-ONLY import of the element's own prop shape plus the shared capability resolver; this
+// page never reads the mark map, and the components it feeds never resolve anything.
+import type { StepIdentityProps } from "@/components/workflows/StepIdentity"
+import { stepActionWords } from "@/components/workflows/stepActionWords"
 // SEED-190 / the run-surface re-port: the panel's heading is rendered by the HEADER BAND now,
 // not by `RunSpine`, so the two columns' headings share one row. See the header's own note.
 import { SPINE_HEADING } from "@/components/workflows/transcriptVocabulary"
@@ -990,6 +995,53 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     [titleBySlug],
   )
 
+  /**
+   * Phase 214-11 Task 2b (STEP-04 · D-214-16 / D-214-14) — THE STEP'S IDENTITY, RESOLVED HERE
+   * AND HANDED DOWN, in the shape `titleBySlug` / `titleOf` already established above.
+   *
+   * ⚠ BUILT FROM THE RUN-PHASE WIRE, NOT FROM `specs`. `titleBySlug` reads the DEFINITION
+   * (what the workflow says it will do); these read `run.phases` (what the run actually did,
+   * with the connection resolved server-side at read time). A definition read would give the
+   * step's CONFIGURED connection id, which is not the same fact as the display name of the
+   * connection that was actually used — and a renamed or deleted connection is exactly where
+   * the two diverge. D-213-02 rejected storing the name for this reason; this reads it fresh.
+   *
+   * ⚠ THE COMPONENTS RESOLVE NOTHING (D-214-14's rule, and T-214-11-04). `RunSpine` and
+   * `RunStepList` receive strings. A component that reached for the connection list itself
+   * would answer differently from the wire, and this page and the chat panel would then
+   * disagree about one step at one moment — which is the failure `models/thread.py:210-218`
+   * exists to prevent, one layer up.
+   *
+   * ⚠ `null` IS A LEGITIMATE SERVICE, not a lookup miss: the connection was deleted or belongs
+   * to another org. The element renders the action ALONE for it. Never substitute.
+   */
+  const identityBySlug = useMemo(() => {
+    const m = new Map<string, { action: string | null; service: string | null; shape: StepIdentityProps["shape"] }>()
+    for (const row of run?.phases ?? []) {
+      m.set(row.slug, {
+        // ⚠ THE WIRE `tool_name` IS AN ID AND IS NEVER PASSED AS THE ACTION (invariant #4).
+        // The shared resolver translates the CAPABILITY and returns `null` for anything it has
+        // no authored phrase for — read its header before widening this.
+        action: stepActionWords(row.capability),
+        service: row.service_name ?? null,
+        shape: { capability: row.capability ?? null, tool_name: row.tool_name ?? null },
+      })
+    }
+    return m
+  }, [run])
+  const actionOf = useCallback(
+    (slug: string) => identityBySlug.get(slug)?.action ?? null,
+    [identityBySlug],
+  )
+  const serviceOf = useCallback(
+    (slug: string) => identityBySlug.get(slug)?.service ?? null,
+    [identityBySlug],
+  )
+  const shapeOf = useCallback(
+    (slug: string): StepIdentityProps["shape"] => identityBySlug.get(slug)?.shape ?? {},
+    [identityBySlug],
+  )
+
 
   // ── The elapsed figure (D-188-18) ────────────────────────────────────────────
   // (`runStatus` / `isTerminal` are hoisted above the run-state memo — F5 needs the live/
@@ -1513,6 +1565,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                 <RunStepList
                   phases={run?.phases ?? []}
                   titleOf={titleOf}
+                  actionOf={actionOf}
+                  serviceOf={serviceOf}
+                  shapeOf={shapeOf}
                   runId={runId ?? ""}
                   runStatus={runStatus}
                   liveOf={runState}
@@ -1555,6 +1610,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           <RunSpine
             phases={wireRows}
             titleOf={titleOf}
+            actionOf={actionOf}
+            serviceOf={serviceOf}
+            shapeOf={shapeOf}
             liveOf={runState}
             runStatus={runStatus}
             now={nowMs}
@@ -1570,6 +1628,14 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                         ask={ask}
                         reconcile={reconcileAsks}
                         runIsOver={isTerminal}
+                        // ⚠ 214-11 — THE PAUSE IS THE FIFTH SURFACE AND IT IS FED HERE TOO,
+                        // from the SAME resolvers the spine and the list read. The pause is
+                        // rendered at `askAnchorSlug`, so its identity is that step's — a
+                        // second derivation would let the row and the card inside it name one
+                        // step two ways, on the same screen, at the same moment.
+                        action={actionOf(askAnchorSlug ?? "")}
+                        service={serviceOf(askAnchorSlug ?? "")}
+                        shape={shapeOf(askAnchorSlug ?? "")}
                       />
                     ))
                 : null
