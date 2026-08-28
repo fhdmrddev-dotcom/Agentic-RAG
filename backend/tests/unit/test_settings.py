@@ -38,6 +38,7 @@ def _fake_settings(**overrides):
         rerank_model="rerank-3",
         rerank_top_n=5,
         rerank_api_key="",
+        multimodal_max_vision_calls=100,
         retrieval_top_k=10,
         retrieval_match_threshold=0.3,
         hybrid_search_enabled=True,
@@ -235,3 +236,57 @@ async def test_update_settings_persists_registry_judge_model(monkeypatch):
         supabase=MagicMock(),
     )
     assert captured.get("harness_judge_model") == "claude-opus-4-8"
+
+
+# ---------------------------------------------------------------------------
+# SEED-227: the vision-call ceiling reaches the product
+#
+# Measured 2026-08-28: ten of twelve extraction knobs were `api:0 ui:0` — a DB
+# column (migration 044), a loader, and a live reader in multimodal_service, with
+# no route to any surface. These pin the route, and the refusal that bounds it.
+# ---------------------------------------------------------------------------
+
+def test_vision_call_ceiling_is_readable_and_writable():
+    """The knob round-trips: out through the response, in through the update."""
+    from app.api.settings import SettingsUpdate, _build_response
+    import asyncio
+
+    resp = asyncio.run(_build_response(_fake_settings(multimodal_max_vision_calls=250)))
+    assert resp.multimodal_max_vision_calls == 250
+
+    assert SettingsUpdate(multimodal_max_vision_calls=250).multimodal_max_vision_calls == 250
+    # Omitted stays None so a partial PATCH never rewrites it to a default.
+    assert SettingsUpdate().multimodal_max_vision_calls is None
+
+
+@pytest.mark.parametrize("bad", [0, -1, 1001])
+def test_vision_call_ceiling_refuses_values_that_fail_silently(bad):
+    """⚠ The refusal is the FEATURE, not defensive noise.
+
+    0 stops every image in the install from being read while each ingestion still
+    reports success, and an unbounded value turns one upload into unbounded spend.
+    Both ends are silent, so a 400 with a sentence is the only thing that can speak.
+    """
+    import asyncio
+    from fastapi import HTTPException
+    from unittest.mock import MagicMock
+    from app.api.settings import SettingsUpdate, update_settings
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(update_settings(
+            body=SettingsUpdate(multimodal_max_vision_calls=bad),
+            background_tasks=MagicMock(),
+            current_user={"id": "u-seed227", "email": "t@example.com"},
+            supabase=MagicMock(),
+        ))
+    assert exc.value.status_code == 400
+    assert "between 1 and 1000" in str(exc.value.detail)
+
+
+@pytest.mark.parametrize("ok", [1, 100, 1000])
+def test_vision_call_ceiling_accepts_its_boundaries(ok):
+    """Both ends of the range are INSIDE it — an off-by-one here silently narrows
+    what an operator is allowed to choose."""
+    from app.api.settings import SettingsUpdate
+
+    assert SettingsUpdate(multimodal_max_vision_calls=ok).multimodal_max_vision_calls == ok

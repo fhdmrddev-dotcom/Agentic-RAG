@@ -587,6 +587,8 @@ export function SettingsPage() {
   const [rerankApiKey, setRerankApiKey] = useState("")
 
   // Retrieval
+  // SEED-227 — mirrors migration 044's default so a cold load matches the server.
+  const [maxVisionCalls, setMaxVisionCalls] = useState(100)
   const [retrievalTopK, setRetrievalTopK] = useState(5)
   const [retrievalThreshold, setRetrievalThreshold] = useState(0.3)
   const [hybridEnabled, setHybridEnabled] = useState(true)
@@ -658,6 +660,7 @@ export function SettingsPage() {
     setRerankModel(data.rerank_model)
     setRerankTopN(data.rerank_top_n)
     setRerankApiKey(data.rerank_has_api_key ? KEY_PLACEHOLDER : "")
+    setMaxVisionCalls(data.multimodal_max_vision_calls)
     setRetrievalTopK(data.retrieval_top_k)
     setRetrievalThreshold(data.retrieval_match_threshold)
     setHybridEnabled(data.hybrid_search_enabled)
@@ -761,6 +764,7 @@ export function SettingsPage() {
       rerank_api_key: rerankApiKey || KEY_PLACEHOLDER,
       rerank_model: rerankModel,
       rerank_top_n: rerankTopN,
+      multimodal_max_vision_calls: maxVisionCalls,
       retrieval_top_k: retrievalTopK,
       retrieval_match_threshold: retrievalThreshold,
       hybrid_search_enabled: hybridEnabled,
@@ -1351,6 +1355,17 @@ export function SettingsPage() {
                     )}
                   </>
                 )}
+              </SectionCard>
+
+              {/* Images SectionCard — SEED-227. The description carries the CONSEQUENCE,
+                  because a bare number is what this setting already was in the database. */}
+              <SectionCard
+                title="Images in documents"
+                description="How many images are read per document. Anything past this limit is not read, and the document says so on its detail panel."
+              >
+                <FieldRow label="Images read per document">
+                  <NumberInput value={maxVisionCalls} onChange={setMaxVisionCalls} min={1} max={1000} />
+                </FieldRow>
               </SectionCard>
 
               {/* Retrieval SectionCard */}

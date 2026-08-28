@@ -244,6 +244,12 @@ export interface DocumentMetadata {
    *  `status === "suggested"`; the panel section renders the accepted receipt +
    *  Undo. `undefined`/absent once the suggestion is dismissed. */
   _classification?: ClassificationSuggestion
+  /** SEED-227 — stamped by `multimodal_service._record_image_truncation` ONLY when a
+   *  document held more images than the per-document ceiling, so absent is the normal
+   *  case and means "nothing was left unread". `read` is the ceiling that applied at
+   *  ingestion time, NOT the current setting — raising the setting later does not
+   *  retroactively read the rest, and the panel must not imply that it did. */
+  _images?: { total: number; read: number }
   /** Custom (user-defined) field_keys read through. The panel renders the union of
    *  built-ins + enabled custom defs (`MetadataFieldDef`), never raw keys. */
   [key: string]: unknown

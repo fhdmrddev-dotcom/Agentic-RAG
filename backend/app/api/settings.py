@@ -65,6 +65,10 @@ class FullSettingsResponse(BaseModel):
     rerank_model: str
     rerank_top_n: int
     rerank_has_api_key: bool
+    # Multimodal (SEED-227) — migration 044's column, reachable from the product at last.
+    # It had a DB column, a loader and a live reader in multimodal_service, and NO route
+    # to any surface: `api:0 ui:0` when measured 2026-08-28.
+    multimodal_max_vision_calls: int
     # Retrieval
     retrieval_top_k: int
     retrieval_match_threshold: float
@@ -161,6 +165,8 @@ class SettingsUpdate(BaseModel):
     rerank_api_key: str | None = None      # "***" = keep; "" = clear; real = save
     rerank_model: str | None = None
     rerank_top_n: int | None = None
+    # Multimodal (SEED-227)
+    multimodal_max_vision_calls: int | None = None
     # Retrieval
     retrieval_top_k: int | None = None
     retrieval_match_threshold: float | None = None
@@ -236,6 +242,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         rerank_model=s.rerank_model,
         rerank_top_n=s.rerank_top_n,
         rerank_has_api_key=bool(s.rerank_api_key),
+        multimodal_max_vision_calls=s.multimodal_max_vision_calls,
         retrieval_top_k=s.retrieval_top_k,
         retrieval_match_threshold=s.retrieval_match_threshold,
         hybrid_search_enabled=s.hybrid_search_enabled,
@@ -402,6 +409,22 @@ async def update_settings(
         updates["rerank_model"] = body.rerank_model
     if body.rerank_top_n is not None:
         updates["rerank_top_n"] = body.rerank_top_n
+
+    # SEED-227 — the per-document ceiling on paid vision calls. BOUNDED ON WRITE, because
+    # the two ends fail in opposite and equally silent ways: 0 disables image description
+    # for the whole install while every ingestion still reports success, and an unbounded
+    # value turns one upload into an unbounded spend. Neither end announces itself, so the
+    # refusal is the only thing that can.
+    if body.multimodal_max_vision_calls is not None:
+        if not 1 <= body.multimodal_max_vision_calls <= 1000:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Images read per document must be between 1 and 1000. "
+                    "0 would silently stop every image from being read."
+                ),
+            )
+        updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
 
     if body.retrieval_top_k is not None:
         updates["retrieval_top_k"] = body.retrieval_top_k

@@ -2312,6 +2312,47 @@ carries the verdict — **⚠ absent at 16 phases (added 196)** — and this is 
 
 > ⚠ **was ABSENT at SIXTEEN phases** (196) — SC#3's scope fence lives here (`verified_models` untouched)
 
+### `backend/app/services/multimodal_service.py`
+
+**Re-derived 2026-08-28 (SEED-227): `14 commits / 7 phases / 984 L`** · six-digit dated quick-task buckets:
+**checked, none exist** · **G-5 FIRES** (7 phases vs threshold 3) — **absent from this ledger for its entire
+life**, so the guardrail could never fire on it at any count.
+
+**What SEED-227 did:** added `_record_image_truncation` and one call to it, so a document whose image count
+exceeds `multimodal_max_vision_calls` records `metadata._images = {total, read}`.
+
+**Why G-5 is honoured by construction:** one new leaf helper and one guarded call at the point where the cap
+was already applied. No change to the vision loop, the size guard, the dedup, the chunking or the embed path.
+
+**⚠ WHAT BINDS THIS FILE:**
+
+1. ⚠ **The cap has truncated in TOTAL SILENCE since Phase 072.** `test_app_settings_max_vision_calls_read`
+   has pinned since then that a cap of 3 over 10 images produces 3 describe calls — it pinned the CAPPING and
+   nothing ever pinned the TELLING. The other 7 images were unreachable *and* unmentioned, on a document
+   reporting a clean ingestion. **A green suite proved the truncation worked; nothing asked whether anyone
+   was told.**
+2. ⚠ **`documents.metadata` must be READ-MERGE-WRITTEN, never overwritten.** It is one jsonb column and
+   **two GENERATED columns read from it** — `document_type_norm` from `document_type`, `date_typed` from
+   `date`. A bare overwrite blanks a classification and a date, and the generated columns follow silently.
+   `test_truncation_note_preserves_existing_metadata` is the fence, driven RED against a planted defect.
+3. **The stamp is `_`-prefixed by CONTRACT, not by taste.** `DocumentDetailPanel` documents that it "always
+   ignores `_`-prefixed keys" and never enumerates raw metadata — that is what keeps a system fact off the
+   user's editable field list, the same contract `_confidence`, `_source` and `_classification` rely on.
+4. **Absence is the signal.** `_images` is written ONLY on truncation, so the quiet path stays quiet; a note
+   written unconditionally would warn on every document in the library and train people to ignore it.
+5. **The whole function swallows every exception by design** ("never blocks ingestion"), and the new helper
+   carries its own try/except so a metadata write can never cost the image rows that follow it.
+   `test_a_failing_metadata_write_never_costs_the_image_rows` pins that.
+6. ⚠ **The tests in `test_multimodal_extraction.py` reach the real OpenAI embeddings endpoint** and log a
+   401 with the fake key. Pre-existing, harmless to the assertions, and noted so the next reader does not
+   read it as a new failure.
+
+**The named seam, if this file is next opened for extraction:** the vision-description loop
+(`describe_image` + downscale + per-image guards) is a separable unit from the storage/chunking half below
+it; SEED-226's full-page-vision path would want that seam rather than a third branch inside this function.
+
+---
+
 ### `backend/app/services/harness/validator_kinds.py`
 
 **Re-derived 2026-08-18 (plan `196-09`): `12 commits / 5 phases / 749 L`** · six-digit dated quick-task
@@ -6148,6 +6189,22 @@ Phases touched: 190, 206.1, 211.
 **Added 2026-08-27, at Phase 212's close, by the reviewer's driven check.** Measured **34 commits /
 21 phases / 1426 lines** — it FIRES G-5 and had **no row for the project's entire life**, so the
 guardrail could never fire on it at any count.
+
+**⚠ RE-DERIVED 2026-08-28 (SEED-227): `38 commits / 21 phases / 1500 L`** — `+4 commits / +74 L` in ONE
+DAY, while the phase count held at 21. **The re-open trigger this row armed at 212's close has now FIRED:**
+its wording was *"the next phase whose `files_modified` names either of them"*, and SEED-227's settings work
+names this file. Recorded as DISCHARGED rather than left armed, because a trigger that fires and is not
+written down is indistinguishable from one that never fired.
+
+**What SEED-227 did:** one `SectionCard` ("Images in documents") added beside the existing Retrieval card,
+plus the three lines every knob on this page already needs — a `useState`, a read in the loader, a key in the
+save payload. **Honoured by construction:** no branch, no effect, no fetch; it copies the shape
+`retrievalTopK` already uses four lines above it.
+
+⚠ **The card's `description` carries the CONSEQUENCE, and that is load-bearing rather than decorative.** A
+bare number is precisely what this setting already was in the database for the whole of its life; surfacing
+the figure without saying that anything past it goes unread would make the control visible and its effect
+still invisible.
 
 ⚠ **Its recorded re-open trigger did NOT fire.** Phase 196's D-22 left this file *named-only by
 decision*, with the trigger *"the next phase whose `files_modified` names either of them"*. **Phase

@@ -2796,6 +2796,13 @@ const BASELINE = {
   "apiBarrel.test.ts": 3,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
+  // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
+  // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
+  // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
+  // fall to 1 and the gate would report OK. The load-bearing case is the ABSENCE one —
+  // `_images` is stamped only on truncation — and an absence assertion is the easiest kind
+  // to delete without anyone noticing.
+  "DocumentDetailPanel.images.test.tsx": 3,
 
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
@@ -3956,6 +3963,24 @@ const TARGETS = [
   "src/lib/__tests__/apiBarrel.test.ts",
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "src/components/settings/__tests__/ConnectionGrantsList.test.tsx",
+  // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
+  // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
+  // ── whole script returned NOTHING before this line was written. `src/components/metadata`
+  // ── is covered by no directory entry, so the gate has never EXECUTED a suite there —
+  // ── including the shipped `DocumentDetailPanel.a11y.test.tsx`.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory: adopting `src/components/metadata`
+  // would pull in the a11y and InlineEdit suites and make this change the owner of their
+  // future rot, which is the same reasoning already recorded for `src/pages` and
+  // `src/components/layout` above. Phase 218 owns the document space and can adopt the
+  // directory deliberately, with its own measured number.
+  //
+  // What would be unguarded without it: the ONLY fence on the truncation notice, whose
+  // load-bearing case is an ABSENCE — `_images` is stamped only when images were skipped,
+  // so a notice rendered unconditionally would warn on every document in the library. Both
+  // positive cases were driven RED against a planted `{false && …}` (2 failed, absence
+  // control correctly green) before this entry was written.
+  "src/components/metadata/DocumentDetailPanel.images.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

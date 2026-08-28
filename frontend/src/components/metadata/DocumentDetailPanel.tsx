@@ -227,6 +227,18 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
 
       {/* Sections — Metadata (112), then Relationships (117). 118 adds Classification. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* SEED-227 — the images this document has that were never read. Rendered ONLY
+            when the backend stamped `_images`, which it does only on truncation, so the
+            quiet case stays quiet. ⚠ Says "were read", past tense, against the ceiling
+            that applied AT INGESTION: raising the setting now does not go back and read
+            the rest, and a present-tense sentence here would promise that it had. */}
+        {doc.metadata?._images && (
+          <div className="mx-4 mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            This document has {doc.metadata._images.total} images. The first{" "}
+            {doc.metadata._images.read} were read — the rest are not searchable. Re-upload
+            it after raising the limit in Settings to read them all.
+          </div>
+        )}
         <PanelSection
           // Phase 154 Plan 02 (LANG-01 / Surface B): plain "Details" by default,
           // "Metadata" under the reveal — via the single-source term-map (D-02).

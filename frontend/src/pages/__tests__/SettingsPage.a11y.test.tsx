@@ -80,6 +80,7 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     rerank_model: "",
     rerank_top_n: 5,
     rerank_has_api_key: false,
+    multimodal_max_vision_calls: 100,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,
