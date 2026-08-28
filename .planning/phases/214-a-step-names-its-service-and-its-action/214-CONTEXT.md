@@ -306,6 +306,90 @@ or a section without a row, is drift.
   draft that can be published if the hole is missed, and STEP-03's gate is a *different* gate at a
   *different* moment.
 
+- **D-214-22 - THE PANEL TRACK IS DECIDED: THE BUILDER PANEL WIDENS TO `clamp(480px, 38%, 640px)`
+  AND VARIANT B SHIPS, GUTTER AND ALL.** Operator decision, 2026-08-28, at `/gsd:plan-phase`.
+  Sketch `214-argument-form-and-its-source` §4 drew both tracks over byte-identical content and left
+  the fork open precisely so a plan could not pick it silently.
+
+  ⚠ **THE CONSEQUENCE IS A SAME-COMMIT PIN CHANGE, AND THE PINS ARE NAMED HERE SO THE PLAN CANNOT
+  DISCOVER THEM MID-RUN** — the exact shape of Phase 213's `ConnectionFormPanel.test.tsx:571`.
+  Measured with `grep -rn "400px" frontend/src` on 2026-08-28:
+  - `frontend/src/pages/WorkflowBuilderPage.tsx:2817` — the live track:
+    `gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "400px" : "44px")`. ⚠ **The 44px collapsed
+    strip is NOT part of this decision and does not change.**
+  - `frontend/src/pages/WorkflowBuilderPage.test.tsx:167` — **asserts the literal string `"400px"`
+    on the grid style. THIS IS THE PIN.** It changes in the same commit.
+  - `frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx:367` — the test NAME says *"the shipped
+    400px form panel"*; its assertion is on panel presence, not width. **Rename, do not re-baseline.**
+  - `frontend/src/components/workflows/WorkflowCanvas.composition.test.tsx:123,234` — the shared
+    column and a 900px overflow case. ⚠ **Re-run both: the overflow arithmetic at line 234 was
+    written against a 400px panel and a wider panel moves that boundary.**
+  - Prose-only mentions to keep truthful in the same commit (no behaviour change):
+    `PhaseFormPanel.tsx:30`, `WorkflowBuilderPage.tsx:25,27,60,958,2181,2806`,
+    `ConnectionPicker.tsx:73,433`, `McpToolPicker.tsx:125,521`, `WorkflowCanvas.tsx:1337`.
+
+  ⚠ **`frontend/src/components/settings/*` 400px references are the SETTINGS panel and are NOT in
+  scope** — Settings already moved to this clamp at Phase 213. That is the point of the decision:
+  after this change the two authoring panels are ONE track, not two.
+
+  **The gutter's binding property** (sketch SC#5 / BUILD-CONTRACT row 3): the lane is a grid column
+  that **widens** — `.arow` ships `grid-template-columns: 0 minmax(0,1fr)` and `.gutter-on` widens
+  *that same column* to `118px`. It is never inserted. A sourced and an unsourced row must have
+  **identical** label-column offsets.
+
+- **D-214-23 - D-214-18's MEASUREMENT WAS TAKEN, AND IT REFUTES BOTH ARMS OF THE BINARY.** That
+  decision says *"read `workflow_phases.error` for that failed phase and compare it against the
+  `run_failed` frame"*, then branches on populated-vs-empty. **Measured against the live local DB on
+  2026-08-28 (psycopg2, `127.0.0.1:54322`), the answer is a THIRD one neither arm predicted:**
+
+  1. ⚠ **`workflow_phases` HAS NO `error` COLUMN.** Its columns are exactly
+     `id, workflow_run_id, phase_index, slug, status, output, org_id, created_at, updated_at,
+     started_at, completed_at`. The binary was posed against a column that does not exist.
+  2. ⚠ **The run the bug names — `e2c0db68-dc94-4864-b7bd-afd0e163f69b` — is ABSENT from this
+     database** (`select count(*) from workflow_runs where id = …` → **0**). It cannot be measured
+     here, so the measurement was taken over the **whole failed population instead: 43 failed phase
+     rows** — a stronger sample than one run.
+  3. ✅ **THE REASON IS CAPTURED.** It lives at **`output._failure_reason`**, written by
+     `backend/app/db/workflows.py:1835` (`payload = {**(output or {}), "_failure_reason": reason}`).
+     A real external-action failure is in there verbatim:
+     `"tool 'read_wiki_structure' refused: permission not granted"`.
+
+  **So the defect is NOT the executor's failure path and NOT the emitter. It is the READ/SERIALIZE
+  SEAM, and it has two independent halves — both must close or SC#5 stays false:**
+
+  - **(a) NOTHING PROJECTS IT.** `load_run_phases` (`backend/app/db/workflows.py:1371-1386`) selects
+    `id, slug, phase_index, status, output, started_at, completed_at` — and cannot select an error
+    column that does not exist. On the frontend, `Phase.error` is documented at
+    `frontend/src/types/index.ts:188` as *"error string from SSE terminal errorPayload … Only
+    available for live-streamed runs (not backfilled from DB)"*. **`grep -rn "_failure_reason"
+    frontend/src` returns ZERO hits.** So `classifyFailure` (`PhaseCard.tsx:236`) reads
+    `phase.error ?? ""`, finds it empty on any reconciled or reloaded run, and fires the
+    `reason_unknown` sentinel — **while the reason sits in the row.** ⚠ This is **D-v2.5-03**
+    (*Realtime is a best-effort hint, never a source of truth — always reconcile via fetch*), and it
+    is `BUG-260826-05`'s mechanism stated precisely.
+  - **(b) THE COLUMN IS A JSONB STRING SCALAR ON MOST FAILED ROWS.** Of the **43** failed phase rows:
+    **38 are `jsonb_typeof = 'string'`**; only **5 are `'object'`, of which only 2 carry the
+    `_failure_reason` key.** A reader written as `output["_failure_reason"]` therefore finds the
+    reason on **2 of 43** rows and reads empty on the rest. ⚠ **This is the SAME string-scalar trap
+    already recorded for `workflow_phases.output`** (the `declared_phase_measure` finding that killed
+    Phase 200's per-step count silently) — measured here on the FAILURE path for the first time. Any
+    projection MUST parse the string arm, and **must be driven RED against a string-scalar row**, or
+    it ships green and reads empty in production.
+
+  ⚠ **`PhaseCard.tsx:253`'s `reason_unknown` fallback is CORRECT and must not be weakened** — it is
+  an honesty mechanism. The fix is to stop it firing when the reason is known, by carrying the
+  reason; never by removing the sentinel.
+
+  ⚠ **The plan must NOT re-open this as research.** It is measured. The reproduction is
+  `select jsonb_typeof(output), count(*) from workflow_phases where status='failed' group by 1`.
+
+- **D-214-24 - NO RESEARCH.md AND NO VALIDATION.md ARE OWED FOR THIS PHASE.** Operator decision,
+  2026-08-28: plan directly from this CONTEXT.md plus the four generated BUILD-CONTRACTs. Precedent
+  is Phase 213, which shipped with neither. ⚠ **Recorded as a DECISION, not as a claim that Nyquist
+  ran** — `nyquist_validation` is `true` in `.planning/config.json`, so plans carry no Dimension-8
+  VALIDATION.md and their acceptance bars come from the sketch contracts and the failure-mode list
+  above instead.
+
 ### Claude's Discretion
 
 - The internal shape of `connectors/args.py` — function names, whether resolution and satisfiability
@@ -374,8 +458,23 @@ or a section without a row, is drift.
 **Downstream agents MUST read these before planning or implementing.**
 
 ### The G-2 acceptance bar — owed, read FIRST once it exists
-- `.planning/sketches/214-*/` — **DOES NOT EXIST YET.** The step picker with argument fields, and
-  the canvas + run node faces. Run `/gsd:sketch 214` before `/gsd:plan-phase 214`.
+- ✅ **THE G-2 BAR SHIPPED 2026-08-28 (`1d36f4057`) — four sketches, `587 assertions, 0 failing`.**
+  Each is the 213 pattern (`COPY.js` + `index.html` + `drive.cjs` + a **generated**
+  `BUILD-CONTRACT.generated.md`). **Read the four generated contracts FIRST — they are the
+  acceptance bar, and no UI-SPEC.md is owed** (operator decision 2026-08-28; CLAUDE.md G-2 and Phase
+  213's precedent, which shipped with no UI-SPEC.md):
+  - `.planning/sketches/214-argument-form-and-its-source/` (141) — the argument form + its source
+    picker. **§4 is the panel-track fork, now CLOSED by D-214-22.**
+  - `.planning/sketches/215-publish-refuses-by-name/` (129) — STEP-03's refusal.
+  - `.planning/sketches/216-the-mark-and-the-action-everywhere/` (138) — STEP-04 / STEP-05.
+  - `.planning/sketches/217-the-door-that-knows-your-services/` (179) — STEP-06.
+  - Step 1 (Stitch — never collapsed with the sketch, `SEED-155`):
+    `.planning/sketches/214-stitch-step-names-service-and-action/`.
+  ⚠ **Stitch drew `Cc` and `Reply to` rows for `send_email` that the backend STRUCTURALLY REFUSES** —
+  `smtp_adapter.INPUT_SCHEMA` (`smtp_adapter.py:293-311`) declares exactly `to`, `subject`, `body`
+  under `additionalProperties: False`, and `send()` raises `SmtpArgumentsInvalid` on any undeclared
+  key (`smtp_adapter.py:337`). **Never render a field the schema does not declare** — it would
+  typecheck, render and pass every frontend test while failing every real submission.
 - `screenshots/…workflow-edit.webp` — the **xyOps** canvas bar: named action nodes, per-node glyphs,
   typed edges. Named by the ROADMAP as this phase's canvas reference.
 - `.claude/skills/sketch-findings-agentic-rag/SKILL.md` — auto-loads; the validated design decisions
