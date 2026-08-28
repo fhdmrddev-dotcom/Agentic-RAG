@@ -124,6 +124,28 @@ branch, and **each new surface pays the branch again**.
       ⚠ BLOCKING `BUG-260815-05`. Not connector work — folded because it poisons the trustworthiness
       of every deliverable this milestone produces
 
+### The Library — the document space becomes one home
+
+⚠ **These four IDs existed only in `ROADMAP.md` until 2026-08-29.** The traceability register could
+not see Phase 217's requirements at all; they are added here at plan-time per **D-217-03**, using the
+ROADMAP's own wording. ⚠ **Phase 217 has FIVE success criteria and FOUR requirement IDs** — SC#5
+(one source of selection truth) carries no ID of its own and is tracked by the phase's success
+criteria, not by this register.
+
+- [ ] **LIB-01**: The document space is called **Library** in the nav and on the page, and
+      `IngestionPage.tsx` is renamed `LibraryPage.tsx` in the same commit
+      ⚠ The `ActiveView` key stays `"documents"` — it is never printed to a user
+- [ ] **LIB-02**: A person landing on the Library can **start an upload without hunting for it** — a
+      full-width dropzone, the real accepted formats, and the folder it will land in
+- [ ] **LIB-03**: A file being ingested shows **the six stages the pipeline actually writes**, two of
+      them conditional and struck through when skipped
+      ⛔ **Never a three-segment bar, never a percentage, never an ETA** — `onUploadProgress` is absent
+      from the upload path, so any percentage would be unknowable
+- [ ] **LIB-04**: A document's detail panel shows **what we already store and never showed**: the
+      parsed text, extracted tables **as tables**, image descriptions, its chunks, and the questions
+      that found it
+      ⚠ The data is in Postgres; **none of it was on the wire** — five new read routes are required
+
 ---
 
 ## Future Requirements — deferred, each with a re-open trigger
@@ -179,12 +201,15 @@ branch, and **each new surface pays the branch again**.
 ## Traceability
 
 Filled by `/gsd:new-milestone`'s roadmapper (2026-08-26). **Every requirement maps to exactly one
-phase: 32 / 32 mapped, no orphans, no duplicates.**
+phase: 36 / 36 mapped, no orphans, no duplicates.**
+
+⚠ **Was 32 until 2026-08-29.** `LIB-01`..`LIB-04` were added at Phase 217's plan-time (**D-217-03**) because
+they existed only in `ROADMAP.md` — this register was blind to an entire phase.
 
 ⚠ **The scoping brief said 31 requirements; this file contains 32.** `grep -c "^- \[ \] \*\*"` returns
 `32`. The roadmap is validated against the file, not against the brief.
 
-**Counts by phase:** 210 → 4 · 211 → 3 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.
+**Counts by phase:** 210 → 4 · 211 → 3 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5 · **217 → 4**.
 
 | REQ-ID | Phase | What the phase must make true | Status |
 |---|---|---|---|
@@ -220,6 +245,10 @@ phase: 32 / 32 mapped, no orphans, no duplicates.**
 | **CONN-10** | Phase 210 | No silent schedule on a scheduler-off install; the default budget does not self-cancel | Planned |
 | **CONN-11** | Phase 210 | A manual schedule trigger succeeds when `org_id` is null | Planned |
 | **RAG-09** | Phase 210 | An embedding-provider failure is reported as a provider failure | Planned |
+| **LIB-01** | Phase 217 | The surface is called Library, and the page file is renamed in the same commit | Planned |
+| **LIB-02** | Phase 217 | Upload is a real front door — a full-width dropzone with the real formats | Planned |
+| **LIB-03** | Phase 217 | Six ingestion stages in the order the pipeline writes; no percentage, no ETA | Planned |
+| **LIB-04** | Phase 217 | The detail panel renders text, tables, images, chunks, and the queries that found it | Planned |
 
 **Load-bearing order** (see `.planning/ROADMAP.md` → *The sequencing constraints*):
 **211** (`SEED-207`, the connection model) precedes **212 / 214 / 216** · **213** (per-tool approval)
