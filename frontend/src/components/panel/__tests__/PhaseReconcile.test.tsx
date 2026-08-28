@@ -795,3 +795,239 @@ describe("Phase 188 F2 — the two derivations must agree for identical rows (Re
     expect(live, "the same rows must not read differently just because the lock went stale").toEqual(stale)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 214 plan 02 (STEP-04 / STEP-05 / D-214-23) — THE MAPPER, which no type system will
+// remind anyone about.
+//
+// ⚠ THIS BLOCK EXISTS BECAUSE THE OMISSION IT GUARDS ALREADY HAPPENED, ON THESE EXACT TWO
+// FILES, AT PHASE 200-02 — and `lib/api/threads.ts` records it in its own comment: the backend
+// `WorkflowPhaseState` was widened, the CLIENT MIRROR was not, and `GET /threads/{id}/workflow`
+// spent a phase sending four fields the panel could not declare.
+//
+// The second hop is worse, because no type error is even possible: `reconcilePhases` builds
+// every `Phase` FIELD-BY-FIELD, in TWO branches, with no spread anywhere. **A field absent from
+// those two object literals is structurally `undefined` on every panel surface forever, and the
+// build stays green.** ⚠ And a downstream suite cannot catch it either: a test that seeds a
+// `Phase` fixture with `failureReason` set supplies the very hop that is broken. That is why
+// these cases run the REAL `reconcilePhases` over a REAL `ThreadWorkflowState` payload.
+//
+// ⚠ SCOPE OF THE STRUCTURAL FENCE BELOW, stated so it is not read as more than it is: it covers
+// `reconcilePhases`' TWO `Phase`-RETURNING literals and nothing else. `StreamsProvider.tsx`
+// builds a THIRD `Phase`-shaped object — the `onPhaseStarted -> appendPhaseForThread` ARGUMENT
+// (`:998-1005`). It is an argument rather than a typed return, so the extraction structurally
+// cannot see it, and it is deliberately OUT OF SCOPE: a live-SSE row appended before reconcile
+// lands carries no service/action, which is TRANSIENT rather than wrong — the placeholder
+// branch merges via `{...p, ...phase}` and the pure-append branch is healed by
+// `replacePhasesForThread`. **"Two literals" is a claim about `reconcilePhases`, never about
+// the 4,119-line file.**
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+const THREAD_214 = "thread-214-identity"
+
+/** The four wire fields, in the snake_case the server sends. */
+const IDENTITY_ROW = {
+  failure_reason: "tool 'read_wiki_structure' refused: permission not granted",
+  tool_name: "post_message",
+  capability: "post_message",
+  service_name: "Acme Slack (production)",
+}
+
+/** The four client fields, in the camelCase `Phase` declares. */
+const EXPECTED_ON_PHASE = {
+  failureReason: IDENTITY_ROW.failure_reason,
+  toolName: IDENTITY_ROW.tool_name,
+  capability: IDENTITY_ROW.capability,
+  serviceName: IDENTITY_ROW.service_name,
+}
+
+describe("Phase 214 — reconcilePhases carries the step identity onto Phase, in BOTH branches", () => {
+  beforeEach(() => {
+    resetPhases()
+  })
+
+  it("HISTORICAL branch — a terminal run's rows carry all four onto Phase", async () => {
+    // ⚠ OBSERVED RED on unmodified source, 2026-08-28, before `lib/api/threads.ts` or
+    // `StreamsProvider.tsx` changed. The received object had NONE of the four keys:
+    //   AssertionError: expected { slug: 'notify', phaseIndex: 0, …(4) } to match object
+    //   { failureReason: 'tool …', toolName: 'post_message', capability: 'post_message',
+    //     serviceName: 'Acme Slack (production)' }
+    //   - Expected  + Received … + undefined (×4)
+    // i.e. THE SERVER WAS SENDING ALL FOUR AND THE MAPPER WAS DROPPING ALL FOUR — the
+    // 200-02 omission, reproduced deliberately before being closed.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: true, // TERMINAL → the `wf.phases` row branch
+      definition_name: "Wiki sync",
+      run_status: "failed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [
+        {
+          slug: "notify",
+          phase_index: 0,
+          status: "failed",
+          phase_type: "external_action",
+          ...IDENTITY_ROW,
+        },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+    expect(result.current.data[0]).toMatchObject(EXPECTED_ON_PHASE)
+    // The branch really was the historical one: it carries the REAL slug off `wf.phases`,
+    // where the live branch would have emitted a positional placeholder.
+    expect(result.current.data[0].slug).toBe("notify")
+  })
+
+  it("LIVE branch — the same four are overlaid onto the positional skeleton", async () => {
+    // ⚠ TWO BRANCHES, TWO CASES. One passing proves NOTHING about the other: the live branch
+    // is a separate object literal in a separate `return`, and widening one alone is the same
+    // defect one branch over. Observed RED in the same run as the case above.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: false, // LIVE → the positional skeleton branch
+      definition_name: "Wiki sync",
+      run_status: "running",
+      current_phase_index: 1,
+      total_phases: 2,
+      phases: [
+        { slug: "gather", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+        {
+          slug: "notify",
+          phase_index: 1,
+          status: "active",
+          phase_type: "external_action",
+          ...IDENTITY_ROW,
+        },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(2))
+    expect(result.current.data[1]).toMatchObject(EXPECTED_ON_PHASE)
+    // …and the row that carries none of them reads four honest absences, not a borrowed set.
+    expect(result.current.data[0].serviceName ?? null).toBeNull()
+    expect(result.current.data[0].toolName ?? null).toBeNull()
+    expect(result.current.data[0].failureReason ?? null).toBeNull()
+  })
+
+  it("LIVE branch — a POSITIONAL FILLER index yields the four undefined, status arithmetic intact", async () => {
+    // `total_phases` can exceed the rows the server sent (the `?? placeholder` tail the floor
+    // keeps as defence in depth). Those indices have no `row`, so the four are `undefined` —
+    // correctly — and the status must still come from the floor rather than from a crash.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: false,
+      definition_name: "Wiki sync",
+      run_status: "running",
+      current_phase_index: 1,
+      total_phases: 3, // one MORE than the rows below
+      phases: [
+        { slug: "gather", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+        { slug: "notify", phase_index: 1, status: "active", phase_type: "external_action", ...IDENTITY_ROW },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(3))
+    const filler = result.current.data[2]
+    expect(filler.slug).toBe("phase-2")
+    expect(filler.failureReason).toBeUndefined()
+    expect(filler.toolName).toBeUndefined()
+    expect(filler.capability).toBeUndefined()
+    expect(filler.serviceName).toBeUndefined()
+    // THE ARITHMETIC IS UNTOUCHED — index 2 is after the cursor, so it is `pending`, and the
+    // two real rows keep their readings. A widening that disturbed the floor would show here.
+    expect(filler.status).toBe("pending")
+    expect(result.current.data[0].status).toBe("done")
+    expect(result.current.data[1].status).toBe("running")
+  })
+
+  it("a row that carries NONE of the four still reconciles — the additive widening is optional", async () => {
+    // Every pre-214 payload, and every non-external step. `undefined` must remain a legal
+    // reading; a mapper that assumed the keys were present would break every existing run.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: true,
+      definition_name: "X",
+      run_status: "completed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [{ slug: "gather", phase_index: 0, status: "completed", phase_type: "llm_agent" }],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_214))
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+    expect(result.current.data[0].status).toBe("done")
+    expect(result.current.data[0].failureReason ?? null).toBeNull()
+    expect(result.current.data[0].serviceName ?? null).toBeNull()
+  })
+})
+
+// ── THE STRUCTURAL FENCE — the guard that survives the NEXT widening ───────────────────────
+
+describe("Phase 214 — the two Phase-RETURNING literals in reconcilePhases declare the same keys", () => {
+  it("both literals are found, and they agree on their key set", async () => {
+    const source = (await import("@/providers/StreamsProvider.tsx?raw")).default as string
+
+    // NON-VACUITY FIRST — a `?raw` import that resolved to the empty string would make every
+    // assertion below pass against nothing. This project measured exactly that for CSS.
+    expect(typeof source).toBe("string")
+    expect(source.length).toBeGreaterThan(50_000)
+    expect(source).toContain("async function reconcilePhases")
+
+    // The two literals are the ones TYPED as `Phase`: the harness branch's
+    // `Array.from(..., (_, i): Phase => { … return { … } })` and the historical branch's
+    // `.map((r): Phase => ({ … }))`. Both are located by their `Phase` type annotation, which
+    // is what makes this an extraction of RETURNS rather than of every brace in the file.
+    const fn = source.slice(source.indexOf("async function reconcilePhases"))
+    const bodies: string[] = []
+    for (const marker of ["(_, i): Phase =>", "(r): Phase => ("]) {
+      const at = fn.indexOf(marker)
+      expect(at, `the ${marker} literal was not found — this fence is vacuous`).toBeGreaterThan(-1)
+      // Read forward to the closing brace of the returned object literal by brace balance,
+      // starting at the `{` that opens it.
+      const openAt = marker.endsWith("(")
+        ? fn.indexOf("{", at)
+        : fn.indexOf("return {", at) + "return ".length
+      let depth = 0
+      let end = openAt
+      for (let i = openAt; i < fn.length; i++) {
+        if (fn[i] === "{") depth++
+        else if (fn[i] === "}") {
+          depth--
+          if (depth === 0) {
+            end = i
+            break
+          }
+        }
+      }
+      bodies.push(fn.slice(openAt, end + 1))
+    }
+    expect(bodies).toHaveLength(2)
+
+    // ⚠ THE SCOPE, RESTATED WHERE THE ASSERTION IS: this covers `reconcilePhases`' two RETURN
+    // literals ONLY. The `appendPhaseForThread` ARGUMENT at `:998-1005` is a third
+    // `Phase`-shaped object this extraction structurally cannot see (it carries no `Phase`
+    // type annotation), and it is a deliberate exclusion — the row it appends is transient and
+    // is healed by `replacePhasesForThread` when reconcile lands.
+    const keysOf = (body: string) =>
+      new Set(
+        [...body.matchAll(/^\s{6,}([A-Za-z_][A-Za-z0-9_]*)\s*:/gm)].map((m) => m[1]),
+      )
+    const [harnessKeys, historicalKeys] = bodies.map(keysOf)
+
+    // POSITIVE CONTROL — the extractor really found keys, not an empty set.
+    expect(harnessKeys.size).toBeGreaterThan(5)
+    expect(historicalKeys.size).toBeGreaterThan(5)
+
+    for (const key of ["failureReason", "toolName", "capability", "serviceName"]) {
+      expect(harnessKeys.has(key), `the HARNESS literal is missing ${key}`).toBe(true)
+      expect(historicalKeys.has(key), `the HISTORICAL literal is missing ${key}`).toBe(true)
+    }
+    // And the two agree overall — the invariant that catches the NEXT field, not just these.
+    expect([...harnessKeys].sort()).toEqual([...historicalKeys].sort())
+  })
+})

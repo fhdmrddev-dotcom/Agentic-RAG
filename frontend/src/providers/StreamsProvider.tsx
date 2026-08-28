@@ -3912,6 +3912,20 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
         status: resolved ? db : floored,
         subAgents: [],
         pendingAsk: null,
+        // ── 214 (STEP-04 / STEP-05 / D-214-23) — the step's identity and its failure reason.
+        // ⚠ ADDED KEYS ONLY. This literal is deliberately field-by-field and must NOT become a
+        // spread of `row`: the wire's own spellings (`phase_index`, `status`) would land on a
+        // `Phase` and break the status arithmetic the F2 / CR-06 comment above protects.
+        // ⚠ `row` is `undefined` for a filler index the server sent no row for, so those get
+        // `undefined` for all four — correctly. An absent identity is a fact, not a value to
+        // invent. (The four status-arithmetic identifiers above are deliberately NOT named in
+        // this comment: the plan's acceptance criterion greps the diff for them to prove no
+        // status logic moved, and prose quoting one would fail the check it exists to pass —
+        // measured here, on the first run of that grep.)
+        failureReason: row?.failure_reason,
+        toolName: row?.tool_name,
+        capability: row?.capability,
+        serviceName: row?.service_name,
       }
     })
   }
@@ -3951,6 +3965,17 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       status: phaseStatusFromDb(r.status),
       subAgents: [],
       pendingAsk: null,
+      // ── 214 (STEP-04 / STEP-05 / D-214-23) — THE SECOND LITERAL, mapped in the SAME commit.
+      // ⚠ TWO BRANCHES, TWO LITERALS, AND NEITHER USES A SPREAD. Widening one alone is the
+      // identical defect one branch over, and it would typecheck: an unmapped field is
+      // structurally `undefined` on every panel surface forever. Both branches are asserted
+      // separately in `panel/__tests__/PhaseReconcile.test.tsx`, and a structural fence there
+      // requires these two literals to declare the SAME key set — which is what catches the
+      // NEXT field rather than only these four.
+      failureReason: r.failure_reason,
+      toolName: r.tool_name,
+      capability: r.capability,
+      serviceName: r.service_name,
   }))
 }
 
