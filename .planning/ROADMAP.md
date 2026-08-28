@@ -242,10 +242,10 @@ Plans:
 **Plans**: 16 plans in 5 waves
 
 Plans:
-- [ ] 214-01-PLAN.md - `connectors/args.py` leaf cut (D-214-00): one shared resolve/satisfiability predicate for the executor AND the publish gate, plus `ExternalActionPhaseConfig.arg_sources` with URL-refusing validators
-- [ ] 214-02-PLAN.md - the run-phase read seam (D-214-23): `output._failure_reason` projected through `phase_output_object` on the jsonb STRING-SCALAR arm, both wire models widened in one commit, every `lib/api/workflows.ts` widening the phase needs, **and the client mirror + `reconcilePhases`' two field-by-field literals** — the hops Phase 200-02 missed on this same file
-- [ ] 214-03-PLAN.md - the four governed vocabularies (`argumentVocabulary` / `publishRefusalVocabulary` / `stepIdentityVocabulary` / `doorVocabulary` additions), each suite re-parsing its generated BUILD-CONTRACT
-- [ ] 214-04-PLAN.md - the panel track widens to `clamp(480px, 38%, 640px)` (D-214-22) with its named pins, the 44px strip newly pinned, and the 900px overflow arithmetic re-run
+- [x] 214-01-PLAN.md - `connectors/args.py` leaf cut (D-214-00): one shared resolve/satisfiability predicate for the executor AND the publish gate, plus `ExternalActionPhaseConfig.arg_sources` with URL-refusing validators
+- [x] 214-02-PLAN.md - the run-phase read seam (D-214-23): `output._failure_reason` projected through `phase_output_object` on the jsonb STRING-SCALAR arm, both wire models widened in one commit, every `lib/api/workflows.ts` widening the phase needs, **and the client mirror + `reconcilePhases`' two field-by-field literals** — the hops Phase 200-02 missed on this same file
+- [x] 214-03-PLAN.md - the four governed vocabularies (`argumentVocabulary` / `publishRefusalVocabulary` / `stepIdentityVocabulary` / `doorVocabulary` additions), each suite re-parsing its generated BUILD-CONTRACT
+- [x] 214-04-PLAN.md - the panel track widens to `clamp(480px, 38%, 640px)` (D-214-22) with its named pins, the 44px strip newly pinned, and the 900px overflow arithmetic re-run
 - [ ] 214-05-PLAN.md - STEP-03's publish gate: five lint codes joining `LINT_CODES` + `/workflows/validate` in one commit, the pre-golden-run block, and the golden run validating resolved arguments while sending nothing
 - [ ] 214-06-PLAN.md - the approval pause names the service (D-214-14) and shows the RESOLVED argument object (D-214-15), with the composer still pure and the receipt untouched
 - [ ] 214-07-PLAN.md - the argument editor: a field per declared `inputSchema` property with a three-arm source picker and the widening source gutter; `MCP_TOOL_ARGS_LABEL` and its `<Textarea>` DELETED with nothing replacing them

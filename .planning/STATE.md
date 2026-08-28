@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
-last_updated: "2026-08-28T00:00:00.000Z"
-last_activity: 2026-08-28 -- Phase 214 PLANNED: 16 plans / 5 waves, 3 verification rounds, 6 blockers found and closed. Five of the six were one class -- a value one plan writes and another reads, with the file in the middle owned by no plan.
+last_updated: "2026-08-28T05:48:56.869Z"
+last_activity: 2026-08-28
 progress:
   total_phases: 14
-  completed_phases: 6
-  total_plans: 38
-  completed_plans: 22
-  percent: 43
+  completed_phases: 3
+  total_plans: 37
+  completed_plans: 16
+  percent: 21
 ---
 
 # Project State
@@ -32,12 +32,13 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase **214** — ✅ **PLANNED 2026-08-28: 16 plans in 5 waves, ready to execute.** The panel-track fork is CLOSED (D-214-22) and the G-2 obligation was discharged at sketch. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
+**Current focus:** Phase 214 — a-step-names-its-service-and-its-action
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: **214 (a-step-names-its-service-and-its-action) — PLANNED 2026-08-28** (`4fa3b7f07`).
+Phase: 214 (a-step-names-its-service-and-its-action) — EXECUTING
+Plan: 1 of 16
 **16 plans in 5 waves. Next: `/gsd:execute-phase 214`** — worktrees are ENABLED and wave 1 has four
 genuinely parallel plans with zero `files_modified` overlap. ⚠ Carry `GSD_VITEST_MAX_WORKERS=2`, and
 `bash scripts/bootstrap-worktree.sh "$(pwd)"` as every executor's FIRST action.
@@ -67,22 +68,26 @@ mitigation) rather than left as a reviewer's judgement.
    the existing postMessage payload"*. SC#2 would have shipped **one of three** doors (schedule
    worked). ⚠ `214-14`'s own seam test **passed green over it**, handing `run_inputs` straight to
    `resolve_arguments` in-process. → new plan **`214-16`**.
+
 2. ⭐ **AND THE MECHANICAL SWEEP FOUND A SIXTH SITE NOBODY HAD NAMED:
    `backend/app/services/workflow_kickoff.py:500`** builds a SECOND copy of the run-inputs dict for
    the live `ctx.inputs`, under an F8 comment reading *"Mirror EXACTLY what was persisted"* **since
    Phase 092, with nothing checking it**. Widening only `threads.py` would have shipped a workflow
    whose **first run sees no declared values and whose resumed run sees them all** — reproducing only
    on resume. It has no ledger row and never has had one.
+
 3. **The failure reason and step identity never reached the chat panel** — `lib/api/threads.ts`'s
    client mirror was unwidened and `StreamsProvider::reconcilePhases` builds every `Phase`
    **field-by-field, not by spread**, so a widened type propagates NOTHING while typechecking
    cleanly. ⚠ **The file itself carries a comment recording this exact omission happening at
    `200-02`** — a plan repeated it against a warning written in the file it was editing.
+
 4. **`WorkflowRunPhaseRead`'s identity fields were WIDENED by a task and POPULATED by none**, and the
    only assertion was `set(model_fields) >= {...}` — a **declaration** check that "passes unchanged
    on a field that is `None` on every row for the life of the product". ⚠ **The null arm renders
    honestly**, so `RunSpine` + `RunStepList` would have shipped serviceless forever with every test
    green — the `declared_phase_measure` / Phase 198 shape, recorded here for the third time.
+
 5. **Gate/executor schema provenance was unspecified.** The two agreement tests pass ONE schema
    object to both predicates, proving `f(s) ≡ g(s)` and **structurally blind to `s_gate ≠ s_executor`**
    — `BUG-260826-02` restated one level up. Closed by a seventh `args.py` export,
@@ -188,12 +193,15 @@ vary**. D-214-15 composes the sentence AFTER resolution instead. D-213-14 is unt
 never written to the ledger.
 
 ⭐ **Three decisions a planner must not re-derive:**
+
 - **STEP-01 is already HALF-BUILT.** 211-04 deleted the two radiogroups and shipped *one question,
   then one question*. What remains is the **arguments** — specifically deleting
   `MCP_TOOL_ARGS_LABEL = "Tool Arguments (JSON)"` (`McpToolPicker.tsx:68`), and **no JSON escape
   hatch replaces it anywhere**, because that box under another name is the surface SC#1 forbids.
+
 - **`descriptors.py:169` already emits `inputSchema` for BOTH shapes** — one field renderer, one
   source, no branch. It is the single most load-bearing asset in the phase.
+
 - **The upstream binding stores a phase SLUG and passes that phase's WHOLE output.** No dotted
   paths, no `{{ }}`, no `output_key` sub-picker — `output_keys` is unverified author-declared text,
   so a sub-picker could offer a key that never arrives, which is `BUG-260826-01`'s shape one level up.
@@ -246,11 +254,13 @@ third).**
    same value in both slots → **`It will run "post_message" through post_message.`** — a tautology.
    The service a person needs is *Slack*, which sits on the connection row and is not resolved
    because the composer is pure. **Driven verbatim on both shapes.** → **route to 214.**
+
 2. ⚠ **The override marker overclaims — "You changed this" on rows nobody changed.**
    `isOverridden` is keyed on **key presence** (`ConnectionGrantsList.tsx:29`), and migration 128 §3
    backfills an explicit key onto every capability row. Slack's `post_message` shows the marker and
    **no person can have set it** — the control was unreachable for that shape until `09bfcb95f`, the
    same day.
+
 3. ⚠ **The `approval_required` arm is UNREACHABLE from a workflow, and the drive proved it rather
    than assuming it.** A step authored `action_risk_armed: false` still emitted
    `action_risk_pending` — the armed checkpoint is structural on `external_action`
@@ -280,9 +290,11 @@ operation** as the backend deploy: the column carries the fail-closed default, a
 - ⚠ **An absent `tool_grants` key flips from DENY to INHERIT.** GRANT-02 requires it; the safety
   moves one level up — a connection's `default_posture` has an **"Ask first" floor** and reaches
   Allow only by a deliberate act. Nothing is armed by a row merely existing.
+
 - ⚠ **Migration 128 grandfathers PER SHAPE.** MCP rows are gated today (absent = denied);
   capability rows are **not gated at all** (`BUG-260827-02`). One uniform backfill breaks one of
   the two populations — deny-everything breaks every shipped external_action workflow silently.
+
 - ⚠ **Measured, not assumed:** `ChatLayout.launch.test.tsx:502` asserts `WorkspacePanel` mounts
   **only** in the chat branch, so `PendingAskCard` does not exist on `WorkflowRunPage` — a
   library-launched run that pauses has nowhere to be answered. Same shape as the Phase 194
@@ -301,7 +313,7 @@ refactor by construction: the gate leaves into `backend/app/services/connectors/
 prose pointed at them). `SEED-214` → `status: partially-folded`, with the unlock/filling split
 recorded and triggers 2–4 named as still live. `SEED-188` (prompt injection) left planted with
 **216** as its trigger — 213 ships no read path.
-Status: ✅ **Phase 212 CLOSED 2026-08-27**, all five driven defects fixed and operator-confirmed.
+Status: Executing Phase 214
 It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
 the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
 waves + 2 gap-closure rounds + 5 defect fixes. Full record:
@@ -331,10 +343,12 @@ opposite responses.** Rule written to `BUS-023`.
 * **`BUG-260827-02`** — Gate 6 (`phase_types.py:2511`) is nested inside `if
   connection.mcp_server_url:`, so `tool_grants` is enforced for **MCP rows only** and a Slack, Jira
   or SMTP send consults **no grant at all**. Closes as GRANT-04.
+
 * **`SEED-214`** — `connector_connections.capability` is a **single column**, so a first-party
   connection **structurally holds one action**. Measured on the operator's own rows: **GitHub 44 ·
   DeepWiki 3 · Slack 1 · Jira 1 · Email 1.** 213's SC#1 (*"every tool a connection offers in one
   list"*) is **unsatisfiable as written** without the unlock.
+
 * ⭐ **ORDERING IS BINDING** — the grant gate closes **before or with** the unlock, never after. A
   connection that can hold many actions with no per-tool gate is every one of them armed by the row
   merely existing.
@@ -361,10 +375,11 @@ not free.
 
 * `/code-review ultra` on `ac159cc7`, `474ef7ea`, `724f9b9f`, `4aa28090` — **every fix in this phase
   is reviewer-authored with no independent verifier.**
+
 * **Cloud drive of SC#3.** `BUG-260810-01` stays `folded`, never `closed`, until then.
 * **Rovo connector detail screenshot** for 213's design bar (`BUS-019`) — the one the ROADMAP cites
   is not in `screenshots/`.
-Last activity: 2026-08-27 — reviewer driven check + `ac159cc7`.
+Last activity: 2026-08-28
 
 **Gates at close** (verbatim, re-derived): tsc **34** (baseline held) · count gate **OK, 118/118
 pinned, total 5847, failed 0** (116→118: both new suites pinned, the preflight GATE-1 fix) ·
@@ -406,12 +421,14 @@ fixed, two OPEN. Full record: §9 of `212-VERIFICATION.md`.
 - **D-1 SNI lost on the IP pin** ✅ `ac159cc7` — broke ALL MCP discovery, incl. Phase 206's shipped path.
 - **D-2 `list_tools` rejected the route's own `timeout` kwarg** ✅ `474ef7ea` — `POST /discover-tools`
   had **never once succeeded**.
+
 - **D-3 the upstream reason was computed, sent, then discarded** ✅ `724f9b9f`.
 - ⛔ **D-4 OPEN — a SAVED MCP connection can never discover its tools.** The panel imports only
   `probeMcpServer` (pre-save) and never `discoverConnectorTools(id)`. In edit mode `draft.secret` is
   empty BY DESIGN, so the probe sends no credential. Measured: Notion and GitHub both hold
   `secret_ciphertext` and both still failed *missing Authorization*; the operator regenerated both
   tokens, which changed nothing because no token was ever sent.
+
 - ⛔ **D-5 OPEN — 3 of 7 Popular services have NO configurable form.** Driven: typing `github` or
   `notion` reveals only Name; `custom_mcp` reveals URL + token; `slack` reveals Channel + Bot token.
   Field reveal is keyed on three hard-coded ids, not on catalog shape. **This is SC#3 failing.**
@@ -464,10 +481,12 @@ scheduled at 03:00? Put it to the operator at 213's discuss-phase.
    `has_a_service_identity` + `shape_is_not_ambiguous` present, migration 126's `shape_is_one_of_two`
    gone. ⚠ `211-05-SUMMARY.md` claimed this was owed AND that `docker` is denied to the agent —
    **both were wrong**, and the summary is corrected in place.
+
 2. ⭐ **`/code-review ultra review-210-211-base`** — 46 files / 5,784 lines, both phases' source
    in one pass. It is the ONLY independent gate on **two reviewer-authored fixes that have no
    verifier** (`7bd77065` W-1, `ca015df9` SC#10). Branch built in `.claude/worktrees/revbase`;
    tear down with `scripts/teardown-worktree.sh` afterwards, and **never `rm -rf`** it.
+
 3. **211's five per-shape UAT rows + four G-4 lived-experience checks.** Row 5 is named as the one
    to run first; **row 3 (SMTP · `send_email`) is ⛔ BLOCKED** — no such connection exists here
    (the table holds `slack`, `jira`, `mcp.deepwiki.com`).
@@ -491,6 +510,7 @@ rewritten in the same commit → 14 passed. Baseline held: `tests/unit` 68 faile
   still stack-trace-shaped on the surface whose whole discipline is not over-claiming. Kept asserted
   in §7 so it cannot quietly vanish; it is now the report's `re_open_trigger` (OAuth / Phase 215, or
   the next touch of the closed-set guard). **A phase that reads only the `✅` will ship over it.**
+
 - **G-5 ON `phase_types.py` IS NOW OWED, NOT HONOURED.** Its ledger row read *honoured by
   construction (211)* purely because the phase's diff was EMPTY. It is no longer empty, and this was
   a G-3 fast fix with **no review cycle** — the right instrument for four lines, the wrong one for a
@@ -509,24 +529,30 @@ PASSED at iteration 2 — 0 blockers / 2 warnings, both applied inline).** Wave 
 **Phase: 210 — Ground Truth — Operability & Failure Honesty — ✅ COMPLETE (3/3 plans), closed
 2026-08-26 WITH OWED ROWS.** Closed as a DECISION, not as a claim everything passed —
 `210-VERIFICATION.md` carries the full record.
+
 - **SC#1 DRIVEN and passing** (kill-switch both ways, DB-verified, refusal observed, install restored).
 - **SC#2 / #3 / #4 shipped but NOT DRIVEN** — blocked on absent test data, not on defects: the schedule
   door needs a `provenance === "published"` row and this install has none (`Yours 0`), and
   `workflow_schedules` holds 0 rows. ⚠ **SC#3 is structurally unreachable through the UI** — the lift
   fires only on an exact `50_000` while the modal now defaults to `500_000`.
+
 - **SC#5 code-complete, never observed** against a real embedding outage.
 - ⚠ **SC#10 was NEVER RUN.** The ROADMAP binds 210 to SC#10 with the **embedding** roster
   (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible), and no row was executed. That is the axis
   where W-1's residual weakness lives — the provider name falls back to substring-matching base URLs.
 
 ⚠ **GUARDRAIL / SEPARATION OVERRIDES — audited, per AGENTS.md §6.3:**
+
 1. **No independent verifier exists for SC#5's W-1 fix.** Gemini authored it, ran out of quota, and the
    **reviewer committed it** (`7bd77065`, disclosed in that commit message). `/code-review ultra` —
    operator-only — is the outstanding gate.
+
 2. **The reviewer drove the UAT** because the builder was out of quota and the operator authorised it.
    Correct seat under §3.1; the before-state was captured before any browser touched the install.
+
 3. **W-2 has NO OPERATOR RULING.** `705a7412` modified `phase_types.py`, which BUS-006 ruled 210 would
    leave inside 211's fence — and 211 has since committed into that same file.
+
 4. **A reviewer claim was WRONG and is corrected in `210-REVIEW.md`, not edited away** — the W-1
    "names the wrong provider on this install" assertion. `_val()` falls back to the env var, so a
    dedicated embedding key is set and the client really points at OpenAI.
