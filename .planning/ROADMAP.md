@@ -360,6 +360,22 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
   4. A document's detail panel shows **what we already store and never showed**: the parsed text, extracted tables **as tables**, image descriptions, its chunks, and the questions that found it (LIB-04).
   5. A saved View is reachable as a tab **and** from the sidebar, from **one source of selection truth** — the two renderings can never disagree.
 
+**Plans:** 12 plans in 6 waves (planned 2026-08-29)
+
+Plans:
+- [ ] 217-01-PLAN.md — the wire's four new document fields, the five response models, the stage-applicability predicates
+- [ ] 217-02-PLAN.md — GET /content, /chunks, /tables, /images (user-JWT, threadpooled, 404-before-read)
+- [ ] 217-03-PLAN.md — GET /queries in its own uniformly service-role module (the audit_log carve-out)
+- [ ] 217-04-PLAN.md — the rename: LibraryPage.tsx, the nav label, the ledger row + anchor, the rename fence
+- [ ] 217-05-PLAN.md — librarySelection: one discriminated union + a pure reducer (SC#5's mechanism)
+- [ ] 217-06-PLAN.md — the shared ui/tabs primitive: the --tab-active token pair and the inset ring
+- [ ] 217-07-PLAN.md — the front-door dropzone and ONE accepted-formats constant, fenced against the server
+- [ ] 217-08-PLAN.md — the six-stage ingestion strip in backend write order + the wire types + the sketch's stage order
+- [ ] 217-09-PLAN.md — the four-tab Library shell: Documents · Views · Ingestion · Indexing, on one selection truth
+- [ ] 217-10-PLAN.md — five client fns + the guarded barrel + the Content and Chunks sections (lazy on expand)
+- [ ] 217-11-PLAN.md — tables as tables, image descriptions, the questions that found it
+- [ ] 217-12-PLAN.md — count-gate adoption (both knobs), the seam audit, and the blocking G-4 drive
+
 ⚠ **G-5 fires on five files in this blast radius** (`DocumentList.tsx` 12 phases, `IngestionPage.tsx` 9, `DocumentDetailPanel.tsx` 5, `useDocuments.ts` 3, and `retrieval_service.py` 9 if touched). All ten document-space rows were added at `8b99c19b2`; **read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.**
 
 #### Phase 218: The Library Knows How It Is Used
@@ -427,7 +443,7 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 | 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
 | 215. BYO OAuth | 0/? | Not started | - |
 | 216. Connections in Chat, and One File In by Hand | 0/? | Not started | - |
-| 217. The Library — One Home for Documents | 0/? | Not started — ⭐ **startable now** (no dependency) | - |
+| 217. The Library — One Home for Documents | 0/12 | Planned — 12 plans in 6 waves; ⭐ **startable now** (no dependency) | - |
 | 218. The Library Knows How It Is Used | 0/? | Not started — depends on 210 (shipped) + 217 | - |
 | 219. A Connected Source Feeds the Library | 0/? | Not started — depends on **215** + 216 | - |
 | 220. A Drawing Becomes Quantities — SPIKE | 0/? | Not started — depends on 217. Extraction half already proven by two committed probes (`SEED-226`) | - |
