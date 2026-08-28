@@ -583,7 +583,18 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # adds no module-scope registry importer and joins no cycle. The fence fired on the line
     # move, exactly as the paragraph above says it should, and the number is re-derived here
     # rather than inherited.
-    assert module_scope_importers == ["app/services/harness/phase_types.py:107"], (
+    #
+    # ⚠ AND AGAIN, 107 -> 114, at Phase 214.1-03 (BUG-260828-03): `phase_types` gained a
+    # module-top `from app.services.harness.publish_service import _clean_label` — ONE
+    # scrubber, TWO callers, so a remote-server-advertised `tool_name` reaching a system
+    # prompt goes through the SHIPPED Unicode-category scrub + 72-char clamp rather than a
+    # second copy of one. THE IMPORTER SET IS UNCHANGED: `publish_service` has no app-level
+    # module-top imports AT ALL (logging, unicodedata, UUID — everything heavier is
+    # function-local) and the `harness` package `__init__` never loads it, so it adds no
+    # module-scope registry importer and closes no cycle. Proven by a real fresh import
+    # before the line was written. The fence fired on the line move; the number is
+    # re-derived, the property is not.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:114"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "
