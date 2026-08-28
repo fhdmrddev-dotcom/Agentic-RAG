@@ -288,7 +288,7 @@ recipient a person typed at launch.
 
 Plans:
 - [x] 214.1-01-PLAN.md - the authoring surface: the pure leaf that refuses reserved/duplicate/empty keys and derives the definition's own undeclared ask keys, `setDeclaredInputs` as the SIXTH `meta` writer, the definition-level editor behind ONE gated line, and the save path PROVED at the parsed PATCH body rather than assumed (SC#1)
-- [ ] 214.1-02-PLAN.md - ⭐ THE REACHABILITY PROPERTY (empty builder → published, mocking neither the store nor the API, fenced so seeding it FAILS it) + the describe door emitting `inputs[]` by prompt AND by a `model_copy` derivation on the single success path + every shared-registry edit this phase owes (SC#2, SC#4)
+- [x] 214.1-02-PLAN.md - ⭐ THE REACHABILITY PROPERTY (empty builder → published, mocking neither the store nor the API, fenced so seeding it FAILS it) + the describe door emitting `inputs[]` by prompt AND by a `model_copy` derivation on the single success path + every shared-registry edit this phase owes (SC#2, SC#4)
 - [x] 214.1-03-PLAN.md - `BUG-260828-04` DIAGNOSED against the byte-exact live payload across THREE hypotheses (classification defect / stale bundle / ⚠ `ProblemsTray`, which renders the diagnostic verbatim BY DESIGN) with a CSS clamp forbidden in every arm, and `BUG-260828-03` answered by a pure `_wired_services_block` at all three prompt-composition sites (SC#3, SC#5)
 
 **UI hint**: yes
