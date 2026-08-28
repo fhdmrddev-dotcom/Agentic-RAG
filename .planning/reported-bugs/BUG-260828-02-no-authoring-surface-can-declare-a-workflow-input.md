@@ -43,6 +43,21 @@ That refusal is right. But there is no surface anywhere that can declare the inp
 the author is stuck in a loop with no exit. The only way to send an email today is to hardcode the
 recipient with **"Set here"** — which is exactly the state `BUG-260826-01` describes.
 
+## ⚠ CORRECTION 2026-08-28 (Phase 214.1 planning) — one claim below is a TRUE GREP with a
+## POSSIBLY FALSE CONCLUSION
+
+*"`lib/api/workflows.ts` never sends `inputs`: zero occurrences"* is literally true and may still
+be the wrong inference. `updateWorkflowDraft` sends `JSON.stringify(def)` with **no field
+whitelist**, and `useDraftPersistence.ts:619` hands it `selectDefinition(snapshot)` whole — so
+`inputs` present on `meta` would ship ALREADY, without the symbol ever appearing in that file.
+
+The grep proved the absence of a NAME, not the absence of a BEHAVIOUR. Phase 214.1-01 treats it as
+diagnose-then-act with a driven assertion on the parsed request body, and forbids inventing a field
+whitelist that would defend nothing.
+
+**The headline claim is unaffected**: nothing can CREATE a declared input, which is what makes
+*Asked when this runs* a dead end. Only that one bullet's conclusion is in question.
+
 ## Measured, not inferred (2026-08-28)
 
 - `frontend/src/components/workflows/builderStore.ts` has **no action** that writes
