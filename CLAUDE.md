@@ -238,6 +238,47 @@ fresh worktree false-failed every plan:
    (`library/WorkflowCard.test.tsx`, `WorkflowsPage.test.tsx`) sat inside this phase's blast radius and
    were EDITED by it, and both were green on the first run of every invocation.
 
+   ---
+
+   ### ⚠ CORRECTION 2026-08-28 (Phase 214, plan `214-15`) — THE FIFTH ROT, AND IT TOOK NINE DAYS. Every prior set of figures is preserved above, never overwritten.
+
+   Re-derived on the phase's merge base — quiet tree, **no sibling agent**, run from the **repo root**,
+   verdict line read **verbatim** rather than summarised:
+
+   ```
+     total                                      5266    6355   +1089
+     total 6355  ·  failed 0  ·  pinned total 5266
+   count gate OK — 120/120 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-08-19 said | **measured 2026-08-28** |
+   |---|---|---|
+   | grand total | 4594 | **6355** |
+   | pinned total | 4328 | **5266** |
+   | pinned files | 92/92 | **120/120** |
+
+   ⚠ **READ THE DATES: `4594` was 2026-08-19 and this is 2026-08-28 — NINE DAYS, and `+1761` cases.**
+   The four rots before this took one, two, two and two days; **the rate has not slowed, and the gap
+   here is a gap in RE-DERIVATION, not in growth.** That is the point of publishing a trajectory rather
+   than a number: **a plan that reads a bigger figure than this paragraph quotes has read the correct
+   current one.** Re-derive rather than doubt it, always from the repo root.
+
+   ⚠ **`+1089` OF THE GAP IS UNPINNED SUITES, NOT NEW CASES** — the grand total exceeds the pinned total
+   by exactly the suites nobody has adopted. Phase 214's close pinned **twelve** of them from the gate's
+   own printed `— N new` figures; **six more remain unpinned and are named in `SEED-222` rather than
+   left silent.** ⚠ **`WorkflowScheduleModal.test.tsx` was believed to be in NEITHER knob and that was
+   MEASURED FALSE at this close**: the `src/components/workflows` **directory** entry recurses into
+   `__tests__/`, so the gate had been RUNNING it and GUARDING nothing. **TARGETS decides what runs;
+   BASELINE decides what is guarded, and a suite can sit on the wrong side of exactly one of them.**
+
+   ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the second consecutive close.** It held at `2`,
+   `failed 0` on every invocation, and **none of SEED-171's five cap-independent flaky suites went red
+   — although three of them (`WorkflowsPage.test.tsx`, `WorkflowBuilderPage.canvas.test.tsx`,
+   `WorkflowRunPage.test.tsx`) sat inside this phase's blast radius and were EDITED by it.** Recorded as
+   an observation, never as proof of innocence: **one green sample of a flaky suite proves nothing.**
+
+   ---
+
    **(b) ⚠ THE CAUSAL CLAIM ABOVE IS REFUTED, AND THIS IS THE CORRECTION THAT MATTERS —
    ADJUSTING THE CAP IS MEASURED NOT TO FIX THESE FAILURES.** The paragraphs above attribute every
    `STACK_TRACE_ERROR` to worker oversubscription and present the cap as the remedy. **Across ~15 gate
@@ -493,67 +534,67 @@ wc -l <file>                                                           # lines
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 47 / 19 / 995 | ⚠ **FIRES** | extraction due |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 57 / 29 / 856 | ⚠ **FIRES** | extraction due |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 234 / 76 / 1273 | **FIRES** | **extraction TAKEN 2026-08-17** |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 84 / 33 / 4119 | **FIRES** | honoured by construction (194.1) |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 238 / 78 / 1408 | **FIRES** | extraction TAKEN 2026-08-17 · honoured by construction (**214**) — one launch-inputs field on a request model it already owns |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 85 / 34 / 4144 | **FIRES** | honoured by construction (194.1 / **214**) — one run field added to the wire type |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
-| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 27 / 8 / 1565 | **FIRES** | honoured by construction (199 / **200**) |
+| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 17 / 8 / 489 | **FIRES** | honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20) |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 47 / 21 / 2664 | **FIRES** | extraction TAKEN (200-03) · honoured by construction (211). ✅ `BUG-260827-01` CLOSED 2026-08-27 (`/gsd:fast`, G-3) — the G-5 obligation is now OWED, not honoured |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 41 / 16 / 1383 | **FIRES** | satisfied (192 / 192.1) |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 50 / 23 / 2809 | **FIRES** | extraction TAKEN (200-03) · honoured by construction (211 / **214**) — ⚠ the G-5 obligation stays **OWED** |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 43 / 17 / 1415 | **FIRES** | the 192 / 192.1 extraction is TAKEN — ⚠ **not a standing `satisfied`**; and `onOpenSettings` is UNWIRED here (`SEED-218`) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 19 / 6 / 1616 | **FIRES** | ✅ **G-5 DISCHARGED (192.2-02)** |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 10 / 4 / 727 | ⚠ **FIRES** | no seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
-| [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 13 / 9 / 575 | **FIRES** | honoured by construction (193 / 193.1 / 199) |
-| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 51 / 17 / 2867 | **FIRES** | honoured by construction ×4 (193.1 / 193.2 / 197 / **200.3**) |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 38 / 19 / 2143 | **FIRES** | extraction due |
-| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 7 / 5 / 776 | **FIRES** | honoured by construction (200 / 200.1) — at threshold |
-| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 14 / 9 / 319 | ⚠ **FIRES** | honoured by construction (200.1) |
+| [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
+| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 55 / 20 / 2956 | **FIRES** | honoured by construction ×5 (193.1 / 193.2 / 197 / 200.3 / **214**) |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 41 / 21 / 2211 | **FIRES** | ⚠ **extraction still OWED** — 214-05 declined it again and said so; the named seam is unchanged |
+| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
+| [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 40 / 21 / 815 | ⚠ **FIRES** | ⚠ absent from BOTH at 21 phases (added 200) |
-| [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 19 / 6 / 1311 | **FIRES** | honoured by construction (193.1, **211**) — 211 changed the connection's AXIS, never the closed capability set; empty diff across the phase |
-| [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 29 / 13 / 1561 | **FIRES** | honoured by construction ×5 (185 / 193 / 193.1 / 199 / **200**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 43 / 21 / 2194 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / **200.1**) |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 22 / 9 / 1223 | **FIRES** | honoured by construction (193.2) |
-| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 13 / 7 / 625 | **FIRES** | honoured by construction (193.2 / **197**) |
-| [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 17 / 16 / 611 | **FIRES** | honoured by construction (193.2) |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 41 / 22 / 911 | ⚠ **FIRES** | honoured by construction (**214**) — the launch form is a CHILD component, not a branch. ⚠ absent from BOTH until 200, at 21 phases |
+| [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
+| [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 48 / 25 / 2585 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 23 / 10 / 1567 | **FIRES** | honoured by construction (193.2 / **214**) — 214-05 added the argument-satisfiability lint through the existing lint seam |
+| [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 14 / 8 / 881 | **FIRES** | honoured by construction (193.2 / 197 / **214**) |
+| [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 12 / 6 / 907 | **FIRES** | honoured by construction (193.2 / **197**) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 6 / 3 / 459 | **FIRES** | honoured by construction (194) — at threshold |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 46 / 16 / 2567 | **FIRES** | honoured by construction (194) |
-| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 21 / 9 / 608 | **FIRES** | honoured by construction (194) |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
+| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 22 / 10 / 661 | **FIRES** | honoured by construction (194 / **214**) — it renders the shared step identity and resolves nothing |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 25 / 13 / 478 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 19 / 8 / 267 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 63 / 30 / 571 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 10 / 5 / 629 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 25 / 8 / 1601 | **FIRES** | honoured by construction (200, 200.1, **200.2**) |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 13 / 7 / 736 | **FIRES** | honoured by construction (194.1 / **214**) — ⚠ it still renders `Needs you`; `stepIdentityVocabulary`'s six PAUSE sentences reach it from nothing (`SEED-219`) |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 8 / 5 / 334 | **FIRES** | honoured by construction (195) |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 182 / 105 / 412 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — 12 domain modules under `lib/api/`, this path kept as a re-export barrel. The trigger is RETIRED, not re-declined |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 70 / 56 / 1154 | ⚠ **FIRES** | ⚠ absent at 56 phases (added 196) |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 71 / 57 / 1203 | ⚠ **FIRES** | no seam proposed — a barrel of wire types; ⚠ absent until 196, at 56 phases (214) |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 74 / 54 / 835 | ⚠ **FIRES** | honoured by construction (204) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 73 / 43 / 1331 | ⚠ **FIRES** | honoured by construction (204) — seam named: `MODEL_CAPABILITIES` + its readers out |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 32 / 12 / 1733 | ⚠ **FIRES** | ⚠ absent at 12 phases (added 196) |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 30 / 16 / 616 | ⚠ **FIRES** | ⚠ absent at 16 phases (added 196) |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 118 / 21 / 3909 | ⚠ **FIRES** | ⚠ absent at 16 phases (196) — the file that ENFORCES the guardrails |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 124 / 24 / 4045 | ⚠ **FIRES** | honoured by construction (**214-15**) — BASELINE pins and one TARGETS check, no logic change; ⚠ absent until 196, at 16 phases |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
-| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 13 / 9 / 623 | ⚠ **FIRES** | honoured by construction (**200**) |
-| [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 8 / 6 / 370 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE (added 200) |
+| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
+| [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 3 / 3 / 236 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; crossed the threshold in the commit that added its row (200) |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 12 / 5 / 749 | ⚠ **FIRES** | ⚠ absent at 5 phases (added 196) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 10 / 4 / 1191 | ⚠ **FIRES** | ⚠ absent at 4 phases (added 196) |
-| [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 9 / 7 / 373 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 197) |
-| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 14 / 7 / 1025 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 199) |
+| [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 11 / 9 / 465 | ⚠ **FIRES** | honoured by construction (**214**); ⚠ absent until 197, at 7 phases |
+| [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 16 / 8 / 1245 | ⚠ **FIRES** | honoured by construction (**214**) — the refusal became `PublishRefusalList`, a child; ⚠ absent until 199 |
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 5 / 5 / 473 | ⚠ **FIRES** | honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (1 phase) | young (200) |
-| [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 4 / 3 / 341 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 199) |
+| [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 6 / 4 / 540 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape (214); ⚠ absent until 199, and it is no longer at threshold |
 | [`frontend/src/components/workflows/StepTypePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssteptypepickertsx) | 7 / 3 / 522 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (199) — ⚠ absent, on the boundary |
-| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 4 / 3 / 526 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 199) |
+| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door |
 | [`frontend/src/components/panel/PanelEmpty.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpanelemptytsx) | 4 / 4 / 52 | ⚠ **FIRES** | ⚠ absent at 4 phases — invisible to G-5 for its entire life (199) |
 | [`frontend/src/components/chat/StopControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatstopcontroltsx) | 3 / 1 / 315 | no (1 phase) | young — owes a detail section at its 3rd phase |
 | [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 1 / 1 / 357 | no (1 phase) | young — owes a detail section at its 3rd phase |
@@ -573,15 +614,15 @@ wc -l <file>                                                           # lines
 | [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 1 / 1 / 226 | no (1 phase) | young (197) |
 | [`frontend/src/components/workflows/DecisionsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionslisttsx) | 4 / 2 / 413 | no (2 phases) | young (197, 199) |
 | [`frontend/src/components/workflows/DraftArrivalCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftarrivalcardtsx) | 1 / 1 / 338 | no (1 phase) | young (197) |
-| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 5 / 2 / 630 | no (2 phases) | young (193.1, 197) |
+| [`frontend/src/components/workflows/useTemplateFirstDraft.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusetemplatefirstdraftts) | 6 / 3 / 673 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**214**) — ⚠ its detail-file ANCHOR did not resolve until this commit |
 | [`frontend/src/components/workflows/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstoolnamests) | 1 / 1 / 128 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/StepCardSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepcardsectiontsx--stepcardsectioncontextts) | 1 / 1 / 95 | no (1 phase) | young (200) |
 | [`frontend/src/providers/ThemeProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersthemeprovidertsx) | 1 / 1 / 149 | no (1 phase) | young (200) |
-| [`frontend/src/components/workflows/RunSpine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunspinetsx) | 3 / 2 / 372 | no (2 phases) | young (200, **200.2**) |
+| [`frontend/src/components/workflows/RunSpine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunspinetsx) | 5 / 3 / 426 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**214**) — it crossed the threshold IN THIS PHASE; renders the shared identity and resolves nothing |
 | [`frontend/src/components/workflows/NodeIconWell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsnodeiconwelltsx) | 4 / 2 / 190 | no (2 phases) | **DELETED AND RESTORED** |
-| [`frontend/src/components/workflows/RunTranscript.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsruntranscripttsx) | 6 / 2 / 652 | no (2 phases) | young (200, 200.1, **200.2**) |
+| [`frontend/src/components/workflows/RunTranscript.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsruntranscripttsx) | 7 / 3 / 652 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ **FIRES on a component with NO MOUNT in the product** — 214-11 measured it; 214 does not modify it |
 | [`frontend/src/components/workflows/RunHero.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunherotsx) | 1 / 1 / 242 | no (1 phase) | young (200.2) |
-| [`frontend/src/components/workflows/RunStepList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunsteplisttsx) | 1 / 1 / 298 | no (1 phase) | young (200.2) |
+| [`frontend/src/components/workflows/RunStepList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunsteplisttsx) | 2 / 2 / 339 | no (2 phases) | young (200.2, 214) — ⚠ its only suite `RunStepList.test.tsx` was UNPINNED until 214-15 |
 | [`frontend/src/components/workflows/runColumnVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsruncolumnvocabularyts) | 1 / 1 / 70 | no (1 phase) | young (200.2) |
 | [`frontend/src/components/workflows/transcriptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstranscriptvocabularyts) | 3 / 1 / 131 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/connectionState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsconnectionstatets) | 1 / 1 / 114 | no (1 phase) | young (200) |
@@ -593,26 +634,50 @@ wc -l <file>                                                           # lines
 | [`frontend/src/components/workflows/library/runFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunfactsts) | 4 / 1 / 260 | no (1 phase) | young (192.2) |
 | [`frontend/src/components/workflows/library/relativeChanged.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrelativechangedts) | 2 / 2 / 137 | no (2 phases) | young (192.1, 192.2) |
 | [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 3 / 1 / 10 | no (1 phase) | young (192.2) |
-| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 13 / 5 / 1414 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (212) |
+| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 17 / 7 / 1477 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (212 / **214**) |
 | [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 9 / 5 / 2009 | ⚠ **FIRES** | honoured by construction (212) |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 8 / 6 / 573 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 7 / 5 / 968 | ⚠ **FIRES** | no seam proposed — the same verdict as its sibling |
-| [`frontend/src/components/settings/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionmarktsx) | 4 / 2 / 217 | no (2 phases) | young (206.1-01, 212) |
 | [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 34 / 21 / 1426 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE — row added 2026-08-27 at 212's close. ⚠ its re-open trigger did NOT fire (212 never named it); this closes a known gap, it does not discharge the trigger |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
 | [`frontend/src/components/settings/catalogCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingscatalogcopyts) | 1 / 1 / 22 | no (1 phase) | young (212) |
 | [`frontend/src/components/settings/connectionRefusalCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrefusalcopyts) | 1 / 1 / 567 | no (1 phase) | ⚠ absent for its entire life at 567 L — row added 2026-08-27 |
 | [`frontend/src/components/workflows/phaseVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasevocabularyts) | 16 / 6 / 990 | **FIRES** | honoured by construction (206.2) |
-| [`frontend/src/components/workflows/ConnectionPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsconnectionpickertsx) | 5 / 3 / 651 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (206.2) |
-| [`frontend/src/components/workflows/ExternalActionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalactionsectiontsx) | 4 / 3 / 498 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (206.2) |
-| [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 3 / 3 / 645 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211) — ⚠ the row read `2 / 2 / 570` and a disposition that was itself out of date |
+| [`frontend/src/components/workflows/ConnectionPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsconnectionpickertsx) | 7 / 5 / 888 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (206.2 / **214**) — ⚠ its named seam is still **OWED**; 214-07 grew it by 186 L |
+| [`frontend/src/components/workflows/ExternalActionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalactionsectiontsx) | 8 / 5 / 179 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (206.2 / **214**) — ⚠ **net −319 L**: the JSON surface DELETED (214-07). Its named seam is still OWED |
+| [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 6 / 3 / 468 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (212) |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 4 / 2 / 407 | no (2 phases) | young (211, 212) |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 7 / 3 / 781 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (212) |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 7 / 3 / 1149 | ⚠ **FIRES — CROSSED THE THRESHOLD IN THE COMMIT THAT ADDED THIS ROW** | ⚠ named inside Phase 206's section with no row and no anchor (added 211) — honoured by construction (211) |
+| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 15 / 8 / 120 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 46 / 30 / 1352 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14) |
+| [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
+| [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
+| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 8 / 6 / 554 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned |
+| [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12) — chat collects declared inputs BEFORE it creates anything |
+| [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
+| [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
+| [`frontend/src/components/workflows/DescribeServicePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribeservicepickertsx) | 2 / 1 / 464 | no (1 phase) | young (214-13) — the describe door at the GRANT grain |
+| [`frontend/src/components/workflows/LaunchInputFields.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslaunchinputfieldstsx) | 1 / 1 / 91 | no (1 phase) | young (214-09 / 214-12) — **the ONE declared-input renderer three doors mount** |
+| [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
+| [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close |
+| [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
+| [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
+| [`frontend/src/components/workflows/describeServiceMatch.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribeservicematchts) | 1 / 1 / 188 | no (1 phase) | young (214-13) — the match rule the describe door refuses on |
+| [`frontend/src/components/workflows/nodePresentation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsnodepresentationts) | 8 / 7 / 221 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added 214 |
+| [`frontend/src/components/workflows/publishRefusalEntry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusalentryts) | 1 / 1 / 87 | no (1 phase) | young (214-10) |
+| [`frontend/src/components/workflows/publishRefusalVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusalvocabularyts) | 1 / 1 / 290 | no (1 phase) | young (214-10) — pinned at 41 |
+| [`frontend/src/components/workflows/stepActionWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepactionwordsts) | 2 / 1 / 91 | no (1 phase) | young (214) — the action half of a step's identity |
+| [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
+| [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 775 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
+| [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 3 / 2 / 1600 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
+| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 3 / 3 / 1055 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules** |
+| [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 
