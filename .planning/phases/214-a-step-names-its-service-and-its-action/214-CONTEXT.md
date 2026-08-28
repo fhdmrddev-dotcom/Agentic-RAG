@@ -231,8 +231,32 @@ or a section without a row, is drift.
   **rejected** — the sentence is already long.
 
 - **D-214-16: EVERY SURFACE A RUN APPEARS ON, VIA ONE SHARED ELEMENT.** The panel's `PhaseCard` /
-  `PhaseTimeline`, `WorkflowRunPage`'s `RunSpine` + `RunStepList` + `RunTranscript`, the chat
-  `RunCard`, **and the approval pause**. ⚠ `SEED-206`'s trigger is *the moment ANY step surface
+  `PhaseTimeline`, `WorkflowRunPage`'s `RunSpine` + `RunStepList`, the chat
+  `RunCard`, **and the approval pause** — **FIVE surfaces.**
+
+  ⚠ **CORRECTED 2026-08-28 AT PLAN-PHASE (operator decision), AND THE ORIGINAL IS RECORDED HERE
+  RATHER THAN OVERWRITTEN: this decision as first written named `RunTranscript` as a sixth
+  surface, and `RunTranscript` HAS NO MOUNT ANYWHERE IN THE PRODUCT.** `grep -rn '<RunTranscript'
+  frontend/src` returns its own test file only. It was removed outright at **Phase 200.2** for
+  four measured reasons recorded at `WorkflowRunPage.tsx:107` — it duplicated the run log, which
+  an operator reported — and its absence is **pinned** at `WorkflowRunPage.test.tsx:2241-2244`
+  (`expect(codeOf(pageSource)).not.toContain("RunTranscript")`).
+
+  ⭐ **The operator-approved G-2 acceptance bar already had this right**: sketch 216's
+  `BUILD-CONTRACT.generated.md:46` invariant #3 names **five** surfaces and excludes the
+  transcript. The decision was written against a premise that stopped being true two milestones
+  ago, and it was found the only way it could be — by opening the component and looking for its
+  mount.
+
+  ⚠ **Mounting it would have been worse than a no-op**, which is why this is a correction rather
+  than a note: `WorkflowRunPage.test.tsx` sits in the owning plan's own `files_modified`, so an
+  executor would have been **licensed to delete that pin** and would have silently reverted a
+  removal the operator drove. **Re-mounting the transcript is a separate decision about their
+  own removal and must never arrive inside a coverage task.**
+
+  ⚠ **A G-5 ROW NOW FIRES ON AN UNMOUNTED COMPONENT** — `RunTranscript.tsx` measures
+  `7 / 3 / 652` against a ledger cell reading *young (2 phases)*. Recorded because a hot-file
+  obligation on code no user can reach is itself worth knowing. ⚠ `SEED-206`'s trigger is *the moment ANY step surface
   other than the builder canvas renders an external step*, and its own warning is **"do NOT wait for
   a catalog — the spine gap is live TODAY on shipped surfaces"**; a partial answer leaves the seed
   live for the next phase to rediscover. **Coverage should be a consequence of one component
