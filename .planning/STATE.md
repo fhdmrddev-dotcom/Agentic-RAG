@@ -37,6 +37,30 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+⚠ **SESSION 2026-08-28 — Phase 217 context gathered (this block is hand-edited; the `state.*` SDK
+verbs are forbidden here).** `/gsd:discuss-phase 217` ran to completion.
+**Resume file: `.planning/phases/217-the-library-one-home-for-documents/217-CONTEXT.md`**
+(committed `d33d7f74a`, with `217-DISCUSSION-LOG.md`). **Next: `/gsd:plan-phase 217`.**
+
+Three findings from that session that a planner must not re-derive:
+1. ⛔ **The ROADMAP's ⭐ "ZERO schema, ZERO backend" for Phase 217 is HALF FALSE.** ZERO schema
+   holds (authenticated SELECT policies already exist on all three child tables, migs `108`/`110`).
+   ZERO backend does not: **none of SC#4's six facts is on the wire** — `documents.py` has 11 routes
+   and not one reads any of them. Five new read endpoints are required.
+2. ⚠ **The six-stage strip's drawn order contradicts the backend's write order** — `documents.py`
+   writes `extracting → chunking → embedding → extracting_tables → extracting_images → metadata`,
+   while sketch 218's BUILD-CONTRACT draws Tables/Images second and third. **The strip would jump
+   backwards.** Resolved: draw in write order, regenerate the contract in the same commit.
+3. ⚠ **`ingestion_step` is on NO backend response model** — it reaches the browser only via the
+   Realtime payload, so a file already mid-ingest shows no stage on page load. The D-v2.5-03 failure,
+   and **invisible to any test that mocks the fetch.**
+
+**Scope refinement recorded:** 217 ships **four** tabs (`Documents · Views · Ingestion · Indexing`);
+the Health tab arrives in **218** with the merge that justifies it. This SEQUENCES sketch 218's
+variant A rather than reversing it.
+
+---
+
 Phase: 214 (a-step-names-its-service-and-its-action) — EXECUTING
 Plan: 1 of 16
 **16 plans in 5 waves. Next: `/gsd:execute-phase 214`** — worktrees are ENABLED and wave 1 has four
