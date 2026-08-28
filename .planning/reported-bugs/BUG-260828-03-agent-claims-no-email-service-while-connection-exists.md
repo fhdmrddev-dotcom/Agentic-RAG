@@ -3,8 +3,9 @@ id: BUG-260828-03
 title: The agent wrote "no email service is connected" into a delivered summary while the SMTP connection existed
 surface: Agentic-RAG
 severity: high
-status: open
-folded_into: null
+status: folded
+folded_into: 214.1
+verified_closed_by: null   # ⚠ NOT closed — the LAUNCH half was never driven live
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas: [backend/app/services/harness/phase_types.py, agent-honesty]
