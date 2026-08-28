@@ -2788,6 +2788,61 @@ const BASELINE = {
   "apiBarrel.test.ts": 3,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
+  // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
+  // ERROR (exit 2) rather than fail, which is why sixteen plans' pins land in one
+  // commit instead of sixteen.
+  //
+  // ⚠ EVERY FIGURE BELOW IS THE GATE'S OWN PRINTED `— N new`, read off the run
+  // recorded verbatim in `214-15-SUMMARY.md` (`total 6355 · failed 0 · pinned total
+  // 5266 · 120/120`). NOT ONE IS HAND-DERIVED. A hand-derived pin is a number the
+  // gate has never agreed with.
+  //
+  // ⚠ TARGETS vs BASELINE was CHECKED HERE, NOT ASSUMED — and the check refuted the
+  // plan's own belief. `WorkflowScheduleModal.test.tsx` was recorded at plan time as
+  // being in NEITHER knob. It is in `src/components/workflows/__tests__/`, and the
+  // `src/components/workflows` entry in TARGETS below is a DIRECTORY entry, which
+  // recurses. So the gate had been EXECUTING it and GUARDING nothing — the worse of
+  // the two halves, because a green gate read as covering a launch-critical surface.
+  // No TARGETS edit is needed for it; the pin below is the whole fix.
+  //   · plan `214-16` creates no frontend suite at all — it extends
+  //     `src/lib/apiRunFields.fences.test.ts`, already a TARGETS **file** entry.
+  //   · plan `214-07`'s reachability case lives inside `ArgumentEditor.test.tsx`,
+  //     under the `src/components/workflows` **directory** entry.
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // ⛔ BACKEND SUITES ARE NOT PINNED HERE AND CANNOT BE — this gate is vitest-only.
+  // `backend/tests/integration/test_214_launch_inputs_wire.py` (214-16) and
+  // `backend/tests/integration/test_214_argument_seams.py` (214-14) are guarded by
+  // their plans' own pytest criteria and by the backend failure-count baseline (68).
+  // Recorded as a DECISION rather than a silence, so nobody later reads this gate's
+  // green as covering them.
+  "ArgumentEditor.test.tsx": 33,
+  "DescribeServicePicker.test.tsx": 20,
+  "LaunchInputFields.test.tsx": 15,
+  "PublishRefusalList.test.tsx": 22,
+  "StepIdentity.coverage.test.tsx": 23,
+  "WorkflowScheduleModal.test.tsx": 9,
+  "argumentModel.test.ts": 26,
+  "argumentVocabulary.test.ts": 44,
+  "describeServiceMatch.test.ts": 15,
+  "publishRefusalVocabulary.test.ts": 41,
+  "stepIdentityVocabulary.test.ts": 34,
+  // ⭐ ADOPTED rather than created. `RunStepList.tsx` IS in this phase's diff
+  // (214-11 mounted the shared step identity in it) and its only suite was
+  // unpinned — executed by the directory entry, guarded by nothing. An unpinned
+  // suite is not a lightly-guarded one, it is an unguarded one.
+  "RunStepList.test.tsx": 17,
+  // ⚠ FIVE MORE SUITES REMAIN UNPINNED AND ARE NAMED RATHER THAN LEFT SILENT:
+  // `PromptVariableChips.test.tsx` (3), `RunHero.test.tsx` (18),
+  // `automationFacts.test.ts` (11), `nodeEffectBanner.test.ts` (8),
+  // `toolReadOnlyMap.test.ts` (7). None guards a file in Phase 214's diff, so
+  // adopting them here would fold unrelated drift into a commit that did not cause
+  // it — the same reason twelve consecutive plans declined the pre-existing four.
+  // Registered as `SEED-222` with a concrete re-open trigger, because a decision
+  // recorded only in a comment is invisible to every sweep.
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
