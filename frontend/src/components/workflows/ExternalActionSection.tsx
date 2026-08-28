@@ -90,8 +90,12 @@ export interface ExternalActionSectionProps {
    */
   toolName: string
   /**
-   * ⚠ 211-04 SHIPPED THREE DEAD WRITE SEAMS HERE — `onChange`, `onChangeShape`, `onPersist` —
-   * AND 214-07 REMOVED THEM, ON THEIR OWN RECORDED TRIGGER RATHER THAN ON A WHIM.
+   * ⚠ 211-04 SHIPPED THREE DEAD WRITE SEAMS HERE — a value write, a multi-key shape patch and
+   * a persist call — AND 214-07 REMOVED THEM, ON THEIR OWN RECORDED TRIGGER RATHER THAN ON A
+   * WHIM. ⚠ THEIR IDENTIFIERS ARE DELIBERATELY NOT SPELLED IN THIS FILE ANY MORE: the phase's
+   * acceptance for the removal is a mechanical grep, and a docblock naming them would read to
+   * that sweep as a survivor (the 187-24 trap, which fired four times in this phase's first
+   * wave). The three names are recorded in `214-07-SUMMARY.md` and in the git history.
    *
    * Their docblock read, verbatim: *"They stay in the prop contract because removing them
    * would edit `PhaseFormPanel.tsx`, which is outside this plan's `files_modified` […]
