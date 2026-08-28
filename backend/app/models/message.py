@@ -22,6 +22,34 @@ class MessageCreate(BaseModel):
     # definition's project_folder_id author default (D-03). None = today's behavior
     # (whole-KB / author default — D-06). A malformed UUID → FastAPI 422 for free (V5).
     folder_id: UUID | None = None
+    # Phase 214 D-214-04 (STEP-02): the DECLARED input values a launcher collected for
+    # this kickoff — the Run modal's fields, the chat launch form, Test Run. Merged
+    # server-side into create_workflow_run.inputs (api/threads.py) AND into the live
+    # ctx.inputs mirror (services/workflow_kickoff.py) in the same commit, beside
+    # kickoff_prompt and folder_id. Those two are RESERVED and win: a launcher key
+    # spelled `folder_id` must not be able to impersonate the owner-gated override
+    # (D-05), and one spelled `kickoff_prompt` could never have reached an adapter
+    # argument anyway (_NON_ACTION_RUN_INPUTS excludes it by NAME). None = today's
+    # behavior — the run's inputs dict is byte-identical to the pre-214 literal.
+    # dict[str, str], never dict[str, Any]: the launchers collect text fields, and the
+    # flat-path guarantee is what a permissive value type would quietly give away. A
+    # non-string value → FastAPI 422 for free, exactly as folder_id's malformed UUID.
+    #
+    # ── D-103-CONF-1 IS AMENDED HERE, DELIBERATELY AND IN WRITING ──────────────────
+    # The shipped constraint reads "reuses the EXISTING kickoff path — createThread +
+    # sendMessage(workflow_definition_id) — NEVER a bespoke /workflows/{id}/run route
+    # (D-103-CONF-1; threads.py byte-identical)". Its PURPOSE is that there is exactly
+    # ONE kickoff path with one governance story; "threads.py byte-identical" is how
+    # Phase 103 achieved that at the time, not the thing being protected.
+    #   * WHAT IS AMENDED: this one additive request field, plus one dict merge in each
+    #     of the two kickoff literals.
+    #   * WHY SC#2 CANNOT BE MET WITHOUT IT: the declared values have no other channel,
+    #     and a second route is the thing D-103-CONF-1 actually forbids.
+    #   * THE NEW BOUNDARY: no new route, no new key on the POST *response*, no change
+    #     to the two-rows model, the create-before-spawn ordering, the template-upload
+    #     sequencing or the orphan cleanup. The amendment is exactly one request field
+    #     and one dict literal (twice).
+    inputs: dict[str, str] | None = None
 
 
 class MessageResponse(BaseModel):
