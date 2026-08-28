@@ -320,8 +320,8 @@ describe("doorVocabulary — the table itself", () => {
     // …and the declared exception is not a dead entry excusing a collision that no longer
     // exists. Every declared pair must ACTUALLY be equal, or the list is documenting a fiction.
     for (const [a, b] of DECLARED_EQUALITIES) {
-      const va = (doorVocabulary as Record<string, string>)[a]
-      const vb = (doorVocabulary as Record<string, string>)[b]
+      const va = (doorVocabulary as unknown as Record<string, string>)[a]
+      const vb = (doorVocabulary as unknown as Record<string, string>)[b]
       expect(va, `${a} is not exported`).toBeTypeOf("string")
       expect(va, `${a} and ${b} are declared equal but are not`).toBe(vb)
     }
@@ -352,7 +352,7 @@ describe("doorVocabulary 193-08 — every word is EXACTLY its governed literal (
   // no exact-match case at all.
   for (const id of Object.keys(ALL_GOVERNED_COPY)) {
     it(`${id} is byte-exactly its governed literal`, () => {
-      expect((doorVocabulary as Record<string, string>)[id]).toBe(ALL_GOVERNED_COPY[id])
+      expect((doorVocabulary as unknown as Record<string, string>)[id]).toBe(ALL_GOVERNED_COPY[id])
     })
   }
 

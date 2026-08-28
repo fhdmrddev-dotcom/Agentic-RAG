@@ -362,3 +362,179 @@ export const SOUL_LABEL = "What this will do"
  * No severity word and no mechanism: it names the shortfall in the author's own terms.
  */
 export const DESCRIBE_CTA_REFUSED = "Too thin to draft"
+
+// ── ⭐ SKETCH 217 (Phase 214-03 Task 2 · STEP-06 / D-214-21) — THE DOOR THAT KNOWS YOUR
+//    SERVICES. TWELVE IDS AND THREE COMPOSED, AS **ADDITIONS TO THIS MODULE** ───────────
+//
+// ⚠ THIS IS A SECOND ARM ON ONE MECHANISM, NEVER A SECOND MECHANISM BESIDE IT.
+//
+// The door ALREADY draws its disabled control carrying its reason — that is exactly what
+// `DESCRIBE_CTA_REFUSED` is, and `DESCRIBE_REFUSAL` is the same finding answered for the
+// field. Sketch 217 §3 records that Stitch arrived at the same idea independently
+// ("Waiting for connection"), which is a CONFIRMATION rather than a discovery. So the new
+// refusal reuses the shipped shape rather than inventing one beside it, and every rule
+// `DESCRIBE_REFUSAL` carries is inherited whole: a refusal SENTENCE is presentation and
+// never a rule; no severity word; no exclamation; no mechanism — it names what is missing
+// and what to do; and the dash is an EM DASH (U+2014), asserted by codepoint.
+//
+// ── ⚠ THE PRECEDENCE RULE: THE TWO REASONS DO NOT COMPETE ────────────────────────────
+//
+// With an EMPTY description AND nothing connected, the CTA reads the **thinness** reason.
+// A workflow with no external step is perfectly legitimate, so refusing on the connection
+// there would refuse for a reason that is **not binding** — the author could connect every
+// service in the catalog and still be refused, which teaches them the refusal is noise.
+// Thinness is the reason that actually blocks the draft; the connection reason applies only
+// once there is something to draft FROM that names a service they do not have.
+//
+// This module STATES that precedence; plan `214-13` IMPLEMENTS it at the render site
+// (`WorkflowDoorSwitch.tsx:246, 428-431, 462-471, 493-521`), using the spread-conditional
+// idiom that keeps the non-refusing DOM character-identical.
+//
+// ── ⚠ THE COLOUR RULING, RESOLVED HERE BECAUSE THE CONTRACTS DISAGREED ───────────────
+//
+// Measured conflict (PATTERNS §7): the SHIPPED refusal renders `text-destructive` /
+// `border-destructive` (`WorkflowDoorSwitch.tsx:462-471`), while sketch 217 invariant #11
+// says the anchor spends WARNING and never destructive, and sketches 214 #14 / 215 #9
+// assert `--destructive` is ABSENT from the new surfaces.
+//
+// **THE RULING THIS PHASE TAKES: the refusal block's tone token is unified to the WARNING
+// token for BOTH arms.** A refusal that names a next action is not a destructive event, the
+// three newest contracts agree, and leaving the shipped arm destructive while the new arm
+// is warning would make ONE mechanism read as TWO severities — which is precisely the
+// second-mechanism outcome the paragraph above rejects. (`warning` resolves in
+// `tailwind.config.js:84-86`; it was a missing DECLARATION added by 192.2 WR-01, not a new
+// colour, so this is a token swap rather than a palette change.)
+//
+// ⚠ CHANGING THE SHIPPED ARM'S COLOUR RE-BASELINES `WorkflowDoorSwitch.baseline.test.tsx`,
+// WHICH PINS ALL SIX RESTING STATES BYTE FOR BYTE. Named here so it cannot arrive as a
+// surprise. **Plan `214-13` owns that re-baseline and must record the before/after captures
+// rather than regenerate them silently** — a characterization baseline regenerated without
+// its diff being read is a baseline that has stopped proving anything (the 188.1 lesson).
+
+// ── The service picker ────────────────────────────────────────────────────────────────
+
+/** `SERVICES_LABEL` — the picker's own label on the describe door. */
+export const SERVICES_LABEL = "Services this workflow may use"
+
+/**
+ * `SERVICES_HINT` — what ticking actually DOES, said before anything is ticked.
+ *
+ * Sketch 217 §5: the picker exists instead of post-draft validation because the generator's
+ * vocabulary IS the ticked set, which makes an invented step naming an unconnected service
+ * STRUCTURALLY impossible rather than caught afterwards. This sentence is that mechanism in
+ * the author's own words.
+ */
+export const SERVICES_HINT = "Only what you tick can appear in the draft."
+
+/**
+ * `SERVICE_NO_GRANTS` — an ungranted service's state on its chip.
+ *
+ * ⚠ Sketch 217 #9: an ungranted service is PRESENT, NOT SELECTABLE, AND SAYS WHY. Hiding it
+ * would leave the author hunting for a service they can see in Settings, and pre-selecting
+ * it would promise a capability the grant does not carry. ⭐ The grant grain IS the
+ * vocabulary grain — granted tools, not merely discovered ones (STEP-06 · Phase 213).
+ */
+export const SERVICE_NO_GRANTS = "Nothing allowed yet"
+
+/** `SERVICE_NO_GRANTS_NEXT` — the one next action on an ungranted chip. */
+export const SERVICE_NO_GRANTS_NEXT = "Choose what it can do"
+
+/** `SERVICES_EMPTY` — the picker with nothing in it at all. It states the world; it does
+ *  not scold, and it does not disappear (sketch 217 #10). */
+export const SERVICES_EMPTY = "You have not connected anything yet."
+
+/** `SERVICES_EMPTY_NEXT` — the empty picker's next action. */
+export const SERVICES_EMPTY_NEXT = "Connect a service"
+
+// ── The refusal's own controls ────────────────────────────────────────────────────────
+
+/**
+ * `DOOR_REFUSAL_REVISE` — the SECOND next action on a service refusal, and the one that
+ * keeps the author where they are.
+ *
+ * ⚠ Sketch 217 #4/#5: every refusal names the service, WHERE TO CONNECT IT, and THE WAY TO
+ * STAY — exactly two next actions. Offering only "connect it" would make an unrelated
+ * detour the sole way forward out of a screen the author is mid-thought on.
+ */
+export const DOOR_REFUSAL_REVISE = "Revise the description"
+
+/**
+ * `DOOR_CTA_REFUSED_SERVICE` — what the draft button SAYS while refusing on a connection.
+ *
+ * ⚠ Sketch 217 #3: EVERY DISABLED CTA CARRIES ITS REASON AND NAMES NO SERVICE. The button
+ * is the reason's second reading, not its detail — the service is named in the refusal
+ * sentence beside it, where there is room to say what to do about it.
+ * ⚠ It is the sibling of `DESCRIBE_CTA_REFUSED`, and the two never render together: the
+ * precedence rule above decides which reason the control reads.
+ */
+export const DOOR_CTA_REFUSED_SERVICE = "Waiting on a connection"
+
+/**
+ * `DOOR_REFUSAL_ANCHOR` — the tag on the marked span in the author's own prose.
+ *
+ * ⚠ Sketch 217 #12: VISIBLE WHILE REFUSING, not only on hover — a tag that needs a pointer
+ * is a tag a keyboard reader never learns exists. #11: it is an UNDERLINE spending the
+ * warning token, never destructive (see the colour ruling above).
+ * ⚠ Sketch 217 §4 bounds the mark itself: only an exact, case-insensitive WHOLE-WORD match
+ * against a catalog name, falling back to the unanchored refusal when there is no single
+ * unambiguous match. A mis-anchor is worse than no anchor, because it claims a precision
+ * the system does not have. Plan `214-13` carries that fallback.
+ */
+export const DOOR_REFUSAL_ANCHOR = "why this stopped"
+
+// ── The three SHIPPED strings, ALIASED — one literal per sentence in the repository ────
+//
+// ⚠ Sketch 217 #2: the three shipped strings are REPRODUCED, NEVER REWORDED. D-13 and the
+// 166-C precedent already declined rewording a governed literal, twice. These three are
+// therefore ALIASES of the exports above — not second copies of the same words. A second
+// literal is exactly the drift this module exists to prevent, and it is the one failure
+// mode a table of correct-looking strings can carry invisibly.
+
+/** `SHIPPED_DESCRIBE_CTA` — sketch 217's name for the shipped `DESCRIBE_CTA`. */
+export const SHIPPED_DESCRIBE_CTA = DESCRIBE_CTA
+
+/** `SHIPPED_DESCRIBE_CTA_REFUSED` — sketch 217's name for the shipped
+ *  `DESCRIBE_CTA_REFUSED`, the thinness arm of the CTA's reason. */
+export const SHIPPED_DESCRIBE_CTA_REFUSED = DESCRIBE_CTA_REFUSED
+
+/** `SHIPPED_DESCRIBE_REFUSAL` — sketch 217's name for the shipped `DESCRIBE_REFUSAL`, the
+ *  FIRST arm of the one mechanism this section adds a second arm to. */
+export const SHIPPED_DESCRIBE_REFUSAL = DESCRIBE_REFUSAL
+
+// ── COMPOSED — the three values that name a service ───────────────────────────────────
+
+/**
+ * `SERVICE_ACTIONS` — the group label over one service's actions in the picker.
+ *
+ * ⚠ It names the SERVICE, never a capability id. Sketch 217 #8: every chip declares
+ * pressed · grants · service, and an ungranted chip is never pre-selected.
+ */
+export const SERVICE_ACTIONS = ({ service }: { service: string }): string => `${service} actions`
+
+/**
+ * `DOOR_REFUSAL` — ⭐ THE SECOND ARM. What the door says when the description names a
+ * service that is not connected.
+ *
+ * ⚠ It names all three things sketch 217 #4 requires: THE SERVICE, WHERE TO CONNECT IT, and
+ * THE WAY TO STAY. The third clause is what makes this a refusal rather than a dead end —
+ * describing the step without that service is a legitimate outcome, not a consolation.
+ *
+ * ⚠ THE SERVICE NAME COMES FROM WHAT THE AUTHOR WROTE (D-214-21), so untrusted free text is
+ * interpolated here. This function returns a plain `string`; React renders it as a text
+ * child and escapes it. There is no `dangerouslySetInnerHTML` anywhere on this door, and
+ * the suite asserts both — the escaped-literal round trip and the absence of that API
+ * across the subtree.
+ *
+ * ⚠ NO CREDENTIAL FIELD ACCOMPANIES THIS (sketch 217 #6, rejected under D-214-21): a
+ * credential form on a drafting screen is a new outbound trust surface with no prior review
+ * cycle. The refusal points at Settings, where that surface already exists and was reviewed.
+ *
+ * ⚠ Em dash (U+2014). No severity word, no exclamation — `DESCRIBE_REFUSAL`'s rules, whole.
+ */
+export const DOOR_REFUSAL = ({ service }: { service: string }): string =>
+  `${service} is not connected — connect it in Settings, or describe this step without it.`
+
+/** `DOOR_REFUSAL_CONNECT` — the FIRST of the refusal's exactly two next actions, naming the
+ *  service so the author knows which connection they are about to go and make. */
+export const DOOR_REFUSAL_CONNECT = ({ service }: { service: string }): string =>
+  `Connect ${service}`
