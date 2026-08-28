@@ -948,14 +948,29 @@ async def _run_phase_with_gates(
                     )
                     _service_name = getattr(_connection, "name", None) or None
                 except ConnectorError as _exc:
-                    # Disabled, absent, another org's, or a credential this run cannot
-                    # read. Mirrors `phase_types.py`'s refusal posture and adds no new
-                    # one — but here it is not even a refusal: the clause simply omits a
-                    # service it cannot name.
+                    # The resolver's OWN refusal family — disabled, absent, another org's,
+                    # or a credential this run cannot read. Mirrors `phase_types.py`'s
+                    # posture and adds no new one; here it is not even a refusal, the
+                    # clause simply omits a name it cannot know.
                     logger.debug(
                         "214 D-214-14: approval pause for phase %s could not resolve a "
                         "service name (%s) — the service clause is omitted rather than "
                         "guessed", getattr(phase, "slug", None), _exc,
+                    )
+                except Exception as _exc:  # noqa: BLE001 — T-214-06-05, driven RED
+                    # ⚠ THE SECOND ARM IS NOT DEFENSIVE PADDING; IT WAS MEASURED. A
+                    # storage layer that raises a timeout or a driver error raises no
+                    # `ConnectorError` at all, and with the narrow arm alone the drive
+                    # `test_T_214_06_05_a_failing_connection_lookup_still_produces_a_well
+                    # _formed_pause` went RED with the raw exception escaping through the
+                    # checkpoint — a DISPLAY-ONLY lookup killing the run, which is exactly
+                    # the denial of service its own threat row names. Nothing fails open:
+                    # the send path resolves this same connection again, at its own gate,
+                    # unchanged, and refuses there if it must.
+                    logger.debug(
+                        "214 D-214-14: approval pause for phase %s hit an unexpected error "
+                        "resolving a service name (%r) — the service clause is omitted "
+                        "rather than guessed", getattr(phase, "slug", None), _exc,
                     )
 
             if _connection is not None:
