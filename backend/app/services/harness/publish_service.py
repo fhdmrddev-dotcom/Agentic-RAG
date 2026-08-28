@@ -1311,13 +1311,43 @@ async def _drive_golden_run(
             definition.project_folder_id, supabase=supabase, user_id=str(user_id)
         )
 
+    # ── 3a-pre. BUG-260828-10 — the golden run must ANSWER what the workflow asks for ──
+    #
+    # A launch-time argument is sourced `ask`, and a golden run has no launcher and nobody
+    # to ask. Before this, `inputs` carried `kickoff_prompt` and NOTHING else, so every such
+    # argument resolved to nothing and the structural gate afterwards reported
+    # `no_source: … resolved to nothing when the workflow actually ran`.
+    #
+    # ⚠ THE GATE WAS RIGHT ABOUT WHAT IT SAW; WHAT IT WAS SHOWN WAS WRONG. Validating
+    # *does this argument resolve* against a run structurally incapable of supplying it
+    # tests the harness, not the workflow — the gate could only ever return `no_source`
+    # for this source kind, so `Asked when this runs` was unpublishable for EVERY author.
+    # Measured 2026-08-28 by the operator: three phases green, citations green, blocked here.
+    #
+    # ⚠ THIS DOES NOT WEAKEN THE GATE. An argument with genuinely NO declared source still
+    # resolves to nothing and is still refused — that is `BUG-260826-02` and the reason the
+    # gate exists. Only a DECLARED input gets an answer here, which is precisely the case
+    # the author already told us about.
+    #
+    # ⚠ `.invalid` IS LOAD-BEARING, NOT DECORATION (RFC 2606): it is a reserved TLD that can
+    # never resolve, so a placeholder recipient cannot reach a person even if every other
+    # guard failed. The golden run already records instead of sending and withholds `org_id`
+    # so a credential cannot be scoped; this is a THIRD independent reason a publish-time
+    # send cannot deliver. Do not replace it with a real-looking address.
+    golden_inputs: dict[str, str] = {"kickoff_prompt": golden_input}
+    for _spec in getattr(definition, "inputs", None) or []:
+        _key = getattr(_spec, "key", None)
+        # Never shadow the kickoff prompt: it carries the author's real golden input.
+        if _key and _key not in golden_inputs:
+            golden_inputs[_key] = f"golden-run-placeholder-{_key}@example.invalid"
+
     # ── 3. create the golden run (is_golden_run=True — the REAL run on the KB) ────
     run_id = await create_workflow_run(
         pool,
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         definition_id=definition_id,
         definition=definition,
-        inputs={"kickoff_prompt": golden_input},
+        inputs=golden_inputs,
         model=ctx_model or None,
         user_id=user_id,
         is_golden_run=True,
@@ -1365,7 +1395,7 @@ async def _drive_golden_run(
         current_user={"id": str(user_id)},
         user_settings=owner_settings,
         model=ctx_model,
-        inputs={"kickoff_prompt": golden_input},
+        inputs=golden_inputs,
         redis=redis,
         pool=pool,
         emit=_emit,
