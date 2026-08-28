@@ -307,6 +307,200 @@ async def _check_grounding_fidelity(
     )
 
 
+# ── Phase 214 (STEP-06 / D-214-20) — THE AUTHOR'S TICKED SERVICES AS A VOCABULARY ─────────
+#
+# ⚠ THIS BLOCK IS THE PROMPT HALF, AND THE PROMPT HALF ALONE GUARANTEES NOTHING. The rule
+# stated further up this module about the interactive-step clause applies verbatim here: *"a
+# prompt clause reduces how often the model composes such a step; it can never guarantee
+# absence."* D-214-20's claim is STRUCTURAL IMPOSSIBILITY, and a prompt cannot deliver that —
+# `_check_allowed_connections` below is the half that does, and nothing downstream may be
+# relaxed on the strength of these words.
+#
+# ⚠ LENGTH IS MEASURED FROM THE LITERAL AT RUNTIME, NEVER HAND-COUNTED — the discipline this
+# file already records for the `external_action` bullet and the DELIVERABLE RULE's interactive
+# clause, both of which say an over-long block is a NUDGE. **Measured 2026-08-28: the two
+# frames below are 236 and 237 characters**, against a DELIVERABLE-RULE block of 1202 and a
+# phase-type-bullet median of 83.5. They are proportionate to the RULES block they sit beside
+# (the only comparison that means anything) and are not a second nudge toward `external_action`
+# — the *forbid* frame in particular can only ever narrow composition.
+# ⚠ THE COMMENT ABOVE ROTS AND THE TEST DOES NOT: `test_214_describe_vocabulary.py`
+# RE-DERIVES both figures from these literals and asserts the bound, exactly as F-8 does for
+# the bullets. This file's own history is the reason — it records a comment that credited a
+# control with a mitigation it did not deliver.
+# ⚠ AND THAT TEST FIRED ON THIS VERY COMMENT, IN THE COMMIT THAT WROTE IT. The forbid frame
+# was hand-counted here as **178**; the re-derivation measured **237** on its first run and this
+# line was corrected to match. A hand-counted constant in this file was wrong within minutes of
+# being written — which is the argument for the test, made by the test.
+_VOCABULARY_ALLOWED_FRAME = (
+    "CONNECTED SERVICES — the ONLY connections an `external_action` phase may name:\n"
+    "{lines}\n"
+    "Set `connection_id` to one of the ids above and `tool_name` to one of that "
+    "connection's listed actions. Any other value is rejected after you emit.\n\n"
+)
+
+_VOCABULARY_FORBIDDEN_FRAME = (
+    "CONNECTED SERVICES: none. Do NOT compose an `external_action` phase at all — there is "
+    "nothing for one to act through, and a workflow containing one is rejected after you "
+    "emit. Write the deliverable with the tools you are given instead.\n\n"
+)
+
+
+def _render_vocabulary_block(vocabulary: dict[str, dict]) -> str:
+    """Render the ticked connections as a prompt paragraph, or the forbid frame when empty.
+
+    ``vocabulary`` maps connection id -> ``{"name": str, "service_id": str,
+    "actions": list[str]}``. Only ids the author ticked appear, and only GRANTED actions —
+    the grant grain IS the vocabulary grain (STEP-06 depends on Phase 213).
+    """
+    if not vocabulary:
+        return _VOCABULARY_FORBIDDEN_FRAME
+    lines = "\n".join(
+        f"- id `{cid}` — {meta.get('name') or meta.get('service_id') or cid} "
+        f"({meta.get('service_id') or 'service'}); actions: "
+        f"{', '.join(meta.get('actions') or []) or 'none'}"
+        for cid, meta in vocabulary.items()
+    )
+    return _VOCABULARY_ALLOWED_FRAME.format(lines=lines)
+
+
+def _check_allowed_connections(
+    wd: WorkflowDefinition,
+    allowed: list[str] | None,
+    vocabulary: dict[str, dict] | None = None,
+) -> dict | None:
+    """⭐ THE ENFORCEMENT HALF — walk the EMITTED definition and refuse an out-of-vocabulary step.
+
+    Returns an honest structured error dict, or ``None`` when clean. **This is what makes
+    D-214-20's "structurally impossible" true**: the prompt block above reduces how often the
+    model composes such a step, and this refuses the ones it composes anyway.
+
+    ⚠ ``allowed is None`` AND ``allowed == []`` ARE DIFFERENT, AND THE FIRST LINE IS WHERE THAT
+    LIVES. ``None`` means the author expressed no preference, so today's behaviour is returned
+    unchanged — no check, no refusal, byte-identical to the pre-214 path. ``[]`` means they
+    ticked nothing, which is a DECISION that no ``external_action`` may be emitted at all. An
+    ``if not allowed:`` here would collapse the two and silently forbid every external step for
+    every caller that never sent the field.
+
+    ⚠ A FAILURE NEVER CARRIES A RUNNABLE OR PARTIAL DRAFT (REQ-2 c, and D-214-21's own words:
+    *"a draft containing a hole is a draft that can be published if the hole is missed"*). The
+    returned dict has no ``definition`` key and no ``readiness`` key.
+    """
+    if allowed is None:
+        return None
+
+    allowed_set = {str(cid) for cid in allowed}
+    vocab = vocabulary or {}
+    for phase in wd.phases:
+        config = getattr(phase, "config", None)
+        if getattr(config, "phase_type", None) != "external_action":
+            continue
+        connection_id = getattr(config, "connection_id", None)
+        # An `external_action` with NO connection bound is 189's `recorded_not_sent` shape and
+        # names no service, so there is nothing here to hold against the vocabulary — EXCEPT
+        # when the author ticked nothing at all, which is a decision that no such phase may
+        # exist. Both arms are stated rather than folded together.
+        if not allowed_set:
+            return {
+                "ok": False,
+                "error": "connection_not_allowed",
+                "detail": (
+                    f"phase '{phase.slug}' acts outside the app, but no connected service was "
+                    "chosen for this workflow."
+                ),
+            }
+        if connection_id is None or str(connection_id) not in allowed_set:
+            return {
+                "ok": False,
+                "error": "connection_not_allowed",
+                "detail": (
+                    f"phase '{phase.slug}' names a service that was not chosen for this "
+                    "workflow."
+                ),
+            }
+        # ⭐ THE GRANT GRAIN, NOT THE DISCOVERY GRAIN. A ticked connection is not a licence for
+        # every tool on it: the executor's gate 5.5 resolves each tool's own posture, so a step
+        # naming an ungranted tool would validate here and refuse at run time — which is
+        # precisely *"an invented step that validates and fails at 03:00"*.
+        actions = (vocab.get(str(connection_id)) or {}).get("actions")
+        if actions is None:
+            # No action list was supplied for this connection, so there is nothing to check
+            # against. Recorded as a distinct arm rather than passing silently: it is the
+            # caller's omission, not a grant.
+            continue
+        tool_name = getattr(config, "tool_name", None) or getattr(config, "capability", None)
+        if tool_name is None or str(tool_name) not in set(actions):
+            return {
+                "ok": False,
+                "error": "connection_not_allowed",
+                "detail": (
+                    f"phase '{phase.slug}' uses an action that is not allowed on the chosen "
+                    "service."
+                ),
+            }
+    return None
+
+
+async def _resolve_allowed_vocabulary(
+    *, supabase, user_id: str, allowed_connection_ids: list[str] | None
+) -> dict[str, dict]:
+    """Resolve the ticked connections into ``{id: {name, service_id, actions}}``, SERVER-SIDE.
+
+    ⚠ THE SETS ARE COMPUTED HERE AND NEVER TAKEN FROM THE CLIENT (T-103-02-03, the same rule
+    the folder / tool / skill grounding sets obey). The request carries only the author's
+    TICKED IDS; which ACTIONS those connections may perform is a fact about org-scoped rows and
+    their grants, so a client that claimed a longer action list would be claiming a permission.
+
+    ⭐ THE GRANT GRAIN, THROUGH THE ONE HOME. ``is_tool_allowed`` is the executor's own
+    predicate (`app.services.connectors.grants`, gate 5.5's), imported rather than reproduced —
+    a second copy here would drift from the gate that actually stops the send, which is exactly
+    the two-copies-of-one-predicate failure D-214-00 exists to prevent.
+
+    FAIL-CLOSED. An unreadable membership or connection list yields an EMPTY vocabulary, which
+    NARROWS composition; it never widens it. An id the caller's org does not own simply does
+    not appear, so a cross-org id constrains rather than granting anything.
+    """
+    if not allowed_connection_ids:
+        return {}
+
+    from app.services.connector_service import list_connections  # function-local (Pitfall 4)
+    from app.services.connectors.grants import is_tool_allowed  # function-local
+    from app.utils.folder_utils import _resolve_caller_org_ids  # function-local
+
+    wanted = {str(cid) for cid in allowed_connection_ids}
+    vocabulary: dict[str, dict] = {}
+    try:
+        org_ids = await _resolve_caller_org_ids(supabase, user_id)
+        for org_id in sorted(org_ids):
+            for conn in await list_connections(org_id=org_id, supabase=supabase):
+                cid = str(getattr(conn, "id", "") or "")
+                if cid not in wanted or cid in vocabulary:
+                    continue
+                candidates: list[str] = []
+                for tool in getattr(conn, "discovered_tools", None) or []:
+                    name = tool.get("name") if isinstance(tool, dict) else None
+                    if isinstance(name, str) and name.strip() and name not in candidates:
+                        candidates.append(name)
+                capability = getattr(conn, "capability", None)
+                if isinstance(capability, str) and capability and capability not in candidates:
+                    candidates.append(capability)
+                for key in (getattr(conn, "tool_grants", None) or {}):
+                    if isinstance(key, str) and key and key not in candidates:
+                        candidates.append(key)
+                vocabulary[cid] = {
+                    "name": getattr(conn, "name", None),
+                    "service_id": getattr(conn, "service_id", None),
+                    "actions": [a for a in candidates if is_tool_allowed(conn, a)],
+                }
+    except Exception:  # noqa: BLE001 — an unreadable set NARROWS the vocabulary, never widens it
+        logger.warning(
+            "214 STEP-06: could not resolve the author's connection vocabulary; "
+            "generation will refuse every external_action step",
+            exc_info=True,
+        )
+        return {}
+    return vocabulary
+
+
 def _normalised_for_copy_check(text: str) -> str:
     """Normalise a string for the D-07 describe-copy comparison: strip, collapse every
     internal whitespace run to a single space, casefold.
@@ -330,6 +524,20 @@ async def generate_workflow_definition(
     project_folder_id: "UUID | str | None" = None,
     template_asset_id: "UUID | str | None" = None,
     template_placeholders: list[str] | None = None,
+    # ── Phase 214 (STEP-06 / D-214-20) — THE AUTHOR'S TICKED SERVICES ────────────────────
+    #
+    # Keyword-only, on the ``template_placeholders`` precedent directly above: an optional
+    # pre-draft choice the describe door makes and only this call can spend.
+    #
+    # ⚠ THE TWO ARMS DIFFER AND MUST NEVER COLLAPSE — this is stated HERE, at the declaration,
+    # because that is where a future caller reads it:
+    #   · ``None``  → today's behaviour EXACTLY. No vocabulary block in the prompt, no
+    #                 post-emit check, byte-identical to the pre-214 path.
+    #   · ``[]``    → the author ticked NOTHING, which is a DECISION rather than a missing
+    #                 value: no ``external_action`` phase may be emitted at all.
+    # An ``or None`` / ``or []`` anywhere on this path turns one into the other — the same
+    # ``0``-vs-``null`` family this project documents on ``WorkflowRunPhase.step_count``.
+    allowed_connection_ids: list[str] | None = None,
 ) -> dict:
     """Generate ONE grounded ``WorkflowDefinition`` draft from an NL description.
 
@@ -340,8 +548,17 @@ async def generate_workflow_definition(
     ``app.services.harness.grounding``. It is present ONLY here, on the success path — see
     the block that builds it. On failure returns an
     honest structured error: ``{"ok": False, "error": <code>, "detail": ...}`` where code
-    is one of ``no_authoring_model`` / ``could_not_generate`` / ``grounding_failed``. A
-    failure NEVER carries a runnable/partial draft (REQ-2 c).
+    is one of ``no_authoring_model`` / ``could_not_generate`` / ``grounding_failed`` /
+    ``connection_not_allowed`` (Phase 214 STEP-06). A failure NEVER carries a runnable/partial
+    draft (REQ-2 c).
+
+    ⚠ ``connection_not_allowed`` NEEDS NO CLIENT CHANGE, AND THAT IS A MEASUREMENT RATHER THAN
+    AN ASSUMPTION. The refusal's render path is agnostic about the code string:
+    ``useTemplateFirstDraft.ts:580`` calls ``store.getState().setErrorState(result.error,
+    result.detail)`` on any ``result.ok === false``; ``builderStore.ts:433-439`` sets
+    ``builderPhase: "error"`` with the message and detail; ``WorkflowBuilderPage.tsx:2151``
+    renders it. Plan ``214-14``'s seam **S-7** drives that path end to end — this docstring
+    names it so a *"covered by the audit"* claim can be checked rather than believed.
 
     Provider-call budget (REQ-2 a/b): EXACTLY one call on a valid first emit; EXACTLY two
     (attempt 1 then 2, no third) on a first-pass ValidationError; each call emits one
@@ -392,8 +609,32 @@ async def generate_workflow_definition(
         template_placeholders=template_placeholders,
     )
 
+    # ── Phase 214 (STEP-06) — THE VOCABULARY, RESOLVED SERVER-SIDE, THEN SPENT TWICE ──────
+    #
+    # Once as PROMPT (it reduces how often the model composes an out-of-vocabulary step) and
+    # once as ENFORCEMENT after the emit (it is what makes D-214-20's claim true). The single
+    # resolve feeds both, so the words the model was given and the rule it is judged against
+    # cannot disagree — two resolves would be two sources for one fact.
+    #
+    # ⚠ THE ``is not None`` TEST IS THE WHOLE ABSENT-VS-EMPTY DISTINCTION. With ``None`` the
+    # prompt gains nothing at all, which is what makes the unconstrained arm byte-identical to
+    # the pre-214 path.
+    allowed_vocabulary = await _resolve_allowed_vocabulary(
+        supabase=supabase, user_id=user_id, allowed_connection_ids=allowed_connection_ids
+    )
+    vocabulary_block = (
+        _render_vocabulary_block(allowed_vocabulary) if allowed_connection_ids is not None else ""
+    )
+
     base_messages = [
-        {"role": "user", "content": grounded_prompt + "\n\n## The task to author\n" + describe}
+        {
+            "role": "user",
+            "content": grounded_prompt
+            + "\n\n"
+            + vocabulary_block
+            + "## The task to author\n"
+            + describe,
+        }
     ]
 
     async def _shot(messages: list[dict], attempt: int) -> dict:
@@ -443,6 +684,21 @@ async def generate_workflow_definition(
     )
     if fidelity is not None:
         return fidelity
+
+    # ── ⭐ Phase 214 (STEP-06 / D-214-20) — THE VOCABULARY CONSTRAINT, ENFORCED ────────────
+    #
+    # BESIDE the grounding-fidelity check and for the identical reason: both are server-side
+    # rules the model cannot widen, applied to what it ACTUALLY emitted rather than to what it
+    # was asked for. The prompt block above is a reduction; this is the absence.
+    #
+    # ⚠ IT RETURNS BEFORE THE PROVENANCE STAMPS AND THE SLUG MINT, so a refused generation
+    # carries NO definition, no readiness and no minted slug (REQ-2 c — a failure never carries
+    # a runnable or partial draft). ``allowed_connection_ids is None`` short-circuits inside
+    # ``_check_allowed_connections``, so the unconstrained path reaches this line and leaves it
+    # having done nothing.
+    vocabulary_refusal = _check_allowed_connections(wd, allowed_connection_ids, allowed_vocabulary)
+    if vocabulary_refusal is not None:
+        return vocabulary_refusal
 
     # ── Phase 187 (VOCAB-01 / REQ-3, D-187-03) — stamp the name PROVENANCE.
     #

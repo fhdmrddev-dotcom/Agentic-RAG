@@ -676,6 +676,20 @@ export interface WorkflowBuilderPageProps {
    *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
   initialProjectFolderId?: string
   /**
+   * 214-13 (STEP-06 / D-214-20): the connections the author ticked on the LOOSE door, made
+   * BEFORE the AI drafts. Straight through to the generate call, which is the only thing that
+   * can spend them.
+   *
+   * ⚠ THE PRECEDENT IS `initialProjectFolderId` DIRECTLY ABOVE — the same mechanism, for the
+   * same kind of pre-draft choice: no store, no context, no global.
+   *
+   * ⚠ ABSENT AND `[]` ARE DIFFERENT AND MUST NOT COLLAPSE. `undefined` is *no preference* and
+   * reaches the server's unconstrained arm, which is today's behaviour byte for byte; `[]` is
+   * the author's decision that no external step may be emitted. Every hop on this path branches
+   * on `=== undefined` rather than on truthiness.
+   */
+  initialAllowedConnectionIds?: string[]
+  /**
    * 193.1-08 (D-24) — the document the author supplied on the LOOSE door, and its
    * ALREADY-COMPLETED reading, carried across the hand-off.
    *
@@ -736,6 +750,7 @@ export function WorkflowBuilderPage({
   initialDescribe,
   autoDraft,
   initialProjectFolderId,
+  initialAllowedConnectionIds,
   initialTemplateFile,
   initialTemplateRead,
   registerCanLeave,
@@ -911,6 +926,10 @@ export function WorkflowBuilderPage({
     initialDescribe,
     autoDraft,
     initialProjectFolderId,
+    // 214-13 (STEP-06) — straight through to the hook, which is the only holder of the
+    // generate call. `undefined` on every mount that supplies nothing, which is every shipped
+    // call site but the loose door's.
+    initialAllowedConnectionIds,
     // 193.1-08 (D-24) — straight through to the hook, which SEEDS its reading with them.
     // Undefined on every mount that supplies nothing, which is every shipped call site but
     // the loose door's.

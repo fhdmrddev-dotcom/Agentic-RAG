@@ -1798,6 +1798,21 @@ class GenerateRequest(BaseModel):
     project_folder_id: UUID | None = None
     template_asset_id: UUID | None = None
     template_placeholders: list[str] | None = None
+    # Phase 214 (STEP-06 / D-214-20) — the connections the AUTHOR ticked on the describe door,
+    # which become the generator's whole vocabulary for `external_action` steps.
+    #
+    # ⚠ ABSENT AND EMPTY ARE DIFFERENT FACTS AND MUST NEVER COLLAPSE. `None` is today's
+    # UNCONSTRAINED behaviour (the author expressed no preference); `[]` is the author's
+    # DECISION that no external step may be emitted at all. `list[str] | None = None` carries
+    # both; a `Field(default_factory=list)` here would erase the distinction at the boundary
+    # and no amount of care downstream could get it back. The full semantics are stated where
+    # the service parameter is declared (`workflow_authoring.generate_workflow_definition`).
+    #
+    # ⚠ `str`, NOT `UUID`, and deliberately: `connector_connections.id` reaches the client as a
+    # string and is re-scoped by org at every read (D-14). A `UUID` here would 422 a whole
+    # generation on a malformed id the ENFORCEMENT below would otherwise simply refuse to
+    # honour — an unrecognised id constrains, it never widens.
+    allowed_connection_ids: list[str] | None = None
 
 
 @router.post(
@@ -1834,6 +1849,10 @@ async def generate_workflow(
         project_folder_id=body.project_folder_id,
         template_asset_id=body.template_asset_id,
         template_placeholders=body.template_placeholders,
+        # ⚠ FORWARDED VERBATIM — no `or None`, no `or []`, no `if body.allowed_connection_ids`.
+        # Every one of those collapses the absent arm into the empty one or the reverse, and
+        # the two mean opposite things (see the field's own declaration above).
+        allowed_connection_ids=body.allowed_connection_ids,
     )
     return result
 

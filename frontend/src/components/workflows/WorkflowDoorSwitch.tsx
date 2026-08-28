@@ -403,6 +403,17 @@ export function WorkflowDoorSwitch({
             // generate call so a fast-path workflow can be born BOUND. `""` (nobody
             // picked) leaves the Builder's own initializer at exactly today's value.
             initialProjectFolderId={kbFolderId}
+            // 214-13 (STEP-06 / D-214-20) — the door's ticked services, carried into the
+            // EXISTING generate call so the drafted workflow's vocabulary IS the author's set.
+            // The precedent is `initialProjectFolderId` directly above (187-26): pre-draft
+            // state chosen on this door that only the Builder can spend. Same mechanism, one
+            // wave later — no store, no context, no global.
+            //
+            // ⚠ ALWAYS SENT, INCLUDING `[]`. The picker is always mounted on this door, so
+            // this door ALWAYS has an answer, and `[]` here is the author's real decision
+            // rather than a missing value. `undefined` — the server's unconstrained arm — is
+            // reserved for the mounts that carry no picker at all, which is every other one.
+            initialAllowedConnectionIds={allowedConnectionIds}
             registerCanLeave={registerCanLeave}
             // 193.1-08 (D-24) — the supplied document and its FINISHED reading, crossing the
             // hand-off. The precedent is `initialProjectFolderId` directly above (187-26):

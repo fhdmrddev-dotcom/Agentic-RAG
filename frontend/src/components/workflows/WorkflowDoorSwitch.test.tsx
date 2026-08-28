@@ -973,7 +973,25 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
     expect(mockReadPlaceholders).toHaveBeenCalledTimes(0)
     // The KEY SET, not merely the absence of a value: `template_placeholders: undefined`
     // would satisfy a `toBeUndefined` and would still be a changed body on the wire.
-    expect(Object.keys(mockGenerateWorkflow.mock.calls[0][0]).sort()).toEqual(["describe"])
+    //
+    // ⚠ 214-13 (STEP-06) — THIS PIN GAINED A SECOND KEY, AND IT IS AN ARGUED CHANGE RATHER
+    // THAN A RE-BASELINE TO MAKE A RED GO GREEN. The pin did exactly its job: it caught the
+    // request body growing a field, which is what it exists for. The field is INTENTIONAL and
+    // belongs on THIS door only — `DescribeServicePicker` is always mounted here, so this door
+    // ALWAYS has an answer to *"which services may this workflow use?"*, and `[]` is the
+    // author's real decision (no external step may be emitted) rather than a missing value.
+    //
+    // ⚠ THE `template_placeholders` HALF OF THE ORIGINAL CLAIM IS UNCHANGED AND IS STILL
+    // ASSERTED BELOW: with no document supplied, that key is genuinely ABSENT. The two are
+    // checked apart so a future edit cannot smuggle one in under the other's name.
+    const body = mockGenerateWorkflow.mock.calls[0][0]
+    expect(Object.keys(body).sort()).toEqual(["allowed_connection_ids", "describe"])
+    expect("template_placeholders" in body).toBe(false)
+    expect("project_folder_id" in body).toBe(false)
+    // ⚠ `[]`, NEVER `undefined`. The two mean opposite things on the wire — `undefined` is
+    // *no preference* and reaches the server's UNCONSTRAINED arm, which is not what a door
+    // carrying a picker means when nothing is ticked.
+    expect(body.allowed_connection_ids).toEqual([])
   })
 
   it("WorkflowDoorSwitch.tsx: the two crossing props are genuinely ABSENT when nothing is supplied — a spread-conditional, not a default", () => {
@@ -1692,5 +1710,80 @@ describe("WorkflowDoorSwitch — the describe door refuses an unconnected servic
     // this file's own docblock PROMISES never to use it and a bare-word grep would count that).
     expect(workflowDoorSwitchSource).not.toContain("dangerouslySetInnerHTML=")
     expect("<p dangerouslySetInnerHTML={x} />").toContain("dangerouslySetInnerHTML=")
+  })
+})
+
+
+// ── 214-13 (STEP-06 · D-214-20) — THE KEY LINK: THE TICKED SET REACHES `/generate` ──────
+//
+// ⚠ THIS IS THE CASE THAT MAKES THE PHASE'S CLAIM CHECKABLE END TO END. The picker, the
+// Builder prop and the hook's request field are three separate hops in three separate files;
+// each one typechecks in isolation while the value never arrives. Nothing but a drive through
+// the real components can tell the difference — the 204 pre-flight's recorded lesson is that
+// both defects which reached the operator were SEAMS between plans, each side green.
+describe("WorkflowDoorSwitch — the ticked services ride POST /workflows/generate", () => {
+  const grantedSlack = {
+    id: "conn-slack",
+    org_id: "o1",
+    service_id: "slack",
+    name: "Acme Slack",
+    config: {},
+    is_enabled: true,
+    discovered_tools: [{ name: "post_message" }],
+    tool_grants: { post_message: "allow" },
+  }
+
+  it("a ticked service arrives as `allowed_connection_ids` on the generate body", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    fireEvent.click(await screen.findByTestId("describe-service-conn-slack"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    expect(mockGenerateWorkflow.mock.calls[0][0].allowed_connection_ids).toEqual(["conn-slack"])
+  })
+
+  it("ticking NOTHING sends `[]` — a decision, never a missing value", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await screen.findByTestId("describe-service-conn-slack")
+
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    const body = mockGenerateWorkflow.mock.calls[0][0]
+    expect(body.allowed_connection_ids).toEqual([])
+    // POSITIVE CONTROL — the key is PRESENT, so the `[]` above is a sent decision rather than
+    // an absent field that happens to read as empty at the assertion.
+    expect("allowed_connection_ids" in body).toBe(true)
+  })
+
+  it("un-ticking removes it again — the door holds the parent's set, not a copy", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    const chip = await screen.findByTestId("describe-service-conn-slack")
+    fireEvent.click(chip)
+    expect(chip.getAttribute("aria-pressed")).toBe("true")
+    fireEvent.click(chip)
+    expect(chip.getAttribute("aria-pressed")).toBe("false")
+
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    expect(mockGenerateWorkflow.mock.calls[0][0].allowed_connection_ids).toEqual([])
   })
 })
