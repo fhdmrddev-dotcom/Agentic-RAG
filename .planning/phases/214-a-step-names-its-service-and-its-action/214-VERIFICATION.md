@@ -35,6 +35,33 @@ human_verification:
     why_human: "Requires live browser + real provider credentials; explicitly out of scope for a code-only verification pass per the phase's own closing decision."
 ---
 
+## ✅ CORRECTION 2026-08-28 — SC#2 IS NOW MET (this report said FAILED, and that was true when written)
+
+The gap this report recorded was real and is now closed by **Phase 214.1** plus two fixes driven out
+of the operator’s own testing. Recorded here rather than by editing the finding above, because the
+finding was CORRECT at the time and the sequence is the useful part.
+
+**The proof, operator-driven 2026-08-28 18:00:50** — a library launch wrote into `workflow_runs`:
+
+```json
+{"topic": "test", "to": "fhdmrd@gmail.com", "kickoff_prompt": "go"}
+```
+
+The author’s real values, from the door they clicked — not placeholders, not the bare
+`kickoff_prompt` this report measured. **declare → publish → launch asks → run receives**, end to end.
+
+| | |
+|---|---|
+| SC#2 / STEP-02 | ❌ FAILED → **✅ MET** |
+| ⛔ `BUG-260826-01` | **CLOSED** — the milestone’s blocking defect |
+| `BUG-260828-02` (authoring surface) | CLOSED by 214.1 |
+| `BUG-260828-10` (golden run supplied no declared inputs) | CLOSED |
+
+⚠ **SC#3 stays PARTIAL** and is NOT corrected by this. The gate mechanics are right, but a failed
+publish still does not tell the author what failed or in which step — `BUG-260828-09`, hit three
+times on the evening of the drive. **Phase 214 is 5/6, not 6/6.**
+
+
 # Phase 214: A Step Names Its Service and Its Action — Verification Report
 
 **Phase Goal:** An author adds an external step by picking a service and then a named action;
