@@ -540,10 +540,16 @@ export interface ModelCapabilityPatch {
   enabled?: boolean
   deprecated?: boolean
   deprecated_reason?: string | null
-  context_window_tokens?: number
-  max_output_tokens?: number
-  native_tools?: boolean
-  llm_call_timeout_seconds?: number
+  /** ⚠ Every capability column is `| null`, and the null is LOAD-BEARING: an explicit null
+   *  is a Reset (clears the stored override so the value falls back to the built-in DEF —
+   *  `set_model_capability` writes only the keys present in the body). These read `number` /
+   *  `boolean` until Phase 216, which forced every caller sending a Reset through an
+   *  `as ModelCapabilityPatch` cast — a cast that would equally have hidden a wrong-typed
+   *  field. The type now says what the endpoint has always accepted. */
+  context_window_tokens?: number | null
+  max_output_tokens?: number | null
+  native_tools?: boolean | null
+  llm_call_timeout_seconds?: number | null
   /** AUTH-04: an explicit `null` is a Reset (clears the override to DEF) — the same
    *  explicit-null semantics every other column here carries. */
   emit_tier?: "force_strict" | "force" | "coerce" | null

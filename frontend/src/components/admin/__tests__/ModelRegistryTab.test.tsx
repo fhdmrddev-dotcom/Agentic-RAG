@@ -16,6 +16,8 @@ import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, within, fireEvent, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
+import type { ReactElement } from "react"
+
 import { ModelRegistryTab } from "../ModelRegistryTab"
 import { ApiError, type ModelRegistryRow } from "@/lib/api"
 
@@ -25,6 +27,22 @@ afterEach(() => {
 })
 
 const noop = () => Promise.resolve()
+
+/** Render the tab and OPEN every provider section.
+ *
+ *  ⚠ The shipped tab lands FOLDED — an operator opens the provider they came for. So a test
+ *  that queries a row control has to expand first, exactly as a user does; rendering and
+ *  querying straight into a `tbody` would assert against a state nobody sees on load.
+ *  Scoped to the provider headers (`[data-provider] > button`) on purpose: the add-by-ID
+ *  form is ALSO an aria-expanded disclosure, and a blanket expand would silently open it and
+ *  change the preconditions of every test in that describe block. */
+function renderTab(ui: ReactElement) {
+  const result = render(ui)
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-provider] > button[aria-expanded="false"]')
+    .forEach((btn) => fireEvent.click(btn))
+  return result
+}
 
 function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
   return {
@@ -49,7 +67,7 @@ function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
 
 describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling", () => {
   it("derives the coupling chip from `enabled` — ✓ in picker when on, ✕ hidden when off", () => {
-    const { container } = render(
+    const { container } = renderTab(
       <ModelRegistryTab
         rows={[
           makeRow({ model_id: "m-on", enabled: true }),
@@ -72,7 +90,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("editing a numeric cell writes the field patch through onSetCapability", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab rows={[makeRow()]} onSetCapability={onSet} onLock={noop} showTechnical={false} />,
     )
 
@@ -88,7 +106,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("toggling `deprecated` writes { deprecated: true } and the row stays enabled/selectable", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    const { container } = render(
+    const { container } = renderTab(
       <ModelRegistryTab
         rows={[makeRow({ enabled: true, deprecated: false })]}
         onSetCapability={onSet}
@@ -110,7 +128,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("gates the lock control on a ✕ hidden (disabled) row — clicking it does NOT call onLock", async () => {
     const user = userEvent.setup()
     const onLock = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ model_id: "m-off", enabled: false, is_locked: false })]}
         onSetCapability={noop}
@@ -131,7 +149,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("an enabled row's lock control IS clickable and calls onLock(true)", async () => {
     const user = userEvent.setup()
     const onLock = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ model_id: "m-on", enabled: true, is_locked: false })]}
         onSetCapability={noop}
@@ -149,7 +167,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     const onSet = vi
       .fn()
       .mockRejectedValue(new ApiError("Pick a new default first — this model is the org default.", 409))
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ enabled: true, is_default: true })]}
         onSetCapability={onSet}
@@ -164,7 +182,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   })
 
   it("seeds the deprecation-reason input from the stored reason (IN-02) — re-edit preserves the note", () => {
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: "superseded by gpt-5.6" })]}
         onSetCapability={noop}
@@ -188,7 +206,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("test_reason_enter_commits_once — Enter commits the typed reason exactly once (never lost)", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
         onSetCapability={onSet}
@@ -212,7 +230,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("test_reason_escape_cancels — Escape reverts the draft to the stored reason and does NOT write", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: "original reason" })]}
         onSetCapability={onSet}
@@ -237,7 +255,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("test_reason_enter_then_blur_no_double_write — Enter then the trailing blur writes at most once", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
         onSetCapability={onSet}
@@ -261,7 +279,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("test_reason_noop_blur_never_writes — focus + blur with zero edits issues NO write (no PATCH, no ✎ receipt, no refetch)", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: "original reason" })]}
         onSetCapability={onSet}
@@ -288,7 +306,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
         () => new Promise<void>((resolve) => { resolveFirst = resolve }),
       )
       .mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
         onSetCapability={onSet}
@@ -338,7 +356,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("test_native_tools_gated_on_native_sdk_rows — anthropic/google rows gate the toggle (no inert write); compat rows keep it live", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[
           makeRow({ model_id: "claude-opus-4-8", provider: "anthropic" }),
@@ -366,7 +384,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   })
 
   it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[
           makeRow({
@@ -390,7 +408,7 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
   it("shows a Reset ONLY on an overridden field, and Reset sends an explicit null (clears to DEF)", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={[makeRow({ overridden_fields: ["context_window_tokens"] })]}
         onSetCapability={onSet}
@@ -421,7 +439,7 @@ describe("ModelRegistryTab (070-A) — the + Add model by ID form (D-159-02 / D-
 
   async function openForm(onAddModel = vi.fn().mockResolvedValue(undefined)) {
     const user = userEvent.setup()
-    render(
+    renderTab(
       <ModelRegistryTab
         rows={baseRows}
         onSetCapability={noop}
@@ -435,7 +453,7 @@ describe("ModelRegistryTab (070-A) — the + Add model by ID form (D-159-02 / D-
   }
 
   it("renders NO add affordance when the shell wires no onAddModel (the leaf stays byte-identical)", () => {
-    render(<ModelRegistryTab rows={baseRows} onSetCapability={noop} onLock={noop} showTechnical={false} />)
+    renderTab(<ModelRegistryTab rows={baseRows} onSetCapability={noop} onLock={noop} showTechnical={false} />)
     expect(screen.queryByRole("button", { name: /add model by id/i })).not.toBeInTheDocument()
   })
 
@@ -522,5 +540,197 @@ describe("ModelRegistryTab (070-A) — the + Add model by ID form (D-159-02 / D-
   it("the form copy states the model is added disabled and enabled from the table", async () => {
     await openForm()
     expect(screen.getByText(/enable it from the table/i)).toBeInTheDocument()
+  })
+})
+
+// ── Phase 216 — the override marker IS the Reset, + the row-level "reset everything" ──
+// Two gaps this locks, both structural rather than cosmetic:
+//   1. `native_tools` has always landed in `overridden_fields` like any other column, but the
+//      Tools cell rendered only the EFFECTIVE value — no OVR/DEF, no Reset. An operator who
+//      flipped it could neither see it was an override nor get back to the built-in default.
+//   2. A Reset was per-field only, so putting one model back how you found it took up to four
+//      separate writes (and four audit rows for one intention).
+describe("ModelRegistryTab — the OVR marker as Reset + the row-level reset", () => {
+  it("the Tools column carries its own OVR marker, and it resets native_tools to DEF", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    renderTab(
+      <ModelRegistryTab
+        rows={[makeRow({ provider: "openai", overridden_fields: ["native_tools"] })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const reset = screen.getByRole("button", { name: /reset tools for gpt-5\.6-sol/i })
+    await user.click(reset)
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { native_tools: null })
+  })
+
+  it("on a native-SDK provider the Tools marker is READ-ONLY — an inert Reset is never offered", () => {
+    renderTab(
+      <ModelRegistryTab
+        rows={[
+          makeRow({
+            model_id: "claude-opus-4-8",
+            provider: "anthropic",
+            overridden_fields: ["native_tools"],
+          }),
+        ]}
+        onSetCapability={noop}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    // The stored override is still VISIBLE (the operator can see one exists)…
+    const row = document.querySelector('[data-model="claude-opus-4-8"]') as HTMLElement
+    expect(within(row).getAllByText("OVR").length).toBeGreaterThan(0)
+    // …but clearing it would change no routing on this provider, so it is not a button.
+    expect(
+      screen.queryByRole("button", { name: /reset tools for claude-opus-4-8/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("the row-level reset ARMS on the first click and writes nothing", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    renderTab(
+      <ModelRegistryTab
+        rows={[
+          makeRow({
+            overridden_fields: ["context_window_tokens", "max_output_tokens", "native_tools"],
+          }),
+        ]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const rowReset = screen.getByRole("button", {
+      name: /reset 3 overridden values for gpt-5\.6-sol/i,
+    })
+    await user.click(rowReset)
+    expect(onSet).not.toHaveBeenCalled()
+    // Armed state is VISIBLE — the control says what the next click will do.
+    expect(rowReset).toHaveTextContent(/reset 3\?/i)
+    // …and the accessible name does NOT change underneath an assistive-tech user.
+    expect(
+      screen.getByRole("button", { name: /reset 3 overridden values for gpt-5\.6-sol/i }),
+    ).toBe(rowReset)
+  })
+
+  it("the second click clears every overridden CAPABILITY in ONE patch — and never touches enabled/deprecated", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    renderTab(
+      <ModelRegistryTab
+        rows={[
+          makeRow({
+            // Five stored overrides — but only THREE of them are capabilities.
+            overridden_fields: [
+              "context_window_tokens",
+              "llm_call_timeout_seconds",
+              "emit_tier",
+              "enabled",
+              "deprecated",
+            ],
+          }),
+        ]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const rowReset = screen.getByRole("button", {
+      name: /reset 3 overridden values for gpt-5\.6-sol/i,
+    })
+    await user.click(rowReset)
+    await user.click(rowReset)
+
+    // ONE request, not three — the endpoint clears every key present in the body.
+    expect(onSet).toHaveBeenCalledTimes(1)
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", {
+      context_window_tokens: null,
+      llm_call_timeout_seconds: null,
+      emit_tier: null,
+    })
+    // ⚠ THE EXCLUSION IS THE POINT: a null `enabled` resolves to TRUE server-side
+    // (`_registry_row`), so clearing it would SHOW a model the operator deliberately hid.
+    const patch = onSet.mock.calls[0][1]
+    expect(patch).not.toHaveProperty("enabled")
+    expect(patch).not.toHaveProperty("deprecated")
+  })
+
+  it("a row with no capability overrides shows no row-level reset (an action with no effect is not an affordance)", () => {
+    renderTab(
+      <ModelRegistryTab
+        rows={[
+          // Stored overrides, but ONLY the excluded lifecycle ones → nothing to reset.
+          makeRow({ model_id: "m-lifecycle-only", overridden_fields: ["enabled", "deprecated"] }),
+          // ⚠ NON-VACUITY CONTROL, in the same render: without this the assertion below would
+          // also pass on a build where the row-level reset does not exist AT ALL — a fence
+          // with nothing defending it. This row proves the query CAN find one.
+          makeRow({ model_id: "m-has-caps", overridden_fields: ["max_output_tokens"] }),
+        ]}
+        onSetCapability={noop}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    expect(
+      screen.getByRole("button", { name: /reset 1 overridden value for m-has-caps/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /overridden value.* for m-lifecycle-only/i }),
+    ).not.toBeInTheDocument()
+  })
+})
+
+// ── The tab lands FOLDED ────────────────────────────────────────────────────────────
+// Pinned with the RAW `render` (never `renderTab`, which exists precisely to open these
+// sections): every other test in this file expands first, so without this one nothing would
+// notice the default flipping back — the helper would absorb it silently.
+describe("ModelRegistryTab — provider sections are FOLDED on arrival", () => {
+  it("renders no capability rows until the operator opens a provider, and the header stays readable", async () => {
+    const user = userEvent.setup()
+    render(
+      <ModelRegistryTab
+        rows={[
+          makeRow({ model_id: "gpt-5.6-sol", provider: "openai" }),
+          makeRow({ model_id: "claude-opus-4-8", provider: "anthropic" }),
+        ]}
+        onSetCapability={noop}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    // Both provider sections exist and both are shut.
+    const headers = document.querySelectorAll('[data-provider] > button')
+    expect(headers).toHaveLength(2)
+    headers.forEach((h) => expect(h).toHaveAttribute("aria-expanded", "false"))
+
+    // No row control is reachable — the table body is not rendered at all.
+    expect(
+      screen.queryByRole("button", { name: /edit context for gpt-5\.6-sol/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole("switch", { name: /enabled for gpt-5\.6-sol/i })).not.toBeInTheDocument()
+
+    // The folded header still carries the count, so a shut section is not a blank one.
+    // (Both sections hold one model each, hence two matches — the point is that a folded
+    // header still states its count rather than going blank.)
+    expect(screen.getAllByText(/1 model · 1 shown to users/i)).toHaveLength(2)
+
+    // Opening ONE provider reveals only that provider's rows.
+    await user.click(screen.getByRole("button", { name: /openai/i }))
+    expect(screen.getByRole("button", { name: /edit context for gpt-5\.6-sol/i })).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /edit context for claude-opus-4-8/i }),
+    ).not.toBeInTheDocument()
   })
 })
