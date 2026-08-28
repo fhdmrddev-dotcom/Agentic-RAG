@@ -201,7 +201,19 @@ def test_declared_phase_measure_tail_is_byte_identical_to_the_base_commit():
     def tail(source: str) -> str:
         body = source[source.index("def declared_phase_measure"):]
         # stop at the next top-level definition
-        end = body.index("\nclass ")
+        #
+        # ⚠ CORRECTED AT PHASE 214, AND THE LINE ABOVE IS WHY THIS IS A CORRECTION AND NOT A
+        # RE-BASELINE. It has always said "the next top-level DEFINITION"; the code looked for
+        # `\nclass ` alone, which was indistinguishable from correct for exactly as long as no
+        # top-level `def` happened to sit between this function and the next class. Phase 214
+        # added one (`step_identity` — the shared definition→identity derivation, sited beside
+        # its two read-side siblings), and the slice silently grew to swallow it, so the fence
+        # reported `declared_phase_measure`'s tail as CHANGED while not one byte of it had
+        # moved. **A guard that fires on an unrelated neighbour is a guard nobody trusts
+        # twice**, so the extractor is repaired to do what its own comment already promised.
+        candidates = [i for i in (body.find("\nclass "), body.find("\ndef ")) if i != -1]
+        assert candidates, "no following top-level definition — this extractor is unanchored"
+        end = min(candidates)
         return body[body.index(anchor):end]
 
     base = _blob_at_base("backend/app/models/thread.py")
