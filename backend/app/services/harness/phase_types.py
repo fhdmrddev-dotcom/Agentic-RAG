@@ -101,6 +101,7 @@ from app.models.user_settings import (
 )
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
+from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
 from app.services.connectors.grants import resolve_effective_posture
 from app.services.connectors.protocol import AdapterError
 from app.services.connectors.registry import get_adapter
@@ -2122,7 +2123,7 @@ def _url_host(url: str) -> str:
     return without_scheme.split("/", 1)[0].split("@")[-1].split(":")[0]
 
 
-def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
+def _adapter_args(adapter, capability: str, resolved: dict, config=None, schema=None) -> dict:
     """Project the resolved inputs onto the adapter's DECLARED schema, and nothing more.
 
     Two rules, both fail-closed:
@@ -2136,13 +2137,49 @@ def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
     **No expression language, no templating surface** (D-09). This is a closed two-column
     lookup; where a field must be COMPOSED the shipped ``SandboxedEnvironment(autoescape=True)``
     path is the only one that may do it, and this phase composes nothing.
+
+    ── 214 (D-214-00) · THE BODY MOVED; THE NAME AND THE RULES DID NOT ────────────────────
+    The projection itself now lives in ``app.services.connectors.args.resolve_arguments``,
+    because the publish gate refuses at save time exactly what this resolves at run time, and
+    two copies of that logic in two files is a guaranteed drift — whose symptom is a workflow
+    that publishes and then fails at the send (``BUG-260826-02`` restated).
+
+    ⚠ **THE RE-EXPORT IS LOAD-BEARING** (``human_input.py``'s cut rule 2). This function keeps
+    its NAME, its module and the D-09 sentence above, because three shipped suites import
+    ``_adapter_args`` / the body-argument map from ``phase_types``. There is ONE projection,
+    not two; do not "tidy" this wrapper away.
+
+    ⚠ **THE PRODUCTION CALL SITE OBTAINS ``schema`` FROM THE ONE ACCESSOR** — GATE 7 below
+    passes the ONE schema accessor's answer, and it does NOT read ``adapter``'s own frozen
+    declaration even though ``adapter`` is right there one line above it. ``descriptor_for``
+    derives from exactly that attribute today, so the two are equal; reading the attribute at
+    the call site would silently stop being equal the moment either side gains a transform,
+    and the publish gate reads the descriptor. ``descriptors.py`` calls its own derivation
+    *"DERIVED from the adapter's own declaration — never retyped"* for precisely that reason.
+
+    ⚠ ``schema=None`` IS A COMPATIBILITY ARM FOR THE PRE-214 THREE-POSITIONAL SHAPE, NOT THE
+    PRODUCTION PATH. Three shipped suites call this with a stub adapter of their own and no
+    schema (``test_190_ssti_fence.py`` records at the seam with an adapter whose declaration
+    deliberately differs from Slack's), so the fallback reads the handed adapter's own
+    declaration and keeps their assertions character-identical — the re-import discipline
+    applied to a signature rather than to a name. A production caller that omits ``schema``
+    would be reading a schema for itself, which is the drift D-214-00 exists to prevent, so
+    ``test_214_args_leaf.py`` asserts the executor's call site passes it.
+
+    ``config`` is the phase config, carrying ``arg_sources`` and ``tool_args``. Also optional,
+    for the same reason; a ``None`` config is the pre-214 shape and resolves byte-identically
+    (D-214-12), which the characterization pins in ``test_214_args_leaf.py`` PROVE rather than
+    assert.
     """
-    declared = set(adapter.INPUT_SCHEMA.get("properties", {}))
-    args = {key: value for key, value in resolved.items() if key in declared}
-    body_arg = _BODY_ARG_FOR_CAPABILITY[capability]
-    if body_arg in declared and body_arg not in args and resolved.get("content"):
-        args[body_arg] = resolved["content"]
-    return args
+    if schema is None:
+        schema = adapter.INPUT_SCHEMA
+    return resolve_arguments(
+        config=config,
+        schema=schema,
+        upstream_outputs={},
+        run_inputs=resolved,
+        body_arg=_BODY_ARG_FOR_CAPABILITY[capability],
+    )
 
 
 async def _write_send_receipt(
@@ -2613,8 +2650,34 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         if not tool_name:
             return _record("no tool_name specified for MCP connection")
 
-        tool_args = getattr(phase.config, "tool_args", None) or {}
-        final_args = dict(tool_args) if isinstance(tool_args, dict) else {}
+        # ⭐ 214 (D-214-00) — THE MCP SHAPE ROUTES THROUGH THE SAME RESOLVER AND THE SAME
+        # ACCESSOR AS THE NATIVE ONE, so the two shapes cannot drift. The snapshot is the one
+        # GATE 5 already resolved — ⚠ do NOT re-resolve the connection and do NOT add I/O to
+        # this path. It is the SAME `discovered_tools` column the publish gate reads.
+        #
+        # This replaced a raw `dict(tool_args)`: every key the author had ever stored went to
+        # the vendor, declared or not. The projection is now the schema's, which is what makes
+        # STEP-03's publish refusal and STEP-02's send agree about the argument object.
+        tool_schema = schema_for_bound_tool(
+            capability=None,
+            tool_name=tool_name,
+            discovered_tools=getattr(connection, "discovered_tools", None),
+        )
+        if tool_schema is None:
+            # ⛔ A `None` SCHEMA MUST NOT FALL BACK TO SENDING `tool_args` RAW. The gate
+            # refuses this same case as `shape_unknown`; an executor that SENDS where the
+            # gate REFUSES is the D-214-00 drift pointing the dangerous way — an unreviewed
+            # argument object reaching a vendor because nobody could say what it accepts.
+            return _record(
+                "the bound tool's argument shape is not knowable from this connection's "
+                "discovered tools"
+            )
+        final_args = resolve_arguments(
+            config=phase.config,
+            schema=tool_schema,
+            upstream_outputs=accumulated_outputs,
+            run_inputs=resolved,
+        )
 
         from app.services import mcp_client
         try:
@@ -2656,7 +2719,20 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # ── GATE 7 · dispatch legacy adapter ───────────────────────────────────────────────
     adapter = get_adapter(capability)
     config = dict(getattr(connection, "config", None) or {})
-    args = _adapter_args(adapter, capability, resolved)
+    # ⭐ 214 (D-214-00) — THE SCHEMA'S PROVENANCE, NAMED. It comes from the ONE accessor, so
+    # it is the SAME object the publish gate's `tool_schemas` builder obtains for this bound
+    # tool (`descriptor_for` is a pure function of the registry). ⚠ Do NOT substitute the
+    # adapter's own frozen declaration here: it is equal today and would stop being equal
+    # silently, and the gate reads the descriptor.
+    args = _adapter_args(
+        adapter,
+        capability,
+        resolved,
+        config=phase.config,
+        schema=schema_for_bound_tool(
+            capability=capability, tool_name=None, discovered_tools=None
+        ),
+    )
 
     try:
         result = await adapter.send(

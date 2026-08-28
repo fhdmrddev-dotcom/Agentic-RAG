@@ -27,10 +27,11 @@ engine is the consumer and these are the fields it reads.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,97 @@ class LlmEmitPhaseConfig(_StrictBase):
     # enforcement, doc labeled DRAFT. Every non-strict mode marks or blanks, never silent.
     citation_policy: Literal["strict", "flag", "partial", "draft"] = "strict"
     integrity_policy: Literal["strict", "documented_limit"] = "strict"  # F3 sibling (pptx/xlsx)
+
+
+#: Phase 214 (D-214-01) — the key an author may name as an `ask` run input or an `upstream`
+#: phase slug. STRUCTURALLY EXCLUDES a URL: no scheme (`:` and `/` are absent), no `@`, no
+#: whitespace, and a 64-character ceiling. That exclusion is the point rather than tidiness —
+#: see `ArgumentSourceSpec._a_key_is_a_name_not_a_destination`.
+_ARGUMENT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$")
+
+#: The three arms, spelled here because this module must not import a service (the same
+#: reason `capability`'s Literal is a second spelling of `EXTERNAL_ACTION_CAPABILITIES`).
+#: The runtime home is `app.services.connectors.args.ArgumentSourceKind`, and
+#: `tests/unit/test_214_arg_source_field.py` asserts the two sets are EQUAL — mechanically,
+#: not by memory.
+ArgumentSourceKind = Literal["fixed", "ask", "upstream"]
+
+
+class ArgumentSourceSpec(_StrictBase):
+    """Phase 214 (STEP-01 / D-214-01 / D-214-03) — where ONE argument's value comes from.
+
+    A stored, VALIDATED enum with three arms, never an inferred one:
+
+      * ``fixed``    — the author typed the value; it lives at ``tool_args[<property>]``.
+      * ``ask``      — the value arrives with the run, under ``ask_key`` (defaulting to the
+        property's own name). The workflow's ``inputs`` must DECLARE that key or the publish
+        gate refuses with ``ask_undeclared`` — nothing would ever populate it.
+      * ``upstream`` — the value is the output of the phase named by ``upstream_slug``. This
+        is D-214-03: the body-class auto-fill that used to be an invisible rule inside the
+        executor's projection becomes an EXPLICIT, author-visible source.
+
+    One of these per argument; the map is ``ExternalActionPhaseConfig.arg_sources`` below,
+    KEYED BY THE SCHEMA PROPERTY NAME — the vendor's own declared argument — so an entry
+    cannot describe a field the tool does not have. A leftover entry naming an undeclared
+    property is surfaced to the author (D-214-08) and is never a publish gap.
+
+    ── ⚠ WHAT THIS FIELD MAY NOT CARRY, IN THE D-13 REGISTER ─────────────────────────────
+    It is not a secret, not a token, not a password, not a host, not a base_url, not a
+    channel and not an email address. It is a NAME — of a run input, or of a phase in this
+    same workflow. A workflow definition is copyable, exportable, hand-editable JSONB that
+    reaches the client verbatim, and ``_pre_credential_destination`` reads ``config.base_url``
+    precisely so that "the day a destination DOES land on the step the guard is already ahead
+    of the resolver". A free-text key here would be that day arriving through a field the
+    egress guard does not read.
+
+    **So it is ENFORCED rather than asked for.** The validator below refuses anything outside
+    ``^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$``, which structurally excludes a URL, a scheme, an
+    ``@``, a ``/`` and whitespace — the same posture the shipped patch-sweep fence in
+    ``ConnectionPicker.tsx`` takes one layer up, and fail-CLOSED in the only direction that
+    matters: the field can only ever hold a plain name.
+    """
+
+    source: ArgumentSourceKind
+    ask_key: str | None = None
+    upstream_slug: str | None = None
+
+    @field_validator("ask_key", "upstream_slug")
+    @classmethod
+    def _a_key_is_a_name_not_a_destination(cls, value: str | None, info) -> str | None:
+        """Refuse anything that is not a plain name, and NAME the offending field."""
+        if value is None:
+            return None
+        if not isinstance(value, str) or not _ARGUMENT_KEY_PATTERN.match(value):
+            raise ValueError(
+                f"{info.field_name} must be a plain name matching "
+                f"{_ARGUMENT_KEY_PATTERN.pattern} — {value!r} is not one. This field carries "
+                "the NAME of a run input or of a phase in this workflow; it is never a URL, "
+                "a host, a destination or a credential."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _two_arms_are_never_stored_at_once(self) -> "ArgumentSourceSpec":
+        """``ask`` with an ``upstream_slug``, or ``upstream`` with an ``ask_key``, is refused.
+
+        Not tidiness: two mutually exclusive arms stored at once means a READER PICKS
+        ARBITRARILY, and the readers are the approval pause and the executor. They would then
+        be able to disagree about what is about to leave the app — a person approving one
+        value while another is sent. Unrepresentable beats documented.
+        """
+        if self.source == "ask" and self.upstream_slug is not None:
+            raise ValueError(
+                "an 'ask' argument source must not also carry an upstream_slug — two "
+                "mutually exclusive arms stored at once let the approval pause and the "
+                "executor disagree about what leaves"
+            )
+        if self.source == "upstream" and self.ask_key is not None:
+            raise ValueError(
+                "an 'upstream' argument source must not also carry an ask_key — two "
+                "mutually exclusive arms stored at once let the approval pause and the "
+                "executor disagree about what leaves"
+            )
+        return self
 
 
 class ExternalActionPhaseConfig(_StrictBase):
@@ -317,6 +409,30 @@ class ExternalActionPhaseConfig(_StrictBase):
     # precedent for symmetry.
     tool_name: str | None = None
     tool_args: dict[str, Any] = Field(default_factory=dict)
+
+    # Phase 214 (STEP-01 / D-214-01 / D-214-03) — WHERE each argument's value comes from.
+    #
+    # Keyed by the SCHEMA PROPERTY NAME (the vendor's own declared argument), annotating the
+    # `tool_args` sibling above rather than replacing it: `fixed` still reads its value from
+    # there. The three arms are `fixed` / `ask` / `upstream` — see `ArgumentSourceSpec`, which
+    # is where the arms, the refusals and the "what this may not carry" register live.
+    #
+    # It ANSWERS the "no shape-symmetry optionals" test stated above — it DOES something on
+    # this step at run time: `args.resolve_arguments` reads it per declared property to build
+    # the outbound object, and `args.unsatisfiable_arguments` reads the SAME map at publish to
+    # refuse a step that cannot supply a required argument. One predicate, two callers, no
+    # second copy to drift (D-214-00).
+    #
+    # ⚠ D-214-12 · NOTHING RETROACTIVE. Defaulted to the EMPTY map, so every definition
+    # published before this phase still `model_validate()`s and still resolves byte-identically
+    # — a property with no entry here falls back exactly as the pre-cut projection did. The
+    # same additive-optional / ZERO-MIGRATION shape `connection_id`, `tool_name` and
+    # `tool_args` all arrived by.
+    #
+    # ⚠ IT MUST CLEAR WITH `tool_name`, NEVER WITHOUT IT (ConnectionPicker.tsx:394-395,
+    # :521-530). A source map for a tool that no longer exists is the identical half-clear
+    # hazard `tool_args` already refuses, one field over.
+    arg_sources: dict[str, ArgumentSourceSpec] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _available_tools_is_the_capability(self) -> "ExternalActionPhaseConfig":

@@ -42,6 +42,19 @@ def _conn(**over) -> ResolvedConnection:
         mcp_server_url="https://mcp.atlassian.com/v1",
         default_approval_posture="ask",
         tool_grants={},
+        # ⚠ ADDED at Phase 214 (D-214-00). The MCP arm now projects its argument object onto
+        # the bound tool's DECLARED schema, obtained through the ONE accessor the publish gate
+        # also uses, so a connection carrying NO snapshot has an unknowable argument shape and
+        # RECORDS rather than sending. Every case in this file is about the GRANT gate, which
+        # sits one gate earlier — leaving the snapshot empty would make the `armed=True`
+        # proceed-arm measure a schema refusal instead of an approval, i.e. green for the
+        # wrong reason. A real MCP connection always carries the snapshot `discover_tools`
+        # wrote; the no-snapshot refusal has its own case in `test_214_args_leaf.py`.
+        discovered_tools=[{
+            "name": "jira_create_issue",
+            "inputSchema": {"type": "object", "required": ["summary"],
+                            "properties": {"summary": {"type": "string"}}},
+        }],
     )
     base.update(over)
     return ResolvedConnection(**base)

@@ -224,6 +224,23 @@ async def test_gate55_mcp_allow_dispatches_tool_and_writes_sent_receipt():
         mcp_server_url="https://mcp.atlassian.com/v1",
         default_approval_posture="ask",
         tool_grants={"jira_create_issue": "allow"},
+        # ⚠ ADDED at Phase 214 (D-214-00). The MCP arm now projects its argument object onto
+        # the bound tool's DECLARED schema through the one accessor, exactly as the native arm
+        # and the publish gate do, so a connection with no snapshot has an unknowable argument
+        # shape and RECORDS rather than sending. That is the intended refusal — an executor
+        # that sends where the gate refuses is the drift pointing the dangerous way — and a
+        # real MCP connection always carries the snapshot `discover_tools` wrote. Declaring it
+        # here restores this case to a DISPATCH, which is what the test is about; the
+        # no-snapshot refusal has its own case in `test_214_args_leaf.py`.
+        discovered_tools=[{
+            "name": "jira_create_issue",
+            "description": "Create a Jira issue",
+            "inputSchema": {
+                "type": "object",
+                "required": ["summary"],
+                "properties": {"summary": {"type": "string"}},
+            },
+        }],
     )
     phase = SimpleNamespace(
         slug="phase_external",
