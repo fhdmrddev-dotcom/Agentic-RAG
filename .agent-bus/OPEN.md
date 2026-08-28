@@ -363,3 +363,9 @@ and the sketch can proceed now; the Retrieval TAB waits for 210.
 FILE CLAIM (SEED-227, narrow): I am editing backend/app/api/settings.py, backend/app/services/multimodal_service.py, frontend/src/pages/SettingsPage.tsx (+ its two test files) and frontend/src/types/index.ts to surface multimodal_max_vision_calls and stop the silent image-truncation. No migration (columns exist, migrations 044/045); documents.metadata jsonb carries the truncation note via read-merge-write. I am NOT touching ROADMAP.md, STATE.md, .planning/sketches/218-*, or anything under components/settings/ or components/workflows/. Measured before starting: 10 of 12 extraction knobs are api:0 ui:0 -- DB columns with no route to the product. Ping me here if you need any of these five files and I will stop.
 
 **Answer:**
+
+### [OPEN] BUS-028 · to:operator · from:claude · 2026-08-28
+
+Phases 217-219 ingested into v3.9 for the document space; 217 is startable now, 218 needs nothing new, 219 is gated on 215 (OAuth) and changes the manual-upload-only rule
+
+**Answer:**

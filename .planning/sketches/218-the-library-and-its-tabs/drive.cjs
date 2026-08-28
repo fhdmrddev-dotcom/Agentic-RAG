@@ -723,6 +723,17 @@ ok("G4 · no chart uses more colours than it has named series",
   (HTML.match(/class="sw s-[a-z]+"/g) || []).length >= 5,
   "every swatch in a legend must correspond to a word; the count is the floor, not the ceiling")
 
+
+// G5 — the third segment: searches that COULD NOT RUN
+ok("G5 · Phase 210 ships the provider_error status",
+  /"retrieval_status": "provider_error"/.test(DISPATCH))
+ok("G5b · ⚠ but that path RETURNS before the audit write — an outage writes NO row today",
+  DISPATCH.indexOf('"retrieval_status": "provider_error"') < DISPATCH.indexOf('action_type="search.query"'),
+  "so the chart would dip toward zero with no explanation; one audit write on the error path fixes it")
+ok("G5c · the sketch draws the outage as its own segment, and names the gap",
+  /className = "err"/.test(SCRIPT_CODE) && /could not search/.test(SURFACE) &&
+  /RETURNS BEFORE the audit write/.test(HTML))
+
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // §H · THE GOVERNANCE MERGE — operator, 2026-08-28.
 //

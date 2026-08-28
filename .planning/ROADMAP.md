@@ -22,7 +22,7 @@
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
-- 🚧 **v3.9 Connections: Any Service, Any Tool** — Phases **210-216** (ACTIVE, opened 2026-08-26). Seven phases, **32/32 requirements mapped**. A person connects a **service** — not a protocol — sees every tool it offers, grants each one individually, and then uses it **by name in chat** and as a **specific step** on the canvas. ⭐ Nothing is per-vendor: a connection is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds **rows, not code**. Order is load-bearing — `SEED-207` (retire `capability` as the browse axis) is a PREREQUISITE, the per-tool approval model is a HARD prerequisite for the chat surface, CONN-08's migration precedes OAuth, and MCP-first precedes OAuth. Nine bugs folded (2 blocking).
+- 🚧 **v3.9 Connections: Any Service, Any Tool** — Phases **210-219** (ACTIVE, opened 2026-08-26). Ten phases, **32/32 connection requirements mapped**; **217-219 ingested 2026-08-28** (the document space — `SEED-224` / `BUS-026`; G-2 bar is sketch 218; migration block **140-149**). A person connects a **service** — not a protocol — sees every tool it offers, grants each one individually, and then uses it **by name in chat** and as a **specific step** on the canvas. ⭐ Nothing is per-vendor: a connection is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds **rows, not code**. Order is load-bearing — `SEED-207` (retire `capability` as the browse axis) is a PREREQUISITE, the per-tool approval model is a HARD prerequisite for the chat surface, CONN-08's migration precedes OAuth, and MCP-first precedes OAuth. Nine bugs folded (2 blocking).
 
 ---
 
@@ -121,6 +121,9 @@ it.*
 | 214 | A Step Names Its Service and Its Action | An author adds an external step by picking a service and a named action, the step's arguments arrive from whatever launched the run, publish refuses one nothing can satisfy, and every run surface says which service and action it was | STEP-01..06 | 5 | Closes ⛔ `BUG-260826-01` + `-02` + `-05`; **G-2 sketch** (step picker, canvas + run faces); **G-5 ×3** (`ConnectionPicker.tsx`, `ExternalActionSection.tsx`, `phase_types.py`) + `McpToolPicker.tsx` (⚠ **no ledger row of its own**); **threat model** (publish gate + argument provenance); SC#10; ⚠ **launch decision owed on `visual_workflow_canvas`** (cold default `off`) |
 | 215 | BYO OAuth | A customer registers their own OAuth application, connects a first-party service with it on any deployment including self-hosted, and the connection keeps working without them reconnecting | OAUTH-01, OAUTH-02, OAUTH-03 | 4 | **Depends on CONN-08 (211)**; **threat model — MANDATORY** (this is migration 118's defect class); **G-2 sketch** ⚠ **whose bar is NOT `screenshots/`** — those show a vendor-owned 2-click Connect this milestone explicitly does not ship (D-v3.9-01); **migration** (token / refresh / expiry / scope / account identity); refresh must be **claim-based** (`WORKER_COUNT=2`, no leader); deployment-artifact parity (redirect URI is a new env var) |
 | 216 | Connections in Chat, and One File In by Hand | A connected service is a platform asset a person uses by name in a thread, the agent picks which granted tool to call, and a person can pull a single named file from a connected source into the thread | CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01 | 5 | ⭐ **Gated behind 213** — never an outbound capability in `_TOOL_REGISTRY` before the approval model; **G-2 sketch** (service chip, starter prompts, attach picker); **G-5 ×4** (`ChatLayout.tsx` ⚠ 21 phases and **absent from the ledger**, `MessageInput.tsx`, `ToolCallPanel.tsx`, `MessageItem.tsx` — the last two read **extraction due**); **threat model** (⚠ **prompt injection** — every read lands untrusted text in the model's context; the tree has never faced this because until 206.2 every connector was a write); **SC#10 full 8-row roster** |
+| 217 | The Library — One Home for Documents | The document space becomes **Library**: one five-tab home, upload as a real front door, and the facts we already store finally on screen | LIB-01, LIB-02, LIB-03, LIB-04 | 4 | ⭐ **ZERO schema, ZERO backend** — every fact already flows. **G-2 bar: sketch 218** (193 assertions). **G-5 ×5** (`DocumentList` 12ph, `IngestionPage` 9ph, `DocumentDetailPanel` 5ph, `useDocuments` 3ph — rows added `8b99c19b2`). No dependency: **startable now** |
+| 218 | The Library Knows How It Is Used | Library Health **and** Governance retire into the Library's Health tab, and a search that could not run stops looking like a search that found nothing | LIB-05, LIB-06, LIB-07 | 4 | **Depends on 210 (SHIPPED)**. ⚠ Two hazards: `KnowledgeHealthPage` is `ChatLayout`'s **positional fallback**; Governance is **feature-gated** and Documents is not. ⚠ Name collision (`Low Confidence` 0.38 vs 0.5). Migration block **140-149**; may be **zero** — the missing facts are jsonb keys |
+| 219 | A Connected Source Feeds the Library | A person connects a cloud drive once, sees what it would bring in **before** it does, and the Library keeps reading it on a schedule | LIB-08, LIB-09, LIB-10 | 4 | ⭐ **Depends on 215 (OAuth) and 216 (ATTACH-01 — the manual precursor this generalises)**. **Changes the CLAUDE.md manual-upload-only rule in the same commit** (`SEED-142`). ⚠ **threat model MANDATORY** — inbound untrusted content + a new credential scope. Migration in **140-149** |
 
 ### Phase Checklist
 
@@ -342,6 +345,52 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 **UI hint**: yes
 **Flags**: ⭐ **Gated behind Phase 213.** ⚠ **CAT-04 lives here, not in the catalog phase, and the reason is honesty**: a starter prompt is only truthful once the agent can act on it — chips shipped before the chat surface are suggestions that fail. **G-2 sketch owed** (service chip in the thread, starter prompts, the attach picker). **G-5 ×4, and two of them read *extraction due***: `ChatLayout.tsx` (40/21/815 — ⚠ fires at **21 phases** and has been **absent from the ledger for its entire life**), `MessageInput.tsx` (25/13/478), `ToolCallPanel.tsx` (47/19/995 — *extraction due*), `MessageItem.tsx` (57/29/856 — *extraction due*). Refactor recommendation owed first. ⚠ **The workspace panel is a CROSS-SURFACE shell mounted by `ChatLayout`** — a change here lands in chat first, so UAT on a workflow surface alone will miss it. **Threat model REQUIRED — and the named threat is PROMPT INJECTION**: every read lands untrusted external text in a model's context, and this tree has never faced that class because until 206.2 every connector was a write. ⚠ *No vendor in the competitor study documents a defence; treat it as unsolved, design for it rather than discovering it.* **SC#10 — the FULL 8-row native roster + OpenRouter**, plus multi-tool, parallel-thread and long-message rows; derive the roster from `MODEL_CAPABILITIES`, never re-type it; blocked rows recorded ⛔ with a reason. **ATTACH-01 is mode C and is deliberately human-initiated** — it dodges ACL mirroring, deletion propagation and sync loops by construction. ⚠ **The re-open trigger for `SEED-209/210/211/212` is "the first AUTOMATIC or BACKGROUND sync from a connected source"** — if any plan in this phase reaches for a poll, a watcher or a scheduled pull, **it has left this milestone** and the Connected Knowledge deferral applies.
 
+#### Phase 217: The Library — One Home for Documents
+
+**Goal**: The document space stops being three pages and a stale filename. It becomes **Library** — one home, five tabs, with **upload as a real front door** instead of a button in a folder header's corner, and with the facts this app already stores finally rendered.
+**Depends on**: Nothing. ⭐ **Every fact in this phase already flows** — no schema, no new backend, no provider call.
+**Requirements**: LIB-01, LIB-02, LIB-03, LIB-04
+**Success Criteria** (what must be TRUE):
+
+  1. The surface is called **Library** in the nav and on the page, and `IngestionPage.tsx` is renamed `LibraryPage.tsx` in the same commit (LIB-01). ⚠ The `ActiveView` key stays `"documents"` — it is never printed to a user.
+  2. A person lands on the Library and can **start an upload without hunting for it**: a full-width dropzone, the real accepted formats, and the folder it will land in (LIB-02).
+  3. A file being ingested shows **the six stages the pipeline actually writes**, two of them conditional and struck through when skipped — never a three-segment bar, never a percentage, never an ETA (LIB-03).
+  4. A document's detail panel shows **what we already store and never showed**: the parsed text, extracted tables **as tables**, image descriptions, its chunks, and the questions that found it (LIB-04).
+  5. A saved View is reachable as a tab **and** from the sidebar, from **one source of selection truth** — the two renderings can never disagree.
+
+⚠ **G-5 fires on five files in this blast radius** (`DocumentList.tsx` 12 phases, `IngestionPage.tsx` 9, `DocumentDetailPanel.tsx` 5, `useDocuments.ts` 3, and `retrieval_service.py` 9 if touched). All ten document-space rows were added at `8b99c19b2`; **read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.**
+
+#### Phase 218: The Library Knows How It Is Used
+
+**Goal**: Two document-scoped nav homes retire into the Library's Health tab, and the retrieval picture stops having a hole in it — a search that **could not run** stops being indistinguishable from a search that **found nothing**.
+**Depends on**: **Phase 210 (SHIPPED)** — the provider-error honesty this builds on. Phase 217 for the tab shell.
+**Requirements**: LIB-05, LIB-06, LIB-07
+**Success Criteria** (what must be TRUE):
+
+  1. `Library Health` and `Governance` are **gone from the primary nav** and their seven signals live as grouped chips in the Library's Health tab — with **nothing lost**, proven against a declared rename map (LIB-05).
+  2. ⚠ Retiring `KnowledgeHealthPage` **installs a replacement fallback in the same commit** — `ChatLayout.tsx:879` renders it as the trailing `else`, so an unmatched view must not become a blank screen.
+  3. ⚠ The **`governance_health` gate moves with the signals**. A person who cannot see Governance today cannot see those three chips after the merge — verified by a negative test, not by inspection.
+  4. A provider outage is **visible in the analytics**, not only in the chat message: the retrieval path writes its audit row on the error path too, and the chart shows *could not search* as its own segment (LIB-06).
+  5. Per-hit relevance is recorded, so the detail panel's *average relevance* stops saying *"not recorded yet"* (LIB-07). ⭐ This is a **jsonb key on an existing column**, not a new table.
+
+⚠ **The two `Low Confidence` signals mean different things** — retrieval similarity below `0.38` (`knowledge_health.py`) versus an extracted field below `0.5` (`document_governance.py`). They are renamed apart; a merge that leaves both words standing ships a lie.
+
+#### Phase 219: A Connected Source Feeds the Library
+
+**Goal**: The knowledge base stops depending on somebody remembering to upload. A person connects a cloud drive **once**, sees exactly what it would bring in **before** it brings anything, and the Library keeps reading it on a schedule.
+**Depends on**: ⭐ **Phase 215 (HARD — OAuth)** and **Phase 216** (ATTACH-01 ships the deliberate one-file pull this generalises into a standing sync).
+**Requirements**: LIB-08, LIB-09, LIB-10
+**Success Criteria** (what must be TRUE):
+
+  1. A person connects a cloud source, maps an external folder to a Library folder, and it is **watched on a schedule** — using the shipped scheduler, never a new one (LIB-08).
+  2. ⭐ Before the first import, they see **what it would add**, split three ways: *will be added* / *already here* (a `content_hash` lookup, not a guess) / *type not supported*. **Nothing is ingested until they say so** (LIB-09).
+  3. A source that has **stopped reading** says so, says when it stopped, and offers the one action that fixes it — it is never silently quiet (LIB-10).
+  4. ⚠ The screen says **"checked every N minutes"**, never *"instantly"* or *"on change"* — there is no delta cursor and no webhook. When one lands, the sentence changes in the same commit.
+  5. ⚠ A file removed at the source is **NOT removed from the Library** unless explicitly asked for. A revoked share must never silently delete knowledge the agent depends on.
+  6. ⚠ **Write and delete grants are OFF by default.** The operator's "to and from" is a grant a person switches on; it inherits Phase 213's approval model and invents nothing.
+
+⚠ **THIS PHASE CHANGES A STANDING RULE.** `CLAUDE.md` reads *"Ingestion is manual file upload only — no connectors or automated pipelines"*, marked **dated, not permanent**, with the instruction that whoever ships the first sync connector changes it **in the same commit**. ⚠ **Threat model MANDATORY**: this pulls untrusted external content into the corpus the agent answers from, and adds a credential scope.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -353,6 +402,9 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 | 214. A Step Names Its Service and Its Action | 0/? | Not started | - |
 | 215. BYO OAuth | 0/? | Not started | - |
 | 216. Connections in Chat, and One File In by Hand | 0/? | Not started | - |
+| 217. The Library — One Home for Documents | 0/? | Not started — ⭐ **startable now** (no dependency) | - |
+| 218. The Library Knows How It Is Used | 0/? | Not started — depends on 210 (shipped) + 217 | - |
+| 219. A Connected Source Feeds the Library | 0/? | Not started — depends on **215** + 216 | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 · 215 → 3 · 216 → 5.

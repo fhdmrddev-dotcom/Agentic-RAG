@@ -187,7 +187,12 @@
      ⚠ Colour still never carries alone — the legend prints both words and both counts. */
   .chart .bar { display: flex; flex-direction: column-reverse; }
   .chart .bar .hit { flex: 1 1 auto; background: var(--color-primary); border-radius: 0 0 0 0; }
-  .chart .bar .miss { flex: 0 0 auto; background: var(--color-warning); border-radius: 3px 3px 0 0; }
+  .chart .bar .miss { flex: 0 0 auto; background: var(--color-warning); border-radius: 0; }
+  /* ⚠ THE THIRD SEGMENT — searches that COULD NOT RUN. Phase 210 made the chat message
+     honest about a provider outage, but the error path RETURNS BEFORE the audit write, so
+     an outage currently writes no row at all and the chart simply DIPS. A dip is a quieter
+     version of the same lie: "nobody searched" and "search was broken" look identical. */
+  .chart .bar .err { flex: 0 0 auto; background: var(--color-danger); border-radius: 3px 3px 0 0; }
   .chart .bar .hit:only-child { border-radius: 3px 3px 0 0; }
   .chart .bar:hover .hit { background: var(--color-primary-strong); }
 
@@ -646,6 +651,7 @@
             <div class="legend">
               <span class="li"><span class="sw s-primary"></span>found something <b>371</b></span>
               <span class="li"><span class="sw s-warning"></span>found nothing <b>41</b></span>
+              <span class="li"><span class="sw s-danger"></span>could not search <b>6</b></span>
             </div>
             <div class="chartwrap">
               <div class="grid"><div class="gl" style="top:0"><span>50</span></div>
@@ -667,6 +673,17 @@
         <!-- ⭐ TWO GROUPS, NOT ONE ROW OF SEVEN. Merging Governance in brings three more
              signals, and seven undifferentiated chips is a filter bar nobody reads. They split
              on the question they answer: "is it being used?" vs "is it in good shape?" -->
+
+    <div data-anno><b>⚠ PHASE 210 FIXED THE CHAT MESSAGE, NOT THE ANALYTICS — measured 2026-08-28.</b>
+      It ships <code>retrieval_status: "provider_error"</code> and a clear sentence to the user
+      (<i>"your documents were never queried"</i>). ⭐ But <b>that path RETURNS BEFORE the audit
+      write</b>, so a search that failed on a provider outage <b>writes no row at all</b> — and this
+      chart would simply <b>dip toward zero</b> with no explanation. <b>A dip is a quieter version of
+      the same lie:</b> "nobody searched" and "search was broken" look identical.
+      <b>The fix is one audit write on the error path</b>, and it is what turns the third segment above
+      from a drawing into a measurement. Until it lands, the red segment renders from nothing and the
+      Health tab must not claim it.</div>
+
         <div class="chipgroup">
           <span class="cglabel">Being used</span>
           <div class="chiprow">
@@ -1643,19 +1660,25 @@ var SERIES = [4,7,11,5,14,22,9,27,6,17,24,31,18,8,29,38,21,12,26,15,35,44,30,19,
 var SERIES_D = [3,6,4,9,7,12,8,5]
 // the miss series — searches that came back empty on that day.
 var MISS = [1,0,2,0,3,1,0,4,1,0,2,3,0,1,5,2,0,1,3,0,2,4,1,0,2,1,3,0,2,1]
+// ⚠ the outage series — searches that could not run at all. Two consecutive days.
+var ERR  = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,2,0,0,0,0,0,0]
 
 // ⭐ EVERY BAR IS TWO SEGMENTS: searches that found something, and searches that found
 // nothing. MISS[] is the second series — a search returning zero documents still writes its
 // row, so this needs no new data and no new write. It is the one fact nobody can see today.
-function fill(el, data, max, miss) {
+function fill(el, data, max, miss, err) {
   if (!el || el.childElementCount) return
   data.forEach(function (v, i) {
     var m = miss ? miss[i] || 0 : 0
+    var e = err ? err[i] || 0 : 0
     var b = document.createElement("div")
     b.className = "bar"
     b.style.height = Math.round((v / max) * 100) + "%"
     b.style.animationDelay = (i * 0.018).toFixed(3) + "s"
-    b.setAttribute("data-v", m > 0 ? v + " · " + m + " found nothing" : String(v))
+    var label = String(v)
+    if (m > 0) label += " · " + m + " found nothing"
+    if (e > 0) label += " · " + e + " could not search"
+    b.setAttribute("data-v", label)
     var hit = document.createElement("span"); hit.className = "hit"
     b.appendChild(hit)
     if (m > 0) {
@@ -1663,10 +1686,15 @@ function fill(el, data, max, miss) {
       ms.style.height = Math.round((m / v) * 100) + "%"
       b.appendChild(ms)
     }
+    if (e > 0) {
+      var es = document.createElement("span"); es.className = "err"
+      es.style.height = Math.round((e / v) * 100) + "%"
+      b.appendChild(es)
+    }
     el.appendChild(b)
   })
 }
-fill(document.getElementById("chart-h"), SERIES, 50, MISS)
+fill(document.getElementById("chart-h"), SERIES, 50, MISS, ERR)
 fill(document.getElementById("chart-d"), SERIES_D, 12)
 
 // ── replay the entrance animation each time a variant is shown, so the charts are seen
