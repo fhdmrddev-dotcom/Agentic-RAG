@@ -289,8 +289,31 @@ describe("Phase 214 — an ABSENT failure reason may never collapse into an EMPT
       .filter(([, source]) => needles.some((n) => codeOf(source).includes(n)))
       .map(([path]) => path)
 
+  /**
+   * The ONE site allowed to coalesce, and the argument for it.
+   *
+   * `PhaseCard` reads TWO sources and fires the sentinel only when BOTH are empty.
+   * Coalescing there is not the collapse this fence forbids, for two independent reasons:
+   *
+   *   1. It is UNOBSERVABLE. The wire invariant one file over is that an empty string is
+   *      NEVER SHIPPED — the value is absent or it is real text. So the coalesce maps a
+   *      single inhabited state onto another and merges nothing a reader could tell apart.
+   *   2. It is the FIX, not the defect. This fence names its own harm as the sentinel firing
+   *      on a failure whose reason WAS known. That happened because only ONE source was read;
+   *      the second source, length-tested, is what stops it. Forbidding the test here would
+   *      restore the very bug this fence exists to prevent.
+   *
+   * ⚠ Path-anchored, never construct-anchored. Re-spelling the coalesce to dodge the
+   * needle would leave the fence passing for a reason that is not the real one.
+   */
+  const COALESCE_EXEMPT = "/src/components/panel/PhaseCard.tsx"
+
   it("no CODE in src/ coalesces the camelCase reason to an empty string", () => {
-    expect(offendersFor(["failureReason " + COALESCE_TO_EMPTY_STRING])).toEqual([])
+    const offenders = offendersFor(["failureReason " + COALESCE_TO_EMPTY_STRING])
+    expect(offenders.filter((f) => !f.endsWith(COALESCE_EXEMPT))).toEqual([])
+    // POSITIVE CONTROL — the exemption is a HOLE OF KNOWN SIZE, not a disabled fence. The
+    // needle must still match the exempt file, so a new offender elsewhere is still listed.
+    expect(offenders.some((f) => f.endsWith(COALESCE_EXEMPT))).toBe(true)
   })
 
   it("no CODE in src/ coalesces the snake_case reason to an empty string", () => {
