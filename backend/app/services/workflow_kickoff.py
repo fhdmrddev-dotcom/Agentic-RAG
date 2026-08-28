@@ -497,7 +497,31 @@ async def build_harness_run_context(
         # inputs jsonb the resume builders read back (152: mirror the folder
         # override too). ctx.inputs["kickoff_prompt"] is the first phase's user
         # turn / sub-agent task; programmatic split_topic reads ctx.inputs at :178.
-        inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
+        #
+        # ── Phase 214 (STEP-02 / D-214-04) — THE SAME MERGE, IN THE SAME COMMIT ───────
+        # ⚠ THIS IS THE TWIN OF api/threads.py's create_workflow_run(inputs=...) LITERAL,
+        # and the F8 rule above ("mirror EXACTLY what was persisted") is why it is widened
+        # here rather than only there. Widening only the persisted copy would leave a
+        # workflow's FIRST, LIVE run resolving every `ask` argument to nothing while a
+        # RESUMED run — which rebuilds run_inputs from the persisted jsonb
+        # (runs.py:1052-1119) — resolved them all. That defect reproduces only on a resume.
+        #
+        # ⚠ THE "MIRROR EXACTLY" RULE HAS LIVED IN PROSE SINCE PHASE 092 AND NOTHING
+        # CHECKED IT — which is exactly how this file came to be the fifth file on the
+        # kickoff path that no plan owned. It is now checked by a driven case that builds
+        # this context and compares it to the row read back out of Postgres:
+        # tests/integration/test_214_launch_inputs_wire.py::test_MIRROR_*.
+        #
+        # Precedence is identical to the twin and identical for the same reasons: the
+        # RESERVED keys are LAST and therefore WIN. kickoff_prompt is excluded from action
+        # inputs by NAME (_NON_ACTION_RUN_INPUTS) so a declared key spelled that way could
+        # never reach an adapter argument; folder_id is owner-reachability-gated (D-05) and
+        # a launcher string must not be able to impersonate it.
+        inputs={
+            **(body.inputs or {}),
+            "kickoff_prompt": body.content,
+            **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
+        },
         redis=redis,
         pool=pool,
         emit=harness_emit,
