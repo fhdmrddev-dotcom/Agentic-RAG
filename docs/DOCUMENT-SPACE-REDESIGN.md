@@ -1,6 +1,10 @@
 # Document Space Redesign — Requirements Capture (assessment, 2026-08-28)
 
 Source: Stitch project **RAG Document Manager V1** (`projects/6647337692456837497`, 12 screens).
+Register entry: **SEED-224** (`.planning/seeds/SEED-224-document-space-redesign-five-tab-rag-honesty.md`),
+which carries the measured findings this assessment left as assumptions — including that there is
+NO `DocumentsPage` and the five-tab shell has no host today.
+
 Goal (operator): reimagine the Documents space at the same tone / information density / UX level as
 the redesign — inside the **Documents section as multi-tab**, keeping document management
 **inside RAG**, and keeping it simple. This is an assessment, not a plan.
