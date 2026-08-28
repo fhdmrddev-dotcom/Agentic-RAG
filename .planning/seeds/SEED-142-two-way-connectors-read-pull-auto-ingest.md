@@ -3,6 +3,7 @@ id: SEED-142
 title: Connectors must be TWO-WAY — read/pull from external systems inside a workflow, and auto-ingest from a connected drive; today every planned connector is send-only
 status: open
 planted: 2026-08-08
+corrected: 2026-08-28 — four of the five auto-ingest blockers have since shipped; see the CORRECTION section
 planted_by: Operator, immediately after the Phase 190 context lock (2026-08-08) — "of course we need to integrate with other applications through MCP or whatever and it should be a two way communication… we might connect with one drive that whenever there's a document it will auto ingest… also we need the ability to read write to pull something from Jira from email from Slack from anything"
 surface: Agentic-RAG
 severity: info
@@ -141,3 +142,46 @@ questions: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`.
 
 Status stays `planted` deliberately — the milestone is a CANDIDATE, not opened. It opens after
 v3.8 closes (204 running, 205 planned).
+
+---
+
+## ⚠ CORRECTION 2026-08-28 — FOUR OF THIS SEED'S FIVE BLOCKERS HAVE SINCE SHIPPED
+
+**The original text above is preserved rather than edited, because the point is that it went stale
+without anyone noticing.** It was written 2026-08-08, *before* v3.8 shipped and *before* v3.9 opened.
+Re-measured against the tree on 2026-08-28, during the `SEED-224` document-space design
+(`.planning/sketches/218-the-library-and-its-tabs/`, drive §E — every row below is an executable
+assertion, not a claim):
+
+| what Half 2 (auto-ingest) needs | this seed says | measured 2026-08-28 |
+|---|---|---|
+| a scheduler | *"a scheduler (none exists — SEED-014 owns automations)"* | ✅ **SHIPPED** — `backend/app/services/scheduler_service.py` + `workflow_schedules` (cron_expression, interval_seconds, timezone, is_active, per-run token + duration budgets) |
+| OAuth | *"exactly where OAuth … become unavoidable"*, deferred to Open Platform | ✅ **IN THE ACTIVE MILESTONE** — v3.9 Phase **215 · BYO OAuth** (token / refresh / expiry / scope / account identity) |
+| a read capability | *"no path today by which a workflow step reads anything"* | ✅ **SHIPPED (v3.8)** — MCP client, any official server, per-tool consent, **zero per-vendor adapter code** |
+| per-tool permission | *"read scope is a permission question"* | ✅ **THE ACTIVE MILESTONE'S THESIS** — a connection is `{service identity, auth, discovered tools, per-tool grants}` |
+| per-file dedup + re-ingest-on-change | *"none of which exists today"* | ✅ **SHIPPED** — `documents.content_hash` plus the `version_number` / `is_latest` model |
+| a failure surface for documents nobody chose to upload | *"none of which exists today"* | ✅ **designed** — sketch 218's *Needs attention* list + the per-source state row |
+| **source-side change detection (delta cursor / webhook)** | listed | ⛔ **STILL MISSING — the real remaining gap** |
+| **external folder → our folder mapping** | listed | ⛔ still missing (net-new config) |
+
+### ⚠ What this changes about this seed's verdict
+
+Its closing line reads *"Nothing about that is buildable inside v3.6"* — true when written, and
+**materially misleading now**. A planner reading this seed today would defer work whose substrate has
+mostly already landed. **The remaining gap is change detection and folder mapping, not the platform.**
+
+⚠ It also says *"Not Phase 190"* and routes both halves to the Open Platform milestone. **Half 1
+(read inside a workflow) effectively arrived via the v3.8 MCP client**, which the seed could not have
+anticipated. Half 2 is what is left, and it is now much smaller than described.
+
+### ⚠ The standing rule this still fires, unchanged
+
+`CLAUDE.md` continues to read *"Ingestion is manual file upload only — no connectors or automated
+pipelines"*, marked **dated, not permanent**, with the explicit instruction that **whoever ships the
+first sync connector changes that rule in the same commit**. That obligation is untouched by this
+correction — it becomes *more* live, not less.
+
+**Design already done:** the connected-source surface (sources list, first-read dry run with
+content-hash dedupe, per-tool grants with write/delete off by default, polling language rather than
+"instant", and a stopped-source state that names when it stopped) is drawn in sketch 218's
+**sources** tab and fenced by 190 assertions.
