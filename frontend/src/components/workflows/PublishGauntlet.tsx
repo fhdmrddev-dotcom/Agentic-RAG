@@ -1177,7 +1177,20 @@ export function PublishGauntlet({
         <span
           id={blockedReasonId}
           data-testid="publish-blocked-reason"
-          className="ml-2 text-[12px] leading-snug text-muted-foreground"
+          /*
+           * ⚠ `block` + a bounded `max-w`, NOT `ml-2` inline. MEASURED IN A REAL BROWSER
+           * 2026-08-28: as an inline span beside the button this reason rendered 722px wide
+           * starting at x=901, so its right edge landed at 1623 against a 1536 viewport — it
+           * ran 87px OFF THE SCREEN and the operator could read only
+           * `…but this workflow is not bo`. The cause is one level up:
+           * `BuilderHeaderBar.tsx`'s `ml-auto flex shrink-0` row REFUSES to shrink, so an
+           * inline child of any length pushes past the edge instead of wrapping.
+           *
+           * ⚠ NO TEST COULD HAVE CAUGHT THIS. This file's own suite asserts the span EXISTS
+           * in the code; jsdom lays nothing out, so `getBoundingClientRect` is all zeroes and
+           * an overflow is invisible to it. The guard is the bounded width here, not a case.
+           */
+          className="mt-1 block max-w-[44ch] text-[12px] leading-snug text-muted-foreground"
         >
           {blockedReason}
         </span>
