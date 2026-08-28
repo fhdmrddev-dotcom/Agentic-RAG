@@ -46,7 +46,7 @@ import redis.asyncio as aioredis
 # buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
 # RedisError subclass, so the specific branch is handled BEFORE the broad except.
 from redis.exceptions import RedisError, ResponseError
-from app.models.message import MessageCreate, MessageResponse
+from app.models.message import RESERVED_RUN_INPUT_KEYS, MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
@@ -916,7 +916,47 @@ async def send_message(
             ),
             definition=_kickoff_definition,
             # SEED-047 kickoff_prompt + 152 WFIN-02: persist the per-run folder override (D-01, no migration) so resume/Continue read it back (Pitfall 5).
-            inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
+            #
+            # ── Phase 214 (STEP-02 / D-214-04) — THE LAUNCHER'S DECLARED INPUTS, MERGED ──
+            # body.inputs is the ONE channel a launcher (RunModal, the chat launch form,
+            # Test Run) has for the values an `ask` argument resolves from; without this
+            # merge a declared `to` recipient dies at the fetch body and BUG-260826-01
+            # cannot close. The schedule door already behaves this way
+            # (scheduler_service.py:150 spreads **raw_inputs) — this makes the other doors
+            # match it; that file is deliberately untouched.
+            #
+            # ⚠ PRECEDENCE: THE RESERVED KEYS ARE LAST AND THEREFORE WIN. That is the
+            # decision, not an accident of spread order, and it is written here because a
+            # reader who sees only the order will "fix" it.
+            #   * kickoff_prompt — _NON_ACTION_RUN_INPUTS (phase_types.py) excludes it from
+            #     action inputs BY NAME, so a declared key spelled that way could never have
+            #     reached an adapter argument; letting it overwrite the run's real kickoff
+            #     would break _exec_programmatic and the first phase's user turn for no gain.
+            #   * folder_id — owner-reachability-gated server-side (D-05). A launcher-supplied
+            #     string must not be able to impersonate it and route around that gate.
+            #
+            # ⚠ THIS LITERAL HAS A TWIN: workflow_kickoff.build_harness_run_context builds
+            # the SAME dict for the LIVE ctx.inputs. Widening only one would mean a
+            # workflow's FIRST run sees no declared values while a RESUMED run (which reads
+            # this persisted jsonb back — runs.py:1052-1119) sees them all. The two are
+            # asserted EQUAL by a driven case, not by these comments:
+            # tests/integration/test_214_launch_inputs_wire.py::test_MIRROR_*.
+            #
+            # ── D-103-CONF-1 AMENDED, DELIBERATELY (full text: models/message.py) ──────
+            # The constraint is ONE kickoff path, not a frozen file. ⛔ No new route, ⛔ no
+            # new key on the POST *response*, ⛔ no change to the two-rows model, the
+            # create-before-spawn ordering, the template-upload sequencing or the orphan
+            # cleanup. The amendment is exactly one request field and one dict literal (twice).
+            # ⚠ STRIPPED, not merely out-ranked: `folder_id` is spread CONDITIONALLY below,
+            # so "the reserved keys win" was false whenever the request carried none — the
+            # launcher's value then survived (measured). RESERVED_RUN_INPUT_KEYS is the ONE
+            # frozenset, imported here and by the twin literal.
+            inputs={
+                **{k: v for k, v in (body.inputs or {}).items()
+                   if k not in RESERVED_RUN_INPUT_KEYS},
+                "kickoff_prompt": body.content,
+                **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
+            },
             model=_resolved_model,                      # SEED-047
             # Phase 092-05 F1: persist the run-owner so harness_audit writes
             # (NOT NULL user_id) and the resume path resolve a real user.

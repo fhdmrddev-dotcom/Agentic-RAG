@@ -465,6 +465,16 @@ export async function postMessage(
      *  modal picks a folder that differs from the workflow default — absence is the
      *  byte-identical D-06 path (no override → the author default / whole-KB). */
     folderId?: string | null
+    /** Phase 214 (STEP-02 / D-214-04) — the declared input values collected by a
+     *  launcher (RunModal, the chat launch form, Test Run). Merged server-side into
+     *  create_workflow_run.inputs BESIDE kickoff_prompt and folder_id, which are
+     *  RESERVED and win over any key spelled the same here (see the merge comment in
+     *  backend/app/api/threads.py). Only sent when the map is NON-EMPTY; absence — and
+     *  an empty map — produce the byte-identical pre-214 request body, which is what
+     *  keeps every ordinary Deep chat send unchanged. Values are strings: the server
+     *  declares `dict[str, str]`, so a non-string arrives as a 422 rather than as a
+     *  nested object on a flat path. */
+    inputs?: Record<string, string>
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -483,6 +493,13 @@ export async function postMessage(
       // WFIN-02 (D-01): additive — same shape as workflow_definition_id. Only sent
       // when a per-run folder override is present; absence = D-06 (author default).
       ...(options.folderId ? { folder_id: options.folderId } : {}),
+      // STEP-02 (D-214-04): additive, and CONDITIONAL for the same reason the two
+      // keys above are — an always-present key would change the request body of every
+      // chat message in the app. An EMPTY map is not sent either: a workflow that
+      // declares no launch inputs must post exactly what it posted before Phase 214.
+      ...(options.inputs && Object.keys(options.inputs).length > 0
+        ? { inputs: options.inputs }
+        : {}),
     }),
   })
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is

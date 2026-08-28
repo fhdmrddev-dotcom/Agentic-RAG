@@ -32,8 +32,19 @@
  * THREE markers), because a fence with a broken matcher passes vacuously and looks exactly like
  * a fence that holds.
  */
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+
+// Phase 214 plan 16 — the launch-inputs cases below call the REAL `postMessage` against a
+// stubbed `fetch`, so `getAuthHeaders` needs a session. Mock only Supabase auth; nothing
+// else in the client is faked, because the property under test is the REQUEST BODY the
+// shipped function builds. (Pattern: `lib/api.workflows.test.ts`.)
+const { mockGetSession } = vi.hoisted(() => ({ mockGetSession: vi.fn() }))
+vi.mock("@/lib/supabase", () => ({
+  supabase: { auth: { getSession: mockGetSession } },
+}))
+
 import { API_SOURCE as apiSource } from "@/lib/apiSource.testutil"
+import { postMessage } from "@/lib/api"
 
 /** The single fixed literal embedded in each of the three cross-reference docblocks. */
 const MARKER = "WR-02-LOOKALIKE-LAST-RUN-STATUS"
@@ -368,5 +379,119 @@ describe("Phase 214 — an ABSENT failure reason may never collapse into an EMPT
     )
     expect(genBlock).toContain("absent")
     expect(genBlock.toLowerCase()).toContain("empty")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 214 plan 16 (STEP-02 / D-214-04) — THE LAUNCH-INPUTS CHANNEL, AND THE BODY THAT MUST
+// NOT MOVE.
+//
+// `postMessage` gains ONE option: the declared input values a launcher collected. It is the
+// only channel those values have — before this plan the POST body was exactly
+// {content, model, provider, agent_mode, workflow_definition_id?, folder_id?} and a declared
+// `to` recipient died at the fetch call (`BUG-260826-01`).
+//
+// ⚠ TWO PROPERTIES, AND THE SECOND IS THE ONE THAT COULD BREAK THE APP. Sending the map is
+// easy; NOT sending it is the contract. Every ordinary Deep chat send goes through this same
+// function, so an unconditional `inputs` key — or an `inputs: {}` — would change the request
+// body of every message in the product. Both arms are therefore asserted by DEEP EQUALITY
+// against a literal pre-change body, never by a partial match: a subset assertion cannot see
+// an ADDED key, which is precisely the regression it would need to see.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+/** `?? {}` and `|| {}` on the launch-inputs path — assembled, never written as one literal. */
+const EMPTY_OBJECT_LITERAL = "{" + "}"
+const COALESCE_INPUTS_NULLISH = "inputs ?? " + EMPTY_OBJECT_LITERAL
+const COALESCE_INPUTS_OR = "inputs || " + EMPTY_OBJECT_LITERAL
+
+describe("Phase 214 — postMessage carries declared launch inputs, and only when there are any", () => {
+  const calls: Array<{ url: string; init: RequestInit }> = []
+
+  beforeEach(() => {
+    calls.length = 0
+    vi.clearAllMocks()
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8000")
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: "u1" }, access_token: "tok-214" } },
+    })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url, init })
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ message_id: "m1", run_id: "r1" }),
+        }
+      }),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  const sentBody = (): Record<string, unknown> =>
+    JSON.parse(String(calls[0].init.body)) as Record<string, unknown>
+
+  it("the declared values reach the request body under `inputs`, with their keys intact", async () => {
+    await postMessage("t-1", "run it", {
+      workflowDefinitionId: "wf-1",
+      inputs: { to: "a@example.test", subject: "S" },
+    })
+    expect(calls).toHaveLength(1)
+    expect(sentBody().inputs).toEqual({ to: "a@example.test", subject: "S" })
+  })
+
+  it("⭐ OMITTED — the body is DEEP-EQUAL to the pre-214 literal, not merely a superset", async () => {
+    await postMessage("t-1", "hello")
+    // The whole body, asserted as an object. `model`/`provider` are undefined and
+    // JSON.stringify drops them, which is the pre-change behaviour being pinned.
+    expect(sentBody()).toEqual({ content: "hello", agent_mode: "default" })
+  })
+
+  it("⭐ EMPTY MAP — same body, byte for byte: `inputs: {}` is NEVER put on the wire", async () => {
+    await postMessage("t-1", "run it", { workflowDefinitionId: "wf-1", inputs: {} })
+    expect(sentBody()).toEqual({
+      content: "run it",
+      agent_mode: "default",
+      workflow_definition_id: "wf-1",
+    })
+    // …and stated the other way round, because the deep-equal above is what a future
+    // reader will be tempted to relax into a subset match.
+    expect(Object.keys(sentBody())).not.toContain("inputs")
+  })
+
+  it("no CODE in src/ coalesces the launch inputs to an empty map, in EITHER direction", () => {
+    // ⚠ BOTH forms, and they are two different lies on this path. `?? {}` turns "the
+    // launcher declared nothing" into "the launcher declared an empty map", which is the
+    // key that would then always be sent; `|| {}` does the same and additionally swallows
+    // a deliberately-empty map. The server distinguishes absent from empty (the merge is a
+    // spread of `body.inputs or {}` — an absent map and an empty one are the SAME dict, so
+    // the honest client behaviour is to send neither).
+    const offenders = Object.entries(srcModules())
+      .filter(([, source]) =>
+        [COALESCE_INPUTS_NULLISH, COALESCE_INPUTS_OR].some((n) => codeOf(source).includes(n)),
+      )
+      .map(([path]) => path)
+    expect(offenders).toEqual([])
+  })
+
+  it("⚠ THE CONTROL — the launch-inputs matcher SEES a planted collapse and spares prose", () => {
+    const plantedNullish = "const i = options." + COALESCE_INPUTS_NULLISH
+    expect(codeOf(plantedNullish).includes(COALESCE_INPUTS_NULLISH)).toBe(true)
+    const plantedOr = "const i = options." + COALESCE_INPUTS_OR
+    expect(codeOf(plantedOr).includes(COALESCE_INPUTS_OR)).toBe(true)
+    // The needles are the assembled operators, not accidents of concatenation.
+    expect(COALESCE_INPUTS_NULLISH).toHaveLength(12)
+    expect(COALESCE_INPUTS_OR).toHaveLength(12)
+    // A docblock that FORBIDS the form is spared; the same form as code is still caught.
+    const mixed = [
+      "/** never write options." + COALESCE_INPUTS_NULLISH + " here. */",
+      "const i = options." + COALESCE_INPUTS_NULLISH,
+    ].join("\n")
+    expect(codeOf(mixed).includes(COALESCE_INPUTS_NULLISH)).toBe(true)
+    expect(codeOf(mixed.split("\n")[0]).includes(COALESCE_INPUTS_NULLISH)).toBe(false)
   })
 })
