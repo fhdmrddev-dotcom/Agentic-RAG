@@ -786,9 +786,32 @@ class GroundingBundleResponse(BaseModel):
 # fixed — the known set DERIVES from the modules that OWN the codes, and the unknown branch
 # fails LOUD (see ``_severity``). The composition, one row per owner:
 #
-#   ``reachability.LINT_CODES``           — the 5 structural codes ``lint_workflow`` emits
+#   ``reachability.LINT_CODES``           — the 10 codes ``lint_workflow`` emits: the 5
+#                                           STRUCTURAL ones, plus Phase 214's 5
+#                                           ARGUMENT-GAP ones (``reachability.ARGUMENT_GAP_CODES``
+#                                           — ``no_source`` / ``ask_undeclared`` /
+#                                           ``upstream_unreachable`` / ``shape_unknown`` /
+#                                           ``unrenderable``). Their OWNER is
+#                                           ``args.unsatisfiable_arguments``, which MINTS the
+#                                           kind; ``reachability`` carries it and publishes it.
 #   ``grounding.GROUNDING_VERDICT_CODES`` — the 3 fidelity codes ``grounding_verdicts`` emits
 #   ``_ROUTE_ASSIGNED_CODES``             — the 3 codes THIS route mints itself
+#
+# ⚠ PHASE 214 · THE FIVE ARGUMENT-GAP CODES ARE ``error``, AND THEY JOIN THAT BUCKET BY
+# COMPOSITION RATHER THAN BY A LITERAL. ``_ERROR_CODES`` is DERIVED
+# (``_KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES``), so widening ``LINT_CODES``
+# drops them into the error bucket automatically — which is the REQUIRED classification: a
+# step whose required argument nothing can supply is BROKEN, not "still building". The author
+# has already bound an action; the workflow cannot perform it. Painting the soft
+# ``incomplete`` here would tell them "keep going" and then hard-block the publish, which is
+# exactly the WR-05 posture this block exists to prevent.
+#
+# ⚠ AND ``/validate`` SEES ONLY THE NATIVE HALF, ON PURPOSE. ``lint_workflow``'s MCP arm needs
+# a ``tool_schemas`` map that only a connection read can build, and this route is called on
+# every canvas keystroke — so it passes none, and the MCP arm is skipped for it. That is this
+# module's shipped division of labour, not a gap: ``/validate`` is the live ADVISORY surface
+# and PUBLISH is the ENFORCING gate (``publish_service``'s own docblock says so). The publish
+# gate ALWAYS supplies the map. See ``reachability``'s module docblock for the full argument.
 #
 # ``tests/unit/test_182_severity_codes.py`` SCANS the two owning modules' emit sites and
 # fails if a published set drifts from what its functions can really emit. That guard is

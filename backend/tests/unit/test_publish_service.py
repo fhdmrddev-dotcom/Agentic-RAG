@@ -1804,6 +1804,28 @@ def _external_action_definition_dict() -> dict:
     `available_tools` is deliberately NOT written here: D-03 DERIVES it from `capability`
     by total replacement, so the value stage 2.6 tests membership on is the one the
     production validator produced.
+
+    ⚠ PHASE 214 (STEP-03) — `tool_args` WAS ADDED HERE, AND ITS ABSENCE WAS NOT A DETAIL.
+    This fixture used to carry NO arguments at all, and the new stage-2 argument gate refuses
+    it — verbatim, on the commit that added the gate and before this line existed:
+
+        blocked_stage='lint' named_failures=[
+          {'code': 'no_source', 'phase': 'notify-the-customer',
+           'message': "step 'Notify the customer': nothing supplies the required argument 'to'"},
+          {'code': 'no_source', 'phase': 'notify-the-customer',
+           'message': "... the required argument 'subject'"}]
+
+    That refusal is CORRECT and is the whole of `BUG-260826-02`: `smtp_adapter.INPUT_SCHEMA`
+    requires `to`, `subject` and `body`, and a step supplying none of them publishes and then
+    dies at the send with `the 'to' recipient must be a string, got NoneType`. The fixture was
+    demonstrating the defect while asserting the opposite. **D-06's claim is unchanged** — an
+    external_action workflow still publishes and its governed step still records — so the
+    repair is to make the step SATISFIABLE, never to weaken the gate.
+
+    `body` is deliberately NOT supplied: it is the capability's BODY ARGUMENT, which the
+    executor auto-fills from the upstream text, so the gate exempts it from `no_source`
+    (D-214-03). Its absence here is therefore a live assertion that the exemption works — add
+    it and this fixture stops covering that arm.
     """
     return {
         "slug": "v20-external-action",
@@ -1815,7 +1837,14 @@ def _external_action_definition_dict() -> dict:
                 "slug": _V20_SLUG,
                 "phase_index": 0,
                 "name": "Notify the customer",
-                "config": {"phase_type": "external_action", "capability": "send_email"},
+                "config": {
+                    "phase_type": "external_action",
+                    "capability": "send_email",
+                    "tool_args": {
+                        "to": "customer@example.com",
+                        "subject": "Your renewal is due",
+                    },
+                },
                 "validators": [],
             }
         ],
