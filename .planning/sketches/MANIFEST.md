@@ -2369,3 +2369,34 @@ passing every frontend test. That is the whole argument for step 4 existing.
 since 213) over byte-identical content. **The consequence is conditional** — 400px drops the source
 gutter and makes variant C the shape; the clamp ships variant B and changes a pinned assertion in
 the same commit.
+
+### SEED-224 session — the document space becomes the Library (2026-08-28)
+
+**Step 1 (direction)** is `STITCH-BRIEF-218-the-document-space.md` + the durable pixels under
+`218-the-library-and-its-tabs/stitch/`. **Step 3 (the bar)** is sketch 218. ⚠ Never collapsed.
+
+Operator direction, in two parts: follow the reference redesign closely — *"I like the journey, the
+charts, the simplicity, not many text pollution"* — but **"abide to our theme: not the colors, the
+content, the types of charts, the journey, the functionality."** So the reference supplies the
+journey and the chart vocabulary; every colour, radius and spacing value is a shipped token.
+
+Two operator decisions were taken mid-pass and are recorded in the brief: **Library Health MERGES
+into this surface (D-1)** and **the surface is renamed `Library` (D-2, front-end only)**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 218 | the-library-and-its-tabs | What is the Library's tab set, and which of the reference's surfaces can this app draw honestly? | *pending* — A five tabs · **B four tabs** | seed-224, bus-026, library-health, charts, acceptance-bar |
+
+**97 assertions, 0 failing — and 31 of them read the LIVE SOURCE TREE**, not the sketch. Three were
+driven RED against planted defects and the file restored md5-identical.
+
+⭐ **What the sketch found that the Stitch pass structurally could not.** The shipped `Tabs` primitive
+puts the active trigger on `bg-background` over a `bg-muted` track — which is **lighter in light mode
+and DARKER on Deep Midnight (11% L → 4% L)**. Every reference image drew a lighter raised chip: a
+shape the shipped component cannot produce. Its only second cue is `shadow-sm`, invisible at 4%
+lightness. Second finding: the ingestion pipeline writes **six** stages, not the three the seed
+assumes, and two are conditional — so a fixed 3-segment bar draws a shape the pipeline never has.
+
+⚠ **And one finding in the drive script itself:** its SURFACE stripper consumed one closing tag too
+many and silently ate the second tab-bar arm — the remedy the sketch exists to propose — while still
+reading 70/70 green. **A stripper bug looks exactly like a passing suite.**
