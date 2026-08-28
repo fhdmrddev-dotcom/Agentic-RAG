@@ -183,6 +183,9 @@ import {
   type TemplateAssetDescriptor,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+// Phase 214.1-01 (STEP-02) — the definition-level declared-input door. ONE import, ONE
+// gated node, no page state; see `declaredInputsAffordance` below.
+import { DeclaredInputsEditor } from "@/components/workflows/DeclaredInputsEditor"
 import { classifyTemplateNames } from "@/components/workflows/templateNameBuckets"
 import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
@@ -2630,6 +2633,23 @@ export function WorkflowBuilderPage({
   ) : null
 
   /**
+   * Phase 214.1-01 (STEP-02 · D-214.1-01) — the declared-input door.
+   *
+   * ⚠ ONE GATED NODE, INSIDE THE SAME `canvasEnabled ? (…) : null` SHAPE ITS TWO SIBLINGS
+   * USE, and never a new node in `identityGroup` reached by a second condition. That
+   * placement is not tidiness: band 3 of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting
+   * `identityGroup`, a literal that has been re-captured twice and whose own note says no
+   * third is expected. Living inside the gate is what makes the flag-off header unable to
+   * see this node at all — structural, rather than careful.
+   *
+   * ⚠ THE PAGE GAINS NO STATE. The dialog's open flag, the pending key and the refusal all
+   * live inside `DeclaredInputsEditor`, which reads the store through the provider this page
+   * already mounts. That is the measurable form of "honoured by construction" for a file
+   * that fires G-5 at 22 phases: one import, one node, zero `useState`, zero deleted lines.
+   */
+  const declaredInputsAffordance = canvasEnabled ? <DeclaredInputsEditor /> : null
+
+  /**
    * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
    * the slug when it does not, the shipped fallback when it has neither.
    *
@@ -2694,6 +2714,7 @@ export function WorkflowBuilderPage({
       {kbAffordance}
       {requirementAffordance}
       {statefulAffordance}
+      {declaredInputsAffordance}
     </>
   )
 

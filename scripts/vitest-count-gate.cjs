@@ -2819,6 +2819,21 @@ const BASELINE = {
   // their plans' own pytest criteria and by the backend failure-count baseline (68).
   // Recorded as a DECISION rather than a silence, so nobody later reads this gate's
   // green as covering them.
+  // Phase 214.1-01 (STEP-02) — the declared-input door's suite.
+  //
+  // ⚠ TARGETS vs BASELINE WAS CHECKED FROM THE GATE'S OWN PRINTED ROWS, NOT ASSUMED, and
+  // the check is the whole reason no TARGETS line accompanies this pin: the pre-pin run
+  // printed `DeclaredInputsEditor.test.tsx — 16 new`, so the file was ALREADY EXECUTING
+  // under the `src/components/workflows` **directory** entry the moment it existed. It was
+  // running and guarding nothing; the pin below is the entire fix.
+  //
+  // ⚠ AND A SECOND NEW SUITE IS NAMED RATHER THAN LEFT SILENT. The same run printed
+  // `declaredInputs.test.ts — 25 new`. It is likewise executing and likewise unguarded, and
+  // it is NOT pinned here because plan `214.1-02` owns this phase's registry edits and a
+  // wave-1 worktree must not race a shared artifact for a second line. An unpinned suite is
+  // not a lightly-guarded one, it is an UNGUARDED one — recorded so the adoption is owed
+  // rather than forgotten. Its measured count at this commit is **25**.
+  "DeclaredInputsEditor.test.tsx": 16,
   "ArgumentEditor.test.tsx": 33,
   "DescribeServicePicker.test.tsx": 20,
   "LaunchInputFields.test.tsx": 15,

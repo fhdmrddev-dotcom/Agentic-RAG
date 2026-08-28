@@ -302,6 +302,32 @@ export async function listDraftWorkflows(signal?: AbortSignal): Promise<Workflow
  *
  * The token is inserted BEFORE `signal` in the argument list. That is safe because no
  * call site passed a third argument (verified by grep across `frontend/src`, 186-03).
+ *
+ * ── ⚠ THE BODY IS THE WHOLE DEFINITION, AND THAT IS A MEASUREMENT, NOT AN INTENTION ───
+ *
+ * `BUG-260828-02` records that *"`frontend/src/lib/api/workflows.ts` never sends `inputs`:
+ * zero occurrences"*. That grep is TRUE and its conclusion is FALSE, and plan `214.1-01`
+ * drove the distinction rather than reasoning about it.
+ *
+ * `body` is `JSON.stringify(def)` — the whole object, with NO field whitelist — and `def` is
+ * `selectDefinition(snapshot)` handed over whole by `useDraftPersistence.ts`, which is
+ * literally `{ ...meta, phases }`. So EVERY key the builder store puts on `meta` already
+ * ships, including one this module has never named. A driven test asserts exactly that on the
+ * PARSED request body (`DeclaredInputsEditor.test.tsx`, section B): a real store, the real
+ * hook, this real function, and `globalThis.fetch` as the only stub. It was FALSIFIED before
+ * it was trusted — with the store's write repointed at a differently-named key it reads
+ * `expected { slug: 'risk-register', …(5) } to have property "inputs"`.
+ *
+ * ⛔ SO NO FIELD WHITELIST WAS ADDED HERE, DELIBERATELY. One would be new machinery
+ * defending nothing, and it would have to grow a line for every future definition field — a
+ * second, drifting copy of a shape the server already owns strictly (`WorkflowDefinition` is
+ * `extra="forbid"`). The pass-through is the contract.
+ *
+ * ⚠ THE COROLLARY IS THE REAL HAZARD, and it is why this note exists rather than a
+ * one-liner: because nothing filters, a stray key anywhere on `meta` reaches a model that
+ * FORBIDS extras, and the first autosave after it appears returns 422 and the write is lost.
+ * The fence therefore lives at the MINTING sites, not here — see
+ * `components/workflows/declaredInputs.ts` for the one that mints `inputs[]`.
  */
 export async function updateWorkflowDraft(
   id: string,
