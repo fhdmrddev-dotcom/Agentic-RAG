@@ -155,6 +155,64 @@ the plan*.
   image drew. Rejected: an accent underline (changes the silhouette); raising the shadow opacity
   (trades one theme's legibility for the other's).
 
+### Rulings added at plan-time (2026-08-29) — raised by 217-RESEARCH.md, decided by the operator
+
+⚠ **These three were NOT in the discuss-phase set.** Research measured that the 21 locked decisions
+do not rule on them, and each changes what gets built. They are recorded here rather than in a plan
+so the decision-coverage gate can see them.
+
+- **D-217-22 — D-217-19's "no percentage, no ETA" scopes the INGESTION STRIP and the UPLOAD PATH
+  only; tab 4's `ReembedStatusCard` keeps its determinate bar and its `~3 min` remaining.**
+  ⚠ **MEASURED CONFLICT:** `ReembedStatusCard.tsx:163` prints `"~3 min"` under the label `remaining`
+  and `:146` renders a width-percentage bar — so D-217-19 ("anywhere") and D-217-16 ("composes this
+  card unchanged") could not both hold. The distinction is real: D-217-19's stated reason is that two
+  of six stages are decided *while the file runs*, so there is **no honest denominator**. Re-embed
+  **has** one — `total chunks`, live from `document_chunks`. **The card is NOT edited.** ⚠ The
+  sketch's own fence `B4c` (`drive.cjs`, `!/ETA|remaining.*minutes?/i`) would fire if
+  this card's copy ever reached the sketch surface — so the ruling must be stated in the plan, not
+  left implicit. Rejected: rewriting `:163` to a chunk count (edits a shipped 278 L component
+  D-217-16 said to compose unchanged).
+
+- **D-217-23 — a `failed` document's segments after the failure point render as a THIRD state:
+  dimmed "not reached".** The strip therefore has three non-done renderings, not two:
+  **done · struck-through (skipped) · dimmed (never reached)**. The failing step itself renders as
+  the failure point, and the row's existing `error_message` carries the reason (`DocumentList`
+  already renders it). ⚠ **`ingestion_step` is NEVER CLEARED** — the terminal write
+  (`documents.py:2266-2273`) does not null it, so a `completed` document reads `"metadata"` by
+  RESIDUE, not by observation, and a `failed` one permanently reads the last step it reached.
+  ⛔ **Do not "fix" that by nulling the column: `text_sanitize.py:9` DIAGNOSES the BUG-260825-01 NUL
+  defect by reading `status=failed / ingestion_step=embedding`. Nulling it deletes a diagnostic.**
+  Consequence: on `completed`, the strip must NOT read `ingestion_step` at all. Rejected: rendering
+  later segments as *pending* (a stalled file then looks like it is still working — the exact
+  "absent thing that looks pending" failure D-217-19 exists to avoid).
+
+- **D-217-24 — conditional-stage applicability is DERIVED ON THE SERVER, as two booleans on
+  `DocumentResponse`: `tables_stage_applies` and `images_stage_applies`**, computed from
+  `multimodal_service.py`'s own frozensets (`:26-32, 491-501, 755-758`). This is **D-217-18's
+  one-list principle applied a second time** — the strip cannot advertise a stage the pipeline would
+  never run. ⚠ **MEASURED, and it is why the marker cannot be trusted:** both `ingestion_step`
+  markers are written *before* the extractor call (`documents.py:2080, 2091`), and
+  `extract_and_store_tables`/`_images` `return` immediately for an unsupported mime
+  (`multimodal_service.py:502`, `:759`) — so observing `ingestion_step="extracting_tables"` proves
+  **nothing**. ⚠ Also measured: the two conditionals sit inside ONE `if raw and mime_type:`
+  (`:2074`) — they can never be skipped independently. ⚠ And the `extracted_doc` fast path (`:479`)
+  can supply tables/images for ANY mime when Docling pre-extracted them, so the truthful rule is
+  **`skipped` iff `!applies_to_mime && count === 0`**, never mime alone. Rejected: hardcoding the
+  mime sets in TypeScript (duplicates a list that lives in `multimodal_service.py`, and nothing
+  would catch the drift — the exact failure D-217-18 exists to prevent).
+
+⚠ **A fourth research finding needs no ruling but binds the plan:** `D-217-05`'s cited `kb.py:404`
+is inside `read_path`'s owner fetch, not the slicing. The real function is `read_path` (`:397-461`),
+the params are **`start_line` / `end_line`** (not `?from=&to=`), and it **prefixes every line with
+its line number** (`kb.py:446`) — which must not reach a human reader. The decision (*reuse the
+line-range shape*) is unchanged; a plan that copies `read_path` verbatim ships numbered prose.
+
+⚠ **And a fifth: `BUILD-CONTRACT.generated.md` IS ALREADY STALE AT HEAD**, before this phase changes
+anything — its mtime (20:37) predates `drive.cjs` (20:52), and it claims **190** assertions where
+`node drive.cjs` measures **193**. D-217-11's regeneration obligation therefore starts from a stale
+artifact, and D-217-02's "190 assertions / 31 reading the live tree" figures are stale in this file
+too. **Re-derive; do not quote them.**
+
 ### Claude's Discretion
 
 - Tailwind class choices, spacing, hover/focus states, and the exact `PanelSection` titles for the
