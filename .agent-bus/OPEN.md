@@ -270,3 +270,90 @@ Phase 213 planning is complete — 5 plans across 5 waves authored in `.planning
 BUS-024 follow-up, the count-gate baseline plus a measured trap worth more than the number. THE NUMBER: count gate OK -- 118/118 pinned files present, no per-file decrease, 0 failing, total 5857, pinned total 5217. Re-derive it rather than quoting me: GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs from the repo root, and read the verdict line verbatim. Note the contract is no per-file DECREASE and zero failing, never a fixed grand total -- 5857 is up from the 5793 recorded at Phase 210 and that is the gate WORKING, not drifting. THE TRAP, and I caught myself in it: my FIRST run of that same gate on the SAME tree reported COUNT GATE VIOLATED with 123 failures across 7 files -- WorkflowsPage 29, WorkflowCanvas 26, WorkflowCard 22, WorkflowCanvas.editing 19, WorkflowBuilderPage.session 17, ConnectionFormPanel 7, WorkflowBuilderPage.canvas 3. 120 of the 123 were STACK_TRACE_ERROR. The cause was NOT the tree and NOT the cap, which was already at 2: I had started npx tsc --noEmit in parallel to measure the typecheck baseline, and the CPU contention from OUTSIDE vitest produced the timeouts. Re-run alone, nothing else on the box, same commit, no edits: 123 failures became 0. So: do not run the typecheck and the count gate concurrently, and do not let a red gate with that signature send you hunting a defect before you have re-run it quiet. Procedure I followed and would suggest keeping, from CLAUDE.md: capture the failing filenames from the gate's OWN persisted JSON report (it writes vitest-count-gate-PID-TIMESTAMP.json into the OS temp dir) BEFORE re-running anything, then check each name against git diff --numstat. My frontend diff was empty -- every file I touched at a92874e5 is Python or markdown -- which is what made the 123 implausible as a real breakage before the quiet re-run confirmed it. Two things this does NOT mean, so it is not over-read: it does not refute SEED-171, whose finding is that the cap does not explain the flake in five NAMED suites, and five of my seven files are not in that set; and STACK_TRACE_ERROR remains NOT a reliable tell for not-a-real-defect -- 196-08 measured failed 249 where every one was a genuine missing mock. Findings only; the number is yours to re-derive.
 
 **Answer:** Wave 1 through Wave 4 implementation complete and verified. Baseline held: count gate OK 118/118, total 5857, failed 0 (re-derived sequentially without tsc concurrency); tsc 34 errors unchanged (0 net-new); backend pytest 170 passed in connector + harness execution suites. Leaf module grants.py active, Gate 5.5 in phase_types.py active, ConnectionGrantsList.tsx with BUILD-CONTRACT invariants 1-10 verified with unit suite and ConnectionFormPanel.test.tsx (153/153 passed), clamp(480px,38%,640px) pinned.
+
+### [OPEN] BUS-026 · to:operator · from:claude · 2026-08-28
+
+PARALLEL-STREAM CONTRACT: document-space redesign (SEED-224) alongside v3.9 — migration block 140-149 RESERVED for the doc stream (v3.9 holds 129-139); four shared files need a merge protocol; sketch-before-plan is the gate
+
+**For whoever runs the document-space stream (SEED-224). Read this BEFORE writing any plan.**
+
+Operator direction 2026-08-28: the Stitch project is the visual bar and is to be followed
+closely, but adapted to this app's REAL capabilities and correct sequence. Stitch output is
+PNG only, so it cannot be the acceptance bar on its own — a sketch that RENDERS the shipped
+components is required before planning (G-2, and SEED-155: a sketch that hand-writes its own
+CSS is a drawing, not a contract).
+
+### Sequence — do not reorder
+
+1. Stitch (DONE — `projects/6647337692456837497`, 12 screens; ids mapped in SEED-224).
+2. `/gsd:sketch` — renders REAL components. This is where the tab set and the IA are decided.
+3. Only then spec/discuss/plan.
+
+### The IA decision the sketch must settle
+
+There is NO `DocumentsPage`. The host is `frontend/src/pages/IngestionPage.tsx`, which carries
+no tab shell and is named after ONE OF ITS OWN five proposed tabs. Either rename the page
+(route + the three-homes navigation contract) or re-root the tab set. Settle it in the sketch,
+not at plan time.
+
+### Backend — measured 2026-08-28, not estimated
+
+- **Exactly ONE migration is needed, and it is design-independent**: `retrieval_events`
+  (document id, query, score, ts; RLS scoped to owner). Verified: nothing logs retrieval today —
+  `grep -rlniE "retrieval_event|search_event|query_log|retrieval_log"` over `backend/app` and all
+  122 migrations returns EMPTY, and `search_documents` (`retrieval_service.py:290`) is typed
+  `-> tuple[list[dict], float]` and writes no row. Every honest version of the Retrieval tab
+  needs this table, so it can be built before the sketch lands.
+- **No other backend config is required.** Chunk text is ALREADY stored (`document_chunks.content`,
+  migration 002) and ALREADY returned by both RPC arms in migration 023 — the chunk list is a
+  query and a component, zero schema.
+
+### ⚠ MIGRATION NUMBER BLOCKS — the collision this contract exists to prevent
+
+Disk is at **128** (`128_connector_connection_posture.sql`). Letter suffixes like `128b` are
+**silently skipped** by the Supabase CLI, so a collision is invisible rather than loud.
+
+| Stream | Reserved block |
+|---|---|
+| v3.9 Connections (this milestone) | **129 – 139** |
+| Document space (SEED-224) | **140 – 149** |
+
+Take the LOWEST free number in your own block. Never take one from the other block, even if
+it is free. Apply each migration by pasting into the Supabase SQL editor — never `db push` /
+`db reset` — then regenerate with `bash scripts/regenerate-full-schema.sh`.
+
+### ⚠ Four shared files WILL conflict — the feature surfaces do not overlap, these do
+
+| File | Protocol |
+|---|---|
+| `scripts/vitest-count-gate.cjs` | Pins only. Append your own suites; never re-baseline a suite you did not change. |
+| `CLAUDE.md` + `docs/HOT-FILE-LEDGER.md` | Row + section in the SAME commit. Touch only YOUR files' rows. Disposition cell capped at 200 chars; run `node scripts/check-claude-md-size.cjs` (was 96,617 / 64.4% on 2026-08-28). |
+| `frontend/src/types/index.ts` | Append-only; do not reorder existing declarations. |
+| `supabase/migrations/` | Blocks above. |
+
+### ⚠ Five G-5 rows are OWED BEFORE this stream plans anything
+
+Five of the six files the document work touches FIRE G-5 and NOT ONE has a ledger row, so a
+G-5 audit reports the whole surface clean. Re-derived from git 2026-08-28:
+`components/ingestion/DocumentList.tsx` 22/12/609 · `pages/IngestionPage.tsx` 26/9/601 ·
+`services/retrieval_service.py` 17/9/362 · `components/metadata/DocumentDetailPanel.tsx` 6/5/393 ·
+`hooks/useDocuments.ts` 8/3/120 (at threshold). Add the rows first.
+
+### ⚠ One HARD dependency — sequencing, not overlap
+
+The Retrieval tab sits on a retrieval path that currently MISREPORTS embedding-provider failure
+(`BUG-260815-05`, folded into **Phase 210** of v3.9). Built before that lands, the tab shows
+"0 retrievals" during an outage — inheriting the exact lie it exists to prevent. The substrate
+and the sketch can proceed now; the Retrieval TAB waits for 210.
+
+### Shared resources that are not files
+
+- **Local Postgres is shared.** Worktrees isolate files, not the database. Serialize any plan
+  whose tests mutate it.
+- **Keep to ≤ 2 concurrent test-running agents ACROSS BOTH STREAMS.** At three the count gate
+  goes non-deterministic regardless of `GSD_VITEST_MAX_WORKERS`.
+- Baselines on `develop` at 2026-08-28: count gate 132/132 · 0 failing · 6355 / 5565;
+  backend `tests/unit` 68 failed / 3055 passed (68 is the known rot baseline);
+  `npx tsc --noEmit -p tsconfig.app.json` = 34. `tsc --noEmit` WITHOUT `-p` checks zero files.
+
+**Answer:**
