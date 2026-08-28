@@ -717,6 +717,34 @@ CLAUDE.md carries a MANDATORY sweep rule; it is honoured by the orchestrator, no
 
 ## Guardrail overrides
 
+**Phase 214.1 — G-2, OVERRIDDEN 2026-08-28 at the operator's explicit authorisation of an
+UNATTENDED build.** The gate fires correctly: 214.1 ships a declared-input authoring UI, `ROADMAP`
+marks it `**UI hint**: yes`, and **no operator-approved sketch exists**. The operator authorised
+`discuss → plan → execute` while absent and **explicitly retained the visual veto**.
+
+⚠ **This override is weaker than 211's and is recorded as such.** 211's rested on a locked
+decision that the phase designed no surface. **214.1 DOES design a surface** — there is no argument
+that the sketch was unnecessary, only that the operator chose speed over the mockup and kept the
+right to reject the result. It is a deferral of the gate, not a discharge of it.
+
+Mitigation, so the override costs as little as possible:
+- The UI is authored from the shipped design system and the `sketch-findings-agentic-rag` skill,
+  never invented.
+- **The wiring is design-independent** — the `builderStore` action, the save path sending `inputs`,
+  the describe-door emission and the reachability test all survive a full re-skin untouched. A
+  rejected visual costs the surface, not the phase.
+- CONTEXT.md records every decision as MINE with the alternative beside it (see `D-214.1-01`, whose
+  inline-affordance alternative moves only the mount point).
+
+⚠ **RE-OPEN TRIGGER: the operator's first look at the shipped surface.** If it is rejected, a
+sketch is owed BEFORE the re-skin — not another unattended pass. And the next UI phase in this
+milestone gets no similar override without a sketch, or this becomes a habit rather than an
+exception.
+
+⚠ **A second, quieter override rides with it:** CONTEXT.md was authored, not discussed. No operator
+answered any question in it. A CONTEXT nobody agreed to is a weaker acceptance bar than one that
+was negotiated, and any decision in it may be overturned without argument.
+
 **Phase 211 — G-2 / UI-SPEC gate, OVERRIDDEN 2026-08-26 at `/gsd:plan-phase 211`.** The gate fired
 correctly: `ROADMAP.md` marks Phase 211 `**UI hint**: yes` and no `211-UI-SPEC.md` exists. Resolved
 `--skip-ui` **on the operator's explicit call**, on the basis of the phase's own locked
