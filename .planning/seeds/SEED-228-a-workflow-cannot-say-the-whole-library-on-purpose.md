@@ -16,6 +16,7 @@ affected_areas: [backend/app/api/workflows.py, backend/app/services/harness/grou
 relates_to:
   - BUG-260731-03 (the report the 2026-08-04 decision answered)
   - D-187-11 (the decision this seed asks to revisit)
+  - SEED-230 (the OTHER publish bind on the SAME workflow — measured to be a different cause)
 re_open_trigger: >
   Immediately — the operator raised it against a live workflow they cannot publish. Otherwise the
   next phase touching grounding, the KB picker, or the publish gate.
@@ -69,3 +70,20 @@ surface and inexpressible in the other.
 A blanket waiver or a "publish anyway" escape. The gate is right for the case it was built for —
 an author who simply has not chosen. This seed asks for a way to CHOOSE everything, not a way to
 skip choosing.
+
+
+---
+
+## ⚠ MEASURED 2026-08-29 — THIS SEED WAS NOT WHAT BLOCKED THE OPERATOR'S FOUR PUBLISH ATTEMPTS
+
+Recorded here because the two binds sit on the SAME workflow and the obvious move is to fold them.
+**Do not.** `Knowledge Base Library Structure Summary` carries a real
+`definition.project_folder_id` (`37380338-2ccd-4eec-84be-645036d37a09`), so `unbound_retrieval`
+never fired on any of the six golden runs. What blocked them was a synthesized
+`citations_required` gate on the survey step — **`SEED-230`**, a different cause with a different
+fix.
+
+⚠ **This seed is still LIVE and its argument is untouched.** The workflow was bound to a folder,
+which is exactly the falsification of intent the seed predicts an author will perform to get past
+the gate — so if anything the measurement supports it. What changed is only the attribution of one
+specific set of failures.
