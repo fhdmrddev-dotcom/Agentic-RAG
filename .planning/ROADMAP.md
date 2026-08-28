@@ -129,6 +129,7 @@ it.*
 - [x] **Phase 212: The Catalog and Its Doors** — searchable service catalog with marks and purposes, state-only filters, a Popular row, the paste-a-URL door, and edit/delete that keeps grants (CAT-01, CAT-02, CAT-03, CAT-05, CONN-06, CONN-07) · ⚠ closed with owed rows (`/code-review ultra`, cloud SC#3) and two findings routed to 213 (`SEED-214`, `BUG-260827-02`)
 - [x] **Phase 213: Per-Tool Grants and the Approval Moment** — one list of reads and writes, an inheritable default posture, a run that pauses and names service/tool/arguments, a refusal that names its grant, and an audit receipt per call (GRANT-01..05) ⭐ HARD PREREQUISITE for 216 · ⚠ **+ the 1:1 unlock and the grant-gate close** (`SEED-214`, `BUG-260827-02`) — SC#1 is unsatisfiable without them
 - [ ] **Phase 214: A Step Names Its Service and Its Action** — service→action picking with no URL and no hand-written JSON, arguments that arrive from every launch path, a publish that refuses the unsatisfiable, honest step identity and failure on the run surfaces, and a describe door bound to the author's real vocabulary (STEP-01..06)
+- [ ] **Phase 214.1: An Author Can Declare an Input** — the authoring surface that makes *Asked when this runs* reachable: a declared-input editor, the save path that sends it, a describe door that emits it, and a refusal an author can actually read (closes ⛔ `BUG-260828-02` → ⛔ `BUG-260826-01`; STEP-02, STEP-03)
 - [ ] **Phase 215: BYO OAuth** — customer-registered client id/secret, an authorization-code consent that works self-hosted, silent refresh, a plainly-stated revoked state, and secrets unreadable at rest (OAUTH-01..03)
 - [ ] **Phase 216: Connections in Chat, and One File In by Hand** — add a service to a thread by name, see and remove what is active, tool calls that render with the real mark and name, starter prompts that actually run, and one file pulled in by hand (CHAT-05..07, CAT-04, ATTACH-01)
 
@@ -262,6 +263,45 @@ Plans:
 **UI hint**: yes
 **Flags**: Closes three folded bugs including ⛔ **`BUG-260826-01`** — the milestone's blocking defect on the shipped surface. **Sequenced BEFORE chat deliberately**: the canvas already carries D-19's armed checkpoint and the egress guard, so the model and the grants are proven on the governed surface before outbound reaches chat, which carries neither. **G-2 sketch owed** (step picker + the canvas and run node faces; the `…workflow-edit.webp` **xyOps** reference is the canvas bar — named action nodes, per-node glyphs, typed edges — and the `sketch-findings-agentic-rag` skill auto-loads; read `references/icon-convention.md` §4 before drawing any canvas mark). **G-5**: `ConnectionPicker.tsx` (5/3/651 — fires at threshold), `ExternalActionSection.tsx` (4/3/498 — fires at threshold), `phase_types.py` (fires), plus `McpToolPicker.tsx` (2/2/570) which ⚠ **is named inside Phase 206's ledger section but has no row of its own**. Refactor recommendation owed first at discuss-phase. **Threat model REQUIRED** (the publish gate is a safety gate, and argument provenance decides what a step is allowed to send). ⚠ **A launch decision is owed on `visual_workflow_canvas`, whose cold default is `off`** — Phase 209's 16/16 browser drive ran against a flag-flipped database, so a criterion here that renders only behind the flag is not shipped. ⚠ **`SEED-206` is exactly SC#4's second half** — 209's node face never reached the run surface. **SC#10.** ⚠ **`{{prior_run.*}}` misses `llm_emit`** (carried from v3.8) — if STEP-02's argument plumbing reuses that resolver, the same gap applies. **Existing precedent to reuse, not reinvent**: `DESCRIBE_REFUSAL` in `doorVocabulary.ts` (Phase 199) already knows how to refuse in a governed vocabulary — ⚠ *a refusal is only honest if it names the next action*.
 
+#### Phase 214.1: An Author Can Declare an Input
+
+**Goal**: An author can declare a workflow input and source a step's argument from it — so that
+*Asked when this runs* stops being a dead end, and a `send_email` step actually receives the
+recipient a person typed at launch.
+**Depends on**: Phase 214 (the gate, the launch forms and the run wire all shipped there and all work).
+**Requirements**: STEP-02, STEP-03
+**Success Criteria** (what must be TRUE):
+
+  1. An author declares an input in the builder, sources a step argument from it, and **publishes** —
+     the gate that refused before now passes, with no hand-editing of JSON anywhere (STEP-02).
+  2. A run launched from the library and from Test Run **asks for that input and the step receives
+     its value** — `workflow_runs.inputs` carries the declared key, not just `kickoff_prompt`
+     (STEP-02 — closes ⛔ `BUG-260828-02`, and with it ⛔ `BUG-260826-01`).
+  3. A publish refusal is **readable in full on screen** and names its next action — never the raw
+     backend diagnostic (STEP-03 — closes `BUG-260828-04`).
+  4. The describe door **emits** `inputs[]` when it drafts a step whose argument is asked at launch,
+     so an AI-drafted workflow is publishable without hand-repair (STEP-02).
+  5. The agent never states that a service is unconnected when a connection exists — the claim is a
+     lookup, not a generation (closes `BUG-260828-03`).
+
+**Plans**: 3 plans (214.1-01, 214.1-02, 214.1-03)
+
+**UI hint**: yes
+**Flags**: ⚠ **AUTONOMOUS BUILD, operator absent** — the operator authorised discuss→plan→execute
+unattended on 2026-08-28 and explicitly retained the visual veto. **G-2 is OVERRIDDEN, not
+satisfied**: no operator-approved sketch exists, so the UI is authored from the shipped design
+system and the `sketch-findings-agentic-rag` skill, and the override is recorded in `STATE.md`.
+The wiring is design-independent and survives a re-skin. ⚠ **The reachability standard is the
+phase's whole point**: `BUG-260828-02` survived Phase 214 because every test built
+`definition.inputs[]` by hand — fixtures could reach a state no human could. At least one test
+MUST start from an EMPTY builder and end at a published workflow with a non-empty `inputs[]`,
+mocking neither the store nor the API. ⚠ **`BUG-260828-04` is NOT yet diagnosed** — the operator saw
+the raw backend diagnostic, which `PublishRefusalList.tsx`'s own docblock forbids rendering, so it
+is either a classification defect or a stale bundle; the plan must DRIVE the distinction rather
+than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `builderStore.ts`,
+`api/workflows.py` all fire — read `docs/HOT-FILE-LEDGER.md` before planning. No migration expected
+(`definition` is existing jsonb). ⚠ **Migration block if one IS needed: 129-139** (v3.9's block —
+140-149 belongs to the parallel document-space stream, BUS-026).
 #### Phase 215: BYO OAuth
 
 **Goal**: A customer registers their **own** OAuth application, connects a first-party service with it on any deployment including self-hosted and on-prem, and the connection keeps working afterwards without them reconnecting — or says plainly that it cannot.
