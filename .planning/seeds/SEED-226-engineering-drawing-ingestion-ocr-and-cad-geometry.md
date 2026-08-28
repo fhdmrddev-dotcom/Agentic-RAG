@@ -182,6 +182,77 @@ measures **10** drawing ops where a real AutoCAD plot has thousands. The probe's
 `vector_drawings > 0` heuristic is therefore tuned on a weak sample — **re-check the verdict
 logic against the operator's real file before trusting the classification on anything else.**
 
+## ⚠⚠ MEASURED ON A REAL DRAWING 2026-08-28 — AND IT IS WORSE THAN THE FIXTURE PREDICTED
+
+The operator supplied a real residential floor plan (`screenshots/5c8c98858152b.pdf`, 99 KB,
+1 page, A5 landscape). **This supersedes the synthetic numbers above, which are kept only to
+show what the stand-in failed to capture.**
+
+| | synthetic fixture | **REAL drawing** |
+|---|---|---|
+| vector drawing ops | 10 | **2,799** |
+| line segments | — | **2,822** |
+| text, `legacy` engine | 229 chars | **237 chars** |
+| text, `pymupdf` engine | 229 — identical | **252 — NOT identical** |
+| images | 0 | **0** |
+| tables | camelot 0 · pdfplumber 1 | **camelot 1 · pdfplumber 4** |
+| **numeric tokens in the whole text layer** | 8 dimensions | **EXACTLY ONE: `6`** |
+
+**The entire text layer of the drawing, verbatim (252 chars, 33 spans, one font):**
+
+> `BED ROOM KITCHEN BED ROOM KITCHEN BED ROOM KITCHEN BED ROOM KITCHEN HALL HALLHALL
+> HALLBATHBATH BATHBATHVERANDA FIRST FLOORGROUND FLOOR KITCHENKITCHEN HALLHALL
+> VERANDAVERANDA BED ROOMBED ROOMBATHBATHWASHWASH PASSAGE 6FEET WIDE CAR PARKING`
+
+**⚠ THE PREDICTION IN THIS SEED WAS TOO OPTIMISTIC.** It said dimensions would arrive
+*unanchored*. On this real drawing **they do not arrive at all** — the only number anywhere in
+the text layer is the `6` in *"PASSAGE 6FEET WIDE"*. Room names arrive mashed together
+(`HALLHALL`, `BATHBATH`) because adjacent text runs concatenate with no separator. **And there
+are no images either**, so the vision-caption path — the one consolation for a scan — yields
+nothing on a vector plot.
+
+**So the app ingests this drawing as ~252 characters of run-together room names, reports
+`completed`, and discards 2,822 line segments.** No error, no `needs OCR` sentence, nothing
+red. A BOQ question against this document today is answered from room names alone.
+
+**⚠ THE FINDING THAT CHANGES THE PLAN: the geometry is fully present and measurable.**
+
+    line segments      : 2822
+    total length (pt)  : 16342.0
+    longest segment    : 254.3
+    horizontal/vertical: 1399 / 1445   (overwhelmingly orthogonal — walls)
+    geometry bbox (pt) : 89.0 17.8 → 329.6 580.5
+
+Every wall is a `LINE` primitive with real coordinates, reachable in three lines of PyMuPDF
+(`page.get_drawings()`). **This seed's L3 assumed DXF was the only route to real measurement.
+That is now measured false for VECTOR PDFs** — the takeoff geometry is already in the PDF, and
+what is missing is only **scale** (derivable from one known dimension, a title-block scale note,
+or an operator-supplied reference). ⚠ **DXF remains strictly better** — it carries layers, block
+names and entity types, so `INSERT` counting per block gives door/fixture COUNTS that bare
+coordinates cannot. But an **L2.5 — vector-geometry takeoff straight from the PDF** — now exists
+between L2 and L3, and it is cheaper than both.
+
+**Two more measured notes:**
+
+1. **The two text engines DISAGREE on a real file (237 vs 252)** — the fixture said identical.
+   Neither is usable for takeoff, so this does not revive the engine-switch idea; it is recorded
+   because *"the engines are equivalent"* is now known to be a fixture artefact.
+2. ⚠ **pdfplumber reports FOUR phantom tables in the drawing geometry (camelot: 1).** At fixture
+   scale this was 1 vs 0. **Four fabricated tables from one small floor plan** is the clearest
+   evidence yet that drawing geometry is actively polluting the index, not merely absent from it.
+
+**The pricing half is now VERIFIED rather than assumed.** A reference rate sheet
+(`screenshots/BOQ-reference-rates.xlsx`, 24 priceable items across 8 categories, plus a
+Preambles sheet of narrative rules that must NOT be priced) round-trips through the shipped
+`extract_excel_tables` with headers and all 24 rows intact. ⚠ Both sheets report
+`table_index: 0`, which was checked and is **NOT** a collision — `page` carries the 1-based
+sheet number, so the pair stays unique.
+
+**The DWG the operator supplied** (`architectural_-_annotation_scaling_and_multileaders.dwg`,
+189 KB) has magic `AC1021` = **AutoCAD 2007 format**. `ezdxf` reads DXF, not DWG, so this file
+needs a conversion step (ODA File Converter, free; or the CAD tool's own DXF export) before any
+of L3 applies. Nothing in this repo can open it today.
+
 ## Open questions for whoever picks this up
 
 - Which OCR engine, decided on **real customer drawings**, not on a benchmark corpus.
