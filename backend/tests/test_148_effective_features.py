@@ -45,10 +45,18 @@ def test_operator_sees_all_features_true(client, auth_headers, mock_asyncpg_pool
     """An operator's effective map is all-True across the four SHIPPED governed features.
 
     Phase 181 (REVERT-01 / D-181-01) added a 5th governed key, ``visual_workflow_canvas``,
-    whose cold default is the new ``"off"`` audience — hidden from EVERYONE, operators
-    included. So the operator map now carries 5 keys: the 4 shipped ones stay all-True (no
-    Phase-148 regression, REVERT-02), and the canvas key is False (the master switch wins
-    over the operator short-circuit).
+    whose cold default was the ``"off"`` audience — hidden from EVERYONE, operators included.
+    So the operator map carried 5 keys: the 4 shipped ones all-True (no Phase-148 regression,
+    REVERT-02), and the canvas key False, because the master switch won over the operator
+    short-circuit.
+
+    ⚠ **AMENDED BY PHASE 214 / D-214-19.** That cold default is now ``"everyone"``, so the
+    canvas key reads **True** here. The Phase-181 property this case was really pinning — that
+    an ``"off"`` master switch outranks the operator short-circuit — has NOT been weakened and
+    is still proven, in ``test_181_off_audience.py`` and ``test_revert_byte_identical.py``,
+    against a STORED off record. The original expectation is written out above rather than
+    overwritten, because reading `False` -> `True` with no explanation is how a security-shaped
+    assertion gets loosened by accident.
     """
     _cold_defaults(monkeypatch)
     monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
@@ -59,8 +67,14 @@ def test_operator_sees_all_features_true(client, auth_headers, mock_asyncpg_pool
     feats = res.json()["features"]
     assert FEATURE_KEYS <= set(feats), "the 4 shipped governed keys are still present"
     assert all(feats[k] is True for k in FEATURE_KEYS), "operator -> every SHIPPED governed feature True"
-    # Phase 181: the off-cold-default canvas is hidden from operators too (D-181-01).
-    assert feats["visual_workflow_canvas"] is False
+    # Phase 214 / D-214-19: the canvas cold default is now "everyone", so it is VISIBLE here.
+    # (Phase 181 asserted `is False` on this line; see the docstring for why that flipped and
+    # where the "an off master switch outranks the operator short-circuit" property still lives.)
+    assert feats["visual_workflow_canvas"] is True
+    # ⭐ THE NEIGHBOUR IS THE CONTROL. `live_connectors` shares the "off" cold default the
+    # canvas key just left, so it proves the map still HAS an off-audience arm and that this
+    # case is reading a per-key decision rather than a blanket True.
+    assert feats["live_connectors"] is False
 
 
 def test_end_user_sees_only_everyone_features(client, auth_headers, mock_asyncpg_pool, monkeypatch):

@@ -72,10 +72,29 @@ async def _not_banned(user_id):
 
 
 def _cold_off(monkeypatch):
-    """Flag off (cold default): an empty feature_visibility map -> canvas resolves "off"."""
+    """Canvas OFF — and after D-214-19 that is an operator's FLIP, no longer the default.
+
+    ⚠ THIS HELPER USED TO HAND BACK AN EMPTY ``feature_visibility`` MAP and let the canvas
+    key fall through to ``_GOVERNED_FEATURES``, because that cold default was ``"off"``.
+    Phase 214 (plan 214-14, D-214-19) flipped it to ``"everyone"`` — left off, the surface
+    this milestone governs rendered for nobody on a fresh install. So an empty map now
+    resolves ON, and every *"when off"* assertion downstream silently INVERTED: 20 cases
+    across seven suites, measured rather than predicted.
+
+    The OFF state is therefore STORED EXPLICITLY. What each case asserts is unchanged —
+    only how OFF is reached. ``feature_audience`` honours a stored ``{"audience": "off"}``
+    record (Phase 181 / D-181-01 put ``"off"`` in the accepted-enum tuple for exactly this
+    reason), so this is the product's own re-flip route rather than a test-only shape.
+    """
     from app.models import user_settings as us
 
-    monkeypatch.setattr(us, "load_app_settings", lambda: SimpleNamespace(feature_visibility={}))
+    monkeypatch.setattr(
+        us,
+        "load_app_settings",
+        lambda: SimpleNamespace(
+            feature_visibility={"visual_workflow_canvas": {"audience": "off"}}
+        ),
+    )
 
 
 def _flipped_on(monkeypatch):

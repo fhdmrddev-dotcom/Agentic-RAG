@@ -8,8 +8,16 @@ gate (require_canvas 404) + the GET /features off-bypass are proven in test_181_
 Modeled on ``test_148_visibility_cold_default.py`` (monkeypatch ``us.load_app_settings`` to
 drive cold-default vs stored-record). The five behaviors pinned here:
 
-  1. cold read (DB unreachable / missing key) -> ``feature_audience`` resolves ``"off"``;
-  2. a stored ``{"audience": "off"}`` record is HONORED (not silently re-defaulted);
+  1. ⚠ **AMENDED BY PHASE 214 / D-214-19** — the cold read now resolves ``"everyone"``. The
+     canvas layer had shipped through 199, 200, 209, 211 and 213 and was the surface v3.8
+     governs; left ``off``, that surface rendered for nobody on a fresh install, and Phase
+     209's 16/16 browser drive had run against a hand-flipped database. The cold-default
+     assertions moved to ``tests/unit/test_214_flag_cold_default.py``, which owns them now;
+     the two cases below are kept HERE as the counter-assertion so this file cannot quietly
+     go on describing a default the product no longer has;
+  2. a stored ``{"audience": "off"}`` record is HONORED (not silently re-defaulted) — and
+     after the flip that record IS the off-switch rather than belt-and-braces, so behaviour
+     3 below is now the whole of how the canvas gets hidden;
   3. ``resolve_feature_access(..., off)`` denies for ANY role / groups (fail-closed);
   4. the 4 shipped governed keys resolve EXACTLY as Phase 148 asserts (no regression);
   5. ``PUT /admin/visibility`` accepts ``visual_workflow_canvas`` + ``off`` | ``everyone`` and
@@ -20,23 +28,39 @@ from types import SimpleNamespace
 
 # ── 1-2: feature_audience resolves + honors "off" ─────────────────────────────
 
-def test_cold_read_canvas_is_off(monkeypatch):
-    """DB-unreachable (load_app_settings raises) -> visual_workflow_canvas resolves "off"."""
+def test_cold_read_canvas_is_everyone_after_the_214_flip(monkeypatch):
+    """⚠ RENAMED AND INVERTED BY D-214-19 — a cold read now SHOWS the canvas.
+
+    Phase 181 asserted ``"off"`` here and that was right for v3.6/v3.7. Phase 214 flipped the
+    cold default to ``"everyone"``; the assertion is inverted rather than deleted so this
+    file records the change instead of going quiet about it, and the primary ownership of the
+    cold-read contract now sits in ``tests/unit/test_214_flag_cold_default.py``.
+
+    The FAIL-SAFE property Phase 181 cared about is untouched and still asserted: a cold
+    cache resolves to the DECLARED default rather than raising or inventing an audience.
+    What changed is which default was declared, and that was a decision, not a drift.
+    """
     from app.models import user_settings as us
 
     def _boom():
         raise RuntimeError("settings DB unreachable (cold cache)")
 
     monkeypatch.setattr(us, "load_app_settings", _boom)
-    assert us.feature_audience("visual_workflow_canvas") == "off", "cold read HIDES the canvas"
+    assert us.feature_audience("visual_workflow_canvas") == "everyone", (
+        "cold read SHOWS the canvas after D-214-19 — see tests/unit/test_214_flag_cold_default.py"
+    )
+    # The neighbouring off-by-default flag is UNCHANGED, and asserting it here is what keeps
+    # "the canvas flipped" from reading as "the governed flags flipped".
+    assert us.feature_audience("live_connectors") == "off"
 
 
-def test_missing_key_canvas_is_off(monkeypatch):
-    """An unseeded feature_visibility map -> the canvas key falls through to its "off" default."""
+def test_missing_key_canvas_is_everyone_after_the_214_flip(monkeypatch):
+    """An unseeded map falls through to the declared default — now ``"everyone"``."""
     from app.models import user_settings as us
 
     monkeypatch.setattr(us, "load_app_settings", lambda: SimpleNamespace(feature_visibility={}))
-    assert us.feature_audience("visual_workflow_canvas") == "off"
+    assert us.feature_audience("visual_workflow_canvas") == "everyone"
+    assert us.feature_audience("live_connectors") == "off"
 
 
 def test_stored_off_record_is_honored(monkeypatch):
