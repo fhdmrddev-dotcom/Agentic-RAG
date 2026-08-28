@@ -218,9 +218,31 @@ ok("A9 · Library Health ships exactly four top-level tabs",
 ok("A9b · COPY pins them verbatim",
   JSON.stringify(khTabs) === JSON.stringify(COPY.SHIPPED_HEALTH_TABS),
   `shipped ${JSON.stringify(khTabs)} vs COPY ${JSON.stringify(COPY.SHIPPED_HEALTH_TABS)}`)
-ok("A9c · all four survive as chips in the merged tab — nothing is lost in the merge",
-  COPY.HEALTH_FILTERS.every((f) => SURFACE.includes(f)),
-  COPY.HEALTH_FILTERS.filter((f) => !SURFACE.includes(f)).join(",") || "all present")
+// ⚠ REWRITTEN 2026-08-28 when Governance was merged in too. The first version asserted the four
+// shipped tab names appeared VERBATIM — which correctly fired the moment three were renamed to
+// resolve the "Low Confidence" collision. A verbatim check cannot tell a RENAME from a LOSS.
+// So the rename is now declared in COPY.SIGNAL_RENAMES and the fence proves the map is TOTAL:
+// every shipped signal is mapped, and every target is actually on the surface.
+const SHIPPED_SIGNALS = [...COPY.SHIPPED_HEALTH_TABS, ...COPY.SHIPPED_GOVERNANCE_CARDS]
+ok("A9c · every shipped signal is MAPPED — a rename is allowed, a loss is not",
+  SHIPPED_SIGNALS.every((sig) => COPY.SIGNAL_RENAMES[sig]),
+  SHIPPED_SIGNALS.filter((sig) => !COPY.SIGNAL_RENAMES[sig]).join(", ") || "all mapped")
+ok("A9c2 · and every mapped target is actually rendered",
+  SHIPPED_SIGNALS.every((sig) => SURFACE.includes(COPY.SIGNAL_RENAMES[sig])),
+  SHIPPED_SIGNALS.filter((sig) => !SURFACE.includes(COPY.SIGNAL_RENAMES[sig]))
+    .map((sig) => `${sig} → ${COPY.SIGNAL_RENAMES[sig]}`).join(", ") || "all rendered")
+ok("A9c3 · ⭐ the two 'low confidence' signals map to DIFFERENT words",
+  COPY.SIGNAL_RENAMES["Low Confidence"] !== COPY.SIGNAL_RENAMES["Low-confidence metadata"],
+  "retrieval similarity (0.38) and extraction confidence (0.5) must not share a label")
+ok("A9c4 · the shipped Governance page really does carry those three cards",
+  COPY.SHIPPED_GOVERNANCE_CARDS.every((c) =>
+    (src("frontend/src/pages/GovernancePage.tsx") || "").includes(`title: "${c}"`)),
+  "measured against GovernancePage's CARD_META, never transcribed")
+ok("A9c5 · the chips are grouped, not a flat row of seven",
+  Object.keys(COPY.HEALTH_GROUPS).length === 2 &&
+  COPY.HEALTH_FILTERS.length === 7 &&
+  Object.keys(COPY.HEALTH_GROUPS).every((g) => SURFACE.includes(g)),
+  `${COPY.HEALTH_FILTERS.length} chips in ${Object.keys(COPY.HEALTH_GROUPS).length} groups`)
 ok("A9d · every chip carries a count — a filter with no count hides how much it hides",
   (SURFACE_HTML.match(/class="chip[^"]*">[^<]*<span class="b">\d+/g) || []).length >= 4)
 
@@ -700,6 +722,70 @@ ok("G3b · with a legend giving each colour its word",
 ok("G4 · no chart uses more colours than it has named series",
   (HTML.match(/class="sw s-[a-z]+"/g) || []).length >= 5,
   "every swatch in a legend must correspond to a word; the count is the floor, not the ceiling")
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// §H · THE GOVERNANCE MERGE — operator, 2026-08-28.
+//
+// ⚠ THE ASSERTION THAT MATTERS HERE IS A PERMISSION ONE. Governance is feature-gated and
+// Documents is not; folding gated signals into an ungated tab SHOWS THEM TO PEOPLE THE MAP
+// CURRENTLY HIDES THEM FROM. A merge that drops a gate is a leak, not a tidy-up.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const GOV = src("frontend/src/pages/GovernancePage.tsx") || ""
+
+// H1 — the page really is document-scoped, which is what justifies the merge at all
+ok("H1 · the Governance page's own heading is 'Document Governance'",
+  /<h1[^>]*>Document Governance<\/h1>/.test(GOV))
+ok("H1b · its own docblock calls it 'Library Health, three different lists'",
+  /Library Health, three different lists/.test(GOV))
+ok("H1c · and it never mutates — every row links out to the document panel",
+  /this surface never mutates/.test(GOV))
+ok("H1d · it carries exactly three signal cards",
+  COPY.SHIPPED_GOVERNANCE_CARDS.length === 3 &&
+  (GOV.match(/^\s{4}title: "/gm) || []).length === 3,
+  `measured ${(GOV.match(/^\s{4}title: "/gm) || []).length} cards`)
+
+// H2 — ⚠ THE GATE. Governance is governed; Documents is not.
+ok("H2 · the Governance nav entry is feature-gated today",
+  /view: "governance",[\s\S]{0,140}feature: "governance_health"/.test(NAV))
+ok("H2b · ⚠ while the Documents entry is UNGATED — it carries no feature key",
+  /\{ view: "documents", icon: FileText, label: "Documents" \}/.test(NAV),
+  "this asymmetry is exactly why the merge must carry the gate explicitly")
+ok("H2c · a governed entry VANISHES rather than rendering locked",
+  /the sketch VANISH, never a locked\/disabled\/badged placeholder/.test(NAV))
+ok("H2d · the sketch states that the gate must move with the signals",
+  /governance_health/.test(HTML) && /A merge that drops a permission is a leak/.test(HTML))
+
+// H3 — ⭐ the collision, measured on both sides rather than asserted
+ok("H3 · Library Health's low-confidence is a RETRIEVAL similarity threshold",
+  /LOW_CONF_THRESHOLD\s*=\s*0\.38/.test(KH_PY) && /avg similarity below this/.test(KH_PY))
+const GOV_PY = src("backend/app/api/document_governance.py") || ""
+ok("H3b · Governance's low-confidence is an EXTRACTION confidence tier",
+  /ConfidenceChip TIER\.MED low cutoff \(0\.5\)/.test(GOV_PY))
+ok("H3c · ⭐ so the two thresholds genuinely differ (0.38 vs 0.5)",
+  /0\.38/.test(KH_PY) && /0\.5\)/.test(GOV_PY))
+// ⚠ SCOPED TO THE CHIP LABELS. The first version forbade "similarity" anywhere on the surface
+// and fired on the QUALIFIED `Match strength` tile — "average similarity of what searches
+// returned" — which is the arm that exists precisely to say what a number measures. Plain
+// language explaining a value is not "printing the mechanism"; a filter label carrying a
+// threshold name would be. The fence tests the labels, not the whole page.
+const CHIP_LABELS = [...SURFACE_HTML.matchAll(/<span class="chip[^"]*">([^<]*)<span class="b">/g)]
+  .map((m) => m[1].trim())
+ok("H3d-control · the chip labels parse",
+  CHIP_LABELS.length === 7, `parsed ${CHIP_LABELS.length}: ${CHIP_LABELS.join(" · ")}`)
+ok("H3d · the two are renamed apart, and no chip label names a mechanism",
+  CHIP_LABELS.includes("Weak matches") && CHIP_LABELS.includes("Unsure metadata") &&
+  !CHIP_LABELS.some((l) => /similarity|threshold|tier|confidence|score/i.test(l)),
+  CHIP_LABELS.filter((l) => /similarity|threshold|tier|confidence|score/i.test(l)).join(", ") || "clean")
+
+// H4 — the nav arithmetic the merge buys
+const NAV_ENTRIES = (NAV.match(/\{ view: "/g) || []).length
+ok("H4 · the primary nav has eight entries today",
+  NAV_ENTRIES === 8, `measured ${NAV_ENTRIES}`)
+ok("H4b · and the sketch claims exactly two of them retire into the Library",
+  /eight entries to six/.test(HTML))
+ok("H4c · ⚠ Classification is NOT folded in, and the sketch says why rather than staying silent",
+  /Classification/.test(HTML) && /rules-authoring/.test(HTML),
+  "it is a different KIND of surface; folding it unasked would be scope creep")
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // REPORT

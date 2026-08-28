@@ -229,6 +229,11 @@
   .chip.on { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
   .chip .b { font-family: var(--font-mono); font-size: 10.5px; opacity: .85; }
 
+
+  .chipgroup { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; flex-wrap: wrap; }
+  .chipgroup .cglabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-dim); width: 92px; flex-shrink: 0; }
+  .chipgroup .chiprow { margin: 0; }
+
   table.checks { width: 100%; border-collapse: collapse; font-size: .8rem; }
   table.checks th { padding: 10px 16px; text-align: left; font-weight: 500; font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-dim); border-bottom: 1px solid var(--color-border-soft); }
   table.checks td { padding: 9px 16px; border-bottom: 1px solid var(--color-border-soft); }
@@ -659,11 +664,25 @@
           <div class="tile"><div class="tl">Checked queries</div><div class="tv">12</div><div class="ts">9 holding, 3 slipped</div></div>
         </div>
 
-        <div class="chiprow">
-          <span class="chip on">Most retrieved <span class="b">87</span></span>
-          <span class="chip">Never retrieved <span class="b">137</span></span>
-          <span class="chip">Stale <span class="b">41</span></span>
-          <span class="chip">Low confidence <span class="b">23</span></span>
+        <!-- ⭐ TWO GROUPS, NOT ONE ROW OF SEVEN. Merging Governance in brings three more
+             signals, and seven undifferentiated chips is a filter bar nobody reads. They split
+             on the question they answer: "is it being used?" vs "is it in good shape?" -->
+        <div class="chipgroup">
+          <span class="cglabel">Being used</span>
+          <div class="chiprow">
+            <span class="chip on">Most found <span class="b">87</span></span>
+            <span class="chip">Never found <span class="b">137</span></span>
+            <span class="chip">Weak matches <span class="b">23</span></span>
+          </div>
+        </div>
+        <div class="chipgroup">
+          <span class="cglabel">In good shape</span>
+          <div class="chiprow">
+            <span class="chip">Stale <span class="b">41</span></span>
+            <span class="chip">Unclassified <span class="b">18</span></span>
+            <span class="chip">Broken links <span class="b">3</span></span>
+            <span class="chip">Unsure metadata <span class="b">12</span></span>
+          </div>
         </div>
 
         <div class="card">
@@ -712,6 +731,39 @@
     <div data-anno><b>⛔ Cut from screen 09:</b> the section-level retrieval heatmap with its narrative
       executive summary — four walls of prose in coloured blocks, and per-section scoring needs a
       per-chunk score nobody stores. <b>The per-document strip above replaces it</b> and is backed today.</div>
+
+
+    <div data-anno><b>⭐ Governance merges here too — operator, 2026-08-28, and the evidence is
+      stronger than "it only has three rows".</b> That page's own heading is
+      <b>"Document Governance"</b>; all three of its signals are document signals (broken document
+      relationships, unclassified documents, low-confidence document metadata); its own docblock calls
+      it <i>"Library Health, three different lists"</i>; and <b>every row is already a pure link-out
+      into the DocumentDetailPanel this Library owns</b> — it never mutates anything itself.
+      <b>It is a filtered view of the Library wearing its own nav icon.</b></div>
+
+    <div data-anno><b>⚠ THE MERGE HAS A NAME COLLISION, AND IT WOULD HAVE SHIPPED SILENTLY.</b>
+      Library Health already has a <b>"Low Confidence"</b> tab and Governance has a
+      <b>"Low-confidence metadata"</b> card. <b>They are different measurements:</b>
+      Library Health's is <i>average retrieval similarity below <b>0.38</b></i> — how well searches
+      matched. Governance's is <i>an extracted field below the confidence tier at <b>0.5</b></i> — how
+      sure the extractor was about a value. <b>Two thresholds, two meanings, one pair of words</b>, and
+      the merge puts them side by side in the same row. Renamed here to <b>Weak matches</b> and
+      <b>Unsure metadata</b> — plain words, and neither prints its mechanism.</div>
+
+    <div data-anno><b>⚠ And the merge must carry a permission, not just a list.</b> The Governance nav
+      entry is <b>feature-gated</b> (<code>governance_health</code>) while Documents is ungoverned and
+      always visible. Folding gated signals into an ungated tab would <b>show them to people the map
+      currently hides them from</b>. The gate moves to the three merged chips, or the tab; it does not
+      simply evaporate with the nav row. <b>A merge that drops a permission is a leak, not a tidy-up.</b></div>
+
+    <div data-anno><b>⭐ What this buys the navigation.</b> Two top-level homes retire into one
+      (<i>Library Health</i> and <i>Governance</i>), taking the primary nav from eight entries to six —
+      and both were document-scoped surfaces sitting outside the document space.
+      ⚠ <b>The remaining question, which this sketch deliberately does NOT answer:</b>
+      <b>Classification</b> is still its own home, adjacent to Documents. It is different in kind — it
+      is a <i>rules-authoring</i> surface, not a view of documents — so it is not obviously the same
+      merge, and folding it in without asking would be exactly the scope creep this project's
+      guardrails exist to stop.</div>
 
     <h3 class="sub">The one shipped tile the merge must rule on — drawn both ways</h3>
     <div class="sxs">

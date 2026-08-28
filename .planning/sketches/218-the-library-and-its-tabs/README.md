@@ -13,11 +13,11 @@ tags: [seed-224, bus-026, documents, library-health, retrieval, ingestion, chart
 ⚠ The two are never collapsed — Stitch renders zero shipped components (`SEED-155`).
 
 ```
-node drive.cjs           # 170 assertions
+node drive.cjs           # 190 assertions
 node drive.cjs --emit    # regenerates BUILD-CONTRACT.generated.md FROM the running sketch
 ```
 
-Current state: **170 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
+Current state: **190 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
 sketch — column order, tab classes, theme lightness, the ingestion steps, the eval FKs. If the repo
 moves, they fail. That is the point.
 
@@ -350,3 +350,61 @@ enough to be worth naming: **a fence whose failure mode is indistinguishable fro
 ⚠ **`E6b` is the one that matters.** It is the most security-bearing assertion in the connector
 design — *a write grant must never default to on* — and it silently passed its own planted defect.
 **Every one of the three was found by planting the defect, never by reading the code.**
+
+---
+
+## 12 · ⭐ Governance merges in too — and it brings a collision with it
+
+> *"we have one page which has three rows only, which is Governance, and I believe the best place
+> is to merge this page also with the Library space — do you agree?"*
+
+**Agreed, and the evidence is stronger than the row count:**
+
+- its own heading is literally **"Document Governance"**
+- all three signals are document signals — broken document relationships, unclassified documents,
+  low-confidence document metadata
+- its own docblock calls it *"Library Health, three different lists"*
+- **every row already links out into the `DocumentDetailPanel` the Library owns**, and the page
+  never mutates anything itself
+
+**It is a filtered view of the Library wearing its own nav icon.**
+
+### ⚠ The collision it brings, which would have shipped silently
+
+| | shipped label | what it actually measures | threshold |
+|---|---|---|---|
+| Library Health | *Low Confidence* | average **retrieval similarity** | **0.38** |
+| Governance | *Low-confidence metadata* | an **extracted field's** confidence | **0.5** |
+
+**Two measurements, two thresholds, one pair of words** — and the merge puts them adjacent in the
+same filter row. Renamed to **Weak matches** and **Unsure metadata**: plain words, neither printing
+its mechanism.
+
+⚠ **A verbatim fence could not have allowed this.** `A9c` asserted the four shipped tab names
+appeared exactly, and fired the moment three were renamed — **a verbatim check cannot tell a rename
+from a loss.** The rename now lives in `COPY.SIGNAL_RENAMES`, and the fence proves the map is
+**total**: every shipped signal mapped, every target rendered. Dropping one fails; renaming one is
+allowed and auditable.
+
+### ⚠ And the merge must carry a permission, not just a list
+
+The Governance nav entry is **feature-gated** (`governance_health`); the Documents entry is
+**ungoverned and always visible**. Folding gated signals into an ungated tab **shows them to people
+the map currently hides them from**. The gate moves to the merged chips or the tab — it does not
+evaporate with the nav row. **A merge that drops a permission is a leak, not a tidy-up.**
+
+### The nav arithmetic
+
+Two document-scoped homes retire into the Library — **eight primary nav entries become six**.
+
+⚠ **Classification is deliberately NOT folded in.** It is a different kind of surface — *rules
+authoring*, not a view of documents — so it is not obviously the same merge, and folding it unasked
+would be the scope creep this project's guardrails exist to stop. **It is named as an open question
+rather than left silent.**
+
+### Seven chips, two groups
+
+A flat row of seven is a filter bar nobody reads, so they split on the question they answer:
+
+- **Being used** — Most found · Never found · Weak matches
+- **In good shape** — Stale · Unclassified · Broken links · Unsure metadata

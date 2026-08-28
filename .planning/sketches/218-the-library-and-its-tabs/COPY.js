@@ -95,8 +95,42 @@ const COPY = {
   // ⚠ THESE FOUR FILTERS ARE THE SHIPPED `KnowledgeHealthPage` TABS. They become CHIPS inside
   // one tab, because four more top-level tabs would make a nine-tab bar.
   // ══════════════════════════════════════════════════════════════════════════════════════
-  HEALTH_FILTERS: ["Most retrieved", "Never retrieved", "Stale", "Low confidence"],
+  /** ⚠ SEVEN chips, in TWO named groups — the merge of Library Health (4) AND Governance (3).
+   *  Seven undifferentiated chips is a filter bar nobody reads, so they split on the question
+   *  they answer: is it being used, or is it in good shape. */
+  HEALTH_GROUPS: {
+    "Being used": ["Most found", "Never found", "Weak matches"],
+    "In good shape": ["Stale", "Unclassified", "Broken links", "Unsure metadata"],
+  },
+  get HEALTH_FILTERS() {
+    return [...this.HEALTH_GROUPS["Being used"], ...this.HEALTH_GROUPS["In good shape"]]
+  },
+
   SHIPPED_HEALTH_TABS: ["Most Retrieved", "Never Retrieved", "Stale", "Low Confidence"],
+  /** The three cards on the shipped Governance page, which merges in here (operator, 2026-08-28). */
+  SHIPPED_GOVERNANCE_CARDS: ["Broken relationships", "Unclassified documents", "Low-confidence metadata"],
+
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  // ⚠ THE RENAME MAP — every shipped signal maps to exactly ONE chip, and the map is TOTAL.
+  //
+  // This exists so a rename can never become a LOSS. The drive asserts (a) every shipped
+  // signal appears here, and (b) every target is actually rendered — so dropping a signal
+  // during the merge fails, while renaming one is allowed and auditable.
+  //
+  // ⭐ THE COLLISION THIS RESOLVES, AND IT WOULD HAVE SHIPPED SILENTLY:
+  //   Library Health "Low Confidence"      = avg RETRIEVAL SIMILARITY below 0.38
+  //   Governance     "Low-confidence …"    = an EXTRACTED FIELD below the confidence tier, 0.5
+  // Two thresholds, two meanings, one pair of words — and the merge puts them in the same row.
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  SIGNAL_RENAMES: {
+    "Most Retrieved": "Most found",
+    "Never Retrieved": "Never found",
+    "Stale": "Stale",
+    "Low Confidence": "Weak matches",              // ← retrieval similarity
+    "Broken relationships": "Broken links",
+    "Unclassified documents": "Unclassified",
+    "Low-confidence metadata": "Unsure metadata",  // ← extraction confidence
+  },
 
   /** ⚠ The shipped Library Health stat cards, verbatim, so the merge can be checked for LOSS
    *  rather than assumed complete. `Retrieval Score` is the contested one — see §7. */
