@@ -193,6 +193,80 @@ def declared_phase_measure(raw: object) -> tuple[int | None, str | None]:
     return count, noun
 
 
+def step_identity(definition: object) -> dict[str, tuple[str | None, str | None, str | None]]:
+    """``slug -> (tool_name, capability, connection_id)`` for every ``external_action`` phase.
+
+    Phase 214 / **D-214-16** (*"every surface a run appears on, via one shared element"*). A run
+    surface must be able to say WHICH SERVICE and WHICH ACTION a step runs — including when it
+    failed — and the durable ``workflow_phases`` row carries none of that: the table stores
+    ``slug``, ``status``, ``output`` and its timestamps and nothing else. The only honest source
+    is the definition that executed, exactly as ``phase_type`` already is.
+
+    ⚠ **ONE DERIVATION, TWO CONSUMERS — sited here for the reason its two neighbours are.**
+    ``api/threads.py`` and ``api/workflow_runs.py`` ALREADY walk this same definition JSON in
+    two separately-written ``slug -> phase_type`` loops (``workflow_runs.py::_slug_to_phase_type``
+    and the inline ``try``-wrapped loop in ``get_thread_workflow``). Two copies of one derivation
+    is how the chat panel and the run page come to disagree about the same row — the failure
+    ``WorkflowPhaseState``'s own two-wire-model rule below exists to prevent. **Adding a third
+    and a fourth copy is what this function refuses.** The two shipped ``phase_type`` loops are
+    deliberately left byte-unchanged: re-pointing them is a refactor Phase 214 does not own.
+
+    ⚠ **PURE. No pool, no client, no I/O, no clock.** That is what makes it callable from both
+    API modules, which hold DIFFERENT database clients (``threads.py`` reads through the asyncpg
+    user-JWT path; ``workflow_runs.py`` holds a user-JWT supabase client). **The RULE is shared;
+    the I/O is not.** In particular this function returns a ``connection_id`` and NEVER a service
+    name — resolving that id to the connection row's display ``name`` is per-module I/O.
+
+    ⚠ **``service_name`` IS COMPUTED, NEVER STORED** (D-213-02 / D-214-14). A stored copy of a
+    derived fact goes stale the moment the connection is renamed, which is the shape D-213-02
+    rejected for descriptors. So the identity travels as an ID here and becomes a name at the
+    edge, per read.
+
+    CONTRACT. Every non-``external_action`` phase contributes NOTHING — it is absent from the
+    mapping, and all three fields resolve ``None`` on the wire. An ``external_action`` phase
+    contributes a 3-tuple whose members are independently nullable: an MCP step carries a
+    ``tool_name`` and ``capability = None``; a native capability step may carry a ``capability``
+    and no ``tool_name``; a step bound to nothing carries ``connection_id = None``. **Those
+    absences are facts, not gaps**, and nothing here substitutes for one.
+
+    Defensive in ``_slug_to_phase_type``'s own shape, because this reads authored/model-influenced
+    JSON: a definition that is missing, a ``str`` that does not parse, a non-list ``phases``, a
+    non-dict phase, a missing ``config`` and a non-``str`` field value each contribute nothing
+    rather than raising. ⚠ **It must never raise** — both call sites are on read paths whose
+    failure mode is a 500 on a page the caller owns.
+    """
+    if isinstance(definition, str):
+        try:
+            definition = json.loads(definition)
+        # `RecursionError` for the same reason `phase_output_object` names it: it inherits from
+        # `RuntimeError`, not `ValueError`, and this input is authored/model-influenced.
+        except (ValueError, TypeError, RecursionError):
+            return {}
+    if not isinstance(definition, dict):
+        return {}
+
+    def _text(value: object) -> str | None:
+        return value if isinstance(value, str) and value else None
+
+    mapping: dict[str, tuple[str | None, str | None, str | None]] = {}
+    phases = definition.get("phases")
+    for phase in phases if isinstance(phases, list) else []:
+        if not isinstance(phase, dict):
+            continue
+        slug = _text(phase.get("slug"))
+        config = phase.get("config")
+        if not slug or not isinstance(config, dict):
+            continue
+        if config.get("phase_type") != "external_action":
+            continue
+        mapping[slug] = (
+            _text(config.get("tool_name")),
+            _text(config.get("capability")),
+            _text(config.get("connection_id")),
+        )
+    return mapping
+
+
 class WorkflowPhaseState(BaseModel):
     """Phase 098-UAT run-honesty fix (B) — one ``workflow_phases`` row's durable
     per-phase status, surfaced so the frontend reconcile floor can rebuild an
@@ -241,6 +315,35 @@ class WorkflowPhaseState(BaseModel):
     completed_at: datetime | None = None
     step_count: int | None = None
     step_noun: str | None = None
+
+    # ── 214 (STEP-04 / STEP-05 / D-214-23 / D-214-16) — WHY IT FAILED, AND WHAT IT WAS ──
+    #
+    # ⚠ **THE RULE ABOVE APPLIES AT FULL STRENGTH HERE, AND `D-200.1-02-A`'S EXCEPTION WAS
+    # CONSIDERED AND DOES NOT APPLY.** That exception declined `deliverable_text` because the
+    # chat surface ALREADY renders that text — it is the assistant's message — so widening
+    # would have put a second rendering of the same words on the same screen. **Nothing
+    # renders the failure reason on the chat panel today**: `PhaseCard.tsx:253` fires the
+    # `reason_unknown` sentinel instead, which is exactly the "two surfaces silently
+    # disagreeing" the rule was written to prevent. So these four are widened in the SAME
+    # commit as `WorkflowRunPhaseRead`'s, and the field semantics are stated ONCE, there.
+    #
+    # ⚠ AND THE CLIENT MIRROR IS PART OF THAT SAME COMMIT. `frontend/src/lib/api/threads.ts`
+    # declares a `WorkflowPhaseState` interface that IS this model's client copy; `200-02`
+    # widened this side and not that one, and `GET /threads/{id}/workflow` spent a phase
+    # sending fields the panel could not declare. That incident is recorded in the mirror's
+    # own comment. It is not repeated here.
+    #
+    # ⚠ DECLARING IS NOT POPULATING. Both of these fields' producers are named, because a
+    # declared field with no producer is a `null` on the wire forever and — since a `null`
+    # `service_name` renders the ACTION ALONE, the honest arm — it ships green and looks
+    # right. `api/threads.py`'s builder populates this model; `api/workflow_runs.py`'s loop
+    # populates the other. `tests/unit/test_214_failure_reason_seam.py` asserts the two
+    # properties SEPARATELY: a `model_fields` check for the declaration, and a VALUE off each
+    # side's real serializer path for the population.
+    failure_reason: str | None = None
+    tool_name: str | None = None
+    capability: str | None = None
+    service_name: str | None = None
 
 
 class ThreadWorkflowState(BaseModel):

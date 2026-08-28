@@ -74,7 +74,12 @@ from app.dependencies import (
 # 484 of 484 `completed` rows, so a second `isinstance(raw, dict)` test anywhere in this
 # module would be dead on every row that matters — silently, because the absent arm renders
 # honestly. There is one door; this module reads through it and never beside it.
-from app.models.thread import declared_phase_measure, phase_output_object
+# 214 (D-214-16) — `step_identity` joins them for the same reason: `slug -> (tool_name,
+# capability, connection_id)` is derived from the definition JSON, and this module and
+# `api/threads.py` ALREADY carry two separately-written copies of the sibling `slug ->
+# phase_type` walk. A third and a fourth is how the run page and the chat panel come to
+# disagree about what a step even IS.
+from app.models.thread import declared_phase_measure, phase_output_object, step_identity
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -815,6 +820,30 @@ async def read_workflow_run(
     phase_rows = (phases_resp.data if phases_resp is not None else None) or []
 
     slug_to_type = _slug_to_phase_type(definition)
+    # ── 214 (D-214-16) — THE SHARED DERIVATION, in the same position as its sibling above.
+    # `_slug_to_phase_type` stays byte-unchanged; this sits BESIDE it rather than re-pointing
+    # it (that refactor is not this phase's), and the SAME function serves `api/threads.py`.
+    identity_by_slug = step_identity(definition)
+    # ── 214 (D-214-14 / D-213-02) — the service NAME, resolved ONCE PER RUN, before the loop.
+    #
+    # ⚠ COMPUTED, NEVER STORED: the step config carries a `connection_id`, and the display
+    # name lives on the connection row, where a rename is immediately true.
+    # ⚠ BEFORE THE LOOP, never inside it — a run holds 1-3 distinct connections across all
+    # its steps, so a per-row resolve would be one query per phase for the same few ids.
+    # ⚠ ONLY `name` CROSSES (T-214-02-01): the projection is named column-by-column, so
+    # nothing on that row travels except the word a person recognises. Migration 118 grants
+    # this table's SELECT column by column, so an ungranted column fails 42501 visibly.
+    # ⚠ `aexec` runs the BLOCKING supabase-py call through `run_in_threadpool` (D-v2.5-01).
+    conn_names: dict[str, str] = {}
+    conn_ids = sorted({cid for (_t, _c, cid) in identity_by_slug.values() if cid})
+    if conn_ids:
+        conn_resp = await aexec(
+            supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
+        )
+        for conn_row in (conn_resp.data if conn_resp is not None else None) or []:
+            conn_name = conn_row.get("name")
+            if isinstance(conn_name, str) and conn_name.strip():
+                conn_names[str(conn_row.get("id"))] = conn_name
     phases = []
     for row in phase_rows:
         # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
@@ -842,6 +871,14 @@ async def read_workflow_run(
         failure_reason = (
             raw_reason if isinstance(raw_reason, str) and raw_reason.strip() else None
         )
+        # ── 214 (D-214-16) — the step's identity, off the shared derivation + the run's map.
+        # ⚠ A non-`external_action` phase is absent from the mapping and resolves three
+        # `None`s; an unresolvable connection resolves `service_name = None`. Both are FACTS,
+        # and no substitute string is ever emitted for either.
+        tool_name, capability, connection_id = identity_by_slug.get(
+            row["slug"], (None, None, None)
+        )
+        service_name = conn_names.get(connection_id) if connection_id else None
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -854,6 +891,15 @@ async def read_workflow_run(
                 step_noun=noun,
                 deliverable_text=deliverable_text,
                 failure_reason=failure_reason,
+                # ── 214 — POPULATED, not merely declared. A field this loop declares and
+                # never passes ships `null` on every row of every run, and `214-11`'s
+                # `serviceOf` renders the action ALONE on a null service — the HONEST arm —
+                # so the run spine and the step list would lose the service forever with
+                # every typecheck and every seeded-prop case green. That is the
+                # `declared_phase_measure` / Phase 198 shape, one wire over.
+                tool_name=tool_name,
+                capability=capability,
+                service_name=service_name,
             )
         )
 

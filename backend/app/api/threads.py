@@ -99,6 +99,8 @@ from app.models.thread import (
     ThreadWorkflowState,
     WorkflowPhaseState,
     declared_phase_measure,
+    phase_output_object,
+    step_identity,
 )
 from app.models.user_settings import (
     load_all_model_overrides,
@@ -1212,6 +1214,12 @@ async def get_thread_workflow(
             # timeline can render the correct 3D icon for completed/historical runs
             # (the workflow_phases table doesn't store phase_type).
             slug_to_type: dict[str, str] = {}
+            # 214 (D-214-16) — HOISTED so the SHARED step-identity derivation can read the
+            # SAME already-fetched definition. It was bound only inside the `try` below; the
+            # alternative to hoisting it is a SECOND `_rls_fetchrow` for a row this handler
+            # already holds, which is a duplicate round trip bought with nothing. The
+            # `slug_to_type` loop below is deliberately byte-unchanged.
+            defn: object = None
             def_row = await _rls_fetchrow(
                 "SELECT wd.definition FROM workflow_runs wr "
                 "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
@@ -1231,9 +1239,68 @@ async def get_thread_workflow(
                             slug_to_type[slug] = ptype
                 except Exception:
                     pass
+            # ── 214 (D-214-16) — THE SHARED DERIVATION, consumed here and in
+            #    `api/workflow_runs.py`. ONE definition walk lives in `models/thread.py`; the
+            #    two shipped `slug -> phase_type` loops are left alone on purpose.
+            identity_by_slug = step_identity(defn)
+            # ── 214 (D-214-14 / D-213-02) — the service NAME, resolved ONCE PER RUN.
+            #
+            # ⚠ COMPUTED, NEVER STORED. The step config carries a `connection_id`; the name a
+            # person recognises ("Slack") lives on the connection row and would go stale the
+            # moment it were copied onto the step.
+            #
+            # ⚠ RESOLVED BEFORE THE LOOP, NEVER INSIDE IT. A run has typically 1-3 distinct
+            # connections across all its steps; a per-row lookup would issue one query per
+            # phase for the same handful of ids.
+            #
+            # ⚠ ONLY `name` CROSSES (T-214-02-01). `GET /threads/{id}/workflow` carries NO
+            # canvas gate, so this is the narrower door and the projection is named
+            # column-by-column: never `config`, never `mcp_server_url`, never
+            # `secret_ciphertext`. ⚠ Migration 118 grants SELECT on this table COLUMN BY
+            # COLUMN, so naming a column it does not grant fails with `42501` rather than
+            # silently narrowing — which is the intended, visible failure.
+            #
+            # ⚠ NO `run_in_threadpool` HERE, and that is not an omission: `_rls_fetch` is the
+            # asyncpg user-JWT path and is already async (D-v2.5-01 concerns the BLOCKING
+            # supabase-py client — which is what the sibling builder in `api/workflow_runs.py`
+            # uses, and it goes through `aexec`, which wraps it).
+            conn_names: dict[str, str] = {}
+            conn_ids: list[UUID] = []
+            for _t, _c, _cid in identity_by_slug.values():
+                if not _cid:
+                    continue
+                try:
+                    parsed_cid = UUID(_cid)
+                except (ValueError, AttributeError, TypeError):
+                    # A malformed id resolves to no name, which renders the ACTION ALONE.
+                    continue
+                if parsed_cid not in conn_ids:
+                    conn_ids.append(parsed_cid)
+            if conn_ids:
+                conn_rows = await _rls_fetch(
+                    "SELECT id, name FROM connector_connections WHERE id = ANY($1::uuid[])",
+                    conn_ids,
+                )
+                for cr in conn_rows or []:
+                    _name = cr["name"]
+                    if isinstance(_name, str) and _name.strip():
+                        conn_names[str(cr["id"])] = _name
             phases_list = []
             for r in phase_rows:
-                _count, _noun = declared_phase_measure(r["output"])
+                # 200.1 / 214 — ONE parse per row, feeding BOTH reads. `declared_phase_measure`
+                # calls the same helper on a dict, so handing it `_obj` changes no behaviour
+                # and keeps the parse count at one. (It read the RAW value until Phase 214.)
+                _obj = phase_output_object(r["output"])
+                _count, _noun = declared_phase_measure(_obj)
+                # ⚠ 38 of 43 failed rows store `output` as a jsonb STRING SCALAR, so this MUST
+                # read off the unwrapped object. Whitespace-only / non-`str` normalise to
+                # `None`: ABSENT and EMPTY stay different facts, or the panel's
+                # `reason_unknown` sentinel stops meaning "not recorded".
+                _raw_reason = _obj.get("_failure_reason") if isinstance(_obj, dict) else None
+                _reason = (
+                    _raw_reason if isinstance(_raw_reason, str) and _raw_reason.strip() else None
+                )
+                _tool, _cap, _cid = identity_by_slug.get(r["slug"], (None, None, None))
                 phases_list.append(
                     WorkflowPhaseState(
                         slug=r["slug"],
@@ -1244,6 +1311,14 @@ async def get_thread_workflow(
                         completed_at=r["completed_at"],
                         step_count=_count,
                         step_noun=_noun,
+                        failure_reason=_reason,
+                        tool_name=_tool,
+                        capability=_cap,
+                        # ⚠ An unresolvable connection yields `None`, and that is CORRECT, not
+                        # a gap to fill. Never "Unknown service", never the capability id,
+                        # never the connection id — `grounding.py`'s shipped rule: never draw
+                        # a name the system cannot know.
+                        service_name=conn_names.get(_cid) if _cid else None,
                     )
                 )
 
