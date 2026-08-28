@@ -137,3 +137,23 @@ name, no commas, no control characters. Anything `parseaddr` has to normalise is
 - `frontend/src/pages/WorkflowsPage.tsx:907` — Test Run reuses `onLaunch`
 - `frontend/src/components/workflows/library/RunModal.tsx:552` — declared inputs render as a hint only
 - `backend/app/models/harness.py:319` — the unused-on-native `tool_args`
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — why this stays `folded` and is NOT `closed`
+
+**Both halves shipped, and they are in different plans.** The launcher forms are `214-09`
+(library modal + schedule door) and `214-12` (chat, plus the one shared `LaunchInputFields`
+renderer); **the wire** is `214-16`, whose integration suite
+`backend/tests/integration/test_214_launch_inputs_wire.py` drives a REAL `POST` and reads
+`workflow_runs.inputs` back out of Postgres. The argument leaf is `214-01`.
+
+⛔ **`verified_closed_by` stays `null` because no operator has driven G4-3 on all three doors.**
+A bug closed on a green gate rather than a drive is `T-214-15-05`, and it is the exact shape
+Phase 212 shipped: green gates, then the operator found two more defects. **Two doors out of
+three is still `folded`, with the un-driven door named.** Flip to `closed` with
+`verified_closed_by: 214` only when G4-3 in `214-UAT.md` reads a driven verdict for library,
+thread AND schedule.
+
+⚠ **One measured hazard remains inside this bug's own subject matter and is NOT closed by it:**
+an `upstream` argument source is INERT on native capability rows — `send_email`'s `subject`
+sourced `upstream(draft)` is silently DROPPED and `body` falls back to the latest phase's text
+(`SEED-217`). That threatens SC#2 and would be visible in exactly the G4-2/G4-3 drive above.

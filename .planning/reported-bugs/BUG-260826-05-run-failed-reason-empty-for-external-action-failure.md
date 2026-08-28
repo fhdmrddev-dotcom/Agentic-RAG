@@ -81,3 +81,14 @@ shows the unknown-reason sentinel.
 - `frontend/src/components/panel/__tests__/FailReason.test.tsx:103` — the pinned `run_failed{reason:""}` case
 - `backend/app/services/harness_engine.py:2178-2245` — the `failure`-key branch and `fail_phase` write
 - Observed on run `e2c0db68-dc94-4864-b7bd-afd0e163f69b`, phase `email-briefing`, 2026-08-26
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — why this stays `folded` and is NOT `closed`
+
+The wire half is `214-02` (`backend/app/api/workflow_runs.py`, `backend/app/api/threads.py`)
+and the render half is `214-11`: `PhaseCard`'s `reason_unknown` sentinel now fires only when
+the DB-backed reason AND the wire reason are BOTH empty, with whitespace counted as empty.
+
+⛔ **`verified_closed_by` stays `null` pending G4-5**, and that check has a specific shape the
+tests cannot reproduce: it must be driven against a **RELOADED** run, not only a live one,
+because the defect is on the reconcile path (D-v2.5-03 — Realtime is a hint, the fetch is the
+truth). A green suite on the live path says nothing about the reload.
