@@ -175,10 +175,25 @@ AUTHORING_SYSTEM_PROMPT = (
     # ⚠ NON-DETERMINISTIC BY DESIGN (D-08). When the model emits nothing here the
     # behaviour is byte-identical to today's: the field stays None and the author fills
     # it, exactly as before. Nothing in this module asserts it is always populated.
-    "Set the definition `slug`, `version` (1), `name`, `status` ('draft'), and "
+    # 214.1-02 (STEP-02 / SC#4) — `inputs` joins the SAME sentence, on the identical
+    # `business_requirement` precedent directly above. Measured at HEAD before the edit:
+    # `grep -c inputs backend/app/services/workflow_authoring.py` → **0**, while
+    # `WF_SCHEMA` (= `WorkflowDefinition.model_json_schema()`) ALREADY advertises the
+    # field and its `InputFieldSpec` `$defs` entry (asserted, not assumed). The schema was
+    # never the gap; the prompt was — so this is ONE field on ONE existing sentence, and
+    # no schema changes.
+    #
+    # ⚠ THIS CLAUSE GUARANTEES NOTHING, and SC#4 asks for a guarantee. The rule this
+    # module already records twice binds verbatim: *"a prompt clause reduces how often the
+    # model composes such a step; it can never guarantee absence."* SC#4 says an
+    # AI-drafted workflow is publishable WITHOUT HAND-REPAIR — so the words below are the
+    # cheap half and `_declare_asked_arguments` is the half that carries the claim.
+    # Nothing downstream may be relaxed on the strength of these words.
+    "Set the definition `slug`, `version` (1), `name`, `status` ('draft'), "
     "`business_requirement` — ONE line saying what this workflow must deliver on ANY "
     "run, phrased so it stays true for the next run and the one after, NOT a restatement "
-    "of the particular request described below."
+    "of the particular request described below — and `inputs`: whenever a step's "
+    "argument is asked for at launch, declare a matching entry under the SAME key."
 )
 
 
@@ -440,6 +455,86 @@ def _check_allowed_connections(
     return None
 
 
+def _declare_asked_arguments(wd: WorkflowDefinition) -> WorkflowDefinition:
+    """⭐ Phase 214.1-02 (STEP-02 / SC#4 / D-214.1-05) — THE HALF THAT GUARANTEES IT.
+
+    Declare, under ``definition.inputs``, every launch key the emitted definition's own
+    steps say they will ASK for. Returns ``wd`` unchanged when there is nothing to add.
+
+    ── WHY A DERIVATION AND NOT JUST THE PROMPT ────────────────────────────────────────
+    The clause added to ``AUTHORING_SYSTEM_PROMPT`` above is the cheap half, and this
+    module records twice why it cannot be the whole one: *"a prompt clause reduces how
+    often the model composes such a step; it can never guarantee absence."* SC#4 says an
+    AI-drafted workflow is publishable **without hand-repair** — a guarantee — and
+    ``BUG-260828-02`` is exactly what its absence looks like: the publish gate refuses
+    ``ask_undeclared`` on a draft nobody could repair, because no authoring surface could
+    declare an input at all. This function is the sibling of ``_check_allowed_connections``
+    directly above: the prompt reduces, the server-side walk of what was ACTUALLY emitted
+    makes the claim true.
+
+    ── WHAT THIS IS ────────────────────────────────────────────────────────────────────
+    A COMPLETION OF THE AUTHOR'S OWN EXPRESSED INTENT. The model already said *this
+    argument is asked for at launch*; the declaration is the mechanical consequence of
+    that sentence and of nothing else. It is derived from the emitted definition alone.
+
+    ── WHAT THIS IS NOT (D-214.1-05's scope limit) ─────────────────────────────────────
+    It is **not** a censor over generated text: it removes nothing, rewrites nothing, and
+    never touches a field the model set. It **invents no value** — ``label`` is the key
+    itself, ``required`` is the schema default, and ``type`` is ``"text"``, the only type
+    this phase has. ⛔ A friendly ``label`` is NOT fabricated here: a made-up human name is
+    precisely the invention the launch renderer's two-arm rule refuses, and plan 214.1-01
+    Task 3 makes ``label == key`` read as an ABSENCE downstream, so the launcher prints
+    the key in the mono face rather than pretending a person wrote prose.
+
+    ── THE KEY RULE IS THE GATE'S OWN RULE ─────────────────────────────────────────────
+    ``key = spec.ask_key or <property name>`` — the SAME resolution
+    ``connectors/args.py`` performs (``resolve_arguments``) and refuses with
+    (``unsatisfiable_arguments`` → ``ask_undeclared``). A second answer here would draft a
+    workflow the publish gate then refuses, which is D-214-00's drift pointing at the
+    author.
+
+    ⚠ A RESERVED KEY IS NEVER DECLARED (T-214.1-02-01). ``RESERVED_RUN_INPUT_KEYS`` values
+    are STRIPPED server-side at both run-input merge sites, so a declared ``folder_id`` or
+    ``kickoff_prompt`` would mint a launch field whose value silently vanishes — the trap
+    214-09 measured and D-214.1-03 refuses at the authoring door. The set is IMPORTED, not
+    re-typed, so a third reserved key inherits this skip with no edit here.
+
+    ⚠ ``model_copy``, NEVER AN IN-PLACE MUTATION AND NEVER A MODEL-LEVEL VALIDATOR HOOK —
+    the same rule the two provenance stamps state at the call site. The save path persists
+    ``model_dump(mode="json")``, so a derivation living in the model would be BAKED into
+    the JSONB and could never change when the row changes.
+
+    ⚠ ``None`` AND ``[]`` ARE DIFFERENT FACTS and are not collapsed. When there is nothing
+    to add, ``wd`` is returned untouched — a definition that declared nothing keeps its
+    ``None``, and one whose list is empty keeps its ``[]``.
+    """
+    from app.models.harness import InputFieldSpec  # function-local (Pitfall 4 discipline)
+    from app.models.message import RESERVED_RUN_INPUT_KEYS
+
+    existing = list(wd.inputs or [])
+    already: set[str] = {str(getattr(f, "key", "") or "") for f in existing}
+    additions: list[InputFieldSpec] = []
+
+    for phase in wd.phases:
+        config = getattr(phase, "config", None)
+        if getattr(config, "phase_type", None) != "external_action":
+            continue
+        for prop, spec in (getattr(config, "arg_sources", None) or {}).items():
+            if getattr(spec, "source", None) != "ask":
+                continue
+            key = str(getattr(spec, "ask_key", None) or prop)
+            if key in RESERVED_RUN_INPUT_KEYS or key in already:
+                continue
+            already.add(key)  # ⇒ two steps asking under one key produce ONE entry
+            additions.append(
+                InputFieldSpec(key=key, label=key, type="text", required=True)
+            )
+
+    if not additions:
+        return wd
+    return wd.model_copy(update={"inputs": [*existing, *additions]})
+
+
 async def _resolve_allowed_vocabulary(
     *, supabase, user_id: str, allowed_connection_ids: list[str] | None
 ) -> dict[str, dict]:
@@ -699,6 +794,19 @@ async def generate_workflow_definition(
     vocabulary_refusal = _check_allowed_connections(wd, allowed_connection_ids, allowed_vocabulary)
     if vocabulary_refusal is not None:
         return vocabulary_refusal
+
+    # ── Phase 214.1-02 (STEP-02 / SC#4) — DECLARE what the emitted steps ASK FOR.
+    #
+    # Placed here for the reason the two stamps below are: on the SINGLE success path,
+    # AFTER the vocabulary refusal, so a first-emit result and a retry-emit result are
+    # treated identically and a REFUSED generation gains nothing. The four
+    # `{"ok": False, …}` returns above are untouched — a failed generation carries no
+    # definition and makes no claim about publishability (REQ-2 c / T-214.1-02-03).
+    #
+    # ⚠ It runs BEFORE the slug mint and the readiness verdict deliberately: the verdict
+    # must describe the definition actually returned, and the definition actually returned
+    # is the one whose asked arguments are declared.
+    wd = _declare_asked_arguments(wd)
 
     # ── Phase 187 (VOCAB-01 / REQ-3, D-187-03) — stamp the name PROVENANCE.
     #

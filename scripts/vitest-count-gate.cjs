@@ -375,7 +375,11 @@ const BASELINE = {
   // and compared as a RECORD, so a failure names the offending type and the eighth type
   // joins the coverage without anyone remembering to extend a list.
   "canvasModel.test.ts": 52,
-  "PublishGauntlet.test.tsx": 46,
+  // 214.1-02 RE-BASELINE 46 -> 83. ⚠ NOT A BUMP: this pin was stale by 32 BEFORE Phase 214.1
+  // began (the file ran 78 at wave 1's start), so it was leaving 37 cases deletable in
+  // silence on the gauntlet — the publish surface. Reasons + the full six-pin table live in
+  // the 214.1-02 block beside `declaredInputs.test.ts`.
+  "PublishGauntlet.test.tsx": 83,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
@@ -640,7 +644,9 @@ const BASELINE = {
   // both reported `expected 'does-not-admit' to be 'unknown'` — with the source restored
   // md5-identical), and the jsonb STRING SCALAR that 194 of 223 live rows actually carry,
   // which nothing pinned before despite being the dominant shape (WR-07).
-  "soulData.test.ts": 36,
+  // 214.1-02 RE-BASELINE 36 -> 58 (214.1-01's RESERVED-key mirror cases). See the 214.1-02
+  // block beside `declaredInputs.test.ts` for the measured six-pin table.
+  "soulData.test.ts": 58,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with
@@ -1488,7 +1494,9 @@ const BASELINE = {
   // reproduced the report's own measurement exactly (`got position function Object() {
   // [native code] }`). Read from a full-file run: 65 passed.
   "WorkflowCanvas.editing.test.tsx": 65,
-  "builderStore.test.ts": 52,
+  // 214.1-02 RE-BASELINE 52 -> 77 (214.1-01's `setDeclaredInputs` cases — the ONE write path
+  // for `definition.inputs[]`). See the 214.1-02 block beside `declaredInputs.test.ts`.
+  "builderStore.test.ts": 77,
   "phaseVocabulary.corpus.test.ts": 45,
   // 189-12: 43 → 46. The 7th row — one case pinning it is offered LAST (a bare count
   // passes an insert), one pinning its title comes from the resolver rather than from a
@@ -2836,8 +2844,57 @@ const BASELINE = {
   "DeclaredInputsEditor.test.tsx": 16,
   "ArgumentEditor.test.tsx": 33,
   "DescribeServicePicker.test.tsx": 20,
-  "LaunchInputFields.test.tsx": 15,
-  "PublishRefusalList.test.tsx": 22,
+
+  // ══ Phase 214.1-02 (STEP-02) — THE PHASE'S REGISTRY DEBTS, PAID IN ONE PLACE ═══════════
+  //
+  // Plan `214.1-02` owns EVERY shared-registry edit of this phase, because a shared artifact
+  // must not be written from two parallel worktrees. Six pins move below and one suite is
+  // adopted, and EVERY figure is read from the gate's OWN `actual` column on a pre-edit run
+  // — never hand-counted, and never carried over from a plan's prose. The dispatch note for
+  // this plan named three of these; the gate's own output named six.
+  //
+  // ⚠ THE DISTINCTION THAT MATTERS: these are RE-BASELINES, not bumps. A pin sitting far
+  // below its file's real count guards almost nothing — `PublishGauntlet.test.tsx` pinned at
+  // 46 against a file running 83 left THIRTY-SEVEN cases deletable in silence, which is the
+  // failure mode this whole register exists to prevent. Raising each pin to the measured
+  // actual is what re-arms it.
+  //
+  //   file                            was  ->  now   attribution
+  //   PublishGauntlet.test.tsx         46  ->   83   +37; stale BEFORE this phase (it read
+  //                                                  78 at wave 1's start), plus 214.1-03's
+  //                                                  five BUG-260828-04 diagnosis cases
+  //   builderStore.test.ts             52  ->   77   +25; 214.1-01's setDeclaredInputs cases
+  //   soulData.test.ts                 36  ->   58   +22; 214.1-01's RESERVED-key mirror
+  //   PublishRefusalList.test.tsx      22  ->   25    +3; 214.1-03
+  //   LaunchInputFields.test.tsx       15  ->   20    +5; 214.1-01's `required` mark
+  //   declaredInputs.test.ts            —  ->   25   ADOPTED — see below
+  //
+  // ⭐ THE ADOPTION `214.1-01` EXPLICITLY OWED THIS PLAN. That plan's own note reads: *"an
+  // unpinned suite is not a lightly-guarded one, it is an UNGUARDED one"*. `declaredInputs.ts`
+  // is the ONE minting site every declared input passes through — its three refusals and its
+  // ask-key derivation — and its 25 cases have been executing under the
+  // `src/components/workflows` directory entry while guarded by nothing.
+  // ⚠ THREE OF THE SIX ARE EDITED AT THEIR ORIGINAL LINES, NOT RE-DECLARED HERE.
+  // `PublishGauntlet.test.tsx`, `builderStore.test.ts` and `soulData.test.ts` already have
+  // entries far above; a second entry for the same key is a silent LAST-WINS override that
+  // reads as two facts and behaves as one. Each carries a pointer back to this block.
+  "declaredInputs.test.ts": 25,
+  "LaunchInputFields.test.tsx": 20,
+  "PublishRefusalList.test.tsx": 25,
+
+  // ⭐ THE REACHABILITY PROPERTY (214.1-02 Task 2), AND IT NEEDS BOTH KNOBS.
+  //
+  // ⚠ CHECKED FROM THE GATE'S OWN PRINTED ROWS RATHER THAN ASSUMED, and the answer differs
+  // from its wave-1 sibling directly above: the pre-edit run's file list contains **no row
+  // at all** for `WorkflowBuilderPage.declaredInputs.test.tsx`, because `src/pages` is
+  // reached by NAMED FILES ONLY — there is no `src/pages` directory entry. So this file was
+  // neither running nor guarded, and the pin alone would have guarded a file the gate never
+  // executes. A `TARGETS` line is added beside it.
+  //
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED. This suite needed both;
+  // `DeclaredInputsEditor.test.tsx` needed only the second. The two sit ten lines apart and
+  // took opposite answers, which is why the check is made per file and never inferred.
+  "WorkflowBuilderPage.declaredInputs.test.tsx": 9,
   "StepIdentity.coverage.test.tsx": 23,
   "WorkflowScheduleModal.test.tsx": 9,
   "argumentModel.test.ts": 26,
@@ -3271,6 +3328,23 @@ const TARGETS = [
   // to it. Half of those rows are ABSENCE assertions, which is the easiest kind of case to
   // delete unnoticed.
   "src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx",
+  // ⭐ Added in 214.1-02 — THE SECOND KNOB for this phase's headline artefact, and it was
+  // MEASURED to be needed rather than added by habit: the pre-edit gate run printed no row
+  // whatsoever for this file, because `src/pages` is reached by NAMED FILES ONLY and there
+  // is no `src/pages` directory entry. Contrast its wave-1 sibling
+  // `DeclaredInputsEditor.test.tsx`, which was ALREADY executing under the
+  // `src/components/workflows` directory entry and needed a pin alone. Two suites in one
+  // phase, opposite answers — which is why the check is per file and never inferred.
+  //
+  // What would be unguarded without it: the ONLY test in this repository that walks an
+  // EMPTY builder to a PUBLISHED workflow with a non-empty `definition.inputs[]` while
+  // mocking NEITHER the store NOR any `@/lib/api` module. `BUG-260828-02` shipped through a
+  // sixteen-plan phase with green gates precisely because every other test built
+  // `definition.inputs[]` by hand, so this file is the phase's whole answer to *"could a
+  // person actually do it?"* — plus three `?raw` self-fences (each with a positive control,
+  // all three driven RED against planted defects) and a non-vacuity control. A reachability
+  // proof the gate never executes has proved nothing.
+  "src/pages/WorkflowBuilderPage.declaredInputs.test.tsx",
   // Added in 188-01 (Wave 0), for the same two-knob reason spelled out directly above and
   // for one more: `src/components/panel/__tests__/` lands outside BOTH knobs by default —
   // the directory entries above cover only `src/components/workflows` and three named

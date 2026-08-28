@@ -465,6 +465,10 @@ carries the verdict — **honoured by construction (199) — ⚠ the 200 canvas 
 
 ## `backend/app/services/harness/phase_types.py`
 
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `50 / 23 / 2809` → `51 commits / 24 phases / 2925 L`** · quick-task buckets: **none**. Recorded beside every previous value below, never over them. **G-5 fires at 24 phases; 214.1-03 honoured it by construction** — `_wired_services_block` hands each LLM step the connected-service FACT the agent was previously inventing, composed at the four sites that already frame external actions. ⚠ **THE EXTRACTION OBLIGATION REMAINS OWED, NOT DISCHARGED**, and `BUG-260827-01` closing under `/gsd:fast` did not discharge it either.
+
+⚠ **214.1-03 MEASURED FOUR COMPOSITION SITES, NOT THREE** — `llm_batch_agents` composes the same framing and had been missed. **Both binding arms are read** (native `capability` AND `tool_name`), because the bug's own SMTP step is the native arm and reading `tool_name` alone returns `""` for it. The site count was established by **AST**, not by grep, precisely because a grep criterion counts its own prose (the 187-24 trap).
+
 **Re-derived 2026-08-17 (extraction):** `38 commits / 15 phases / 2393 L` · **G-5 FIRES** (15 phases vs threshold 3) — extraction due — not taken in 190 (no 2nd concern).
 
 ### Phases touched (verbatim)
@@ -721,6 +725,21 @@ carries the verdict — **honoured by construction (193 / 193.1 / 199)** — and
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 9 / 575` → `18 / 12 / 1075`.** `DescribeServicePicker.tsx` and `describeServiceMatch.ts` are separate files; the switch gained the mount, not the logic. Phase buckets gain `214`.
 
 ## `frontend/src/pages/WorkflowBuilderPage.tsx`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `55 / 20 / 2956` → `56 commits / 21 phases / 2977 L`** · quick-task buckets excluded: `260809`, `260814`. Recorded beside every previous value below, never over them. **G-5 fires at 21 phases and was honoured BY CONSTRUCTION for the SIXTH consecutive phase**, on a measurement rather than an argument:
+
+| probe | before 214.1 | after |
+|---|---|---|
+| `useState[(<]` | **21** | **21** |
+| `useEffect(` | 7 | 7 |
+| `fetch(` | 0 | 0 |
+| `git diff --numstat` | — | **21 added / 0 deleted** |
+
+The page gained **one import and one gated node** — `declaredInputsAffordance = canvasEnabled ? <DeclaredInputsEditor /> : null`, rendered inside `identityGroup` beside `statefulAffordance`. The dialog's open flag, the pending key and the refusal all live INSIDE the component, which reads the store through the provider this page already mounts. **Zero `useState`, zero deleted lines** is the measurable form of *honoured by construction*.
+
+⚠ **THE PLACEMENT INSIDE THE EXISTING `canvasEnabled ? (…) : null` IS LOAD-BEARING, NOT TIDINESS.** Band 3 of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting `identityGroup` — a literal already re-captured twice, whose own note says no third is expected. Living inside the gate is what makes the flag-off header structurally unable to see this node; a sibling node reached by a second condition would have forced that third re-capture. **`FLAG_OFF_HEADER_MARKUP` is byte-unmoved.** The flag-ON atom pin did move (+3: `"✎"`, `"Asked when this runs"`, `"0"`) and was re-baselined — **forcing exactly that acknowledgement is what the literal list is FOR.**
+
+**The obligation is still NOT discharged.** The page continues to host the Builder shell, the canvas mount, the publish gauntlet, the descriptor resolution and the save/concurrency machinery. It inherits `56 / 21 / 2977`.
 
 **Re-derived 2026-08-17 (extraction):** `41 commits / 12 phases / 2348 L` · quick-task buckets excluded: `260809`, `260814` · **G-5 FIRES** (12 phases vs threshold 3) — honoured by construction (193.1 / 193.2).
 
@@ -1343,6 +1362,25 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 ## `backend/app/services/workflow_authoring.py`
 
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `14 / 8 / 881` → `15 commits / 9 phases / 989 L`** · quick-task buckets: **none** (this file has still never been touched by a dated task). Recorded beside every previous value below, never over them. **G-5 fires at 9 phases and was honoured BY CONSTRUCTION**, argued rather than asserted: the whole diff is **`+110 / -2`**, and the two deleted lines are the two halves of ONE existing prompt sentence that was extended. No new emit path, no new refusal branch, no new `{"ok": False}` return, no `WF_SCHEMA` change, no schema edit anywhere.
+
+⭐ **WHAT 214.1-02 ADDED, AND WHY IT COULD NOT HAVE BEEN THE PROMPT ALONE.** SC#4 requires an AI-drafted workflow to be publishable **without hand-repair** — a GUARANTEE — and this module already records, twice, that *"a prompt clause reduces how often the model composes such a step; it can never guarantee absence."* So the change is two halves:
+
+1. **The cheap half** — `inputs` joins the SAME definition-level sentence that already names `slug`, `version`, `name`, `status` and `business_requirement`. Exactly the `business_requirement` precedent, one field on one sentence. **Measured before the edit: `grep -c inputs` → 0, while `WF_SCHEMA` ALREADY advertised the field and its `InputFieldSpec` `$defs` entry** (asserted at runtime, not assumed). The schema was never the gap; the prompt was. The added clause is **112 characters**, against a 236-char vocabulary frame — proportionate, and not a second nudge toward `external_action`.
+2. **The half that guarantees it** — `_declare_asked_arguments`, a pure walk beside `_check_allowed_connections` in the identical shape: the prompt reduces, the server-side walk of what was ACTUALLY emitted makes the claim true.
+
+⚠ **THE DERIVATION'S RULES, each of which is a way it could have gone wrong:**
+- **`model_copy`, never an in-place mutation and never a model-level validator hook** — the save path persists `model_dump(mode="json")`, so a derivation living in the model would be BAKED into the JSONB. Asserted by a diff criterion: `git diff | grep -c "^+.*\.inputs = "` → **0**.
+- **The SINGLE success path only**, after the vocabulary refusal and beside the two provenance stamps, so a first-emit and a retry-emit result are treated identically. The four `{"ok": False}` returns are **byte-untouched** — a failed generation makes no claim about publishability.
+- **`key = ask_key or <property>`** — the SAME rule `connectors/args.py` resolves and refuses with. A second answer would draft a workflow the publish gate then refuses.
+- **`RESERVED_RUN_INPUT_KEYS` is IMPORTED and skipped**, never re-typed, so a third reserved key inherits the skip with no edit. A declared `folder_id` would mint a field whose value the server strips.
+- **`None` and `[]` are not collapsed** — nothing to add returns `wd` untouched.
+- **It invents no value**: `label` is the key (see `LaunchInputFields.tsx`, where `label === key` reads as an ABSENCE), `required` is the schema default, `type` is the only type this phase has.
+
+⚠ **THE 197 EMIT-CONTRACT FENCE FIRED ON THIS CHANGE, AND THAT IS THE FENCE WORKING.** `inputs` sat in `test_workflow_authoring_requirement.py`'s `ADVERTISED_BUT_NOT_ASKED` allowlist; teaching the prompt to ask for it turned that suite red on the commit that did so. The allowlist is two-directional by design and cannot be grown *or* shrunk in silence, so the row was removed **in the same commit** — and its REASON (*"a generated draft that invented launch inputs would hand the author a form nobody asked for"*) is **preserved verbatim there and refuted on both halves**: no draft could be repaired at all before 214.1 (`BUG-260828-02`), and nothing is invented (only keys the model's own `arg_sources` already named). The removal also left `is_stateful`'s *"same shape as `inputs` above"* cross-reference dangling; that row now carries its own reason instead of a borrowed one.
+
+**The seam the next refactor should take** is unchanged and neither taken nor obstructed by 214.1: grounding-assembly reads and definition-shaping are already two concerns, and `_declare_asked_arguments` joins the second.
+
 **Re-derived 2026-08-17 (extraction):** `12 commits / 6 phases / 572 L` · **G-5 FIRES** (6 phases vs threshold 3) — honoured by construction (193.2).
 
 **⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `12 / 6 / 572` → `13 commits / 7 phases / 625 L`** — recorded beside the previous value. Quick-task buckets: **none** (this file has never been touched by a dated task). **G-5 fires (7 phases) and was honoured BY CONSTRUCTION:** the diff is `+56 / -3` and every added line serves ONE key on ONE return. `generate_workflow_definition`'s success arm went from `{"ok": True, "definition": …}` to `{"ok": True, "definition": …, "readiness": …}`, where `readiness` is built from an **imported** predicate, not a re-implemented one. ⚠ **THE KEY RIDES THE `ok: True` ARM ALONE** — a failed generation carries no server-side verdict, so the failure arm is byte-unchanged and the client type makes reading a verdict off it a typecheck error. **The seam the next refactor should take**, named rather than implied: this module is the orchestration seam between the NL describe path and the harness definition model; its grounding-assembly reads and its definition-shaping are already two concerns, and a third would be the moment to split them.
@@ -1390,6 +1428,12 @@ carries the verdict — **honoured by construction (193.2)** — and this is the
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `17 / 16 / 611` → `20 / 19 / 766`.** 214-01 added `arg_sources` to `ExternalActionPhaseConfig`; 214-02 the failure reason. Both are fields on shapes this file already owns. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/builderStore.ts`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `12 / 6 / 907` → `14 commits / 8 phases / 968 L`** · quick-task buckets excluded: `260809`. Recorded beside every previous value below, never over them. **G-5 fires at 8 phases and was honoured BY CONSTRUCTION:** `setDeclaredInputs` is **the SIXTH `meta` writer** and takes the shape the five before it take — a spread producing a fresh `meta` object, which is exactly what the store's own dirty subscription and `useDraftPersistence`'s two-reference identity check key on.
+
+⭐ **IT IS THE ONE WRITE PATH FOR `definition.inputs[]`**, and that single-home rule is what lets the client-side extras fence live at one minting site (`declaredInputs.declaredInputFor`) rather than being re-spelled at every caller. `selectDefinition` is literally `{ ...meta, phases }` and `updateWorkflowDraft` sends it whole with no whitelist — so **every key this store puts on `meta` reaches the wire**, including one the API module has never named. That was DRIVEN and then FALSIFIED (repointing this action's write at a differently-named key reddens the assertion), not reasoned about.
+
+⚠ **THE COROLLARY IS A STANDING HAZARD FOR ANY FUTURE `meta` WRITER:** because nothing filters, a stray key added here reaches a server model that FORBIDS extras, and the first autosave after it returns 422 with the write lost. A new `meta` field is therefore a change to the server shape too, in the same commit.
 
 **Re-derived 2026-08-17 (extraction):** `11 commits / 5 phases / 837 L` · quick-task buckets excluded: `260809` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.2).
 
@@ -2062,6 +2106,20 @@ carries the verdict — **⚠ absent at 56 phases (added 196)** — and this is 
 
 ### `scripts/vitest-count-gate.cjs`
 
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `124 / 24 / 4045` → `127 commits / 25 phases / 4189 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814`. Recorded beside every previous value, never over them. **Honoured by construction:** the edit adds one `TARGETS` line and re-baselines six BASELINE pins — **no logic, no threshold and no check changed.** Its standing finding — *absent at 16 phases, the file that ENFORCES the guardrails* — is NOT discharged by this and must not appear to be.
+
+⭐ **THE TWO-KNOB TRAP, MEASURED TWICE IN ONE PHASE WITH OPPOSITE ANSWERS.** `214.1` created two suites ten directories apart:
+- `DeclaredInputsEditor.test.tsx` printed `— 16 new` on a pre-pin run, so it was **already executing** under the `src/components/workflows` **directory** entry. It needed a pin ALONE; a TARGETS line would have been noise.
+- `WorkflowBuilderPage.declaredInputs.test.tsx` printed **no row whatsoever**, because `src/pages` is reached by **NAMED FILES ONLY** — there is no `src/pages` directory entry. It needed **BOTH** knobs; the pin alone would have guarded a file the gate never runs.
+
+**TARGETS decides what RUNS; BASELINE decides what is GUARDED**, and a suite can sit on the wrong side of exactly one of them. The check was made per file from the gate's own printed rows, never inferred from the sibling ten lines away.
+
+⚠ **SIX PINS WERE RE-BASELINED, NOT BUMPED, and the distinction is the point.** Every figure was read from the gate's own `actual` column on a pre-edit run: `PublishGauntlet.test.tsx` **46 → 83**, `builderStore.test.ts` **52 → 77**, `soulData.test.ts` **36 → 58**, `LaunchInputFields.test.tsx` **15 → 20**, `PublishRefusalList.test.tsx` **22 → 25**, plus `declaredInputs.test.ts` **adopted at 25**. `PublishGauntlet.test.tsx` was the worst: pinned at 46 against a file running 83 — and **stale by 32 BEFORE this phase started** — it left **thirty-seven cases on the publish surface deletable in silence.** A pin far below its actual is not a lightly-guarded file, it is very nearly an unguarded one.
+
+⚠ **THREE OF THE SIX WERE EDITED AT THEIR ORIGINAL LINES rather than re-declared in the new block.** A second entry for the same key in an object literal is a silent LAST-WINS override that reads as two facts and behaves as one; each now carries a pointer back to the block that explains it.
+
+⚠ **THE ARITHMETIC CLOSED WITH NO RESIDUAL, which is what distinguishes growth from drift.** Pinned total `5581 → 5707` = **+126**, attributed exactly: `25 + 9 + 37 + 25 + 22 + 5 + 3`. Grand total `6426 → 6435` = **+9**, exactly the new suite's nine cases. Verdict: `count gate OK — 135/135 pinned files present, no per-file decrease, 0 failing.`
+
 **⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `100 / 16 / 3215` → `101 commits / 17 phases / 3259 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814` — recorded beside the previous value, never over it. ⚠ **THIS ROW WENT STALE INSIDE THE PLAN THAT WROTE IT**: the figure was measured *after* 197's own gate commit landed, because a triple taken before it would have been wrong by one commit the moment the task finished. That is the self-staling this ledger documents about `WorkflowsPage.tsx`, `WorkflowCard.tsx` and `WorkflowBuilderPage.tsx`, now observed on the file that ENFORCES the guardrails.
 
 ⚠ **A CORRECTION TO THIS ROW'S OWN WARNING, recorded beside it rather than over it.** The row says *"raising a pin necessarily deletes one line, so a `grep -c '^-[^-]'` expecting 0 is WRONG"*, and that remains true **for a RAISE**. **It does not generalise to an ADD.** Phase 197's edit here is `+44 / -0` on `git diff --numstat`: it added three BASELINE keys for suites that had never been pinned, so no old number existed to delete. **The distinction matters because the phase declared this file a zero-deletion EXCLUSION (`197-01`, exclusion 2) and then did not need it** — the exclusion was correct to declare in advance and was measurably unused, which is a different and better outcome than being consumed. Both facts are here so a future plan neither drops the exclusion nor assumes it must fire.
@@ -2529,6 +2587,10 @@ fires G-5.
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 9 / 623` → `16 / 10 / 755`.** 214-11 fixed `BUG-260826-05`'s render half: the sentinel fires only when the DB-backed reason AND the wire reason are both empty (whitespace counts as empty). Phase buckets gain `214`.
 
 ### `frontend/src/components/workflows/soulData.ts`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `11 / 9 / 465` → `12 commits / 10 phases / 499 L`** · no dated quick-task buckets. Recorded beside the figures below, never over them. **G-5 fires at 10 phases and 214.1-01 honoured it by construction:** it added `RESERVED_LAUNCH_INPUT_KEYS`, the CLIENT MIRROR of the backend's `RESERVED_RUN_INPUT_KEYS` (`kickoff_prompt`, `folder_id`).
+
+⚠ **THE MIRROR IS ASSERTED BY ITERATING THE SHIPPED SET, NEVER BY RE-TYPING ITS MEMBERS**, so a third reserved key inherits the refusal with no edit here. That is the only property that makes a second spelling of a one-owner set acceptable: this one is an authoring-time REFUSAL that can be too strict but never too lax, and the server strips these values regardless. The authoritative half is `backend/app/models/message.py`; `workflow_authoring._declare_asked_arguments` (214.1-02) imports it rather than mirroring it, because a server-side derivation has no excuse for a copy.
 
 **Measured 2026-08-18 (plan `197-11`): `9 commits / 7 phases / 373 L`** · buckets: `124 · 127 · 183 ·
 184 · 189 · 193 · 197`, no dated tasks · **G-5 FIRES** (7 phases vs threshold 3).
@@ -6189,6 +6251,14 @@ The lane widens so a sourced and an unsourced row keep identical label offsets �
 
 Library modal, chat launch form and schedule modal all render this. It is 214-09's deferred seam, taken by 214-12.
 
+**⚠ RE-DERIVED at Phase 214.1's close (2026-08-28): `2 / 2 / 152`** — `+61` lines in one plan. The figure above is kept rather than overwritten.
+
+⚠ **`required` NOW REACHES ALL THREE LAUNCHERS AS A MARK, AND IT IS NEVER A BLOCK.** `214.1-01` declined to gate any launcher's confirm control: three shipped doors would change contract, and the SMTP adapter plus the publish gate already fail closed on an empty required argument. **The re-open trigger is written into the component**: *the next phase that touches a launcher's confirm control takes the block.*
+
+⭐ **A REAL ACCESSIBILITY REGRESSION WAS CAUGHT HERE AND FIXED IN THE NEW CODE, NOT IN THE ASSERTION.** The mark was first placed INSIDE the `<label>`, which takes its whole text content as the input's **accessible name** — producing `"Recipient emailRequired"`. That is not a stale pin: the field's name would have stopped being the author's words, which is this component's entire contract. ⛔ `aria-hidden` on the mark was the cheaper fix and was **REFUSED** — it would keep the name clean by making requiredness a sighted-only signal, the same dishonesty the two-arm rule exists to prevent. The mark now sits **outside** the label, linked by `aria-describedby`.
+
+⚠ **`label === key` NOW MEANS ABSENCE DOWNSTREAM.** A future surface that wants to print a declared input's prose must not assume `label` is always present on `EntryInputField` — the launcher renders the key in the mono face instead of pretending a human wrote it. `workflow_authoring._declare_asked_arguments` (214.1-02) depends on this: it writes `label = key` precisely so a derived declaration reads as unnamed rather than fabricated.
+
 ### `frontend/src/components/workflows/PublishRefusalList.tsx`
 
 **Triple at Phase 214's close (2026-08-28): `2 / 1 / 178` — G-5: no (1 phase).** young (214-10) — the refusal renders as a CAUSE, not a status
@@ -6272,4 +6342,36 @@ One of the twelve domain modules the 207 split created. The barrel re-exports it
 **Triple at Phase 214's close (2026-08-28): `3 / 3 / 1055` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules**
 
 Buckets `207` `210` `214`. It crossed the threshold with no row in place, so G-5 could not have fired on it at any count.
+
+**⚠ RE-DERIVED at Phase 214.1's close (2026-08-28, plan `214.1-02`): `4 / 4 / 1081`** — buckets `207` `210` `214` `214.1`, no quick-task buckets to subtract. The figure above is kept rather than overwritten, because the drift being visible is the finding: this row was written one afternoon and was stale the next.
+
+⚠ **`214.1-02`'s PLAN SAID THIS FILE HAD NO ROW AT ALL, AND THAT WAS FALSE — the plan's own staleness table was itself stale.** The row had already been added at Phase 214's close, three commits before the plan was written. It is recorded here rather than quietly corrected because it is the same defect one level up: *"a row that is present and WRONG answers the auditor with `satisfied` and stops the audit"* applies to a PLAN's table exactly as it applies to this one. Only re-deriving from git caught it — the plan named ten files as `stale` or `NO ROW`, and **four of those ten claims were wrong**: `PublishRefusalList.tsx`, `publishRefusalEntry.ts` and `LaunchInputFields.tsx` all had rows, and `PublishGauntlet.tsx`'s cell (`16 / 8 / 1245`) was already exactly right.
+
+⚠ **214.1 CHANGED NO BEHAVIOUR HERE.** `214.1-01` added a **docblock and nothing else** — 26 lines, 0 deleted — recording a measurement that refutes `BUG-260828-02`'s conclusion: `updateWorkflowDraft`'s body is `JSON.stringify(def)` with **no field whitelist**, so `inputs` ALREADY shipped and no whitelist was invented. The corollary the docblock records is the real hazard and belongs here too: because nothing filters, a stray key anywhere on `meta` reaches a model that forbids extras and the first autosave after it returns 422 — so **the fence lives at the MINTING site** (`declaredInputs.declaredInputFor`), never at the client.
+
+### `frontend/src/components/workflows/declaredInputs.ts`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 174` — G-5: no (1 phase).** young (214.1-01) — **the ONE minting site for `definition.inputs[]`**
+
+Every declared input an author creates passes through `declaredInputFor`, which is why the extras fence lives here rather than in `lib/api/workflows.ts` (see that file's section). It owns three refusals — reserved key, duplicate, empty — and `undeclaredAskKeys`, the OFFER derived from the definition's own `ask` steps.
+
+⚠ **`undeclaredAskKeys` RE-SPELLS ONE SERVER RULE** (`key = ask_key or name`, owned by `backend/app/services/connectors/args.py`). Accepted under T-214.1-01-03 because it is an OFFER and never a gate: a disagreement offers one key too many or too few, and can never admit a publish the server would refuse. ⚠ The server's own half of that rule is `_declare_asked_arguments` in `workflow_authoring.py` (214.1-02) — **three spellings of one rule now exist, and only the two server-side ones are load-bearing.**
+
+⚠ **THE STORED SHAPE IS EXACTLY `{key, label, type: "text", required}` AND MUST NOT GAIN `description`.** `InputFieldSpec` is `extra="forbid"` and its `type` has no default; both were re-measured at HEAD by `214.1-01` rather than inherited, and D-214.1-02's wording (`{key, label, required, description?}`) is **corrected by that measurement**. A `description` key would 422 the first autosave.
+
+### `frontend/src/components/workflows/declaredInputsVocabulary.ts`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 94` — G-5: no (1 phase).** young (214.1-01) — every word the declared-input door says
+
+Separate from its component because `react-refresh/only-export-components` is an ACTIVE error on this directory. Its title is `ARG_SOURCE_ASK` verbatim — *"Asked when this runs"* — so an author meets the same words on the argument row and on the door that satisfies it; that agreement is the fix, not decoration.
+
+### `frontend/src/components/workflows/DeclaredInputsEditor.tsx`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 333` — G-5: no (1 phase).** young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist
+
+⚠ **G-2 IS OVERRIDDEN HERE, NOT SATISFIED (D-214.1-06).** No operator-approved sketch exists for this surface. Nothing visual was invented: the affordance copies `statefulAffordance`'s tokens, and the dialog copies `PublishGauntlet`'s shell exactly. **The two places to look first if the operator rejects it** are the per-row list and the offers block, where no shipped primitive covered the need.
+
+⭐ **THE WIRING SURVIVES A RE-SKIN UNTOUCHED**, and that is what makes the override cheap to reverse: every write goes through `setDeclaredInputs`, every refusal through `refuseDeclaredInputKey`, every offer through `undeclaredAskKeys`, every word through `declaredInputsVocabulary.ts`. A rejected visual changes this file's JSX and nothing else — not the store, not the save path, not the launch renderer, not the describe-door derivation.
+
+⚠ **ITS REACHABILITY IS PROVED SOMEWHERE ELSE, DELIBERATELY.** This component's own suite mounts it directly; `frontend/src/pages/WorkflowBuilderPage.declaredInputs.test.tsx` (214.1-02) is the one that walks an EMPTY builder to a PUBLISHED workflow through it while mocking neither the store nor any `@/lib/api` module. A component test can never answer *"could a person get here?"* — that is the whole lesson of the bug this file closes.
 
