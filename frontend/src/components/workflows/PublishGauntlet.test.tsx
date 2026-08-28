@@ -60,6 +60,7 @@ import { blockedSentence } from "./verdictModel"
 import {
   ALREADY_PUBLISHED_NOTE,
   GOLDEN_NO_SEND,
+  REFUSE_ASK_UNDECLARED,
   STAGE_BLOCKED,
   STAGE_NOT_REACHED,
   STAGE_PASSED,
@@ -1788,5 +1789,140 @@ describe("PublishGauntlet 214-10 — the golden run says what it did NOT do (ske
     await doPublish()
     await waitFor(() => expect(screen.getByTestId("publish-refusals")).toBeInTheDocument())
     expect(screen.queryByTestId("golden-no-send")).not.toBeInTheDocument()
+  })
+})
+
+// ── PHASE 214.1-03 TASK 1 (D-214.1-04) — THE DRIVEN DIAGNOSIS OF `BUG-260828-04` ──────
+//
+// The operator drove Phase 214's G-4 checkpoint and reported reading, on screen:
+//
+//     phase 'act': the required argument 'to' is asked for at launch, but the wor
+//
+// — the BACKEND DIAGNOSTIC, clipped mid-word. `PublishRefusalList.tsx`'s own docblock
+// FORBIDS rendering that string, and the phase verifier's hand-trace says
+// `isArgumentRefusal` returns `true` for that exact entry, so the composed sentence
+// SHOULD have rendered. Three hypotheses each needed a DIFFERENT fix, and only a render
+// could tell them apart:
+//
+//   (a) a classification or mount defect on the publish path;
+//   (b) a stale bundle at drive time — both 214-10 commits (`0af16b150` and `3d508f28f`)
+//       are dated 2026-08-28, the SAME DAY as the drive;
+//   (c) the operator was reading `ProblemsTray`, which states in its own docblock that it
+//       renders the server's `message` VERBATIM BY DESIGN. It is fed by
+//       `POST /workflows/validate` — the SAME `lint_workflow` call, a different route and
+//       a different surface, where a raw diagnostic is correct behaviour.
+//
+// ⚠ THE FIXTURE IS THE LIVE ENTRY BYTE-FOR-BYTE, both never-rendered keys included, and
+// its `step_name` is the SLUG rather than an authored name — the one documented case where
+// the author's word and the slug coincide (`reachability.py:283`), which is also why the
+// diagnostic reads `phase 'act':` and not `step 'act':`. A convenient payload would have
+// proved something about a shape that never occurred.
+const LIVE_ASK_UNDECLARED: Record<string, unknown> = {
+  code: "ask_undeclared",
+  phase: "act",
+  message:
+    "phase 'act': the required argument 'to' is asked for at launch, but the workflow declares no matching input",
+  step_name: "act",
+  argument: "to",
+  upstream: null,
+}
+
+/** The refusal verdict carrying exactly that entry and nothing else. */
+function liveVerdict(entry: Record<string, unknown> = LIVE_ASK_UNDECLARED): PublishOutcome {
+  return {
+    kind: "verdict",
+    verdict: {
+      published: false,
+      version: null,
+      golden_run_id: null,
+      blocked_stage: "lint",
+      named_failures: [entry],
+    },
+  } satisfies PublishOutcome
+}
+
+/** The sentence the surface is supposed to compose, READ OFF THE VOCABULARY. */
+const LIVE_SENTENCE = REFUSE_ASK_UNDECLARED({ step: "act", arg: "to" })
+/** Its FINAL clause, DERIVED from the sentence rather than re-typed — an opening that
+ *  rendered proves nothing about the clipping this bug is reported against. */
+const LIVE_FINAL_CLAUSE = LIVE_SENTENCE.slice(LIVE_SENTENCE.lastIndexOf(",") + 1).trim()
+/** The clipped fragment the operator actually read, verbatim from the report. */
+const OPERATOR_FRAGMENT = "but the wor"
+
+describe("PublishGauntlet 214.1-03 — BUG-260828-04 diagnosed against the LIVE payload", () => {
+  it("(non-vacuity) the derived final clause is a real clause, and the needle is really in the diagnostic", () => {
+    expect(LIVE_FINAL_CLAUSE.length).toBeGreaterThan(10)
+    expect(LIVE_FINAL_CLAUSE).not.toEqual(LIVE_SENTENCE)
+    expect(LIVE_SENTENCE).toContain(LIVE_FINAL_CLAUSE)
+    // The absence assertion below has something real to be absent.
+    expect(String(LIVE_ASK_UNDECLARED.message)).toContain(OPERATOR_FRAGMENT)
+  })
+
+  it("renders the COMPOSED sentence IN FULL — and the server's diagnostic appears nowhere", async () => {
+    mockedPublish.mockResolvedValue(liveVerdict())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-refusals")).toBeInTheDocument())
+
+    const text = screen.getByTestId("publish-modal").textContent ?? ""
+    // BOTH halves, because one without the other cannot tell the hypotheses apart.
+    expect(text).toContain(LIVE_SENTENCE)
+    expect(text).toContain(LIVE_FINAL_CLAUSE)
+    expect(text).not.toContain(String(LIVE_ASK_UNDECLARED.message))
+    expect(text).not.toContain(OPERATOR_FRAGMENT)
+    expect(text).not.toContain("declares no matching input")
+    // …and the slug and the machine code stay off the screen for this entry too.
+    expect(text).not.toContain("ask_undeclared")
+  })
+
+  it("the next-action control renders DISABLED — the gauntlet mounts the list without `onGoToStep`", async () => {
+    mockedPublish.mockResolvedValue(liveVerdict())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-refusals")).toBeInTheDocument())
+
+    // ⚠ RECORDED AS A FINDING, NOT FIXED HERE. SC#3 says a refusal names its NEXT ACTION;
+    // the words are on screen and the control is inert, because `PublishGauntlet` mounts
+    // `PublishRefusalList` with `entries` + `totalSteps` and no handler. Wiring a canvas
+    // navigation seam that does not exist in this file is a second concern on a file whose
+    // ledger row already fires — so this PINS the current state, and the summary carries
+    // the verdict and the re-open trigger. `RefusalItem` keeps the affordance honest by
+    // stating where the fix lives in the control's `title`, asserted here so the disabled
+    // state is never merely dead.
+    const next = screen.getAllByTestId("refusal-next")
+    expect(next).toHaveLength(1)
+    expect(next[0]).toBeDisabled()
+    expect(next[0].getAttribute("title") ?? "").toContain("open this workflow in the builder")
+  })
+
+  it("DECLINE (positive control): with no `step_name` the GENERIC renderer is reached and prints the diagnostic", async () => {
+    const noStepName = { ...LIVE_ASK_UNDECLARED }
+    delete noStepName.step_name
+    mockedPublish.mockResolvedValue(liveVerdict(noStepName))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    // The cause block claims nothing…
+    expect(screen.queryByTestId("publish-refusals")).not.toBeInTheDocument()
+    // …and the shipped generic path prints the server's own sentence, which is the
+    // MECHANISM that produces the reported symptom, reached honestly.
+    const text = screen.getByTestId("publish-modal").textContent ?? ""
+    expect(text).toContain("declares no matching input")
+    expect(text).not.toContain(LIVE_SENTENCE)
+  })
+
+  it("DECLINE (positive control): with no `argument` the GENERIC renderer is reached and prints the diagnostic", async () => {
+    const noArgument = { ...LIVE_ASK_UNDECLARED }
+    delete noArgument.argument
+    mockedPublish.mockResolvedValue(liveVerdict(noArgument))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    expect(screen.queryByTestId("publish-refusals")).not.toBeInTheDocument()
+    const text = screen.getByTestId("publish-modal").textContent ?? ""
+    expect(text).toContain("declares no matching input")
+    expect(text).not.toContain(LIVE_SENTENCE)
   })
 })
