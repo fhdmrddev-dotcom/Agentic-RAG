@@ -1334,8 +1334,10 @@ export function WorkflowCanvas({
    *
    * THE COMPOSITION RISK THIS RESOLVES. Sketch 141-B put the editing controls on the
    * canvas; sketch 139-A put the problems tray at the bottom. Built naively that is TWO
-   * bottom bands stacked on each other, on a column that at 900px already has a 400px
-   * panel beside 248px cards. The recorded fix is this: fold the tray's SUMMARY LINE into
+   * bottom bands stacked on each other, on a column that at 900px already has a
+   * `clamp(480px, 38%, 640px)` panel beside 248px cards (D-214-22 widened that panel; the
+   * arithmetic is worst-case at the clamp's 480px minimum, leaving 420px of column). The
+   * recorded fix is this: fold the tray's SUMMARY LINE into
    * the same bottom edge and let the tray expand upward from it. Publish stays in the page
    * header it already had (141-B's operator correction), so this plan adds no band at all.
    *

@@ -120,7 +120,8 @@ function renderComposed(opts: {
   const store = opts.store ?? draftedStore()
   return render(
     <BuilderStoreProvider store={store}>
-      {/* The R12 width, on the canvas COLUMN — the same track the 400px panel shares. */}
+      {/* The R12 width, on the canvas COLUMN — the same track the
+          `clamp(480px, 38%, 640px)` form panel shares (D-214-22). */}
       <div style={{ width: R12_WIDTH, height: 700 }}>
         <WorkflowCanvas
           phases={evalCoverage}
@@ -231,7 +232,17 @@ describe("WorkflowCanvas composition — R12: ONE bottom region, TWO rows maximu
 
     // The mechanism that keeps the width budget survivable at all: the canvas section can
     // SHRINK inside its grid track. Without `min-w-0` a flex/grid child refuses to go
-    // below its content width and the 400px panel pushes the column off screen.
+    // below its content width and the form panel pushes the column off screen.
+    //
+    // ⚠ D-214-22 WIDENED THAT PANEL, SO THIS CASE WAS RE-RUN RATHER THAN REASONED ABOUT.
+    // OBSERVED 2026-08-28 against the shipped `clamp(480px, 38%, 640px)` track: this case
+    // still PASSES, and `WorkflowCanvas.composition.test.tsx` + `WorkflowBuilderPage.canvas
+    // .test.tsx` were green together (174 passed). The headroom that survives is
+    // `900 − 480 = 420` — the R12 column width minus the panel's clamp MINIMUM, which is
+    // the worst case since the clamp only ever grows from there. That subtraction is stated
+    // as arithmetic over an OBSERVED pass, not as the reason the case passes: this assertion
+    // is structural (declared inline widths in a renderer that lays nothing out), so it does
+    // not read the panel at all. Real overflow at 900px remains live G-4 UAT.
     expect(screen.getByLabelText("Workflow canvas").className).toContain("min-w-0")
   })
 })
