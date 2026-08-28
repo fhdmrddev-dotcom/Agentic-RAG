@@ -217,11 +217,29 @@ interface WorkflowsPageProps {
    *  Phase 152 (WFIN-01/02): the optional third arg carries the Run modal's two run
    *  inputs — a staged template `File` (uploaded to the launched thread, Landmine 8)
    *  and a per-run KB-folder override `folderId` (→ create_workflow_run.inputs, D-01).
-   *  Both absent = today's byte-identical launch (D-06). */
+   *  Both absent = today's byte-identical launch (D-06).
+   *
+   *  Phase 214-09 (STEP-02 / D-214-04): the third member `inputs` carries the values the
+   *  Run modal collected for the definition's DECLARED entry inputs, keyed by their declared
+   *  key. `{}` when the definition declares none; absent from a call site that collects none
+   *  at all (the Test Run adapter below, `:907-923`, which passes no third argument and is
+   *  deliberately NOT edited by that plan — an absent optional is safe there by construction).
+   *
+   *  ⛔ THIS TYPE WIDENING PROVES NOTHING ON ITS OWN, AND SAYS SO HERE SO THE NEXT READER
+   *  DOES NOT READ IT AS PROOF. Under parameter CONTRAVARIANCE a narrower `doRun` stays
+   *  assignable to this wider type: the extra key typechecks and is silently discarded. The
+   *  hop from here into `doRun` → `postMessage` → `create_workflow_run.inputs` is owed to
+   *  plans `214-12` (the `doRun` parameter) and `214-16` (the wire, already landed). The
+   *  assertion that this dict actually arrives is a RUNTIME one, in `RunModal.test.tsx`, on
+   *  the argument object handed to `onLaunch` — never on the build. */
   onLaunch: (
     def: PublishedWorkflow,
     kickoff: string,
-    opts?: { templateFile?: File | null; folderId?: string | null },
+    opts?: {
+      templateFile?: File | null
+      folderId?: string | null
+      inputs?: Record<string, string>
+    },
   ) => Promise<void>
   /**
    * SEED-190 — open a run's own surface. This is `ChatLayout.openRunSurface`, the SAME
@@ -1337,7 +1355,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
             if (runSubmitting) return
             setRunFor(null)
           }}
-          onRun={async ({ templateFile, folderId }) => {
+          onRun={async ({ templateFile, folderId, inputs }) => {
             // WR-05: one click = one thread. Ignore re-entry while a launch is in flight.
             if (runSubmitting) return
             const target = runFor
@@ -1348,7 +1366,11 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
               // through the existing launch (doRun uploads the file to the launched
               // thread, then create_workflow_run.inputs carries folder_id). Re-throw on
               // failure so the modal can render the server's 422 verbatim (do NOT close).
-              await onLaunch(target, text, { templateFile, folderId })
+              // 214-09 (STEP-02 / D-214-04): the declared-input dict is FORWARDED in the
+              // same commit that renders the fields. A field rendered but not forwarded is
+              // BUG-260826-01 in a new costume — a declared intention no launcher honours —
+              // so the consumer widens with the producer, never one release later.
+              await onLaunch(target, text, { templateFile, folderId, inputs })
               setRunFor(null) // close only on a successful launch
             } finally {
               setRunSubmitting(false)

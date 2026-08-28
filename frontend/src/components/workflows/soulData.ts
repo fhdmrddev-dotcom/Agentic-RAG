@@ -207,6 +207,46 @@ export function entryInputKeys(def: DefShape | null | undefined): string[] {
 }
 
 /**
+ * Phase 214-09 (STEP-02 / D-214-04) — the RUN-SCAFFOLDING keys a launcher must NOT draw a
+ * field for, because another control on the same form already collects them and the server
+ * STRIPS a launcher-supplied copy.
+ *
+ * ⚠ THIS MIRRORS A BACKEND FROZENSET AND SAYS SO RATHER THAN RE-DERIVING IT.
+ * `backend/app/models/message.py::RESERVED_RUN_INPUT_KEYS` is
+ * `frozenset({"kickoff_prompt", "folder_id"})`, and BOTH kickoff merge sites strip those keys
+ * out of a launcher's `inputs` dict before they reach `create_workflow_run.inputs`. Plan
+ * `214-16` measured the strip into existence; this constant is the client half of the same
+ * one rule. ⚠ A DIVERGENCE IS A SILENT DATA LOSS, NOT A TYPE ERROR — a field drawn for a key
+ * the server strips is `BUG-260826-01` in a new costume: a control a person fills in whose
+ * value reaches nothing. Change the two together or not at all.
+ *
+ * Both keys already have their own control on every launcher this phase touches: the Run
+ * modal's kickoff textarea and its KB-scope `<select>`; the schedule form's "Starting
+ * instruction" textarea. A second control for the same fact is not a feature.
+ */
+export const RESERVED_LAUNCH_INPUT_KEYS: ReadonlySet<string> = new Set([
+  "kickoff_prompt",
+  "folder_id",
+])
+
+/**
+ * The declared entry inputs a LAUNCHER should render a field for.
+ *
+ * `entryInputFields` answers *"what does this definition declare?"* and its last arm falls
+ * back to `[{ key: "kickoff_prompt" }]` for a definition that declares nothing at all — which
+ * is the right answer to that question and the WRONG list to draw a form from. Every
+ * definition would grow a text field beside the kickoff textarea that collects the same fact,
+ * and the server would strip the value on arrival.
+ *
+ * So this is `entryInputFields` MINUS the reserved keys, and nothing else: same resolver, same
+ * precedence, same two-arm label rule. An empty result means *"this launcher asks for nothing
+ * extra"* and a caller renders no field region at all.
+ */
+export function launchInputFields(def: DefShape | null | undefined): EntryInputField[] {
+  return entryInputFields(def).filter((f) => !RESERVED_LAUNCH_INPUT_KEYS.has(f.key))
+}
+
+/**
  * The honest deliverable signal (D-03 / A1). The verified mechanism: a workflow
  * WITH a terminal `llm_emit` phase produces a FILE; ABSENT → the honest
  * "produces: answer in chat".
