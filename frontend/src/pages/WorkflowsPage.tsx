@@ -1335,6 +1335,16 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPagePro
         <WorkflowScheduleModal
           key={scheduleFor.id}
           workflow={scheduleFor}
+          // 214-09 (STEP-02 / D-214-04): the definition, for its DECLARED entry inputs.
+          // `onSchedule` hands this page a `{ id, name }` scope only, so the definition is
+          // looked up out of the feed this page already owns rather than threaded through
+          // the card — the card's prop surface is unchanged, and the modal grows no feed of
+          // its own. `undefined` when the row is not in `published` (a starter or a draft
+          // reached this door): the modal then renders exactly as it shipped.
+          definition={
+            (published.find((p) => p.id === scheduleFor.id)?.definition as DefShape | undefined) ??
+            null
+          }
           onClose={() => setScheduleFor(null)}
         />
       )}

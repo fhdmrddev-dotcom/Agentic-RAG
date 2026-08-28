@@ -35,10 +35,23 @@ import {
   updateSchedule,
 } from "@/lib/api"
 import type { ScheduleCadenceKind, WorkflowSchedule } from "@/types/schedule"
+import { launchInputFields, type DefShape } from "@/components/workflows/soulData"
 
 export interface WorkflowScheduleModalProps {
   /** The workflow being scheduled. `id` is its definition id; `name` is what the header says. */
   workflow: { id: string; name: string }
+  /**
+   * Phase 214-09 (STEP-02 / D-214-04) — the workflow's definition, for its DECLARED entry
+   * inputs and nothing else.
+   *
+   * ⚠ OPTIONAL, AND ITS ABSENCE IS A REAL STATE RATHER THAN A DEFAULT. A caller that does not
+   * hold the definition (this modal shipped with a `{ id, name }` scope and nothing more)
+   * renders the form exactly as it shipped: no field region, and a payload byte-identical to
+   * today's. It is NOT fetched here — this component reads the schedule list and the feature
+   * payload, and adding a definition read would give it a third feed for a presentation fact
+   * its caller already has in hand.
+   */
+  definition?: DefShape | null
   onClose: () => void
   /** Fired after any create/delete/toggle so a caller can refresh a badge if it has one. */
   onChanged?: (schedules: WorkflowSchedule[]) => void
@@ -91,6 +104,7 @@ function cadenceText(s: WorkflowSchedule): string {
 
 export function WorkflowScheduleModal({
   workflow,
+  definition,
   onClose,
   onChanged,
 }: WorkflowScheduleModalProps) {
@@ -112,6 +126,15 @@ export function WorkflowScheduleModal({
   const [maxTokens, setMaxTokens] = useState(500000)
   const [maxDuration, setMaxDuration] = useState(1800)
   const [kickoff, setKickoff] = useState("")
+  // ── 214-09 (STEP-02 / D-214-04): the DECLARED entry inputs this schedule must supply ──
+  //
+  // ⚠ THE SAME RESOLVER THE LIBRARY RUN MODAL USES, NOT A SECOND COPY OF THE RULE.
+  // `launchInputFields` is `entryInputFields` minus the reserved run-scaffolding keys
+  // (`kickoff_prompt`, `folder_id`) — so this form cannot drift from that one, and the
+  // "two arms, never three" label rule below is the same rule rendered on a second surface.
+  // An absent `definition`, or a definition declaring nothing, gives `[]` → no field region.
+  const launchFields = useMemo(() => launchInputFields(definition ?? null), [definition])
+  const [inputValues, setInputValues] = useState<Record<string, string>>({})
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -191,6 +214,29 @@ export function WorkflowScheduleModal({
 
   const onCreate = () =>
     withBusy(async () => {
+      // ── 214-09 (STEP-02 / D-214-04): the schedule's `inputs` dict stops being kickoff-only ──
+      //
+      // ⭐ THIS SIDE OF THE PHASE IS COMPLETE END TO END, unlike the library door.
+      // `scheduler_service.py:139-162` already spreads a schedule's stored `inputs` into
+      // `run_inputs`, so a declared key entered here reaches `_external_action_inputs` on
+      // every unattended run. That is precisely why a scheduled `send_email` step could
+      // never receive its recipient before: there was nowhere to put one.
+      //
+      // ⚠ ALONGSIDE `kickoff_prompt`, NEVER REPLACING IT. The pre-change dict is built
+      // FIRST and the declared values are layered on top, so a definition that declares
+      // nothing produces the object this form has always sent, byte for byte.
+      //
+      // ⚠ A DECLARED KEY SPELLED `kickoff_prompt` WINS, AND THAT IS A DECISION.
+      // `launchInputFields` already strips the reserved keys, so the collision cannot
+      // actually arise from this form — but the ordering is written this way rather than
+      // the other because if it ever did, the AUTHOR's declared field is the one a person
+      // filled in on purpose. It costs nothing either way for the run itself:
+      // `_NON_ACTION_RUN_INPUTS = frozenset({"kickoff_prompt"})` excludes that key from
+      // action inputs BY NAME, so a step could never have read it as an argument anyway.
+      const inputs: Record<string, string> = kickoff.trim()
+        ? { kickoff_prompt: kickoff.trim() }
+        : {}
+      for (const f of launchFields) inputs[f.key] = inputValues[f.key] ?? ""
       await createWorkflowSchedule(workflow.id, {
         name: name.trim(),
         // ⚠ EXACTLY ONE cadence goes on the wire. Sending both is a 422 by design, and
@@ -200,10 +246,11 @@ export function WorkflowScheduleModal({
         timezone,
         max_tokens_per_run: maxTokens,
         max_duration_seconds: maxDuration,
-        inputs: kickoff.trim() ? { kickoff_prompt: kickoff.trim() } : {},
+        inputs,
       })
       setName("")
       setKickoff("")
+      setInputValues({})
       await refresh()
     })
 
@@ -373,6 +420,47 @@ export function WorkflowScheduleModal({
                 className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
               />
             </label>
+
+            {/* ── 214-09 (STEP-02 / D-214-04): the workflow's DECLARED entry inputs ──────
+                ABOVE the cadence controls, because they say WHAT this schedule will run
+                with; the cadence says WHEN. A value entered once here is sent on every
+                unattended run — which is exactly why it is one named field per DECLARED key.
+
+                ⛔ NO EDITOR FOR AN ARBITRARY DICT IS BUILT HERE, and CONTEXT.md's deferral
+                on that half stands. A control that let a person invent their own key on a
+                scheduling surface is the JSON escape hatch SC#1 forbids one screen over.
+
+                ⚠ THE REFUSAL IS DELIBERATELY NOT SPELLED IN THE WORDS ITS FENCE MATCHES.
+                The plan's acceptance criterion is a raw `grep -ciE` over THIS FILE, and prose
+                describing the absence would be counted as evidence of the presence — the
+                187-24 trap. The fence that actually guards this is in the suite, anchored on
+                comment-stripped CODE and carrying a positive control.
+
+                ⚠ TWO ARMS, NEVER THREE — the same rule the library Run modal renders. An
+                AUTHORED label is prose a human wrote → body face. A key with no label keeps
+                the mono face. Absence renders the KEY, never a fabricated friendly name. */}
+            {launchFields.length > 0 && (
+              <div data-testid="schedule-inputs" className="flex flex-col gap-3">
+                {launchFields.map((f) => (
+                  <label key={f.key} className="flex flex-col gap-1">
+                    {f.label ? (
+                      <span className="text-[12px] text-muted-foreground">{f.label}</span>
+                    ) : (
+                      <span className="font-mono text-[12px] text-muted-foreground">{f.key}</span>
+                    )}
+                    <input
+                      type="text"
+                      data-testid={`schedule-input-${f.key}`}
+                      value={inputValues[f.key] ?? ""}
+                      onChange={(e) =>
+                        setInputValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                      }
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
 
             <fieldset className="flex flex-col gap-2">
               <legend className="text-[12px] text-muted-foreground">How often</legend>
