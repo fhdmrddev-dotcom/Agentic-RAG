@@ -1693,6 +1693,32 @@ const BASELINE = {
   // that makes a `-0` deletion check wrong. ADDING a pin is not RAISING one; this edit is
   // additions only.
   "connectionMark.test.tsx": 39,
+  // ── 214-08 (STEP-04 / SC#4 / D-214-16) — the shared step-identity element's own suite, ──
+  // ── pinned in the commit that creates it, because a `BASELINE` key naming a path that ──
+  // ── does not yet exist makes this gate ERROR (exit 2) rather than fail. ──────────────
+  //
+  // ⚠ IT NEEDS ONLY THIS KNOB, AND THAT WAS CHECKED RATHER THAN ASSUMED: the file sits
+  // under `src/components/workflows`, which is the ONE directory-level entry in `TARGETS`,
+  // so it RAN the moment it existed. Contrast its sibling in the same commit —
+  // `connectionMark.test.tsx` moved to `src/lib`, which has NO directory entry anywhere in
+  // this script, and so needed its `TARGETS` PATH repointed while its BASENAME pin above
+  // resolved untouched. Same commit, two files, two different answers.
+  //
+  // ⚠ THE NUMBER IS A SCOPED-RUN MEASUREMENT, NOT THIS GATE'S OWN `actual` COLUMN, and the
+  // difference is recorded rather than glossed. Phase 214's wave-2 executors run under an
+  // orchestrator rule forbidding a full gate run (two sibling agents were active; `count
+  // gate OK` is not reliably reachable on demand — SEED-171). `41` is what
+  // `npx vitest run src/components/workflows/StepIdentity.test.tsx` reported on FOUR
+  // separate invocations at `GSD_VITEST_MAX_WORKERS=2`, three of them the green runs
+  // bracketing four planted-defect RED drives. Plan `214-15` re-derives it at the phase
+  // close. ⚠ Never a hand count of `it(` literals — unsound under the three `it.each`
+  // blocks this suite uses.
+  //
+  // What would be unguarded without it: the three properties sketch 216 #6 says the import
+  // fence STRUCTURALLY CANNOT catch (resolved-but-EMPTY / -IDENTICAL / -INVISIBLE), the
+  // null-service arm that must render the action ALONE, and the wire-id sweep. Each was
+  // driven RED against a planted defect before this line was written.
+  "StepIdentity.test.tsx": 41,
   // ── 190-17: the add/edit panel's own suite, pinned in the commit that creates it. ──
   // Number read from THIS SCRIPT'S OWN `actual` column across two agreeing runs — never a
   // hand count of `it(` literals, which is unsound under the `it.each` this suite uses for
