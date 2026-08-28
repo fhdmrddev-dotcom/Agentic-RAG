@@ -162,9 +162,30 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     // Select a node → the form opens (the rail is replaced by the form).
     await user.click(screen.getByTestId("spine-node-gather"))
     expect(screen.queryByTestId("phase-form-rail")).not.toBeInTheDocument()
-    // The grid track reflects panelOpen (400px column).
+    // The grid track reflects panelOpen — the shared authoring clamp (D-214-22).
+    // ⚠ THIS ASSERTS THE LITERAL STRING IN THE `style` ATTRIBUTE, DELIBERATELY. jsdom does
+    // not resolve `clamp()`, so a `getComputedStyle` check here would be green-by-accident
+    // whatever the source said. Do NOT "improve" this into a computed-width assertion.
     const grid = screen.getByTestId("builder-grid")
-    expect(grid.getAttribute("style") ?? "").toContain("400px")
+    expect(grid.getAttribute("style") ?? "").toContain("clamp(480px, 38%, 640px)")
+  })
+
+  it("the COLLAPSED track stays exactly 44px — widening the open panel must not take the strip with it", async () => {
+    // D-214-22 widened the OPEN arm only; the 44px collapsed strip is explicitly not part
+    // of that decision. Before this case the pin only ever covered the open arm, so a
+    // future widening could have carried the strip along unobserved.
+    mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage />)
+    await user.type(screen.getByRole("textbox"), "summarize vendor risk")
+    await user.click(screen.getByRole("button", { name: /draft/i }))
+    await screen.findByTestId("spine-node-gather")
+
+    // Resting (no node selected) → the collapsed strip arm of the same one grid track.
+    const grid = screen.getByTestId("builder-grid")
+    expect(grid.getAttribute("style") ?? "").toContain("44px")
+    expect(grid.getAttribute("style") ?? "").not.toContain("clamp(480px, 38%, 640px)")
   })
 
   it("forwards the chosen project_folder_id to generate + shows the bound NAME in the header", async () => {
