@@ -1339,7 +1339,23 @@ async def _drive_golden_run(
         _key = getattr(_spec, "key", None)
         # Never shadow the kickoff prompt: it carries the author's real golden input.
         if _key and _key not in golden_inputs:
-            golden_inputs[_key] = f"golden-run-placeholder-{_key}@example.invalid"
+            # ⚠ KEY-AWARE, because a placeholder is READ BY A MODEL and shown in a receipt.
+            # The first cut used an address shape for EVERY field, so an essay workflow was
+            # handed `topic = golden-run-placeholder-topic@example.invalid` and dutifully wrote
+            # 200 words about an email address. Operator caught it on the first published run.
+            #
+            # `InputFieldSpec.type` is `"text"` for every field today, so the KEY is the only
+            # signal available. An address-shaped value goes only where an address belongs —
+            # everywhere else gets a plainly-worded placeholder that reads as one.
+            _k = _key.lower()
+            _is_addr = any(
+                _t in _k for _t in ("email", "mail", "recipient", "sender", "cc", "bcc")
+            ) or _k in {"to", "from"}
+            golden_inputs[_key] = (
+                f"golden-run-placeholder-{_key}@example.invalid"
+                if _is_addr
+                else f"golden run placeholder for {_key}"
+            )
 
     # ── 3. create the golden run (is_golden_run=True — the REAL run on the KB) ────
     run_id = await create_workflow_run(
