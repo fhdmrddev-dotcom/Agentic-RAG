@@ -4,7 +4,7 @@ milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool"
 status: executing
 last_updated: "2026-08-28T00:00:00.000Z"
-last_activity: 2026-08-28 -- Phase 214 context captured (21 decisions). G-5 fires on TEN files, SIX cells stale. Registers written back. G-2 sketch owed before planning.
+last_activity: 2026-08-28 -- Phase 214 SKETCHED: four G-2 acceptance bars, 587 assertions, 0 failing. Stitch drew two send_email arguments the adapter structurally refuses. Panel-track fork left open for the operator.
 progress:
   total_phases: 14
   completed_phases: 6
@@ -32,15 +32,45 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase **214** — context captured 2026-08-28, **sketch owed before planning**. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
+**Current focus:** Phase **214** — **sketched 2026-08-28; the G-2 obligation is discharged and planning is unblocked**, with the panel-track fork owed to the operator. Phase 213 ✅ **CLOSED 2026-08-28** — 5 waves + gap-closure round 1 + the driven check. ⚠ Closed **with SC#3 PARTIAL** and three findings recorded, as a DECISION rather than a claim everything passed. Ready for Phase 214.
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: **214 (a-step-names-its-service-and-its-action) — CONTEXT CAPTURED 2026-08-28**
-(`50c923822`). 0 plans. **Next: `/gsd:sketch 214`, NOT `/gsd:plan-phase 214`** — G-2 is owed on the
-step picker with its argument fields and on the canvas + run node faces, and 213 set the precedent
-that the sketch also settles the panel-width question the operator raised while driving 212.
+Phase: **214 (a-step-names-its-service-and-its-action) — SKETCHED 2026-08-28** (`1d36f4057`).
+0 plans. **Next: `/gsd:plan-phase 214`** — the G-2 obligation is DISCHARGED.
+
+✅ **THE OWED G-2 SKETCH SHIPPED — four acceptance bars, `587 assertions, 0 failing`**, each on the
+213 pattern (`COPY.js` + `index.html` + `drive.cjs` + a **generated** `BUILD-CONTRACT.md`):
+`.planning/sketches/214-argument-form-and-its-source` (141) ·
+`215-publish-refuses-by-name` (129) · `216-the-mark-and-the-action-everywhere` (138) ·
+`217-the-door-that-knows-your-services` (179). Step 1 (Stitch) is
+`214-stitch-step-names-service-and-action`; the two are **never collapsed** (`SEED-155`).
+
+⭐ **A DEFECT CAUGHT BEFORE PLANNING, THAT STITCH STRUCTURALLY COULD NOT SEE.** Stitch drew `Cc` and
+`Reply to` rows for `send_email`. **`smtp_adapter.INPUT_SCHEMA` (`smtp_adapter.py:293-311`) declares
+EXACTLY THREE properties — `to`, `subject`, `body` — under `additionalProperties: False`, and
+`send()` raises `SmtpArgumentsInvalid` on any undeclared key** (`smtp_adapter.py:337`). A `cc` field
+would have specified a form the backend refuses on **every** submission — while typechecking,
+rendering, and passing every frontend test. `cc` survives only as a removable leftover (D-214-08).
+
+⛔ **ONE FORK IS OPEN AND A PLAN MUST NOT PICK IT SILENTLY — the panel track.** Sketch 214 §4 draws
+`400px` (shipped, `WorkflowBuilderPage.tsx:2817`) and `clamp(480px, 38%, 640px)` (Settings' track
+since 213, `ConnectionsTab.tsx:387`) over **byte-identical content**. ⚠ **The consequence is
+conditional:** `400px` ⇒ the source **gutter is dropped** (it does not fit — that is the finding, not
+a stacked deck) and variant **C**'s inline control is the shape, no pin changes; the clamp ⇒ variant
+**B** ships and `WorkflowBuilderPage.tsx:2817` **plus whatever pins it** change in the **same
+commit** — the exact shape of Phase 213's `ConnectionFormPanel.test.tsx:571`, which pinned `400px`
+and was discovered only once the plan was already running. **Name the pin in the plan.**
+
+⚠ **THREE FENCES IN THE SKETCHES FIRED ON THEIR OWN FIRST DRAFT, and each is recorded as a finding
+rather than smoothed away.** (1) 214's SC#1 JSON fence read only `placeholder`/`aria-label`, so a
+JSON blob in a pre-filled `value` would have passed — **its positive control caught that**.
+(2) 215's stage-name fence tripped on a step an author legitimately named *"Commit the changelog"*;
+the fix removes the `.qs` spans — **names we did not write** — before reading the headline, with
+three positive controls. (3) 217's refusal fence asserted *"every refusal names a service"* and fired
+on the **shipped** thinness refusal, which correctly names none; every `.dr-text` now carries
+`data-kind` and the fence also asserts **no sentence is unlabelled**.
 
 ⚠ **G-5 FIRES ON TEN FILES AND SIX LEDGER CELLS WERE MEASURED STALE** (re-derived from git, not
 copied): `ConnectionPicker.tsx` 5/3/651 → **6/4/706** · `ExternalActionSection.tsx` 4/3/498 →
