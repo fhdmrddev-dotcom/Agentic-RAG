@@ -517,3 +517,77 @@ describe("RunModal 193-07 a11y — D-18's label is inert (a text node, never a b
     expect(await axe(modal)).toHaveNoViolations()
   })
 })
+
+/**
+ * ── 214-09 a11y (STEP-02 / D-214-04) — EVERY DECLARED-INPUT FIELD HAS A NAME ─────────────
+ *
+ * The two-arm rule is an ACCESSIBILITY contract before it is a typographic one: whichever
+ * face a field wears, a screen reader must hear the same word a sighted person reads. For an
+ * unlabelled key that word is the KEY, exactly — never a fabricated friendly name, and never
+ * a bare unlabelled box (which is the one outcome aXe would call a violation).
+ */
+const declaredInputsPublished = {
+  id: "pub-3",
+  slug: "vendor-outreach",
+  name: "Vendor outreach",
+  definition: {
+    slug: "vendor-outreach",
+    version: 1,
+    project_folder_id: "folder-aaa",
+    inputs: [
+      { key: "to", label: "Recipient email" },
+      { key: "subject_line" },
+      { key: "kickoff_prompt" },
+    ],
+    phases: [
+      { slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } },
+    ],
+  },
+}
+
+describe("RunModal 214-09 a11y — the declared-input fields are NAMED and in the cycle", () => {
+  it("every rendered field has an accessible name — the authored label, or the KEY verbatim", async () => {
+    mockListPublished.mockResolvedValue([declaredInputsPublished])
+    const { modal } = await openRunModal()
+    const fields = within(modal).getAllByTestId(/^run-input-/)
+    expect(fields).toHaveLength(2) // non-vacuity: an empty list makes every claim below free
+    expect(within(modal).getByTestId("run-input-to")).toHaveAccessibleName("Recipient email")
+    expect(within(modal).getByTestId("run-input-subject_line")).toHaveAccessibleName("subject_line")
+    // …and NOT the other way round: the mono arm is named by the key, never by an invention.
+    expect(within(modal).getByTestId("run-input-subject_line")).not.toHaveAccessibleName(
+      "Subject line",
+    )
+  })
+
+  it("no aXe structural violations with the fields rendered", async () => {
+    mockListPublished.mockResolvedValue([declaredInputsPublished])
+    const { modal } = await openRunModal()
+    within(modal).getByTestId("run-input-to")
+    expect(await axe(modal)).toHaveNoViolations()
+  })
+
+  it("the fields join the focus cycle in DOM order, and the trap's two ends are unchanged", async () => {
+    mockListPublished.mockResolvedValue([declaredInputsPublished])
+    const { modal } = await openRunModal()
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+      ),
+    )
+    // Unchanged ends: the ✕ is still first, the Run button still last (the 199-10 contract).
+    expect(focusables[0]).toBe(within(modal).getByTestId("run-modal-close"))
+    expect(focusables[focusables.length - 1]).toBe(within(modal).getByTestId("run-confirm"))
+    // The two fields are IN the cycle, in declaration order, after the kickoff textarea.
+    const kickoffAt = focusables.indexOf(within(modal).getByTestId("run-kickoff"))
+    const toAt = focusables.indexOf(within(modal).getByTestId("run-input-to"))
+    const subjectAt = focusables.indexOf(within(modal).getByTestId("run-input-subject_line"))
+    expect(toAt).toBeGreaterThan(kickoffAt)
+    expect(subjectAt).toBeGreaterThan(toAt)
+  })
+
+  it("POSITIVE CONTROL — the boundPublished fixture renders NO field, so the cycle is as shipped", async () => {
+    const { modal } = await openRunModal()
+    expect(within(modal).queryAllByTestId(/^run-input-/)).toHaveLength(0)
+    expect(within(modal).queryByTestId("run-hint")).toBeNull()
+  })
+})
