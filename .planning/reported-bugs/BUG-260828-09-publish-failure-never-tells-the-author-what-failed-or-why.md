@@ -146,3 +146,46 @@ rather than the stage spine.
 still names none** — it falls to the headline that shipped. That is correct, not a gap: there is
 no failing step to name. `BUG-260828-04` (a refusal the author cannot read) is a different defect
 and is untouched here.
+
+---
+
+# ⚠ SECOND DEFECT, FOUND ONLY BY DRIVING IT — RENDERING THE ANSWER IS NOT SHOWING IT
+
+The card shipped, rendered correctly, and **was 399 pixels above the fold.** Measured in a real
+browser on a real failed publish of `Summarize DeepWiki structure and post to Slack`
+(golden run `22bbf8bb`, 2026-08-28 23:16):
+
+```
+scroller  scrollTop 713 of scrollHeight 1254   (clientHeight 493)
+publish-blocked-step   top -399      ← the answer
+verdict-headline       top  -69
+raw-verdict            top   63      ← ON SCREEN
+golden-no-send         top  408      ← ON SCREEN
+document.activeElement = <summary> "Show raw verdict — the 5 server fields, verbatim"
+```
+
+**The cause is FOCUS, not layout.** The publish form unmounts when the verdict arrives, so the
+browser hands focus to the first focusable element in the replacement content — the raw-verdict
+disclosure — and scrolls it into view. ⭐ **The surface was aiming the reader's eye at the machine
+fields and leaving the plain sentence off-screen above.** That is the operator's original complaint
+restated as a DOM fact: *"a lot of information are displayed and none of them are useful."*
+
+**Fix:** on verdict arrival, focus and scroll the LEADING ANSWER into view — the cause card when
+one rendered, else the verdict headline. ⚠ **Scrolling to the top would be wrong on the arm that
+has no card**: a judge block names no step, so its answer IS the headline below the spine. Both
+anchors carry `tabIndex={-1}`, so no new keyboard tab stop is added.
+
+**After:** card top `105` against scroll-port top `98`, `fullyVisible: true`, focus on the card.
+
+## ⚠ THE IRONY IS THE FINDING, AND IT IS WORTH KEEPING
+
+`scrollIntoView` had to be guarded because **jsdom does not implement it** — unguarded it threw
+`TypeError` and took **44 of `PublishGauntlet.test.tsx`'s cases** down. So the SAME jsdom limitation
+that hid the original defect for a whole phase (no layout, no viewport, no scrolling) also makes its
+fix **unrunnable and therefore uncovered** in this repo's suite. That line is verified by exactly one
+thing: a browser drive. **A green frontend suite is not evidence about anything a person has to SEE.**
+
+## Cost of the two drives
+
+Two real golden runs on the DeepWiki draft (it stays a draft — a refused publish changes nothing,
+and D-16 records-not-sends, so nothing left the workflow). Both blocked at the same honest gate.

@@ -47,6 +47,9 @@ import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib
 // is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { PublishBlockedStepCard } from "@/components/workflows/PublishBlockedStepCard"
+// The SAME predicate the card uses to decide whether it renders — imported, never re-spelled,
+// so the anchor and the card can never disagree about whether a cause block exists.
+import { blockedStepOf } from "@/components/workflows/publishBlockedStep"
 import type { DefShape } from "@/components/workflows/soulData"
 // Phase 186-05 (CONCUR-02, D-186-11) — the worded refusal. The map + its total resolver
 // live in the pure verdict module, next to the other sentences a surface says about a
@@ -781,6 +784,47 @@ function GauntletContent({
     verdict.golden_run_id != null &&
     !(verdict.blocked_stage != null && GOLDEN_RUN_CODES.includes(verdict.blocked_stage))
 
+  // ── BUG-260828-09 — RENDERING THE ANSWER IS NOT SHOWING IT ───────────────────────────
+  //
+  // ⚠ MEASURED IN A REAL BROWSER, ON A REAL FAILED PUBLISH (2026-08-28), and NOT catchable
+  // from inside jsdom — which is why it survived a green suite. On arrival the modal body
+  // sat at `scrollTop 713` of `scrollHeight 1254`: the cause card was at `top: -399`, the
+  // verdict headline at `-69`, and the two things actually ON SCREEN were the **raw-verdict
+  // disclosure** and the no-send note.
+  //
+  // THE CAUSE IS FOCUS, NOT LAYOUT. The publish FORM unmounts when the verdict arrives, so
+  // the browser hands focus to the first focusable element in the replacement content — the
+  // `<summary>` of *"Show raw verdict — the 5 server fields, verbatim"* — and scrolls it into
+  // view. `document.activeElement` on that real run was exactly that summary. So the surface
+  // was AIMING THE READER'S EYE AT THE MACHINE FIELDS and leaving the plain sentence four
+  // hundred pixels above the fold. That is the operator's complaint restated as a DOM fact:
+  // *"a lot of information are displayed and none of them are useful."*
+  //
+  // ⚠ SCROLLING TO THE TOP IS THE WRONG FIX, and it is wrong on the arm that has no card. A
+  // judge block names no step, so its answer IS the verdict headline BELOW the spine —
+  // scrolling to the top would replace one hidden answer with another. The anchor is
+  // therefore the LEADING ANSWER that actually rendered: the cause card when there is one,
+  // else the headline. Both carry `tabIndex={-1}` so focus is programmatic only and no new
+  // tab stop is added for keyboard users.
+  const causeAnchorRef = useRef<HTMLDivElement>(null)
+  const headlineAnchorRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (outcome == null) return
+    const anchor = causeAnchorRef.current ?? headlineAnchorRef.current
+    if (!anchor) return
+    // `preventScroll` then an explicit `scrollIntoView`: focusing alone scrolls the element to
+    // wherever the browser likes, and we want its TOP against the top of the scroll port.
+    anchor.focus({ preventScroll: true })
+    // ⚠ THE GUARD IS NOT DEFENSIVE PADDING — jsdom DOES NOT IMPLEMENT `scrollIntoView` AT ALL.
+    // Unguarded, this threw `TypeError: anchor.scrollIntoView is not a function` and took 44 of
+    // `PublishGauntlet.test.tsx`'s cases down with it, measured here rather than reasoned about.
+    // The irony is the finding: the SAME jsdom limitation that made this defect invisible for a
+    // phase — no layout, no scrolling, no viewport — is what makes its fix unrunnable there. So
+    // the guard is required, and it also means NO TEST IN THIS REPO COVERS THE LINE BELOW. It
+    // was verified the only way it can be: driven in a real browser on a real failed publish.
+    if (typeof anchor.scrollIntoView === "function") anchor.scrollIntoView({ block: "start" })
+  }, [outcome])
+
   return (
     <div className="w-full">
       {/* Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③): the PREPENDED pub-scale
@@ -827,7 +871,14 @@ function GauntletContent({
           is passed so the face resolves through `nodeTitle`'s ladder; absent, the card still
           renders and falls back to the server's name and then to the step's ordinal — never
           to the slug. */}
-      <PublishBlockedStepCard step={verdict?.blocked_step} definition={definition} />
+      {/* The anchor wraps rather than replaces the card, so `PublishBlockedStepCard` keeps
+          rendering `null` on every stage that names no step — and the ref is then also null,
+          which is exactly what makes the effect above fall through to the headline. */}
+      {blockedStepOf(verdict?.blocked_step) != null && (
+        <div ref={causeAnchorRef} tabIndex={-1} className="scroll-mt-2 outline-none">
+          <PublishBlockedStepCard step={verdict?.blocked_step} definition={definition} />
+        </div>
+      )}
 
       {/* THE SPINE IS CONTEXT, AND IT SITS BELOW THE ANSWER — the same reason the refusal
           list above does. A person reads WHAT IS WRONG before they read WHERE IT STOPPED;
@@ -996,7 +1047,10 @@ function GauntletContent({
                 <span className="flex-none text-4xl leading-none" aria-hidden>
                   {isSuccess ? "🎉" : verdict.blocked_stage === "judge" ? "⚖️" : "⛔"}
                 </span>
-                <div className="min-w-0 flex-1">
+                {/* The FALLBACK anchor (BUG-260828-09). Used only when no cause card
+                    rendered — a judge block, a lint block, a stage that names no step —
+                    because on those arms this headline IS the leading answer. */}
+                <div ref={headlineAnchorRef} tabIndex={-1} className="min-w-0 flex-1 scroll-mt-2 outline-none">
                   <div
                     data-testid="verdict-headline"
                     className={`text-[17px] font-bold leading-snug ${isSuccess ? "text-success" : "text-destructive"}`}
