@@ -65,6 +65,7 @@ import { createStore, type StoreApi } from "zustand/vanilla"
 import { temporal, type TemporalState } from "zundo"
 
 import { fromCanvas, type CanvasNode } from "@/components/workflows/canvasModel"
+import type { DeclaredInput } from "@/components/workflows/declaredInputs"
 import {
   addPhase,
   insertPhaseAt,
@@ -306,6 +307,11 @@ export interface BuilderStoreState extends TrackedSlice {
   setName: (name: string) => void
   /** Phase 205 (STATE-01 / D-07) — Toggle stateful / living register mode. */
   setIsStateful: (isStateful: boolean) => void
+  /** Phase 214.1 (STEP-02 / D-214.1-01) — write the workflow's declared launch inputs, the
+   *  SIXTH `meta`-writing sibling and the ONE write path for `definition.inputs[]`. Untracked,
+   *  and arms `dirty` itself for the same reason the five actions above it do; see its
+   *  implementation docblock in the factory below. */
+  setDeclaredInputs: (inputs: readonly DeclaredInput[]) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -835,6 +841,50 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, is_stateful: isStateful }, dirty: true })
+        },
+
+        /**
+         * Phase 214.1 (STEP-02 · D-214.1-01) — write the workflow's DECLARED LAUNCH INPUTS.
+         *
+         * A SIXTH STRUCTURAL MIRROR of `setProjectFolder` / `setBusinessRequirement` /
+         * `setTemplateAsset` / `setName` / `setIsStateful` above, deliberately: same field
+         * class (`meta`), same failure shape, same reasons. It is the ONE write path for
+         * `definition.inputs[]`, which matters more here than for its siblings — a SECOND
+         * writer is how `tool_args` became confusing, and D-214.1-01 exists to prevent it.
+         *
+         * ⚠ WHY IT LIVES AT THE DEFINITION LEVEL AND NOT ON THE PHASE FORM. `inputs[]` is a
+         * property of the WORKFLOW, not of a step: several steps can source from one input,
+         * and an input can exist before any step uses it. Putting the write on a phase-scoped
+         * action would make a definition-level fact look phase-owned and force a second copy
+         * the moment a second step used it.
+         *
+         * ⚠ IT WRITES EXACTLY ONE `meta` KEY, AND THE ENTRIES ARE PLAIN OBJECTS.
+         * `selectDefinition` spreads `meta` STRAIGHT into the autosave PATCH body, so anything
+         * this action puts on `meta` ships — and the definition model is `extra="forbid"`, as
+         * is `InputFieldSpec` itself. A stray key on an ENTRY is therefore a 422 that would
+         * destroy the write on the first autosave, exactly as a stray key on `meta` would. The
+         * entry shape is minted in ONE place (`declaredInputs.declaredInputFor`) so the fence
+         * is one assertion rather than a discipline every call site must remember.
+         *
+         * ⚠ NO VALIDATION HERE, deliberately. Refusing a reserved, duplicate or empty key is
+         * the EDITOR's job, because a refusal an author cannot read is not a refusal — the
+         * reason has to reach a screen. This action states what the door decided, exactly as
+         * `setName` states what the author typed. A silent drop here would be the shape of
+         * `BUG-260826-01`: a control a person uses whose value reaches nothing.
+         *
+         * WHY IT SETS `dirty` EXPLICITLY. Identical to its five siblings' reason: the
+         * subscription below arms `dirty` on a change to the **`phases`** reference and on
+         * nothing else. Writing and arming in ONE `set()` is what makes that impossible to
+         * forget at a second call site.
+         *
+         * WHY IT IS UNTRACKED. `partialize` narrows the undo stack to `phases` plus the two
+         * edit discriminators. An undo restores STEPS, never the workflow's identity — and a
+         * declared input is identity, not structure.
+         */
+        setDeclaredInputs: (inputs) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          set({ meta: { ...s.meta, inputs: [...inputs] }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

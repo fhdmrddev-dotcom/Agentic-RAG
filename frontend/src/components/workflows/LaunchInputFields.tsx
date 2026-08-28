@@ -1,4 +1,5 @@
 import type { EntryInputField } from "@/components/workflows/soulData"
+import { ARG_OPTIONAL_MARK, ARG_REQUIRED_MARK } from "@/components/workflows/argumentVocabulary"
 
 /**
  * Phase 214-12 (STEP-02 / D-214-04) — THE ONE declared-input field renderer.
@@ -55,6 +56,32 @@ import type { EntryInputField } from "@/components/workflows/soulData"
  * already refuses a workflow whose `ask` key is undeclared; a launcher that blocked on an empty
  * optional field would refuse a run the system can perform. An empty field sends an empty string
  * and the executor's schema is the arbiter.
+ *
+ * ── 214.1-01 (STEP-02) — REQUIREDNESS IS NOW SHOWN, AND STILL NOT ENFORCED ────────────
+ *
+ * `InputFieldSpec.required` (`bool = True`) has always travelled inside
+ * `WorkflowDefinition.inputs`; `soulData`'s read-shape threw it away, so all three doors drew
+ * a required field and an optional one identically. `entryInputFields` now carries it and this
+ * component renders it as a MARK, from `argumentVocabulary`'s SHIPPED `ARG_REQUIRED_MARK` /
+ * `ARG_OPTIONAL_MARK` rather than a third copy of the words the argument form already says.
+ *
+ * ⛔ AND THE CONFIRM CONTROL IS STILL NOT BLOCKED — the paragraph above stands, and this one
+ * says WHY it stands rather than leaving the omission to look like an oversight:
+ *
+ *   1. Blocking would change the contract of THREE shipped launch doors from Phase 214 (the
+ *      library Run modal, the chat launch form, the schedule form) in a plan that ships a mark.
+ *   2. Nothing silently succeeds today. The SMTP adapter and the publish gate BOTH fail closed
+ *      on an empty required argument, so an empty box produces a refusal that names itself —
+ *      not a run that quietly does the wrong thing.
+ *   3. A client-side block would be a second copy of a server predicate (D-182-06), and the
+ *      weaker copy: this component cannot see the action's schema.
+ *
+ * ⚠ RE-OPEN TRIGGER, recorded here rather than in a plan file: **the next phase that touches a
+ * launcher's confirm control takes the block.** At that point the change is one place and the
+ * mark is already rendered; today it would be three doors and a new refusal vocabulary.
+ *
+ * ⚠ THE MARK IS AN ADDITION, NOT A THIRD ARM. The label/key rule above is untouched and the
+ * label reading is still the FIRST span inside the `<label>`; the mark follows it.
  */
 export function LaunchInputFields({
   fields,
@@ -71,20 +98,54 @@ export function LaunchInputFields({
   return (
     <div data-testid="run-inputs" className="flex flex-col gap-4">
       {fields.map((f) => (
-        <label key={f.key} className="flex flex-col gap-1">
-          {f.label ? (
-            <span className="text-[13px] font-medium text-foreground">{f.label}</span>
-          ) : (
-            <span className="font-mono text-[13px] font-medium text-foreground">{f.key}</span>
-          )}
-          <input
-            type="text"
-            data-testid={`run-input-${f.key}`}
-            value={values[f.key] ?? ""}
-            onChange={(e) => onChange(f.key, e.target.value)}
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </label>
+        <div key={f.key} className="flex flex-col gap-1">
+          {/* ⚠ THE MARK SITS OUTSIDE THE `<label>`, AND THAT PLACEMENT IS THE WHOLE POINT.
+              An input WRAPPED by a label takes the label's entire text content as its
+              ACCESSIBLE NAME — so a mark rendered inside it produced `"Recipient emailRequired"`,
+              which turned `RunModal.test.tsx`'s *"an AUTHORED label IS the accessible name"* red.
+              That was a REAL accessibility regression, not a stale pin: the field's name would
+              have stopped being the author's words, which is this component's whole contract.
+
+              ⛔ `aria-hidden` on the mark was the cheaper fix and is REFUSED: it would keep the
+              name clean by making requiredness a sighted-only signal, which is the same class of
+              dishonesty the two-arm rule exists to prevent. So the label OWNS the name and the
+              mark is a DESCRIPTION, announced after it by any AT that reads `aria-describedby`.
+
+              ⚠ The id is derived from the key rather than from `useId`, deliberately: this is a
+              fenced LEAF with no hooks at all, and `f.key` is unique within a definition. Only
+              one launch form is ever on screen at a time (three doors, none concurrent). */}
+          {/* ⚠ THE `<label>`'S OWN CHILDREN ARE UNCHANGED — face span, then input, in that
+              order and with nothing between them. Three shipped cases read the face as
+              `input.parentElement.querySelector("span")` and one reads it as
+              `input.previousElementSibling`, so the span and the input MUST stay direct
+              siblings under the label. Both shapes were driven; both went red when they were
+              not. */}
+          <label className="flex flex-col gap-1">
+            {f.label ? (
+              <span className="text-[13px] font-medium text-foreground">{f.label}</span>
+            ) : (
+              <span className="font-mono text-[13px] font-medium text-foreground">{f.key}</span>
+            )}
+            <input
+              type="text"
+              aria-describedby={`run-field-mark-${f.key}`}
+              data-testid={`run-input-${f.key}`}
+              value={values[f.key] ?? ""}
+              onChange={(e) => onChange(f.key, e.target.value)}
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+          {/* ⚠ ABSENT reads REQUIRED — `InputFieldSpec.required` is `bool = True`, and
+              `entryInputFields` already normalised that. This renders the answer; it does not
+              re-derive it. */}
+          <span
+            id={`run-field-mark-${f.key}`}
+            data-testid={`run-field-mark-${f.key}`}
+            className="text-[11px] text-muted-foreground"
+          >
+            {f.required === false ? ARG_OPTIONAL_MARK : ARG_REQUIRED_MARK}
+          </span>
+        </div>
       ))}
     </div>
   )

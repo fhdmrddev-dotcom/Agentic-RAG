@@ -46,6 +46,9 @@ import {
   type TemplateAdmission,
   type DefShape,
 } from "./soulData"
+// Plan 214.1-01 Task 3, as SEPARATE statements so this file's diff stays additive.
+import { entryInputFields, launchInputFields } from "./soulData"
+import { declaredInputFor } from "./declaredInputs"
 
 /** A strict workflow: a terminal llm_emit with citation_policy "strict" → STRICT. */
 const strictDef: DefShape = {
@@ -624,6 +627,85 @@ describe("soulData.terminalEmitSlug — WHICH step makes the file (D-18)", () =>
       // claim and not two reads of something that never changes.
       expect(after.label).not.toBe(before.label)
     }
+  })
+})
+
+// ── Phase 214.1-01 Task 3 (STEP-02) — `required` reaches the launcher, and a label
+//    equal to its key is an ABSENCE ────────────────────────────────────────────────────
+//
+// ⭐ WHY THE `label === key` ARM EXISTS. `declaredInputFor` writes `label: key`, because
+// `InputFieldSpec.label` is a required `str` and inventing a friendly name would fabricate
+// words no author wrote. Downstream, `LaunchInputFields`'s two-arm rule prints an AUTHORED
+// label in the body face and a bare key in the MONO face — so without this arm every
+// one-click declaration would render in the body face, telling the reader a human phrased
+// that word. A label identical to the key carries nothing the key does not.
+
+describe("soulData.entryInputFields — required, and the third absence arm (214.1)", () => {
+  it("carries an authored label AND required:true by default", () => {
+    expect(entryInputFields({ inputs: [{ key: "recipient", label: "Recipient" }] })).toEqual([
+      { key: "recipient", label: "Recipient", required: true },
+    ])
+  })
+
+  it("an ABSENT required reads true — InputFieldSpec.required defaults True", () => {
+    expect(entryInputFields({ inputs: [{ key: "a", label: "A" }] })[0].required).toBe(true)
+  })
+
+  it("an explicit required:false reads false", () => {
+    expect(
+      entryInputFields({ inputs: [{ key: "a", label: "A", required: false }] })[0].required,
+    ).toBe(false)
+  })
+
+  it("a label EQUAL to its key is an ABSENCE, not a value to print", () => {
+    const out = entryInputFields({ inputs: [{ key: "recipient", label: "recipient" }] })
+    expect(out).toEqual([{ key: "recipient", required: true }])
+    expect(out[0].label).toBeUndefined()
+
+    // POSITIVE CONTROL, same block: a genuinely different label SURVIVES. Without it this
+    // would pass just as happily against a resolver that dropped every label.
+    const authored = entryInputFields({ inputs: [{ key: "recipient", label: "Who to email" }] })
+    expect(authored[0].label).toBe("Who to email")
+  })
+
+  it("a whitespace-only label is still an absence (unchanged)", () => {
+    expect(entryInputFields({ inputs: [{ key: "a", label: "   " }] })[0].label).toBeUndefined()
+  })
+
+  it("a label equal to the key AFTER TRIMMING is also an absence", () => {
+    expect(
+      entryInputFields({ inputs: [{ key: "recipient", label: "  recipient  " }] })[0].label,
+    ).toBeUndefined()
+  })
+
+  it("input_keys STILL WINS over inputs[] — that precedence is UNTOUCHED", () => {
+    const out = entryInputFields({
+      input_keys: ["topic"],
+      inputs: [{ key: "ignored", label: "Ignored" }],
+    })
+    expect(out).toEqual([{ key: "topic", required: true }])
+  })
+
+  it("the editor's own output never mints an input_keys key — it would SHADOW every input", () => {
+    // `WorkflowDefinition` does not declare `input_keys` at all, and a definition carrying
+    // both would render the wrong form. The one minting site produces four keys and no more.
+    expect(Object.keys(declaredInputFor("recipient")).sort()).toEqual([
+      "key",
+      "label",
+      "required",
+      "type",
+    ])
+    expect(declaredInputFor("recipient")).not.toHaveProperty("input_keys")
+  })
+
+  it("launchInputFields carries required through, minus the reserved keys", () => {
+    const out = launchInputFields({
+      inputs: [
+        { key: "kickoff_prompt", label: "Nope" },
+        { key: "recipient", label: "Recipient", required: false },
+      ],
+    })
+    expect(out).toEqual([{ key: "recipient", label: "Recipient", required: false }])
   })
 })
 
