@@ -13,8 +13,30 @@
  *  #8 driven from the REAL `inputSchema`, extracted from the adapter's own source, so a row
  *     for an undeclared key cannot be invented by the fixture.
  */
-import { describe, it, expect, vi } from "vitest"
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+
+// ⚠ ONLY the API module is faked, and only for the reachability block at the bottom. No
+// provider is mocked, NO COMPONENT IS STUBBED, and no `ArgumentEditor` prop is constructed
+// there — that is the whole point of the leg. The three names are exactly the ones
+// `McpToolPicker` and `ConnectionPicker` import from this module; a factory missing one
+// throws AT MOUNT, which is what Phase 196 measured as `failed 249`.
+const { listMock, discoverMock, grantsMock } = vi.hoisted(() => ({
+  listMock: vi.fn(),
+  discoverMock: vi.fn().mockResolvedValue([]),
+  grantsMock: vi.fn().mockResolvedValue({}),
+}))
+vi.mock("@/lib/api", () => ({
+  listConnectorConnections: listMock,
+  discoverConnectorTools: discoverMock,
+  updateConnectorGrants: grantsMock,
+}))
+
+import { PhaseFormPanel } from "./PhaseFormPanel"
+import { BuilderStoreProvider } from "./BuilderStoreProvider"
+import { SelectedPhaseSlugProvider } from "./SelectedPhaseSlugContext"
+import { createBuilderStore } from "./builderStore"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 import { ArgumentEditor } from "./ArgumentEditor"
 import type { UpstreamPhase } from "./argumentModel"
@@ -509,5 +531,162 @@ describe("ArgumentEditor — #12/#13/#14/#15 the remaining absences", () => {
     // empty component.
     expect(editorSource).toMatch(/ARG_SECTION_HEADING/)
     expect(rowSource).toMatch(/ARG_SOURCE_GROUP_LABEL/)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ REACHABILITY — A DIFF SHAPE IS NOT A RENDER
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ `git diff --numstat` and *"exactly one added JSX element"* prove the code was WRITTEN.
+// They prove nothing at all about whether a person can reach it. **Phase 209's whole lesson
+// is *"shipped nothing to anyone"*** — sixteen browser checks green against a hand-flipped
+// flag, over a surface that rendered for no one. The repo's answer is the two-legged guard in
+// `McpToolPicker.reachability.test.tsx` and `__tests__/connectionCardReachability.test.tsx`,
+// and this block is that idiom copied rather than re-invented.
+//
+// THE TIER DISCIPLINE, restated because it is what makes this block worth its lines:
+//   T1 — every case ABOVE builds `ArgumentEditor`'s props by hand. That is right for the
+//        component's own contract and STRUCTURALLY UNABLE to see that nothing builds them.
+//   T3 — this block. The PRODUCTION parent (`PhaseFormPanel`), a real store, only `@/lib/api`
+//        faked, NOT ONE `ArgumentEditor` PROP CONSTRUCTED, and NOTHING between the panel and
+//        the editor stubbed. The whole chain runs: PhaseFormPanel → ExternalActionSection →
+//        ConnectionPicker → ArgumentEditor.
+//
+// ⚠ THE FEATURE FLAG, STATED HONESTLY RATHER THAN STUBBED INTO A CLAIM THIS CANNOT MAKE.
+// `PhaseFormPanel` reads NO feature gate — `useCanvasGate` is defined in
+// `pages/WorkflowBuilderPage.tsx` and consumed by `RunModal`/the door, never by this panel,
+// whose own `rails` docblock records why: it is ONE instance serving BOTH the shipped Spine
+// view and the flagged Canvas view. So this surface is flag-INDEPENDENT by construction and
+// there is nothing here to stub. ⭐ The authoritative COLD-READ assertion is `214-14`'s
+// `backend/tests/unit/test_214_flag_cold_default.py`, against `_GOVERNED_FEATURES` with no
+// `app_settings` row — that is where Phase 209's failure is actually fenced, and this case
+// must NOT be read as a substitute for it.
+
+const REACH_SLUG = "notify-the-owner"
+
+/** The WIRE shape of a first-party row, exactly as `GET /connectors/connections` returns it.
+ *  ⚠ Its `discovered_tools` entry is the DESCRIPTOR migration 127 §2b writes — the action's
+ *  name IS the capability, which is what lets one action list serve both shapes. */
+const REACH_ROW: Record<string, unknown> = {
+  id: "conn-slack",
+  org_id: "org-1",
+  service_id: "slack",
+  capability: "post_message",
+  name: "#ops-alerts",
+  config: { default_channel: "ops-alerts" },
+  is_enabled: true,
+  last_check_verdict: "ok",
+  tool_grants: {},
+  discovered_tools: [
+    {
+      name: "post_message",
+      title: "Post message",
+      description: "Post one plain-text message to the channel configured on this connection.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text"],
+        properties: { text: { type: "string", description: "The message." } },
+      },
+    },
+  ],
+}
+
+function reachPhases(phaseType: string): PhaseSpecJSON[] {
+  return [
+    {
+      slug: "draft-the-note-b2",
+      phase_index: 0,
+      name: "Draft the note",
+      config: { phase_type: "llm_single" },
+    } as unknown as PhaseSpecJSON,
+    {
+      slug: REACH_SLUG,
+      phase_index: 1,
+      config: {
+        phase_type: phaseType,
+        // The two facts an author has already answered by this point, and nothing else. The
+        // arguments themselves are EMPTY — the editor must appear from the SCHEMA, not from
+        // stored values, or it would only ever show up for a step somebody already finished.
+        connection_id: "conn-slack",
+        capability: "post_message",
+      },
+    } as unknown as PhaseSpecJSON,
+  ]
+}
+
+/** ⚠ NOTHING BELOW THE PANEL IS STUBBED. The only thing supplied is the WIRE RESPONSE. */
+function renderPanel(phaseType: string) {
+  const store = createBuilderStore({
+    slug: "vendor-brief",
+    version: 1,
+    phases: reachPhases(phaseType),
+  })
+  listMock.mockResolvedValue([REACH_ROW])
+  const phase = store.getState().phases[1]
+  return render(
+    <BuilderStoreProvider store={store}>
+      <SelectedPhaseSlugProvider slug={REACH_SLUG}>
+        <PhaseFormPanel
+          phase={phase}
+          open
+          onChange={(patch) => store.getState().patchConfig(REACH_SLUG, patch)}
+          onPersist={() => store.getState().flushHistory()}
+          onClose={NOOP}
+        />
+      </SelectedPhaseSlugProvider>
+    </BuilderStoreProvider>,
+  )
+}
+
+describe("⭐ REACHABILITY — the editor renders through the REAL mount chain", () => {
+  beforeEach(() => {
+    listMock.mockReset()
+    discoverMock.mockClear()
+  })
+
+  it("⭐ PhaseFormPanel → ExternalActionSection → ConnectionPicker → ArgumentEditor", async () => {
+    renderPanel("external_action")
+
+    // The chain, link by link, so a break is diagnosable in one read rather than one bit.
+    expect(await screen.findByTestId("external-action-section")).toBeTruthy()
+    expect(await screen.findByTestId("connection-picker")).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeTruthy())
+
+    // ⭐ THE EDITOR'S OWN MARKER NODE, reached without anyone constructing a prop for it.
+    const editor = await screen.findByTestId("argument-editor")
+    expect(editor.getAttribute("data-arg-state")).toBe("fields")
+
+    // …AND AT LEAST ONE ARGUMENT ROW'S SOURCE CONTROL — the thing a person operates. A
+    // marker node alone would pass against a section that rendered its heading and nothing.
+    const groups = within(editor).getAllByRole("radiogroup", { name: ARG_SOURCE_GROUP_LABEL })
+    expect(groups.length).toBeGreaterThanOrEqual(1)
+    expect(within(groups[0]).getAllByRole("radio")).toHaveLength(3)
+
+    // The field really came from the adapter's declared schema, not from a stored value.
+    expect(within(editor).getAllByTestId("argument-row")).toHaveLength(1)
+  })
+
+  it("⭐ NEGATIVE CONTROL — an `llm_single` step renders NO editor at all", async () => {
+    // Without this, the case above would pass against a panel that rendered the editor
+    // unconditionally, which is a different feature and a worse one.
+    renderPanel("llm_single")
+    await waitFor(() => expect(screen.queryByTestId("external-action-section")).toBeNull())
+    expect(screen.queryByTestId("argument-editor")).toBeNull()
+    expect(screen.queryByTestId("connection-picker")).toBeNull()
+  })
+
+  it("⛔ and no free-form control appears anywhere on the panel for this step", async () => {
+    // The tree-wide claim, made where a person actually stands. POSITIVE CONTROL first.
+    expect("a <text".concat("area/>").toLowerCase()).toContain("<text" + "area")
+    const { container } = renderPanel("external_action")
+    await screen.findByTestId("argument-editor")
+    const html = container.innerHTML.toLowerCase()
+    for (const needle of ["js" + "on", "tool arg" + "uments", "key" + "-value"]) {
+      expect(html.includes(needle), needle).toBe(false)
+    }
+    // NON-VACUITY: the panel really rendered a substantial surface.
+    expect(html.length).toBeGreaterThan(2000)
   })
 })

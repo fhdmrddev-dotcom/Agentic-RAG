@@ -201,13 +201,9 @@ function renderChain(rows: Record<string, unknown>[]) {
   const view = render(
     <BuilderStoreProvider store={store}>
       <SelectedPhaseSlugProvider slug={SLUG}>
-        <ExternalActionSection
-          capability=""
-          toolName=""
-          onChange={(value) => store.getState().patchConfig(SLUG, { capability: value })}
-          onChangeShape={(patch) => store.getState().patchConfig(SLUG, patch)}
-          onPersist={() => store.getState().flushHistory()}
-        />
+        {/* ⚠ 214-07 — the three dead write props came off this call with their own recorded
+            re-open trigger. They had no caller inside the section since 211-04. */}
+        <ExternalActionSection capability="" toolName="" />
       </SelectedPhaseSlugProvider>
     </BuilderStoreProvider>,
   )

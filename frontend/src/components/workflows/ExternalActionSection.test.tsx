@@ -217,31 +217,44 @@ describe("ExternalActionSection — the write moved, and this leaf makes none", 
     // ⚠ REPLACES the shipped `writes the capability NAME (never the sentence) and commits
     // it`, and its arrow-key siblings. The write did not disappear — it moved to
     // `ConnectionPicker`, the only child on this surface holding a store reference, where
-    // it is asserted directly. What is owed HERE is the negative: this leaf, which still
-    // ACCEPTS the three seams so `PhaseFormPanel.tsx` need not be edited, never calls them.
-    const onChange = vi.fn()
-    const onChangeShape = vi.fn()
-    const onPersist = vi.fn()
+    // it is asserted directly.
+    //
+    // ⚠ 214-07 — THE SPY HALF OF THIS CASE IS GONE BECAUSE THE PROPS ARE, and the assertion
+    // it made is now stronger rather than weaker: the seams cannot be called because they no
+    // longer exist. Rendering every state and finding no write is the residual obligation,
+    // and it is what the states below still prove.
     for (const props of [
       { capability: "" },
       { capability: "send_email" },
       { toolName: "ask_question" },
     ]) {
-      const { unmount } = renderSection({ ...props, onChange, onChangeShape, onPersist })
+      const { container, unmount } = renderSection(props)
+      // NON-VACUITY: each state really rendered the section.
+      expect(container.querySelector('[data-testid="external-action-section"]')).not.toBeNull()
       unmount()
     }
-    expect(onChange).not.toHaveBeenCalled()
-    expect(onChangeShape).not.toHaveBeenCalled()
-    expect(onPersist).not.toHaveBeenCalled()
   })
 
-  it("the props are still ACCEPTED — the panel's call site is untouched by this plan", () => {
-    // A named debt rather than a silent one: removing them would edit `PhaseFormPanel.tsx`,
-    // which is outside this plan's `files_modified` and therefore outside its review.
-    expect(externalActionSectionSource).toContain("onChange?")
-    expect(externalActionSectionSource).toContain("onChangeShape?")
-    expect(externalActionSectionSource).toContain("onPersist?")
-    expect(externalActionSectionSource).toContain("RE-OPEN TRIGGER")
+  it("⭐ the three dead write props are GONE, on their OWN recorded re-open trigger", () => {
+    // ⚠ THIS CASE IS THE INVERSE OF THE ONE IT REPLACES, WHICH READ *"the props are still
+    // ACCEPTED — the panel's call site is untouched by this plan"*. 211-04 kept them and
+    // wrote down the exact condition for removing them: *the first phase whose
+    // `files_modified` names `PhaseFormPanel.tsx`*. 214-07 is that phase, so the debt is
+    // paid rather than re-dated — and a removed assertion and a removed feature look
+    // identical in a count, which is why this replaces it instead of deleting it.
+    //
+    // Needles assembled at runtime: this file's own prose names all three above, and a fence
+    // that spells its needle counts itself (the 187-24 trap).
+    for (const prop of ["on" + "Change?", "on" + "ChangeShape?", "on" + "Persist?"]) {
+      expect(externalActionSectionSource, prop).not.toContain(prop)
+    }
+    // POSITIVE CONTROL — the matcher really matches an optional-prop declaration.
+    expect("  onChange" + "?: (v: string) => void").toContain("on" + "Change?")
+    // …and the source really is the section's, so the absence is not an empty read.
+    expect(externalActionSectionSource).toContain("export function ExternalActionSection")
+    // The prop contract that REMAINS is exactly the two facts the section renders from.
+    expect(externalActionSectionSource).toContain("capability: string")
+    expect(externalActionSectionSource).toContain("toolName: string")
   })
 })
 
@@ -474,5 +487,98 @@ describe("ExternalActionSection — the client mirror agrees with the backend Li
     // consumer: it is what makes an UNRECOGNISED stored capability derive nothing, which the
     // T-189-39 case above drives as behaviour.
     expect(externalActionSectionSource).toContain("EXTERNAL_ACTION_CAPABILITIES.includes(capability)")
+  })
+})
+
+// ── 8. ⭐ 214-07 — THE SOURCE FENCES, EXTENDED TO THE TWO NEW COMPONENTS ─────────────
+//
+// ⚠ EXTENDED, NEVER RESTATED. This section's fences (§6) are the house rules for a LEAF on
+// this surface, and `ArgumentEditor` / `ArgumentRow` are two more leaves under it. Writing
+// them a second, private copy of the rules inside their own suite would create two homes for
+// one property — which is the drift the one-constant-read-twice rule exists to prevent — so
+// the rules are applied FROM HERE, over the same `?raw` loader, in one loop.
+
+describe("214-07 · the argument leaves obey THIS section's fences", () => {
+  const LEAVES = ["ArgumentEditor.tsx", "ArgumentRow.tsx", "argumentModel.ts"] as const
+
+  const sourcesOf = (): Record<string, string> => {
+    const modules = import.meta.glob("/src/**/*.{ts,tsx}", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>
+    // ⚠ NON-VACUITY FIRST — an empty glob makes every absence below FREE, and that failure is
+    // invisible. Asserted before any claim rests on it.
+    expect(Object.keys(modules).length).toBeGreaterThan(200)
+    const picked: Record<string, string> = {}
+    for (const leaf of LEAVES) {
+      const source = modules[`/src/components/workflows/${leaf}`]
+      expect(typeof source, `${leaf} is not in the glob`).toBe("string")
+      expect(source.length, leaf).toBeGreaterThan(1000)
+      picked[leaf] = source
+    }
+    return picked
+  }
+
+  it("they import nothing from the API client and open no request", () => {
+    for (const [leaf, source] of Object.entries(sourcesOf())) {
+      expect(source, leaf).not.toMatch(/from\s+["']@\/lib\/api["']/)
+      expect(source, leaf).not.toMatch(/fetch\(/)
+      expect(source, leaf).not.toMatch(/XMLHttpRequest|EventSource|navigator\.sendBeacon/)
+      expect(source, leaf).not.toMatch(/["'`]\/(workflows|api)\//)
+    }
+  })
+
+  it("they are LEAVES — no context, no store, no effect", () => {
+    for (const [leaf, source] of Object.entries(sourcesOf())) {
+      expect(source, leaf).not.toMatch(/useContext|useStore|useEffect|useSyncExternalStore|zustand/)
+    }
+  })
+
+  it("they carry NO title attribute — guidance cannot regress into a tooltip", () => {
+    for (const [leaf, source] of Object.entries(sourcesOf())) {
+      expect(source, leaf).not.toMatch(/title=/)
+    }
+  })
+
+  it("no forbidden spacing value, weight or dead colour utility enters them", () => {
+    for (const [leaf, source] of Object.entries(sourcesOf())) {
+      for (const needle of [
+        "p-0.5",
+        "gap-0.5",
+        "py-2.5",
+        "space-y-",
+        "font-semibold",
+        "font-bold",
+        "text-panel-",
+        "text-muted-foreground-dim",
+      ]) {
+        expect(source, `${leaf} · ${needle}`).not.toContain(needle)
+      }
+    }
+  })
+
+  it("⛔ NO CAPABILITY ID IS SPELLED IN EITHER COMPONENT — the shape stays in the caller", () => {
+    // D-214-05's structural half: one renderer over one `inputSchema`, no capability branch.
+    // The map that DOES name the three ids lives in `ConnectionPicker`, which is allowed to
+    // know a connection's shape and is fenced against its own backend twin over there.
+    for (const [leaf, source] of Object.entries(sourcesOf())) {
+      for (const name of EXTERNAL_ACTION_CAPABILITIES) {
+        expect(source, `${leaf} · ${name}`).not.toContain(`"${name}"`)
+      }
+    }
+  })
+
+  it("those fences are real — each pattern matches its planted literal", () => {
+    expect('import { x } from "@/lib/api"').toMatch(/from\s+["']@\/lib\/api["']/)
+    expect('const r = await fetch("/x")').toMatch(/fetch\(/)
+    expect("new EventSource(url)").toMatch(/XMLHttpRequest|EventSource|navigator\.sendBeacon/)
+    expect('const r = get("/workflows/x")').toMatch(/["'`]\/(workflows|api)\//)
+    expect("const s = useStore(store)").toMatch(
+      /useContext|useStore|useEffect|useSyncExternalStore|zustand/,
+    )
+    expect('<span title="why">x</span>').toMatch(/title=/)
+    expect('class="p-0.5 font-semibold"').toContain("p-0.5")
+    expect('const a = "send_email"').toContain('"send_email"')
   })
 })

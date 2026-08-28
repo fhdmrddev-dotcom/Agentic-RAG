@@ -500,28 +500,32 @@ describe("⚠ argumentVocabulary — THE ESCAPE HATCH IS ABSENT, AND THE ABSENCE
     }
 
     /**
-     * ⚠ THE ONE OFFENDER THAT EXISTS TODAY, DECLARED RATHER THAN EXCLUDED BY A LOOSER RULE.
+     * ⭐ 214-07 HAS LANDED, SO THE LIST IS EMPTY — AND THE MECHANISM THAT EMPTIED IT WORKED
+     * EXACTLY AS 214-03 DESIGNED IT.
      *
-     * `McpToolPicker.tsx` still exports the label sketch 214 #1 forbids; **plan `214-07` owns
-     * its deletion**, and this plan owns only the vocabulary half of D-214-06. Declaring it
-     * keeps the fence tree-wide and green today, and the case below makes the entry
-     * SELF-RETIRING: an exemption that is no longer offending is a red test, so `214-07`
-     * cannot land its deletion and leave a fiction behind here.
+     * This list read `["/src/components/workflows/McpToolPicker.tsx"]`, declared by `214-03`
+     * as a bridge with a self-retiring guard attached: a case below asserted each exemption
+     * STILL offended, so the moment `214-07` deleted the label the exemption went RED and
+     * forced its own removal rather than surviving as a fiction. That is what happened; the
+     * message it failed with named this plan by number.
+     *
+     * ⛔ NOTHING MAY BE ADDED BACK. An escape-hatch label anywhere under `workflows/` is now
+     * an unconditional failure, with no category of exception — which is what SC#1 asks for
+     * and what `214-03`'s companion case (*"the NEW argument vocabulary is not on the
+     * exemption list, and never will be"*) already said out loud.
      */
-    const DECLARED_OFFENDERS = ["/src/components/workflows/McpToolPicker.tsx"]
+    const DECLARED_OFFENDERS: string[] = []
     expect([...new Set(offenders)].sort()).toEqual(DECLARED_OFFENDERS)
 
-    // …and the declared exemption is not a dead entry excusing something that no longer
-    // exists. Each one must ACTUALLY still carry the identifier, assembled at runtime.
+    // …and the identifier the bridge existed for is gone from the WHOLE swept tree, not just
+    // from the file that used to declare it. Assembled at runtime (the 187-24 trap).
     const forbiddenIdentifier = "MCP_TOOL_" + "ARGS_LABEL"
-    for (const path of DECLARED_OFFENDERS) {
-      const source = modules[path]
-      expect(source, `${path} is no longer in the tree`).toBeTypeOf("string")
-      expect(
-        source.includes(forbiddenIdentifier),
-        `${path} no longer offends — remove it from DECLARED_OFFENDERS (214-07 has landed)`,
-      ).toBe(true)
+    for (const [path, source] of workflowModules) {
+      if (path.includes(".test.")) continue
+      expect(source.includes(forbiddenIdentifier), `${path} still names it`).toBe(false)
     }
+    // POSITIVE CONTROL for that sweep — the needle really can be found.
+    expect(`export const ${forbiddenIdentifier} = "x"`).toContain(forbiddenIdentifier)
 
     // POSITIVE CONTROL — the copy matcher really finds an exported literal.
     const planted = 'export const DEMO_LABEL = "Tool Arguments (JS' + 'ON)"'

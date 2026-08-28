@@ -34,7 +34,6 @@ import { AlertTriangle, CheckCircle2, RefreshCw, Wrench } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { discoverConnectorTools, updateConnectorGrants } from "@/lib/api"
 import type { ConnectorConnection, McpDiscoveredTool, ToolGrantPosture } from "@/lib/api"
 // ⚠ `useOrgOptional`, NEVER `useOrg` — the latter THROWS outside a provider and six shipped
@@ -65,7 +64,6 @@ export const MCP_GRANT_GRANTED_LABEL = "Permission Granted"
 export const MCP_GRANT_DENIED_LABEL = "Permission Not Granted"
 export const MCP_GRANT_DENIED_WARNING =
   "This tool is not granted permission on this connection. Execution will be refused by policy at run time."
-export const MCP_TOOL_ARGS_LABEL = "Tool Arguments (JSON)"
 
 // ── 206.2-04 · the grant control's copy. Every one is an exported identifier, because a
 //    sentence living inline inside JSX is a sentence nobody can test for drift.
@@ -111,6 +109,23 @@ export const MCP_NO_TOOLS_ADMIN_ONLY =
 export interface McpToolPickerProps {
   connection: ConnectorConnection | null
   toolName?: string | null
+  /**
+   * ⚠ 214-07 — `toolArgs` AND `onChangeArgs` STAY ON THE CONTRACT AND ARE NO LONGER READ
+   * HERE, and that is a decision rather than an oversight.
+   *
+   * The free-form arguments surface this card used to own is DELETED — the label, its
+   * control and the parse-error line are gone, with **nothing replacing them** (SC#1). What
+   * replaced the SURFACE is `ArgumentEditor`, a sibling the caller mounts, and the caller is
+   * the only child on this surface holding a store reference.
+   *
+   * They stay because removing them would edit `ConnectionPicker`'s call site for no reason
+   * this plan can review, and because the pair names the seam a future reader will look for.
+   * ⛔ NOTHING IN THIS FILE MAY RE-ADD A CONTROL FOR THEM. An arguments box under any name is
+   * the surface SC#1 forbids, and its absence here is asserted by two independent fences.
+   *
+   * RE-OPEN TRIGGER: *the first phase that gives this card a reason to write an argument
+   * again* — at which point the pair either gains a consumer or comes out entirely.
+   */
   toolArgs?: Record<string, unknown> | null
   onSelectTool?: (toolName: string) => void
   onChangeArgs?: (args: Record<string, unknown>) => void
@@ -122,7 +137,7 @@ export interface McpToolPickerProps {
    * all re-derive from one server-owned value. ⚠ WITHOUT IT THE TWO GO OUT OF SYNC AND THE
    * NEXT TOGGLE MERGES FROM A STALE MAP — which, against a whole-column REPLACE, is a silent
    * lost update. The rejected alternative is a re-fetch nonce: it re-issues the whole
-   * connection list on every toggle inside a 400px panel field, and the response IS the row.
+   * connection list on every toggle inside a narrow panel field, and the response IS the row.
    */
   onConnectionUpdated?: (row: ConnectorConnection) => void
   disabled?: boolean
@@ -197,9 +212,9 @@ export function audienceOf(
 export function McpToolPicker({
   connection,
   toolName = "",
-  toolArgs = {},
+  // ⚠ `toolArgs` / `onChangeArgs` are DELIBERATELY NOT DESTRUCTURED — see their docblock on
+  // the props interface. They remain on the contract; this component no longer reads them.
   onSelectTool,
-  onChangeArgs,
   onConnectionUpdated,
   disabled = false,
   grantsEnforced = true,
@@ -209,12 +224,6 @@ export function McpToolPicker({
   const [localDiscoveredTools, setLocalDiscoveredTools] = useState<
     McpDiscoveredTool[] | null
   >(null)
-  const [argsJsonString, setArgsJsonString] = useState<string>(() =>
-    toolArgs && Object.keys(toolArgs).length > 0
-      ? JSON.stringify(toolArgs, null, 2)
-      : ""
-  )
-  const [jsonError, setJsonError] = useState<string | null>(null)
 
   // ── 206.2-04 · the grant write's TRANSIENT state, and nothing else ──────────────────
   // The switch's POSITION is not in here, deliberately: it is derived from the connection
@@ -253,31 +262,6 @@ export function McpToolPicker({
       }
     },
     [onSelectTool]
-  )
-
-  const handleArgsChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value
-      setArgsJsonString(val)
-      if (!val.trim()) {
-        setJsonError(null)
-        if (onChangeArgs) onChangeArgs({})
-        return
-      }
-      try {
-        const parsed = JSON.parse(val)
-        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-          setJsonError(null)
-          if (onChangeArgs) onChangeArgs(parsed as Record<string, unknown>)
-        } else {
-          setJsonError("Arguments must be a JSON object")
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Invalid JSON syntax"
-        setJsonError(msg)
-      }
-    },
-    [onChangeArgs]
   )
 
   /**
@@ -518,7 +502,7 @@ export function McpToolPicker({
 
               ⚠ THE WHOLE ROW IS THE TARGET. Every control on this panel is 24-32px tall,
               far under the 44px touch guideline, and the switch inherits that deliberately —
-              a 44px switch would read as the most important control on a 400px panel. The
+              a 44px switch would read as the most important control on this panel. The
               mitigation is required rather than optional: the switch and its label are ONE
               button spanning the row's full width, a ~26px x ~370px target. */}
           {canWriteGrants && (
@@ -608,34 +592,6 @@ export function McpToolPicker({
             </p>
           )}
 
-          {/* Tool Arguments Input */}
-          <div className="flex flex-col gap-1">
-            <Label
-              htmlFor="mcp-tool-args"
-              className="text-[11px] font-normal text-muted-foreground"
-            >
-              {MCP_TOOL_ARGS_LABEL}
-            </Label>
-            <Textarea
-              id="mcp-tool-args"
-              data-testid="mcp-tool-args"
-              value={argsJsonString}
-              disabled={disabled}
-              placeholder='{ "key": "value" }'
-              onChange={handleArgsChange}
-              rows={3}
-              className="font-mono text-[11px]"
-            />
-            {jsonError && (
-              <p
-                role="alert"
-                data-testid="mcp-args-error"
-                className="text-[10px] text-destructive"
-              >
-                {jsonError}
-              </p>
-            )}
-          </div>
         </div>
       )}
     </div>

@@ -203,13 +203,20 @@ const select = (): HTMLSelectElement =>
 
 /** The four keys `bind()` writes — the reference plus the three action fields it clears.
  *  Declared once so a case cannot quietly assert a PARTIAL clear. */
-const BIND_KEYS = ["capability", "connection_id", "tool_args", "tool_name"]
+/** ⚠ 214-07 — THE DECLARED SET GREW TO FIVE, `arg_sources` JOINING IT, AND THE THREAT DID NOT
+ *  CHANGE. D-13 forbids a HOST, a port, an account or a token crossing into `definition`; the
+ *  new key is a step's OWN per-argument source map, cleared to `undefined` at the same moment
+ *  the other three are, because re-binding is a moment at which the step's whole action can
+ *  change. SET EQUALITY is kept — a superset would pass a patch carrying a SIXTH key, and a
+ *  sixth key is the defect this case exists to catch. Sorted, because `sweep` sorts. */
+const BIND_KEYS = ["arg_sources", "capability", "connection_id", "tool_args", "tool_name"]
 
 const bindPatch = (id: string | null) => ({
   connection_id: id,
   capability: undefined,
   tool_name: undefined,
   tool_args: undefined,
+  arg_sources: undefined,
 })
 
 beforeEach(() => {
@@ -431,7 +438,7 @@ describe("ConnectionPicker — T6: a reference, and nothing else", () => {
     }
   }
 
-  it("every bind this component makes carries exactly the declared four keys", async () => {
+  it("every bind this component makes carries exactly the declared five keys", async () => {
     const { patch } = renderPicker({ rows: [mailbox(), UNCHECKED] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     fireEvent.change(select(), { target: { value: "conn-ok" } })
@@ -866,10 +873,20 @@ describe("ConnectionPicker — a step writes exactly ONE action field", () => {
     const written = patch.mock.calls[0][1] as Record<string, unknown>
     // ⚠ SET EQUALITY, never `toMatchObject` — a superset passes a PARTIAL clear, and
     // `tool_args` left behind is arguments for a tool that no longer exists.
-    expect(Object.keys(written).sort()).toEqual(["capability", "tool_args", "tool_name"])
+    //
+    // ⚠ 214-07 — `arg_sources` JOINS THE CLEAR, AND THE HAZARD IS THE SAME ONE ONE FIELD
+    // OVER: a source map naming arguments of an action that is no longer chosen would survive
+    // onto the next one and pre-decide things nobody chose.
+    expect(Object.keys(written).sort()).toEqual([
+      "arg_sources",
+      "capability",
+      "tool_args",
+      "tool_name",
+    ])
     expect(written.capability).toBe("post_message")
     expect(written.tool_name).toBeUndefined()
     expect(written.tool_args).toBeUndefined()
+    expect(written.arg_sources).toBeUndefined()
   })
 
   it("⛔ NO DEFAULT — with nothing bound, NEITHER field is ever written", async () => {
@@ -956,5 +973,110 @@ describe("ConnectionPicker — 211-04 source discipline", () => {
   it("the destination ladder's tail is NEUTRAL at source, and the Slack arm names itself", () => {
     expect(connectionPickerSource).toContain('connection.capability === "post_message"')
     expect(connectionPickerSource).toContain("if (connection.mcp_server_url)")
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ 214-07 — `arg_sources` IS A WRITE SEAM, AND IT CLEARS WITH ITS TWIN
+// ═════════════════════════════════════════════════════════════════════════════════════════
+
+describe("ConnectionPicker — 214-07 · the per-argument source map", () => {
+  it("⭐ `arg_sources` CLEARS WITH `tool_name` when a first-party action is chosen", async () => {
+    // ⚠ THE HAZARD IS `ExternalActionSection`'s AR-05 REASONING, ONE FIELD OVER: a source map
+    // naming arguments of an action nobody is bound to any more would survive onto the next
+    // one, be read against a schema that never declared those properties, and show the author
+    // a form that has silently decided things.
+    const { patch } = renderPicker({ rows: [SLACK], config: { connection_id: "conn-slack" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    patch.mockClear()
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "post_message" } })
+    const written = patch.mock.calls[0][1] as Record<string, unknown>
+    expect(Object.keys(written)).toContain("arg_sources")
+    expect(written.arg_sources).toBeUndefined()
+  })
+
+  it("⭐ `arg_sources` CLEARS ON BIND, and on UNBIND — a re-bind changes the whole action", async () => {
+    const { patch } = renderPicker({ rows: [SLACK, MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    fireEvent.change(select(), { target: { value: "conn-mcp" } })
+    fireEvent.change(select(), { target: { value: "" } })
+    expect(patch).toHaveBeenCalledTimes(2)
+    for (const call of patch.mock.calls) {
+      const written = call[1] as Record<string, unknown>
+      expect(Object.keys(written), "arg_sources joins the bind clear").toContain("arg_sources")
+      expect(written.arg_sources).toBeUndefined()
+    }
+  })
+
+  it("⭐ the credential sweep covers `arg_sources` exactly as it covers `tool_args`", () => {
+    // T-214-07-02. The client half of two layers; plan `214-01`'s `ArgumentSourceSpec`
+    // validator is the other, at the model, because a client gate is bypassable.
+    const FORBIDDEN = /secret|token|password|host|base_url/i
+    const sweepSources = (sources: Record<string, unknown>) => {
+      for (const key of Object.keys(sources)) expect(key).not.toMatch(FORBIDDEN)
+      for (const spec of Object.values(sources)) {
+        for (const value of Object.values(spec as Record<string, unknown>)) {
+          if (typeof value === "string") {
+            expect(value).not.toMatch(FORBIDDEN)
+            expect(value).not.toContain("smtp.")
+            expect(value).not.toMatch(/^https?:\/\//)
+          }
+        }
+      }
+    }
+    // POSITIVE CONTROL FIRST — the sweep really fires on each shape it forbids.
+    expect(() => sweepSources({ smtp_password: { source: "fixed" } })).toThrow()
+    expect(() => sweepSources({ to: { source: "ask", ask_key: "smtp.evil.test" } })).toThrow()
+    expect(() => sweepSources({ to: { source: "upstream", upstream_slug: "https://x.test" } })).toThrow()
+    // …and a legitimate map passes.
+    expect(() =>
+      sweepSources({ text: { source: "upstream", upstream_slug: "draft-the-note" } }),
+    ).not.toThrow()
+  })
+
+  it("⭐ THE CROSS-LANGUAGE BODY-ARG MIRROR — the client map equals the backend's", async () => {
+    // ⚠ A MIRROR NEEDS A FENCE, NOT A PROMISE. `BODY_ARG_FOR_CAPABILITY` here is a client copy
+    // of `_BODY_ARG_FOR_CAPABILITY` in `phase_types.py`, which is where the executor decides
+    // which field an upstream step's text fills. A fourth capability, a rename or a reorder on
+    // one side alone would make the form pre-set a field the executor never fills — which is
+    // what `BUG-260826-01` looked like from the outside.
+    const phaseTypesSource = (
+      await import("../../../../backend/app/services/harness/phase_types.py?raw")
+    ).default as string
+    // NON-VACUITY: the backend source really loaded.
+    expect(phaseTypesSource.length).toBeGreaterThan(10000)
+
+    // CRLF-tolerant: these files check out with Windows line endings, and a `\n`-anchored
+    // terminator would silently never match and yield an empty map that compares equal to
+    // nothing at all.
+    const pyBlock = /_BODY_ARG_FOR_CAPABILITY:\s*dict\[str,\s*str\]\s*=\s*\{([\s\S]*?)\}/.exec(
+      phaseTypesSource,
+    )
+    expect(pyBlock, "the backend map was not found").not.toBeNull()
+    const pyPairs = [...(pyBlock?.[1] ?? "").matchAll(/"([^"]+)":\s*"([^"]+)"/g)].map(
+      (m) => `${m[1]}=${m[2]}`,
+    )
+
+    const tsBlock = /BODY_ARG_FOR_CAPABILITY:\s*Record<string,\s*string>\s*=\s*\{([\s\S]*?)\}/.exec(
+      connectionPickerSource,
+    )
+    expect(tsBlock, "the client map was not found").not.toBeNull()
+    const tsPairs = [...(tsBlock?.[1] ?? "").matchAll(/([A-Za-z0-9_]+):\s*"([^"]+)"/g)].map(
+      (m) => `${m[1]}=${m[2]}`,
+    )
+
+    // NON-VACUITY CONTROLS, BOTH SIDES, BEFORE THE EQUALITY — an empty extraction on either
+    // side would make the comparison free, which is how a fence reads as coverage.
+    expect(pyPairs.length, "python pairs extracted").toBe(3)
+    expect(tsPairs.length, "typescript pairs extracted").toBe(3)
+    expect([...tsPairs].sort()).toEqual([...pyPairs].sort())
+  })
+
+  it("the read is through `own()` — a prototype key cannot reach the pre-set (WR-04)", () => {
+    // The tenth sink of this class in this tree, closed by construction rather than found.
+    expect(connectionPickerSource).toContain("own(BODY_ARG_FOR_CAPABILITY")
+    const forbidden = "BODY_ARG_FOR_CAPABILITY" + "["
+    expect(connectionPickerSource).not.toContain(forbidden)
+    expect("x = BODY_ARG_FOR_CAPABILITY[k]").toContain(forbidden)
   })
 })
