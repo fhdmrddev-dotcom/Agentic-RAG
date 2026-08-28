@@ -178,11 +178,25 @@
     transition: opacity .12s ease-out; pointer-events: none; white-space: nowrap;
   }
   .chart .bar:hover::after { opacity: 1; }
+
+  /* ⭐ THE BAR IS TWO-TONE, AND THE SECOND TONE IS THE POINT.
+     A search that returned nothing still writes its row — the returned-document list is simply
+     empty. So every bar splits into "found something" and "found nothing" with no new data and
+     no new write. This is the one fact in the product nobody can currently see: how often the
+     agent asked your library a question and came back empty-handed.
+     ⚠ Colour still never carries alone — the legend prints both words and both counts. */
+  .chart .bar { display: flex; flex-direction: column-reverse; }
+  .chart .bar .hit { flex: 1 1 auto; background: var(--color-primary); border-radius: 0 0 0 0; }
+  .chart .bar .miss { flex: 0 0 auto; background: var(--color-warning); border-radius: 3px 3px 0 0; }
+  .chart .bar .hit:only-child { border-radius: 3px 3px 0 0; }
+  .chart .bar:hover .hit { background: var(--color-primary-strong); }
+
   .xaxis { display: flex; justify-content: space-between; padding: 8px 8px 4px 44px; font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
 
   /* the progress ring */
   .ring { display: block; }
   .ring-bg { fill: none; stroke: var(--color-muted); }
+  .ring-never { stroke: color-mix(in srgb, var(--color-warning) 34%, var(--color-muted)); }
   .ring-fg { fill: none; stroke: var(--color-primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
   .is-live .ring-fg { animation: sweep 1s cubic-bezier(.22,1,.36,1) forwards; }
   @keyframes sweep { to { stroke-dashoffset: var(--dash-to) } }
@@ -327,6 +341,47 @@
   .subnav button:hover { color: var(--color-text); }
   .subnav button.on { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 
+
+  /* ── connected sources ──────────────────────────────────────────────────────────── */
+  .srow { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .srow:last-child { border-bottom: 0; }
+  .smark { width: 30px; height: 30px; border-radius: 7px; background: var(--color-muted); border: 1px solid var(--color-border); display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
+  .sbody { flex: 1; min-width: 0; }
+  .stitle { font-size: .84rem; color: var(--color-text); font-weight: 500; }
+  .stitle .sacct { color: var(--color-text-dim); font-weight: 400; font-family: var(--font-mono); font-size: .74rem; }
+  .smeta { font-size: 11.5px; color: var(--color-text-muted); margin-top: 3px; }
+  .smeta code { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
+  .smeta2 { font-size: 11px; color: var(--color-text-dim); margin-top: 3px; }
+  .smeta2.warn, .warn { color: var(--color-warning); }
+  .sstat { text-align: right; width: 62px; flex-shrink: 0; }
+  .sstat b { display: block; font-family: var(--font-mono); font-size: .9rem; color: var(--color-text); font-weight: 500; }
+  .sstat span { font-size: 10px; color: var(--color-text-dim); }
+  .sact { width: 92px; text-align: right; color: var(--color-text-dim); flex-shrink: 0; }
+  .grantrow { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--color-border-soft); font-size: .82rem; }
+  .grantrow:last-child { border-bottom: 0; }
+  .grantrow .gname { color: var(--color-text-muted); }
+
+  /* ── view cards ─────────────────────────────────────────────────────────────────── */
+  .vgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .vcard { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); padding: 14px 16px; }
+  .vcard.vempty { border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border)); }
+  .vhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .vname { font-family: var(--font-headline); font-size: .95rem; font-weight: 600; color: var(--color-text); }
+  .vcount { font-family: var(--font-mono); font-size: 1.1rem; color: var(--color-text); }
+  .vcount.vzero { color: var(--color-warning); }
+  .vrule { font-size: 11.5px; color: var(--color-text-dim); margin: 7px 0 11px; line-height: 1.6; }
+  .vrule b { color: var(--color-text-muted); font-weight: 500; }
+  .vbar { height: 5px; border-radius: 3px; background: var(--color-muted); overflow: hidden; }
+  .vbar > i { display: block; height: 100%; width: 0; border-radius: 3px; }
+  .is-live .vbar > i { animation: growX .8s cubic-bezier(.22,1,.36,1) forwards; }
+  .vfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; font-size: 11px; color: var(--color-text-dim); }
+  .vfoot .vact { cursor: pointer; }
+
+  /* ── chunk boundary shading ─────────────────────────────────────────────────────── */
+  .ck { margin: 0; padding: 9px 11px; font-size: .78rem; line-height: 1.65; color: var(--color-text-muted); border-radius: 6px; }
+  .ck1 { background: color-mix(in srgb, var(--color-primary) 12%, transparent); border-left: 2px solid var(--color-primary); }
+  .ck2 { background: color-mix(in srgb, var(--color-accent-violet) 12%, transparent); border-left: 2px solid var(--color-accent-violet); margin: -6px 0; }
+
   .sxs { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 </style>
 </head>
@@ -341,6 +396,9 @@
   <button class="variant-tab" data-v="g">Ingestion</button>
   <button class="variant-tab" data-v="d">Document detail</button>
   <button class="variant-tab" data-v="u">⭐ upload</button>
+  <button class="variant-tab" data-v="s">⭐ sources</button>
+  <button class="variant-tab" data-v="v">Views</button>
+  <button class="variant-tab" data-v="c">Chunking</button>
   <button class="variant-tab" data-v="x">⭐ what we hide</button>
   <button class="variant-tab" data-v="f">⚠ findings</button>
 </nav>
@@ -553,14 +611,20 @@
             <div class="cardbody" style="display:flex;align-items:center;gap:18px">
               <div class="ringwrap">
                 <svg class="ring" width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
-                  <circle class="ring-bg" cx="66" cy="66" r="56" stroke-width="11"/>
+                  <!-- ⭐ the remainder is NOT grey: 137 never-found documents are a REAL state, not
+                       absence of data. Drawing them as empty track would hide the bigger number. -->
+                  <circle class="ring-bg ring-never" cx="66" cy="66" r="56" stroke-width="11"/>
                   <circle class="ring-fg" cx="66" cy="66" r="56" stroke-width="11"
                           stroke-dasharray="351.9" stroke-dashoffset="351.9" style="--dash-to:215.3"/>
                 </svg>
                 <div class="ringlabel"><b>87</b><span>of 224</span></div>
               </div>
-              <div style="font-size:11.5px;color:var(--color-text-dim);line-height:1.7">
-                found by a search<br>in the last 30 days
+              <div style="line-height:1.7">
+                <div class="li" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--color-text-muted)">
+                  <span class="sw s-primary" style="width:9px;height:9px;border-radius:2px"></span>found by a search <b style="font-family:var(--font-mono);color:var(--color-text)">87</b></div>
+                <div class="li" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--color-text-muted);margin-top:5px">
+                  <span class="sw" style="width:9px;height:9px;border-radius:2px;background:color-mix(in srgb, var(--color-warning) 34%, var(--color-muted))"></span>never found <b style="font-family:var(--font-mono);color:var(--color-text)">137</b></div>
+                <div style="font-size:11px;color:var(--color-text-dim);margin-top:8px">in the last 30 days</div>
               </div>
             </div>
           </div>
@@ -574,6 +638,10 @@
                 <button class="tabtrigger" style="padding:3px 9px;font-size:.72rem">90d</button>
               </div>
             </header>
+            <div class="legend">
+              <span class="li"><span class="sw s-primary"></span>found something <b>371</b></span>
+              <span class="li"><span class="sw s-warning"></span>found nothing <b>41</b></span>
+            </div>
             <div class="chartwrap">
               <div class="grid"><div class="gl" style="top:0"><span>50</span></div>
                 <div class="gl" style="top:50%"><span>25</span></div>
@@ -599,12 +667,17 @@
         </div>
 
         <div class="card">
-          <div class="hrow"><span class="nm">Q3_Earnings_Report.pdf</span><span class="hbar"><i style="--w:100%;animation-delay:.00s"></i></span><span class="ct">412</span><span class="ago">2d ago</span></div>
-          <div class="hrow"><span class="nm">Architecture_V2_Draft.md</span><span class="hbar"><i style="--w:92%;animation-delay:.05s"></i></span><span class="ct">380</span><span class="ago">2d ago</span></div>
-          <div class="hrow"><span class="nm">HR_Policy_2023.txt</span><span class="hbar"><i style="--w:76%;animation-delay:.10s"></i></span><span class="ct">315</span><span class="ago">3d ago</span></div>
-          <div class="hrow"><span class="nm">API_Integration_Guide.pdf</span><span class="hbar"><i style="--w:58%;animation-delay:.15s"></i></span><span class="ct">240</span><span class="ago">5d ago</span></div>
-          <div class="hrow"><span class="nm">Onboarding_Checklist.docx</span><span class="hbar"><i style="--w:46%;animation-delay:.20s"></i></span><span class="ct">189</span><span class="ago">6d ago</span></div>
-          <div class="hrow"><span class="nm">Database_Schema_v4.json</span><span class="hbar"><i style="--w:35%;animation-delay:.25s"></i></span><span class="ct">145</span><span class="ago">1w ago</span></div>
+          <div class="legend" style="padding:12px 16px 4px;border-bottom:1px solid var(--color-border-soft)">
+            <span class="li"><span class="sw s-primary"></span>ready</span>
+            <span class="li"><span class="sw s-violet"></span>re-indexing</span>
+            <span class="li"><span class="sw s-warning"></span>stale — the file changed after it was indexed</span>
+          </div>
+          <div class="hrow"><span class="nm">Q3_Earnings_Report.pdf</span><span class="hbar"><i class="s-primary" style="--w:100%;animation-delay:.00s"></i></span><span class="ct">412</span><span class="ago">2d ago</span></div>
+          <div class="hrow"><span class="nm">Architecture_V2_Draft.md</span><span class="hbar"><i class="s-primary" style="--w:92%;animation-delay:.05s"></i></span><span class="ct">380</span><span class="ago">2d ago</span></div>
+          <div class="hrow"><span class="nm">HR_Policy_2023.txt</span><span class="hbar"><i class="s-violet" style="--w:76%;animation-delay:.10s"></i></span><span class="ct">315</span><span class="ago">3d ago</span></div>
+          <div class="hrow"><span class="nm">API_Integration_Guide.pdf</span><span class="hbar"><i class="s-primary" style="--w:58%;animation-delay:.15s"></i></span><span class="ct">240</span><span class="ago">5d ago</span></div>
+          <div class="hrow"><span class="nm">Onboarding_Checklist.docx</span><span class="hbar"><i class="s-warning" style="--w:46%;animation-delay:.20s"></i></span><span class="ct">189</span><span class="ago">6d ago</span></div>
+          <div class="hrow"><span class="nm">Database_Schema_v4.json</span><span class="hbar"><i class="s-primary" style="--w:35%;animation-delay:.25s"></i></span><span class="ct">145</span><span class="ago">1w ago</span></div>
         </div>
 
         <div class="card" style="margin-top:16px">
@@ -1146,6 +1219,309 @@
 </section>
 
 <!-- ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ SOURCES — connected cloud storage. Operator direction, 2026-08-28.
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-s">
+  <div class="sheet">
+    <h2>⭐ Sources — a connected drive that feeds the Library</h2>
+    <p class="lede">Operator: <i>"we need to have connectors with the cloud storage, to and from, based on
+      a specific event or trigger… somewhere I remember we discussed this for this milestone."</i>
+      <b>You did — it is <code>SEED-142</code>, and this milestone is where it becomes reachable.</b></p>
+
+    <div class="page">
+      <div class="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span><a>Ingestion</a><span class="sep">›</span>Sources</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger" data-state="active">Ingestion</button>
+        <button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button>
+      </div>
+      <div class="subnav">
+        <button>Add files</button><button class="on">Sources</button>
+        <button>In progress</button><button>Needs attention</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="card">
+          <header>
+            <div><h4>Connected sources</h4><p class="hsub">Folders the agent keeps reading, on a schedule.</p></div>
+            <button class="btn ghost">Connect a source</button>
+          </header>
+
+          <div class="srow">
+            <div class="smark" style="color:#4285f4">▲</div>
+            <div class="sbody">
+              <div class="stitle">Google Drive · <span class="sacct">fhdmrd@gmail.com</span></div>
+              <div class="smeta"><code>/Shared drives/Engineering/Specs</code> → 📁 Engineering</div>
+              <div class="smeta2">PDF · DOCX · PPTX &nbsp;·&nbsp; checked every 15 minutes &nbsp;·&nbsp; last checked 4 min ago</div>
+            </div>
+            <div class="sstat"><b>218</b><span>added</span></div>
+            <div class="sstat"><b>2</b><span>failed</span></div>
+            <div><span class="badge success"><span class="dot"></span>Watching</span></div>
+            <div class="sact">⋯</div>
+          </div>
+
+          <div class="srow">
+            <div class="smark" style="color:#0364b8">▣</div>
+            <div class="sbody">
+              <div class="stitle">OneDrive · <span class="sacct">contracts@acme.com</span></div>
+              <div class="smeta"><code>/Contracts/2026</code> → 📁 HR Policies</div>
+              <div class="smeta2">PDF only &nbsp;·&nbsp; checked every hour &nbsp;·&nbsp; last checked 22 min ago</div>
+            </div>
+            <div class="sstat"><b>41</b><span>added</span></div>
+            <div class="sstat"><b>0</b><span>failed</span></div>
+            <div><span class="badge dim"><span class="dot"></span>Paused</span></div>
+            <div class="sact">⋯</div>
+          </div>
+
+          <div class="srow">
+            <div class="smark" style="color:var(--color-danger)">▲</div>
+            <div class="sbody">
+              <div class="stitle">Google Drive · <span class="sacct">old-admin@acme.com</span></div>
+              <div class="smeta"><code>/Marketing/Collateral</code> → 📁 Marketing</div>
+              <div class="smeta2 warn">Its permission expired 3 days ago. Nothing has been read since.</div>
+            </div>
+            <div class="sstat"><b>—</b><span>added</span></div>
+            <div class="sstat"><b>—</b><span>failed</span></div>
+            <div><span class="badge danger"><span class="dot"></span>Needs reconnecting</span></div>
+            <div class="sact"><button class="btn ghost" style="font-size:.74rem;padding:4px 10px">Reconnect</button></div>
+          </div>
+        </div>
+
+        <div data-anno><b>⚠ The third row is the one that earns this screen.</b> A source that has silently
+          stopped reading is <b>indistinguishable from a source with nothing new</b> — and unlike a manual
+          upload, <b>nobody is standing there to notice.</b> It states when it stopped and what that means
+          in a sentence, and it is the only row offering an action. <b>Silence is not success</b> applies
+          harder to a connector than to anything else in this product.</div>
+
+        <h3 class="sub">What a source brings in — before it brings it in</h3>
+        <div class="card">
+          <header><div><h4>First read · Google Drive</h4>
+            <p class="hsub">Nothing has been added yet. This is what it would add.</p></div>
+            <div style="display:flex;gap:8px"><button class="btn ghost">Change what it watches</button><button class="btn">Add these 218</button></div>
+          </header>
+          <div class="cardbody" style="padding:14px 16px">
+            <div class="legend" style="padding:0 0 10px">
+              <span class="li"><span class="sw s-primary"></span>will be added <b>218</b></span>
+              <span class="li"><span class="sw s-warning"></span>already here <b>34</b></span>
+              <span class="li"><span class="sw s-dim"></span>type not supported <b>96</b></span>
+            </div>
+            <div class="stackbar">
+              <i class="s-primary" style="--w:63%"></i><i class="s-warning" style="--w:10%;animation-delay:.08s"></i><i class="s-dim" style="--w:27%;animation-delay:.16s"></i>
+            </div>
+            <p style="font-size:11.5px;color:var(--color-text-dim);margin:12px 0 0;line-height:1.6">
+              The 34 already here were matched by content, not by name — the same file uploaded by hand
+              will not be added twice.</p>
+          </div>
+        </div>
+
+        <div data-anno><b>⭐ A dry run is not a nicety here, it is the safety property.</b> Manual upload is
+          self-limiting: a person picks the files. A connected drive can put <b>thousands</b> of documents
+          into the thing the agent answers from, and <i>every one of them changes what the agent says</i>.
+          <b>Showing the shape of the import before it happens is the difference between a feature and an
+          accident.</b> ⚠ The dedupe arm is real, not aspirational — every document already stores a
+          content hash, so "already here" is a lookup rather than a guess.</div>
+
+        <h3 class="sub">What it is allowed to do</h3>
+        <div class="card"><div class="cardbody">
+          <div class="grantrow"><span class="gname">See the file list</span><span class="badge success"><span class="dot"></span>Allowed</span></div>
+          <div class="grantrow"><span class="gname">Read a file's contents</span><span class="badge success"><span class="dot"></span>Allowed</span></div>
+          <div class="grantrow"><span class="gname">Write a file back to the drive</span><span class="badge dim"><span class="dot"></span>Not allowed</span></div>
+          <div class="grantrow"><span class="gname">Delete a file on the drive</span><span class="badge dim"><span class="dot"></span>Not allowed</span></div>
+        </div></div>
+
+        <div data-anno><b>⭐ This list is not new machinery — it is the milestone's own model, rendered.</b>
+          A connection is <i>{service identity, auth, discovered tools, per-tool grants}</i>, so a drive is
+          <b>rows, not code</b>: the same per-tool consent that already governs every other service governs
+          this one. <b>Two-way is a GRANT, not a separate feature</b> — the operator's "to and from" is the
+          third row being switched on, and it inherits the approval model rather than inventing one.</div>
+
+        <div data-anno><b>⚠ Two rules this screen encodes, and both are deliberate.</b>
+          <b>(1) "Connect a source" leaves for Settings › Connections.</b> It does not collect a credential
+          here. A credential form on an ingestion screen is a new outbound trust surface with no prior
+          review cycle — the same reason the describe door refused to grow one.
+          <b>(2) A file removed from the drive is NOT removed from the Library</b> unless the person asks
+          for that explicitly. A revoked share or a moved folder would otherwise <b>silently delete
+          knowledge the agent depends on</b>, and the person who lost it never chose to.</div>
+
+        <div data-anno><b>⚠ The words are "checked every 15 minutes", never "instantly" or "on change".</b>
+          The scheduler this rides on runs on a cron or an interval — <b>there is no change feed and no
+          webhook</b>. Saying "as soon as a document appears" would promise a mechanism that does not
+          exist. When a delta cursor or a webhook lands, <b>the sentence changes in the same commit.</b></div>
+      </div>
+    </div>
+
+    <h3 class="sub">⭐ What this actually costs — re-measured 2026-08-28, and it is far less than the seed says</h3>
+    <div class="card" data-meta>
+      <table class="audit">
+        <thead><tr><th>what auto-ingest needs</th><th>state</th><th>where</th></tr></thead>
+        <tbody>
+          <tr><td class="c">a scheduler</td><td class="yes">✅ SHIPPED</td>
+              <td><code>scheduler_service.py</code> + <code>workflow_schedules</code> (cron, interval, timezone, active, budgets). ⚠ <b><code>SEED-142</code> says "none exists" — that claim is now STALE.</b></td></tr>
+          <tr><td class="c">OAuth</td><td class="yes">✅ IN THIS MILESTONE</td>
+              <td>Phase <b>215 · BYO OAuth</b> — token / refresh / expiry / scope / account identity.</td></tr>
+          <tr><td class="c">a read capability</td><td class="yes">✅ SHIPPED</td>
+              <td>v3.8's MCP client — any official server, per-tool consent, <b>zero per-vendor adapter code</b>.</td></tr>
+          <tr><td class="c">per-tool grants</td><td class="yes">✅ THIS MILESTONE</td>
+              <td>the whole point of v3.9 — a connection is rows, not code.</td></tr>
+          <tr><td class="c">per-file dedupe</td><td class="yes">✅ SHIPPED</td>
+              <td><code>documents.content_hash</code>, plus <code>version_number</code> / <code>is_latest</code> for re-ingest-on-change.</td></tr>
+          <tr><td class="c">a failure surface for documents nobody chose to upload</td><td class="yes">✅ designed here</td>
+              <td>the <i>Needs attention</i> list and the source's own state row.</td></tr>
+          <tr><td class="c"><b>change detection (delta cursor / webhook)</b></td><td class="no">⛔ MISSING</td>
+              <td>the real gap. Until it exists the schedule polls, and <b>the UI must say so.</b></td></tr>
+          <tr><td class="c"><b>external folder → our folder mapping</b></td><td class="no">⛔ MISSING</td>
+              <td>net-new config, drawn above as <code>path → 📁 folder</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div data-anno><b>⚠ SEED-142 lists five blockers for auto-ingest and FOUR OF THEM HAVE SINCE SHIPPED.</b>
+      It was written 2026-08-08, before v3.8 delivered both the scheduler and the MCP client, and before
+      v3.9 put OAuth and per-tool grants on the board. <b>Its verdict — "nothing about that is buildable"
+      — is out of date, and a planner reading it today would defer work that is now mostly substrate
+      that already exists.</b> The seed needs this measurement written back into it.</div>
+
+    <div data-anno><b>⚠ And it fires a standing rule.</b> <code>CLAUDE.md</code> still reads <i>"Ingestion
+      is manual file upload only — no connectors or automated pipelines"</i>, marked <b>dated, not
+      permanent</b>, with the instruction that <b>whoever ships the first sync connector changes that rule
+      in the same commit.</b> This design is that trigger. It must not ship with the rule left standing.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     TAB 2 — VIEWS & COLLECTIONS (the gap variant A creates)
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-v">
+  <div class="sheet">
+    <h2>Views &amp; Collections — tab 2</h2>
+    <p class="lede">⚠ <b>This tab had no design until now.</b> The sketch argued for dropping it; variant A
+      keeps it, so it needs content of its own — otherwise it is the sidebar again with more clicks.</p>
+
+    <div class="page">
+      <div class="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Views</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger" data-state="active">Views</button>
+        <button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+
+      <div style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <p style="margin:0;font-size:.82rem;color:var(--color-text-muted)">A view is a saved question about your library. The sidebar switches between them; this is where they are made and compared.</p>
+          <button class="btn">New view</button>
+        </div>
+
+        <div class="vgrid">
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Needs review</span><span class="vcount">8</span></div>
+            <div class="vrule">type is <b>contract</b> · added in the <b>last 30 days</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:6%"></i></div>
+            <div class="vfoot"><span>8 of 224 documents</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Recently added</span><span class="vcount">34</span></div>
+            <div class="vrule">added in the <b>last 7 days</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:15%;animation-delay:.05s"></i></div>
+            <div class="vfoot"><span>34 of 224 documents</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Contracts <span class="gpill">G</span></span><span class="vcount">19</span></div>
+            <div class="vrule">type is <b>contract</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:8%;animation-delay:.1s"></i></div>
+            <div class="vfoot"><span>Built in · shared with everyone</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard vempty">
+            <div class="vhead"><span class="vname">Q3 board pack</span><span class="vcount vzero">0</span></div>
+            <div class="vrule">folder is <b>Marketing</b> · type is <b>report</b> · added <b>after 1 Jul</b></div>
+            <div class="vbar"><i class="s-dim" style="--w:1%;animation-delay:.15s"></i></div>
+            <div class="vfoot"><span class="warn">Matches nothing right now</span><span class="vact">⋯</span></div>
+          </div>
+        </div>
+
+        <div data-anno><b>⭐ The fourth card is what makes this a tab rather than a list.</b> A saved view
+          that has quietly stopped matching anything is invisible in a sidebar — it just shows
+          <code>0</code> beside a name, next to seven other names. <b>Here it is a card that says
+          <i>"Matches nothing right now"</i></b>, and the rule that produced the nothing is on its face.
+          A view is a saved question; <b>a question with no answers is worth seeing.</b></div>
+
+        <div data-anno><b>⚠ THE BUILD CONSTRAINT variant A creates, and it is the reason the sketch
+          argued the other way.</b> Views now render in <b>two places</b> — this tab and the Documents
+          sidebar. <b>One source of truth, two renderings.</b> Selecting a view here must select it there;
+          a second piece of selection state is the defect this shape invites, and it will not announce
+          itself — the two lists will simply disagree.</div>
+
+        <h3 class="sub">⛔ What is NOT drawn here, and why</h3>
+        <div data-anno><b>The reference's "collection search-quality score" (screen 10) is cut.</b> A score
+          per collection needs enough retrieval history per collection to be honest, and a number that
+          means nothing until week three is worse than no number in week one. <b>It re-opens when the
+          Health tab has real history</b> — the seed already carries that trigger.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     CHUNKING — reference screen 900d
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-c">
+  <div class="sheet">
+    <h2>Chunking — what the agent actually searches, and why it is cut that way</h2>
+    <p class="lede">The reference's screen 4, which the first pass skipped entirely. Its strongest idea is
+      the <b>left pane: the original text with the chunk boundaries drawn on it.</b></p>
+
+    <div class="sxs">
+      <div>
+        <p class="caption">the source, with the cuts shown</p>
+        <div class="card"><div class="cardbody" style="padding:14px">
+          <p class="ck ck1">The system architecture uses a service-per-domain split, with the retrieval
+            path isolated behind a single interface so the embedding provider can be replaced without
+            touching callers.</p>
+          <p class="ck ck2">Each document is chunked on paragraph boundaries with an overlap, which keeps
+            a definition and its example in the same chunk more often than a fixed window does.</p>
+          <p class="ck ck1">Retrieval runs two arms — a vector search and a keyword search — and merges
+            them, so an exact term still matches when the embedding does not.</p>
+        </div></div>
+        <div data-anno><b>The overlap is why the shading interleaves.</b> A reader who has ever wondered
+          <i>"why did it find that paragraph and not this one"</i> gets the answer from this pane alone.</div>
+      </div>
+      <div>
+        <p class="caption">how it is cut today</p>
+        <div class="card"><div class="cardbody">
+          <div class="kv"><span class="k">Chunk size</span><span class="v">1000 characters</span></div>
+          <div class="kv"><span class="k">Overlap</span><span class="v">200 characters</span></div>
+          <div class="kv"><span class="k">Split on</span><span class="v">paragraph boundaries</span></div>
+          <div class="kv"><span class="k">Applies to</span><span class="v">every new document</span></div>
+          <p style="font-size:11.5px;color:var(--color-text-dim);margin:12px 0 0;line-height:1.6">
+            Changing these re-splits and re-indexes everything. Search keeps working on the old chunks
+            until it finishes.</p>
+        </div></div>
+        <div data-anno><b>⚠ CHARACTERS, NOT TOKENS — and the reference says tokens.</b>
+          <code>chunk_size = 1000</code> / <code>chunk_overlap = 200</code> are character counts.
+          Drawing a "512 tokens" slider would be a <b>units lie</b>: the number would not mean what the
+          system does with it, and a person tuning it would be tuning something else.</div>
+        <div data-anno><b>⚠ And these are ENV/CONFIG values today, not settings.</b> They live in
+          <code>config.py</code>, not in <code>user_settings</code> / <code>app_settings</code> — which
+          <b>collides with the standing rule</b> that <i>settings live in the Settings UI; env vars are
+          for secrets and infra only</i>. Chunk size is a behaviour knob, not infrastructure.
+          <b>Surfacing it as a control means moving it first</b> — which is a real task, not a render.</div>
+      </div>
+    </div>
+
+    <div data-anno><b>⛔ The reference's live "Preview" with sliders is NOT drawn as shipping v1.</b>
+      Re-chunking on a slider drag implies a preview path that re-runs the splitter on demand; that is
+      buildable (the splitter is pure, and the parsed text is already stored) but it is <b>a feature, not
+      a rendering of existing state</b>. Drawn here as the read-only truth first — <b>see how it is cut
+      before you are offered a knob to change it.</b></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
      FINDINGS
      ══════════════════════════════════════════════════════════════════════════════════════ -->
 <section class="variant" id="v-f">
@@ -1213,19 +1589,32 @@
 //    cannot be an acceptance bar, and a reviewer cannot tell a rendering bug from noise.
 var SERIES = [4,7,11,5,14,22,9,27,6,17,24,31,18,8,29,38,21,12,26,15,35,44,30,19,10,23,41,16,28,25]
 var SERIES_D = [3,6,4,9,7,12,8,5]
+// the miss series — searches that came back empty on that day.
+var MISS = [1,0,2,0,3,1,0,4,1,0,2,3,0,1,5,2,0,1,3,0,2,4,1,0,2,1,3,0,2,1]
 
-function fill(el, data, max) {
+// ⭐ EVERY BAR IS TWO SEGMENTS: searches that found something, and searches that found
+// nothing. MISS[] is the second series — a search returning zero documents still writes its
+// row, so this needs no new data and no new write. It is the one fact nobody can see today.
+function fill(el, data, max, miss) {
   if (!el || el.childElementCount) return
   data.forEach(function (v, i) {
+    var m = miss ? miss[i] || 0 : 0
     var b = document.createElement("div")
     b.className = "bar"
     b.style.height = Math.round((v / max) * 100) + "%"
     b.style.animationDelay = (i * 0.018).toFixed(3) + "s"
-    b.setAttribute("data-v", String(v))
+    b.setAttribute("data-v", m > 0 ? v + " · " + m + " found nothing" : String(v))
+    var hit = document.createElement("span"); hit.className = "hit"
+    b.appendChild(hit)
+    if (m > 0) {
+      var ms = document.createElement("span"); ms.className = "miss"
+      ms.style.height = Math.round((m / v) * 100) + "%"
+      b.appendChild(ms)
+    }
     el.appendChild(b)
   })
 }
-fill(document.getElementById("chart-h"), SERIES, 50)
+fill(document.getElementById("chart-h"), SERIES, 50, MISS)
 fill(document.getElementById("chart-d"), SERIES_D, 12)
 
 // ── replay the entrance animation each time a variant is shown, so the charts are seen

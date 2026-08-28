@@ -13,11 +13,11 @@ tags: [seed-224, bus-026, documents, library-health, retrieval, ingestion, chart
 ⚠ The two are never collapsed — Stitch renders zero shipped components (`SEED-155`).
 
 ```
-node drive.cjs           # 124 assertions
+node drive.cjs           # 170 assertions
 node drive.cjs --emit    # regenerates BUILD-CONTRACT.generated.md FROM the running sketch
 ```
 
-Current state: **124 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
+Current state: **170 passed, 0 failed.** ⚠ **Thirty-one of them read the LIVE SOURCE TREE**, not the
 sketch — column order, tab classes, theme lightness, the ingestion steps, the eval FKs. If the repo
 moves, they fail. That is the point.
 
@@ -265,3 +265,88 @@ sidebar beside it already renders the whole `ViewsGroup`. That argument is not w
 
 **Still owed by the operator:** the `Retrieval Score` ruling (§3 of the Health tab — bare as it ships,
 or qualified with what it measures). It is a small call and it does not block planning.
+
+---
+
+## 9 · ⭐ Connected sources — cloud storage, in scope as of 2026-08-28
+
+> *"we need to have connectors with the cloud storage, to and from, based on a specific event or
+> trigger… somewhere I remember we discussed this for this milestone."*
+
+You did — it is **SEED-142**, planted 2026-08-08. The **sources** tab designs it.
+
+### ⚠ SEED-142 lists five blockers for drive auto-ingest. FOUR HAVE SINCE SHIPPED.
+
+| what auto-ingest needs | state | where |
+|---|---|---|
+| a scheduler | ✅ **shipped** | `scheduler_service.py` + `workflow_schedules` (cron / interval / timezone / budgets). ⚠ the seed still says *"a scheduler (none exists)"* |
+| OAuth | ✅ **this milestone** | Phase **215 · BYO OAuth** |
+| a read capability | ✅ **shipped** | v3.8's MCP client — per-tool consent, zero per-vendor adapter code |
+| per-tool grants | ✅ **this milestone** | v3.9's whole thesis: a connection is rows, not code |
+| per-file dedupe | ✅ **shipped** | `content_hash` + `version_number` / `is_latest` |
+| **change detection** | ⛔ **missing** | the real gap — until it exists the schedule polls |
+| **external folder → our folder mapping** | ⛔ missing | net-new config |
+
+**The seed's verdict — *"nothing about that is buildable"* — is out of date.** A planner reading it
+today would defer work that is now mostly substrate we already have. That measurement needs writing
+back into the seed.
+
+⚠ **And it fires a standing rule.** `CLAUDE.md` still reads *"Ingestion is manual file upload only"*,
+marked **dated, not permanent**, with the instruction that whoever ships the first sync connector
+changes it **in the same commit**. This design is that trigger.
+
+### The four honesty rules the screen encodes
+
+1. **"Checked every 15 minutes", never "instantly".** There is no change feed and no webhook. When a
+   delta cursor lands, the sentence changes in the same commit.
+2. **A dry run before the first import.** Manual upload is self-limiting — a person picks the files.
+   A drive can put thousands of documents into the thing the agent answers from. The three arms
+   (*will be added / already here / type not supported*) are all real; "already here" is a
+   content-hash lookup, not a guess.
+3. **A file removed from the drive is NOT removed from the Library** unless asked for explicitly. A
+   revoked share would otherwise silently delete knowledge the agent depends on.
+4. **"Connect a source" leaves for Settings › Connections.** No credential is collected on an
+   ingestion screen — the same rule that kept the describe door from growing one.
+
+⭐ **Two-way is a grant, not a feature.** The operator's *"to and from"* is the write row switched on
+by a person. It inherits the per-tool approval model rather than inventing one, and **defaults off**.
+
+---
+
+## 10 · ⭐ Why the charts were one colour, and what changed
+
+> *"why is it one color? maybe it's better to have it colored — your advice"*
+
+**The advice: don't make it colourful, give the colour a job.** One colour for one series is correct;
+thirty bars of one measurement in thirty colours invites a reader to hunt for meaning that is not
+there — the same failure as the reference's *"Embedding Quality 92%"*.
+
+**But there was a second dimension sitting unused in the data, and it is the best one in the product:**
+every search already writes the documents it returned, and a search that found *nothing* writes an
+empty list. So every bar now splits:
+
+- **found something** (primary) · **found nothing** (warning)
+
+That surfaces the single most important RAG fact there is — **how often the agent asked your library a
+question and came back empty** — with no new schema and no new write. The ring's remainder is likewise
+a real state (*137 never found*), not empty track, and the per-document bars carry each document's
+state (ready / re-indexing / stale).
+
+⚠ **Colour still never carries alone.** Every swatch prints its word and its count.
+
+---
+
+## 11 · ⚠ Three more fences that could not fire, all found the same way
+
+This suite has now caught **three** vacuous or mis-targeted fences, and the pattern is consistent
+enough to be worth naming: **a fence whose failure mode is indistinguishable from its success.**
+
+| fence | how it was broken | how it was found |
+|---|---|---|
+| the buried-column check | shelled out to `grep`, which failed on this box and returned empty — so it *manufactured* the finding it was meant to verify | rewritten to walk the tree, behind two positive controls |
+| `E1c` (SEED-142 staleness) | read `src(guess1) \|\| src(guess2) \|\| "none exists"` — **both filenames were wrong**, so it passed on its own fallback string | resolves the seed by glob, with a control asserting the file exists |
+| `E6b` (the write grant) | a 220-char window regex across repeated rows **matched the next row's answer** — flipping the write grant to *Allowed* left it green | parses each grant row individually; a control prints what it parsed |
+
+⚠ **`E6b` is the one that matters.** It is the most security-bearing assertion in the connector
+design — *a write grant must never default to on* — and it silently passed its own planted defect.
+**Every one of the three was found by planting the defect, never by reading the code.**

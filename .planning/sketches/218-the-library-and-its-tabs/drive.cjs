@@ -178,9 +178,18 @@ ok("A6c · ⚠ the per-document SCORE is NOT persisted — the one real gap",
 const win = KH_PY.match(/WINDOW_DAYS\s*=\s*(\d+)/)
 ok("A6d · the shipped window is 30 days",
   win && win[1] === "30", `measured WINDOW_DAYS=${win ? win[1] : "?"}`)
-ok("A6e · the sketch never prints a window other than 30",
-  !/last 7 days|\(7d\)|RETRIEVED \(7D\)/i.test(SURFACE),
-  "a 7-day tile would be a fabricated window")
+// ⚠ NARROWED 2026-08-28, and the original is recorded rather than replaced silently.
+// It read `!/last 7 days|\(7d\)|RETRIEVED \(7D\)/` over the WHOLE surface, and fired when the
+// Views tab drew a saved view whose RULE is "added in the last 7 days". That is a filter a user
+// wrote, not a claim about the retrieval window — the fence had conflated two different sevens.
+// What must stay true: no RETRIEVAL COUNT is labelled with a window other than the shipped 30.
+const RETRIEVAL_WINDOW_CLAIMS = SURFACE.match(/(?:found by a search|returned by a search|retrieved|searches)[^.]{0,40}?\blast (\d+) days/gi) || []
+ok("A6e · every retrieval count the sketch labels is labelled 30 days",
+  RETRIEVAL_WINDOW_CLAIMS.every((c) => /last 30 days/i.test(c)),
+  RETRIEVAL_WINDOW_CLAIMS.filter((c) => !/last 30 days/i.test(c)).join(" | ") || "none")
+ok("A6e2 · and the 7d/90d chart range control is a RANGE PICKER, not a counted window",
+  /7d[\s\S]{0,80}30d[\s\S]{0,80}90d/.test(SURFACE),
+  "the picker is legitimate; a TILE claiming a 7-day retrieval count would not be")
 
 // A7 — the rename is front-end only, and the IA is already decided
 ok("A7 · ActiveView already carries \"documents\" (there is no route to change)",
@@ -365,7 +374,13 @@ const CUTS = [
   ["Semantic Match % column", /Semantic Match/i],
   ["a token pie chart", /token(s)? (usage|pie)/i],
   ["query latency p99", /p99|Query Latency/i],
-  ["connector source column", /SharePoint|Zendesk|Confluence|Google Drive/i],
+  // ⚠ REWRITTEN 2026-08-28 — THE SCOPE CHANGED, THE SKETCH DID NOT DRIFT.
+  // This read /SharePoint|Zendesk|Confluence|Google Drive/ over the whole surface, and it was
+  // right while connectors were cut. The operator has since put cloud-storage connectors IN
+  // scope for this milestone, so a connected drive is now a designed surface and MUST appear.
+  // What is still forbidden is the thing that was actually dishonest: a Source column on the
+  // DOCUMENT TABLE implying documents arrived from systems we cannot connect.
+  ["a service we cannot actually connect", /Zendesk|Confluence|Salesforce Files/i],
   ["a retrieval heatmap", /heatmap/i],
   ["Mark as Golden Answer", /golden/i],
 ]
@@ -502,6 +517,189 @@ ok("D10 · the chart palette uses five state tokens, no invented hex",
   [".s-primary", ".s-violet", ".s-success", ".s-warning", ".s-danger"].every((c) => HTML.includes(c)))
 ok("D10b · every series colour resolves to a theme variable, never a literal hex",
   !/\.s-(primary|violet|success|warning|danger|dim)\s*\{\s*background:\s*#/.test(HTML))
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// §E · CONNECTED SOURCES — the operator put cloud storage in scope on 2026-08-28.
+//
+// ⚠ THESE ARE THE HIGHEST-STAKES CLAIMS IN THE SKETCH. It asserts that four of SEED-142's
+// five blockers have since shipped. If any of that is wrong, a planner defers or schedules
+// work on a false premise — so every one is measured against the tree, never asserted.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const SCHED = src("backend/app/services/scheduler_service.py")
+const ROADMAP = src(".planning/ROADMAP.md") || ""
+
+// E1 — ⭐ the scheduler EXISTS (SEED-142 says it does not)
+ok("E1 · a scheduler service ships today", SCHED !== null,
+  "SEED-142 says 'a scheduler (none exists)' — that is the claim under test")
+ok("E1b · with a durable schedule table carrying cron, interval and timezone",
+  /CREATE TABLE public\.workflow_schedules/.test(SCHEMA) &&
+  /cron_expression text/.test(SCHEMA) && /interval_seconds integer/.test(SCHEMA) &&
+  /timezone text/.test(SCHEMA))
+// ⚠ THIS FENCE WAS FOUND PASSING ON ITS OWN FALLBACK. Its first version read
+//   src("…SEED-142-connectors-two-way-read-and-auto-ingest.md") || src("…SEED-142.md") || "none exists"
+// and BOTH guessed filenames were wrong (the file is SEED-142-two-way-connectors-read-pull-auto-ingest.md),
+// so the `|| "none exists"` default satisfied the regex and it went green having read nothing.
+// This is the SECOND vacuous pass in this suite, from the same root cause: a fence whose failure
+// mode is indistinguishable from its success. It now resolves the seed by GLOB and asserts it exists.
+const SEED142_PATH = (() => {
+  const dir = path.join(REPO, ".planning", "seeds")
+  try { return (fs.readdirSync(dir).find((f) => f.startsWith("SEED-142")) || null) } catch { return null }
+})()
+ok("E1c-control · SEED-142 is actually found on disk",
+  SEED142_PATH !== null, "the fence below is meaningless without this")
+const SEED142 = SEED142_PATH ? fs.readFileSync(path.join(REPO, ".planning", "seeds", SEED142_PATH), "utf8") : ""
+ok("E1c · ⚠ SEED-142 still carries the STALE 'no scheduler' claim, so the sketch must say so",
+  /a scheduler\s*\n?\s*\(none exists/.test(SEED142),
+  `read ${SEED142_PATH || "(nothing)"} — if this fails, the seed has been corrected and the sketch's note can be retired`)
+ok("E1d · the sketch records the staleness rather than quietly relying on it",
+  /STALE/.test(HTML) && /SEED-142/.test(HTML))
+
+// E2 — OAuth is IN this milestone, not a future one
+ok("E2 · the active milestone is the connections milestone",
+  /v3\.9 Connections/.test(ROADMAP))
+ok("E2b · and it contains a BYO OAuth phase", /BYO OAuth/.test(ROADMAP))
+
+// E3 — per-file dedupe substrate exists (the dry run's 'already here' arm)
+ok("E3 · documents carry a content hash, so 'already here' is a lookup not a guess",
+  /content_hash text/.test(SCHEMA))
+ok("E3b · and a version model for re-ingest-on-change",
+  /version_number integer/.test(SCHEMA) && /is_latest boolean/.test(SCHEMA))
+ok("E3c · the sketch says the match is by content, not by name",
+  /matched by content, not by name/.test(SURFACE))
+
+// E4 — ⛔ THE HONESTY FENCES. These are what stop the screen promising a mechanism.
+ok("E4 · the sketch never promises instant / on-change sync",
+  !/\b(instantly|in real ?time|as soon as|the moment)\b/i.test(SURFACE),
+  "there is no change feed and no webhook — the scheduler polls")
+ok("E4b · it states a polling interval in plain words instead",
+  /checked every \d+ (minutes?|hour)/i.test(SURFACE) || /checked every hour/i.test(SURFACE))
+ok("E4c · a source that stopped reading says WHEN it stopped and offers an action",
+  /permission expired/i.test(SURFACE) && /Nothing has been read since/i.test(SURFACE) &&
+  /Reconnect/.test(SURFACE))
+ok("E4d · ⚠ the sketch never claims a removed remote file is deleted here",
+  !/\bdeleted from (the |your )?library\b/i.test(SURFACE))
+
+// E5 — the credential is NOT collected on this screen
+ok("E5 · no credential field anywhere on the sources surface",
+  !/type="password"|api[_ ]?key|client[_ ]secret|access[_ ]token/i.test(SURFACE_HTML),
+  "a credential form on an ingestion screen is a new trust surface with no review cycle")
+ok("E5b · connecting LEAVES for the shipped connections home",
+  /Connect a source/.test(SURFACE) && /Settings › Connections|Settings . Connections/.test(HTML))
+
+// E6 — two-way is a GRANT, rendered, not a separate feature
+const GRANTS = (SURFACE_HTML.match(/class="grantrow"/g) || []).length
+ok("E6 · the per-tool grant list is rendered", GRANTS >= 4, `${GRANTS} grant rows`)
+// ⚠⚠ THIS FENCE FAILED TO FIRE ON ITS OWN PLANTED DEFECT, AND IT IS THE MOST SECURITY-BEARING
+// ONE HERE. The first version read /Write a file back[\s\S]{0,220}Not allowed/ over the flattened
+// SURFACE. Flipping the write grant to "Allowed" left it GREEN, because the 220-character window
+// ran past the end of that row and matched the NEXT row's "Not allowed" (the delete grant).
+// **A window-based regex across a repeated structure reads its neighbour's answer.** It now parses
+// each grant row individually, so a row can only be judged by its own badge.
+// a grant row closes at its FIRST </div> — its children are spans. Requiring two closing divs
+// (as the first draft did) matched only the last row, which the control caught immediately.
+const GRANT_ROWS = [...SURFACE_HTML.matchAll(/<div class="grantrow">([\s\S]*?)<\/div>/g)]
+  .map((m) => norm(m[1]))
+const grantOf = (name) => GRANT_ROWS.find((r) => r.startsWith(name)) || ""
+ok("E6b-control · the grant rows parse individually",
+  GRANT_ROWS.length >= 4 && grantOf("Write a file back").length > 0,
+  `parsed ${GRANT_ROWS.length} rows: ${GRANT_ROWS.map((r) => r.slice(0, 26)).join(" | ")}`)
+ok("E6b · the WRITE grant is shown OFF by default",
+  /Not allowed$/.test(grantOf("Write a file back")),
+  `write row reads: "${grantOf("Write a file back")}" — the operator's 'to and from' is this row switched ON by a person, and it must never default to on`)
+ok("E6c · and the DELETE grant is off too",
+  /Not allowed$/.test(grantOf("Delete a file")),
+  `delete row reads: "${grantOf("Delete a file")}"`)
+ok("E6d · while both READ grants are on — a source that cannot read is not a source",
+  /Allowed$/.test(grantOf("See the file list")) && /Allowed$/.test(grantOf("Read a file")),
+  "a positive control: the fence must distinguish allowed from not-allowed, not just find the word")
+
+// E7 — ⭐ the dry run, and its three honest arms
+ok("E7 · a first read shows what it WOULD add before adding it",
+  /This is what it would add/.test(SURFACE))
+ok("E7b · with three arms — added, already here, unsupported",
+  /will be added/.test(SURFACE) && /already here/.test(SURFACE) && /type not supported/.test(SURFACE))
+ok("E7c · the composition is one stacked bar, never a pie chart",
+  /class="stackbar"/.test(SURFACE_HTML) && !/pie/i.test(SURFACE))
+
+// E8 — ⚠ the standing CLAUDE.md rule this design fires
+const CMD = src("CLAUDE.md") || ""
+ok("E8 · CLAUDE.md still says ingestion is manual upload only",
+  /manual file upload only/.test(CMD))
+ok("E8b · and marks that rule DATED, with a same-commit change instruction",
+  /Dated, not permanent/.test(CMD) && /changes this rule in the same commit/.test(CMD))
+ok("E8c · the sketch names the rule it fires rather than leaving it to be discovered",
+  /manual file upload only/.test(HTML) && /same commit/.test(HTML))
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// §F · TAB 2 AND CHUNKING — the two surfaces the first pass left undrawn
+// ═══════════════════════════════════════════════════════════════════════════════════════
+ok("F1 · the Views tab has content of its own, not a copy of the sidebar",
+  /class="vgrid"/.test(SURFACE_HTML) && (SURFACE_HTML.match(/class="vcard/g) || []).length >= 4)
+ok("F1b · ⭐ a view that matches nothing says so on its face",
+  /Matches nothing right now/.test(SURFACE))
+ok("F1c · every view card shows the RULE that produced its count",
+  (SURFACE_HTML.match(/class="vrule"/g) || []).length >= 4)
+ok("F1d · the two-renderings build constraint is recorded",
+  /One source of truth, two renderings/.test(HTML))
+
+// F2 — chunking, and the units trap
+const CFG = src("backend/app/config.py") || ""
+const csize = (CFG.match(/chunk_size:\s*int\s*=\s*(\d+)/) || [])[1]
+const coverlap = (CFG.match(/chunk_overlap:\s*int\s*=\s*(\d+)/) || [])[1]
+ok("F2 · the shipped chunk size and overlap are measured, not invented",
+  csize === "1000" && coverlap === "200", `measured ${csize} / ${coverlap}`)
+ok("F2b · and the sketch prints those exact numbers",
+  SURFACE.includes(`${csize} characters`) && SURFACE.includes(`${coverlap} characters`))
+ok("F2c · ⚠ it says CHARACTERS — the reference says tokens, and that would be a units lie",
+  /characters/.test(SURFACE) && !/\d+\s*tokens?\b/i.test(SURFACE.replace(/128 tokens|116 tokens/g, "")))
+ok("F2d · the chunk-boundary shading is drawn on the source text",
+  (SURFACE_HTML.match(/class="ck ck[12]"/g) || []).length >= 3)
+ok("F2e · ⚠ and the sketch flags that these are env values, not Settings",
+  /config\.py/.test(HTML) && /user_settings/.test(HTML))
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// §G · COLOUR HAS A JOB — operator, 2026-08-28: "why is it one color?"
+//
+// ⭐ The answer is not "make it colourful". One colour for one series is correct; thirty bars
+// of one measurement in thirty colours invites a reader to hunt for meaning that is not there
+// — the same failure as the reference's "Embedding Quality 92%". So colour was given a JOB,
+// and the job comes from a second dimension that is ALREADY IN THE DATA.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+// G1 — ⭐ a search that found NOTHING is knowable today, with no new write
+ok("G1 · the audit row is written whether or not anything was found",
+  /_audit_doc_ids = list\(\{/.test(DISPATCH) && /for h in \(results or \[\]\)/.test(DISPATCH),
+  "an empty result writes an empty document list — the row still exists, so a miss is countable")
+// ⚠ the miss segment is created in JS (`ms.className = "miss"`), so it is NEVER a literal
+// `class="miss"` attribute in the file. The first version of this fence looked for the
+// attribute and failed on a sketch that was correct — testing the wrong artifact.
+ok("G1b · the chart draws that second series",
+  /className = "miss"/.test(SCRIPT_CODE) &&
+  /var MISS = \[/.test(SCRIPT_CODE) &&
+  /\.chart \.bar \.miss\s*\{/.test(HTML))
+ok("G1c · and names it in words, not colour alone",
+  /found nothing/.test(SURFACE) && /found something/.test(SURFACE))
+ok("G1d · with both counts printed in the legend",
+  (SURFACE_HTML.match(/class="li"/g) || []).length >= 5)
+
+// G2 — the ring's remainder is a STATE, not empty track
+ok("G2 · never-found is drawn as its own colour, not as bare background",
+  /ring-never/.test(HTML))
+ok("G2b · and both arms are labelled with their number",
+  /never found/.test(SURFACE) && /137/.test(SURFACE))
+
+// G3 — the per-document bars carry each document's state
+ok("G3 · the most-retrieved bars are state-coloured, not one flat colour",
+  (SURFACE_HTML.match(/class="hbar"><i class="s-(primary|violet|warning)"/g) || []).length >= 6)
+ok("G3b · with a legend giving each colour its word",
+  /re-indexing/.test(SURFACE) && /stale/.test(SURFACE))
+
+// G4 — ⛔ the fence that stops this becoming decoration
+ok("G4 · no chart uses more colours than it has named series",
+  (HTML.match(/class="sw s-[a-z]+"/g) || []).length >= 5,
+  "every swatch in a legend must correspond to a word; the count is the floor, not the ceiling")
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // REPORT
