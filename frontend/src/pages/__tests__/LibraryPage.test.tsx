@@ -441,11 +441,95 @@ describe("LibraryPage", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Ingestion" }))
     const ingestion = await screen.findByTestId("ingestion-tab")
 
+    // Plan 03's sub-tab restructure: the in-flight queue lives under the
+    // "In progress" sub-tab, not the default "Add files" one.
+    fireEvent.mouseDown(within(ingestion).getByRole("tab", { name: "In progress" }))
+
     expect(within(ingestion).getByText("in-flight.pdf")).toBeInTheDocument()
     const strips = within(ingestion).getAllByTestId("ingestion-strip")
     expect(strips.length).toBeGreaterThan(0)
     expect(strips[0].getAttribute("data-status")).toBe("processing")
     // ⛔ D-217-19 — the queue shows stages, never a proportion.
     expect(ingestion.textContent).not.toContain("%")
+  })
+})
+
+// ── Phase 217.1 plan 06 — stat tiles, breadcrumb, and the client-side pager ─────────────
+
+describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUseDocuments.mockReturnValue({
+      documents: sampleDocuments,
+      uploading: false,
+      uploadingCount: 0,
+      upload: vi.fn().mockResolvedValue({ isDuplicate: false }),
+      deleteDoc: vi.fn().mockResolvedValue(undefined),
+    })
+    mockUseFolders.mockReturnValue({
+      folders: sampleFolders,
+      createFolder: vi.fn().mockResolvedValue({}),
+      renameFolder: vi.fn().mockResolvedValue(undefined),
+      deleteFolder: vi.fn().mockResolvedValue(undefined),
+    })
+    mockListViews.mockResolvedValue(sampleViews)
+    mockListMetadataFields.mockResolvedValue([])
+    mockResolveView.mockResolvedValue({ documents: [], total: 7 })
+    mockResolveAdHoc.mockResolvedValue({ documents: [], total: 0 })
+    mockGetReembedProgress.mockResolvedValue({
+      status: "idle",
+      total: 224,
+      re_embedded: 87,
+      remaining: 137,
+      model: "text-embedding-3-small",
+      updated_at: null,
+    })
+  })
+
+  it("renders the three stat tiles (CHUNKS / VECTORS / FOUND BY A SEARCH)", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    const tiles = await screen.findByTestId("documents-stat-tiles")
+    // CHUNKS sums chunk_count over the two sample docs (10 + 2 = 12).
+    expect(within(tiles).getByText("12")).toBeInTheDocument()
+    // VECTORS from re-embed progress (total 224).
+    expect(await within(tiles).findByText("224")).toBeInTheDocument()
+  })
+
+  it("renders the Library › folder › tab breadcrumb", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    const crumb = await screen.findByTestId("library-breadcrumb")
+    expect(within(crumb).getByText("Library")).toBeInTheDocument()
+    expect(within(crumb).getByText("Documents")).toBeInTheDocument()
+  })
+
+  it("renders the client-side pager under the Documents table (rows-per-page + range + prev/next)", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    const pager = await screen.findByTestId("documents-tfoot")
+    expect(within(pager).getByText(/Rows per page/)).toBeInTheDocument()
+    // 2 sample documents → "1–2 of 2".
+    expect(within(pager).getByText(/1–2 of 2/)).toBeInTheDocument()
+  })
+
+  it("the pager's 'list may be larger' arm renders at/above the 1000-row ceiling", async () => {
+    // 1000 sample docs → capped arm.
+    const many = Array.from({ length: 1000 }, (_, i) => ({
+      ...sampleDocuments[1],
+      id: `many-${i}`,
+      filename: `doc-${i}.txt`,
+    }))
+    mockUseDocuments.mockReturnValue({
+      documents: many,
+      uploading: false,
+      uploadingCount: 0,
+      upload: vi.fn().mockResolvedValue({ isDuplicate: false }),
+      deleteDoc: vi.fn().mockResolvedValue(undefined),
+    })
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    const pager = await screen.findByTestId("documents-tfoot")
+    expect(within(pager).getByText(/may be larger than shown/)).toBeInTheDocument()
   })
 })

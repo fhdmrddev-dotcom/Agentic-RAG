@@ -19,6 +19,9 @@ import { ViewsGroup } from "@/components/ingestion/ViewsGroup"
 import { ViewsTab } from "@/components/library/ViewsTab"
 import { IngestionTab } from "@/components/library/IngestionTab"
 import { IndexingTab } from "@/components/library/IndexingTab"
+import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
+import { LibraryBreadcrumb } from "@/components/library/LibraryBreadcrumb"
+import { DocumentsPager } from "@/components/library/DocumentsPager"
 import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
@@ -82,6 +85,15 @@ const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
 // (the Documents tab and the Views tab) share ONE copy of it rather than two.
 const SHED_COLUMNS_3_TO_5 =
   "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden"
+
+// Phase 217.1-06 — the tab's display name, for the breadcrumb suffix. Four members only;
+// a fifth key is the same schema change as a fifth trigger (D-217-15).
+const TAB_LABELS: Record<LibraryTab, string> = {
+  documents: "Documents",
+  views: "Views",
+  ingestion: "Ingestion",
+  indexing: "Indexing",
+}
 
 // ── The page's own reducer ────────────────────────────────────────────────────────────
 //
@@ -391,6 +403,21 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   const listDocuments = filteredDocs !== null ? filteredDocs : documents
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
 
+  // Phase 217.1-06 (LIB-01) — the Documents tab's client-side pager state. The offset
+  // keys off (folder, view, filter) changes so a navigation never strands a stale page.
+  const [pageOffset, setPageOffset] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
+  useEffect(() => {
+    setPageOffset(0)
+  }, [selectedFolderId, filteredDocs])
+
+  // ⛔ Client-side slice. `GET /documents` is unpaginated (documents.py:726-760), so the
+  // denominator here is real — bounded by PostgREST's 1000-row ceiling, which the pager's
+  // honest arm names (WR-04 / T-217.1-11a). Views' server-resolved list is NOT re-sliced
+  // here — a saved view's row count is its own resolve, not the pager's business.
+  const pagedDocuments =
+    filteredDocs !== null ? listDocuments : listDocuments.slice(pageOffset, pageOffset + pageSize)
+
   // Phase 114: the inline filter/view builder (D-114-1). Ad-hoc filtering and a
   // loaded saved view are the SAME surface. When the detail panel is open the bar
   // collapses to a summary chip to reclaim room (D-114-17).
@@ -459,16 +486,33 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
       >
         {lead}
         {filterBarEl}
-        <DocumentList
-          documents={listDocuments}
-          onDelete={deleteDoc}
-          onRefresh={loadDocuments}
-          folderId={listFolderId}
-          currentUserId={user?.id ?? ""}
-          onSelect={setSelectedDocId}
-          selectedDocId={selectedDocId}
-          folders={folders}
-        />
+        <div data-testid="documents-doclist">
+          <DocumentList
+            documents={pagedDocuments}
+            onDelete={deleteDoc}
+            onRefresh={loadDocuments}
+            folderId={listFolderId}
+            currentUserId={user?.id ?? ""}
+            onSelect={setSelectedDocId}
+            selectedDocId={selectedDocId}
+            folders={folders}
+          />
+        </div>
+        {/* Phase 217.1-06 — the client-side pager (the sketch's table footer). Shown on
+            the folder view only; a filter/view resolve carries its own server count. */}
+        {filteredDocs === null && (
+          <div data-testid="documents-tfoot">
+            <DocumentsPager
+              total={listDocuments.length}
+              offset={pageOffset}
+              limit={pageSize}
+              onChange={(off, lim) => {
+                setPageOffset(off)
+                setPageSize(lim)
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Detail panel track (desktop) — the panel renders a bottom-sheet on
@@ -508,6 +552,10 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         folderName={selectedFolderName}
         disabled={!canUploadToFolder}
       />
+
+      {/* Phase 217.1-06 (LIB-01 / D-217.1 sparkline-drop) — CHUNKS · VECTORS · FOUND BY
+          A SEARCH. Numbers stand alone; an unreachable source says so. */}
+      <LibraryStatTiles documents={listDocuments} />
 
       <div className="min-w-0">
         {selectedFolderId === null ? (
@@ -572,11 +620,22 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
-        <div className="mb-6">
+        <div className="mb-6" data-testid="documents-pagehead">
           <h1 className="text-2xl font-headline font-bold text-foreground">Library</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
             What the agent can read, and how well it reads it.
           </p>
+        </div>
+
+        {/* Phase 217.1-06 — Library › <folder> › <tab> breadcrumb, composed from the
+            already-shipped FolderBreadcrumb. Additive; never replaces the heading. */}
+        <div className="mb-4">
+          <LibraryBreadcrumb
+            folders={folders}
+            selectedFolderId={selectedFolderId}
+            onSelectFolder={handleSelectFolder}
+            tabLabel={TAB_LABELS[tab]}
+          />
         </div>
 
         {/* Phase 111.1 follow-up #1: the slim "search is catching up" pointer.
@@ -611,7 +670,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         >
           {/* ⛔ FOUR TRIGGERS, AND NO FIFTH. Written out rather than mapped so the set is
               countable by eye and by grep — the absence of `Health` is the decision here. */}
-          <TabsList className="self-start mb-4">
+          <TabsList className="self-start mb-4" data-testid="documents-tabslist">
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="views">Views</TabsTrigger>
             <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
@@ -626,6 +685,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
                 panel opens (unless the user pinned it expanded). */}
             {showSidebar && (
               <div
+                data-testid="documents-sidebar"
                 className={cn(
                   "hidden md:flex shrink-0 flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border transition-[width,padding] duration-300 ease-out",
                   sidebarRail ? "w-[50px] p-2 items-center" : "w-72 p-3",
