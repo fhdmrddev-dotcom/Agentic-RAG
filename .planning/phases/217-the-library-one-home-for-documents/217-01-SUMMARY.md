@@ -202,3 +202,7 @@ None. No new endpoint, no new auth path, no schema change, no file access, and n
 *Phase: 217-the-library-one-home-for-documents*
 *Plan: 01*
 *Completed: 2026-08-29*
+
+## Self-Check: PASSED
+
+All five files present on disk; all four commits resolve in `git log`; working tree clean.
