@@ -24,33 +24,41 @@
  * ⛔ IT FETCHES NOTHING. Every document it renders is one the page already holds.
  * ⛔ NO SECOND STATUS VOCABULARY. Every stage word comes from `TERM_MAP`.
  */
-import { useState } from "react"
+import React, { useState } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { IngestionStrip } from "@/components/ingestion/IngestionStrip"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
 import {
-  INGESTION_STAGES,
-  stageTermKey,
-  type IngestionStage,
+  type IngestionStageKey,
 } from "@/components/ingestion/ingestionStages"
-import { usePlainLabel, type TermKey } from "@/lib/termMap"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { formatBytes } from "@/lib/formatBytes"
 import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
+import {
+  cardForStage,
+  PIPELINE_CARDS,
+  CARD_LABEL,
+  type PipelineCardId,
+} from "@/components/library/ingestion/pipelineGroups"
 
-/** One aggregate card: how many documents are at this stage RIGHT NOW. */
-function StageCount({ stage, count }: { stage: IngestionStage; count: number }) {
-  const label = usePlainLabel(stageTermKey(stage) as TermKey)
+/** One pipeline card: how many in-flight documents are at this group of stages. */
+function PipelineCard({
+  cardId,
+  count,
+}: {
+  cardId: PipelineCardId
+  count: number
+}) {
   return (
     <div
-      data-stage-card={stage.key}
+      data-stage-card={cardId}
       className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl bg-card/50 ghost-border px-3 py-2.5"
     >
-      <span className="truncate text-xs font-medium text-foreground" title={label}>
-        {label}
+      <span className="truncate text-xs font-medium text-foreground">
+        {CARD_LABEL[cardId]}
       </span>
       <span className="font-mono text-lg font-bold text-foreground">{count}</span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -94,7 +102,18 @@ export function IngestionTab({
   const [uploadFolderId, setUploadFolderId] = useState<string | null>(folderId ?? null)
   const [uploadFolderName, setUploadFolderName] = useState<string>(folderName ?? "Root")
 
-  // In flight == not finished and not failed.
+  // ── Pipeline card counts — fold the six stages into four cards ─────────────────
+  const stageCounts = new Map<PipelineCardId, number>()
+  for (const cardId of PIPELINE_CARDS) stageCounts.set(cardId, 0)
+  for (const doc of documents) {
+    if (doc.status === "processing" && doc.ingestion_step) {
+      const card = cardForStage(doc.ingestion_step as IngestionStageKey)
+      stageCounts.set(card, (stageCounts.get(card) ?? 0) + 1)
+    }
+  }
+
+  // Completed + failed for the History tab.
+  const historyDocs = documents.filter((d) => d.status === "completed" || d.status === "failed")
   const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing")
   const failed = documents.filter((d) => d.status === "failed")
 
@@ -136,50 +155,83 @@ export function IngestionTab({
           </div>
         </TabsContent>
 
-        {/* ── IN PROGRESS — the queue + stage aggregate ──────────────────────── */}
+        {/* ── IN PROGRESS — the pipeline row + queue table ──────────────── */}
         <TabsContent value="in-progress" data-testid="ingestion-subtab-in-progress">
           <div>
             <h2 className="text-lg font-semibold leading-tight">Where every file is right now</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               A count of the files sitting at each stage of the pipeline.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {INGESTION_STAGES.map((stage) => (
-                <StageCount
-                  key={stage.key}
-                  stage={stage}
-                  count={
-                    documents.filter(
-                      (d) => d.status === "processing" && d.ingestion_step === stage.key,
-                    ).length
-                  }
-                />
+            {/* ── THE FOUR-CARD PIPELINE ROW ──────────────────────────────────────── */}
+            <div className="mt-3 flex items-center gap-2">
+              {PIPELINE_CARDS.map((cardId, i) => (
+                <React.Fragment key={cardId}>
+                  <PipelineCard key={cardId} cardId={cardId} count={stageCounts.get(cardId) ?? 0} />
+                  {i < PIPELINE_CARDS.length - 1 && (
+                    <span className="text-muted-foreground/50 text-sm" aria-hidden="true">
+                      ›
+                    </span>
+                  )}
+                </React.Fragment>
               ))}
             </div>
           </div>
 
+          {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
           <div className="mt-6">
-            <h2 className="text-lg font-semibold leading-tight">The queue</h2>
+            <h2 className="text-lg font-semibold leading-tight">
+              The queue{" "}
+              {inFlight.length > 0 && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  ({inFlight.length} {inFlight.length === 1 ? "file" : "files"})
+                </span>
+              )}
+            </h2>
             {inFlight.length === 0 ? (
               <p className="mt-0.5 text-sm text-muted-foreground">
                 Nothing is being read right now.
               </p>
             ) : (
-              <ul role="list" className="mt-3 flex flex-col gap-2">
-                {inFlight.map((doc) => (
-                  <li
-                    key={doc.id}
-                    className="flex flex-col gap-2 rounded-xl bg-card/50 ghost-border px-3 py-2.5 sm:flex-row sm:items-center sm:gap-4"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={doc.filename}>
-                      {doc.filename}
-                    </span>
-                    <div className="w-full sm:max-w-[420px] sm:flex-1">
-                      <IngestionStrip document={doc} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm" data-testid="queue-table">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <th className="px-4 py-3">File</th>
+                      <th className="px-4 py-3">Stage</th>
+                      <th className="px-4 py-3">Folder</th>
+                      <th className="px-4 py-3">Size</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inFlight.map((doc) => (
+                      <tr key={doc.id} className="border-b border-border/50">
+                        <td className="px-4 py-3 max-w-[200px] truncate" title={doc.filename}>
+                          {doc.filename}
+                        </td>
+                        <td className="px-4 py-3">
+                          {doc.status === "pending" ? (
+                            <span className="text-muted-foreground">Waiting its turn</span>
+                          ) : (
+                            <div className="w-full max-w-[420px]">
+                              <IngestionStrip document={doc} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                          --
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                          {formatBytes(doc.file_size)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {/* Actions column reserved for future stop/retry */}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </TabsContent>
@@ -200,13 +252,62 @@ export function IngestionTab({
           </div>
         </TabsContent>
 
-        {/* ── HISTORY — placeholder shell for Plan 04 ────────────────────────── */}
+        {/* ── HISTORY — completed and failed, grouped by date ───────────────────── */}
         <TabsContent value="history" data-testid="ingestion-subtab-history">
           <div>
             <h2 className="text-lg font-semibold leading-tight">History</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Recently completed and failed uploads.
             </p>
+            {historyDocs.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Nothing has been ingested yet.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm" data-testid="history-table">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <th className="px-4 py-3">File</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Size</th>
+                      <th className="px-4 py-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyDocs
+                      .sort(
+                        (a, b) =>
+                          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+                      )
+                      .map((doc) => (
+                        <tr key={doc.id} className="border-b border-border/50">
+                          <td className="px-4 py-3 max-w-[300px] truncate" title={doc.filename}>
+                            {doc.filename}
+                          </td>
+                          <td className="px-4 py-3">
+                            {doc.status === "completed" ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                                Complete
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                                Failed
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                            {formatBytes(doc.file_size)}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                            {new Date(doc.updated_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

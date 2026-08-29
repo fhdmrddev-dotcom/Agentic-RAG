@@ -66,9 +66,21 @@ vi.mock("@/lib/termMap", async (importOriginal) => {
     }),
   }
 })
+vi.mock("@/providers/TechnicalNamesProvider", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/providers/TechnicalNamesProvider")>()
+  return {
+    ...actual,
+    useTechnicalNamesOptional: () => ({
+      showTechnical,
+      toggle: () => {},
+      setShowTechnical: () => {},
+    }),
+  }
+})
 
 import { IngestionTab } from "../IngestionTab"
 import { acceptAttribute } from "@/components/ingestion/acceptedFormats"
+import { PIPELINE_CARDS, CARD_LABEL, cardForStage } from "../ingestion/pipelineGroups"
 
 // ── FIXTURES ──────────────────────────────────────────────────────────────────────────
 
@@ -402,5 +414,148 @@ describe("IngestionTab — the empty arms say the thing they mean", () => {
     renderPlain()
     await user.click(screen.getByRole("tab", { name: "Needs attention" }))
     expect(screen.getByText("Nothing needs attention.")).toBeInTheDocument()
+  })
+})
+
+// ── Phase 217.1 plan 04 — the four-card pipeline row ──────────────────────────────────
+
+describe("IngestionTab — the four-card pipeline row (D-217.1-07)", () => {
+  it("renders exactly four data-stage-card cards in PIPELINE_CARDS order", async () => {
+    const user = userEvent.setup()
+    renderPlain()
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    const cards = document.querySelectorAll("[data-stage-card]")
+    expect(cards).toHaveLength(4)
+    // Cards are rendered in PIPELINE_CARDS order
+    for (let i = 0; i < PIPELINE_CARDS.length; i++) {
+      expect(cards[i].getAttribute("data-stage-card")).toBe(PIPELINE_CARDS[i])
+    }
+  })
+
+  it("each card shows a label from CARD_LABEL", async () => {
+    const user = userEvent.setup()
+    renderPlain()
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    for (const cardId of PIPELINE_CARDS) {
+      expect(screen.getByText(CARD_LABEL[cardId])).toBeInTheDocument()
+    }
+  })
+
+  it("chevrons render between adjacent cards", async () => {
+    const user = userEvent.setup()
+    renderPlain()
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    // Three chevrons between four cards
+    const chevrons = screen.getAllByText("›")
+    expect(chevrons).toHaveLength(3)
+  })
+
+  it("one document at each of the six backend stages → four card counts sum to six", async () => {
+    const user = userEvent.setup()
+    const sixDocs: Document[] = [
+      doc({ id: "1", status: "processing", ingestion_step: "extracting" }),
+      doc({ id: "2", status: "processing", ingestion_step: "chunking" }),
+      doc({ id: "3", status: "processing", ingestion_step: "embedding" }),
+      doc({ id: "4", status: "processing", ingestion_step: "extracting_tables" }),
+      doc({ id: "5", status: "processing", ingestion_step: "extracting_images" }),
+      doc({ id: "6", status: "processing", ingestion_step: "metadata" }),
+    ]
+    renderPlain({ documents: sixDocs })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    // Read the count from each card by its data-stage-card attribute
+    function countFor(cardId: string): number {
+      const el = document.querySelector(`[data-stage-card="${cardId}"]`)
+      if (!el) return 0
+      const match = el.textContent?.match(/(\d+)/)
+      return match ? parseInt(match[1], 10) : 0
+    }
+    expect(countFor("reading")).toBe(1)
+    expect(countFor("splitting")).toBe(1)
+    expect(countFor("indexing")).toBe(3)
+    expect(countFor("labelling")).toBe(1)
+  })
+
+  it("no document is double-counted or orphaned", async () => {
+    const user = userEvent.setup()
+    // Each stage is covered by exactly one card
+    const stages: Array<NonNullable<Document["ingestion_step"]>> = [
+      "extracting", "chunking", "embedding", "extracting_tables", "extracting_images", "metadata",
+    ]
+    for (const stage of stages) {
+      const card = cardForStage(stage)
+      expect(PIPELINE_CARDS.includes(card), `stage "${stage}" maps to unknown card "${card}"`).toBe(true)
+    }
+  })
+})
+
+// ── Phase 217.1 plan 04 — the queue table ─────────────────────────────────────────────
+
+describe("IngestionTab — the queue table (D-217.1-07)", () => {
+  it("renders a table with columns File, Stage, Folder, Size, Actions", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "q1", status: "pending", file_size: 2048 })] })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    const table = screen.getByTestId("queue-table")
+    expect(table).toBeInTheDocument()
+    expect(screen.getByText("File")).toBeInTheDocument()
+    expect(screen.getByText("Stage")).toBeInTheDocument()
+    expect(screen.getByText("Folder")).toBeInTheDocument()
+    expect(screen.getByText("Size")).toBeInTheDocument()
+    expect(screen.getByText("Actions")).toBeInTheDocument()
+  })
+
+  it("a pending document shows 'Waiting its turn' in the Stage cell", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "q1", status: "pending", file_size: 2048 })] })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    expect(screen.getByText("Waiting its turn")).toBeInTheDocument()
+  })
+
+  it("an N files label appears when the queue is non-empty", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "q1", status: "pending" }), doc({ id: "q2", status: "processing" })] })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    expect(screen.getByText(/2 files/)).toBeInTheDocument()
+  })
+})
+
+// ── Phase 217.1 plan 04 — the History sub-tab ─────────────────────────────────────────
+
+describe("IngestionTab — the History sub-tab (D-217.1-07)", () => {
+  it("renders completed and failed documents in the history table", async () => {
+    const user = userEvent.setup()
+    renderPlain({
+      documents: [
+        doc({ id: "h1", status: "completed", filename: "done.pdf", updated_at: "2026-08-29T10:00:00Z" }),
+        doc({ id: "h2", status: "failed", filename: "bad.pdf", error_message: "corrupt", updated_at: "2026-08-28T10:00:00Z" }),
+      ],
+    })
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    const historyTable = screen.getByTestId("history-table")
+    expect(historyTable).toBeInTheDocument()
+    expect(screen.getByText("done.pdf")).toBeInTheDocument()
+    expect(screen.getByText("bad.pdf")).toBeInTheDocument()
+  })
+
+  it("completed documents show a 'Complete' badge", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "h1", status: "completed", updated_at: "2026-08-29T10:00:00Z" })] })
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    expect(screen.getByText("Complete")).toBeInTheDocument()
+  })
+
+  it("failed documents show a 'Failed' badge", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: [doc({ id: "h2", status: "failed", error_message: "corrupt", updated_at: "2026-08-28T10:00:00Z" })] })
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    const badges = screen.getAllByText("Failed")
+    expect(badges.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("shows 'Nothing has been ingested yet' when history is empty", async () => {
+    const user = userEvent.setup()
+    renderPlain()
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    expect(screen.getByText("Nothing has been ingested yet.")).toBeInTheDocument()
   })
 })
