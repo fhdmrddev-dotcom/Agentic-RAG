@@ -6447,7 +6447,7 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 **Triple re-derived 2026-08-28: `22 / 12 / 609` — G-5: ⚠ FIRES.** ⚠ **Absent from both registers for its entire life at twelve phases**, alongside `retrieval_service.py` at nine. That is the exact failure Phase 214's close found twenty-five further instances of.
 
-⚠ **THE COLUMN ORDER IS LOAD-BEARING AND IT IS ENFORCED FROM ANOTHER FILE.** The seven columns are fixed — `chevron · Filename · Type · Size · Chunks · Status · Actions` — because `IngestionPage.tsx` sheds columns 3–5 positionally (`[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`) when the 430px detail panel opens or the viewport drops below 768px. **Reordering these columns silently breaks a rule written in a file this one does not import.** Sketch 218 pins the order in `COPY.COLUMNS` and asserts it against this file.
+⚠ **THE COLUMN ORDER IS LOAD-BEARING AND IT IS ENFORCED FROM ANOTHER FILE.** The seven columns are fixed — `chevron · Filename · Type · Size · Chunks · Status · Actions` — because `LibraryPage.tsx` (renamed from `IngestionPage.tsx` at Phase 217) sheds columns 3–5 positionally (`[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`) when the 430px detail panel opens or the viewport drops below 768px. **Reordering these columns silently breaks a rule written in a file this one does not import.** Sketch 218 pins the order in `COPY.COLUMNS` and asserts it against this file.
 
 ⭐ **It already renders `table_count` and `image_count` as bare counts** (*"3 tables"*, *"5 imgs"*) while `document_tables.headers`/`.rows` and `document_images.description` hold the real content. That is the largest single instance of the buried-capability finding.
 
@@ -6455,15 +6455,21 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 ---
 
-### `frontend/src/pages/IngestionPage.tsx`
+### `frontend/src/pages/LibraryPage.tsx`
 
-**Triple re-derived 2026-08-28: `26 / 9 / 601` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-04`, at the rename commit): `27 / 10 / 603` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
+
+⚠ **RENAMED AT PHASE 217 (SC#1 / D-217-01): `IngestionPage.tsx` → `LibraryPage.tsx`, 2026-08-29.** It was a `git mv`, so **the history FOLLOWS the move** — but `git log --oneline -- frontend/src/pages/LibraryPage.tsx` without `--follow` reports **1**, not 27. A re-derive that reads `1 / 1 / 603` has measured the RENAME, not the file; use `git log --follow --oneline -- <file>` (and `--follow --format=%s` for the phase buckets) at this path and do not read the small number as a reset. The 2026-08-29 triple was derived by adding this commit to the old path's measured 26 commits / 9 phases (`03, 08, 29, 47, 111.1, 112, 114, 153, 165` — the six-digit buckets `260328` and `260405` are dated quick tasks and are subtracted).
 
 ⭐ **IT IS ALREADY NAMED `Documents` EVERYWHERE THE USER CAN SEE.** `ActiveView` carries `"documents"` (there is no router), `nav-items.ts:37` labels it *Documents*, `ChatLayout.tsx:757` mounts it, and its own `<h1>` reads *Documents*. **Only the FILE NAME is stale** — which refutes `BUS-026`'s claim that renaming touches the route and the three-homes navigation contract. The rename `IngestionPage.tsx` → `LibraryPage.tsx` is a file move plus ~8 import sites.
 
-**It is the host the five-tab Library shell lands in** (operator direction 2026-08-28: the page becomes `Library`; Library Health and Governance merge into it). It already owns the push/split grid (`minmax(0,1fr) 430px`), the 288px Folders+Views sidebar with its pinnable rail, and the column-shedding rule above.
+⚠ **THAT FINDING IS NOW SPENT, AND IT IS KEPT RATHER THAN DELETED BECAUSE IT WAS RIGHT.** Plan `217-04` measured the blast radius it predicted and found exactly **one import site** (`ChatLayout.tsx:8` + the element at `:758`), one nav label (`nav-items.ts:37`), one `<h1>` and one subtitle. The rename is done: the file is `LibraryPage.tsx`, the export is `LibraryPage`, the nav reads *Library* and the page reads *Library* over *"What the agent can read, and how well it reads it."* **`ActiveView` still carries `"documents"`** — it is a key and is never printed — and so does `SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"`, which is persisted state a rename would silently reset. Both, plus `ChatLayout.tsx:879`'s `<KnowledgeHealthPage />` trailing else, are now fenced from source by `frontend/src/__tests__/library/renameFence.test.ts` instead of by prose. **Twelve comment-only references to the old name survive** (`App.tsx:288,290` · `ClassificationRulesPage.tsx:29` · `FilterBar.test.tsx:127` · `DocumentDetailPanel.tsx:307` · `RelationshipsSection.tsx:9` · `citationNav.tsx:11,56,129` · `GovernancePage.tsx:95` · `types/index.ts:328`) — harmless residue for a later sweep, left deliberately because later plans in this phase own several of those files.
+
+**It is the host the five-tab Library shell lands in** (operator direction 2026-08-28: the page becomes `Library`; Library Health and Governance merge into it). It already owns the push/split grid (`minmax(0,1fr) 430px`), the 288px Folders+Views sidebar with its pinnable rail, and the column-shedding rule above. ⚠ **That rule is written HERE and enforced on a file this one does not import** — the selector is `[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`, so reordering `DocumentList.tsx`'s seven columns silently breaks it. The `nth-child` positions are the invariant, not the header text.
 
 **The named seam:** the sidebar, the filter bar and the grid are three independent concerns in one component. With a tab shell arriving, extract the shell first and let each tab own its body — otherwise the tab bar becomes the tenth conditional branch.
+
+⚠ **THE SEAM IS STILL OWED — `217-04` did NOT take it, and says so.** That plan is a pure rename: zero behaviour change, zero new branch, no new conditional. **Plan `217-09` takes the seam**, because it is the plan that adds the shell. On the gate side: this file is in **NEITHER count-gate knob** today and its suite has **never been executed by the gate** — which is how that suite sat RED at HEAD (an incomplete `@/lib/supabase` mock factory, fixed in `217-04`) without anyone seeing it. **Plan `217-12` adopts it.**
 
 ---
 

@@ -44,6 +44,8 @@ const WIDE_BREAKPOINT = 1536
 // Phase 114 (D-114-17): the sidebar→rail collapse is user-pinnable + session-
 // persisted (mirrors the workspace-panel collapse-to-rail precedent). The pin
 // records the user's MANUAL intent so auto-collapse on panel-open doesn't yo-yo.
+// ⛔ STORED STATE — NOT renamed with the page (Phase 217 SC#1). The literal is a
+// sessionStorage key; renaming it silently resets every user's pinned sidebar.
 const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
 
 function useIsMobile(): boolean {
@@ -72,7 +74,7 @@ function useIsWide(): boolean {
   return isWide
 }
 
-export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
+export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
@@ -335,9 +337,9 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-headline font-bold text-foreground">Documents</h1>
+          <h1 className="text-2xl font-headline font-bold text-foreground">Library</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
-            Upload documents to give the AI context for your conversations.
+            What the agent can read, and how well it reads it.
           </p>
         </div>
 

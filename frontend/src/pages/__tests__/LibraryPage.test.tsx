@@ -1,12 +1,15 @@
 /**
- * Integration tests for IngestionPage two-panel layout.
+ * Integration tests for LibraryPage two-panel layout.
+ *
+ * Renamed from `src/__tests__/components/IngestionPage.test.tsx` at Phase 217 SC#1 —
+ * the file moved and the page title changed; the surface did not.
  *
  * Mocks:
  * - @/hooks/useDocuments — returns sample documents with folder_id fields
  * - @/hooks/useFolders — returns sample folders
  * - @/lib/supabase — prevents real auth/channel calls
  */
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
@@ -26,7 +29,13 @@ vi.mock("@/hooks/useFolders", () => ({
 }))
 
 // ── Mock Supabase (prevent real network calls) ─────────────────────────────────
+// ⚠ [Rule 1 — Phase 217 SC#1] `SUPABASE_CLIENT_REHYDRATED` is NOT optional. `useAuth.ts:3`
+// imports it as a named export and `:51` passes it to `addEventListener`; a mock factory
+// that omits it makes vitest throw at MOUNT, so every case in this file fails before it
+// asserts anything. The suite was RED at HEAD for exactly this reason and nobody saw it —
+// it is in NEITHER count-gate knob, so the gate has never executed it (plan 12 adopts it).
 vi.mock("@/lib/supabase", () => ({
+  SUPABASE_CLIENT_REHYDRATED: "supabase:client-rehydrated",
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
@@ -103,7 +112,7 @@ function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
 
-describe("IngestionPage", () => {
+describe("LibraryPage", () => {
   beforeEach(() => {
     mockUseDocuments.mockReturnValue({
       documents: sampleDocuments,
@@ -120,19 +129,37 @@ describe("IngestionPage", () => {
     })
   })
 
-  it("renders heading 'Documents'", async () => {
-    const { IngestionPage } = await import("@/pages/IngestionPage")
-    renderPage(<IngestionPage />)
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Documents")
+  // Phase 217 SC#1: the page title is the BUILD-CONTRACT's `Library`, not the
+  // shipped `Documents` it replaces.
+  it("renders heading 'Library'", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Library")
+  })
+
+  it("does NOT still render the replaced heading 'Documents'", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent("Documents")
+  })
+
+  // Phase 217 SC#1: the subtitle names the PURPOSE, not the mechanism. Pinned
+  // verbatim from the sketch contract (COPY.PAGE_SUB).
+  it("renders the contract subtitle verbatim", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    expect(
+      screen.getByText("What the agent can read, and how well it reads it."),
+    ).toBeInTheDocument()
   })
 
   it("renders two-panel layout with FolderTree and DocumentUpload", async () => {
-    const { IngestionPage } = await import("@/pages/IngestionPage")
-    renderPage(<IngestionPage />)
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
     // Folder tree panel: "Folders" section label.
     // Phase 114 Plan 06 composition renders "Folders" twice — the desktop
     // folder-tree section header (FolderTree) AND the md:hidden mobile
-    // bottom-sheet trigger (IngestionPage). jsdom ignores the responsive
+    // bottom-sheet trigger (LibraryPage). jsdom ignores the responsive
     // hide, so both sit in the DOM; assert the Folders surface is present.
     expect(screen.getAllByText("Folders").length).toBeGreaterThanOrEqual(1)
     // Upload control — visible label is "Upload"; the folder target ("Upload to
@@ -141,15 +168,15 @@ describe("IngestionPage", () => {
   })
 
   it("DocumentUpload targets Root (accessible name) when no folder selected", async () => {
-    const { IngestionPage } = await import("@/pages/IngestionPage")
-    renderPage(<IngestionPage />)
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
     expect(screen.getByRole("button", { name: "Upload to Root" })).toBeInTheDocument()
   })
 
   it("DocumentList shows only root documents when Root is selected (default)", async () => {
     // Default state: selectedFolderId = null → Root → show folder_id === null docs
-    const { IngestionPage } = await import("@/pages/IngestionPage")
-    renderPage(<IngestionPage />)
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
     // root-doc.txt has folder_id null so it should show
     expect(screen.getByText("root-doc.txt")).toBeInTheDocument()
     // research.pdf is in folder-1, not root, should not show
