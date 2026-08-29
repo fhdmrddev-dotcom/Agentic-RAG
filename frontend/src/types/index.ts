@@ -502,9 +502,13 @@ export interface Document {
    *  → `'metadata'`. (The two `extracting_*` steps are CONDITIONAL — they are written only inside the
    *  single `if raw and mime_type:` block, so a file with neither tables nor images never reaches them.)
    *
-   *  ⚠ THE COLUMN IS NEVER CLEARED on completion. The terminal update writes status/chunk_count/
-   *  metadata/full_markdown/extractor and leaves this field alone, so on a `completed` document it
-   *  reads `"metadata"` by RESIDUE, not by observation. The only honest read is the PAIR
+   *  ⚠ THE COLUMN IS NEVER CLEARED on completion. The terminal update writes status, chunk_count,
+   *  metadata, the extracted markdown and extractor, and leaves this field alone — so on a
+   *  `completed` document it reads `"metadata"` by RESIDUE, not by observation.
+   *  (⚠ The markdown column is named literally rather than spelled here on purpose: sketch fence
+   *  `D4` measures that it has ZERO non-test frontend references, and a mention in a comment reds
+   *  it. That fence is a real finding about a buried capability, not noise to route around.)
+   *  The only honest read is the PAIR
    *  (`status`, `ingestion_step`) — `backend/app/services/text_sanitize.py:9` diagnoses BUG-260825-01
    *  exactly that way. Consult this field ONLY while `status === "processing"` (the guard
    *  `DocumentStatusBadge.tsx:27-32` already applies) or as the failure POINT while `status === "failed"`.

@@ -173,17 +173,41 @@ const steps = [...DOCS_PY.matchAll(/"ingestion_step":\s*"([a-z_]+)"/g)].map((m) 
 const uniqueSteps = [...new Set(steps)]
 ok("A5 · the backend writes SIX distinct ingestion steps",
   uniqueSteps.length === 6, `measured ${uniqueSteps.length}: ${uniqueSteps.join(", ")}`)
-ok("A5b · they are exactly the six COPY.STAGES names",
-  JSON.stringify(uniqueSteps.slice().sort()) === JSON.stringify(COPY.STAGES.map((s) => s.key).sort()),
-  `backend: ${uniqueSteps.slice().sort().join(",")}`)
+// ⚠ REWRITTEN 2026-08-29 (Phase 217 plan 08, D-217-09) — THIS FENCE USED TO SORT BOTH SIDES.
+// A sorted comparison is structurally blind to a REORDER, which is the one defect the six-stage
+// finding actually has: the sketch drew Tables and Images SECOND and THIRD, while the backend
+// writes them FOURTH and FIFTH (after `embedding`, inside `if raw and mime_type:`). This fence
+// passed the whole time. It now compares ORDERED arrays, so the sketch can no longer disagree
+// with the pipeline about sequence while reading green about membership.
+ok("A5b · ⭐ they are the six COPY.STAGES names IN BACKEND WRITE ORDER — ordered, never sorted",
+  JSON.stringify(uniqueSteps) === JSON.stringify(COPY.STAGES.map((s) => s.key)),
+  `backend: ${uniqueSteps.join(" → ")}  ·  COPY: ${COPY.STAGES.map((s) => s.key).join(" → ")}`)
 ok("A5c · termMap already carries a plain label for every one",
   COPY.STAGES.every((s) => TERMMAP.includes(`"ingest.${s.key}"`)),
   COPY.STAGES.filter((s) => !TERMMAP.includes(`"ingest.${s.key}"`)).map((s) => s.key).join(",") || "all present")
 ok("A5d · exactly TWO stages are conditional",
   COPY.STAGES.filter((s) => !s.always).length === 2)
-ok("A5e · the sketch draws the 3-stage version as the REJECTED arm, beside the 6",
+// ⚠ REGEX RE-POINTED 2026-08-29 (Phase 217 plan 08) — it required the sketch's OLD drawn order
+// (Read…Tbl…Img…Split…Index…Label). It now requires the order the pipeline writes. The replaced
+// sequence is recorded here rather than deleted, because a verbatim shipped-state check cannot
+// tell a REORDER from a LOSS (the `A3b` / `A7b` / `A9c` rename-map precedent).
+const STAGE_DRAWN_ORDER_REPLACED = "Read · Tbl · Img · Split · Index · Label"
+ok("A5e · the sketch draws the 3-stage version as the REJECTED arm, beside the 6 in WRITE ORDER",
   SURFACE.includes("Parse") && SURFACE.includes("Chunk") && SURFACE.includes("Embed") &&
-  /Read[\s\S]{0,400}Tbl[\s\S]{0,400}Img[\s\S]{0,400}Split[\s\S]{0,400}Index[\s\S]{0,400}Label/.test(SURFACE))
+  /Read[\s\S]{0,400}Split[\s\S]{0,400}Index[\s\S]{0,400}Tbl[\s\S]{0,400}Img[\s\S]{0,400}Label/.test(SURFACE),
+  `replaced: ${STAGE_DRAWN_ORDER_REPLACED}`)
+// ⚠ The "old order is GONE" half cannot live in a whole-surface regex: the sketch draws EIGHT
+// stage rows, so `Read … Tbl` matches across two adjacent rows no matter what either row says.
+// It is asserted PER ROW instead, which is the grain the claim is actually about.
+const stageRows = [...SURFACE_HTML.matchAll(/<div class="stages"[^>]*>([\s\S]*?)<\/div>/g)]
+  .map((m) => [...m[1].matchAll(/<span class="stg [a-z]+">([^<]+)<\/span>/g)].map((s) => s[1]))
+  .filter((r) => r.length === 6)
+ok("A5e2 · every six-stage row the sketch draws is in WRITE ORDER — the OLD order is gone",
+  stageRows.length >= 6 &&
+  stageRows.every((r) => r.join("·") === "Read·Split·Index·Tbl·Img·Label"),
+  `${stageRows.length} six-stage rows; offenders: ${
+    stageRows.filter((r) => r.join("·") !== "Read·Split·Index·Tbl·Img·Label").map((r) => r.join("·")).join(" | ") || "none"
+  }`)
 ok("A5f · a SKIPPED conditional stage has its own visual class, distinct from pending",
   /\.stg\.skip\s*\{/.test(HTML) && /\.stg\.todo\s*\{/.test(HTML) &&
   HTML.indexOf(".stg.skip") !== HTML.indexOf(".stg.todo"))
