@@ -116,6 +116,21 @@ silently — which is the specific event this gate exists to refuse.
    unverified translation step. Report the count of phases whose CONTEXT.md had decisions the gate
    scored as zero.
 
+## ⭐ CONFIRMED IN A SECOND TOOL, in the same session — it is not one handler's bug
+
+`gsd-tools.cjs gap-analysis` (workflow step **13e**, the post-planning gap report) reads
+`.planning/REQUIREMENTS.md` **and** `${PHASE_DIR}/CONTEXT.md`, and its documented output format has
+one row per **REQ-ID *and* D-ID**. Run against Phase 217 it emitted **36 rows, every one from
+REQUIREMENTS.md, and not a single `CONTEXT.md` row** — against the same 24-decision file.
+
+So **two independent tools that both claim to read CONTEXT.md decisions both see zero of them.** The
+pattern is shared, which means the fix is one pattern and the audit is repo-wide.
+
+⚠ Note also that gap-analysis reports the **whole milestone's** requirement set against a single
+phase's plans — `32 of 36 items not covered` on Phase 217 is 32 *other phases'* requirements, and it
+is non-blocking by design. Fine as written, but it means the one signal in that report that would
+have been phase-specific — the D-ID rows — is exactly the half that is missing.
+
 ## The same blindness probably exists in its sibling
 
 `/gsd:verify-work` has a non-blocking counterpart of this gate (review finding **F15** deliberately
