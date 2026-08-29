@@ -392,9 +392,9 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 217-02-PLAN.md — GET /content, /chunks, /tables, /images (user-JWT, threadpooled, 404-before-read)
-- [ ] 217-06-PLAN.md — the shared ui/tabs primitive: the --tab-active token pair and the inset ring
-- [ ] 217-07-PLAN.md — the front-door dropzone and ONE accepted-formats constant, fenced against the server
+- [x] 217-02-PLAN.md — GET /content, /chunks, /tables, /images (user-JWT, threadpooled, 404-before-read)
+- [x] 217-06-PLAN.md — the shared ui/tabs primitive: the --tab-active token pair and the inset ring
+- [x] 217-07-PLAN.md — the front-door dropzone and ONE accepted-formats constant, fenced against the server
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
