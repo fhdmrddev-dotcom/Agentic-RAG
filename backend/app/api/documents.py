@@ -2301,6 +2301,10 @@ def ingest_document(
                 "embedding": embedding,  # computed from context_header + chunk
                 "embedding_model": _chunk_embedding_model,           # D-10 per-chunk tag
                 "embedding_dimensions": _chunk_embedding_dimensions,  # D-10
+                # BE-1 (217.1): the honest "when the vector was written" timestamp.
+                # created_at is the CHUNKING time and never moves on a re-embed —
+                # printing it as "last indexed" would be a lie after the first re-index.
+                "embedded_at": datetime.now(timezone.utc).isoformat(),
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]

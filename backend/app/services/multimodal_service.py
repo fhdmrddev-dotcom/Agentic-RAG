@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from supabase import Client
@@ -424,6 +425,8 @@ def embed_and_store_table_chunks(
             "embedding": embedding,
             "embedding_model": _tbl_embedding_model,
             "embedding_dimensions": _tbl_embedding_dimensions,
+            # BE-1 (217.1): the honest "when the vector was written" timestamp.
+            "embedded_at": datetime.now(timezone.utc).isoformat(),
             **({"org_id": org_id} if org_id else {}),
         }
         for i, (chunk_text, embedding) in enumerate(zip(all_table_chunks, embeddings))
@@ -902,6 +905,8 @@ def extract_and_store_images(
                         "embedding": embedding,
                         "embedding_model": _img_embedding_model,
                         "embedding_dimensions": _img_embedding_dimensions,
+                        # BE-1 (217.1): the honest "when the vector was written" timestamp.
+                        "embedded_at": datetime.now(timezone.utc).isoformat(),
                     }
                     for (i, content), embedding in zip(descriptions, embeddings)
                 ]

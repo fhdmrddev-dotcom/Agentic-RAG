@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from starlette.concurrency import run_in_threadpool
@@ -195,6 +196,10 @@ async def reembed_job(
                                 "embedding": vec,
                                 "embedding_model": current,
                                 "embedding_dimensions": dims,
+                                # BE-1 (217.1): the honest "when the vector was written"
+                                # timestamp — the re-embed path MOVES it, because a new
+                                # vector IS a new index time.
+                                "embedded_at": datetime.now(timezone.utc).isoformat(),
                             }
                         )
                         .eq("id", row["id"])

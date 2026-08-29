@@ -2351,6 +2351,43 @@ was already applied. No change to the vision loop, the size guard, the dedup, th
 (`describe_image` + downscale + per-image guards) is a separable unit from the storage/chunking half below
 it; SEED-226's full-page-vision path would want that seam rather than a third branch inside this function.
 
+⚠ **217.1-08 wrote `embedded_at` at TWO of its four write sites** — the table-chunk INSERT
+(`:423-432`) and the image-chunk INSERT (`:896-908`). Each chunk row now carries the honest
+"when the vector was written" timestamp (BE-1), using the same `datetime.now(timezone.utc).isoformat()`
+idiom as `documents.py:2296`. A future dims-change re-embed NULLs it via `resize_embedding_column`
+(mig 140). The `datetime` import added to this file is the only new dependency.
+
+---
+
+### `backend/app/api/documents.py`
+
+**Re-derived 2026-08-29: `71 commits / 31 phases / 2535 L`** · six-digit dated quick-task buckets:
+**present** (the recipe's own warning) · **G-5 FIRES HARD** (31 phases vs threshold 3) — ⚠ **absent from
+this ledger for its ENTIRE LIFE**, among the hottest files in the repository. Row added by 217.1-08, the
+first plan to structurally edit it this phase.
+
+**What 217.1-08 did:** added `"embedded_at": datetime.now(timezone.utc).isoformat()` to the main-ingest
+chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_service.py:423` and `:896`,
+`reembed_service.py:187` are the other three). No routing, handler or response-model change.
+
+**What binds this file:**
+
+1. ⚠ **It owns the `_upload_pipeline` and the RLS-scoped document/version/chunk reads.** 11 routes, not
+   one of which read the retrieval facts SC#4 needs — which is exactly why Phase 217 concluded **ZERO
+   backend** for the Library's index facts and why BE-2 (`GET /library/index-summary`, plan 09) lives in a
+   NEW `backend/app/api/library.py`, not here. Adding a cross-folder aggregate to this file is the wrong
+   direction (RESEARCH §G).
+2. ⚠ **`ingestion_step` is NEVER CLEARED on completion** (D-217-23) — it reads `"metadata"` by residue,
+   and `text_sanitize.py:9` diagnoses BUG-260825-01 by reading `status=failed / ingestion_step=embedding`.
+   `:1308` legitimately nulls it on reingest. Do not "fix" this.
+3. **The chunk INSERT is one of FOUR `document_chunks` write sites** — a future change to the chunk-row
+   shape must touch all four or the sites silently diverge (this is exactly the D-217.1-35 correction:
+   a two-site plan leaves table/image chunks NULL forever).
+
+**No seam is named yet** in the source material; state *"none proposed — owed to a future refactor phase"*
+rather than inventing one under 217.1-08's own budget. The 11-route surface and the `_upload_pipeline`
+are the obvious candidates for that future phase.
+
 ---
 
 ### `backend/app/services/harness/validator_kinds.py`
