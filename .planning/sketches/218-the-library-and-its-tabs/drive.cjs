@@ -923,6 +923,190 @@ ok("H4c · ⚠ Classification is NOT folded in, and the sketch says why rather t
   "it is a different KIND of surface; folding it unasked would be scope creep")
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// §K · COMPOSITION — the ordered blocks per screen  (Phase 217.1 SC#1 / D-217.1-08)
+// ═══════════════════════════════════════════════════════════════════════════════════════
+/**
+ * ⭐ WHY THIS EXISTS. Phase 217 shipped against a contract that pinned WORDS — the page
+ * title, the column order, the stage labels — and every one of them was green while four
+ * of the five tabs carried none of the sketch's furniture. A contract that cannot name a
+ * MISSING BLOCK cannot tell "built" from "not built yet". This section emits the block
+ * list, and the fence suite in `frontend/src/components/library/__tests__/` reads it.
+ *
+ * ⚠ IT WALKS `SURFACE_HTML`, NOT `HTML` — the stripper docblock at :32-43 is the reason.
+ *   And it carries its OWN non-vacuity control (`EXPECTED_KINDS` below): if the stripper
+ *   ever eats an arm again, a named kind disappears and THIS suite reds, rather than the
+ *   contract quietly emitting one block fewer and every downstream assertion passing over
+ *   nothing. **An emitter with no floor is a stripper bug waiting to read green.**
+ *
+ * ⚠ THE MARKER IS SKETCH-SIDE ONLY. `data-block="…"` is minted in `index.html` and is NOT
+ *   a build convention — the build's block hooks are `data-testid="<screen>-<kind>"`, the
+ *   house convention at ~1500 occurrences (217.1-RESEARCH §C.4). One marker for the
+ *   drawing, one for the product; the JSON is what joins them.
+ */
+const SCREENS = {
+  "v-a": "documents",
+  "v-v": "views",
+  "v-u": "ingestion",
+  "v-i": "indexing",
+  "v-h": "health",
+}
+
+/** The section slice of SURFACE_HTML for one screen id. */
+function screenSlice(variantId) {
+  const open = new RegExp(`<section class="variant(?: active)?" id="${variantId}">`)
+  const m = open.exec(SURFACE_HTML)
+  if (!m) return ""
+  const start = m.index
+  const end = SURFACE_HTML.indexOf("</section>", start)
+  return end < 0 ? SURFACE_HTML.slice(start) : SURFACE_HTML.slice(start, end)
+}
+
+const VOID_TAGS = new Set(["br", "img", "input", "hr", "meta", "link", "source", "path", "circle", "use"])
+
+/** ⭐ A BALANCED slice, never "up to the next marker". The lazy version leaks the atoms of
+ *  whatever follows the last block into that block — measured on `v-h`, where the REJECTED
+ *  `Retrieval Score` arm sits after the checks table and would have been recorded as one of
+ *  its atoms. Same family of bug as the stripper's: quietly wrong, still green. */
+function elementSlice(html, startIdx) {
+  const tagMatch = /^<([a-zA-Z][\w-]*)/.exec(html.slice(startIdx))
+  if (!tagMatch) return ""
+  const tag = tagMatch[1]
+  const openEnd = html.indexOf(">", startIdx)
+  if (openEnd < 0) return html.slice(startIdx)
+  if (html[openEnd - 1] === "/" || VOID_TAGS.has(tag)) return html.slice(startIdx, openEnd + 1)
+  const re = new RegExp(`<(/?)${tag}\\b[^>]*?(/?)>`, "g")
+  re.lastIndex = openEnd + 1
+  let depth = 1
+  let m
+  while ((m = re.exec(html))) {
+    if (m[1] === "/") {
+      depth--
+      if (depth === 0) return html.slice(startIdx, m.index + m[0].length)
+    } else if (m[2] !== "/") {
+      depth++
+    }
+  }
+  return html.slice(startIdx)
+}
+
+/** The atoms a block declares — STRUCTURAL LABELS ONLY, never fixture rows. A contract that
+ *  pinned `architecture_v2_final.pdf` would fail the day someone renamed a sample file. */
+const ATOM_PATTERNS = [
+  /<th\b[^>]*>([^<]+)<\/th>/g,                     // table column names
+  /<span class="k">([^<]+)<\/span>/g,              // key/value keys
+  /<div class="tl">([^<]+)<\/div>/g,               // stat-tile labels
+  /<div class="sh"><span class="ico [^"]*">[^<]*<\/span>\s*([^<]+)<\/div>/g, // stage names
+  /<span class="cglabel">([^<]+)<\/span>/g,        // chip-group labels
+  /<span class="chip[^"]*">([^<]*)<span class="b">/g, // chip labels
+  /<div class="d1">([^<]+)<\/div>/g,               // dropzone headline
+  /<div class="d3">([^<]+)<\/div>/g,               // dropzone accepted formats
+]
+
+function atomsOf(blockHtml) {
+  const out = []
+  for (const re of ATOM_PATTERNS) {
+    for (const m of blockHtml.matchAll(new RegExp(re.source, "g"))) {
+      const t = norm(m[1])
+      if (t && !out.includes(t)) out.push(t)
+    }
+  }
+  return out
+}
+
+/** A block's own heading, when it has one. `null` is a legitimate answer — inventing a
+ *  heading from the first child label would make a headless block indistinguishable from
+ *  a headed one, which is the distinction a build has to reproduce. */
+function headingOf(blockHtml) {
+  const h4 = /<h4>([^<]+)<\/h4>/.exec(blockHtml)
+  if (h4) return norm(h4[1])
+  const cg = /<span class="cglabel">([^<]+)<\/span>/.exec(blockHtml)
+  if (cg) return norm(cg[1])
+  const d1 = /<div class="d1">([^<]+)<\/div>/.exec(blockHtml)
+  if (d1) return norm(d1[1])
+  return null
+}
+
+/** Every named button on the screen, in document order. `button.btn` is the sketch's one
+ *  button class; a button that is not `.btn` is chrome (tab triggers, sub-nav). */
+function buttonsOf(sliceHtml) {
+  return [...sliceHtml.matchAll(/<button class="btn[^"]*"[^>]*>([^<]*)<\/button>/g)]
+    .map((m) => norm(m[1]))
+}
+
+/** → { blocks: [{ kind, heading, atoms[] }], buttons: [] } for one screen, in DOM order. */
+function composition(variantId) {
+  const slice = screenSlice(variantId)
+  const blocks = []
+  for (const m of slice.matchAll(/\sdata-block="([^"]+)"/g)) {
+    // walk back to the "<" that opens the element carrying the marker
+    const open = slice.lastIndexOf("<", m.index)
+    const blockHtml = elementSlice(slice, open)
+    blocks.push({ kind: m[1], heading: headingOf(blockHtml), atoms: atomsOf(blockHtml) })
+  }
+  return { blocks, buttons: buttonsOf(slice) }
+}
+
+const COMPOSITION = {}
+for (const [variantId, screen] of Object.entries(SCREENS)) {
+  COMPOSITION[screen] = composition(variantId)
+}
+
+/** ⚠ THE NON-VACUITY FLOOR. Hand-written ON PURPOSE and it is the ONE hand-written list
+ *  here: it is not the contract, it is the assertion that the contract was not silently
+ *  emptied. The contract itself (kinds, headings, atoms, buttons, ORDER) is walked. */
+const EXPECTED_KINDS = {
+  documents: ["pagehead", "tabslist", "sidebar", "stat-tiles", "doclist", "tfoot"],
+  views: ["pagehead", "tabslist", "vgrid"],
+  ingestion: ["pagehead", "tabslist", "subnav", "dropbig", "folder-picker", "stagecards", "queue", "needs-attention"],
+  indexing: ["pagehead", "tabslist", "vector-store-card", "embedding-model-card", "folders-table"],
+  health: ["pagehead", "tabslist", "coverage-ring", "searches-chart", "stat-tiles",
+    "chipgroup-being-used", "chipgroup-in-good-shape", "document-bars", "checks", "match-strength-tile"],
+}
+
+for (const [screen, expected] of Object.entries(EXPECTED_KINDS)) {
+  const got = COMPOSITION[screen].blocks.map((b) => b.kind)
+  ok(`K1 · ${screen} · the composition walk finds blocks at all`,
+    got.length > 0, `walked ${got.length}`)
+  const missing = expected.filter((k) => !got.includes(k))
+  ok(`K2 · ${screen} · every expected block kind is present`,
+    missing.length === 0, `missing: ${missing.join(", ") || "none"} · got: ${got.join(" · ")}`)
+  ok(`K3 · ${screen} · no block was emitted with an empty kind`,
+    got.every((k) => k.length > 0), got.join(" · "))
+}
+
+// K4 — every named button carries a label. An unlabelled button in the contract would make
+// the fence assert the presence of a nameless thing, which nothing can satisfy or refute.
+const ALL_BUTTONS = Object.values(COMPOSITION).flatMap((c) => c.buttons)
+ok("K4-control · the button walk finds buttons on the five screens",
+  ALL_BUTTONS.length >= 6, `parsed ${ALL_BUTTONS.length}: ${ALL_BUTTONS.join(" · ")}`)
+ok("K4 · every emitted button label is non-empty",
+  ALL_BUTTONS.every((b) => b.length > 0),
+  ALL_BUTTONS.map((b) => `"${b}"`).join(" · "))
+
+// K5 — the literal control D-217.1-08 asks for: every distinct kind found overall is
+// carried by at least one screen. It is true by construction, and it is asserted anyway so
+// that a future walker which invents a kind from nothing has something to fail.
+const ALL_KINDS = [...new Set(Object.values(COMPOSITION).flatMap((c) => c.blocks.map((b) => b.kind)))]
+ok("K5 · every distinct block kind is carried by at least one screen",
+  ALL_KINDS.every((k) => Object.values(COMPOSITION).some((c) => c.blocks.some((b) => b.kind === k))),
+  ALL_KINDS.join(" · "))
+
+// K6 — the atoms are not empty everywhere. A walker whose ATOM_PATTERNS all stopped matching
+// would emit a structurally valid contract carrying no content at all.
+const ATOM_BEARING = Object.values(COMPOSITION)
+  .flatMap((c) => c.blocks).filter((b) => b.atoms.length > 0).length
+ok("K6 · at least ten blocks carry atoms", ATOM_BEARING >= 10, `${ATOM_BEARING} blocks with atoms`)
+
+// K7 — ⚠ THE BALANCED-SLICE FENCE, driven by the bug it prevents. `v-h`'s REJECTED arm-1
+// tile (`Retrieval Score`, D-217.1-03) sits after the checks table in document order. A
+// naive marker-to-marker slice records it as an atom of `checks`; a balanced one cannot.
+ok("K7 · the rejected `Retrieval Score` arm leaks into NO block's atoms",
+  !COMPOSITION.health.blocks.some((b) => b.atoms.includes("Retrieval Score")),
+  COMPOSITION.health.blocks.filter((b) => b.atoms.includes("Retrieval Score")).map((b) => b.kind).join(", "))
+ok("K7b · and the QUALIFIED arm IS carried, as its own block (D-217.1-29)",
+  COMPOSITION.health.blocks.some((b) => b.kind === "match-strength-tile" && b.atoms.includes("Match strength")))
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
 // REPORT
 // ═══════════════════════════════════════════════════════════════════════════════════════
 const total = pass + failures.length
@@ -1021,6 +1205,49 @@ ${[["never retrieved, none", COPY.EMPTY_NEVER_RETRIEVED], ["no searches yet", CO
 \`Tabs\` primitive draws the selected tab *darker* than its track on Deep Midnight, with only a
 5%-opacity shadow as a second cue — invisible at 4% lightness. Every reference image drew it lighter.
 `
-  fs.writeFileSync(path.join(DIR, "BUILD-CONTRACT.generated.md"), md)
-  console.log("  → BUILD-CONTRACT.generated.md written from the running sketch\n")
+  // ── §K · the composition contract (Phase 217.1 SC#1 / D-217.1-08) ───────────────────
+  // ⚠ THREE artifacts, not one, and the third is the point. `/gsd:complete-milestone`
+  // ARCHIVES `.planning/sketches/`, and `argumentVocabulary.test.ts` already carries that
+  // residual unpaid — its `?raw` import reaches across the repo boundary into a directory
+  // that will one day move. The in-package copy costs one `writeFileSync` and closes it on
+  // day one: the fence imports the copy, never the sketch.
+  const compositionMd = `
+
+## Composition — the ordered blocks per screen
+
+⚠ **GENERATED, never transcribed.** Walked from \`index.html\`'s own \`data-block="…"\` markers in
+document order. \`data-block\` is a **sketch-side marker only**; the build's hook is
+\`data-testid="<screen>-<kind>"\` (217.1-RESEARCH §C.4). The machine-readable form of this section is
+\`BUILD-CONTRACT.composition.json\`, copied into
+\`frontend/src/components/library/__generated__/sketchComposition.json\`, and **that copy is what the
+fence suite imports.**
+
+${Object.entries(COMPOSITION).map(([screen, c]) => `### \`${screen}\`
+
+| # | block | heading | atoms |
+|---|---|---|---|
+${c.blocks.map((b, i) => `| ${i + 1} | \`${b.kind}\` | ${b.heading ? `${b.heading}` : "—"} | ${b.atoms.length ? b.atoms.map((a) => `\`${a}\``).join(" · ") : "—"} |`).join("\n")}
+
+buttons: ${c.buttons.length ? c.buttons.map((b) => `**${b}**`).join(" · ") : "_none_"}
+`).join("\n")}
+⚠ **\`health\`'s \`match-strength-tile\` is drawn LAST in the sketch** — inside the side-by-side arm
+that asked the operator to choose — while **D-217.1-29 rules it into the tile row as the fifth tile**.
+The contract records the sketch's own order because the contract is generated; **the fence asserts
+PRESENCE, not position**, so the ruled placement is the build's to honour and this row is not a
+contradiction of it.
+`
+  fs.writeFileSync(path.join(DIR, "BUILD-CONTRACT.generated.md"), md + compositionMd)
+  console.log("  → BUILD-CONTRACT.generated.md written from the running sketch")
+
+  // ⚠ NO TIMESTAMP IN THE JSON. The markdown carries a generated-on date; the JSON must be
+  // byte-identical across re-runs, or `git diff --exit-code` on the artifact — the drift
+  // signal T-217.1-06a relies on — fires every day for no reason and stops being read.
+  const compositionJson = JSON.stringify(COMPOSITION, null, 2) + "\n"
+  fs.writeFileSync(path.join(DIR, "BUILD-CONTRACT.composition.json"), compositionJson)
+  console.log("  → BUILD-CONTRACT.composition.json written")
+
+  const inPackage = path.join(REPO, "frontend", "src", "components", "library", "__generated__")
+  fs.mkdirSync(inPackage, { recursive: true })
+  fs.writeFileSync(path.join(inPackage, "sketchComposition.json"), compositionJson)
+  console.log("  → frontend/src/components/library/__generated__/sketchComposition.json written\n")
 }
