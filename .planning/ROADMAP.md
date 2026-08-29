@@ -402,8 +402,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 217-09-PLAN.md — the four-tab Library shell: Documents · Views · Ingestion · Indexing, on one selection truth
-- [ ] 217-10-PLAN.md — five client fns + the guarded barrel + the Content and Chunks sections (lazy on expand)
+- [x] 217-09-PLAN.md — the four-tab Library shell: Documents · Views · Ingestion · Indexing, on one selection truth
+- [x] 217-10-PLAN.md — five client fns + the guarded barrel + the Content and Chunks sections (lazy on expand)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
