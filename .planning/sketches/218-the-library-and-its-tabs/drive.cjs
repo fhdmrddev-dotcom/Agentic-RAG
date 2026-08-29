@@ -590,7 +590,39 @@ ok("D5 · document_tables stores real headers AND rows, not just a count",
   /headers jsonb/.test(SCHEMA) && /rows jsonb/.test(SCHEMA))
 ok("D5b · document_images stores a written description",
   /CREATE TABLE public\.document_images[\s\S]{0,400}description text/.test(SCHEMA))
-ok("D5c · the frontend renders only COUNTS of them today",
+// ⚠ INVERTED 2026-08-29 (217-11). The ORIGINAL claim is preserved below rather than
+// overwritten, because it going false is the POINT — not a regression. This is the THIRD
+// fence in this phase to be broken BY SUCCEEDING (D2 at 217-07, D4 at 217-10), and the
+// pattern is now the expected one rather than a surprise.
+//
+//   ORIGINAL: ok("D5c · the frontend renders only COUNTS of them today",
+//             /table_count/.test(src("frontend/src/components/ingestion/DocumentList.tsx") || ""))
+//
+// That fence audited a BURIED capability: `document_tables` stored real headers and rows,
+// `document_images` stored written descriptions, and the only thing the product showed of
+// either was a bare number in the document list. Phase 217 plan 11 shipped
+// DocumentTablesSection / DocumentImagesSection and mounted both in the detail panel — so
+// the fence began failing at the exact moment its subject stopped being a defect. Like D4
+// and 217-04's H2b, a verbatim check cannot tell "still buried (bad)" from "deliberately
+// surfaced (the goal)": it measured the symptom, not the property.
+//
+// It now asserts the capability IS rendered, which is the property worth defending from
+// here on — a later refactor that quietly drops a mount, or re-forks the table renderer,
+// re-buries the content and this reds.
+const D5C_PANEL = src("frontend/src/components/metadata/DocumentDetailPanel.tsx") || ""
+const D5C_TABLES = src("frontend/src/components/metadata/DocumentTablesSection.tsx") || ""
+const D5C_IMAGES = src("frontend/src/components/metadata/DocumentImagesSection.tsx") || ""
+const d5cMissing = [
+  /<DocumentTablesSection/.test(D5C_PANEL) ? null : "the panel does not mount the tables section",
+  /<DocumentImagesSection/.test(D5C_PANEL) ? null : "the panel does not mount the images section",
+  /<DataTableView/.test(D5C_TABLES) ? null : "the tables section no longer renders through the shared table renderer",
+  /row\.description/.test(D5C_IMAGES) ? null : "the images section no longer renders a written description",
+].filter(Boolean)
+ok("D5c · ⭐ the frontend RENDERS the tables and the image descriptions — not merely their counts",
+  d5cMissing.length === 0, d5cMissing.join("; ") || "tables render as tables; descriptions render as text")
+// The COUNTS are still shown too, and that is not in tension with the above — a number in
+// the list and the content in the panel are different jobs.
+ok("D5c-b · …and the document list still shows the count beside it",
   /table_count/.test(src("frontend/src/components/ingestion/DocumentList.tsx") || ""))
 ok("D5d · the sketch RENDERS the buried content — a real table and real descriptions",
   /class="xtable"/.test(SURFACE_HTML) && /class="figrow"/.test(SURFACE_HTML) &&
