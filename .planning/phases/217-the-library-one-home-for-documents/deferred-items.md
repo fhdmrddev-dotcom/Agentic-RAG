@@ -99,3 +99,75 @@ control that silently fails to fire is exactly how a fence gets believed without
 frontend renders only COUNTS of tables/images today"*. Plan 217-11 renders tables as tables and
 image descriptions, which makes that claim false BY SUCCEEDING. Plan 11's agent has been told to
 invert it rather than delete it, on this same pattern.
+
+---
+
+## DEFERRED at the phase's CLOSE (`217-12`, 2026-08-29) — each with a re-open trigger
+
+⛔ **A deferral with no re-open trigger is a deletion that looks like a decision.** Every item below
+carries one.
+
+### 1. Twelve comment-only `IngestionPage` references — DECLINED, not swept
+
+`217-04` left them deliberately (later plans in the same wave owned several of the files, and a
+same-wave edit would have collided). At close they are still present:
+`App.tsx:288,290` · `ClassificationRulesPage.tsx:29` · `FilterBar.test.tsx:127` ·
+`DocumentDetailPanel.tsx:307` · `RelationshipsSection.tsx:9` · `citationNav.tsx:11,56,129` ·
+`GovernancePage.tsx:95` · `types/index.ts:328`.
+
+**Declined at close rather than swept, and the reason is specific rather than caution.** Two of the
+twelve sit in files where a *comment* is load-bearing to a fence: `types/index.ts` carries the
+docblock that `217-08` deliberately wrote to avoid spelling `full_markdown`, because sketch fence
+`D4` uses a **substring `includes()`** and a mention in a comment reds it. This phase has watched the
+mention-vs-use trap fire **five times**; a cosmetic comment sweep across eleven files is exactly the
+shape of edit that trips it, and it would land in the closing commit with no wave left to catch it.
+
+**Re-open trigger:** the next phase whose `files_modified` names any of those files — sweep that
+file's references in the same commit. ⛔ Any sweep of `types/index.ts` must re-run
+`node .planning/sketches/218-the-library-and-its-tabs/drive.cjs` in the same turn.
+
+### 2. A real backend defect, found by `217-07` — RECORDED, deliberately NOT fixed here
+
+A `.csv` announced as `application/vnd.ms-excel` is **accepted**, routed to `openpyxl`, and dies on
+`BadZipFile` in the background: the upload returns **201** and the row later flips to `failed`.
+`.xls` is absent from `_EXT_MIME_OVERRIDES` **and** `application/vnd.ms-excel` is absent from
+`_UNRELIABLE_MIME_TYPES`. The one-line repair is written out verbatim in `217-07-SUMMARY.md`.
+
+Also measured: `documents.py:559`'s comment claims the mime set *"holds fifteen"*; extraction counts
+**fourteen**.
+
+**Not fixed here** because it is outside every plan's `files_modified` and outside the Library's
+scope — a backend ingestion-routing defect, not a Library surface one. ⚠ It is a **silent** failure
+from the user's point of view (a 201 that becomes a `failed` row later), which makes it worth its own
+`/gsd:fast`, not a footnote.
+
+**Re-open trigger:** the next phase touching `backend/app/api/documents.py`'s mime handling — or,
+sooner and cheaper, run it as a `/gsd:fast` (≤ 1 file, ≤ 10 lines, no schema or API surface, so G-3
+applies). ⭐ It is also the cheapest way to produce the failing ingest that `G4-10` needs.
+
+### 3. Three doc-space suites the gate STILL does not execute
+
+`DocumentStatusBadge.test.tsx`, `FilterBar.test.tsx` and
+`ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx` remain in **neither** count-gate knob.
+`217-12` declined them on the recorded rule: 217 modifies neither `DocumentStatusBadge.tsx` nor
+`FilterBar.tsx`, and adopting a suite makes the adopting phase the owner of its future rot in a gate
+that requires 0 failing forever. The decline is written into `scripts/vitest-count-gate.cjs` itself,
+never left silent.
+
+⚠ **`DocumentStatusBadge.test.tsx` is the one that matters**, and the seam audit is why: it guards
+the render path of `DocumentList.tsx:422`, the pre-existing `ingestion_step` consumer whose **input
+changed** when `217-01` made the backend serialize that field.
+
+**Re-open trigger:** Phase 218 owns the document space and is already named — in both
+`scripts/vitest-count-gate.cjs` and `docs/HOT-FILE-LEDGER.md` — as the phase that should adopt
+`src/components/metadata` at **directory** grain with its own measured number. These three are the
+remaining gap at that moment.
+
+### 4. Sixteen G-4 / manual rows, owed by DECISION
+
+Recorded in full in `.planning/phases/217-the-library-one-home-for-documents/217-UAT.md`, one row
+each, every one `⛔ OWED` with a named reason. ⭐ **`G4-4` is named as the row to drive FIRST** — it
+is the only live catch for the D-217-10 defect, because a component test supplies whatever shape its
+author chose and therefore passes before AND after the fix.
+
+**Re-open trigger:** immediate — this is the phase's outstanding acceptance work, not a future idea.
