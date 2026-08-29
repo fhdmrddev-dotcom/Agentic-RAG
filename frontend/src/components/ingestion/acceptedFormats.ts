@@ -24,10 +24,16 @@
  *   1. ⚠ **`accept` is not a security control.** It is trivially bypassed — a drag-and-drop
  *      or a devtools edit sends whatever bytes it likes. The server's set is the gate. This
  *      module can only ever make the client STRICTER than the gate, never looser.
- *   2. The server deliberately allows more than this list advertises (measured 2026-08-29:
- *      fifteen server mimes against the eight below). Those extra formats parse today, and
- *      offering them is a product decision that belongs to a phase, not to a constant. See
- *      `217-07-SUMMARY.md` for the derivation and the full delta.
+ *   2. The server deliberately allows more than this list advertises — measured 2026-08-29 by
+ *      extracting both sets rather than reading either: **fourteen** server mimes against the
+ *      eight below, and the six in the gap all have a working parser. Offering them is a
+ *      product decision that belongs to a phase, not to a constant. Derivation + the full
+ *      delta: `217-07-SUMMARY.md`.
+ *
+ *      ⚠ `documents.py:559`'s own comment says the set "holds fifteen"; the extraction counts
+ *      **fourteen**. Harmless — the 422 message derives the list with `sorted(...)` and never
+ *      re-types it — but it is a hand-typed count inside the comment that warns against
+ *      hand-typed lists, which is the whole reason this fence extracts rather than transcribes.
  *
  * ── A STRICT LEAF ─────────────────────────────────────────────────────────────────────
  * Zero imports of any kind. No component, no vocabulary, no type, no I/O. Everything here
