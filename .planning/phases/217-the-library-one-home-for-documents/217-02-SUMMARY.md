@@ -246,3 +246,7 @@ None beyond the plan's own register. The four routes are new **network endpoints
 *Phase: 217-the-library-one-home-for-documents*
 *Plan: 02*
 *Completed: 2026-08-29*
+
+## Self-Check: PASSED
+
+All four files present on disk; all four commits resolve in `git log`; working tree clean.
