@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-08-28T10:40:33.459Z"
-last_activity: 2026-08-28
+last_updated: "2026-08-29T00:00:00.000Z"
+last_activity: 2026-08-29
 progress:
   total_phases: 11
   completed_phases: 3
-  total_plans: 37
+  total_plans: 49
   completed_plans: 29
   percent: 30
 ---
@@ -32,15 +32,73 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 214 — a-step-names-its-service-and-its-action
+**Current focus:** Phase 217 — the-library-one-home-for-documents (PLANNED, ready to execute)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-⚠ **SESSION 2026-08-28 — Phase 217 context gathered (this block is hand-edited; the `state.*` SDK
-verbs are forbidden here).** `/gsd:discuss-phase 217` ran to completion.
-**Resume file: `.planning/phases/217-the-library-one-home-for-documents/217-CONTEXT.md`**
-(committed `d33d7f74a`, with `217-DISCUSSION-LOG.md`). **Next: `/gsd:plan-phase 217`.**
+⚠ **SESSION 2026-08-29 — Phase 217 PLANNED: 12 plans in 6 waves, ready to execute** (this block is
+hand-edited; the `state.*` SDK verbs are forbidden here). `/gsd:plan-phase 217` ran to completion —
+research → pattern map → plan → plan-check → one targeted revision.
+**Next: `/clear`, then `/gsd:execute-phase 217`.**
+
+**Artifacts** — `217-RESEARCH.md` (1712 L) · `217-VALIDATION.md` · `217-PATTERNS.md` (1070 L) ·
+`217-01..12-PLAN.md`. Commits: `4d254b62d` research+validation+rulings · `b435bb812` REQUIREMENTS ·
+`f0df73ef9` patterns · `ebd7b5d0d` the 12 plans · `21eb0634e` warning closure.
+
+**Plan-checker verdict: VERIFICATION PASSED — 0 blockers, 4 warnings.** Three were closed in the
+revision (W1 verify-ordering, W2 the unfenced invariant, W4 research traceability); W3 is a
+file-count rubric flag on `217-04` (11 files) and `217-08` (10) requiring no action.
+
+⛔ **THE DECISION-COVERAGE GATE PASSED VACUOUSLY AND THAT IS A FINDING, NOT A PASS.**
+`check.decision-coverage-plan` returned **`skipped — "no trackable decisions"`, total 0** on a
+CONTEXT.md holding **24** of them. The SDK matches a literal `D-NN`; this project's ids are
+`D-217-NN` (three segments), so **the BLOCKING translation gate is structurally blind to every
+decision this repo has ever written.** Coverage was therefore re-derived by hand: **24 / 24 covered,
+0 uncovered.** ⚠ Any phase that trusted this gate was never checked — worth a seed.
+
+**Three operator rulings were taken at plan-time and are now D-217-22/23/24 in CONTEXT.md**, because
+research measured that the original 21 decisions did not rule on them:
+- **D-217-22** — the "no ETA anywhere" ban scopes the ingestion strip + upload path; tab 4's
+  `ReembedStatusCard` is composed **byte-unchanged** and keeps its bar and `~3 min`. Re-embed has an
+  honest denominator (total chunks); ingestion does not. That is the whole distinction.
+- **D-217-23** — a `failed` document's later segments are a **third** state: dimmed / *not reached*.
+- **D-217-24** — conditional-stage applicability is derived **on the server** from
+  `multimodal_service.py`'s own frozensets; `skipped` iff `!applies && count === 0`.
+
+**Four measured findings from research/patterns that a later phase must not re-derive:**
+1. ⚠ **The RLS on the three child tables is NOT symmetric.** Mig `110:215-223` widened
+   `document_chunks` SELECT to *owner OR globally-visible folder*; `document_tables` and
+   `document_images` stayed **owner-only** (`108:180-189`). A document shared via someone else's
+   folder returns text + chunks but **empty** tables/images. **Not a defect** — the existing
+   `table_count` aggregate already reads 0 through the same client. It is a test to write.
+2. ⚠ **`ingestion_step` is NEVER cleared.** The terminal write (`documents.py:2266-2273`) does not
+   null it, so a `completed` document reads `"metadata"` by RESIDUE. ⛔ **Do not "fix" this** —
+   `text_sanitize.py:9` diagnoses the BUG-260825-01 NUL defect by reading
+   `status=failed / ingestion_step=embedding`. Consequence: on `completed`, the strip must not read
+   the column at all. ⚠ And `:1308` **legitimately** nulls it on reingest, so a whole-file fence is
+   red at HEAD and the obvious "fix" is deleting the guard.
+3. ⚠ **`BUILD-CONTRACT.generated.md` is ALREADY STALE at HEAD**, before this phase changes anything:
+   it claims **190** assertions where `drive.cjs` measures **193** (its mtime predates `drive.cjs`).
+   D-217-11's regeneration is **four edits, not one**, split across `217-04` / `217-06` / `217-08`.
+4. ⚠ **The document space is almost entirely OUTSIDE the vitest count gate.** Exactly ONE doc-space
+   suite sits in both knobs (`DocumentDetailPanel.images.test.tsx`, pinned at 3); eight others are in
+   **neither** and have never been executed by the gate. `217-12` adopts them. ⚠ A bare-name
+   collision blocks one entry — `DocumentList.test.tsx` exists at two paths and `bareName()` makes
+   BASELINE keys global.
+
+⭐ **Count gate re-derived 2026-08-28** (repo root, cap 2, verdict line verbatim):
+**`total 6438 · failed 0 · pinned total 5710 · 136/136`** — the **sixth rot, on the same calendar day
+as the fifth** (CLAUDE.md's latest correction reads 6355 / 5266 / 120). A growing number is the gate
+WORKING. Re-derive; do not quote.
+
+---
+
+### Superseded — the discuss-phase block from 2026-08-28 (kept, not overwritten)
+
+`/gsd:discuss-phase 217` ran to completion; resume file
+`.planning/phases/217-the-library-one-home-for-documents/217-CONTEXT.md` (committed `d33d7f74a`,
+with `217-DISCUSSION-LOG.md`).
 
 Three findings from that session that a planner must not re-derive:
 1. ⛔ **The ROADMAP's ⭐ "ZERO schema, ZERO backend" for Phase 217 is HALF FALSE.** ZERO schema

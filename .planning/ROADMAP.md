@@ -55,20 +55,25 @@ be met by writing code per service, it is the wrong requirement.**
   it.** ⚠ `CONNECTIONS-MILESTONE-CANDIDATE.md`'s claims that *"no MCP client exists in the backend
   today"* and that `test_189_no_egress.py`'s fence must still be retired are **both STALE** — the
   fence was retired in v3.8. That document is rich and mostly right; those two lines are not.
+
 - ⚠ **OAuth genuinely IS zero.** Exactly one occurrence of the string in all of `backend/app`, and
   it is a comment in `models/connector.py` saying there is no flow, no redirect URI, no callback, no
   refresh token and no consent surface.
+
 - ⚠ **A migration is owed before OAuth can store one row.** Migration 126 leaves
   `CHECK (capability IS NOT NULL OR mcp_server_url IS NOT NULL)`; an OAuth service has neither and
   the database refuses the row. **That is why CONN-08 sits in Phase 211 and OAUTH-01 in Phase 215.**
+
 - ⚠ **The three fixed verbs must NOT be deleted.** `send_email` / `create_ticket` / `post_message`
   (`phase_types.py:2311-2322`) are the only external path that works with **no MCP server**. They
   become an ATTRIBUTE, never the organising axis.
+
 - ⚠ **`readOnlyHint` CANNOT carry a direction design.** Driven live 2026-08-25: DeepWiki ships
   **no `annotations` at all** on any of its three tools — including one whose name begins with
   `read`. It is an optimisation when present, never the mechanism. `outputSchema`, by contrast, was
   **present on every tool** and is discarded by `mcp_client.py:293-296` — the study's *"single
   cheapest actionable finding"*, and it lands in Phase 211.
+
 - ⚠ **`mcp_client.py:220` does blocking DNS inside an async handler** (D-v2.5-01) while the sibling
   capability path IS threadpooled. In scope by adjacency → Phase 212.
 
@@ -78,14 +83,17 @@ be met by writing code per service, it is the wrong requirement.**
    downstream surface — node face, service mark, filter, chat mention, catalog entry, picker — must
    branch, and **each new surface pays the branch again**. Phase **211 lands before 212, 214 and
    216**.
+
 2. **The per-tool approval model (GRANT-01..05, Phase 213) is a HARD PREREQUISITE for the chat
    surface (CHAT-05..07, Phase 216).** Standing project rule: *never add an outbound capability to
    `_TOOL_REGISTRY` before the approval model exists.* An ordering that ships chat first is wrong.
+
 3. **CONN-08 (Phase 211) before OAUTH-01 (Phase 215)** — the database refuses the row otherwise.
 4. **MCP-first, then OAuth** (operator direction, and the competitor study's inverted tiering:
    six of the eight named services are reachable at today's credential shape; **Google and Microsoft
    are the only two that are not, and they were the proposed Tier 1**). Leading with them would
    front-load 100% of the auth bill before one read shipped.
+
 5. **Prove the model and the grants on the GOVERNED surface first.** Phase 214 (workflow steps)
    precedes Phase 216 (chat) because the canvas already carries D-19's armed checkpoint and the
    egress guard; chat carries neither today.
@@ -173,6 +181,7 @@ it.*
 **Plans**: 5 plans in 4 waves — waves 1-2 are a genuine `depends_on` chain, **wave 3 is a genuine PARALLEL pair** (211-03 settings ∥ 211-04 workflows, zero `files_modified` overlap), and 211-05 depends on both
 
 Plans:
+
 - [x] 211-01-PLAN.md - one shape: static tool descriptors derived from each adapter's own INPUT_SCHEMA, the sanitizer widened by `title` + `outputSchema`, and all seven closed-set spellings enumerated (incl. migration 116's SQL CHECK, held by nothing executable until now)
 - [x] 211-02-PLAN.md - migration 127: `service_id` + backfill + ⭐ the §2b **descriptor backfill** that makes SC#2 true for the two rows that already exist + the stated replacement guarantee + the column GRANT; the five-point column lockstep, the third arm in `_validate_connection_shape`, and the `lib/api/org.ts` wire contract wave 3 compiles against. [BLOCKING] operator paste + `regenerate-full-schema.sh`
 - [x] 211-03-PLAN.md - the create flow names a SERVICE: the three-verb chooser leaves the source, an unheard-of service saves with no capability key, no per-vendor branch enters the tree (settings only)
@@ -196,6 +205,7 @@ Plans:
   5. A user edits a connection's name, credentials or endpoint and saves — and its existing per-tool grants are still exactly as they were; deleting the connection removes it cleanly (CONN-07).
 
 **Plans**:
+
 - [ ] 212-01-PLAN.md - outbound egress hardening (D-v2.5-01 threadpooled DNS, IP literal pinning, transport security) + POST /connectors/discover-tools pre-save discovery route
 - [ ] 212-02-PLAN.md - servicesCatalog.ts presentation registry (curated popular services + starter prompts + total fallback) + connectionMark.tsx service_id resolver + discoverConnectorTools API export
 - [ ] 212-03-PLAN.md - ConnectionFormPanel.tsx interactive pre-save discovery preview + popular service templates + key-preserving tool_grants merge + impact-aware deletion sheet
@@ -214,15 +224,18 @@ Plans:
 
   1. A user sees every tool a connection offers in **one list** — a search and a create side by side — and switches each on or off independently, granting the search freely while holding the create back (GRANT-01).
      ⚠ **AND THIS IS TRUE FOR EVERY SHAPE, NOT ONLY THE MCP ONE** (`SEED-214`, added 2026-08-27 from the operator's drive of Phase 212). Today `connector_connections.capability` is a SINGLE column with a `CHECK` over three verbs, so a Slack, Jira or Email connection **structurally holds exactly one action** — GitHub lists 44, they list one each. This criterion is therefore **unsatisfiable as written** for three of the operator's connections unless the phase also breaks that 1:1 lock: a SERVICE maps to MANY descriptors written into `discovered_tools`, exactly as the MCP arm already does. **Additive — `capability` stays as the row's identity, nothing retires, no bound step breaks.** ⚠ **FILLING the lists is explicitly OUT of scope** (growing an adapter's action set, adopting a new MCP server, an OpenAPI ingester): that is per-service work which must FOLLOW the approval model, never accompany it.
+
   2. A user sets a connection-level approval posture **once**, and every tool shows that posture until it is individually overridden (GRANT-02).
   3. When the agent calls a tool whose posture requires approval, the run **pauses** and shows a person the service, the tool and the exact arguments — and nothing leaves until they answer (GRANT-03).
   4. A tool that is denied, or was never granted, is **refused** — and the refusal names the grant that would allow it (GRANT-04 — closes `BUG-260827-02`).
      ⚠ **AND THE REFUSAL MUST REACH THE CAPABILITY SHAPE, WHICH TODAY IT CANNOT.** Gate 6 (`phase_types.py:2511`) is nested inside `if connection.mcp_server_url:`, so `tool_grants` is enforced for MCP rows **only** — a Slack, Jira or SMTP send consults no grant at all, while `descriptors.py`'s docblock claims the opposite in our own source. It is survivable today *only because* of the 1:1 lock SC#1 removes: one action per connection means "grant the connection" and "grant the action" coincide. ⭐ **ORDERING IS BINDING — this gate closes BEFORE or WITH the unlock, never after.** A connection that can hold many actions with no per-tool gate is every one of them armed by the row merely existing, which is the standing rule (*never an outbound capability before the approval model exists*) read from the other side.
+
   5. Every outbound call made through a connection appears in the audit ledger naming service, tool, actor and outcome (GRANT-05).
 
 **Plans**: 5 plans in 5 waves, **+ `213-06` (gap-closure round 1 — the approval moment) and `213-07`**
 
 Plans:
+
 - [x] 213-01-PLAN.md - migration 128: default_approval_posture + shape-aware backfill + column-level GRANT SELECT, Pydantic/service posture models, widened sanitizer, and frontend wire types
 - [x] 213-02-PLAN.md - connectors/grants.py leaf extraction (D-213-00), Gate 5.5 in _exec_external_action across MCP and capability shapes (BUG-260827-02), actionable refusals, and unified audit receipts
 - [x] 213-03-PLAN.md - static_descriptors_for_capability unlock (SEED-214 mechanism), grantsVocabulary.ts, ToolGrantsSection.tsx 3-state control with 10 sketch invariants, and clamp(480px, 38%, 640px) panel track
@@ -248,6 +261,7 @@ Plans:
 **Plans**: 16 plans in 5 waves
 
 Plans:
+
 - [x] 214-01-PLAN.md - `connectors/args.py` leaf cut (D-214-00): one shared resolve/satisfiability predicate for the executor AND the publish gate, plus `ExternalActionPhaseConfig.arg_sources` with URL-refusing validators
 - [x] 214-02-PLAN.md - the run-phase read seam (D-214-23): `output._failure_reason` projected through `phase_output_object` on the jsonb STRING-SCALAR arm, both wire models widened in one commit, every `lib/api/workflows.ts` widening the phase needs, **and the client mirror + `reconcilePhases`' two field-by-field literals** — the hops Phase 200-02 missed on this same file
 - [x] 214-03-PLAN.md - the four governed vocabularies (`argumentVocabulary` / `publishRefusalVocabulary` / `stepIdentityVocabulary` / `doorVocabulary` additions), each suite re-parsing its generated BUILD-CONTRACT
@@ -279,19 +293,24 @@ recipient a person typed at launch.
 
   1. An author declares an input in the builder, sources a step argument from it, and **publishes** —
      the gate that refused before now passes, with no hand-editing of JSON anywhere (STEP-02).
+
   2. A run launched from the library and from Test Run **asks for that input and the step receives
      its value** — `workflow_runs.inputs` carries the declared key, not just `kickoff_prompt`
      (STEP-02 — closes ⛔ `BUG-260828-02`, and with it ⛔ `BUG-260826-01`).
+
   3. A publish refusal is **readable in full on screen** and names its next action — never the raw
      backend diagnostic (STEP-03 — closes `BUG-260828-04`).
+
   4. The describe door **emits** `inputs[]` when it drafts a step whose argument is asked at launch,
      so an AI-drafted workflow is publishable without hand-repair (STEP-02).
+
   5. The agent never states that a service is unconnected when a connection exists — the claim is a
      lookup, not a generation (closes `BUG-260828-03`).
 
 **Plans**: 3 plans in 2 waves (214.1-01 ∥ 214.1-03 in wave 1, zero `files_modified` overlap; 214.1-02 in wave 2, `depends_on: [214.1-01]`)
 
 Plans:
+
 - [x] 214.1-01-PLAN.md - the authoring surface: the pure leaf that refuses reserved/duplicate/empty keys and derives the definition's own undeclared ask keys, `setDeclaredInputs` as the SIXTH `meta` writer, the definition-level editor behind ONE gated line, and the save path PROVED at the parsed PATCH body rather than assumed (SC#1)
 - [x] 214.1-02-PLAN.md - ⭐ THE REACHABILITY PROPERTY (empty builder → published, mocking neither the store nor the API, fenced so seeding it FAILS it) + the describe door emitting `inputs[]` by prompt AND by a `model_copy` derivation on the single success path + every shared-registry edit this phase owes (SC#2, SC#4)
 - [x] 214.1-03-PLAN.md - `BUG-260828-04` DIAGNOSED against the byte-exact live payload across THREE hypotheses (classification defect / stale bundle / ⚠ `ProblemsTray`, which renders the diagnostic verbatim BY DESIGN) with a CSS clamp forbidden in every arm, and `BUG-260828-03` answered by a pure `_wired_services_block` at all three prompt-composition sites (SC#3, SC#5)
@@ -312,6 +331,7 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 `api/workflows.py` all fire — read `docs/HOT-FILE-LEDGER.md` before planning. No migration expected
 (`definition` is existing jsonb). ⚠ **Migration block if one IS needed: 129-139** (v3.9's block —
 140-149 belongs to the parallel document-space stream, BUS-026).
+
 #### Phase 215: BYO OAuth
 
 **Goal**: A customer registers their **own** OAuth application, connects a first-party service with it on any deployment including self-hosted and on-prem, and the connection keeps working afterwards without them reconnecting — or says plainly that it cannot.
@@ -363,17 +383,34 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 **Plans:** 12 plans in 6 waves (planned 2026-08-29)
 
 Plans:
+**Wave 1**
+
 - [ ] 217-01-PLAN.md — the wire's four new document fields, the five response models, the stage-applicability predicates
-- [ ] 217-02-PLAN.md — GET /content, /chunks, /tables, /images (user-JWT, threadpooled, 404-before-read)
 - [ ] 217-03-PLAN.md — GET /queries in its own uniformly service-role module (the audit_log carve-out)
 - [ ] 217-04-PLAN.md — the rename: LibraryPage.tsx, the nav label, the ledger row + anchor, the rename fence
 - [ ] 217-05-PLAN.md — librarySelection: one discriminated union + a pure reducer (SC#5's mechanism)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 217-02-PLAN.md — GET /content, /chunks, /tables, /images (user-JWT, threadpooled, 404-before-read)
 - [ ] 217-06-PLAN.md — the shared ui/tabs primitive: the --tab-active token pair and the inset ring
 - [ ] 217-07-PLAN.md — the front-door dropzone and ONE accepted-formats constant, fenced against the server
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 217-08-PLAN.md — the six-stage ingestion strip in backend write order + the wire types + the sketch's stage order
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 217-09-PLAN.md — the four-tab Library shell: Documents · Views · Ingestion · Indexing, on one selection truth
 - [ ] 217-10-PLAN.md — five client fns + the guarded barrel + the Content and Chunks sections (lazy on expand)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 217-11-PLAN.md — tables as tables, image descriptions, the questions that found it
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 217-12-PLAN.md — count-gate adoption (both knobs), the seam audit, and the blocking G-4 drive
 
 ⚠ **G-5 fires on five files in this blast radius** (`DocumentList.tsx` 12 phases, `IngestionPage.tsx` 9, `DocumentDetailPanel.tsx` 5, `useDocuments.ts` 3, and `retrieval_service.py` 9 if touched). All ten document-space rows were added at `8b99c19b2`; **read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.**
@@ -462,6 +499,7 @@ Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 �
   product and D-v3.9-01 declines that. The `sketch-findings-agentic-rag` skill auto-loads on 212-216.
   ⚠ **A sketch must RENDER the shipped component, not hand-write its own CSS** (`SEED-155`) — Stitch
   first for language, then a sketch that renders real components; never collapse the two.
+
 - **G-5 hot files (re-derive from git at discuss-phase — do NOT trust a ledger cell).** 210:
   `api/admin.py`. 211: `phase_types.py`, `grounding.py`, `models/connector.py`. 212 + 213:
   `ConnectionsTab.tsx`, `ConnectionFormPanel.tsx`, `connectionsCopy.ts`, `connectionFormCopy.ts`
@@ -472,20 +510,25 @@ Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 �
   be argued in the phase's own CONTEXT, never assumed. ⚠ **`api.ts` was measured the hottest file in
   the repo while having no ledger row at all**; `ChatLayout.tsx` and `admin.py` are in the same
   condition here.
+
 - **G-1 phase chain cap**: **213 is the second consecutive phase on `ConnectionFormPanel.tsx` /
   `ConnectionsTab.tsx`.** If a third lands on them, a refactor phase comes first.
+
 - **G-7 gap-closure round cap**: run `node scripts/check-gap-closure-rounds.cjs <phase>` at every
   `gaps_found` — do not eyeball the round count. ⚠ **A closure round may never introduce a new
   user-facing capability**; on this milestone the temptation will be "the catalog has no X".
+
 - **SC#10 (cross-provider mandate):** **216** owes the full 8-row native roster + OpenRouter with
   multi-tool / parallel-thread / long-message rows. **213** and **214** owe it because both suspend
   or resume a live run. **210** owes it on the **embedding-provider** roster (a different set —
   say so in VALIDATION.md rather than borrowing the chat table). Rows are authored under
   `VALIDATION.md`, never as PLAN.md tasks; blocked rows are ⛔ with a reason, **never omitted**.
+
 - **Threat models:** **REQUIRED** on 212 (custom-URL door → SSRF/egress), 213 (the milestone's trust
   boundary), 214 (publish gate + argument provenance), **215 (mandatory — the mig-118 defect class)**
   and 216 (**prompt injection on reads — the class this tree has never faced**). 211 light (relaxing
   a `CHECK` removes a database-level guarantee; say what replaces it). 210 none expected.
+
 - **Migrations:** head is **126**. Expected: **127** (211 — drop mig 126's `CHECK`, service
   identity), then 213 (posture) and 215 (OAuth token/refresh/expiry/scope/account identity) in the
   order they land. **Paste into the Supabase SQL editor — never `db push` / `db reset`** — then
@@ -493,31 +536,37 @@ Counts by phase: 210 → 4 · 211 → 5 · 212 → 6 · 213 → 5 · 214 → 6 �
   suffixes are silently skipped. ⚠ **Adding a column to `connector_connections` breaks every read of
   it** until it is granted — mig 118 granted SELECT column-by-column, and the failure looks like an
   outage on a pre-existing row.
+
 - **Deployment-artifact parity (same-commit rule):** 215's redirect URI and any new
   `app_settings` seed row update `deploy/onebox.env.example`, `docs/OPERATOR.md` and
   `docker-compose.prod.yml` in the **same commit**; `scripts/check-deploy-drift.sh` enforces it.
+
 - **Red lines:** **D-14** — no new harness executor; `external_action` already takes two shapes
   through one executor and a first-party read is a third shape on the same one. **D-v2.5-01** — no
   blocking I/O in an async handler (`mcp_client.py:220` is the standing violation, fixed in 212).
   **D-v2.5-03** — Realtime is a hint; reconcile via fetch on reconnect. **No arbitrary-code /
   community-node connectors, ever** — excluded by construction, and Gumloop's AI-generated node is
   the most seductive wrong answer in the study.
+
 - **Reported-bugs mandate:** nine reports are folded (table above). At each `/gsd:discuss-phase`,
   re-list open `surface: Agentic-RAG` reports and write the routing **back into each report's
   frontmatter** — ⚠ **`status:` frontmatter IS the index; prose in the body is invisible to the
   scan.** ⚠ Also carried and still **unrouted**: `BUG-260818-01/-02/-03` (Resume replays the prompt ·
   Resume drops the model · the Continue that already exists and did not render). **Triage them
   together** — a user cannot tell Resume from Continue, and fixing one leaves the moment still lying.
+
 - **Seeds register sweep:** 12 seeds are folded (`SEED-202` `204` `205` `206` `207` `208` + `142`
   `144` `145` `146` `177` + `213`). **A seed is answered by editing the seed** — flip `status` and
   record where it went, or it is re-proposed forever. ⚠ `SEED-209/210/211/212` are deferred with a
   **binding re-open trigger: the first automatic or background sync from a connected source.**
+
 - **Verification-documentation debt is the standing failure mode here.** ⚠ **Seven of twelve v3.8
   phases had no `VERIFICATION.md` and `REQUIREMENTS.md` was stale from day one — the SECOND
   consecutive milestone to close that way**, and v3.6's own retrospective already read *"the
   paperwork was the problem, never the code."* Every phase in this milestone writes its
   `VERIFICATION.md` at its own close, and the traceability table below is updated as each phase
   ships — not at the audit.
+
 - **Ceremony budget.** v3.7 spent **147 plans across 17 phases**; the operator's recorded direction
   is **fewer, larger, well-scoped phases**, because ceremony scales with PLAN COUNT rather than with
   risk. Seven phases here. **A phase that decomposes into 15 plans has been mis-scoped, not
@@ -544,7 +593,6 @@ carried forward with re-open triggers rather than closed silently.
 day one of the milestone. Both repaired at the audit; both are the SECOND consecutive milestone to
 close this way.
 
-
 ## Prior Milestone Archive: v3.7 Workflow Product Completion — SHIPPED 2026-08-24
 
 17 phases, 145 plans, migrations 119-123, git tag `v3.7`. 20/20 requirements satisfied.
@@ -554,7 +602,6 @@ audit: [`milestones/v3.7-MILESTONE-AUDIT.md`](milestones/v3.7-MILESTONE-AUDIT.md
 ⚠ **Collapsed at v3.8's close, not at its own** — this section carried 1,305 lines that were
 already byte-for-byte in `milestones/v3.8-ROADMAP.md`'s sibling archive. The duplicate is exactly
 the context cost the archive step exists to prevent, and it survived one whole milestone.
-
 
 ## v3.5 UX Consolidation & Chat Polish — ✅ SHIPPED 2026-07-23 (CORE); STRETCH deferred
 
