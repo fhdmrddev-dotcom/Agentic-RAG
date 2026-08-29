@@ -398,7 +398,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 217-08-PLAN.md — the six-stage ingestion strip in backend write order + the wire types + the sketch's stage order
+- [x] 217-08-PLAN.md — the six-stage ingestion strip in backend write order + the wire types + the sketch's stage order
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
