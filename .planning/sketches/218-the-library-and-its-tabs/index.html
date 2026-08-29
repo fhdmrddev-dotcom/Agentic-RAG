@@ -423,13 +423,13 @@
       (D-1) and the page is renamed <b>Library</b> (D-2).</p>
 
     <div class="page">
-      <div class="pagehead">
+      <div class="pagehead" data-block="pagehead">
         <p class="crumbs"><a>Library</a><span class="sep">›</span><a>Engineering</a><span class="sep">›</span>Documents</p>
         <h1>Library</h1>
         <p class="pagesub">What the agent can read, and how well it reads it.</p>
       </div>
 
-      <div class="tabslist" data-tabset="A">
+      <div class="tabslist" data-tabset="A" data-block="tabslist">
         <button class="tabtrigger" data-state="active">Documents</button>
         <button class="tabtrigger">Views</button>
         <button class="tabtrigger">Ingestion</button>
@@ -438,7 +438,7 @@
       </div>
 
       <div class="body">
-        <aside class="sidebar">
+        <aside class="sidebar" data-block="sidebar">
           <div class="grouplabel">Folders</div>
           <div class="navrow sel">📁 Engineering <span class="cnt">24</span></div>
           <div class="navrow">📁 Marketing <span class="cnt">182</span></div>
@@ -451,7 +451,7 @@
         </aside>
 
         <div class="main">
-          <div class="tiles three" style="margin-bottom:16px">
+          <div class="tiles three" style="margin-bottom:16px" data-block="stat-tiles">
             <div class="tile">
               <div class="tl">Chunks</div><div class="tv">1,284</div><div class="ts">across 24 documents</div>
               <svg class="spark" width="62" height="26" viewBox="0 0 62 26" aria-hidden="true">
@@ -470,7 +470,7 @@
           </div>
 
           <div class="card">
-            <table class="doclist">
+            <table class="doclist" data-block="doclist">
               <thead><tr>
                 <th style="width:26px"></th><th>Filename</th><th data-shed>Type</th><th data-shed>Size</th>
                 <th data-shed>Chunks</th><th>Status</th><th>Actions</th>
@@ -513,7 +513,7 @@
                 </tr>
               </tbody>
             </table>
-            <div class="tfoot">
+            <div class="tfoot" data-block="tfoot">
               <span>Rows per page: 25</span><span>1–5 of 24</span>
               <span class="pg"><span>‹</span><span>›</span></span>
             </div>
@@ -603,11 +603,11 @@
       per-document strip), over numbers this app can actually produce.</p>
 
     <div class="page">
-      <div class="pagehead">
+      <div class="pagehead" data-block="pagehead">
         <p class="crumbs"><a>Library</a><span class="sep">›</span>Health</p>
         <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
       </div>
-      <div class="tabslist">
+      <div class="tabslist" data-block="tabslist">
         <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
         <button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button>
         <button class="tabtrigger" data-state="active">Health</button>
@@ -616,7 +616,7 @@
       <div style="margin-top:20px">
         <!-- ⭐ the ring + the bars, side by side: the reference's screen-13 composition -->
         <div style="display:grid;grid-template-columns:300px 1fr;gap:14px">
-          <div class="card">
+          <div class="card" data-block="coverage-ring">
             <header><h4>Coverage</h4></header>
             <div class="cardbody" style="display:flex;align-items:center;gap:18px">
               <div class="ringwrap">
@@ -639,7 +639,7 @@
             </div>
           </div>
 
-          <div class="card">
+          <div class="card" data-block="searches-chart">
             <header>
               <div><h4>Searches over time</h4></div>
               <div class="tabslist" style="height:30px">
@@ -663,7 +663,7 @@
           </div>
         </div>
 
-        <div class="tiles" style="margin-top:14px">
+        <div class="tiles" style="margin-top:14px" data-block="stat-tiles">
           <div class="tile"><div class="tl">Documents</div><div class="tv">224</div><div class="ts">12 added this month</div></div>
           <div class="tile"><div class="tl">Searches</div><div class="tv">412</div><div class="ts">last 30 days</div></div>
           <div class="tile"><div class="tl">Never found</div><div class="tv">137</div><div class="ts">in the last 30 days</div></div>
@@ -684,7 +684,7 @@
       from a drawing into a measurement. Until it lands, the red segment renders from nothing and the
       Health tab must not claim it.</div>
 
-        <div class="chipgroup">
+        <div class="chipgroup" data-block="chipgroup-being-used">
           <span class="cglabel">Being used</span>
           <div class="chiprow">
             <span class="chip on">Most found <span class="b">87</span></span>
@@ -692,7 +692,7 @@
             <span class="chip">Weak matches <span class="b">23</span></span>
           </div>
         </div>
-        <div class="chipgroup">
+        <div class="chipgroup" data-block="chipgroup-in-good-shape">
           <span class="cglabel">In good shape</span>
           <div class="chiprow">
             <span class="chip">Stale <span class="b">41</span></span>
@@ -702,7 +702,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-block="document-bars">
           <div class="legend" style="padding:12px 16px 4px;border-bottom:1px solid var(--color-border-soft)">
             <span class="li"><span class="sw s-primary"></span>ready</span>
             <span class="li"><span class="sw s-violet"></span>re-indexing</span>
@@ -716,7 +716,7 @@
           <div class="hrow"><span class="nm">Database_Schema_v4.json</span><span class="hbar"><i class="s-primary" style="--w:35%;animation-delay:.25s"></i></span><span class="ct">145</span><span class="ago">1w ago</span></div>
         </div>
 
-        <div class="card" style="margin-top:16px">
+        <div class="card" style="margin-top:16px" data-block="checks">
           <header>
             <div><h4>Checked queries</h4><p class="hsub">Questions you expect a document to answer.</p></div>
             <button class="btn">Add a check</button>
@@ -790,7 +790,7 @@
       </div>
       <div>
         <p class="caption">arm 2 · the same number, saying what it measures</p>
-        <div class="tile"><div class="tl">Match strength</div><div class="tv">0.61</div>
+        <div class="tile" data-block="match-strength-tile"><div class="tl">Match strength</div><div class="tv">0.61</div>
           <div class="ts">average similarity of what searches returned</div></div>
       </div>
     </div>
@@ -821,18 +821,18 @@
       re-index, and a collections table. <b>Its 98% donut is replaced by the two numbers that are real.</b></p>
 
     <div class="page">
-      <div class="pagehead">
+      <div class="pagehead" data-block="pagehead">
         <p class="crumbs"><a>Library</a><span class="sep">›</span>Indexing</p>
         <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
       </div>
-      <div class="tabslist">
+      <div class="tabslist" data-block="tabslist">
         <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
         <button class="tabtrigger">Ingestion</button><button class="tabtrigger" data-state="active">Indexing</button>
         <button class="tabtrigger">Health</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">
-        <div class="card">
+        <div class="card" data-block="vector-store-card">
           <header><h4>Vector store</h4></header>
           <div class="cardbody">
             <div class="kv"><span class="k">Vectors</span><span class="v">12,847</span></div>
@@ -841,7 +841,7 @@
             <div class="kv"><span class="k">Last indexed</span><span class="v">14 min ago</span></div>
           </div>
         </div>
-        <div class="card">
+        <div class="card" data-block="embedding-model-card">
           <header><h4>Embedding model</h4></header>
           <div class="cardbody">
             <div class="kv"><span class="k">Model</span><span class="v">text-embedding-3-small</span></div>
@@ -858,7 +858,7 @@
         </div>
       </div>
 
-      <div class="card" style="margin-top:14px">
+      <div class="card" style="margin-top:14px" data-block="folders-table">
         <header><h4>Folders</h4><button class="btn ghost">Re-index selected</button></header>
         <table class="doclist">
           <thead><tr><th>Folder</th><th>Documents</th><th>Chunks</th><th>Vectors</th><th>Last indexed</th><th>Actions</th></tr></thead>
@@ -1073,23 +1073,23 @@
       opens on a full-width dropzone, and it is right to.</p>
 
     <div class="page">
-      <div class="pagehead">
+      <div class="pagehead" data-block="pagehead">
         <p class="crumbs"><a>Library</a><span class="sep">›</span>Ingestion</p>
         <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
       </div>
-      <div class="tabslist">
+      <div class="tabslist" data-block="tabslist">
         <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
         <button class="tabtrigger" data-state="active">Ingestion</button>
         <button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button>
       </div>
 
-      <div class="subnav">
+      <div class="subnav" data-block="subnav">
         <button class="on">Add files</button><button>In progress</button>
         <button>Needs attention</button><button>History</button>
       </div>
 
       <div style="margin-top:18px">
-        <div class="dropbig">
+        <div class="dropbig" data-block="dropbig">
           <svg width="46" height="46" viewBox="0 0 46 46" fill="none" aria-hidden="true">
             <path d="M13 31a8 8 0 0 1-.9-15.9A11 11 0 0 1 33 17.2 7 7 0 0 1 34.5 31H29" stroke="var(--color-primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M23 38V22m0 0-5.5 5.5M23 22l5.5 5.5" stroke="var(--color-primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1100,14 +1100,14 @@
           <div class="d3">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB</div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.82rem;color:var(--color-text-muted)">
+        <div data-block="folder-picker" style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.82rem;color:var(--color-text-muted)">
           <span>Add to</span>
           <span style="display:inline-flex;align-items:center;gap:7px;border:1px solid var(--color-border);border-radius:8px;padding:6px 11px;background:var(--color-surface)">📁 Engineering <span style="color:var(--color-text-dim)">▾</span></span>
           <span style="color:var(--color-text-dim);font-size:11.5px">Everything you add here is searchable by the agent.</span>
         </div>
 
         <h3 class="sub" style="margin-top:26px">Where every file is right now</h3>
-        <div class="stagecards">
+        <div class="stagecards" data-block="stagecards">
           <div class="scard">
             <div class="sh"><span class="ico ok">✓</span> Reading</div>
             <div class="sn">218</div><div class="sl">files read</div>
@@ -1140,7 +1140,7 @@
 
         <h3 class="sub">The queue</h3>
         <div class="card">
-          <table class="doclist">
+          <table class="doclist" data-block="queue">
             <thead><tr><th>File</th><th style="width:42%">Stage</th><th>Folder</th><th>Size</th><th>Actions</th></tr></thead>
             <tbody>
               <tr>
@@ -1168,7 +1168,7 @@
 
         <h3 class="sub">Needs attention</h3>
         <div class="card">
-          <table class="doclist">
+          <table class="doclist" data-block="needs-attention">
             <tbody>
               <tr>
                 <td class="fn">legacy_export.csv</td>
@@ -1470,11 +1470,11 @@
       keeps it, so it needs content of its own — otherwise it is the sidebar again with more clicks.</p>
 
     <div class="page">
-      <div class="pagehead">
+      <div class="pagehead" data-block="pagehead">
         <p class="crumbs"><a>Library</a><span class="sep">›</span>Views</p>
         <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
       </div>
-      <div class="tabslist">
+      <div class="tabslist" data-block="tabslist">
         <button class="tabtrigger">Documents</button><button class="tabtrigger" data-state="active">Views</button>
         <button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button>
         <button class="tabtrigger">Health</button>
@@ -1486,7 +1486,7 @@
           <button class="btn">New view</button>
         </div>
 
-        <div class="vgrid">
+        <div class="vgrid" data-block="vgrid">
           <div class="vcard">
             <div class="vhead"><span class="vname">Needs review</span><span class="vcount">8</span></div>
             <div class="vrule">type is <b>contract</b> · added in the <b>last 30 days</b></div>
