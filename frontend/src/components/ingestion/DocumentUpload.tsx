@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { Lock, Upload } from "lucide-react"
+import { Lock, Upload, Cloud } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ACCEPTED_FORMATS, acceptAttribute, formatsSentence } from "./acceptedFormats"
 
@@ -10,6 +10,8 @@ interface Props {
   folderId?: string | null
   folderName?: string | null
   disabled?: boolean
+  /** The dropzone shape. "band" is the tight full-width strip (~82px); "hero" is the .dropbig panel. */
+  variant?: "band" | "hero"
 }
 
 interface BatchResult {
@@ -48,16 +50,22 @@ interface BatchResult {
  * (`uploaded` / `already up to date` / one line per error). That batching and its reporting
  * are UNCHANGED by this plan.
  *
- * ⚠ D-217-22 scopes the ban: it covers this upload path and the ingestion strip. Tab 4's
- * `ReembedStatusCard` keeps its determinate bar, because re-embed HAS an honest denominator
- * (total chunks). That card is not edited by anyone here.
- *
- * ── THE TARGET FOLDER IS NAMED, NEVER BLANK ───────────────────────────────────────────
- * The band prints the folder the file will land in, from the `folderName` prop it already
- * received, falling back to the named root the page's own header uses. It resolves no folder
- * and looks nothing up (T-217-25) — the name arrives as a prop from a list fetched under RLS.
+ * ── Phase 217.1 plan 03 (D-217.1-05) — the hero variant ───────────────────────────────
+ * `variant="hero"` renders the sketch's `.dropbig` shape: a cloud icon, `Drop files here`,
+ * `or`, a `Choose files` button, and the accepted-formats line. The `accept` attribute and
+ * the formats sentence are COMPUTED from `acceptedFormats.ts` in BOTH variants — never a
+ * second transcription (T-217.1-08a). The hero mounts under the Ingestion tab's `Add files`
+ * sub-tab, not on the Documents tab.
  */
-export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folderId, folderName, disabled = false }: Props) {
+export function DocumentUpload({
+  onUpload,
+  uploading,
+  uploadingCount = 0,
+  folderId,
+  folderName,
+  disabled = false,
+  variant = "band",
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [result, setResult] = useState<BatchResult | null>(null)
@@ -98,11 +106,108 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         ? "Uploading…"
         : null
 
-  // The named root, never a blank — `LibraryPage` heads the unfiled surface "Root" and the
-  // band must agree with it rather than trail off after "into ".
   const targetName = folderName ?? "Root"
   const targetLabel = `Upload to ${targetName}`
 
+  // ── HERO VARIANT — the sketch's .dropbig shape ──────────────────────────────────
+  if (variant === "hero") {
+    return (
+      <div className="flex w-full flex-col gap-2" data-testid="hero-dropzone">
+        <button
+          type="button"
+          onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          onClick={() => !uploading && !disabled && inputRef.current?.click()}
+          disabled={disabled || uploading}
+          aria-label={disabled ? `Read-only folder ${targetName}` : targetLabel}
+          title={
+            disabled
+              ? "Only the folder owner can upload files here"
+              : `${targetLabel} · drop files here or click to browse`
+          }
+          className={cn(
+            "w-full rounded-xl border border-dashed px-8 py-10 text-center transition-colors",
+            disabled
+              ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
+              : dragging
+                ? "cursor-copy border-primary bg-primary/10"
+                : "cursor-pointer border-border bg-card/40 hover:border-primary/50 hover:bg-accent/40",
+            uploading && "cursor-default opacity-70",
+          )}
+        >
+          {disabled ? (
+            <>
+              <span className="flex items-center justify-center gap-2 text-sm font-medium">
+                <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>Read-only folder</span>
+              </span>
+              <span className="mt-1 block text-xs">
+                Only the folder owner can upload files to {targetName}.
+              </span>
+            </>
+          ) : uploading ? (
+            <>
+              <span className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
+                <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span>{statusLabel ?? "Uploading…"}</span>
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Into {targetName}
+              </span>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Cloud className="h-8 w-8 text-primary/70" aria-hidden="true" />
+              <span className="text-base font-medium text-foreground">Drop files here</span>
+              <span className="text-sm text-muted-foreground">or</span>
+              <span
+                className="inline-flex items-center rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                data-testid="choose-files-button"
+              >
+                Choose files
+              </span>
+              {/* The formats are PRINTED from the same constant that feeds `accept` below —
+                  never a hand-written list (D-217-18). */}
+              <span className="text-xs text-muted-foreground">
+                {formatsSentence()}
+              </span>
+            </div>
+          )}
+        </button>
+
+        {result && !uploading && (
+          <div className="text-center">
+            {(result.uploaded > 0 || result.duplicates > 0) && (
+              <p className="text-xs text-muted-foreground">
+                {[
+                  result.uploaded > 0 && `${result.uploaded} uploaded`,
+                  result.duplicates > 0 && `${result.duplicates} already up to date`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+            {result.errors.map((err, i) => (
+              <p key={i} className="text-xs text-destructive">{err}</p>
+            ))}
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept={acceptAttribute()}
+          data-accepted-count={ACCEPTED_FORMATS.extensions.length}
+          className="hidden"
+          onChange={onInputChange}
+        />
+      </div>
+    )
+  }
+
+  // ── BAND VARIANT — the tight full-width strip ───────────────────────────────────
   return (
     <div className="flex w-full flex-col gap-2">
       <button
