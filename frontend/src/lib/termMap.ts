@@ -30,40 +30,63 @@ export interface Term {
   helper?: string
   /** Today's shipped string, verbatim — shown when the reveal is ON. */
   technical: string
+  /**
+   * Optional MICRO-LABEL for surfaces too small to carry `plain` (Phase 217.1 / D-217.1-19).
+   *
+   * ⚠ ADDED BECAUSE A SURFACE WENT BLANK RATHER THAN SHORT. `IngestionStrip` renders six
+   * ~24px-wide segments; `plain` ("Splitting into sections") does not fit, so the strip made
+   * the label `sr-only` and shipped six empty boxes — a component whose whole job is to name
+   * a stage, naming none of them. The honest fix is a SHORTER WORD, never a hidden one.
+   *
+   * ⛔ It is NOT a third audience. `plain` and `technical` are the two-audience contract and
+   * the ⌥ reveal still swaps those; `short` is the same PLAIN voice at a smaller size, so a
+   * surface that cannot fit a sentence still says a true word. Populated today only for the
+   * six `ingest.*` stages — the one surface that measured the need.
+   */
+  short?: string
 }
 
 export const TERM_MAP = {
   // ── Surface A — document ingestion status badge (top priority; every uploader
   //    sees it, and it currently shows RAW technical step names by default). ──
+  // ⚠ ALL SIX CARRY `short` — the ingestion strip renders it as VISIBLE TEXT, so a missing
+  // one is a blank segment (D-217.1-19). ⛔ Do not add a seventh vocabulary for these words:
+  // `ingestionStages.ts` routes every stage label through THIS map, deliberately.
   "ingest.extracting": {
     plain: "Reading the file",
     helper: "Pulling the text out of your document.",
     technical: "Extracting",
+    short: "Read",
   },
   "ingest.extracting_tables": {
     plain: "Reading tables",
     helper: "Pulling structured tables out.",
     technical: "Extracting tables",
+    short: "Tables",
   },
   "ingest.extracting_images": {
     plain: "Reading images",
     helper: "Pulling images and figures out.",
     technical: "Extracting images",
+    short: "Images",
   },
   "ingest.chunking": {
     plain: "Splitting into sections",
     helper: "Breaking the text into searchable pieces.",
     technical: "Chunking",
+    short: "Split",
   },
   "ingest.embedding": {
     plain: "Making it searchable",
     helper: "Building the search index for this document.",
     technical: "Embedding",
+    short: "Index",
   },
   "ingest.metadata": {
     plain: "Reading document details",
     helper: "Detecting title, author, dates, and similar facts.",
     technical: "Extracting metadata",
+    short: "Label",
   },
   "status.pending": {
     plain: "Waiting",

@@ -51,7 +51,7 @@
  * The raw value is NEVER rendered: it is only ever a KEY into `TERM_MAP` (T-217-27).
  */
 import { cn } from "@/lib/utils"
-import { usePlainLabel, type TermKey } from "@/lib/termMap"
+import { TERM_MAP, usePlainLabel, type TermKey } from "@/lib/termMap"
 import {
   INGESTION_STAGES,
   isStageSkipped,
@@ -133,23 +133,39 @@ function StageSegment({
   // One hook per segment, called unconditionally — `INGESTION_STAGES` is a fixed-length
   // constant, so the hook count is stable across every render and every document.
   const label = usePlainLabel(stageTermKey(stage) as TermKey)
+  // The MICRO-LABEL, read from the same map as the sentence. Indexed with the narrow
+  // `ingest.<key>` type rather than the widened `TermKey`, so TypeScript proves all six
+  // entries carry a `short` and a missing one is a build error, not a blank box.
+  const short = TERM_MAP[stageTermKey(stage)].short
 
   return (
     <li
       data-stage={stage.key}
       data-state={state}
       data-failure-point={isFailurePoint ? "true" : undefined}
+      // ⚠ THE FULL SENTENCE LIVES HERE, and it is still reveal-aware (`usePlainLabel`). The
+      // visible text below is the short form; hover and assistive tech get the whole thing.
       title={label}
       aria-label={label}
       className={cn(
-        "flex h-5 min-w-[24px] flex-1 items-center justify-center rounded-[3px] border",
+        "flex h-5 min-w-[38px] flex-1 items-center justify-center gap-0 rounded-[3px] border px-1",
         "text-[9px] font-mono uppercase tracking-wide",
         SEGMENT_CLASS[state],
         isFailurePoint && "ring-1 ring-destructive/60",
       )}
     >
-      <span className="sr-only">{label}</span>
-      <span aria-hidden="true" className="h-full w-full" />
+      {/*
+        ⭐ VISIBLE TEXT, NOT `sr-only` (D-217.1-19). This span was `className="sr-only"` and the
+        strip rendered six BLANK BOXES — a stage strip that named no stage. The word is inside
+        the `<li>` that carries the state class, so `line-through` on a skipped stage strikes
+        THE WORD; a strike over an empty box communicated nothing.
+
+        ⚠ `aria-hidden` — the accessible name is the `aria-label` sentence above, so exposing
+        this abbreviation as well would make a screen reader read the stage twice, once badly.
+      */}
+      <span aria-hidden="true" className="truncate">
+        {short}
+      </span>
     </li>
   )
 }
