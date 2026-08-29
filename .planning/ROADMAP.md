@@ -385,10 +385,10 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
 Plans:
 **Wave 1**
 
-- [ ] 217-01-PLAN.md — the wire's four new document fields, the five response models, the stage-applicability predicates
-- [ ] 217-03-PLAN.md — GET /queries in its own uniformly service-role module (the audit_log carve-out)
-- [ ] 217-04-PLAN.md — the rename: LibraryPage.tsx, the nav label, the ledger row + anchor, the rename fence
-- [ ] 217-05-PLAN.md — librarySelection: one discriminated union + a pure reducer (SC#5's mechanism)
+- [x] 217-01-PLAN.md — the wire's four new document fields, the five response models, the stage-applicability predicates
+- [x] 217-03-PLAN.md — GET /queries in its own uniformly service-role module (the audit_log carve-out)
+- [x] 217-04-PLAN.md — the rename: LibraryPage.tsx, the nav label, the ledger row + anchor, the rename fence
+- [x] 217-05-PLAN.md — librarySelection: one discriminated union + a pure reducer (SC#5's mechanism)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-08-29T00:00:00.000Z"
+last_updated: "2026-08-29T00:23:28.348Z"
 last_activity: 2026-08-29
 progress:
-  total_phases: 11
-  completed_phases: 3
-  total_plans: 49
-  completed_plans: 29
-  percent: 30
+  total_phases: 19
+  completed_phases: 5
+  total_plans: 52
+  completed_plans: 35
+  percent: 26
 ---
 
 # Project State
@@ -32,11 +32,13 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 217 — the-library-one-home-for-documents (PLANNED, ready to execute)
+**Current focus:** Phase 217 — the-library-one-home-for-documents
 Phase numbering continues at **210**.
 
 ## Current Position
 
+Phase: 217 (the-library-one-home-for-documents) — EXECUTING
+Plan: 1 of 12
 ⚠ **SESSION 2026-08-29 — Phase 217 PLANNED: 12 plans in 6 waves, ready to execute** (this block is
 hand-edited; the `state.*` SDK verbs are forbidden here). `/gsd:plan-phase 217` ran to completion —
 research → pattern map → plan → plan-check → one targeted revision.
@@ -59,28 +61,34 @@ decision this repo has ever written.** Coverage was therefore re-derived by hand
 
 **Three operator rulings were taken at plan-time and are now D-217-22/23/24 in CONTEXT.md**, because
 research measured that the original 21 decisions did not rule on them:
+
 - **D-217-22** — the "no ETA anywhere" ban scopes the ingestion strip + upload path; tab 4's
   `ReembedStatusCard` is composed **byte-unchanged** and keeps its bar and `~3 min`. Re-embed has an
   honest denominator (total chunks); ingestion does not. That is the whole distinction.
+
 - **D-217-23** — a `failed` document's later segments are a **third** state: dimmed / *not reached*.
 - **D-217-24** — conditional-stage applicability is derived **on the server** from
   `multimodal_service.py`'s own frozensets; `skipped` iff `!applies && count === 0`.
 
 **Four measured findings from research/patterns that a later phase must not re-derive:**
+
 1. ⚠ **The RLS on the three child tables is NOT symmetric.** Mig `110:215-223` widened
    `document_chunks` SELECT to *owner OR globally-visible folder*; `document_tables` and
    `document_images` stayed **owner-only** (`108:180-189`). A document shared via someone else's
    folder returns text + chunks but **empty** tables/images. **Not a defect** — the existing
    `table_count` aggregate already reads 0 through the same client. It is a test to write.
+
 2. ⚠ **`ingestion_step` is NEVER cleared.** The terminal write (`documents.py:2266-2273`) does not
    null it, so a `completed` document reads `"metadata"` by RESIDUE. ⛔ **Do not "fix" this** —
    `text_sanitize.py:9` diagnoses the BUG-260825-01 NUL defect by reading
    `status=failed / ingestion_step=embedding`. Consequence: on `completed`, the strip must not read
    the column at all. ⚠ And `:1308` **legitimately** nulls it on reingest, so a whole-file fence is
    red at HEAD and the obvious "fix" is deleting the guard.
+
 3. ⚠ **`BUILD-CONTRACT.generated.md` is ALREADY STALE at HEAD**, before this phase changes anything:
    it claims **190** assertions where `drive.cjs` measures **193** (its mtime predates `drive.cjs`).
    D-217-11's regeneration is **four edits, not one**, split across `217-04` / `217-06` / `217-08`.
+
 4. ⚠ **The document space is almost entirely OUTSIDE the vitest count gate.** Exactly ONE doc-space
    suite sits in both knobs (`DocumentDetailPanel.images.test.tsx`, pinned at 3); eight others are in
    **neither** and have never been executed by the gate. `217-12` adopts them. ⚠ A bare-name
@@ -101,14 +109,17 @@ WORKING. Re-derive; do not quote.
 with `217-DISCUSSION-LOG.md`).
 
 Three findings from that session that a planner must not re-derive:
+
 1. ⛔ **The ROADMAP's ⭐ "ZERO schema, ZERO backend" for Phase 217 is HALF FALSE.** ZERO schema
    holds (authenticated SELECT policies already exist on all three child tables, migs `108`/`110`).
    ZERO backend does not: **none of SC#4's six facts is on the wire** — `documents.py` has 11 routes
    and not one reads any of them. Five new read endpoints are required.
+
 2. ⚠ **The six-stage strip's drawn order contradicts the backend's write order** — `documents.py`
    writes `extracting → chunking → embedding → extracting_tables → extracting_images → metadata`,
    while sketch 218's BUILD-CONTRACT draws Tables/Images second and third. **The strip would jump
    backwards.** Resolved: draw in write order, regenerate the contract in the same commit.
+
 3. ⚠ **`ingestion_step` is on NO backend response model** — it reaches the browser only via the
    Realtime payload, so a file already mid-ingest shows no stage on page load. The D-v2.5-03 failure,
    and **invisible to any test that mocks the fetch.**
@@ -395,7 +406,7 @@ refactor by construction: the gate leaves into `backend/app/services/connectors/
 prose pointed at them). `SEED-214` → `status: partially-folded`, with the unlock/filling split
 recorded and triggers 2–4 named as still live. `SEED-188` (prompt injection) left planted with
 **216** as its trigger — 213 ships no read path.
-Status: Executing Phase 214
+Status: Executing Phase 217
 It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
 the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
 waves + 2 gap-closure rounds + 5 defect fixes. Full record:
@@ -461,7 +472,7 @@ not free.
 * **Cloud drive of SC#3.** `BUG-260810-01` stays `folded`, never `closed`, until then.
 * **Rovo connector detail screenshot** for 213's design bar (`BUS-019`) — the one the ROADMAP cites
   is not in `screenshots/`.
-Last activity: 2026-08-28
+Last activity: 2026-08-29
 
 **Gates at close** (verbatim, re-derived): tsc **34** (baseline held) · count gate **OK, 118/118
 pinned, total 5847, failed 0** (116→118: both new suites pinned, the preflight GATE-1 fix) ·
@@ -810,12 +821,15 @@ in this milestone gets no similar override without a sketch, or this becomes a h
 exception."* **That warning has now been overridden once.** A third makes it the rule.
 
 Mitigation, so the override costs as little as possible:
+
 - **The card is a RE-USE, not an invention.** It occupies `PublishRefusalList`'s existing slot with
   that component's frame, header register and body scale — the two surfaces are one kind of refusal
   with two producers, and they can never render together.
+
 - **The wiring is design-independent.** `PublishVerdict.blocked_step`, the harvest fix, the
   `_blocked_step` join, `publishBlockedStep.ts`'s face ladder and both test suites survive a full
   re-skin untouched. A rejected visual costs the card, not the fix.
+
 - The one thing a sketch would have decided — *what does this card say* — is constrained anyway:
   the cause sentence is the SERVER'S, verbatim, and `verdictModel.ts`'s red line forbids this
   client owning a cause vocabulary at all.
@@ -836,11 +850,14 @@ that the sketch was unnecessary, only that the operator chose speed over the moc
 right to reject the result. It is a deferral of the gate, not a discharge of it.
 
 Mitigation, so the override costs as little as possible:
+
 - The UI is authored from the shipped design system and the `sketch-findings-agentic-rag` skill,
   never invented.
+
 - **The wiring is design-independent** — the `builderStore` action, the save path sending `inputs`,
   the describe-door emission and the reachability test all survive a full re-skin untouched. A
   rejected visual costs the surface, not the phase.
+
 - CONTEXT.md records every decision as MINE with the alternative beside it (see `D-214.1-01`, whose
   inline-affordance alternative moves only the mount point).
 
