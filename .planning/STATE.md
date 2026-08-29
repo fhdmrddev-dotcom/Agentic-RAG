@@ -39,7 +39,8 @@ Phase numbering continues at **210**.
 ## Current Position
 
 Phase: 217.1
-Plan: Planning in progress
+Plan: **PLANNED — 18 plans in 16 waves, ready to execute**
+**Next: `/clear`, then `/gsd:execute-phase 217.1`.**
 ⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
 The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
 like it. **Phase 217.1 was inserted and Phase 218 ABSORBED into it** (operator, 2026-08-29). This
@@ -64,6 +65,58 @@ and a fence suite asserts them, **driven RED first**.
 BUILT or DROPPED, never placeheld and never deferred with a trigger.*
 
 **Prior 217 block preserved below for the record.**
+
+---
+
+### Phase 217.1 — plan-phase closeout (2026-08-29)
+
+**Artifacts** — `217.1-CONTEXT.md` (35 decisions) · `217.1-BUILD-TO-SKETCH.md` (the binding element
+ledger) · `217.1-RESEARCH.md` (1254 L) · `217.1-PATTERNS.md` · `217.1-VALIDATION.md` · `217.1-01..18-PLAN.md`.
+Commits: `30bced365` phase insert + 218 absorbed · `a8faf3848` research · `bb6d43f34` the eight rulings +
+two corrections · `a89479305` validation · `6d6e1b3bd` state + gate overrides · `0a34f6ab7` the 18 plans ·
+`38df37643` plan-check fixes.
+
+**Plan-checker verdict: 1 blocker, 6 warnings — the blocker was a malformed `<automated>` tag, now fixed;
+five warnings closed, one ruled acceptable.** ⭐ **The check that mattered PASSED: element-ledger
+completeness.** Every element marked `BUILD` / `BUILD+BE` traces to a plan task, nothing on the cut list is
+built, and no plan builds an element the ledger does not list. That walk is the one 217 never had.
+
+⚠ **THE PLANNER RAN ON SONNET, NOT OPUS** — the configured `planner_model` is `opus` and it **failed on the
+account's weekly Opus limit** (resets Aug 31). The operator chose to proceed on Sonnet rather than wait,
+on the reasoning that this planner was doing **assembly, not invention**: research supplied file+line
+targets for every element, the pattern map supplied 36 of 40 analogs with excerpts, VALIDATION supplied
+every verify command, and 35 decisions closed every ambiguity. **Recorded so the model is auditable if the
+plans read thin at execution.**
+
+⛔ **THE DECISION-COVERAGE GATE IS STILL STRUCTURALLY BLIND, AND THIS IS THE SECOND CONSECUTIVE PHASE TO
+RECORD IT.** `check.decision-coverage-plan` matches a literal `D-NN`; this project's ids are three-segment
+(`D-217.1-NN`), so it returns `skipped — "no trackable decisions"` on a CONTEXT holding **35**. Coverage was
+re-derived **by hand**: **35 / 35 covered**, with the plan-checker independently spot-checking the eight a
+plan could most easily get wrong (**D-26** four-card mapping · **D-27** the ungated BE-2 · **D-28** the
+dropped `re-indexing` arm · **D-29** the fifth tile · **D-30** the version-gated chevron · **D-31** `Root` ·
+**D-34** the characterization test's ORDER · **D-35** all four write sites) — **all eight correct.**
+
+**Two of this phase's own locked decisions were measured FALSE by research and corrected beside their
+originals** (`D-217.1-14`, `D-217.1-17`) — most consequentially that `retrieval_service.py` does **not**
+throw the per-hit similarity away; `:173` returns it and `tool_dispatcher.py:781` copies it into every
+citation. ⭐ **An unmeasured claim inside a locked decision would have sent a plan hunting for a discard
+that does not exist.**
+
+⚠ **Carried into execution, unresolved by design:**
+- **The count gate is VIOLATED at this phase's base** — `total 6666 · failed 1 · pinned 5932`, on
+  `WorkflowBuilderPage.canvas.test.tsx`, a named SEED-171 suite, **provably byte-unchanged**. CLAUDE.md's
+  published `6355 / 5266` is the **sixth rot**.
+- **`tool_dispatcher.py` (66/29/4305), `documents.py` (71/29/2531) and `ViewsGroup.tsx` (5/3/259) have no
+  ledger row at all**; three more rows measured stale. Plans 11 and 18 close them.
+- **The backend↔frontend seam test is approximated**, not literal — mitigated by the fact that every such
+  seam here is sequentially `depends_on`-chained, so the frontend executor sees the landed response shape
+  rather than an assumed contract. ⚠ Ruled acceptable, not solved.
+- **16 owed UAT rows from Phase 217** overlap this phase's G-4 drive; `G4-4` is the row to drive first.
+
+⚠ **LIB-08 / LIB-09 / LIB-10 (Phase 219) are still absent from `REQUIREMENTS.md`** — the same gap LIB-05..07
+had until this session. **Not this phase's job, but the milestone audit will otherwise read 32/32 as
+verified when three requirements have no row.**
+
 
 **Artifacts** — `217-RESEARCH.md` (1712 L) · `217-VALIDATION.md` · `217-PATTERNS.md` (1070 L) ·
 `217-01..12-PLAN.md`. Commits: `4d254b62d` research+validation+rulings · `b435bb812` REQUIREMENTS ·

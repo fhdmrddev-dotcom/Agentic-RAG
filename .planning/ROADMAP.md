@@ -518,6 +518,35 @@ Plans:
 
 - [ ] 217.1-18-PLAN.md — gate closure: sketchComposition proven GREEN, both count-gate knobs adopted, the hot-file ledger current
 
+**Plans:** 18 plans in 16 waves (planned 2026-08-29)
+
+Plans:
+- [ ] 217.1-01-PLAN.md — ⭐ **the composition gate** (`drive.cjs --emit` + the fence, **RED first**) · *wave 1*
+- [ ] 217.1-02-PLAN.md — the four live defects: visible stage labels · the plain-language mapper · `Try again` · the dropzone · *wave 2*
+- [ ] 217.1-03-PLAN.md — Ingestion sub-tabs + the hero dropzone + the folder picker · *wave 3*
+- [ ] 217.1-04-PLAN.md — the four-card pipeline row, the queue table, `History` · *wave 4*
+- [ ] 217.1-05-PLAN.md — ⭐ **the `DocumentRow` extraction** (discharges `DocumentList.tsx`'s 13-phase seam) · *wave 5*
+- [ ] 217.1-06-PLAN.md — Documents furniture: three stat tiles · breadcrumb · pager · *wave 5*
+- [ ] 217.1-07-PLAN.md — Views becomes a card grid + the zero-match card · *wave 5*
+- [ ] 217.1-08-PLAN.md — **BE-1** `embedded_at`, migration **140**, at all **four** write sites · *wave 6* ⚠ `autonomous: false`
+- [ ] 217.1-09-PLAN.md — **BE-2** `/library/index-summary` (ungated) + **BE-3** folder scope · *wave 7* ⚠ `autonomous: false`
+- [ ] 217.1-10-PLAN.md — the Indexing tab's three cards; the actions vanish without `model_management` · *wave 8*
+- [ ] 217.1-11-PLAN.md — ⭐ **BE-4 + BE-5**, with the `retrieval_count` characterization pin landing **first** · *wave 9* ⚠ `autonomous: false`
+- [ ] 217.1-12-PLAN.md — the Health tab: ring · stacked chart · **five** tiles · seven chips renamed apart · *wave 10*
+- [ ] 217.1-13-PLAN.md — the `governance_health` gate move, proven by a **negative** test · *wave 11* ⚠ `autonomous: false`
+- [ ] 217.1-14-PLAN.md — the nav retirement **and** the fallback replacement, same commit · *wave 12*
+- [ ] 217.1-15-PLAN.md — the detail panel against screen 007 · *wave 13*
+- [ ] 217.1-16-PLAN.md — **BE-6** `checked_queries`, migration **141**, + the rank evaluator · *wave 14* ⚠ `autonomous: false`
+- [ ] 217.1-17-PLAN.md — the `Checked queries` tile, table and `Add a check` · *wave 15*
+- [ ] 217.1-18-PLAN.md — gate closure: both count-gate knobs, the ledger sweep, the GREEN clearance · *wave 16*
+
+⚠ **Four plans are `autonomous: false`** — 08, 09, 11 and 16. Two carry **migrations that must be pasted
+into the Supabase SQL editor** (⛔ never `db push`), and all four touch a security or honesty surface.
+
+⭐ **Wave 5 is the only parallel wave** (05 · 06 · 07 — verified no file collisions, all vitest-only). The
+rest is serialized by real dependencies: gate → defects → Ingestion shape → the row extraction → migration
+→ endpoint → frontend → Health → the seams → the new table.
+
 ⚠ **G-5 fires on six files in this blast radius** — `LibraryPage.tsx` (10 phases), `DocumentList.tsx` (12), `KnowledgeHealthPage.tsx` (5), `knowledge_health.py` (5), `document_governance.py` (3) and `tool_dispatcher.py`. **Honour by construction: every wave adds a CHILD, and no wave adds a branch to `LibraryPage.tsx`.** Read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.
 ⚠ **G-2 is SATISFIED, not overridden** — `.planning/sketches/218-the-library-and-its-tabs/index.html` **is** the approved mockup (committed 2026-08-28, one day before 217 was planned). No new `/gsd:sketch`; the executable acceptance bar is SC#1's emitted composition contract.
 ⚠ **G-4 is BLOCKING at close** — the operator drives all five tabs in a browser **with the sketch open beside them**. Wire-format green is exactly what shipped the first pass.
@@ -597,7 +626,7 @@ Plans:
 | 215. BYO OAuth | 0/? | Not started | - |
 | 216. Connections in Chat, and One File In by Hand | 0/? | Not started | - |
 | 217. The Library — One Home for Documents | 12/12 | ✅ Complete — 5/5 SC verified, 16 UAT rows owed. ⚠ **Shipped green against a contract asserting only TEXT** — the sketch's composition was never planned (`217-SKETCH-DRIFT-AUDIT.md`) → **217.1** | 2026-08-29 |
-| 217.1. The Library, Exactly As Sketched | 0/? | Not started — the element-for-element rebuild against sketch 218. ⛔ **Absorbs Phase 218.** Depends on 217 (shipped) + 210 (shipped): **startable now** | - |
+| 217.1. The Library, Exactly As Sketched | 0/18 | **Planned** — 18 plans in 16 waves; plan-check **passed** (1 blocker fixed, 6 warnings closed or ruled). ⛔ **Absorbs Phase 218.** ⭐ **Startable now** | - |
 | 218. ~~The Library Knows How It Is Used~~ | — | ⛔ **ABSORBED INTO 217.1** (operator, 2026-08-29) — all five criteria and LIB-05/06/07 moved. Row kept so dependencies and the coverage map still resolve | - |
 | 219. A Connected Source Feeds the Library | 0/? | Not started — depends on **215** + 216 | - |
 | 220. A Drawing Becomes Quantities — SPIKE | 0/? | Not started — depends on 217. Extraction half already proven by two committed probes (`SEED-226`) | - |
