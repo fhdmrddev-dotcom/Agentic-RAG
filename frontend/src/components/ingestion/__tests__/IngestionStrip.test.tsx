@@ -31,6 +31,7 @@ import { render, screen } from "@testing-library/react"
 
 import { IngestionStrip, segmentState } from "../IngestionStrip"
 import { INGESTION_STAGES, isStageSkipped, stageIndex } from "../ingestionStages"
+import { TERM_MAP, type Term, type TermKey } from "@/lib/termMap"
 import type { Document } from "@/types"
 
 // The live source this suite is BOUND to. `?raw` over a backend `.py` is the shipped
@@ -374,5 +375,116 @@ describe("IngestionStrip — one honest rendering per status", () => {
     INGESTION_STAGES.forEach((stage, i) => {
       expect(stateOf(stage.key)).toBe(segmentState(stage, i, d))
     })
+  })
+})
+
+// ── THE VISIBLE-LABEL HALF (Phase 217.1 plan 02 · D-217.1-19) ─────────────────────────
+
+/**
+ * ⭐ THE DEFECT THIS SECTION PINS: the strip rendered every stage label `sr-only`, so the six
+ * segments were BLANK BOXES to a sighted user. A component whose entire job is to say WHICH
+ * STAGE, that says no stage out loud, communicates nothing — the operator saw six grey
+ * rectangles and could not tell them apart.
+ *
+ * The fix is a `short` field on the six `ingest.*` `TERM_MAP` entries rendered as VISIBLE TEXT,
+ * with the full sentence still on `title` / `aria-label`. ⛔ NOT a seventh vocabulary — one
+ * vocabulary, extended (`ingestionStages.ts:96-98`'s own rule).
+ *
+ * ⚠ THE ORDER IS THE SHIPPED ORDER, NOT THE SKETCH'S DRAWN ONE. The sketch drew
+ * `READ · TBL · IMG · SPLIT · INDEX · LABEL`; the backend writes tables and images AFTER
+ * embedding, so a strip built on the drawn order would visibly JUMP BACKWARDS. The ordered
+ * fence above is what proves that, and this section DERIVES its expectation from the same
+ * array rather than re-typing a second list beside it.
+ */
+describe("the six stage labels are VISIBLE TEXT, not sr-only", () => {
+  /** The visible text of each segment, in DOM order. */
+  function shortLabels(): string[] {
+    const strip = screen.getByTestId("ingestion-strip")
+    return [...strip.querySelectorAll("[data-stage]")].map((el) => (el.textContent ?? "").trim())
+  }
+
+  // Read THROUGH the `Term` interface, not through the const-narrowed literal type: `short`
+  // is optional there, so the non-vacuity case below is a real runtime check rather than a
+  // tautology TypeScript already proved.
+  const termOf = (key: string): Term => TERM_MAP[`ingest.${key}` as TermKey]
+  const shortOf = (key: string) => termOf(key).short ?? ""
+  const plainOf = (key: string) => termOf(key).plain
+
+  it("non-vacuity — every ingest.* term carries a non-blank short label", () => {
+    // Asserted BEFORE any rendering claim below: a blank `short` would make every
+    // "the label is visible" case pass against an empty string.
+    expect(INGESTION_STAGES).toHaveLength(6)
+    for (const stage of INGESTION_STAGES) {
+      // ⚠ Read the RAW optional field — `shortOf` coalesces, and coalescing here would turn a
+      // missing label into a passing empty string, which is the vacuity this case exists for.
+      const short = termOf(stage.key).short
+      expect(short).toBeTypeOf("string")
+      expect((short ?? "").trim().length).toBeGreaterThan(0)
+      // A micro-label: a real word, still small enough for a narrow segment.
+      expect((short ?? "").length).toBeLessThanOrEqual(8)
+    }
+  })
+
+  it("⭐ the six short labels render in the SHIPPED order, derived from INGESTION_STAGES", () => {
+    render(<IngestionStrip document={doc({ status: "processing", ingestion_step: "chunking" })} />)
+    // ⛔ Not a second literal list. The expectation is DERIVED from the same ordered array the
+    // backend fence above pins, so a reorder fails THERE rather than silently agreeing here.
+    expect(shortLabels()).toEqual(INGESTION_STAGES.map((s) => shortOf(s.key)))
+    // …and the shipped order really is this one, spelled once so a human can read it.
+    expect(INGESTION_STAGES.map((s) => shortOf(s.key))).toEqual([
+      "Read",
+      "Split",
+      "Index",
+      "Tables",
+      "Images",
+      "Label",
+    ])
+  })
+
+  it("⭐ the label is READABLE — no sr-only anywhere in the strip", () => {
+    render(<IngestionStrip document={doc({ status: "processing", ingestion_step: "embedding" })} />)
+    const strip = screen.getByTestId("ingestion-strip")
+    expect(strip.querySelectorAll(".sr-only")).toHaveLength(0)
+    // and the words are really in the tree, not merely un-hidden
+    expect(strip.textContent).toContain("Read")
+    expect(strip.textContent).toContain("Index")
+  })
+
+  it("the FULL sentence survives on title and aria-label — the reveal contract is intact", () => {
+    render(<IngestionStrip document={doc({ status: "pending" })} />)
+    const strip = screen.getByTestId("ingestion-strip")
+    for (const stage of INGESTION_STAGES) {
+      const el = strip.querySelector(`[data-stage="${stage.key}"]`)!
+      expect(el.getAttribute("title")).toBe(plainOf(stage.key))
+      expect(el.getAttribute("aria-label")).toBe(plainOf(stage.key))
+      // the visible text is the SHORT form — the sentence is not duplicated into the box
+      expect((el.textContent ?? "").trim()).toBe(shortOf(stage.key))
+    }
+  })
+
+  it("a SKIPPED stage still reads struck through, now that the label is visible text", () => {
+    render(
+      <IngestionStrip
+        document={doc({
+          status: "processing",
+          ingestion_step: "chunking",
+          mime_type: "text/plain",
+          filename: "notes.txt",
+          tables_stage_applies: false,
+          images_stage_applies: false,
+          table_count: 0,
+          image_count: 0,
+        })}
+      />,
+    )
+    const strip = screen.getByTestId("ingestion-strip")
+    for (const key of ["extracting_tables", "extracting_images"]) {
+      const el = strip.querySelector(`[data-stage="${key}"]`)!
+      expect(el.getAttribute("data-state")).toBe("skipped")
+      // The strike-through is on the element CARRYING the visible word, so the word itself is
+      // struck. A strike over an empty box communicated nothing, which is the whole defect.
+      expect(el.className).toMatch(/line-through/)
+      expect((el.textContent ?? "").trim().length).toBeGreaterThan(0)
+    }
   })
 })
