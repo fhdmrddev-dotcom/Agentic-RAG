@@ -132,16 +132,16 @@ ROADMAP's own wording. ⚠ **Phase 217 has FIVE success criteria and FOUR requir
 (one source of selection truth) carries no ID of its own and is tracked by the phase's success
 criteria, not by this register.
 
-- [ ] **LIB-01**: The document space is called **Library** in the nav and on the page, and
+- [x] **LIB-01**: The document space is called **Library** in the nav and on the page, and
       `IngestionPage.tsx` is renamed `LibraryPage.tsx` in the same commit
       ⚠ The `ActiveView` key stays `"documents"` — it is never printed to a user
-- [ ] **LIB-02**: A person landing on the Library can **start an upload without hunting for it** — a
+- [x] **LIB-02**: A person landing on the Library can **start an upload without hunting for it** — a
       full-width dropzone, the real accepted formats, and the folder it will land in
-- [ ] **LIB-03**: A file being ingested shows **the six stages the pipeline actually writes**, two of
+- [x] **LIB-03**: A file being ingested shows **the six stages the pipeline actually writes**, two of
       them conditional and struck through when skipped
       ⛔ **Never a three-segment bar, never a percentage, never an ETA** — `onUploadProgress` is absent
       from the upload path, so any percentage would be unknowable
-- [ ] **LIB-04**: A document's detail panel shows **what we already store and never showed**: the
+- [x] **LIB-04**: A document's detail panel shows **what we already store and never showed**: the
       parsed text, extracted tables **as tables**, image descriptions, its chunks, and the questions
       that found it
       ⚠ The data is in Postgres; **none of it was on the wire** — five new read routes are required

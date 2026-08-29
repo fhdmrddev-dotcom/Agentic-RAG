@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
-status: executing
-last_updated: "2026-08-29T00:23:28.348Z"
+status: ready_to_plan
+last_updated: 2026-08-29T07:22:01.465Z
 last_activity: 2026-08-29
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 52
-  completed_plans: 35
+  completed_plans: 47
   percent: 26
+stopped_at: Phase 217 complete (12/12) — ready to discuss Phase 218
 ---
 
 # Project State
@@ -32,13 +33,13 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 217 — the-library-one-home-for-documents
+**Current focus:** Phase 218 — the library knows how it is used
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 217 (the-library-one-home-for-documents) — EXECUTING
-Plan: 1 of 12
+Phase: 218
+Plan: Not started
 ⚠ **SESSION 2026-08-29 — Phase 217 PLANNED: 12 plans in 6 waves, ready to execute** (this block is
 hand-edited; the `state.*` SDK verbs are forbidden here). `/gsd:plan-phase 217` ran to completion —
 research → pattern map → plan → plan-check → one targeted revision.
@@ -406,7 +407,7 @@ refactor by construction: the gate leaves into `backend/app/services/connectors/
 prose pointed at them). `SEED-214` → `status: partially-folded`, with the unlock/filling split
 recorded and triggers 2–4 named as still live. `SEED-188` (prompt injection) left planted with
 **216** as its trigger — 213 ships no read path.
-Status: Executing Phase 217
+Status: Ready to plan
 It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
 the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
 waves + 2 gap-closure rounds + 5 defect fixes. Full record:
