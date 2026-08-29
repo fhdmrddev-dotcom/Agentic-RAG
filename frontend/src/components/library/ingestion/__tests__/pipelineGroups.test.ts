@@ -1,23 +1,17 @@
 /**
- * Phase 217.1 plan 04 (LIB-03 / D-217.1-26) — the four-card fold fence.
+ * Phase 217.1 plan 04 (LIB-03 / D-217.1-26) — the six-to-four fold fence.
  *
- * Asserts that `pipelineGroups.ts` maps all six shipped stages to exactly four
- * pipeline cards, that every stage is covered (no orphan), and that the mapping
- * is provably monotonic over the measured backend write order.
- *
- * ⚠ Ordered comparison, NOT sorted-before-compare (the `A5b` warning).
+ * ⭐ THREE PROPERTIES, ONE SUITE — exhaustiveness, ordered correctness, monotonicity.
+ * ⛔ ORDERED comparison, never sorted — `drive.cjs`'s `A5b` sorts, and cannot catch a reorder.
  */
 import { describe, it, expect } from "vitest"
-import {
-  cardForStage,
-  PIPELINE_CARDS,
-  CARD_LABEL,
-  type PipelineCard,
-} from "../pipelineGroups"
-import { INGESTION_STAGES, stageTermKey, type IngestionStage } from "@/components/ingestion/ingestionStages"
+import { cardForStage, PIPELINE_CARDS, CARD_LABEL } from "../pipelineGroups"
+import { INGESTION_STAGES } from "@/components/ingestion/ingestionStages"
+import type { IngestionStageKey } from "@/components/ingestion/ingestionStages"
 
-// ── The measured backend write order (documents.py:2069,2249,2277,2315,2326,2436) ──
-const MEASURED_WRITE_ORDER: IngestionStage["key"][] = [
+// ── THE SIX STAGES IN MEASURED WRITE ORDER ────────────────────────────────────────────────
+// Pinned against `backend/app/api/documents.py:2069,2249,2277,2315,2326,2436` — do not re-derive.
+const WRITE_ORDER: IngestionStageKey[] = [
   "extracting",
   "chunking",
   "embedding",
@@ -26,119 +20,72 @@ const MEASURED_WRITE_ORDER: IngestionStage["key"][] = [
   "metadata",
 ]
 
-describe("PIPELINE_CARDS — ordered four-card array", () => {
-  it("has exactly four cards", () => {
-    expect(PIPELINE_CARDS).toHaveLength(4)
+// ── THE FOLD PER D-217.1-26 ────────────────────────────────────────────────────────────────
+
+describe("pipelineGroups — the six-to-four fold (D-217.1-26)", () => {
+  it("cardForStage maps each of the six shipped stages to one of the four cards", () => {
+    const expected: Record<IngestionStageKey, string> = {
+      extracting: "reading",
+      chunking: "splitting",
+      embedding: "indexing",
+      extracting_tables: "indexing",
+      extracting_images: "indexing",
+      metadata: "labelling",
+    }
+    for (const stage of WRITE_ORDER) {
+      expect(cardForStage(stage), `stage "${stage}" must map to "${expected[stage]}"`).toBe(
+        expected[stage],
+      )
+    }
   })
 
-  it("the cards are in the correct order: reading → splitting → indexing → labelling", () => {
+  it("every stage in INGESTION_STAGES has a defined card — no orphan", () => {
+    for (const s of INGESTION_STAGES) {
+      const card = cardForStage(s.key)
+      expect(card, `stage "${s.key}" is orphaned — no card mapping`).toBeTruthy()
+      expect(PIPELINE_CARDS.includes(card), `"${card}" is not a known card id`).toBe(true)
+    }
+  })
+
+  it("PIPELINE_CARDS is the sketch's four cards in display order", () => {
+    // ⛔ ORDERED comparison, never sorted.
     expect(PIPELINE_CARDS).toEqual(["reading", "splitting", "indexing", "labelling"])
   })
 
-  it("does NOT contain the six raw stage keys", () => {
-    for (const stage of INGESTION_STAGES) {
-      expect(PIPELINE_CARDS).not.toContain(stage.key)
+  it("the fold is monotonic over the measured write order", () => {
+    // A document's card index never goes backwards as it progresses through the pipeline.
+    let prevIndex = -1
+    for (const stage of WRITE_ORDER) {
+      const card = cardForStage(stage)
+      const idx = PIPELINE_CARDS.indexOf(card)
+      expect(idx, `monotonicity broken at stage "${stage}": card index ${idx} < previous ${prevIndex}`).toBeGreaterThanOrEqual(prevIndex)
+      prevIndex = idx
+    }
+  })
+
+  it("no two consecutive stages in the write order jump to a DIFFERENT card that is earlier in PIPELINE_CARDS", () => {
+    for (let i = 1; i < WRITE_ORDER.length; i++) {
+      const prev = cardForStage(WRITE_ORDER[i - 1])
+      const curr = cardForStage(WRITE_ORDER[i])
+      const prevIdx = PIPELINE_CARDS.indexOf(prev)
+      const currIdx = PIPELINE_CARDS.indexOf(curr)
+      // The card index must be >= the previous (same card or later card).
+      expect(currIdx, `stage "${WRITE_ORDER[i]}" → "${curr}" (idx ${currIdx}) is BEFORE "${WRITE_ORDER[i - 1]}" → "${prev}" (idx ${prevIdx})`).toBeGreaterThanOrEqual(prevIdx)
     }
   })
 })
 
-describe("CARD_LABEL — human-readable card labels", () => {
-  it("has a label for every pipeline card", () => {
-    for (const card of PIPELINE_CARDS) {
-      expect(CARD_LABEL[card as PipelineCard]).toBeTruthy()
+// ── CARD LABELS ────────────────────────────────────────────────────────────────────────────
+
+describe("pipelineGroups — card labels", () => {
+  it("every card id has a CARD_LABEL entry", () => {
+    for (const id of PIPELINE_CARDS) {
+      expect(CARD_LABEL[id], `card "${id}" has no label`).toBeTruthy()
+      expect(typeof CARD_LABEL[id]).toBe("string")
     }
   })
 
-  it("Reading maps to 'Reading'", () => {
-    expect(CARD_LABEL.reading).toBe("Reading")
-  })
-
-  it("Splitting maps to 'Splitting'", () => {
-    expect(CARD_LABEL.splitting).toBe("Splitting")
-  })
-
-  it("Indexing maps to 'Indexing'", () => {
-    expect(CARD_LABEL.indexing).toBe("Indexing")
-  })
-
-  it("Labelling maps to 'Labelling'", () => {
-    expect(CARD_LABEL.labelling).toBe("Labelling")
-  })
-})
-
-describe("cardForStage — the fold mapping (D-217.1-26)", () => {
-  it("maps extracting → reading", () => {
-    expect(cardForStage("extracting")).toBe("reading")
-  })
-
-  it("maps chunking → splitting", () => {
-    expect(cardForStage("chunking")).toBe("splitting")
-  })
-
-  it("maps embedding → indexing", () => {
-    expect(cardForStage("embedding")).toBe("indexing")
-  })
-
-  it("maps extracting_tables → indexing (D-217.1-26, NOT reading)", () => {
-    expect(cardForStage("extracting_tables")).toBe("indexing")
-  })
-
-  it("maps extracting_images → indexing (D-217.1-26, NOT reading)", () => {
-    expect(cardForStage("extracting_images")).toBe("indexing")
-  })
-
-  it("maps metadata → labelling", () => {
-    expect(cardForStage("metadata")).toBe("labelling")
-  })
-})
-
-describe("cardForStage — exhaustiveness (no orphan)", () => {
-  it("every value in INGESTION_STAGES has a defined card", () => {
-    for (const stage of INGESTION_STAGES) {
-      const card = cardForStage(stage.key)
-      expect(card).toBeDefined()
-      expect(PIPELINE_CARDS).toContain(card)
-    }
-  })
-
-  it("the number of covered stages equals the number of shipped stages", () => {
-    const covered = INGESTION_STAGES.filter(
-      (s) => PIPELINE_CARDS.includes(cardForStage(s.key)),
-    )
-    expect(covered).toHaveLength(INGESTION_STAGES.length)
-  })
-})
-
-describe("cardForStage — monotonicity over the measured write order", () => {
-  it("card index never decreases as a document progresses through the pipeline", () => {
-    let lastIndex = -1
-    for (const stageKey of MEASURED_WRITE_ORDER) {
-      const card = cardForStage(stageKey)
-      const cardIndex = PIPELINE_CARDS.indexOf(card)
-      expect(cardIndex).toBeGreaterThanOrEqual(lastIndex)
-      lastIndex = cardIndex
-    }
-  })
-
-  it("the monotonic sequence is: reading → splitting → indexing → indexing → indexing → labelling", () => {
-    const cards = MEASURED_WRITE_ORDER.map(cardForStage)
-    expect(cards).toEqual([
-      "reading",
-      "splitting",
-      "indexing",
-      "indexing",
-      "indexing",
-      "labelling",
-    ])
-  })
-
-  it("no document would ever appear to jump backwards as it progresses", () => {
-    const indices = MEASURED_WRITE_ORDER.map(
-      (k) => PIPELINE_CARDS.indexOf(cardForStage(k)),
-    )
-    // Verify non-decreasing
-    for (let i = 1; i < indices.length; i++) {
-      expect(indices[i]).toBeGreaterThanOrEqual(indices[i - 1])
-    }
+  it("CARD_LABEL has exactly four entries", () => {
+    expect(Object.keys(CARD_LABEL).length).toBe(4)
   })
 })

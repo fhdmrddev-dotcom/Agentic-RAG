@@ -1,38 +1,44 @@
 /**
- * Phase 217.1 plan 04 (LIB-03 / D-217.1-26) — the four-card fold over the six
- * backend ingestion stages.
+ * Phase 217.1 plan 04 (LIB-03 / D-217.1-07 / D-217.1-26) — the six-stage to four-card fold.
  *
- * The pipeline row shows four cards — Reading · Splitting · Indexing · Labelling —
- * replacing the shipped six. D-217.1-26 folds `extracting_tables` and `extracting_images`
- * into Indexing (not Reading), because both stages run AFTER embedding in the measured
- * write order (`documents.py:2277, 2315, 2326`), and folding them into card 1 would make
- * an in-flight file visibly jump backwards.
+ * ⭐ THE FOLD — the shipped six `IngestionStage` values collapse into exactly four cards
+ * per D-217.1-26 (operator-ruled, overriding the literal ledger mapping):
  *
- * The monotonic mapping:
- *   extracting        → Reading
- *   chunking          → Splitting
- *   embedding         → Indexing
- *   extracting_tables → Indexing
- *   extracting_images → Indexing
- *   metadata          → Labelling
+ *   | Backend stage       | Card       |
+ *   |---------------------|------------|
+ *   | `extracting`        | Reading    |
+ *   | `chunking`          | Splitting  |
+ *   | `embedding`         | Indexing   |
+ *   | `extracting_tables` | Indexing   |
+ *   | `extracting_images` | Indexing   |
+ *   | `metadata`          | Labelling  |
  *
- * Imports stage identity from `ingestionStages.ts` rather than re-declaring the
- * six stage strings.
+ * ⚠ THE ORDER IS MONOTONIC (D-217.1-26). A document's `ingestion_step` progresses through the
+ * backend write-order sequence `extracting → chunking → embedding → extracting_tables →
+ * extracting_images → metadata`, and `PIPELINE_CARDS.indexOf(cardForStage(stage))` is
+ * non-decreasing across that sequence — a document never appears to jump backwards.
+ *
+ * ⛔ DO NOT SORT. `drive.cjs`'s `A5b` assertion sorts before comparing, so it cannot catch a
+ * mis-ordering. The fold's own test compares ORDERED arrays.
+ *
+ * Zero React imports by construction: this is a pure leaf, consumable by a fence without
+ * mounting anything.
  */
-import { INGESTION_STAGES, type IngestionStageKey } from "@/components/ingestion/ingestionStages"
+import type { IngestionStageKey } from "@/components/ingestion/ingestionStages"
 
-export type PipelineCard = "reading" | "splitting" | "indexing" | "labelling"
+/** The four card ids, in display order. */
+export type PipelineCardId = "reading" | "splitting" | "indexing" | "labelling"
 
-/** The four pipeline cards, in render order. */
-export const PIPELINE_CARDS: readonly PipelineCard[] = [
+/** The four cards, left-to-right, exactly as the sketch draws them. */
+export const PIPELINE_CARDS: readonly PipelineCardId[] = [
   "reading",
   "splitting",
   "indexing",
   "labelling",
 ] as const
 
-/** Human-readable labels for each card. */
-export const CARD_LABEL: Record<PipelineCard, string> = {
+/** The ONE human name per card. Never a seventh vocabulary. */
+export const CARD_LABEL: Record<PipelineCardId, string> = {
   reading: "Reading",
   splitting: "Splitting",
   indexing: "Indexing",
@@ -40,39 +46,24 @@ export const CARD_LABEL: Record<PipelineCard, string> = {
 }
 
 /**
- * Map a backend stage key to its pipeline card.
+ * The six-to-four fold per D-217.1-26.
  *
- * D-217.1-26: `extracting_tables` and `extracting_images` fold into Indexing,
- * not Reading, preserving monotonicity over the measured write order.
+ * `extracting_tables` and `extracting_images` fold into Indexing because both stages run AFTER
+ * `embedding` in the measured write order (`documents.py:2277, 2315, 2326`). Folding them into
+ * Reading would make an in-flight file visibly jump backwards — the exact defect
+ * `ingestionStages.ts` was written to fix.
  */
-export function cardForStage(stage: IngestionStageKey): PipelineCard {
+export function cardForStage(stage: IngestionStageKey): PipelineCardId {
   switch (stage) {
     case "extracting":
       return "reading"
     case "chunking":
       return "splitting"
     case "embedding":
-      return "indexing"
     case "extracting_tables":
-      return "indexing"
     case "extracting_images":
       return "indexing"
     case "metadata":
       return "labelling"
   }
 }
-
-/**
- * Assert exhaustiveness at build time: every shipped stage has a card.
- * This is a compile-time assertion; if INGESTION_STAGES gains a seventh stage,
- * this line will fail because not all keys are covered by cardForStage.
- */
-const _exhaustiveCheck: Record<IngestionStageKey, PipelineCard> = {
-  extracting: "reading",
-  chunking: "splitting",
-  embedding: "indexing",
-  extracting_tables: "indexing",
-  extracting_images: "indexing",
-  metadata: "labelling",
-}
-void _exhaustiveCheck // consumed only for type-checking
