@@ -589,6 +589,14 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   // The Views tab's lead: the picker (its own real content, D-217-13) and, when a view is
   // loaded, the header naming it. ⛔ Upload is folder-scoped and is therefore NOT offered
   // here — a view is a filter, not a target.
+  // "New view" — the card grid's affordance opens the SAME compose flow FilterBar's
+  // onViewSaved path already drives: start composing an empty filter (drops any loaded
+  // saved-view label) and make sure the bar is expanded, never a new modal (D-217.1-07).
+  const handleNewView = useCallback(() => {
+    dispatch({ type: "CHANGE_FILTER", filter: EMPTY_FILTER })
+    setFilterChipExpanded(true)
+  }, [])
+
   const viewsLead = (
     <>
       <ViewsTab
@@ -598,6 +606,8 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         onEditView={handleEditView}
         onRenameView={handleRenameView}
         onDeleted={handleDeletedView}
+        corpusCount={listDocuments.length}
+        onNewView={handleNewView}
       />
       {selectedViewId !== null && (
         <div className="min-w-0">

@@ -6605,6 +6605,18 @@ It mirrors `_fetch_never_retrieved`'s SQL-level shape and caps its Python scan t
 
 ---
 
+### `frontend/src/components/ingestion/ViewsGroup.tsx`
+
+**Triple re-derived 2026-08-29: `5 / 3 / 259` — G-5: ⚠ FIRES (at threshold).** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-07, which is the first plan to structurally move the Views tab body off it.
+
+⭐ **It is the sidebar's saved-views list AND the lazy count-cache source.** The D-114-8 lazy+cached per-view count shape (`ViewsGroup.tsx:63-95` — a `counts` state, an `inFlight` ref, a `countsRef` mirror, a `fetchCount` with a pre-network gate) is the ONE pattern the library uses to answer "how many documents does this view match" without fanning out a request per view at mount (T-217-36). **217.1-07 lifts it into `ViewCardGrid.tsx`'s `useViewCounts` so the card grid and the sidebar share one cache rather than fetching twice** — one resolve per view serves both renderings. The sidebar mount itself stays alive beside the tab body (`LibraryPage`'s deliberate "they can never disagree" design), so the two renderings still read the SAME `selectedViewId`.
+
+⚠ **The tab-body mount MOVED off this component in 217.1-07** — the Views tab now renders `ViewCardGrid` (the sketch's 2-column card grid) instead of duplicating this list. The sidebar still mounts `ViewsGroup` unchanged; do not treat this file as orphaned.
+
+**Named seam for the next refactor:** the count-cache shape it owns is now shared with `ViewCardGrid.tsx` — if a third surface ever needs per-view counts, extract `useViewCounts` into a shared hook (`hooks/`) rather than copying the shape a third time.
+
+---
+
 ### `frontend/src/components/workflows/verdictModel.ts`
 
 **Triple re-derived 2026-08-28 (`BUG-260828-09`): `6 / 3 / 355` — ⚠ G-5 FIRES, EXACTLY AT THRESHOLD.**
