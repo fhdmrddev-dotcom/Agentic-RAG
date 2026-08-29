@@ -412,9 +412,12 @@ CREATE FUNCTION public.resize_embedding_column(new_dim integer) RETURNS void
 BEGIN
   -- Drop the HNSW index
   DROP INDEX IF EXISTS public.document_chunks_embedding_idx;
-  -- Alter column type (NULLs out existing embeddings — incompatible dimensions)
+  -- Alter column type (NULLs out existing embeddings + their embedded_at — incompatible
+  -- dimensions mean the vector no longer exists, so "last indexed" is a lie)
   EXECUTE format(
-    'ALTER TABLE public.document_chunks ALTER COLUMN embedding TYPE vector(%s) USING NULL',
+    'ALTER TABLE public.document_chunks
+       ALTER COLUMN embedding TYPE vector(%s) USING NULL,
+       ALTER COLUMN embedded_at TYPE timestamptz USING NULL',
     new_dim
   );
   -- Recreate HNSW index
@@ -869,7 +872,8 @@ CREATE TABLE public.document_chunks (
     search_vector tsvector,
     embedding_model text,
     embedding_dimensions integer,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    embedded_at timestamp with time zone
 );
 
 
@@ -878,6 +882,13 @@ CREATE TABLE public.document_chunks (
 --
 
 COMMENT ON COLUMN public.document_chunks.org_id IS 'TEN-04 (Phase 163): denormalized from documents.org_id via document_id. NOT NULL. RLS (mig 108) + Phase-164 SECDEF filter this directly — never a per-row join to documents (CONCUR-01).';
+
+
+--
+-- Name: COLUMN document_chunks.embedded_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_chunks.embedded_at IS 'Phase 217.1 (BE-1 / LIB-01): the instant THIS chunk''s vector was written, set at all FOUR document_chunks write sites — main ingest (backend/app/api/documents.py:2296), table chunks (backend/app/services/multimodal_service.py:423), image chunks (multimodal_service.py:896) and the re-embed UPDATE (backend/app/services/reembed_service.py:187). NULLABLE and NOT BACKFILLED (D-217.1-13): a pre-140 chunk keeps NULL forever, which reads "never indexed" — distinct from "time not recorded". created_at is the CHUNKING time and does not move on a re-embed; using it would print a lie after the first re-index. resize_embedding_column NULLs it alongside the vector on a dims change.';
 
 
 --
