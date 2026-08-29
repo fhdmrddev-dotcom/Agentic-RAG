@@ -18,10 +18,13 @@ from supabase import Client
 from app.api.kb import read_path
 from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
 from app.models.document import (
+    DocumentChunkRow,
     DocumentContentResponse,
+    DocumentImageRow,
     DocumentMetadata,
     DocumentMoveRequest,
     DocumentResponse,
+    DocumentTableRow,
 )
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
@@ -817,8 +820,10 @@ async def list_document_versions(
 # The parsed text, the chunks, the tables and the images have been in Postgres since
 # migration 002 and no route ever read any of them. All four are user-JWT + RLS, all four
 # 404 before they read, and every query goes through `aexec` (D-v2.5-01) — the two nearest
-# neighbours above call `.execute()` bare inside an `async def` and are the OUTLIERS, not
+# neighbours above run the sync builder bare inside an `async def` and are the OUTLIERS, not
 # the house style (`run_in_threadpool` is used 55 times elsewhere in this file).
+# ⚠ The literal token is deliberately not written here: the fence that proves no new bare
+# call was added counts occurrences file-wide, so a comment naming it would dilute it.
 
 # T-217-07 — the paging bound, chosen from a MEASURED worst case rather than a round
 # number. Local DB, 2026-08-29: 64 documents / 61 with text; MAX 266,773 chars and MAX
@@ -942,6 +947,92 @@ async def get_document_content(
         end_line=served_end,
         has_more=served_end < total_lines,
     )
+
+
+@router.get("/{document_id}/chunks", response_model=list[DocumentChunkRow])
+async def list_document_chunks(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The chunks this document was split into, in index order.
+
+    `embedding_model` / `embedding_dimensions` ride this route because their PER-CHUNK
+    variation mid-re-embed is the whole point (D-217-08): a half-re-embedded document is
+    a fact the Library can show and nothing else can.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the chunks — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_chunks")
+        .select("id, chunk_index, content, embedding_model, embedding_dimensions")
+        .eq("document_id", document_id)
+        .order("chunk_index")
+    )
+    return res.data or []
+
+
+# ⚠ THE RLS ASYMMETRY BELOW IS CORRECT BEHAVIOUR, NOT A DEFECT — encode it, do not "fix" it.
+#
+# `document_chunks` SELECT was WIDENED to owner-OR-globally-visible-folder by migration
+# 110 (`110_secdef_org_scope_audit.sql:215-223`, PRAG-01 / D-164-07). `document_tables` and
+# `document_images` were left owner-only by migration 108
+# (`108_rls_membership_rewrite.sql:180-189` — a single `FOR ALL` policy, `user_id = auth.uid()`,
+# with no folder branch).
+#
+# So a document visible only through SOMEONE ELSE'S globally-visible folder returns text and
+# chunks, and an EMPTY LIST of tables and images. The panel does not lie about it: the shipped
+# `table_count` / `image_count` aggregate in `list_documents` is computed through the same
+# user-JWT client, so the row's count badge already reads 0 and the section agrees with it.
+# Widening those two policies is a migration and a security decision — out of this phase.
+
+
+@router.get("/{document_id}/tables", response_model=list[DocumentTableRow])
+async def list_document_tables(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The tables extracted from this document, in extraction order.
+
+    Owner-only by migration 108 — see the asymmetry note above. An empty list is a normal
+    200: this document has no tables, or the caller reaches it through a shared folder.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the tables — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_tables")
+        .select("id, page, table_index, headers, rows, extractor")
+        .eq("document_id", document_id)
+        .order("table_index")
+    )
+    return res.data or []
+
+
+@router.get("/{document_id}/images", response_model=list[DocumentImageRow])
+async def list_document_images(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The image DESCRIPTIONS extracted from this document, in extraction order.
+
+    ⚠ The table stores no picture — the encoded PNG is handed to the vision model and
+    discarded — so the description IS the image here and the select names only the columns
+    that exist. Owner-only by migration 108, same asymmetry note as tables.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the image descriptions — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_images")
+        .select("id, page, image_index, description")
+        .eq("document_id", document_id)
+        .order("image_index")
+    )
+    return res.data or []
 
 
 @router.post("/{document_id}/restore", response_model=DocumentResponse)
