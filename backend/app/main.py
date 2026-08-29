@@ -748,7 +748,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -784,6 +784,7 @@ app.include_router(me_preferences.router)  # Phase 167 VIS-02 — per-user model
 app.include_router(model_registry.router)  # Phase 196 AUTH-04/D-01 — the non-operator model-registry union GET /models/registry (NOT operator-gated and NOT under /admin: an author must reach it to pick a model, and /admin/models stays default-deny with no RLS backstop). Six-field ALLOWLIST projection (to_author_row), never a drop-list
 app.include_router(schedules.router)  # Phase 204 SCHED-01 — the schedule's own address space (/schedules): list, patch, delete, trigger. Owner-scoped on every route, 404-not-403 on every miss. `claim_due_schedules` is deliberately unrouted and unimported there (it is owner-AGNOSTIC by construction)
 app.include_router(document_queries.router)  # Phase 217 LIB-04 / D-217-06 + D-217-07 — GET /documents/{id}/queries: "the questions that found it", derived from the audit_log search.query rows the retrieval path already writes. Its own module (and its own CLASSIFIED service-role rationale) so api/documents.py stays uniformly user-JWT. Shares the /documents prefix with documents.router; registered AFTER it so every older, more specific /documents route keeps its precedence — no path collides (documents.py has no GET /documents/{id} and no catch-all)
+app.include_router(library.router)  # Phase 217.1 (BE-2 / D-217.1-27) — GET /library/index-summary: the Indexing tab's UNGATED, RLS-enforced corpus facts (vector store / embedding model / folders cards). Deliberately NOT in api/documents.py (71/31/2535, G-5 HARD — a cross-folder aggregate is the wrong direction there), following document_queries.py's one-route-module precedent
 app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the workflow-anchored half (/workflows/{id}/schedules: create + list). Shares the /workflows prefix with api/workflows.py; no path collides. Registered AFTER workflows.router so the older, more specific routes keep their precedence
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
