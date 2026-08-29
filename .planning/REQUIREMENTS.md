@@ -245,10 +245,23 @@ they existed only in `ROADMAP.md` — this register was blind to an entire phase
 | **CONN-10** | Phase 210 | No silent schedule on a scheduler-off install; the default budget does not self-cancel | Planned |
 | **CONN-11** | Phase 210 | A manual schedule trigger succeeds when `org_id` is null | Planned |
 | **RAG-09** | Phase 210 | An embedding-provider failure is reported as a provider failure | Planned |
-| **LIB-01** | Phase 217 | The surface is called Library, and the page file is renamed in the same commit | Planned |
-| **LIB-02** | Phase 217 | Upload is a real front door — a full-width dropzone with the real formats | Planned |
-| **LIB-03** | Phase 217 | Six ingestion stages in the order the pipeline writes; no percentage, no ETA | Planned |
-| **LIB-04** | Phase 217 | The detail panel renders text, tables, images, chunks, and the queries that found it | Planned |
+| **LIB-01** | Phase 217 → ⚠ **re-opened in 217.1** | The surface is called Library, and the page file is renamed in the same commit | ✅ Shipped (217-04) |
+| **LIB-02** | Phase 217 → ⚠ **re-opened in 217.1** | Upload is a real front door — a full-width dropzone with the real formats | ⚠ **Partial** — the dropzone shipped on Documents only; the Ingestion tab has none (217.1 SC#2/#3) |
+| **LIB-03** | Phase 217 → ⚠ **re-opened in 217.1** | Six ingestion stages in the order the pipeline writes; no percentage, no ETA | ⚠ **Partial** — the stages ship, but every label is `sr-only` so the strip renders as six blank boxes (217.1 SC#2) |
+| **LIB-04** | Phase 217 → ⚠ **re-opened in 217.1** | The detail panel renders text, tables, images, chunks, and the queries that found it | ⚠ **Partial** — content shipped; the `RETRIEVAL` block and `Average relevance` did not (217.1 SC#12) |
+| **LIB-05** | **Phase 217.1** (⛔ absorbed from 218) | `Library Health` and `Governance` retire into the Library's Health tab with **nothing lost**, proven against a declared rename map | Planned |
+| **LIB-06** | **Phase 217.1** (⛔ absorbed from 218) | A search that **could not run** is visible in the analytics as its own segment, not indistinguishable from one that found nothing | Planned |
+| **LIB-07** | **Phase 217.1** (⛔ absorbed from 218) | Per-hit relevance is recorded, so the detail panel's *average relevance* stops saying *not recorded yet* | Planned |
+
+⚠ **LIB-05..LIB-07 had NO rows in this table until 2026-08-29** — they existed only in ROADMAP.md, so the
+*"32 / 32 mapped"* claim was never verifiable from this file. Rows added when Phase 218 was absorbed into
+**217.1**. ⚠ **LIB-08 / LIB-09 / LIB-10 (Phase 219) are still absent and remain unmapped here.**
+
+⚠ **LIB-01..04 read `Planned` while Phase 217 was shipped and closed** — the exact staleness the note below
+this table warns about. Statuses re-derived 2026-08-29 against `217-VERIFICATION.md` and the sketch-drift
+audit: **the three `Partial` rows are why Phase 217.1 exists.** Phase 217 verified 5/5 of its *own* success
+criteria; the criteria were narrower than the requirements, because the generated build contract asserted
+vocabulary and order and **nothing about composition**.
 
 **Load-bearing order** (see `.planning/ROADMAP.md` → *The sequencing constraints*):
 **211** (`SEED-207`, the connection model) precedes **212 / 214 / 216** · **213** (per-tool approval)
