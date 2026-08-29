@@ -1,13 +1,13 @@
 ---
 id: SEED-230
 title: A step that reads STRUCTURE is gated as if it read CONTENT — owning a search tool synthesizes a citation gate the author never declared and cannot see
-status: planted
+status: partially-answered  # option 2 SHIPPED 2026-08-29; option 3 is the OPERATOR-STATED DESTINATION
 planted: 2026-08-29
 planted_by: Claude, from six measured golden runs after closing BUG-260828-09
 surface: Agentic-RAG
 severity: high
 category: design gap / governance
-priority: high
+priority: high  # for option 3; option 2 is done
 scope: >
   `effective_phase` synthesizes a `citations_required` gate for ANY `llm_agent` /
   `llm_batch_agents` step whose `available_tools` intersects `KB_TOOLS`. The gate demands
@@ -124,3 +124,82 @@ Three ways it could go, and this seed picks none:
 document content must still show where the answer came from. This seed asks for the system to be
 able to tell those two jobs apart — or, failing that, to say out loud which one it thinks it is
 looking at.
+
+
+---
+
+# ✅ OPERATOR RULING 2026-08-29 — OPTION 2 NOW, OPTION 3 IS THE DESTINATION
+
+Verbatim intent: *"let's do option 2 but aim at option 3 later … eventually we should have
+option 3."* So this seed is **not closed by option 2**. It stays open on option 3 alone, and the
+trigger below is written so it cannot evaporate into "later".
+
+## ⚠ WHAT WE FOUND WHILE BUILDING OPTION 2: MOST OF IT ALREADY EXISTED
+
+Measured from the operator's own screenshot of the `survey-library` step form. `GovernanceSection`
+**already rendered**, under *"How strictly this step is held"*, and already said:
+
+- `⛨ Must prove it`, locked, with the loose arm refusing
+- *"Because this step reads your documents."*
+- *"Switching any of them on is what makes this step have to prove itself — this list is the real control."*
+- a *"Checks that run on this step"* rail naming the attached gate
+
+⭐ **So the diagnosis "the author cannot see the gate" was WRONG, and it was wrong in a way worth
+recording.** They could see it. What the panel never said is what the state DOES: every sentence
+described a condition ("held strictly", "a check runs"), none named a consequence, so the whole
+section reads as a **quality setting** rather than as a gate. That is why it was scrolled past.
+
+**Option 2 therefore shipped as ONE sentence, not a feature:**
+`GROUNDING_PUBLISH_CONSEQUENCE` — *"If it runs and retrieves nothing, publishing refuses — this
+is the check that stops it."*
+
+Two properties pinned by test rather than intended:
+- ⚠ **`detected` ARM ONLY.** `effective_phase` synthesizes the gate for `detected` and nothing
+  else, so rendering it on an `escalated` step would promise a check that is never attached.
+- ⚠ **CONDITIONAL ON THE OUTCOME, never on the state.** The gate retries twice and 2 of 8
+  measured attempts recovered on the retry, so "this step cannot be published" would be false
+  for most runs.
+
+## What option 3 still has to solve — narrowed by what option 2 revealed
+
+Option 2 makes the rule **legible**. It does not make it **right**. The residue is exactly the
+original complaint:
+
+> A step whose job is *map the folder structure* earns a RETRIEVAL gate for owning search tools
+> it never calls. The only exit is removing the tool — and an author whose step legitimately
+> mixes structural and content reading has nowhere to stand.
+
+⚠ **AND THE EVIDENCE FOR IT IS STRONGER THAN THE COMPLAINT.** The run that satisfied the gate did
+so with `similarity_scores: [0.344, 0.408]` — one of them **below the product's own 0.38
+low-confidence line**. The retry feedback pushes the model to run a search it did not need, and
+publish proceeds on whatever comes back. **That is compliance, not provenance.**
+
+### The shape option 3 must have
+
+1. A way for a step to declare **structural reading** — the shape of the library, not the content
+   of documents — satisfied by listing tools (`ls` / `tree` / `glob`).
+2. ⛔ **It may NOT be a way to turn the citation gate off.** A step that answers FROM document
+   content must still show where the answer came from. The lock is deliberately one-way and this
+   must not become the door that reverses it quietly.
+3. It touches `grounding.py`'s `KB_TOOLS` / `grounding_cause` — the module whose own docblock
+   calls a second copy of that list *"a safety hole, not a duplication smell"*. So it needs a
+   **threat read**, not a patch.
+4. **G-2 applies**: it changes what the dial means, so it owes a sketch.
+
+### ⚠ THE RE-OPEN TRIGGER, WRITTEN SO IT CANNOT EVAPORATE
+
+Three conditions, ANY of which fires it. They are concrete on purpose — this project has recorded
+`BUG-260815-06` being read, understood and deferred **twice** before a third live incident, and
+its own note reads *"TWO DECLINES IS THE SIGNAL."*
+
+- **(a)** The next phase that modifies `backend/app/services/harness/grounding.py`,
+  `KB_TOOLS`, or `GovernanceSection.tsx`'s dial — by definition it is already in this code.
+- **(b)** A second author (not this operator) hitting `citations_required` on a step that did not
+  intend content retrieval. **One report is a bind; two is a product defect.**
+- **(c)** The next milestone boundary — `/gsd:new-milestone`'s MANDATORY seeds sweep. This seed is
+  `status: partially-answered`, which the sweep must treat as OPEN, and the operator has stated
+  the destination, so it is a candidate REQ-ID rather than a discussion.
+
+⚠ **`status:` IS THE INDEX.** This file stays out of `planted`/`closed` deliberately: `planted`
+would re-propose option 2 forever, and `closed` would delete a decision the operator explicitly
+made. Prose saying "still open" is invisible to the scan — the frontmatter is what carries it.
