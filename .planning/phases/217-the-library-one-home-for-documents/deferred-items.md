@@ -30,3 +30,45 @@ rather than at the JSX literal, which is a rewrite of the assertion, not a numbe
 **Re-open trigger:** the next plan whose `files_modified` names
 `.planning/sketches/218-the-library-and-its-tabs/drive.cjs` **or**
 `frontend/src/components/ingestion/DocumentUpload.tsx` — plan 12 is the natural home.
+
+---
+
+## RESOLVED 2026-08-29 — the `D2` / `D3` sketch reds (orchestrator, at 217-08's merge)
+
+Fixed at the wave-3 post-merge gate rather than deferred. Recorded here because the
+*shape* of the defect is the finding, not the two red lines.
+
+**It was a cross-plan seam — each side green alone.** 217-07 replaced `DocumentUpload.tsx`'s
+transcribed `accept="..."` literal with a COMPUTED `accept={acceptAttribute()}`, which is the
+better shape and passed every check 217-07 ran. `drive.cjs`'s `D2` parsed that literal with a
+regex. Neither plan could see the break; only the merged tree shows it.
+
+⚠ **And the break was NOT symmetrical, which is the part worth keeping:**
+
+| fence | after 217-07 | why |
+|---|---|---|
+| `D2` | RED | the regex matched nothing — loud, and therefore harmless |
+| `D2b` | **GREEN, VACUOUSLY** | `[].every(...)` is `true` |
+| `D2c` | **GREEN, VACUOUSLY** | `![].includes(".msg")` is `true` |
+
+Two fences reported PASS while measuring an empty set. **A guard that passes over nothing is
+worse than one that fails**, and a run reading `2 failed` conceals that two of the greens were
+also broken. 217-08 called `D2` *"blind, not stale"* and was exactly right.
+
+**The repair.** `D2` now reads `acceptedFormats.ts` — the single constant the input computes
+from — instead of the deleted literal, so it follows the source of truth rather than a
+rendering of it. A new **`D2z` non-vacuity control** fails loudly at zero, so `D2b`/`D2c` can
+never again pass over an empty list. `D2z` was **driven RED** against a moved source (renaming
+`Object.freeze` in the constant) and fired; `acceptedFormats.ts` was restored **md5-identical**.
+
+**`D3` was a different bug with the same cause.** It greps for `onUploadProgress`; 217-07 added
+a docblock that *mentions* `onUploadProgress` to explain that there is none. A source grep
+cannot tell code from prose, so a behavioural fence reddened over behaviour that is still true.
+It now strips comments and reads code only.
+
+**Result:** `196 passed / 2 failed` → **`199 passed / 0 failed / 199 assertions`**.
+`BUILD-CONTRACT.generated.md` regenerated from the driver, never hand-edited.
+
+**Carry-forward:** a fence that reads a *rendering* of a value breaks when the rendering is
+improved. Prefer reading the constant. And every extract-then-quantify fence needs a
+non-vacuity control beside it — the empty set satisfies `every` and `!includes` silently.

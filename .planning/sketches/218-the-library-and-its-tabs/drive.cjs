@@ -495,9 +495,23 @@ ok("D1 · the sketch draws a full-width dropzone with its own icon and a browse 
 ok("D1b · it names the folder the files land in — upload is folder-scoped today",
   /Add to/.test(SURFACE) && /Engineering/.test(SURFACE))
 
-// D2 — ⚠ the accepted formats are MEASURED from the shipped input, never invented
-const acceptAttr = (UPLOAD.match(/accept="([^"]+)"/) || ["", ""])[1]
-const exts = acceptAttr.split(",").map((x) => x.trim()).filter((x) => x.startsWith("."))
+// D2 — ⚠ the accepted formats are MEASURED from the shipped source, never invented.
+//
+// ⚠ CORRECTED 2026-08-29 (217-08 close, orchestrator). This fence used to parse a literal
+// `accept="..."` out of DocumentUpload.tsx. Plan 217-07 replaced that literal with a COMPUTED
+// `accept={acceptAttribute()}` — one derived list instead of a transcribed one, which is the
+// better shape. But the regex then matched nothing, and the failure was not symmetrical:
+//   • D2 went RED (loud, correct-ish — it could no longer see the list)
+//   • D2b and D2c went GREEN **VACUOUSLY** — `[].every(...)` is true and `![].includes(".msg")`
+//     is true, so two fences reported PASS while measuring an empty set.
+// A fence that passes over nothing is worse than one that fails, so the source moved to the
+// single constant the input now computes from, and NON_VACUOUS below fails loudly at zero.
+const FORMATS_SRC = src("frontend/src/components/ingestion/acceptedFormats.ts") || ""
+const extsBlock = (FORMATS_SRC.match(/extensions:\s*(?:Object\.freeze\()?\s*\[([^\]]*)\]/) || ["", ""])[1]
+const exts = (extsBlock.match(/"(\.[a-z0-9]+)"/g) || []).map((x) => x.replace(/"/g, ""))
+ok("D2z · ⚠ NON-VACUITY CONTROL: the extension list was actually read",
+  exts.length > 0,
+  "an empty set makes D2b/D2c pass over nothing — if this reds, the source moved again")
 ok("D2 · the shipped input accepts 8 extensions",
   exts.length === 8, `measured: ${exts.join(" ") || "(none)"}`)
 ok("D2b · every format the dropzone advertises is one the input actually accepts",
@@ -508,8 +522,12 @@ ok("D2c · ⚠ .msg is NOT accepted today, so the dropzone must not advertise it
   "a dropzone listing a format the input rejects sends the user to a dead end")
 
 // D3 — ⛔ there is NO upload progress to report, so no percentage is drawn
+// ⚠ CORRECTED 2026-08-29: strip comments before grepping. Plan 217-07 added a docblock that
+// MENTIONS `onUploadProgress` to explain that there is none; a raw source grep cannot tell code
+// from prose, so this fence reddened over behaviour that is still true. It now reads CODE only.
+const UPLOAD_CODE = UPLOAD.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 ok("D3 · the shipped upload path reports no byte progress",
-  !/onUploadProgress|progressEvent/.test(UPLOAD),
+  !/onUploadProgress|progressEvent/.test(UPLOAD_CODE),
   "if this ever becomes false, a real percentage becomes honest and this fence should be revisited")
 ok("D3b · so the queue shows STAGES, and no upload percentage anywhere",
   !/\b\d{1,3}%\s*(uploaded|upload)/i.test(SURFACE) &&
