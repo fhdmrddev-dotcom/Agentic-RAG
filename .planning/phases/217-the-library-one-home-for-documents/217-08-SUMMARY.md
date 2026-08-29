@@ -297,3 +297,9 @@ None. No new network surface, no auth path, no file access and no schema change.
 is never rendered raw — it is only ever a KEY into `TERM_MAP`, with the unknown-key fallback
 `DocumentStatusBadge.tsx:27-32` already applies (T-217-27, asserted by a render case). The column is
 never cleared and the backend is not asked to clear it (T-217-30). No package was installed.
+
+## Self-Check: PASSED
+
+All five created/modified artifacts resolve on disk and all four commits resolve in `git log`.
+The working tree is clean (`git status --short` is empty), so nothing this plan produced is
+uncommitted — including this SUMMARY.
