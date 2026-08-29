@@ -34,7 +34,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // it stays visible to all today; a future operator tighten makes it vanish for
   // non-operators automatically (the map, not a hardcode).
   { view: "workflows", icon: Workflow, label: "Workflows", feature: "workflow_authoring" },
-  { view: "documents", icon: FileText, label: "Documents" },
+  { view: "documents", icon: FileText, label: "Library" },
   // Phase 118 gap-closure (CLASS-01 reachability): the classification-rules
   // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
   // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.

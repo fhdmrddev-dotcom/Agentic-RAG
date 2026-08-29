@@ -5,7 +5,7 @@ import { ThreadCommandPalette } from "./ThreadCommandPalette"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
-import { IngestionPage } from "@/pages/IngestionPage"
+import { LibraryPage } from "@/pages/LibraryPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
@@ -755,7 +755,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       ) : (
         <main className="flex-1 overflow-hidden">
           {activeView === "documents" ? (
-            <IngestionPage onNavigate={onNavigate} />
+            <LibraryPage onNavigate={onNavigate} />
           ) : activeView === "skills" ? (
             <SkillsPage
               onTryInChat={handleTryInChat}
