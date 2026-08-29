@@ -38,12 +38,32 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 218
-Plan: Not started
-⚠ **SESSION 2026-08-29 — Phase 217 PLANNED: 12 plans in 6 waves, ready to execute** (this block is
-hand-edited; the `state.*` SDK verbs are forbidden here). `/gsd:plan-phase 217` ran to completion —
-research → pattern map → plan → plan-check → one targeted revision.
-**Next: `/clear`, then `/gsd:execute-phase 217`.**
+Phase: 217.1
+Plan: Planning in progress
+⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
+The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
+like it. **Phase 217.1 was inserted and Phase 218 ABSORBED into it** (operator, 2026-08-29). This
+block is hand-edited; the `state.*` SDK verbs are forbidden here.
+
+⭐ **THE FINDING, AND IT IS STRUCTURAL — NOT A CARELESS PHASE.** `BUILD-CONTRACT.generated.md`, the
+artifact 217's twelve plans were written from, carries **200 assertions about vocabulary, ordering and
+honesty and ZERO about composition** — no card, no stat tile, no table anatomy, no button. Grepping
+all twelve plans plus 217's CONTEXT / RESEARCH / PATTERNS for the sketch's own composition strings
+returns **0 hits** for `Vector store`, `Embedding model`, `Re-index everything`, `Found by a search`,
+`In progress`, `Rows per page` and `Documents with no vectors`. **Every gate was green and every gate
+was blind.** Reproduced this session, not quoted: `node .../drive.cjs` → `200 passed · 0 failed`
+**on the current tree**.
+
+⭐ **The tell that the diagnosis is right:** every honesty rule in the contract *did* ship, precisely —
+no percentage, no ETA, `87 of 224` as numerator-and-denominator, `Not known yet` instead of a zero,
+struck-through skipped stages. **The phase executed its contract faithfully. The contract was the
+wrong size.** So 217.1's **SC#1 is the gate itself**: `drive.cjs --emit` gains composition assertions
+and a fence suite asserts them, **driven RED first**.
+
+**The governing rule (operator, 2026-08-29):** *build the sketch exactly — anything it draws is either
+BUILT or DROPPED, never placeheld and never deferred with a trigger.*
+
+**Prior 217 block preserved below for the record.**
 
 **Artifacts** — `217-RESEARCH.md` (1712 L) · `217-VALIDATION.md` · `217-PATTERNS.md` (1070 L) ·
 `217-01..12-PLAN.md`. Commits: `4d254b62d` research+validation+rulings · `b435bb812` REQUIREMENTS ·
@@ -810,6 +830,31 @@ returns `capture.md` only, the command that WRITES seeds. **214 seeds** exist, ~
 CLAUDE.md carries a MANDATORY sweep rule; it is honoured by the orchestrator, not by code.
 
 ## Guardrail overrides
+
+**Phase 217.1 — the UI-SPEC safety gate, SKIPPED BY DECISION 2026-08-29 (Claude, at plan-phase).**
+`workflow.ui_safety_gate` is `true` and the phase section is saturated with frontend indicators, so
+step 5.6 fires and its instruction is to **exit and run `/gsd:ui-phase 217.1`**. It was skipped, and
+the reasoning is recorded here rather than left silent.
+
+⭐ **The rationale is the phase's own thesis.** Phase 217 failed because it was built to a generated
+contract that asserted **only text**, while the approved sketch was never converted into anything
+assertable. Generating a `UI-SPEC.md` now would create a **third** design contract — sketch, UI-SPEC,
+composition contract — competing for authority over the same five screens, which is the precise
+failure mode 217.1 exists to close. **G-2 is SATISFIED, not overridden**:
+`.planning/sketches/218-the-library-and-its-tabs/index.html` is the operator-approved mockup,
+committed 2026-08-28 (one day before 217 was planned), and **SC#1 makes it executable** by emitting
+composition assertions from it.
+
+⚠ **This is a skip of a GENERATOR, not of a design bar** — 217.1's bar is stricter than a UI-SPEC's,
+because it is emitted from the drawing rather than written about it. **Re-open trigger:** any 217.1
+plan that introduces a screen the sketch does **not** draw. There should be none; if one appears, that
+plan needs a sketch before it ships.
+
+⚠ **Also recorded: the generic schema-push gate was overridden by the PROJECT rule.** Step 5.7 would
+inject `supabase db push`; `CLAUDE.md` forbids it. The `[BLOCKING]` task is instead *paste into the
+Supabase SQL editor, then `bash scripts/regenerate-full-schema.sh`* (no `--reset`). Not a discretionary
+call — the generic gate is simply wrong for this repo.
+
 
 **`BUG-260828-09` — G-2, OVERRIDDEN 2026-08-28 on the operator's explicit "proceed".** The gate
 fires correctly: the fix ships a new UI surface (`PublishBlockedStepCard.tsx`) and **no
