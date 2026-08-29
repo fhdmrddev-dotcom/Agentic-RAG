@@ -449,6 +449,75 @@ Plans:
   - **BE-5** persist per-hit similarity on the existing retrieval jsonb + `GET` it per document (LIB-07).
   - **BE-6** ⚠ **the milestone's only new table**: `checked_queries` + CRUD + the rank evaluator.
 
+**Plans:** 18 plans in 16 waves (planned 2026-08-29)
+
+Plans:
+**Wave 1**
+
+- [ ] 217.1-01-PLAN.md — the composition gate: drive.cjs emitter + sketchComposition fence, driven RED first, baseline captured
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 217.1-02-PLAN.md — the four live defects: visible stage labels, plain-language failure sentence, Try again, the dropzone
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 217.1-03-PLAN.md — Ingestion's four sub-tabs, the hero dropzone, the folder picker
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 217.1-04-PLAN.md — the four-card monotonic pipeline row, the queue table, History
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 217.1-05-PLAN.md — DocumentRow.tsx extraction (the 12-phase seam) + the per-row furniture
+- [ ] 217.1-06-PLAN.md — Documents stat tiles, breadcrumb, client-side pager
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 217.1-07-PLAN.md — the Views card grid, the rule-in-words extraction, the zero-match card
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 217.1-08-PLAN.md — BE-1: document_chunks.embedded_at, all four write sites, no backfill
+
+**Wave 8** *(blocked on Wave 7)*
+
+- [ ] 217.1-09-PLAN.md — BE-2 (ungated GET /library/index-summary, RLS-proven) + BE-3 (folder-scoped reembed)
+
+**Wave 9** *(blocked on Wave 8)*
+
+- [ ] 217.1-10-PLAN.md — the three Indexing cards, Change model routing, the model_management gate closing WR-02
+
+**Wave 10** *(blocked on Wave 9)*
+
+- [ ] 217.1-11-PLAN.md — BE-4 (the error-path audit row, characterization test first) + BE-5 (similarities key)
+
+**Wave 11** *(blocked on Wave 10)*
+
+- [ ] 217.1-12-PLAN.md — the fifth Health tab: ring, three-segment chart, five tiles, seven renamed chips, per-document bars
+
+**Wave 12** *(blocked on Wave 11)*
+
+- [ ] 217.1-13-PLAN.md — the governance_health chip-level gate, proven by a negative test on both sides of the wall
+- [ ] 217.1-14-PLAN.md — nav retirement, the ChatLayout fallback replacement, renameFence rewritten as a rename map
+
+**Wave 13** *(blocked on Wave 12)*
+
+- [ ] 217.1-15-PLAN.md — the detail panel's RETRIEVAL block inside Found by, the sparkline, honest Average relevance
+
+**Wave 14** *(blocked on Wave 13)*
+
+- [ ] 217.1-16-PLAN.md — BE-6: checked_queries table + RLS + CRUD + the rank evaluator
+
+**Wave 15** *(blocked on Wave 14)*
+
+- [ ] 217.1-17-PLAN.md — checked_queries frontend: the live tile, the verdict table, Add a check
+
+**Wave 16** *(blocked on Wave 15)*
+
+- [ ] 217.1-18-PLAN.md — gate closure: sketchComposition proven GREEN, both count-gate knobs adopted, the hot-file ledger current
+
 ⚠ **G-5 fires on six files in this blast radius** — `LibraryPage.tsx` (10 phases), `DocumentList.tsx` (12), `KnowledgeHealthPage.tsx` (5), `knowledge_health.py` (5), `document_governance.py` (3) and `tool_dispatcher.py`. **Honour by construction: every wave adds a CHILD, and no wave adds a branch to `LibraryPage.tsx`.** Read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.
 ⚠ **G-2 is SATISFIED, not overridden** — `.planning/sketches/218-the-library-and-its-tabs/index.html` **is** the approved mockup (committed 2026-08-28, one day before 217 was planned). No new `/gsd:sketch`; the executable acceptance bar is SC#1's emitted composition contract.
 ⚠ **G-4 is BLOCKING at close** — the operator drives all five tabs in a browser **with the sketch open beside them**. Wire-format green is exactly what shipped the first pass.
