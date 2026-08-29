@@ -68,12 +68,25 @@ const COPY = {
   // a known denominator; this pipeline's length is not known until it runs. So the strip
   // shows STAGES REACHED, never a percentage and never an ETA.
   // ══════════════════════════════════════════════════════════════════════════════════════
+  // ⚠ REORDERED 2026-08-29 (Phase 217 plan 08, D-217-09) — THIS IS BACKEND WRITE ORDER, and the
+  // order it replaced is recorded rather than deleted, because the reorder IS the finding.
+  //
+  //   was drawn:  Reading → Tables? → Images? → Splitting → Indexing → Labelling
+  //   is written: Reading → Splitting → Indexing → Tables? → Images? → Labelling
+  //
+  // `backend/app/api/documents.py` writes the two conditional steps INSIDE the single
+  // `if raw and mime_type:` block, which sits AFTER the chunk insert and the embedding pass.
+  // A strip built on the drawn order would light segment 5 and then segment 2 — it would
+  // visibly JUMP BACKWARDS on every PDF. ⚠ Fence `A5b` could not have caught this: it SORTED
+  // both sides before comparing, so a reorder was invisible to it. It now compares ORDERED
+  // arrays, and the shipped `INGESTION_STAGES` carries the same order under its own ordered
+  // fence in `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx`.
   STAGES: [
     { key: "extracting", label: "Reading", always: true },
-    { key: "extracting_tables", label: "Tables", always: false },
-    { key: "extracting_images", label: "Images", always: false },
     { key: "chunking", label: "Splitting", always: true },
     { key: "embedding", label: "Indexing", always: true },
+    { key: "extracting_tables", label: "Tables", always: false },
+    { key: "extracting_images", label: "Images", always: false },
     { key: "metadata", label: "Labelling", always: true },
   ],
   STAGE_CONDITIONAL_NOTE: "Skipped when the file has none.",
