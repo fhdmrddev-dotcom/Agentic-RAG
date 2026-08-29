@@ -2793,7 +2793,12 @@ const BASELINE = {
   "connectionCardReachability.test.tsx": 10,
   // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
   "servicesCatalog.test.ts": 3,
-  "apiBarrel.test.ts": 3,
+  // ⚠ RE-BASELINED `3 -> 5` at Phase 217's close (plan `217-12`), edited HERE rather
+  // than re-declared in the 217 block below — a second entry for the same key is a
+  // silent LAST-WINS override. 217-10 extended this barrel guard to `api/documents.ts`
+  // (it covered `connectors.ts` only); the `+2` is exactly its two new `it` blocks, read
+  // from this gate's own printed `3 -> 5 +2` row, with no residual.
+  "apiBarrel.test.ts": 5,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
@@ -2940,6 +2945,72 @@ const BASELINE = {
   // it — the same reason twelve consecutive plans declined the pre-existing four.
   // Registered as `SEED-222` with a concrete re-open trigger, because a decision
   // recorded only in a comment is invisible to every sweep.
+
+  // ══ Phase 217 (plan `217-12`, the phase's CLOSING plan) — THE DOCUMENT SPACE ═════════
+  //
+  // The GUARDED half of the two-knob pair whose RUNS half is the matching `TARGETS` block
+  // below (search `Phase 217`). The full reasoning — why the pins land in one closing plan
+  // rather than in fourteen creating commits, why every entry is file-level, and which five
+  // directories this gate reaches by nothing — is recorded ONCE there and is not duplicated
+  // here, because two copies of a reason drift.
+  //
+  // ⛔ EVERY FIGURE BELOW IS THIS GATE'S OWN PRINTED `— N new` COLUMN, read off the run made
+  // AFTER the TARGETS lines existed and BEFORE these pins were written. NOT ONE IS
+  // HAND-DERIVED. A hand-derived pin is a number the gate has never agreed with, and a pin
+  // guessed high fails every run afterwards.
+  //
+  // ⭐ THE ARITHMETIC CLOSES WITH ZERO RESIDUAL, and that is what distinguishes GROWTH from
+  // DRIFT. Adopting the TARGETS entries moved the grand total `6482 → 6664` = **+182**, and
+  // the fourteen rows below sum to exactly 182. An unexplained `+n` is the thing to worry
+  // about; a bigger number that adds up is this gate WORKING.
+  //
+  // ⚠ `DocumentList.test.tsx` and `DocumentList.moveToFolder.test.tsx` are the two halves of
+  // the resolved bare-name collision. They are COMPLEMENTS (Phase 118 classification chip /
+  // Phase 114 move-to-folder row action), so BOTH are pinned and NEITHER is excluded — an
+  // undocumented exclusion is how a suite becomes invisible.
+  "renameFence.test.ts": 15,
+  "acceptFormats.test.ts": 19,
+  "IngestionStrip.test.tsx": 25,
+  "DetailSections.lazy.test.tsx": 14,
+  "DetailSections.tables.test.tsx": 15,
+  "tabsContrast.test.ts": 14,
+  "LibraryPage.test.tsx": 12,
+  "librarySelection.test.ts": 25,
+  "useDocuments.test.ts": 7,
+  "DocumentList.test.tsx": 7,
+  "DocumentList.moveToFolder.test.tsx": 4,
+  "ViewsGroup.test.tsx": 10,
+  "DocumentDetailPanel.a11y.test.tsx": 7,
+  "CsvTablePreview.test.tsx": 8,
+  //
+  // ⚠ ONE RE-BASELINE, NOT A NEW PIN, AND IT IS EDITED AT ITS ORIGINAL LINE rather than
+  // re-declared here — a second entry for the same key is a silent LAST-WINS override that
+  // reads as two facts and behaves as one. `apiBarrel.test.ts` moves `3 -> 5`: plan 217-10
+  // extended it to cover `api/documents.ts` (it guarded `connectors.ts` only), and the `+2`
+  // is exactly its two new `it` blocks, with no residual. See the pointer at its own entry.
+  //
+  // ── DECLINED, each with its reason, so a decline can never read as an oversight ───────
+  //  · The five `SEED-222` suites named directly above (`PromptVariableChips`, `RunHero`,
+  //    `automationFacts`, `nodeEffectBanner`, `toolReadOnlyMap`) — STILL unpinned. 217 reads
+  //    none of them and none guards a file in this phase's diff; adopting them here would
+  //    fold unrelated drift into a commit that did not cause it. Their measured counts at
+  //    this commit are unchanged from Phase 214's note: 3 / 18 / 11 / 8 / 7.
+  //  · The six other `src/components/panel/__tests__` suites (`FilePreview`,
+  //    `PendingAskCard`, `Seam`, `TodosSection`, `VersionDiff`, `WorkspacePanel.derived`) —
+  //    217 converts only `CsvTablePreview.tsx`, so only its suite is claimed.
+  //  · `DocumentStatusBadge.test.tsx`, `FilterBar.test.tsx` and
+  //    `DocumentStatusBadge.a11y.test.tsx` — doc-space suites this gate STILL never
+  //    executes. 217 modifies neither `DocumentStatusBadge.tsx` nor `FilterBar.tsx`, so
+  //    adopting them would make this phase the owner of rot it did not cause. ⭐ NAMED
+  //    rather than left silent: Phase 218 owns the document space and, when it adopts
+  //    `src/components/metadata` at directory grain, these three are the remaining gap.
+  //
+  // ⛔ BACKEND SUITES ARE NOT PINNED HERE AND CANNOT BE — this gate is vitest-only.
+  // `backend/tests/test_217_document_response_fields.py`,
+  // `backend/tests/test_217_document_detail_routes.py` and
+  // `backend/tests/test_217_document_queries.py` are guarded by their plans' own pytest
+  // criteria and by the backend failure-count baseline. Recorded as a DECISION rather than
+  // a silence, so nobody later reads this gate's green as covering them.
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3999,6 +4070,92 @@ const TARGETS = [
   // positive cases were driven RED against a planted `{false && …}` (2 failed, absence
   // control correctly green) before this entry was written.
   "src/components/metadata/DocumentDetailPanel.images.test.tsx",
+
+  // ══ Phase 217 (plan `217-12`, the phase's CLOSING plan) — THE DOCUMENT SPACE ═════════
+  //
+  // ⚠ MEASURED BEFORE THIS BLOCK WAS WRITTEN, never assumed: of the thirteen suites Phase
+  // 217 wrote, converted or inherited, exactly ONE doc-space suite sat in BOTH knobs —
+  // `DocumentDetailPanel.images.test.tsx`, adopted for SEED-227 one phase earlier. The
+  // gate's grand total did not move at all across this phase's second wave, because it
+  // never executed any of them.
+  //
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED, and a suite can sit on
+  // the wrong side of exactly one. Checked PER FILE from this gate's own printed rows and
+  // never inferred from a sibling — the `WorkflowBuilderPage.declaredInputs` note above
+  // records taking the OPPOSITE answer to its neighbour ten lines away, which is why the
+  // check is made file by file.
+  //
+  // ⚠ WHY THE PINS LAND HERE RATHER THAN IN EACH CREATING COMMIT — a deliberate planning
+  // decision, recorded so it is auditable rather than discovered later. A BASELINE key
+  // naming a file that does not yet exist makes this gate ERROR (exit 2), so pinning ahead
+  // is impossible; pinning per plan would have made this script a shared artifact across
+  // six parallel worktrees and forced the whole phase serial. The cost is real and is
+  // stated rather than hidden: every suite below was UNGUARDED for the length of the
+  // phase. The mitigation is that the adoption list was derived mechanically —
+  // `git diff --name-only --diff-filter=A 9a3808697..HEAD -- 'frontend/src/**/*.test.ts*'`
+  // — and not from memory. Phase 214 left six suites unpinned by doing this from memory.
+  //
+  // ⚠ A BARE-NAME COLLISION BLOCKED ONE ADOPTION AND WAS RESOLVED, NOT WORKED AROUND.
+  // `bareName()` makes the BASELINE key space GLOBAL, and `DocumentList.test.tsx` existed
+  // at TWO paths. Both were read before either was touched, and they are COMPLEMENTS, not
+  // duplicates: the colocated `src/components/ingestion/` one covers the Phase 118
+  // classification chip; the `src/__tests__/components/` one covers the Phase 114
+  // move-to-folder row action. So neither is dropped and neither is excluded — the latter
+  // was `git mv`d to `DocumentList.moveToFolder.test.tsx` (history follows) and both are
+  // adopted below.
+  //
+  // ⚠ FIVE DIRECTORIES REACHED BY NOTHING, NAMED rather than left silent, because an
+  // unnamed absence is exactly how a suite becomes permanently invisible:
+  //   · `src/pages` — reached by NAMED FILES ONLY; there is no directory entry, so
+  //     `src/pages/__tests__/` was reached by nothing at all before this block.
+  //   · `src/components/ingestion`, `src/components/ui`, `src/__tests__/library` and
+  //     `src/__tests__/hooks` — likewise unreached by any entry in this file.
+  //   · `src/components/metadata` — STILL covered by no DIRECTORY entry after this block.
+  //     217 adopts it FILE BY FILE, verbatim the reasoning SEED-227 recorded one phase
+  //     earlier. ⭐ Phase 218 owns the document space and can adopt the directory
+  //     deliberately, with its own measured number.
+  //
+  // ⚠ FILE-LEVEL EVERYWHERE, deliberately NOT bare directories. A directory entry RECURSES
+  // into `__tests__/` — that is precisely how `WorkflowScheduleModal.test.tsx` ended up
+  // RUNNING while guarding nothing at Phase 214 — and adopting a directory here would make
+  // Phase 217 the owner of the future rot of suites it never read, in a gate that requires
+  // 0 failing forever.
+
+  // ── The eight suites Phase 217 CREATED ──────────────────────────────────────────────
+  "src/__tests__/library/renameFence.test.ts",
+  "src/components/ingestion/__tests__/acceptFormats.test.ts",
+  "src/components/ingestion/__tests__/IngestionStrip.test.tsx",
+  "src/components/metadata/__tests__/DetailSections.lazy.test.tsx",
+  "src/components/metadata/__tests__/DetailSections.tables.test.tsx",
+  "src/components/ui/__tests__/tabsContrast.test.ts",
+  "src/pages/__tests__/LibraryPage.test.tsx",
+  "src/pages/__tests__/librarySelection.test.ts",
+
+  // ── The four pre-existing doc-space ORPHANS this gate had NEVER executed ─────────────
+  // Adopted rather than created. Each guards a file inside Phase 217's blast radius:
+  // `useDocuments.ts` carries the reconcile that the `ingestion_step` field flows through,
+  // `DocumentList.tsx` is the strip's host row, `DocumentDetailPanel.tsx` gained five
+  // sections, and `ViewsGroup.tsx` is the sidebar half of the one selection truth.
+  // ⚠ 217 does NOT modify `DocumentList.tsx` itself — the strips live on the Ingestion tab
+  // — so its G-5 obligation is not triggered by a code change here. What changes is that
+  // its two suites stop being invisible to this gate.
+  "src/__tests__/hooks/useDocuments.test.ts",
+  "src/__tests__/components/DocumentList.moveToFolder.test.tsx",
+  "src/components/ingestion/DocumentList.test.tsx",
+  "src/components/ingestion/ViewsGroup.test.tsx",
+  "src/components/metadata/DocumentDetailPanel.a11y.test.tsx",
+
+  // ── ⭐ THE PANEL-DIRECTORY RESERVATION, CLAIMED ──────────────────────────────────────
+  // The comment at the panel entries far above reads, verbatim: *"A later phase that wants
+  // CsvTablePreview / FilePreview / FilesSection / PendingAskCard / Seam / TodosSection /
+  // VersionDiff / WorkspacePanel{,.derived} inside the gate should adopt them deliberately,
+  // with its own measured number."* Phase 217 CONVERTS `CsvTablePreview.tsx` — 217-11
+  // extracted `DataTableView` out of it — so this is that deliberate adoption, on exactly
+  // the ground Phase 195 claimed `FilesSection.test.tsx`. ⭐ Its count is UNCHANGED by the
+  // extraction, which is 217-11's own proof that the extraction was faithful.
+  // The other six panel suites stay DECLINED for their already-recorded reason: 217 reads
+  // none of them, and a decline must never read as an oversight.
+  "src/components/panel/__tests__/CsvTablePreview.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
