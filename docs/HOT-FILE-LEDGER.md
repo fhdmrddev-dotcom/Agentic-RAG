@@ -6457,7 +6457,7 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 ### `frontend/src/pages/LibraryPage.tsx`
 
-**Triple re-derived 2026-08-29 (Phase 217, plan `217-04`, at the rename commit): `27 / 10 / 603` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `28 / 10 / 724` — G-5: ⚠ FIRES.** ⚠ **`217-04`'s own re-derivation five commits earlier read `27 / 10 / 603` and is preserved rather than overwritten — the file grew `+121 L` inside a single phase.** Same-day staleness is this ledger's most-repeated finding; it has now been demonstrated twice on this one file. ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
 
 ⚠ **RENAMED AT PHASE 217 (SC#1 / D-217-01): `IngestionPage.tsx` → `LibraryPage.tsx`, 2026-08-29.** It was a `git mv`, so **the history FOLLOWS the move** — but `git log --oneline -- frontend/src/pages/LibraryPage.tsx` without `--follow` reports **1**, not 27. A re-derive that reads `1 / 1 / 603` has measured the RENAME, not the file; use `git log --follow --oneline -- <file>` (and `--follow --format=%s` for the phase buckets) at this path and do not read the small number as a reset. The 2026-08-29 triple was derived by adding this commit to the old path's measured 26 commits / 9 phases (`03, 08, 29, 47, 111.1, 112, 114, 153, 165` — the six-digit buckets `260328` and `260405` are dated quick tasks and are subtracted).
 
@@ -6469,7 +6469,9 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 **The named seam:** the sidebar, the filter bar and the grid are three independent concerns in one component. With a tab shell arriving, extract the shell first and let each tab own its body — otherwise the tab bar becomes the tenth conditional branch.
 
-⚠ **THE SEAM IS STILL OWED — `217-04` did NOT take it, and says so.** That plan is a pure rename: zero behaviour change, zero new branch, no new conditional. **Plan `217-09` takes the seam**, because it is the plan that adds the shell. On the gate side: this file is in **NEITHER count-gate knob** today and its suite has **never been executed by the gate** — which is how that suite sat RED at HEAD (an incomplete `@/lib/supabase` mock factory, fixed in `217-04`) without anyone seeing it. **Plan `217-12` adopts it.**
+⚠ **THE SEAM WAS OWED AT `217-04` — that plan was a pure rename and said so. ✅ `217-09` TOOK IT.** The shell owns ONE selection reducer (`pages/librarySelection.ts`) and each tab body is a CHILD component (`library/IngestionTab.tsx`, `IndexingTab.tsx`, `ViewsTab.tsx`), so the tab bar did **not** become the tenth conditional branch — which was the seam's whole stated purpose. The `+121 L` above is shell, not branching.
+
+✅ **AND THE GATE ADOPTION IS DISCHARGED (`217-12`).** This file's suite was in **NEITHER** count-gate knob for its entire life — which is exactly how `LibraryPage.test.tsx` sat **RED at HEAD** (an incomplete `@/lib/supabase` mock factory omitting `SUPABASE_CLIENT_REHYDRATED`, fixed in `217-04`) with nobody able to see it. It is now a TARGETS **file** entry and a BASELINE pin at **12**, both read from the gate's own printed `— 12 new` row.
 
 ---
 
@@ -6485,13 +6487,51 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 ### `frontend/src/components/metadata/DocumentDetailPanel.tsx`
 
-**Triple re-derived 2026-08-28: `6 / 5 / 405` — G-5: ⚠ FIRES.** ⚠ Absent at five phases. ⚠ `BUS-026` recorded `393` lines; the re-derivation measured **405** — a small drift, and the reason the recipe is run rather than the figure copied.
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `9 / 6 / 496` — G-5: ⚠ FIRES.**
+
+⚠ **THE THIRD DRIFT ON THIS ONE ROW, AND ALL THREE FIGURES ARE KEPT.** `BUS-026` recorded `393` lines; the 2026-08-28 re-derivation measured **`6 / 5 / 405`**; this close measures **`9 / 6 / 496`** — `+3` commits, `+1` phase and `+91 L` in ONE DAY. **A row that is present and WRONG answers the auditor and stops the audit, which is worse than an absent row** — so the recipe is run, never the figure copied, and that instruction has now been vindicated three times on this file alone.
 
 ⚠ **IT IS A CROSS-SURFACE SHELL, NOT A DOCUMENTS-ONLY COMPONENT.** It reuses `WorkspacePanel`'s sheet shape, which `ChatLayout` mounts — so the panel language already spans **chat, workflow and documents**, and a redesign here is judged against the chat surface too. `GovernancePage` also needs a FULL `Document` to open it, which is why that page holds its own fetch.
 
 Its width is not its own: the 430px track is set by the host grid. The mobile arm is a bottom-sheet rendered internally, so the desktop track is only meaningful ≥768px.
 
 **What sketch 218 adds to it:** a Retrieval section (three arms backed today, one that says *"not recorded yet"*), a read-only Chunks list, extracted tables rendered as tables, and image descriptions — none of which needs schema.
+
+✅ **PHASE 217 SHIPPED THAT, AND HONOURED G-5 BY CONSTRUCTION.** Plans `217-10` and `217-11` added **five** sections — Content, Chunks, Tables, Images, Found-by — and every one is a **CHILD component** (`DocumentContentSection` · `DocumentChunksSection` · `DocumentTablesSection` · `DocumentImagesSection` · `DocumentQueriesSection`), each fetching **on expand, never on mount** (D-217-04). No new conditional branch was added to this shell; the `+91 L` is mounting and prop-threading.
+
+⛔ **THE CROSS-SURFACE WARNING ABOVE IS NOW A LIVE, UNPAID OBLIGATION, not a caution.** Because this component reuses `WorkspacePanel`'s sheet, **Phase 217's five new sections land on the CHAT surface too — and chat UAT was never run.** `217-12` records that as a NEW owed G-4 row in `217-UAT.md` rather than leaving it implied. A phase whose UAT covers only the surface it was scoped for has not covered this file.
+
+✅ **Gate:** its `a11y` suite was in NEITHER knob for its entire life; `217-12` adopts it (TARGETS file entry + BASELINE pin **7**). `DocumentDetailPanel.images.test.tsx` was already adopted at SEED-227 and is unchanged at **3**.
+
+---
+
+### `frontend/src/components/ui/tabs.tsx`
+
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `3 / 3 / 78` — G-5: ⚠ FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **IT HAD NO ROW AT ALL, AND IT CROSSED THE THRESHOLD IN `217-06`'s OWN COMMIT.** Buckets: `043`, `48`, `217`. Before that commit it measured `2 / 2 / 53`, one phase below the line — so G-5 could not have fired on it at plan time, and would never have fired afterwards either, because **a file absent from CLAUDE.md's scan list is permanently invisible to its own guardrail.** This is the identical failure `WorkflowsPage.tsx` suffered for ten phases and `ChatArea.tsx` for twenty-eight. The row is added here for that reason — because it was ABSENT, not because it is new.
+
+⭐ **IT IS A SHARED CROSS-SURFACE PRIMITIVE WITH THREE MOUNTS, AND ONLY ONE OF THEM WAS IN SCOPE.** The Library's four-tab shell is the mount Phase 217 built; **Settings** and **Library Health** are the other two, and neither was touched. A token change here reaches all three at once. That is why `G4-8` exists as its own G-4 row — *"open Settings and Library Health afterwards"* — and why it is owed rather than assumed: no jsdom assertion can tell whether a tab bar on a page nobody re-opened still reads correctly.
+
+**What `217-06` changed, and what it deliberately did not.** It introduced `--tab-active` (declared in `index.css`, exposed through `tailwind.config.js`) so the active trigger is measurably **lighter than its track in BOTH themes** — D-217-20 / D-217-21. ⚠ **The token fence proves the ordering, never the perception:** `tabsContrast.test.ts` (14 cases, adopted into both gate knobs at `217-12`) reads the tokens and asserts `L(active) > L(track)`. Whether the chip reads as **raised** rather than merely *different* is `M-3` / `G4-7`, and it is **OWED**.
+
+⚠ **`--tab-active` is consumed as a Tailwind class, not as a raw CSS variable, inside this file.** A grep for the token name here returns a comment, not a use — the mention-vs-use trap, which fired five times across this phase. The producer is `index.css`; the bridge is `tailwind.config.js`; this file names the generated class.
+
+**No seam proposed.** At 78 lines it is a shadcn primitive doing one thing. The correct response to it firing G-5 is to notice that three surfaces share it, not to split it.
+
+---
+
+### `frontend/src/components/panel/CsvTablePreview.tsx`
+
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `3 / 3 / 134` — G-5: ⚠ FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **IT HAD NO ROW FOR ITS ENTIRE LIFE, across phases `087`, `088` and `217`, and it crossed the threshold in `217-11`'s own commit.** Recorded here because it was ABSENT, not because it is new.
+
+✅ **THE EXTRACTION WAS TAKEN, AND ITS PROOF IS A NUMBER THAT DID NOT MOVE.** `217-11` cut `DataTableView.tsx` (148 L, new) out of this file — **net −67 L here** — so the Library's Tables section and the chat panel's CSV preview now render through **one** table renderer with shared caps and one empty arm, instead of two that could drift. ⭐ **`CsvTablePreview.test.tsx` measures 8 cases BEFORE and 8 cases AFTER**, and that unchanged count is the extraction's own faithfulness proof: behaviour preserved, ownership moved.
+
+✅ **THE PANEL-DIRECTORY RESERVATION WAS CLAIMED, DELIBERATELY.** `scripts/vitest-count-gate.cjs` has carried a comment since Phase 188 reading: *"A later phase that wants CsvTablePreview / FilePreview / FilesSection / PendingAskCard / Seam / TodosSection / VersionDiff / WorkspacePanel{,.derived} inside the gate should adopt them deliberately, with its own measured number."* Phase 195 claimed `FilesSection.test.tsx` on the ground that it CONVERTED that file. **Phase 217 converts this one, so `217-12` claims this one on identical ground** — TARGETS file entry plus a BASELINE pin of **8**, read from the gate's own printed row. ⛔ **The other six panel suites stay DECLINED**, with the reason recorded in the script: 217 reads none of them, and adopting a suite makes the adopting phase the owner of its future rot in a gate that requires 0 failing forever.
+
+⛔ **WHAT NEITHER THE EXTRACTION NOR THE GATE CAN PROVE.** jsdom's `getBoundingClientRect` is **always zero**, so no test in this repository can establish that a wide table **scrolls** inside the 430px panel track rather than being clipped or pushing the panel. That is `G4-5`, it is **OWED**, and it is owed *structurally* — no amount of further test-writing would close it.
 
 ---
 
