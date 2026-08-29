@@ -622,8 +622,10 @@ ok("D5c · ⭐ the frontend RENDERS the tables and the image descriptions — no
   d5cMissing.length === 0, d5cMissing.join("; ") || "tables render as tables; descriptions render as text")
 // The COUNTS are still shown too, and that is not in tension with the above — a number in
 // the list and the content in the panel are different jobs.
+// Phase 217.1-05: the row moved into DocumentRow.tsx (the G-5 seam extraction); the list's
+// per-row renderer IS the row component, so the fence reads it.
 ok("D5c-b · …and the document list still shows the count beside it",
-  /table_count/.test(src("frontend/src/components/ingestion/DocumentList.tsx") || ""))
+  /table_count/.test(src("frontend/src/components/ingestion/DocumentRow.tsx") || ""))
 ok("D5d · the sketch RENDERS the buried content — a real table and real descriptions",
   /class="xtable"/.test(SURFACE_HTML) && /class="figrow"/.test(SURFACE_HTML) &&
   /Region[\s\S]{0,80}EMEA/.test(SURFACE))

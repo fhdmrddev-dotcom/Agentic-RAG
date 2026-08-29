@@ -467,6 +467,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           currentUserId={user?.id ?? ""}
           onSelect={setSelectedDocId}
           selectedDocId={selectedDocId}
+          folders={folders}
         />
       </div>
 
