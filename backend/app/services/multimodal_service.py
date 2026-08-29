@@ -196,6 +196,36 @@ def _mime_to_extractor(mime: str) -> str:
     return "unknown"
 
 
+def tables_stage_applies(mime: str | None) -> bool:
+    """Would the legacy per-mime table extractor look at this MIME type at all?
+
+    ⚠ This is NOT a claim that nothing was extracted: the `extracted_doc` fast path
+    (:479) can supply tables for ANY mime when Docling pre-extracted them, so a False
+    here can still sit beside a non-zero table_count. D-217-24's truthful rule is that
+    a stage is `skipped` iff `not applies_to_mime and count == 0` — and the count half
+    is the caller's job, never this predicate's.
+    """
+    if mime is None:
+        return False
+    return mime == PDF_MIME or mime == DOCX_MIME or mime in CSV_MIMES or mime in EXCEL_MIMES
+
+
+def images_stage_applies(mime: str | None) -> bool:
+    """Would the legacy per-mime image extractor look at this MIME type at all?
+
+    The images extractor's set is PDF and DOCX ONLY — deliberately narrower than
+    `tables_stage_applies`, which also covers CSV and Excel.
+
+    ⚠ This is NOT a claim that nothing was extracted: the `extracted_doc` fast path
+    (:479) can supply images for ANY mime when Docling pre-extracted them. D-217-24's
+    truthful rule is that a stage is `skipped` iff `not applies_to_mime and count == 0`
+    — and the count half is the caller's job, never this predicate's.
+    """
+    if mime is None:
+        return False
+    return mime == PDF_MIME or mime == DOCX_MIME
+
+
 def extract_csv_tables(raw: bytes) -> list[dict]:
     """Return a list of table dicts extracted from CSV bytes.
 
