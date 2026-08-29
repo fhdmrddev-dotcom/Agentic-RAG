@@ -187,6 +187,14 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
     setClassCount(null)
     setContentLines(null)
     setChunkTotal(null)
+    // ⚠ CR-01 (217 review): plan 11 added Tables / Images / Found-by and did NOT extend this
+    // reset. The panel is never remounted (LibraryPage passes `doc` with no `key`) and a COLLAPSED
+    // PanelSection does not render its child, so a section opened on doc A kept its badge count
+    // forever after switching to doc B — including on a doc where the section does not apply.
+    // The open-section case self-corrected on re-fetch, which is why the existing test missed it.
+    setTableTotal(null)
+    setImageTotal(null)
+    setQueryTotal(null)
   }, [doc.id])
 
   useEffect(
