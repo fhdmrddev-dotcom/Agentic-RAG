@@ -21,6 +21,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getFileIcon } from "@/lib/fileIcons"
 import { cn } from "@/lib/utils"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
+// Phase 217.1-02 (D-217.1-21) — `formatBytes` extracted to one shared leaf so the Documents
+// table and the Ingestion tab's Needs-attention row can never disagree about what `1 MB` is.
+import { formatBytes } from "@/lib/formatBytes"
 import type { Document } from "@/types"
 
 interface Props {
@@ -34,12 +37,6 @@ interface Props {
   onSelect?: (id: string) => void
   /** The currently open document (drives the selected-row affordance). */
   selectedDocId?: string | null
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 // Phase 112 Plan 04 (D-01): the inline `MetadataPanel` was RETIRED here — metadata

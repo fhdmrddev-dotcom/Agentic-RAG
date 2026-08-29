@@ -696,7 +696,15 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
               value="ingestion"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              <IngestionTab documents={documents} />
+              <IngestionTab
+                documents={documents}
+                upload={upload}
+                uploading={uploading}
+                uploadingCount={uploadingCount}
+                folderId={selectedFolderId}
+                folderName={selectedFolderName}
+                disabled={!canUploadToFolder}
+              />
             </TabsContent>
 
             <TabsContent
