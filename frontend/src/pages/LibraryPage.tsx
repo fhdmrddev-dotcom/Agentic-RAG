@@ -1,4 +1,12 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from "react"
 import { Folder, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, X } from "lucide-react"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
 import { DocumentList } from "@/components/ingestion/DocumentList"
@@ -8,6 +16,9 @@ import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import { FilterBar } from "@/components/ingestion/FilterBar"
 import { ViewsGroup } from "@/components/ingestion/ViewsGroup"
+import { ViewsTab } from "@/components/library/ViewsTab"
+import { IngestionTab } from "@/components/library/IngestionTab"
+import { IndexingTab } from "@/components/library/IndexingTab"
 import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
@@ -20,12 +31,22 @@ import {
   updateView,
 } from "@/lib/api"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useCitationNavOptional } from "@/lib/citationNav"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
 import type { Document, MetadataFieldDef, SavedView, ViewFilter } from "@/types"
 import type { ActiveView } from "@/App"
+import {
+  activeFolderId,
+  activeViewId,
+  initialLibraryState,
+  libraryReducer,
+  type LibraryAction,
+  type LibraryState,
+  type LibraryTab,
+} from "./librarySelection"
 
 // Mirrors the local hook in WorkspacePanel/DocumentDetailPanel (768px = the app's
 // mobile breakpoint). On the Documents page it drives two things: hiding the fixed
@@ -47,6 +68,51 @@ const WIDE_BREAKPOINT = 1536
 // ⛔ STORED STATE — NOT renamed with the page (Phase 217 SC#1). The literal is a
 // sessionStorage key; renaming it silently resets every user's pinned sidebar.
 const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
+
+// ⛔ POSITIONAL AND LOAD-BEARING — DO NOT EDIT THE SELECTORS (T-217-35).
+// Column-shedding (D-114-17, net-new): hide the Type/Size/Chunks columns (3rd–5th cells of
+// the list table — FIXED order chevron·Filename·Type·Size·Chunks·Status·Actions), keeping
+// Filename + Status + Actions. Applied (a) when the detail panel is open beside the list and
+// (b) on mobile (<768px), where the full 7-column table would otherwise force a horizontal
+// scroll. Scoped to the list table via an arbitrary descendant variant so no shared CSS file
+// is touched.
+// ⚠ The column ORDER this depends on is fixed in `DocumentList.tsx:349-355`, a file this one
+// does NOT import — so a reorder there silently sheds the wrong three columns here. The rule
+// was hoisted to a named constant at Phase 217-09 so the two surfaces that mount the list
+// (the Documents tab and the Views tab) share ONE copy of it rather than two.
+const SHED_COLUMNS_3_TO_5 =
+  "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden"
+
+// ── The page's own reducer ────────────────────────────────────────────────────────────
+//
+// ⭐ ONE SOURCE OF SELECTION TRUTH (D-217-12 / SC#5). `libraryReducer` (plan 05) owns every
+// selection transition; this wrapper delegates to it untouched and adds exactly one action
+// the leaf cannot express.
+//
+// ⚠ WHY THE WRAPPER EXISTS, MEASURED RATHER THAN ASSUMED: `LibraryState.folderSheetOpen` is
+// declared by the leaf and CLEARED by `SELECT_FOLDER` / `SELECT_VIEW`, but **no action in
+// `LibraryAction` sets it to `true`** and `initialLibraryState` starts it `false`. It is a
+// one-way CLOSE signal with no opener, so a page that dispatched only leaf actions could
+// never open the mobile folder sheet. The opener is composed HERE, at the page boundary,
+// rather than by editing the leaf — whose 25-case suite asserts the action set is exactly
+// six. The state stays ONE object; nothing about the selection is decided outside the leaf.
+type LibState = LibraryState<ViewFilter, SavedView>
+type PageAction =
+  | LibraryAction<ViewFilter, SavedView>
+  | { type: "SET_FOLDER_SHEET"; open: boolean }
+
+function pageReducer(state: LibState, action: PageAction): LibState {
+  if (action.type === "SET_FOLDER_SHEET") {
+    return { ...state, folderSheetOpen: action.open }
+  }
+  return libraryReducer<ViewFilter, SavedView>(state, action)
+}
+
+// ⛔ FOUR TABS: Documents · Views · Ingestion · Indexing. THERE IS NO `Health` TAB — Phase
+// 218 owns it, together with the KnowledgeHealthPage merge and the nav retirement that
+// justify it (D-217-15). A Health tab shipped here would sit beside a `KnowledgeHealthPage`
+// that is still its own nav entry AND still `ChatLayout.tsx`'s positional fallback, so the
+// same surface would have two doors and one of them would be a stub.
 
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(
@@ -78,30 +144,30 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
-  // Phase 114 (UX-01): a saved-view selection, MUTUALLY EXCLUSIVE with the folder
-  // selection (state-based nav, NO react-router). Selecting a view clears the
-  // folder selection and vice-versa.
-  const [selectedViewId, setSelectedViewId] = useState<string | null>(null)
-  // Phase 114 (D-114-3): the view currently being EDITED. When set the FilterBar's
-  // Save PATCHes this same view (updateView) instead of POSTing a new one; cleared
-  // after a successful save and whenever the user starts composing ad-hoc again.
-  const [editingView, setEditingView] = useState<SavedView | null>(null)
+
+  // ⭐ ONE reducer replaces `selectedFolderId`, `selectedViewId`, `editingView`, `filter` and
+  // `folderSheetOpen` — five React state hooks and the five handlers that had to keep them
+  // consistent by hand. The tab is PART of the selection, never a variable beside it.
+  const [lib, dispatch] = useReducer(pageReducer, initialLibraryState)
+  const tab = lib.selection.tab
+  const selectedFolderId = activeFolderId(lib)
+  const selectedViewId = activeViewId(lib)
+  const editingView = lib.editingView
+  // `null` in the leaf means "no filter composed" (it has zero imports and cannot name
+  // EMPTY_FILTER). The equivalence is fenced by the leaf's own suite.
+  const filter = lib.filter ?? EMPTY_FILTER
+
   // Phase 112 (D-01): the open document for the right-side push/split detail panel.
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const isMobile = useIsMobile()
   const isWide = useIsWide()
-  // Mobile only: the folder tree lives in a bottom-sheet (desktop shows it inline).
-  const [folderSheetOpen, setFolderSheetOpen] = useState(false)
 
   // ── Phase 114: the filter bar + Views group state ───────────────────────────
   const [customFields, setCustomFields] = useState<MetadataFieldDef[]>([])
   const [views, setViews] = useState<SavedView[]>([])
-  // The controlled filter the FilterBar shows — loaded FROM a selected view or
-  // composed ad-hoc (the SAME surface, D-114-1).
-  const [filter, setFilter] = useState<ViewFilter>(EMPTY_FILTER)
   // The documents resolved by the active filter / selected view (drives the list
   // when a filter is active; null = "no active filter, show the folder view").
+  // ⛔ NOT in the reducer, by decision: this is an ASYNC RESULT, not a selection.
   const [filteredDocs, setFilteredDocs] = useState<Document[] | null>(null)
   // The own+global DISTINCT-deduped match count from the SAME resolve that fills the
   // list (114 CR-01: the page and the FilterBar share ONE resolve per filter change —
@@ -238,22 +304,17 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
     }
   }, [])
 
-  // ── View / filter selection handlers (mutually exclusive with folders) ──────
+  // ── View / filter selection handlers ────────────────────────────────────────
+  // ⭐ Each is now ONE dispatch plus, where the shipped handler also kicked an async
+  // resolve, that resolve. Nothing here re-derives the mutual exclusion by hand: the
+  // reducer already encodes every clear and every reset these handlers used to perform.
   const handleSelectFolder = useCallback((id: string | null) => {
-    setSelectedFolderId(id)
-    setSelectedViewId(null) // mutually exclusive (UX-01)
-    setEditingView(null) // leaving the view surface exits edit mode (D-114-3)
-    setFilter(EMPTY_FILTER)
+    dispatch({ type: "SELECT_FOLDER", folderId: id })
     setFilteredDocs(null)
-    setFolderSheetOpen(false)
   }, [])
 
   const handleSelectView = useCallback((view: SavedView) => {
-    setSelectedViewId(view.id)
-    setSelectedFolderId(null) // mutually exclusive (UX-01)
-    setEditingView(null) // viewing (not editing) — a Save here would be a new view
-    setFilter(view.filter_expr) // load the filter back INTO the bar (D-114-1)
-    setFolderSheetOpen(false)
+    dispatch({ type: "SELECT_VIEW", view })
     void resolveFilterIntoList(view.filter_expr, view.id)
   }, [resolveFilterIntoList])
 
@@ -261,27 +322,23 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
     // Edit reopens the bar pre-filled AND enters edit mode (D-114-3/9): the
     // FilterBar's Save now PATCHes this same view (editingView prop → updateView)
     // instead of POSTing a new one.
-    setSelectedViewId(view.id)
-    setSelectedFolderId(null)
-    setEditingView(view)
-    setFilter(view.filter_expr)
+    dispatch({ type: "EDIT_VIEW", view })
     void resolveFilterIntoList(view.filter_expr, view.id)
   }, [resolveFilterIntoList])
 
   // The FilterBar drives the list as conditions change (ad-hoc == saved). Editing
   // the bar drops the saved-view label (you are now composing, D-114-1). It does
-  // NOT exit edit mode — an explicit "Edit view" still saves back to that view;
-  // edit mode is cleared on save or on a context switch (select folder/view).
+  // NOT exit edit mode — an explicit "Edit view" still saves back to that view.
   const handleFilterChange = useCallback((next: ViewFilter) => {
-    setFilter(next)
-    setSelectedViewId(null)
+    dispatch({ type: "CHANGE_FILTER", filter: next })
     void resolveFilterIntoList(next)
   }, [resolveFilterIntoList])
 
   const handleViewSaved = useCallback((view: SavedView) => {
     refreshViews()
-    setSelectedViewId(view.id)
-    setEditingView(null) // save completed — back to viewing the saved row (D-114-3)
+    // Save completed — back to VIEWING the saved row (D-114-3). One action does both
+    // halves of what `setSelectedViewId` + `setEditingView(null)` used to do.
+    dispatch({ type: "SELECT_VIEW", view })
   }, [refreshViews])
 
   const handleRenameView = useCallback(async (id: string, name: string) => {
@@ -291,22 +348,23 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
   const handleDeletedView = useCallback((id: string) => {
     setViews((prev) => prev.filter((v) => v.id !== id))
-    setEditingView((cur) => (cur?.id === id ? null : cur)) // can't edit a deleted view
-    if (selectedViewId === id) {
-      setSelectedViewId(null)
-      setFilter(EMPTY_FILTER)
-      setFilteredDocs(null)
-    }
+    dispatch({ type: "DELETE_VIEW", viewId: id })
+    if (selectedViewId === id) setFilteredDocs(null)
   }, [selectedViewId])
 
   // The sidebar groups (Folders + Views) are rendered identically on desktop
   // (inline) and mobile (bottom-sheet) — define once. The Views group sits below
   // the Folders tree, both built from the shared NavRow.
+  // ⭐ SC#5: `activeFolderId(lib)` and `activeViewId(lib)` replace the render-time ternary
+  // this file used to carry on the FolderTree's `selectedFolderId` prop — it nulled the
+  // folder whenever a view was loaded. That ternary was the SECOND encoding of the mutual
+  // exclusion; the union carries it now, so the ternary is DELETED rather than moved, and
+  // the Views TAB body below is handed the SAME `selectedViewId` this sidebar receives.
   const sidebarGroupsEl = (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-testid="library-sidebar">
       <FolderTree
         folders={folders}
-        selectedFolderId={selectedViewId === null ? selectedFolderId : null}
+        selectedFolderId={selectedFolderId}
         currentUserId={user?.id ?? ""}
         rootDocumentCount={rootDocumentCount}
         folderDocumentCounts={folderDocumentCounts}
@@ -333,6 +391,183 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   const listDocuments = filteredDocs !== null ? filteredDocs : documents
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
 
+  // Phase 114: the inline filter/view builder (D-114-1). Ad-hoc filtering and a
+  // loaded saved view are the SAME surface. When the detail panel is open the bar
+  // collapses to a summary chip to reclaim room (D-114-17).
+  const filterBarEl =
+    panelOpen && !filterChipExpanded ? (
+      <button
+        type="button"
+        onClick={() => setFilterChipExpanded(true)}
+        className="inline-flex items-center gap-2 self-start rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        {filterActive
+          ? `${filter.conditions.length} ${filter.conditions.length === 1 ? "filter" : "filters"}`
+          : "Filter"}
+      </button>
+    ) : (
+      <div className="rounded-xl bg-card/30 ghost-border p-3">
+        {panelOpen && (
+          <div className="flex justify-end -mt-1 -mr-1 mb-1">
+            <button
+              type="button"
+              aria-label="Collapse filter bar"
+              onClick={() => setFilterChipExpanded(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        <FilterBar
+          customFields={customFields}
+          value={filter}
+          onChange={handleFilterChange}
+          onViewSaved={handleViewSaved}
+          editingView={editingView}
+          matchCount={matchCount}
+        />
+      </div>
+    )
+
+  // The document surface — the push/split grid (D-01). The list shrinks but stays visible
+  // (minmax(0,1fr)) while a fixed 430px detail-panel track mounts when a document is
+  // selected. On mobile the detail panel is a bottom-sheet (portal, out of flow), so the
+  // grid stays a single full-width column.
+  // ⭐ ONE definition, mounted by the Documents tab and the Views tab. `lead` is the only
+  // thing that differs between them, which is what keeps the tab shell from becoming the
+  // tenth conditional branch inside this component (the ledger's named seam for this file).
+  const documentSurface = (lead: ReactNode) => (
+    <div
+      className="grid flex-1 min-h-0 min-w-0 gap-6"
+      style={{
+        gridTemplateColumns: !isMobile && selectedDoc ? "minmax(0,1fr) 430px" : "minmax(0,1fr)",
+      }}
+    >
+      <div
+        className={cn(
+          "flex flex-col overflow-y-auto space-y-4 min-w-0",
+          (panelOpen || isMobile) && SHED_COLUMNS_3_TO_5,
+          // On mobile the Filename column must be allowed to break a long
+          // unbreakable name (e.g. "Fahed_Mrad_Defense_Presentation") instead of
+          // forcing the table wider — otherwise shedding alone wouldn't remove
+          // the horizontal scroll.
+          isMobile &&
+            "[&_table_td:nth-child(2)_button]:whitespace-normal [&_table_td:nth-child(2)_button]:[overflow-wrap:anywhere]",
+        )}
+      >
+        {lead}
+        {filterBarEl}
+        <DocumentList
+          documents={listDocuments}
+          onDelete={deleteDoc}
+          onRefresh={loadDocuments}
+          folderId={listFolderId}
+          currentUserId={user?.id ?? ""}
+          onSelect={setSelectedDocId}
+          selectedDocId={selectedDocId}
+        />
+      </div>
+
+      {/* Detail panel track (desktop) — the panel renders a bottom-sheet on
+          mobile internally, so this track is only meaningful ≥768px. */}
+      {selectedDoc && (
+        <DocumentDetailPanel
+          doc={selectedDoc}
+          onClose={() => setSelectedDocId(null)}
+          onReconcile={loadDocuments}
+        />
+      )}
+    </div>
+  )
+
+  // The Documents tab's lead: the mobile folder trigger, the FULL-WIDTH DROPZONE, and the
+  // folder header band. ⭐ LIB-02 / SC#2 — the dropzone is on the LANDING tab, so a person
+  // can start an upload without hunting for it, and it is mounted ONCE so the accepted
+  // formats cannot diverge between two copies.
+  const documentsLead = (
+    <>
+      {/* Mobile-only folder access — opens the tree as a bottom-sheet. */}
+      <button
+        type="button"
+        onClick={() => dispatch({ type: "SET_FOLDER_SHEET", open: true })}
+        className="md:hidden flex items-center gap-2 rounded-xl bg-card/50 ghost-border px-3 py-2.5 text-sm font-medium text-foreground"
+      >
+        <Folder className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span>Folders</span>
+        <span className="ml-auto text-muted-foreground">{selectedFolderName ?? "Root"}</span>
+      </button>
+
+      <DocumentUpload
+        onUpload={upload}
+        uploading={uploading}
+        uploadingCount={uploadingCount}
+        folderId={selectedFolderId}
+        folderName={selectedFolderName}
+        disabled={!canUploadToFolder}
+      />
+
+      <div className="min-w-0">
+        {selectedFolderId === null ? (
+          <>
+            <h2 className="text-lg font-semibold leading-tight">Root</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Documents not assigned to a folder · {rootDocumentCount}{" "}
+              {rootDocumentCount === 1 ? "document" : "documents"}
+            </p>
+          </>
+        ) : (
+          <>
+            <FolderBreadcrumb
+              folders={folders}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={handleSelectFolder}
+            />
+            {selectedFolder && (
+              <FolderDetail
+                folder={selectedFolder}
+                documents={folderDocuments}
+                subfolderCount={subfolderCount}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </>
+  )
+
+  // The Views tab's lead: the picker (its own real content, D-217-13) and, when a view is
+  // loaded, the header naming it. ⛔ Upload is folder-scoped and is therefore NOT offered
+  // here — a view is a filter, not a target.
+  const viewsLead = (
+    <>
+      <ViewsTab
+        views={views}
+        selectedViewId={selectedViewId}
+        onSelectView={handleSelectView}
+        onEditView={handleEditView}
+        onRenameView={handleRenameView}
+        onDeleted={handleDeletedView}
+      />
+      {selectedViewId !== null && (
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold leading-tight">
+            {views.find((v) => v.id === selectedViewId)?.name ?? "View"}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Documents matching this saved filter.
+          </p>
+        </div>
+      )}
+    </>
+  )
+
+  // The Folders+Views sidebar belongs to the two tabs that navigate documents. It is
+  // deliberately OUTSIDE the tab bodies so the sidebar mount and the Views tab mount are
+  // alive at the same moment — which is what makes "they can never disagree" observable.
+  const showSidebar = tab === "documents" || tab === "views"
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
@@ -344,7 +579,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         </div>
 
         {/* Phase 111.1 follow-up #1: the slim "search is catching up" pointer.
-            Self-fetches re-embed progress; auto-hides when remaining == 0. The
+            Self-fetches re-embed progress; auto-hides when nothing is pending. The
             deep-link switches to Settings and scrolls the status card into view. */}
         <div className="mb-4">
           <ReembedSearchPointer
@@ -364,235 +599,121 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           />
         </div>
 
-        <div className="flex flex-row gap-6 flex-1 min-h-0">
-          {/* Left panel: Folders + Views — desktop only. Below 768px it would eat
-              the full width and crush the document list, so it hides here and is
-              reached via the "Folders" bottom-sheet trigger inside the list column.
-              Phase 114 (D-114-17): collapses to a ~50px icon rail when the detail
-              panel opens (unless the user pinned it expanded). */}
-          <div
-            className={cn(
-              "hidden md:flex shrink-0 flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border transition-[width,padding] duration-300 ease-out",
-              sidebarRail ? "w-[50px] p-2 items-center" : "w-72 p-3",
-            )}
-          >
-            {sidebarRail ? (
-              // Rail mode: a single expand affordance; the groups are hidden until
-              // the user pins the sidebar open (D-114-17, the shared-shell rail
-              // Phases 117/118 inherit).
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Expand sidebar"
-                    onClick={() => setSidebarPinnedExpanded(true)}
-                    className="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                  >
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Folders &amp; Views</TooltipContent>
-              </Tooltip>
-            ) : (
-              <>
-                {/* When the panel is open but pinned-expanded, offer a collapse
-                    affordance so the user can reclaim the list width on demand.
-                    Not offered on wide screens — there the sidebar always stays
-                    expanded (the rail isn't used), so a collapse control would no-op. */}
-                {panelOpen && !isWide && (
-                  <div className="flex justify-end mb-1">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="Collapse sidebar"
-                          onClick={() => setSidebarPinnedExpanded(false)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                        >
-                          <PanelLeftClose className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Collapse to rail</TooltipContent>
-                    </Tooltip>
-                  </div>
-                )}
-                {sidebarGroupsEl}
-              </>
-            )}
-          </div>
+        {/* ⭐ THE TAB SHELL. `value` IS the reducer's selection and a trigger click
+            dispatches SELECT_TAB — the tab bar reads and writes the same state as the
+            sidebar, never its own. There is no reachable render in which the tab and the
+            list beneath it disagree, because there is nothing for them to disagree with. */}
+        <Tabs
+          value={tab}
+          onValueChange={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
+          className="flex flex-col flex-1 min-h-0"
+        >
+          {/* ⛔ FOUR TRIGGERS, AND NO FIFTH. Written out rather than mapped so the set is
+              countable by eye and by grep — the absence of `Health` is the decision here. */}
+          <TabsList className="self-start mb-4">
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="views">Views</TabsTrigger>
+            <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
+            <TabsTrigger value="indexing">Indexing</TabsTrigger>
+          </TabsList>
 
-          {/* Right region: push/split grid (D-01). The list shrinks but stays
-              visible (minmax(0,1fr)) while a fixed 430px detail-panel track mounts
-              when a document is selected. On mobile the detail panel is a bottom-sheet
-              (portal, out of flow), so the grid stays a single full-width column. */}
-          <div
-            className="grid flex-1 min-h-0 min-w-0 gap-6"
-            style={{
-              gridTemplateColumns:
-                !isMobile && selectedDoc ? "minmax(0,1fr) 430px" : "minmax(0,1fr)",
-            }}
-          >
-            {/* Document list column. When the detail panel is open the static
-                7-column table is too wide beside the 430px panel, so we shed the
-                Type/Size/Chunks columns via a scoped CSS wrapper (col order is
-                fixed: chevron·Filename·Type·Size·Chunks·Status·Actions) — keeping
-                Filename + Status + Actions (D-114-17, column-shedding net-new). */}
-            <div
-              className={cn(
-                "flex flex-col overflow-y-auto space-y-4 min-w-0",
-                // Column-shedding (D-114-17, net-new): hide the Type/Size/Chunks
-                // columns (3rd–5th cells of the list table — fixed order
-                // chevron·Filename·Type·Size·Chunks·Status·Actions), keeping
-                // Filename + Status + Actions. Applied (a) when the detail panel is
-                // open beside the list and (b) on mobile (<768px), where the full
-                // 7-column table would otherwise force a horizontal scroll. Scoped to
-                // the list table via an arbitrary descendant variant so no shared CSS
-                // file is touched.
-                (panelOpen || isMobile) &&
-                  "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden",
-                // On mobile the Filename column must be allowed to break a long
-                // unbreakable name (e.g. "Fahed_Mrad_Defense_Presentation") instead of
-                // forcing the table wider — otherwise shedding alone wouldn't remove
-                // the horizontal scroll.
-                isMobile &&
-                  "[&_table_td:nth-child(2)_button]:whitespace-normal [&_table_td:nth-child(2)_button]:[overflow-wrap:anywhere]",
-              )}
-            >
-              {/* Mobile-only folder access — opens the tree as a bottom-sheet. */}
-              <button
-                type="button"
-                onClick={() => setFolderSheetOpen(true)}
-                className="md:hidden flex items-center gap-2 rounded-xl bg-card/50 ghost-border px-3 py-2.5 text-sm font-medium text-foreground"
+          <div className="flex flex-row gap-6 flex-1 min-h-0">
+            {/* Left panel: Folders + Views — desktop only. Below 768px it would eat
+                the full width and crush the document list, so it hides here and is
+                reached via the "Folders" bottom-sheet trigger inside the list column.
+                Phase 114 (D-114-17): collapses to a ~50px icon rail when the detail
+                panel opens (unless the user pinned it expanded). */}
+            {showSidebar && (
+              <div
+                className={cn(
+                  "hidden md:flex shrink-0 flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border transition-[width,padding] duration-300 ease-out",
+                  sidebarRail ? "w-[50px] p-2 items-center" : "w-72 p-3",
+                )}
               >
-                <Folder className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <span>Folders</span>
-                <span className="ml-auto text-muted-foreground">
-                  {selectedFolderName ?? "Root"}
-                </span>
-              </button>
-
-              {/* Folder / view header band — title + count on the LEFT; the upload
-                  control fills the otherwise-empty top-right corner (best use of the
-                  wide header row — previously a separate full-width upload block sat
-                  below an empty corner). Upload is folder-scoped → omitted while a
-                  saved view is the active surface (a view is a filter, not a target). */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  {selectedViewId === null && selectedFolderId === null && (
-                    <>
-                      <h2 className="text-lg font-semibold leading-tight">Root</h2>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Documents not assigned to a folder · {rootDocumentCount}{" "}
-                        {rootDocumentCount === 1 ? "document" : "documents"}
-                      </p>
-                    </>
-                  )}
-                  {selectedViewId === null && selectedFolderId !== null && (
-                    <>
-                      <FolderBreadcrumb
-                        folders={folders}
-                        selectedFolderId={selectedFolderId}
-                        onSelectFolder={handleSelectFolder}
-                      />
-                      {selectedFolder && (
-                        <FolderDetail
-                          folder={selectedFolder}
-                          documents={folderDocuments}
-                          subfolderCount={subfolderCount}
-                        />
-                      )}
-                    </>
-                  )}
-                  {selectedViewId !== null && (
-                    <>
-                      <h2 className="text-lg font-semibold leading-tight">
-                        {views.find((v) => v.id === selectedViewId)?.name ?? "View"}
-                      </h2>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Documents matching this saved filter.
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                {selectedViewId === null && (
-                  <DocumentUpload
-                    onUpload={upload}
-                    uploading={uploading}
-                    uploadingCount={uploadingCount}
-                    folderId={selectedFolderId}
-                    folderName={selectedFolderName}
-                    disabled={!canUploadToFolder}
-                  />
-                )}
-              </div>
-
-              {/* Phase 114: the inline filter/view builder (D-114-1). Ad-hoc
-                  filtering and a loaded saved view are the SAME surface. When the
-                  detail panel is open the bar collapses to a summary chip to
-                  reclaim room (D-114-17). */}
-              {panelOpen && !filterChipExpanded ? (
-                <button
-                  type="button"
-                  onClick={() => setFilterChipExpanded(true)}
-                  className="inline-flex items-center gap-2 self-start rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  {filterActive
-                    ? `${filter.conditions.length} ${filter.conditions.length === 1 ? "filter" : "filters"}`
-                    : "Filter"}
-                </button>
-              ) : (
-                <div className="rounded-xl bg-card/30 ghost-border p-3">
-                  {panelOpen && (
-                    <div className="flex justify-end -mt-1 -mr-1 mb-1">
+                {sidebarRail ? (
+                  // Rail mode: a single expand affordance; the groups are hidden until
+                  // the user pins the sidebar open (D-114-17, the shared-shell rail
+                  // Phases 117/118 inherit).
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <button
                         type="button"
-                        aria-label="Collapse filter bar"
-                        onClick={() => setFilterChipExpanded(false)}
-                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Expand sidebar"
+                        onClick={() => setSidebarPinnedExpanded(true)}
+                        className="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <PanelLeftOpen className="h-4 w-4" />
                       </button>
-                    </div>
-                  )}
-                  <FilterBar
-                    customFields={customFields}
-                    value={filter}
-                    onChange={handleFilterChange}
-                    onViewSaved={handleViewSaved}
-                    editingView={editingView}
-                    matchCount={matchCount}
-                  />
-                </div>
-              )}
-
-              <DocumentList
-                documents={listDocuments}
-                onDelete={deleteDoc}
-                onRefresh={loadDocuments}
-                folderId={listFolderId}
-                currentUserId={user?.id ?? ""}
-                onSelect={setSelectedDocId}
-                selectedDocId={selectedDocId}
-              />
-            </div>
-
-            {/* Detail panel track (desktop) — the panel renders a bottom-sheet on
-                mobile internally, so this track is only meaningful ≥768px. */}
-            {selectedDoc && (
-              <DocumentDetailPanel
-                doc={selectedDoc}
-                onClose={() => setSelectedDocId(null)}
-                onReconcile={loadDocuments}
-              />
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Folders &amp; Views</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <>
+                    {/* When the panel is open but pinned-expanded, offer a collapse
+                        affordance so the user can reclaim the list width on demand.
+                        Not offered on wide screens — there the sidebar always stays
+                        expanded (the rail isn't used), so a collapse control would no-op. */}
+                    {panelOpen && !isWide && (
+                      <div className="flex justify-end mb-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Collapse sidebar"
+                              onClick={() => setSidebarPinnedExpanded(false)}
+                              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            >
+                              <PanelLeftClose className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Collapse to rail</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
+                    {sidebarGroupsEl}
+                  </>
+                )}
+              </div>
             )}
+
+            {/* Each tab owns its body. ⛔ The tab bar is NOT a conditional branch inside the
+                document surface — the surface is defined once and the tabs choose a lead. */}
+            <TabsContent
+              value="documents"
+              className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
+            >
+              {documentSurface(documentsLead)}
+            </TabsContent>
+
+            <TabsContent
+              value="views"
+              className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
+            >
+              {documentSurface(viewsLead)}
+            </TabsContent>
+
+            <TabsContent
+              value="ingestion"
+              className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
+            >
+              <IngestionTab documents={documents} />
+            </TabsContent>
+
+            <TabsContent
+              value="indexing"
+              className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
+            >
+              <IndexingTab />
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
 
         {/* Mobile folder + Views navigation — the desktop sidebar lives here as a
             bottom-sheet below 768px (both groups, internally sectioned). */}
-        <Sheet open={folderSheetOpen} onOpenChange={setFolderSheetOpen}>
+        <Sheet
+          open={lib.folderSheetOpen}
+          onOpenChange={(open) => dispatch({ type: "SET_FOLDER_SHEET", open })}
+        >
           <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto p-3">
             {sidebarGroupsEl}
           </SheetContent>
