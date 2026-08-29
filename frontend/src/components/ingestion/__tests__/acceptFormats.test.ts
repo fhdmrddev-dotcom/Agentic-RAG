@@ -45,11 +45,24 @@ import { ACCEPTED_FORMATS, acceptAttribute, formatsSentence } from "../acceptedF
 // src -> frontend -> repo root.
 import documentsPySource from "../../../../../backend/app/api/documents.py?raw"
 
+// The consumer, swept as source — see section 3's docblock for why this cannot be a grep.
+import uploadSource from "../DocumentUpload.tsx?raw"
+
 // ── EXTRACTION ────────────────────────────────────────────────────────────────────────
 
 /** Every single- or double-quoted literal inside a blob. */
 const quoted = (blob: string): string[] =>
   [...blob.matchAll(/["']([^"']+)["']/g)].map((m) => m[1])
+
+/**
+ * The LINE-ANCHORED comment stripper (`FileRow.sweep.test.ts:100-105`).
+ *
+ * ⚠ The `^\s*` on the second replace is the load-bearing character sequence — the unanchored
+ * variant eats live code from the first `//` of a URL onwards and turns every `not.toContain`
+ * below into a free pass.
+ */
+const codeOf = (src: string): string =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 
 /**
  * `ALLOWED_MIME_TYPES = { ... }` — the server's set, from its own source.
@@ -192,5 +205,66 @@ describe("⛔ the formats an older dropzone advertised and the input refuses", (
     const server = new Set(serverAllowedMimeTypes())
     expect(server.size).toBeGreaterThanOrEqual(8) // non-vacuity before the claim
     expect(server.has("message/rfc" + "822")).toBe(true)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 4 · THE KEY LINK — the consumer really reads the constant, and prints no percentage
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * ⚠ WHY THIS SECTION SWEEPS `codeOf(uploadSource)` AND NEVER THE RAW BYTES — the 187-24 trap,
+ * and it is NOT hypothetical here. `DocumentUpload.tsx`'s docblock deliberately SPELLS
+ * `onUploadProgress` and `XMLHttpRequest` in order to record that they are ABSENT and that
+ * D-217-19 therefore rests on measurement rather than on taste. A whole-file grep for either
+ * symbol counts that WARNING as the VIOLATION. So the arms below scan code, and the warning's
+ * continued presence is proved separately.
+ */
+const uploadCode = codeOf(uploadSource)
+
+describe("the consumer reads the constant, and invents no progress", () => {
+  it("the sweep source loaded, is the right file, and the stripper did not eat it", () => {
+    expect(uploadSource.length).toBeGreaterThan(2000)
+    expect(uploadSource).toContain("export function DocumentUpload") // identity
+    // ⚠ STRIPPER NON-VACUITY: a token that exists ONLY in this file's prose. Present in the
+    // raw source, absent from the code — a `codeOf` that returned "" would make every arm
+    // below pass, and this pair is the one thing that reds when it does.
+    expect(uploadSource).toContain("hero panel")
+    expect(uploadCode).not.toContain("hero panel")
+    expect(uploadCode.length).toBeGreaterThan(1500)
+  })
+
+  it("⭐ both the accept attribute and the printed formats read acceptedFormats", () => {
+    expect(uploadCode).toContain('from "./acceptedFormats"')
+    expect(uploadCode).toContain("accept={acceptAttribute()}")
+    expect(uploadCode).toContain("formatsSentence()")
+  })
+
+  it("⛔ the inline accept literal is GONE — there is no second list to drift", () => {
+    // The head of the literal this plan deleted. If it comes back, so does the drift.
+    expect(uploadCode).not.toContain(".txt,.md,.pdf")
+  })
+
+  it("the band names its target folder and never leaves it blank", () => {
+    expect(uploadCode).toContain("{targetName}")
+    // The fallback is a NAMED root, matching the page header — never an empty string.
+    expect(uploadCode).toContain('folderName ?? "Root"')
+  })
+
+  it("⛔ D-217-19 — no percentage and no ETA anywhere in the code", () => {
+    expect(uploadCode).not.toContain("onUploadProgress")
+    expect(uploadCode).not.toContain("XMLHttpRequest")
+    expect(uploadCode).not.toContain("remaining")
+    // A literal percent sign would be the tell for a width style or a printed figure.
+    const percent = String.fromCharCode(37)
+    expect(uploadCode).not.toContain(percent)
+    // …and the warning that explains WHY is still in the prose, where the grep cannot see it.
+    expect(uploadSource).toContain("onUploadProgress")
+  })
+
+  it("the shipped batch honesty is untouched", () => {
+    expect(uploadCode).toContain("Promise.allSettled")
+    expect(uploadCode).toContain("already up to date")
+    expect(uploadCode).toContain("text-xs text-destructive")
   })
 })
