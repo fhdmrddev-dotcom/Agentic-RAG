@@ -118,9 +118,29 @@ ok("A2b · the sketch marks exactly Type/Size/Chunks as sheddable",
 // A3 — the tab component is rounded-md, NOT a pill
 ok("A3 · shipped TabsList is rounded-md + bg-muted + h-10",
   /inline-flex h-10 items-center justify-center rounded-md bg-muted p-1/.test(TABS))
-ok("A3b · shipped TabsTrigger is rounded-sm and goes bg-background when active",
+// ⚠ REWRITTEN 2026-08-29 (Phase 217 plan 06) when the tab fix SHIPPED. The first version
+// asserted the shipped trigger contains `data-[state=active]:bg-background`, which fired the
+// moment D-217-21 landed — correctly, because that class IS the bug: it painted the selected
+// tab at L 4% inside a track at L 11% on Deep Midnight. A verbatim shipped-state check cannot
+// tell a RENAME from a LOSS (the `A7b` / `A9c` precedent one screen down), so this is now a
+// rename map: the replaced class is RECORDED HERE, asserted GONE, and its replacement
+// asserted PRESENT. Deleting the fence would have deleted the record of what was replaced.
+// ⛔ A4 / A4b below are deliberately UNTOUCHED — they measure `--muted` against `--background`
+//    and remain TRUE. They are the recorded finding, not a target.
+const TAB_ACTIVE_CLASS_REPLACED = "data-[state=active]:bg-background"
+const TAB_ACTIVE_CLASS_NOW = "data-[state=active]:bg-tab-active"
+ok("A3b · shipped TabsTrigger is rounded-sm, and its active surface class was RENAMED not lost",
   /rounded-sm px-3 py-1\.5 text-sm font-medium/.test(TABS) &&
-  /data-\[state=active\]:bg-background/.test(TABS))
+  TABS.includes(TAB_ACTIVE_CLASS_NOW) && !TABS.includes(TAB_ACTIVE_CLASS_REPLACED),
+  `${TAB_ACTIVE_CLASS_REPLACED} → ${TAB_ACTIVE_CLASS_NOW}`)
+ok("A3b2 · ⭐ the active tab carries a SECOND, non-colour cue — an inset ring, never a border",
+  /data-\[state=active\]:ring-1/.test(TABS) &&
+  /data-\[state=active\]:ring-inset/.test(TABS) &&
+  !/data-\[state=active\]:border/.test(TABS),
+  "a real border changes the box size — the tab row must not reflow on selection")
+ok("A3b3 · the remedy is a SHARED-primitive edit — no per-surface flag, no second tab file",
+  !/variant/.test(TABS),
+  "D-217-20 rejects a flag (it makes the WRONG rendering the default) and a Library-local copy")
 ok("A3c · the sketch renders 8px (rounded-md), never a 9999px pill, on .tabslist",
   /\.tabslist\s*\{[^}]*border-radius:\s*8px/.test(HTML) &&
   !/\.tabslist\s*\{[^}]*border-radius:\s*9999px/.test(HTML))
