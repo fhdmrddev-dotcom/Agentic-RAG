@@ -555,7 +555,12 @@ async def upload_document(
     if mime_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported file type: {mime_type}. Allowed: PDF, DOCX, Markdown, plain text.",
+            # D-217-18 class of lie: the prose list named four formats while
+            # ALLOWED_MIME_TYPES (:91) holds fifteen. Derive it, never re-type it.
+            detail=(
+                f"Unsupported file type: {mime_type}. "
+                f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}."
+            ),
         )
 
     raw = await file.read()
