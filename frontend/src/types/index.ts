@@ -495,8 +495,41 @@ export interface Document {
   mime_type: string
   status: "pending" | "processing" | "completed" | "failed"
   error_message: string | null
-  /** Phase 56 D-10/D-11: granular sub-status while status='processing'. One of: 'extracting', 'chunking', 'embedding', 'metadata'. Backend sets via Realtime UPDATE; frontend renders via DocumentStatusBadge. */
+  /** Phase 56 D-10/D-11 · corrected Phase 217 (D-217-09/D-217-23): the granular sub-status the
+   *  ingestion pipeline last entered. SIX steps, not four — in the order `backend/app/api/documents.py`
+   *  actually writes them:
+   *  `'extracting'` → `'chunking'` → `'embedding'` → `'extracting_tables'` → `'extracting_images'`
+   *  → `'metadata'`. (The two `extracting_*` steps are CONDITIONAL — they are written only inside the
+   *  single `if raw and mime_type:` block, so a file with neither tables nor images never reaches them.)
+   *
+   *  ⚠ THE COLUMN IS NEVER CLEARED on completion. The terminal update writes status/chunk_count/
+   *  metadata/full_markdown/extractor and leaves this field alone, so on a `completed` document it
+   *  reads `"metadata"` by RESIDUE, not by observation. The only honest read is the PAIR
+   *  (`status`, `ingestion_step`) — `backend/app/services/text_sanitize.py:9` diagnoses BUG-260825-01
+   *  exactly that way. Consult this field ONLY while `status === "processing"` (the guard
+   *  `DocumentStatusBadge.tsx:27-32` already applies) or as the failure POINT while `status === "failed"`.
+   *  The one legitimate `null` write is the reingest reset (`documents.py:1543`).
+   *
+   *  Reaches the client BOTH ways: it rides the Supabase Realtime `payload.new` (a real column) AND
+   *  is serialized on every `DocumentResponse` route since Phase 217 plan 01 (D-217-10). */
   ingestion_step?: string | null
+  /** Phase 217 (D-217-08) — the ingestion engine that produced this document ("docling", "legacy", …).
+   *  A real `documents` column, so it rides `payload.new`. Optional: five backend routes build their
+   *  response from a narrow select. */
+  extractor?: string | null
+  /** Phase 217 (D-217-24) — SERVER-DERIVED from `mime_type` (a pydantic `@computed_field` on
+   *  `DocumentResponse`, NOT a stored column). True when the pipeline's table pass would run for this
+   *  file type at all.
+   *
+   *  ⚠ OPTIONAL BY NECESSITY, not by taste. It is derived, so it does NOT ride the Realtime
+   *  `payload.new` — exactly like `table_count`. The hook's UPDATE arm spread-merges and therefore
+   *  preserves it; the INSERT arm (`useDocuments.ts:63-68`) casts `payload.new` with no merge, so a
+   *  document uploaded in ANOTHER TAB arrives with this `undefined`. `undefined` means UNKNOWN and must
+   *  render as pending — never as skipped. */
+  tables_stage_applies?: boolean
+  /** Phase 217 (D-217-24) — the image half of the pair above. Same derivation, same optionality, same
+   *  `undefined`-means-unknown rule. */
+  images_stage_applies?: boolean
   chunk_count: number | null
   content_hash: string | null
   version_number?: number
@@ -506,6 +539,72 @@ export interface Document {
   updated_at: string
   table_count?: number
   image_count?: number
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 217 — the document DETAIL row types.
+//
+// Each mirrors a Pydantic model FIELD FOR FIELD, so plans 10 and 11 consume one shape
+// rather than re-deriving it per surface. Sources:
+//   `DocumentChunkRow` / `DocumentTableRow` / `DocumentImageRow` / `DocumentContentResponse`
+//     → backend/app/models/document.py:102-140
+//   `DocumentQueryRow`
+//     → backend/app/api/document_queries.py:42-56 (deliberately NOT in models/document.py —
+//        it exists only because of that module's service-role carve-out)
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** One indexed chunk of a document. `embedding_model` / `embedding_dimensions` are the
+ *  lineage of the CHUNK, not of the document (D-217-08). */
+export interface DocumentChunkRow {
+  id: string
+  chunk_index: number
+  content: string
+  embedding_model?: string | null
+  embedding_dimensions?: number | null
+}
+
+/** One extracted table. `page` is null for formats without pagination (csv/xlsx). */
+export interface DocumentTableRow {
+  id: string
+  page?: number | null
+  table_index: number
+  headers: string[]
+  rows: string[][]
+  extractor?: string | null
+}
+
+/** One extracted image.
+ *  ⚠ THERE IS NO IMAGE HERE AND THERE NEVER CAN BE. `document_images` stores no bytes —
+ *  the encoded PNG is handed to the vision model and DISCARDED, so the `description` IS the
+ *  image on this wire. A `thumbnail` / `url` / `b64` field would promise a thing that does
+ *  not exist (backend/app/models/document.py:124-129). */
+export interface DocumentImageRow {
+  id: string
+  page?: number | null
+  image_index: number
+  description: string
+}
+
+/** One search that returned this document, within the backend's rolling window.
+ *  ⚠ `query_text` is null on rows written by the D-115-10 view/filter path, which records a
+ *  `via` and no question text. Render an honest sentence for that case — never a placeholder
+ *  question, never the string "undefined". */
+export interface DocumentQueryRow {
+  query_text?: string | null
+  asked_at: string
+  via?: string | null
+}
+
+/** The document's extracted text, paged. Shape-mirrors `app.models.kb.ReadResponse` plus
+ *  `has_more`. */
+export interface DocumentContentResponse {
+  document_id: string
+  filename: string
+  total_lines: number
+  content: string
+  start_line?: number | null
+  end_line?: number | null
+  has_more: boolean
 }
 
 /** Phase 123-06 (TRIG-03) — one save-time description-lint warning, mirroring the
