@@ -76,13 +76,13 @@ ok("control · annotations ARE stripped from the surface",
   !SURFACE.includes("SEED-155") && HTML.includes("SEED-155"),
   "the anno stripper must remove data-anno blocks but they must exist in the file")
 ok("control · the repo is reachable from the sketch",
-  src("frontend/src/pages/IngestionPage.tsx") !== null,
+  src("frontend/src/pages/LibraryPage.tsx") !== null,
   `looked under ${REPO}`)
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // §A · THE SKETCH AGREES WITH WHAT SHIPS  (these read the live source tree)
 // ═══════════════════════════════════════════════════════════════════════════════════════
-const PAGE = src("frontend/src/pages/IngestionPage.tsx") || ""
+const PAGE = src("frontend/src/pages/LibraryPage.tsx") || ""
 const TABS = src("frontend/src/components/ui/tabs.tsx") || ""
 const CSS = src("frontend/src/index.css") || ""
 const DOCS_PY = src("backend/app/api/documents.py") || ""
@@ -108,7 +108,7 @@ ok("A1c · COPY.COLUMNS matches the shipped order",
   COPY.COLUMNS.filter(Boolean).join("|") === "Filename|Type|Size|Chunks|Status|Actions")
 
 // A2 — the shed columns are exactly 3,4,5
-ok("A2 · IngestionPage sheds nth-child(n+3)..(-n+5)",
+ok("A2 · LibraryPage sheds nth-child(n+3)..(-n+5)",
   PAGE.includes("th:nth-child(n+3):nth-child(-n+5)]:hidden"))
 const shedMarked = [...SURFACE_HTML.matchAll(/<th data-shed>([^<]+)<\/th>/g)].map((m) => m[1])
 ok("A2b · the sketch marks exactly Type/Size/Chunks as sheddable",
@@ -194,10 +194,22 @@ ok("A6e2 · and the 7d/90d chart range control is a RANGE PICKER, not a counted 
 // A7 — the rename is front-end only, and the IA is already decided
 ok("A7 · ActiveView already carries \"documents\" (there is no route to change)",
   /ActiveView\s*=[\s\S]{0,400}"documents"/.test(APP))
-ok("A7b · the nav entry ships as label \"Documents\" today",
-  /view:\s*"documents",[^}]*label:\s*"Documents"/.test(NAV))
-ok("A7c · the page h1 ships as \"Documents\" today",
-  PAGE.includes(">Documents</h1>"))
+// ⚠ REWRITTEN 2026-08-29 (Phase 217 plan 04) when the rename SHIPPED. The first version
+// asserted the shipped label and h1 read "Documents", which correctly fired the moment they
+// became "Library". A verbatim shipped-state check cannot tell a RENAME from a LOSS — the
+// `A9c` precedent below. So each is now a rename map: the old word is GONE, the new word is
+// PRESENT, and COPY still records what was replaced. Deleting them would be a lost guarantee.
+ok("A7b · the nav entry now ships as label \"Library\" — and the KEY did not move",
+  /view:\s*"documents",[^}]*label:\s*"Library"/.test(NAV) &&
+    !/view:\s*"documents",[^}]*label:\s*"Documents"/.test(NAV),
+  "the `view` key stays \"documents\" (never printed); only the label is renamed")
+ok("A7b2 · COPY still records the label this replaced, so the diff stays visible",
+  COPY.SHIPPED_PAGE_TITLE === "Documents")
+ok("A7c · the page h1 now ships as \"Library\", and the old one is gone",
+  PAGE.includes(">Library</h1>") && !PAGE.includes(">Documents</h1>"))
+ok("A7c2 · and the page subtitle is the contract's, not the one it replaced",
+  PAGE.includes(COPY.PAGE_SUB) && !PAGE.includes(COPY.SHIPPED_PAGE_SUB),
+  `expected ${JSON.stringify(COPY.PAGE_SUB)}`)
 ok("A7d · COPY pins BOTH the shipped title and the new one, so the diff is visible",
   COPY.SHIPPED_PAGE_TITLE === "Documents" && COPY.PAGE_TITLE === "Library")
 ok("A7e · the sketch renders the NEW title, not the shipped one, in its page frame",
@@ -758,8 +770,12 @@ ok("H1d · it carries exactly three signal cards",
 // H2 — ⚠ THE GATE. Governance is governed; Documents is not.
 ok("H2 · the Governance nav entry is feature-gated today",
   /view: "governance",[\s\S]{0,140}feature: "governance_health"/.test(NAV))
-ok("H2b · ⚠ while the Documents entry is UNGATED — it carries no feature key",
-  /\{ view: "documents", icon: FileText, label: "Documents" \}/.test(NAV),
+// ⚠ REWRITTEN 2026-08-29 (Phase 217 plan 04), same reason as A7b: this fence read the
+// LABEL to prove a property about the GATE, so the rename broke it while the property it
+// guards was never in question. It now asserts the STRUCTURE — the entry carries no
+// `feature:` key — which is the thing the merge must not silently change.
+ok("H2b · ⚠ while the Library (view: documents) entry is UNGATED — it carries no feature key",
+  /\{ view: "documents", icon: FileText, label: "[^"]+" \}/.test(NAV),
   "this asymmetry is exactly why the merge must carry the gate explicitly")
 ok("H2c · a governed entry VANISHES rather than rendering locked",
   /the sketch VANISH, never a locked\/disabled\/badged placeholder/.test(NAV))
