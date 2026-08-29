@@ -411,7 +411,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 217-12-PLAN.md — count-gate adoption (both knobs), the seam audit, and the blocking G-4 drive
+- [x] 217-12-PLAN.md — count-gate adoption (both knobs), the seam audit, and the blocking G-4 drive
 
 ⚠ **G-5 fires on five files in this blast radius** (`DocumentList.tsx` 12 phases, `IngestionPage.tsx` 9, `DocumentDetailPanel.tsx` 5, `useDocuments.ts` 3, and `retrieval_service.py` 9 if touched). All ten document-space rows were added at `8b99c19b2`; **read each file's section in `docs/HOT-FILE-LEDGER.md` before planning.**
 
