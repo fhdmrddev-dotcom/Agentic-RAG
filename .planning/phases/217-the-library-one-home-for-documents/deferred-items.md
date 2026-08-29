@@ -171,3 +171,33 @@ is the only live catch for the D-217-10 defect, because a component test supplie
 author chose and therefore passes before AND after the fix.
 
 **Re-open trigger:** immediate — this is the phase's outstanding acceptance work, not a future idea.
+
+---
+
+## OPEN — six code-review Warnings, deferred with re-open triggers (2026-08-29)
+
+From `217-REVIEW.md` (1 Critical · 6 Warning · 6 Info). **CR-01 was FIXED and fenced** — see
+`6b5cd9682`. These six are recorded rather than fixed: none is a security hole, each is larger than
+G-3's ≤1-file/≤10-line bar, and closing them inside this phase would be a gap-closure round that
+G-7 exists to prevent. **They are DEFERRED, not dismissed.**
+
+| id | what | re-open trigger |
+|---|---|---|
+| **WR-01** | All five new detail sections write results with **no generation guard** — a slow doc-A response overwrites doc B. Four docblocks claim the opposite. Both test mocks are `mockResolvedValue`, so the suite structurally cannot catch it. `LibraryPage.tsx:277-303` already has the correct idiom to copy. | the next phase touching `components/metadata/Document*Section.tsx`, or the first UAT report of a wrong count |
+| **WR-02** | The new **Indexing tab is ungated**, but `GET /settings/reembed-progress` is `require_visible("model_management")`, defaulting to `"operators"`. `nav-items.ts:58` gates all of Settings on that same key. **Non-operators get a permanent tab reading "Could not read the indexing facts just now."** | the first non-operator UAT pass, or any change to `nav-items.ts` visibility keys |
+| **WR-03** | `tabs.tsx:55`'s new `data-[state=active]:ring-inset ring-border` shares Tailwind's ring variable slots with the pre-existing `focus-visible:ring-2 ring-ring ring-offset-2`; nothing resets `--tw-ring-inset`. ⚠ **Shared primitive — Settings and KnowledgeHealth inherit it.** | UAT row G4-7/G4-8, or the next phase touching `ui/tabs.tsx` |
+| **WR-04** | `/chunks`, `/tables`, `/images` shipped with **no `.limit()` and no paging**, in the same plan that capped `/content` from a measured worst case. `/chunks` returns the whole document's text again. ⚠ **PostgREST's 1000-row ceiling would truncate SILENTLY** — the same trap 217-03 hit. | any document with >1000 chunks/tables/images, or the next phase touching those routes |
+| **WR-05** | The "Found by" footer prints `100 searches` as a **census** while the route caps at `MAX_ROWS = 100`; its own docblock claims the footer discloses the cap. A user with 910 searches (measured in 217-03) is told they have 100. | UAT row M-6, or the next phase touching `DocumentQueriesSection.tsx` |
+| **WR-06** | `_assert_document_visible` swallows **every** exception into `404 "Document not found"`, so a transient DB fault tells the user their document does not exist. | the next phase touching `documents.py`'s visibility gate |
+
+⚠ **WR-01 and WR-04 are the two that can produce a WRONG ANSWER rather than a poor one**, and WR-02
+is the only one that makes a shipped surface useless for a whole class of user. Take those three
+first if a follow-up phase is scoped.
+
+**What the review confirmed HELD, recorded because it was the phase's highest risk:**
+`document_queries.py`'s owner gate is sound — `.eq("user_id", user_id)` is the first filter, `user_id`
+comes only from `get_current_user`, and the attacker-controlled `document_id` was traced through
+`contains()` -> `json.dumps()` -> `httpx.QueryParams` in the installed postgrest lib: JSON-escaped
+then URL-encoded, so it cannot break out of the `cs.` filter grammar. The four detail routes are
+user-JWT + RLS behind one shared 404-before-read gate with no 404/200 existence asymmetry, and there
+is **zero `dangerouslySetInnerHTML`/`innerHTML`** in any new render path.
