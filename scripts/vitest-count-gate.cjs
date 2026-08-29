@@ -2921,6 +2921,11 @@ const BASELINE = {
   //
   // Counts read from that run's printed rows, not predicted: 13 and 8.
   "publishBlockedStep.test.ts": 13,
+
+  // BUG-260829-01 — same check as the pair above and the same answer: it lives under
+  // `src/components/workflows`, already a DIRECTORY entry in `TARGETS`, so it RAN the moment it
+  // was created and needs BASELINE only. Count read from the gate's printed row, not predicted.
+  "cronPlain.test.ts": 15,
   "PublishBlockedStepCard.test.tsx": 8,
   // ⭐ ADOPTED rather than created. `RunStepList.tsx` IS in this phase's diff
   // (214-11 mounted the shared step identity in it) and its only suite was

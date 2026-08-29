@@ -201,3 +201,37 @@ source changed; no per-file count decreased; all five Phase-195 suites green
 **Later plans in Phase 195 verify on per-file counts plus their own suites, NOT on a green grand
 verdict.** Any plan that reports `count gate OK` should say which run number it was, and any plan that
 reports red must name the failing files before re-running.
+
+
+---
+
+## ⚠ THE SET IS SEVEN, NOT FIVE — measured 2026-08-29 (BUG-260829-01)
+
+Two more suites produced `STACK_TRACE_ERROR` under a full count-gate run on a tree where each
+was **provably unmodified** (`git diff --numstat HEAD` and `git status --short` both empty for
+the suite AND its component):
+
+| suite | in this phase's diff? | verdict |
+|---|---|---|
+| `src/components/workflows/PhaseNode.test.tsx` | **no — provably unmodified** | new member |
+| `src/components/workflows/PublishGauntlet.test.tsx` | ⚠ its COMPONENT was modified | see below |
+
+⭐ **THE FAILING SET CHANGED BETWEEN TWO CONSECUTIVE RUNS OF THE SAME TREE**, which is this
+seed's own signature restated: run 1 was `PhaseNode` ×1; run 2 was `WorkflowBuilderPage.canvas`
+×2 + `PhaseNode` ×3 + `PublishGauntlet` ×2; run 3 was **`count gate OK`, 0 failing**. Nothing
+was edited between them.
+
+⚠ **`PublishGauntlet.test.tsx` COULD NOT BE CALLED INNOCENT BY THE USUAL TEST**, because
+`PublishGauntlet.tsx` WAS in that change's diff. It was cleared by a different method, recorded
+here as the procedure to reuse: **three consecutive isolated runs passed (3/3), and a
+counterfactual with the change stashed also passed** — so the suite passes with and without the
+edit in isolation, and fails only under full-gate load. That is membership in this class, not a
+defect in the change.
+
+⚠ **AND THE COUNTERFACTUAL COST MORE THAN IT SHOULD HAVE.** `git stash push -- <one file>`
+followed by `git stash pop` popped a **year-old unrelated stash** and put 13 files into conflict
+across `.claude/`, `backend/app/config.py` and `frontend/package-lock.json`. Nothing was lost —
+every conflicted file was restored to HEAD and the ancient stash's content discarded — but the
+lesson is cheap to record and expensive to relearn: **on a repo with a pre-existing stash, and
+with a sibling agent committing to the same branch, do not use `stash push`/`pop` as a
+counterfactual.** Copy the file aside, or read the prior version with `git show HEAD:<path>`.

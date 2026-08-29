@@ -26,6 +26,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Loader2, Play, Trash2, X } from "lucide-react"
 
+// BUG-260829-01 — the cron composer and the plain-language echo. A pure module rather than
+// locals here for the reason every sibling vocabulary file records: a component may not export
+// shared constants (`react-refresh/only-export-components`), and the grammar is testable on its
+// own in a way a JSX-embedded regex is not.
+import {
+  CRON_FIELD_ORDER,
+  CRON_MEANS_PREFIX,
+  CRON_UNREADABLE,
+  DAILY_TIME_LABEL,
+  dailyCron,
+  describeCron,
+  timeOfDailyCron,
+} from "@/components/workflows/cronPlain"
+
 import {
   createWorkflowSchedule,
   deleteSchedule,
@@ -494,6 +508,28 @@ export function WorkflowScheduleModal({
                       </option>
                     ))}
                   </select>
+                  {/* ── BUG-260829-01 — THE COMMON CASE NEEDS NO CRON ────────────────────
+                      The five presets above have HARDCODED times, so every time that is not
+                      03:00 / 08:00 / 06:00 / on-the-hour fell through to the raw box below.
+                      The operator wanted 04:18 and had to hand-write `18 4 * * *`. This control
+                      composes it: pick a time, the expression is written for you. It REFLECTS
+                      an expression already in the field (via `timeOfDailyCron`) rather than
+                      resetting, so choosing a preset and then nudging the time both work. */}
+                  <label className="flex items-center gap-2">
+                    <span className="shrink-0 text-[12px] text-muted-foreground">
+                      {DAILY_TIME_LABEL}
+                    </span>
+                    <input
+                      type="time"
+                      data-testid="schedule-daily-time"
+                      value={timeOfDailyCron(cron) ?? ""}
+                      onChange={(e) => {
+                        const next = dailyCron(e.target.value)
+                        if (next) setCron(next)
+                      }}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
+                    />
+                  </label>
                   <input
                     data-testid="schedule-cron"
                     value={cron}
@@ -501,6 +537,24 @@ export function WorkflowScheduleModal({
                     spellCheck={false}
                     className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[13px] text-foreground"
                   />
+                  {/* ── BUG-260829-01 — SAY IT BACK, SO A TYPO IS VISIBLE BEFORE IT SAVES ──
+                      `18 4` and `4 19` are equally plausible to anyone who does not already
+                      know the field order, and a schedule that fires at the wrong hour reports
+                      NOTHING — you find out the next morning, or you never do. The echo reads
+                      the expression back; when it cannot, it says so and claims nothing about
+                      validity, because the SERVER owns that verdict and plenty of legal cron
+                      (a star-slash-number step, `1,15`, `MON`) is simply unphraseable here. */}
+                  <p
+                    data-testid="schedule-cron-means"
+                    className="text-[12px] leading-relaxed text-muted-foreground"
+                  >
+                    {describeCron(cron, timezone)
+                      ? `${CRON_MEANS_PREFIX} ${describeCron(cron, timezone)}`
+                      : CRON_UNREADABLE}
+                    <span className="ml-1 font-mono text-[11px] opacity-70">
+                      {CRON_FIELD_ORDER}
+                    </span>
+                  </p>
                   <label className="flex flex-col gap-1">
                     <span className="text-[12px] text-muted-foreground">
                       Time zone — the schedule fires by this clock, not the server&apos;s
