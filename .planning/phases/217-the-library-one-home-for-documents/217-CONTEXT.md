@@ -213,6 +213,68 @@ anything — its mtime (20:37) predates `drive.cjs` (20:52), and it claims **190
 artifact, and D-217-02's "190 assertions / 31 reading the live tree" figures are stale in this file
 too. **Re-derive; do not quote them.**
 
+### D-217-25 — the eight-section panel: order, names, and the `Details` collision (2026-08-29, operator: "proceed")
+
+⚠ **Raised by the operator BEFORE execution, and it was a real gap:** *"did we consider the metadata
+somewhere, because I see that it was not designed"*, then *"document relationship, metadata and
+classification?"*. The three shipped sections were **protected** by `217-10`'s fence but the resulting
+panel was **designed by nobody** — no artifact said what an eight-section panel looks like.
+
+**What is already true and is NOT changed here:** the three shipped mounts
+(`DocumentDetailPanel.tsx:242` Details/Metadata · `:265` Relationships · `:279` Classification) keep
+their props, exactly as `217-10` already asserts. Phase 112's editable fields + per-field
+`ConfidenceChip` + low-confidence warn badge, Phase 117's relationships + create-link picker, and
+Phase 118's suggestion chips with accept/dismiss/Undo all survive untouched. **217 only ADDS.**
+
+- **D-217-25a — the section ORDER is fixed at eight, and the five new ones are INSERTED, not appended:**
+
+  | # | Section | Origin | Mount |
+  |---|---|---|---|
+  | 1 | **Details** (*Metadata* under ⌥) | shipped, Phase 112 | eager — no fetch, reads `doc` |
+  | 2 | **Text** | NEW (`217-10`) | `defaultOpen={false}` |
+  | 3 | **Chunks** | NEW (`217-10`) | `defaultOpen={false}` |
+  | 4 | **Tables** | NEW (`217-11`) | `defaultOpen={false}` |
+  | 5 | **Images** | NEW (`217-11`) | `defaultOpen={false}` |
+  | 6 | **Found by** | NEW (`217-11`) | `defaultOpen={false}` |
+  | 7 | **Relationships** | shipped, Phase 117 | eager — ⚠ fetches on mount |
+  | 8 | **Classification** | shipped, Phase 118 | eager — no fetch |
+
+  **Reading order, and it is the reason:** *what we know about it* (1) → *what is in it* (2–5) →
+  *how it is actually used* (6) → *how it relates to everything else* (7–8). The five new sections go
+  **between Details and Relationships**, so the document's own content sits next to the facts about
+  it, and the two cross-document sections stay together at the end. ⚠ **The shipped mounts MOVE but
+  their PROPS do not change** — `217-10`'s fence is *"no hunk altering their props"*, which a
+  relocation satisfies; the plan must say so explicitly rather than let an executor read the fence as
+  *"do not move"*. Rejected: appending the five after Classification (puts the document's own text
+  below two sections about other documents); interleaving by plan-landing order (`217-11` would have
+  to insert into `217-10`'s block, and the order would be an artefact of the wave graph).
+
+- **D-217-25b — ⛔ the new text section is called `Text`, and the word `Details` is FORBIDDEN for it.**
+  ⚠ **MEASURED COLLISION:** the shipped metadata section's plain label IS `Details`
+  (`termMap.ts:90` — `{plain: "Details", helper: "Facts about this document.", technical: "Metadata"}`,
+  Phase 154 LANG-01), and **sketch 218's detail screen draws a caption also called `Details`** over a
+  flat read-only `Type · Size · Added · Chunks · Version` list. Building both puts **the word
+  "Details" on the panel twice**, over two unrelated surfaces — one editable with confidence chips,
+  one five static rows.
+  **Resolution: the sketch's `Details` block is ALREADY SATISFIED by the shipped section**, which does
+  that job strictly better (it is editable and it grades its own confidence). **It is not built.** The
+  five new titles are literal strings — `Text` · `Chunks` · `Tables` · `Images` · `Found by` —
+  matching the shipped `title="Relationships"` / `title="Classification"` convention.
+  ⚠ **`Found by`, never `Queries` or `Retrieval`** — the sketch's own `SIGNAL_RENAMES` already renames
+  `Most Retrieved` → `Most found` and `Never Retrieved` → `Never found`; a third word for the same
+  concept on the same product is how a vocabulary stops being one. Rejected: routing the five new
+  titles through `termMap.ts` (the map exists to carry a *technical* string that predates the plain
+  one — these have no shipped technical name to reveal, so an entry would be a fabricated one).
+
+- **D-217-25c — ⚠ "opening a document fires ZERO requests" is FALSE and must not be written as a
+  phase-level truth.** `217-10`'s must-have is true of the **five new** sections only.
+  `DocumentDetailPanel.tsx:265` omits `defaultOpen`, so `RelationshipsSection` inherits `true` and
+  **fetches on mount today** (`RelationshipsSection.tsx:96`, a bare `useEffect`). A cold open fires
+  **exactly one** request before this phase and **exactly one** after. That is shipped behaviour the
+  phase deliberately leaves alone (it is `DocumentDetailPanel`'s ledger seam, owed to a later phase).
+  **State the count as one, not zero** — a must_have that claims zero is refuted by the first person
+  who opens the network tab, and the fix would be a props change the `217-10` fence forbids.
+
 ### Claude's Discretion
 
 - Tailwind class choices, spacing, hover/focus states, and the exact `PanelSection` titles for the
