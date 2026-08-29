@@ -32,6 +32,9 @@ import { RelationshipsSection } from "@/components/relationships/RelationshipsSe
 import { ClassificationSection } from "@/components/classification/ClassificationSection"
 import { DocumentContentSection } from "./DocumentContentSection"
 import { DocumentChunksSection } from "./DocumentChunksSection"
+import { DocumentTablesSection } from "./DocumentTablesSection"
+import { DocumentImagesSection } from "./DocumentImagesSection"
+import { DocumentQueriesSection } from "./DocumentQueriesSection"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
@@ -148,6 +151,9 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // `null` = never loaded → no badge, which is the honest state for a lazy section.
   const [contentLines, setContentLines] = useState<number | null>(null)
   const [chunkTotal, setChunkTotal] = useState<number | null>(null)
+  const [tableTotal, setTableTotal] = useState<number | null>(null)
+  const [imageTotal, setImageTotal] = useState<number | null>(null)
+  const [queryTotal, setQueryTotal] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -306,6 +312,43 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
 
         <PanelSection title="Chunks" count={chunkTotal ?? undefined} defaultOpen={false}>
           <DocumentChunksSection docId={doc.id} onTotalChange={setChunkTotal} />
+        </PanelSection>
+
+        {/* -- Phase 217 Plan 11 (LIB-04 / D-217-25a) - the three that CLOSE the order. --
+            The final sequence is Details - Text - Chunks - Tables - Images - Found by -
+            Relationships - Classification: what we know about it, then what is IN it,
+            then how it is USED, then how it relates to other documents. These three go
+            directly after Chunks and BEFORE Relationships; Relationships and
+            Classification move down and their PROPS do not change, which is the fence
+            exactly - a relocation alters no prop.
+
+            D-217-25b - the titles are the literal strings below. `Found by`, never
+            `Queries` and never `Retrieval`: sketch 218's own SIGNAL_RENAMES already turns
+            `Most Retrieved` into `Most found`, and a third word for one concept is how a
+            vocabulary stops being one. And never `Details`, which is the shipped metadata
+            section's plain label (`termMap.ts:90`).
+
+            All three carry the closed-by-default prop, for the same reason the two above
+            do: `PanelSection.tsx:94` renders children only when open, so a section that
+            fetches in a bare `useEffect` costs nothing until it is clicked. The prop's
+            literal is deliberately absent from this comment - the fence COUNTS
+            occurrences file-wide, so prose about the rule would let the count pass on
+            comments alone (measured in 217-10).
+
+            The tables and images sections are handed the document row itself, not just
+            its id: they need `tables_stage_applies` / `table_count` to choose WHICH of
+            their three empty sentences is true, and those fields are already on the row
+            the panel holds - so it costs no extra request. */}
+        <PanelSection title="Tables" count={tableTotal ?? undefined} defaultOpen={false}>
+          <DocumentTablesSection docId={doc.id} doc={doc} onTotalChange={setTableTotal} />
+        </PanelSection>
+
+        <PanelSection title="Images" count={imageTotal ?? undefined} defaultOpen={false}>
+          <DocumentImagesSection docId={doc.id} doc={doc} onTotalChange={setImageTotal} />
+        </PanelSection>
+
+        <PanelSection title="Found by" count={queryTotal ?? undefined} defaultOpen={false}>
+          <DocumentQueriesSection docId={doc.id} onTotalChange={setQueryTotal} />
         </PanelSection>
 
         {/* Relationships (Phase 117 REL-02) — the section owns its own fetch +
