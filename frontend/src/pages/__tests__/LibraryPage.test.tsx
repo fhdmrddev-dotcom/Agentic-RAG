@@ -4,21 +4,59 @@
  * Renamed from `src/__tests__/components/IngestionPage.test.tsx` at Phase 217 SC#1 —
  * the file moved and the page title changed; the surface did not.
  *
+ * ── Phase 217-09: THE SHELL, NOT THE REDUCER ───────────────────────────────────────────
+ * `src/pages/__tests__/librarySelection.test.ts` already proves every reducer transition
+ * exhaustively (25 cases). These cases prove the WIRING — that both renderings of the
+ * selection are handed the same value, that there are four tabs and no fifth, and that the
+ * dropzone landed on the landing tab. They assert through the DOM on purpose: a passing
+ * reducer suite says nothing about a page that forgot to call it.
+ *
  * Mocks:
  * - @/hooks/useDocuments — returns sample documents with folder_id fields
  * - @/hooks/useFolders — returns sample folders
  * - @/lib/supabase — prevents real auth/channel calls
+ * - @/lib/api — PARTIAL (importOriginal), so only the five functions this page and its
+ *   children actually call are stubbed and every other export stays real
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import type { Document, Folder } from "@/types"
+import type { Document, Folder, SavedView } from "@/types"
 
 // ── Mock hooks ─────────────────────────────────────────────────────────────────
-const { mockUseDocuments, mockUseFolders } = vi.hoisted(() => ({
+const {
+  mockUseDocuments,
+  mockUseFolders,
+  mockListViews,
+  mockResolveView,
+  mockResolveAdHoc,
+  mockListMetadataFields,
+  mockGetReembedProgress,
+} = vi.hoisted(() => ({
   mockUseDocuments: vi.fn(),
   mockUseFolders: vi.fn(),
+  mockListViews: vi.fn(),
+  mockResolveView: vi.fn(),
+  mockResolveAdHoc: vi.fn(),
+  mockListMetadataFields: vi.fn(),
+  mockGetReembedProgress: vi.fn(),
 }))
+
+// ⚠ PARTIAL mock. `@/lib/api` is a re-export barrel with ~12 domain modules behind it; a
+// full replacement would have to declare every symbol the page's children import, and the
+// one it forgot would throw at MOUNT with a message about a missing export rather than
+// about the missing edit (the failure mode Phase 196-08 recorded across nine suites).
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...actual,
+    listViews: mockListViews,
+    resolveView: mockResolveView,
+    resolveAdHoc: mockResolveAdHoc,
+    listMetadataFields: mockListMetadataFields,
+    getReembedProgress: mockGetReembedProgress,
+  }
+})
 
 vi.mock("@/hooks/useDocuments", () => ({
   useDocuments: mockUseDocuments,
@@ -108,12 +146,40 @@ const sampleDocuments: Document[] = [
   },
 ]
 
+// Two saved views, because one view cannot show a NON-VACUITY control: "the selected row
+// carries the selected styling" is worthless unless some other row provably does not.
+const sampleViews: SavedView[] = [
+  {
+    id: "view-1",
+    user_id: "user-1",
+    name: "Quarterly reports",
+    filter_expr: { op: "and", conditions: [] },
+    is_system_global: false,
+  },
+  {
+    id: "view-2",
+    user_id: "user-1",
+    name: "Signed contracts",
+    filter_expr: { op: "and", conditions: [] },
+    is_system_global: false,
+  },
+]
+
 function renderPage(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
 
+/** NavRow marks selection with a class, not with `aria-current` — so the assertion reads
+ *  the class, and every use is paired with a control row that must NOT carry it. */
+const SELECTED_ROW_CLASS = "bg-primary/10"
+
+function viewRow(scope: HTMLElement, name: string): HTMLElement {
+  return within(scope).getByRole("button", { name })
+}
+
 describe("LibraryPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mockUseDocuments.mockReturnValue({
       documents: sampleDocuments,
       uploading: false,
@@ -126,6 +192,20 @@ describe("LibraryPage", () => {
       createFolder: vi.fn().mockResolvedValue({}),
       renameFolder: vi.fn().mockResolvedValue(undefined),
       deleteFolder: vi.fn().mockResolvedValue(undefined),
+    })
+    mockListViews.mockResolvedValue(sampleViews)
+    mockListMetadataFields.mockResolvedValue([])
+    mockResolveView.mockResolvedValue({ documents: [], total: 7 })
+    mockResolveAdHoc.mockResolvedValue({ documents: [], total: 0 })
+    // Idle: `ReembedStatusCard` renders null in this arm, which is exactly why the tab
+    // needs facts of its own — an idle library must not show an empty Indexing tab.
+    mockGetReembedProgress.mockResolvedValue({
+      status: "idle",
+      total: 224,
+      re_embedded: 87,
+      remaining: 137,
+      model: "text-embedding-3-small",
+      updated_at: null,
     })
   })
 
@@ -181,5 +261,191 @@ describe("LibraryPage", () => {
     expect(screen.getByText("root-doc.txt")).toBeInTheDocument()
     // research.pdf is in folder-1, not root, should not show
     expect(screen.queryByText("research.pdf")).not.toBeInTheDocument()
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // Phase 217-09 — the SHELL's own criteria, asserted through the DOM
+  // ═══════════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * ⭐ SC#5, THE RENDERED VERSION.
+   *
+   * `librarySelection.test.ts` proves the reducer never holds a folder and a view at once.
+   * That is a claim about a pure function. THIS is the claim about the page: the sidebar
+   * `ViewsGroup` and the Views tab's `ViewsGroup` are handed the SAME `activeViewId(lib)`,
+   * so no render exists in which they say different things.
+   *
+   * ⚠ Both halves are one case on purpose — "they agree when something is selected" and
+   * "they agree when it is cleared" are the same claim, and splitting them would let a page
+   * that only ever selects pass the half that matters least.
+   */
+  it("⭐ SC#5 — the sidebar mount and the Views tab mount can never disagree", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+
+    const sidebar = await screen.findByTestId("library-sidebar")
+    await within(sidebar).findByRole("button", { name: "Quarterly reports" })
+
+    // ── select a view FROM THE SIDEBAR ──────────────────────────────────────────────
+    fireEvent.click(viewRow(sidebar, "Quarterly reports"))
+
+    // the tab followed the selection (D-217-14) — the Views body is now mounted
+    const viewsTab = await screen.findByTestId("views-tab")
+    expect(screen.getByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true")
+
+    // BOTH renderings show the same row selected …
+    expect(viewRow(sidebar, "Quarterly reports").className).toContain(SELECTED_ROW_CLASS)
+    expect(viewRow(viewsTab, "Quarterly reports").className).toContain(SELECTED_ROW_CLASS)
+    // … and the NON-VACUITY control: the other view is selected in neither.
+    expect(viewRow(sidebar, "Signed contracts").className).not.toContain(SELECTED_ROW_CLASS)
+    expect(viewRow(viewsTab, "Signed contracts").className).not.toContain(SELECTED_ROW_CLASS)
+
+    // ── now click a FOLDER ──────────────────────────────────────────────────────────
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Research" }))
+
+    // (a) the active tab is Documents
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    )
+    // (b) neither mount still shows a selected view. The tab body is unmounted, so it is
+    // re-entered and re-read rather than assumed — an absent mount proves nothing.
+    expect(viewRow(sidebar, "Quarterly reports").className).not.toContain(SELECTED_ROW_CLASS)
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Views" }))
+    const viewsTabAgain = await screen.findByTestId("views-tab")
+    expect(viewRow(viewsTabAgain, "Quarterly reports").className).not.toContain(
+      SELECTED_ROW_CLASS,
+    )
+  })
+
+  /**
+   * D-217-15 — the sequencing must be VISIBLE, not incidental. A Health tab here would sit
+   * beside a `KnowledgeHealthPage` that is still its own nav entry and still `ChatLayout`'s
+   * positional fallback; Phase 218 ships it with the merge that retires both.
+   */
+  it("has exactly four tab triggers — and NO Health tab (D-217-15)", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+
+    const tabs = screen.getAllByRole("tab")
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      "Documents",
+      "Views",
+      "Ingestion",
+      "Indexing",
+    ])
+    expect(tabs).toHaveLength(4)
+    // The negative assertion is the point of this case.
+    expect(screen.queryByRole("tab", { name: "Health" })).toBeNull()
+  })
+
+  /**
+   * LIB-02 / SC#2 — the dropzone is on the LANDING tab, full width, and it names the folder
+   * the file will land in. A dropzone on tab 3 is hunting, which is what SC#2 forbids.
+   */
+  it("LIB-02 — the dropzone is on the Documents tab, full width, naming its target", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+
+    const dropzone = screen.getByRole("button", { name: "Upload to Root" })
+    expect(dropzone).toBeInTheDocument()
+    expect(dropzone.className).toContain("w-full")
+    // It NAMES the target rather than trailing off — the named root, never a blank.
+    expect(dropzone.textContent).toContain("Root")
+
+    // And it tracks the selection: pick a folder, the band re-targets.
+    // ⚠ MEASURED, not assumed: `@/lib/supabase` is mocked with `session: null`, so `useAuth`
+    // yields no user and `selectedFolder.user_id === user?.id` is FALSE for every folder —
+    // the band therefore renders its READ-ONLY arm here. That arm still names the folder
+    // ("Only the folder owner can upload files to Research"), which is the LIB-02 property;
+    // asserting only the writable label would have measured the auth mock, not the band.
+    // The pattern is anchored so it cannot also match the sidebar's own "Research" row.
+    const sidebar = screen.getByTestId("library-sidebar")
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Research" }))
+    const retargeted = await screen.findByRole("button", {
+      name: /^(Upload to|Read-only folder) Research$/,
+    })
+    expect(retargeted.textContent).toContain("Research")
+  })
+
+  /**
+   * D-217-13 — the Views tab has content of its OWN. A tab whose body is an empty state
+   * pointing at the sidebar is the cheapest mistake to find here and the most expensive to
+   * find after it ships (the sketch's own README says so).
+   */
+  it("the Views tab is not hollow — it renders the picker with per-view counts", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    await screen.findByTestId("library-sidebar")
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Views" }))
+    const viewsTab = await screen.findByTestId("views-tab")
+
+    expect(within(viewsTab).getByText("Saved views")).toBeInTheDocument()
+    expect(within(viewsTab).getByRole("button", { name: "Quarterly reports" })).toBeInTheDocument()
+    expect(within(viewsTab).getByRole("button", { name: "Signed contracts" })).toBeInTheDocument()
+    // The counts are the content — one per row, resolved lazily by the shipped ViewsGroup.
+    await waitFor(() => expect(within(viewsTab).getAllByText("7")).toHaveLength(2))
+    // NOT an empty state.
+    expect(within(viewsTab).queryByText("No saved views yet")).toBeNull()
+  })
+
+  /**
+   * D-217-16 / D-217-22 — coverage is a COUNT, never a proportion. A bare proportion reads
+   * as a quality grade; "87 of 224" cannot.
+   */
+  it("the Indexing tab prints coverage as numerator AND denominator, with no proportion", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Indexing" }))
+    const indexing = await screen.findByTestId("indexing-tab")
+
+    await waitFor(() => expect(within(indexing).getByText("87 of 224")).toBeInTheDocument())
+    expect(indexing.textContent).toMatch(/\d+ of \d+/)
+    // ⛔ the whole rendered tab, not just the one node.
+    expect(indexing.textContent).not.toContain("%")
+    // The active embedding model is named beside it.
+    expect(within(indexing).getByText("text-embedding-3-small")).toBeInTheDocument()
+  })
+
+  /**
+   * ⭐ REACHABILITY. Plan 08 shipped `IngestionStrip` + `ingestionStages.ts` with a 25-case
+   * suite and NO CONSUMER — a component no user could reach. D-217-17 puts it on this tab.
+   * This case fails if that mount is ever removed, which is the only thing that would make
+   * plan 08's work invisible again.
+   */
+  it("the Ingestion tab MOUNTS the stage strip for an in-flight document", async () => {
+    mockUseDocuments.mockReturnValue({
+      documents: [
+        ...sampleDocuments,
+        {
+          ...sampleDocuments[1],
+          id: "doc-3",
+          filename: "in-flight.pdf",
+          status: "processing",
+          ingestion_step: "chunking",
+        } as Document,
+      ],
+      uploading: false,
+      uploadingCount: 0,
+      upload: vi.fn().mockResolvedValue({ isDuplicate: false }),
+      deleteDoc: vi.fn().mockResolvedValue(undefined),
+    })
+
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Ingestion" }))
+    const ingestion = await screen.findByTestId("ingestion-tab")
+
+    expect(within(ingestion).getByText("in-flight.pdf")).toBeInTheDocument()
+    const strips = within(ingestion).getAllByTestId("ingestion-strip")
+    expect(strips.length).toBeGreaterThan(0)
+    expect(strips[0].getAttribute("data-status")).toBe("processing")
+    // ⛔ D-217-19 — the queue shows stages, never a proportion.
+    expect(ingestion.textContent).not.toContain("%")
   })
 })
