@@ -32,6 +32,7 @@ const {
   mockResolveAdHoc,
   mockListMetadataFields,
   mockGetReembedProgress,
+  mockGetIndexSummary,
 } = vi.hoisted(() => ({
   mockUseDocuments: vi.fn(),
   mockUseFolders: vi.fn(),
@@ -40,6 +41,7 @@ const {
   mockResolveAdHoc: vi.fn(),
   mockListMetadataFields: vi.fn(),
   mockGetReembedProgress: vi.fn(),
+  mockGetIndexSummary: vi.fn(),
 }))
 
 // ⚠ PARTIAL mock. `@/lib/api` is a re-export barrel with ~12 domain modules behind it; a
@@ -55,6 +57,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     resolveAdHoc: mockResolveAdHoc,
     listMetadataFields: mockListMetadataFields,
     getReembedProgress: mockGetReembedProgress,
+    getIndexSummary: mockGetIndexSummary,
   }
 })
 
@@ -206,6 +209,16 @@ describe("LibraryPage", () => {
       remaining: 137,
       model: "text-embedding-3-small",
       updated_at: null,
+    })
+    mockGetIndexSummary.mockResolvedValue({
+      vectors: 224,
+      chunks_total: 224,
+      documents_without_vectors: 0,
+      last_indexed: "2026-08-29T10:00:00Z",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      provider: "openai",
+      folders: [],
     })
   })
 
@@ -396,18 +409,20 @@ describe("LibraryPage", () => {
    * D-217-16 / D-217-22 — coverage is a COUNT, never a proportion. A bare proportion reads
    * as a quality grade; "87 of 224" cannot.
    */
-  it("the Indexing tab prints coverage as numerator AND denominator, with no proportion", async () => {
+  it("the Indexing tab renders the three cards' facts (Plan 10 composition), with no proportion", async () => {
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
 
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Indexing" }))
     const indexing = await screen.findByTestId("indexing-tab")
 
-    await waitFor(() => expect(within(indexing).getByText("87 of 224")).toBeInTheDocument())
-    expect(indexing.textContent).toMatch(/\d+ of \d+/)
-    // ⛔ the whole rendered tab, not just the one node.
+    // Plan 10: the three cards compose over GET /library/index-summary (BE-2).
+    expect(within(indexing).getByText("Vector store")).toBeInTheDocument()
+    expect(within(indexing).getByText("Embedding model")).toBeInTheDocument()
+    expect(within(indexing).getByText("Folders")).toBeInTheDocument()
+    // ⛔ the whole rendered tab, not just the one node — no proportion anywhere.
     expect(indexing.textContent).not.toContain("%")
-    // The active embedding model is named beside it.
+    // The active embedding model is named beside it (from the index-summary facts).
     expect(within(indexing).getByText("text-embedding-3-small")).toBeInTheDocument()
   })
 

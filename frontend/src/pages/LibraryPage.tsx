@@ -782,7 +782,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
               value="indexing"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              <IndexingTab />
+              <IndexingTab onNavigate={onNavigate} />
             </TabsContent>
           </div>
         </Tabs>

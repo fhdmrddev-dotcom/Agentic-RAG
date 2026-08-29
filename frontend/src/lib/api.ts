@@ -236,6 +236,15 @@ export type {
   PublishOutcome,
 } from "./api/knowledge"
 
+// ── library ─────────────────────────────────────────────────────────
+export {
+  getIndexSummary,
+} from "./api/library"
+export type {
+  IndexSummary,
+  FolderIndexRow,
+} from "./api/library"
+
 // ── workflows ─────────────────────────────────────────────────────────
 export {
   WorkflowConflictError,

@@ -1,59 +1,42 @@
 /**
- * Phase 217 (LIB-01 / D-217-16 / D-217-22) — the Indexing tab body.
+ * Phase 217.1 plan 10 (LIB-01 / BE-2 / D-217.1-27) — the Indexing tab body.
  *
- * ⭐ IT COMPOSES `ReembedStatusCard` **UNCHANGED**. That card is not edited by this plan or
- * by any other plan in this phase (D-217-16). It self-fetches, it polls only while running,
- * and it collapses to nothing when the corpus is current — which is exactly why this tab
- * needs facts of its own beside it: an idle library would otherwise render an empty tab.
+ * ⭐ IT COMPOSES `ReembedStatusCard` **UNCHANGED** (D-217-16) — self-fetching, never edited
+ * here, collapsed to nothing when the corpus is current.
  *
- * ⛔ ZERO NEW MECHANISM. Every number here comes from the shipped, owner-scoped
- * `GET /settings/reembed-progress` (`getReembedProgress`), the same endpoint the Settings
- * surface already calls. No new endpoint, no new table, no new data path (T-217-34).
+ * ⛔ THE THREE CARDS COME FROM **ONE** FETCH. A single `useEffect` calls
+ * `getIndexSummary()` (Plan 09's `GET /library/index-summary`, ungated per D-217.1-27) and
+ * passes the result down as props — no card fetches independently.
  *
- * ── ⚠ D-217-22 — WHY THERE IS A BAR AND AN ELAPSED-TIME GUESS ON THE CARD BELOW ────────
- * `ReembedStatusCard.tsx:146` renders a width-proportion bar and `:163` prints a coarse
- * time guess. D-217-19's "no proportion, no time guess" scopes the INGESTION STRIP and the
- * UPLOAD PATH, where two of six stages are decided while the file runs and there is
- * therefore no honest denominator. Re-embedding HAS one — the live chunk total, derived
- * from the store on every fetch — so that card keeps both. The rule is about honesty, not
- * about a banned shape, and the two surfaces differ in whether the denominator exists.
+ * ⭐ FACTS FOR EVERYONE, ACTIONS ONLY FOR OPERATORS (closes 217's deferred WR-02):
+ * Vector store / Embedding model / Folders numbers render unconditionally. The three ACTION
+ * buttons (`Change model`, `Re-index everything`, `Re-index selected`) render ONLY when
+ * `features.model_management === true`, using the shipped VANISH convention (`nav-items.ts`
+ * `visibleNavItems`) — absent, never disabled. `Change model` routes to Settings' shipped
+ * picker via the exact `onNavigate("settings")` + scroll shape `LibraryPage.tsx:585-597`
+ * uses — no second picker is created.
  *
- * ⛔ THE COVERAGE COUNT IS PRINTED AS NUMERATOR **AND** DENOMINATOR — "87 of 224" — never
- * as a proportion. A bare proportion reads as a quality grade, and coverage is not one.
- *
- * ⚠ An unknown value SAYS SO. A missing total is not zero and not a green tick.
+ * ⛔ HONESTY: `Uncategorized`/`Root` reads `–` and `never`, never `0` and never a tick
+ * (D-217.1-31 — the point of the tab).
  */
 import { useEffect, useState } from "react"
-import { getReembedProgress, type ReembedProgress } from "@/lib/api"
+import { getIndexSummary, type IndexSummary } from "@/lib/api"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
+import { VectorStoreCard } from "@/components/library/indexing/VectorStoreCard"
+import { EmbeddingModelCard } from "@/components/library/indexing/EmbeddingModelCard"
+import { FoldersIndexTable } from "@/components/library/indexing/FoldersIndexTable"
 
-/** What a fact reads when the server has not told us yet. Never blank, never zero. */
-const UNKNOWN = "Not known yet"
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
-        {value}
-      </span>
-    </div>
-  )
-}
-
-export function IndexingTab() {
-  const [progress, setProgress] = useState<ReembedProgress | null>(null)
+export function IndexingTab({ onNavigate }: { onNavigate?: (view: string) => void } = {}) {
+  const [summary, setSummary] = useState<IndexSummary | null>(null)
   const [unreachable, setUnreachable] = useState(false)
 
-  // Reconcile-on-fetch (D-v2.5-03): the counts are derived live on the server for every
-  // request, so one read at mount is a true reading rather than a cached hint. The card
-  // below owns the polling while a run is in flight; duplicating it here would double the
-  // request rate for one number.
+  // ⛔ ONE FETCH — the three cards' data. ReembedStatusCard self-fetches and is untouched.
   useEffect(() => {
     let live = true
-    getReembedProgress()
-      .then((p) => {
-        if (live) setProgress(p)
+    getIndexSummary()
+      .then((s) => {
+        if (live) setSummary(s)
       })
       .catch(() => {
         if (live) setUnreachable(true)
@@ -63,12 +46,10 @@ export function IndexingTab() {
     }
   }, [])
 
-  const total = progress?.total ?? null
-  const done = progress?.re_embedded ?? null
-  // ⭐ NUMERATOR AND DENOMINATOR. Both halves must be known, or the fact is unknown — a
-  // numerator alone would invite the reader to supply their own denominator.
-  const coverage = total !== null && done !== null ? `${done} of ${total}` : UNKNOWN
-  const model = progress?.model ?? null
+  // The VANISH gate: only `model_management === true` renders the ACTION buttons. Absent
+  // for everyone else — never disabled (T-217.1-02 / the nav-items.ts convention).
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canManage = featuresCtx?.features.model_management === true
 
   return (
     <section data-testid="indexing-tab" className="flex flex-col gap-4 overflow-y-auto">
@@ -83,16 +64,20 @@ export function IndexingTab() {
           current — which is the reason the facts below stand on their own. */}
       <ReembedStatusCard id="reembed-status-card" />
 
-      <div className="rounded-xl bg-card/50 ghost-border px-4 py-3">
-        <Fact label="Model" value={model ?? UNKNOWN} />
-        <Fact label="Chunks indexed" value={coverage} />
-        {unreachable && (
-          // ⚠ A failed read is stated, never rendered as a zero.
-          <p className="pt-2 text-xs text-muted-foreground">
-            Could not read the indexing facts just now.
-          </p>
-        )}
-      </div>
+      {unreachable ? (
+        // ⚠ A failed read is stated, never rendered as a zero.
+        <p className="text-sm text-muted-foreground">
+          Could not read the indexing facts just now.
+        </p>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <VectorStoreCard summary={summary} />
+            <EmbeddingModelCard summary={summary} canManage={canManage} onNavigate={onNavigate} />
+          </div>
+          <FoldersIndexTable summary={summary} canManage={canManage} />
+        </>
+      )}
     </section>
   )
 }

@@ -132,6 +132,30 @@ export interface ReembedProgress {
   remaining: number | null
   model: string | null
   updated_at: number | null
+  /** Phase 217.1 (BE-3 / D-217.1-27) — the distinguishable scope marker: absent for an
+   *  unscoped re-index, `"folder_empty"` or `"already_current"` for a scoped one. */
+  scope?: "folder_empty" | "already_current"
+}
+
+/** Phase 217.1 (BE-2 / D-217.1-27) — the wire shape of GET /library/index-summary. */
+export interface FolderIndexRow {
+  folder_id: string | null
+  name: string
+  documents: number
+  chunks: number
+  vectors: number
+  last_indexed: string | null
+}
+
+export interface IndexSummary {
+  vectors: number | null
+  chunks_total: number | null
+  documents_without_vectors: number | null
+  last_indexed: string | null
+  model: string | null
+  dimensions: number | null
+  provider: string | null
+  folders: FolderIndexRow[]
 }
 
 /** GET /settings/reembed-progress — reconcile-on-fetch progress for the status card. */
@@ -143,9 +167,13 @@ export async function getReembedProgress(): Promise<ReembedProgress> {
 }
 
 /** POST /settings/reembed — manual "Re-embed now" re-kick of a failed/partial run. */
-export async function kickReembed(): Promise<ReembedProgress> {
+export async function kickReembed(opts?: { folder_ids?: string[] }): Promise<ReembedProgress> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/settings/reembed`, { method: "POST", headers })
+  const res = await fetch(`${API_BASE}/settings/reembed`, {
+    method: "POST",
+    headers,
+    body: opts && opts.folder_ids ? JSON.stringify({ folder_ids: opts.folder_ids }) : undefined,
+  })
   if (!res.ok) throw new Error("Failed to start re-embed")
   return res.json() as Promise<ReembedProgress>
 }
