@@ -15,18 +15,31 @@
  * SECURITY (T-087-04): every cell renders via React text children ({cell}) —
  * React auto-escapes, so a cell containing `<img src=x onerror=…>` renders as
  * literal text. ZERO raw-HTML injection on file content.
+ *
+ * ⚠ Phase 217 Plan 11 — THE RENDERING MOVED, THE PARSING DID NOT. The <table>, its
+ * horizontal scroll container, the size caps and the fallback arm now live in
+ * `DataTableView.tsx` so the Library's extracted-tables section shares them rather than
+ * forking them. This file keeps what is genuinely CSV-specific: the quote-aware parser,
+ * its own caps decision (taken on the RAW STRING, before parsing — a delegate cap on the
+ * parsed cells would be a weaker guard) and its own three fallback sentences.
+ * ⛔ Its public props and every one of its behaviours are unchanged; the shipped suite
+ * passing untouched is the proof of that.
  */
-import { Download } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {
+  DataTableView,
+  DataTableFallback,
+  MAX_BYTES,
+  MAX_ROWS,
+} from "./DataTableView"
 
 interface CsvTablePreviewProps {
   content: string
   onDownload?: () => void
 }
 
-// Size caps (T-087-07 DoS guard): short-circuit BEFORE building DOM.
-const MAX_BYTES = 256_000
-const MAX_ROWS = 2000
+// ⚠ The caps are IMPORTED, not re-declared — one number, one place. This file still
+// DECIDES when to apply them (on the raw string, before parsing); `DataTableView` applies
+// the same numbers to whatever it is finally handed.
 
 /**
  * Quote-aware CSV row splitter. Returns a 2D array of string cells, or `null`
@@ -96,83 +109,26 @@ function parseCsv(content: string): string[][] | null {
   return rows
 }
 
-function Fallback({
-  message,
-  onDownload,
-}: {
-  message: string
-  onDownload?: () => void
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-      <p className="text-[13px] text-panel-muted-foreground">{message}</p>
-      {onDownload && (
-        <button
-          type="button"
-          onClick={onDownload}
-          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-primary hover:bg-accent transition-colors"
-        >
-          <Download className="h-3.5 w-3.5" aria-hidden="true" />
-          Download
-        </button>
-      )}
-    </div>
-  )
-}
-
 export function CsvTablePreview({ content, onDownload }: CsvTablePreviewProps) {
   // T-087-07: size cap BEFORE parsing/building DOM.
   if (content.length > MAX_BYTES) {
-    return <Fallback message="File too large to preview" onDownload={onDownload} />
+    return <DataTableFallback message="File too large to preview" onDownload={onDownload} />
   }
 
   const rows = parseCsv(content)
 
   if (!rows) {
     return (
-      <Fallback message="No preview available · Download" onDownload={onDownload} />
+      <DataTableFallback message="No preview available · Download" onDownload={onDownload} />
     )
   }
 
   if (rows.length > MAX_ROWS) {
-    return <Fallback message="File too large to preview" onDownload={onDownload} />
+    return <DataTableFallback message="File too large to preview" onDownload={onDownload} />
   }
 
   const [header, ...body] = rows
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse font-mono text-[13px]">
-        <thead>
-          <tr>
-            {header.map((cell, i) => (
-              <th
-                key={i}
-                className={cn(
-                  "border-b border-border px-2.5 py-1.5 text-left",
-                  "font-medium text-foreground whitespace-nowrap",
-                )}
-              >
-                {cell}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {body.map((r, ri) => (
-            <tr key={ri} className="hover:bg-accent/40">
-              {r.map((cell, ci) => (
-                <td
-                  key={ci}
-                  className="border-b border-border/50 px-2.5 py-1.5 text-panel-muted-foreground whitespace-nowrap"
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+  // One renderer, shared with the Library's extracted tables (Phase 217 Plan 11).
+  return <DataTableView headers={header} rows={body} />
 }
