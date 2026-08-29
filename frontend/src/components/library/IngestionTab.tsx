@@ -33,7 +33,8 @@ import {
   stageTermKey,
   type IngestionStage,
 } from "@/components/ingestion/ingestionStages"
-import { usePlainLabel, useTechnicalNamesOptional, type TermKey } from "@/lib/termMap"
+import { usePlainLabel, type TermKey } from "@/lib/termMap"
+import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { classifyIngestionError } from "@/components/library/ingestionErrorVocabulary"
 import { formatBytes } from "@/lib/formatBytes"
 import { reingestDocument } from "@/lib/api"
