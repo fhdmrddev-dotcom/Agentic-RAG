@@ -87,6 +87,16 @@ export {
   renameFolder,
   deleteFolder,
   toggleFolderOrgShared,
+  // Phase 217 (LIB-04 / D-217-04) — the five document-detail reads. ⚠ These MUST be here:
+  // a symbol exported from `api/documents.ts` and forgotten in this barrel typechecks
+  // perfectly and is invisible to every consumer, because everything outside `lib/`
+  // imports `@/lib/api` (D-207-06). `apiBarrel.test.ts` now guards that mechanically for
+  // this module, so the omission reds instead of shipping silently.
+  getDocumentContent,
+  listDocumentChunks,
+  listDocumentTables,
+  listDocumentImages,
+  listDocumentQueries,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────

@@ -10,7 +10,16 @@
  * count it is supposed to hold still (the 187-24 trap — measured here, not feared).
  */
 
-import type { Document, Folder, WorkspaceFile } from "../../types"
+import type {
+  Document,
+  DocumentChunkRow,
+  DocumentContentResponse,
+  DocumentImageRow,
+  DocumentQueryRow,
+  DocumentTableRow,
+  Folder,
+  WorkspaceFile,
+} from "../../types"
 import { API_BASE, getAuthHeaders, getAuthToken } from "./_core"
 export async function listDocuments(): Promise<Document[]> {
   const headers = await getAuthHeaders()
@@ -278,4 +287,88 @@ export async function toggleFolderOrgShared(id: string): Promise<Folder> {
     throw new Error("Failed to update folder sharing")
   }
   return res.json() as Promise<Folder>
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 217 (LIB-04 / D-217-04) — the five document-DETAIL reads.
+//
+// `document_chunks.content` has been stored since migration 002 and `full_markdown` since
+// the pipeline's terminal write; until plans 02/03 landed these routes nothing in the
+// browser could reach either. Each function is `listDocuments`' exact shape — the shared
+// `getAuthHeaders()` -> `fetch` -> `if (!res.ok) throw` -> `res.json() as Promise<T>` —
+// and each throws a DISTINCT message, so a section's error arm can say which read failed
+// rather than sharing one anonymous "Failed to load".
+//
+// ⚠ Every one of these MUST also be re-exported from `lib/api.ts`. A symbol exported from
+// this module and forgotten in the barrel typechecks perfectly and is invisible to every
+// consumer (D-207-06) — `apiBarrel.test.ts` now guards that for this module, not only for
+// `connectors.ts`.
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** GET /documents/{id}/content — the parsed text, sliced to a line range, UNNUMBERED.
+ *
+ *  ⚠ The query parameters are `start_line` / `end_line`, which is what
+ *  `documents.py:883-887` declares — NOT `from` / `to`. Both are 1-based and inclusive.
+ *  Omitting `endLine` asks the server for ONE page (`CONTENT_PAGE_LINES` = 500); an
+ *  explicit span is capped server-side at `CONTENT_MAX_LINES` = 2000 and the envelope's
+ *  `end_line` reports what was actually served, so `has_more` is authoritative and never
+ *  re-derived here.
+ *
+ *  A document with no parsed text is a 200 with `content: ""` — NOT a 404. Only a document
+ *  the caller cannot see is a 404 (217-02's `error_kind` discriminator makes that split on
+ *  the server, so this client never sniffs an error string). */
+export async function getDocumentContent(
+  id: string,
+  opts?: { startLine?: number; endLine?: number },
+): Promise<DocumentContentResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (opts?.startLine != null) params.set("start_line", String(opts.startLine))
+  if (opts?.endLine != null) params.set("end_line", String(opts.endLine))
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/documents/${id}/content${qs ? `?${qs}` : ""}`, { headers })
+  if (!res.ok) throw new Error("Failed to load document text")
+  return res.json() as Promise<DocumentContentResponse>
+}
+
+/** GET /documents/{id}/chunks — the chunks the agent actually searches, in `chunk_index`
+ *  order. `embedding_model` / `embedding_dimensions` are per-CHUNK because their variation
+ *  mid-re-embed is the whole point (D-217-08): a half-re-embedded document is a fact only
+ *  this list can show. */
+export async function listDocumentChunks(id: string): Promise<DocumentChunkRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/chunks`, { headers })
+  if (!res.ok) throw new Error("Failed to load document chunks")
+  return res.json() as Promise<DocumentChunkRow[]>
+}
+
+/** GET /documents/{id}/tables — the extracted tables, in `table_index` order.
+ *  ⚠ Owner-only by migration 108: a document reached through SOMEONE ELSE'S globally
+ *  visible folder returns an empty list here, and that is correct rather than a failure
+ *  (the row's `table_count` badge, computed through the same client, already reads 0). */
+export async function listDocumentTables(id: string): Promise<DocumentTableRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/tables`, { headers })
+  if (!res.ok) throw new Error("Failed to load document tables")
+  return res.json() as Promise<DocumentTableRow[]>
+}
+
+/** GET /documents/{id}/images — the image DESCRIPTIONS.
+ *  ⚠ There is no picture on this wire and there never can be: `document_images` stores no
+ *  bytes, so the description IS the image. Same owner-only asymmetry as tables. */
+export async function listDocumentImages(id: string): Promise<DocumentImageRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/images`, { headers })
+  if (!res.ok) throw new Error("Failed to load document images")
+  return res.json() as Promise<DocumentImageRow[]>
+}
+
+/** GET /documents/{id}/queries — the searches that returned this document, within the
+ *  backend's rolling window. `query_text` is null on rows written by the view/filter path
+ *  (D-115-10), which records a `via` and no question. */
+export async function listDocumentQueries(id: string): Promise<DocumentQueryRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/queries`, { headers })
+  if (!res.ok) throw new Error("Failed to load the searches that found this document")
+  return res.json() as Promise<DocumentQueryRow[]>
 }
