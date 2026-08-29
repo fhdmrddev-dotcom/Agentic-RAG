@@ -562,8 +562,22 @@ ok("D4-control2 · the walker finds a column that IS surfaced (table_count)",
   feMentions("table_count").length > 0, "if this is 0 the walker is broken, not the codebase")
 
 const buried = feMentions("full_markdown")
-ok("D4 · ⭐ documents.full_markdown is stored and has ZERO non-test frontend references",
-  buried.length === 0, `frontend refs: ${buried.join(", ") || "none"}`)
+// ⚠ INVERTED 2026-08-29 (217-10 close, orchestrator). The ORIGINAL claim is preserved below
+// rather than overwritten, because it going false is the POINT — not a regression.
+//
+//   ORIGINAL: ok("D4 · documents.full_markdown is stored and has ZERO non-test frontend
+//             references", buried.length === 0)
+//
+// That fence audited a BURIED capability: the parsed text was stored and no frontend surface
+// read it. Phase 217 plan 10 shipped DocumentContentSection.tsx + lib/api/documents.ts, which is
+// LIB-04 delivered — so the fence began failing at the exact moment its subject stopped being a
+// defect. Like 217-04's H2b, a verbatim check cannot tell "still buried (bad)" from
+// "deliberately surfaced (the goal)"; it measured the symptom, not the property.
+//
+// It now asserts the capability IS reachable, which is the property worth defending from here on
+// — a later refactor that quietly drops the last reader would re-bury it, and this reds.
+ok("D4 · ⭐ documents.full_markdown is SURFACED — the buried capability was un-buried by LIB-04",
+  buried.length > 0, `frontend refs: ${buried.join(", ") || "NONE — it has been re-buried"}`)
 ok("D4b · …and the schema really does store it",
   /full_markdown text/.test(src("supabase/full-schema.sql") || ""))
 // ⚠ the audit TABLE is `data-meta` by design — it is analysis about the product, not a

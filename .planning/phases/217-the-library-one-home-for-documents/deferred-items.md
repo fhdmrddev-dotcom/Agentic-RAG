@@ -72,3 +72,30 @@ It now strips comments and reads code only.
 **Carry-forward:** a fence that reads a *rendering* of a value breaks when the rendering is
 improved. Prefer reading the constant. And every extract-then-quantify fence needs a
 non-vacuity control beside it — the empty set satisfies `every` and `!includes` silently.
+
+---
+
+## RESOLVED 2026-08-29 — sketch fence `D4` inverted (orchestrator, at 217-10's merge)
+
+`D4` asserted `documents.full_markdown` has **zero** non-test frontend references — a
+BURIED-CAPABILITY audit: the parsed text was stored and nothing read it. Plan 217-10 shipped
+`DocumentContentSection.tsx` + `lib/api/documents.ts`, so the fence began failing **at the exact
+moment its subject stopped being a defect**. That is LIB-04 delivered, not a regression.
+
+Same class as 217-04's `H2b`: **a verbatim check cannot tell "still buried (bad)" from
+"deliberately surfaced (the goal)"** — it measured the symptom rather than the property.
+
+Inverted to assert the capability IS reachable, which is the property worth defending from here
+on: a later refactor that quietly drops the last reader re-buries it, and this now reds. The
+original claim is preserved verbatim in a comment above it, never overwritten.
+
+⚠ **My first RED control did not fire, and the fence was innocent — I was wrong.** I renamed
+`full_markdown` -> `full_markdownXX`, and `feMentions` uses a **substring** `includes()`, so the
+needle was still present. Re-driven with a true rename (`-> parsedBody`): `refs = 0`, `D4` fires,
+both files restored **md5-identical**, drive back to `199 passed / 0 failed`. Recorded because a
+control that silently fails to fire is exactly how a fence gets believed without evidence.
+
+⚠ **PREDICTED for wave 5 — `D5c` is the next one to go obsolete the same way.** It asserts *"the
+frontend renders only COUNTS of tables/images today"*. Plan 217-11 renders tables as tables and
+image descriptions, which makes that claim false BY SUCCEEDING. Plan 11's agent has been told to
+invert it rather than delete it, on this same pattern.
