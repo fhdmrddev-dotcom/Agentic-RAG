@@ -407,7 +407,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 217-11-PLAN.md — tables as tables, image descriptions, the questions that found it
+- [x] 217-11-PLAN.md — tables as tables, image descriptions, the questions that found it
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
