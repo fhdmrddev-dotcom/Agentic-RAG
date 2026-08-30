@@ -32,13 +32,13 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 216 — Connections in Chat, and One File In by Hand (READY FOR PLANNING)
+**Current focus:** Phase 216 — Connections in Chat, and One File In by Hand (PLANNED)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 216 (connections-in-chat-and-one-file-in-by-hand) — **DISCUSSED & READY FOR PLANNING (16 locked decisions D-216-01..16 in 216-CONTEXT.md)**, 2026-08-30
-Next: `/gsd:plan-phase 216`
+Phase: 216 (connections-in-chat-and-one-file-in-by-hand) — **PLANNED (5 plans in 3 waves, 216-01..05-PLAN.md, 216-RESEARCH.md, 216-VALIDATION.md, 216-PATTERNS.md)**, 2026-08-30
+Next: `/gsd:execute-phase 216`
 Prior Phase: 215 (BYO OAuth) — COMPLETED & VERIFIED (5 of 5 plans executed, 20/20 pytest tests green, 5/5 vitest OAuth green, count gate 171/171 OK, 6929/6929 tests green), live Google OAuth verified.
 Phase 220 (a-drawing-becomes-quantities-spike) is 4/4 complete and verified.
 Phase 217.1 (the-library-exactly-as-sketched) is 18/18 complete + all 4 UAT observations and visual enhancements resolved.
