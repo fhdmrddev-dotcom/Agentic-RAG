@@ -652,23 +652,18 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         </div>
 
         {/* Phase 111.1 follow-up #1: the slim "search is catching up" pointer.
-            Self-fetches re-embed progress; auto-hides when nothing is pending. The
-            deep-link switches to Settings and scrolls the status card into view. */}
+            Self-fetches re-embed progress; auto-hides when nothing is pending.
+            Deep-links directly to the Indexing tab where ReembedStatusCard lives. */}
         <div className="mb-4">
           <ReembedSearchPointer
-            onViewProgress={
-              onNavigate
-                ? () => {
-                    onNavigate("settings")
-                    // Let the Settings view mount before scrolling its card in.
-                    setTimeout(() => {
-                      document
-                        .getElementById("reembed-status-card")
-                        ?.scrollIntoView({ behavior: "smooth", block: "center" })
-                    }, 100)
-                  }
-                : undefined
-            }
+            onViewProgress={() => {
+              dispatch({ type: "SELECT_TAB", tab: "indexing" })
+              setTimeout(() => {
+                document
+                  .getElementById("reembed-status-card")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
+              }, 100)
+            }}
           />
         </div>
 

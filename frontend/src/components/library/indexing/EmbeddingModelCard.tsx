@@ -9,6 +9,7 @@
  * via the exact `onNavigate("settings")` + scroll-into-view shape `LibraryPage.tsx:585-597`
  * already uses, targeting the existing `#reembed-status-card` id.
  */
+import { useState } from "react"
 import type { IndexSummary } from "@/lib/api"
 import { kickReembed } from "@/lib/api"
 
@@ -40,6 +41,7 @@ export function EmbeddingModelCard({
   /** Routes to Settings' shipped model picker — never a second picker here. */
   onNavigate?: (view: string) => void
 }) {
+  const [reindexing, setReindexing] = useState(false)
   const loading = summary === null
   const model = summary?.model
   const dimensions = summary?.dimensions
@@ -74,12 +76,18 @@ export function EmbeddingModelCard({
             <button
               type="button"
               data-testid="reindex-everything"
-              onClick={() => {
-                void kickReembed()
+              disabled={reindexing}
+              onClick={async () => {
+                setReindexing(true)
+                try {
+                  await kickReembed()
+                } finally {
+                  setTimeout(() => setReindexing(false), 2000)
+                }
               }}
-              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors"
+              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-60"
             >
-              Re-index everything
+              {reindexing ? "Starting..." : "Re-index everything"}
             </button>
           </div>
         )}
