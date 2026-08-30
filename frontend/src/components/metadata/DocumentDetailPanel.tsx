@@ -35,6 +35,7 @@ import { DocumentChunksSection } from "./DocumentChunksSection"
 import { DocumentTablesSection } from "./DocumentTablesSection"
 import { DocumentImagesSection } from "./DocumentImagesSection"
 import { DocumentQueriesSection } from "./DocumentQueriesSection"
+import { TakeoffSection } from "./TakeoffSection"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
@@ -154,6 +155,7 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   const [tableTotal, setTableTotal] = useState<number | null>(null)
   const [imageTotal, setImageTotal] = useState<number | null>(null)
   const [queryTotal, setQueryTotal] = useState<number | null>(null)
+  const [takeoffTotal, setTakeoffTotal] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -195,6 +197,7 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
     setTableTotal(null)
     setImageTotal(null)
     setQueryTotal(null)
+    setTakeoffTotal(null)
   }, [doc.id])
 
   useEffect(
@@ -284,6 +287,23 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
             ))}
           </div>
         </PanelSection>
+
+        {/* Phase 220 (TAKEOFF-04) — CAD Drawing Takeoff & Grounded Quantities BOQ */}
+        {(doc.filename.toLowerCase().endsWith(".dxf") || !!doc.metadata?._takeoff) && (
+          <PanelSection
+            title="Takeoff"
+            count={takeoffTotal ?? undefined}
+            defaultOpen
+          >
+            <div className="px-4 pt-1 pb-3">
+              <TakeoffSection
+                doc={doc}
+                onTotalChange={setTakeoffTotal}
+                onRefresh={onReconcile}
+              />
+            </div>
+          </PanelSection>
+        )}
 
         {/* ── Phase 217 (LIB-04 / D-217-04 / D-217-25a) — the document's OWN content, ──
             INSERTED between Details and Relationships, never appended after them. The
