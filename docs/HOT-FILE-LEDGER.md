@@ -2361,10 +2361,10 @@ idiom as `documents.py:2296`. A future dims-change re-embed NULLs it via `resize
 
 ### `backend/app/api/documents.py`
 
-**Re-derived 2026-08-29: `71 commits / 31 phases / 2535 L`** · six-digit dated quick-task buckets:
-**present** (the recipe's own warning) · **G-5 FIRES HARD** (31 phases vs threshold 3) — ⚠ **absent from
-this ledger for its ENTIRE LIFE**, among the hottest files in the repository. Row added by 217.1-08, the
-first plan to structurally edit it this phase.
+**Re-derived 2026-08-30 (Phase 217.1 close): `72 commits / 30 phases / 2535 L`** · six-digit dated
+quick-task buckets (`260328`, `260405`) present and subtracted (the recipe's own warning) · **G-5 FIRES
+HARD** (30 phases vs threshold 3) — ⚠ **absent from this ledger for its ENTIRE LIFE**, among the hottest
+files in the repository. Row added by 217.1-08, the first plan to structurally edit it this phase.
 
 **What 217.1-08 did:** added `"embedded_at": datetime.now(timezone.utc).isoformat()` to the main-ingest
 chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_service.py:423` and `:896`,
@@ -6482,7 +6482,7 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 ### `frontend/src/components/ingestion/DocumentList.tsx`
 
-**Triple re-derived 2026-08-28: `22 / 12 / 609` — G-5: ⚠ FIRES.** ⚠ **Absent from both registers for its entire life at twelve phases**, alongside `retrieval_service.py` at nine. That is the exact failure Phase 214's close found twenty-five further instances of.
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `24 / 13 / 294` — G-5: ⚠ FIRES.** ⚠ **Absent from both registers for its entire life at thirteen phases**, alongside `retrieval_service.py` at nine. That is the exact failure Phase 214's close found twenty-five further instances of.
 
 ⚠ **THE COLUMN ORDER IS LOAD-BEARING AND IT IS ENFORCED FROM ANOTHER FILE.** The seven columns are fixed — `chevron · Filename · Type · Size · Chunks · Status · Actions` — because `LibraryPage.tsx` (renamed from `IngestionPage.tsx` at Phase 217) sheds columns 3–5 positionally (`[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`) when the 430px detail panel opens or the viewport drops below 768px. **Reordering these columns silently breaks a rule written in a file this one does not import.** Sketch 218 pins the order in `COPY.COLUMNS` and asserts it against this file.
 
@@ -6490,11 +6490,15 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 **The named seam:** the row is the extraction. Twelve phases of per-row affordances (status, stage, marks, actions, selection) live in one file; a `DocumentRow` with the table owning only ordering and shedding is the cut.
 
+✅ **THE SEAM WAS TAKEN (217.1-05)** — `DocumentRow.tsx` is extracted with the sketch's five affordances,
+and the table sheds its per-row branches. The `294 L` (down from `609`) is the extraction; the 7-column
+order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-child`.
+
 ---
 
 ### `frontend/src/pages/LibraryPage.tsx`
 
-**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `28 / 10 / 724` — G-5: ⚠ FIRES.** ⚠ **`217-04`'s own re-derivation five commits earlier read `27 / 10 / 603` and is preserved rather than overwritten — the file grew `+121 L` inside a single phase.** Same-day staleness is this ledger's most-repeated finding; it has now been demonstrated twice on this one file. ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `35 / 11 / 814` — G-5: ⚠ FIRES.** ⚠ **The 2026-08-29 close measured `28 / 10 / 724` and is preserved rather than overwritten — Phase 217.1's five-tab shell grew it `+90 L`.** Same-day staleness is this ledger's most-repeated finding; it has now been demonstrated three times on this one file. ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
 
 ⚠ **RENAMED AT PHASE 217 (SC#1 / D-217-01): `IngestionPage.tsx` → `LibraryPage.tsx`, 2026-08-29.** It was a `git mv`, so **the history FOLLOWS the move** — but `git log --oneline -- frontend/src/pages/LibraryPage.tsx` without `--follow` reports **1**, not 27. A re-derive that reads `1 / 1 / 603` has measured the RENAME, not the file; use `git log --follow --oneline -- <file>` (and `--follow --format=%s` for the phase buckets) at this path and do not read the small number as a reset. The 2026-08-29 triple was derived by adding this commit to the old path's measured 26 commits / 9 phases (`03, 08, 29, 47, 111.1, 112, 114, 153, 165` — the six-digit buckets `260328` and `260405` are dated quick tasks and are subtracted).
 
@@ -6506,7 +6510,7 @@ lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task 
 
 **The named seam:** the sidebar, the filter bar and the grid are three independent concerns in one component. With a tab shell arriving, extract the shell first and let each tab own its body — otherwise the tab bar becomes the tenth conditional branch.
 
-⚠ **THE SEAM WAS OWED AT `217-04` — that plan was a pure rename and said so. ✅ `217-09` TOOK IT.** The shell owns ONE selection reducer (`pages/librarySelection.ts`) and each tab body is a CHILD component (`library/IngestionTab.tsx`, `IndexingTab.tsx`, `ViewsTab.tsx`), so the tab bar did **not** become the tenth conditional branch — which was the seam's whole stated purpose. The `+121 L` above is shell, not branching.
+⚠ **THE SEAM WAS OWED AT `217-04` — that plan was a pure rename and said so. ✅ `217-09` TOOK IT.** The shell owns ONE selection reducer (`pages/librarySelection.ts`) and each tab body is a CHILD component (`library/IngestionTab.tsx`, `IndexingTab.tsx`, `ViewsTab.tsx`), so the tab bar did **not** become the tenth conditional branch — which was the seam's whole stated purpose. The `+121 L` above is shell, not branching. **Phase 217.1 added the fifth tab the same way** — `HealthTab.tsx` is another CHILD, and the `+90 L` is tab wiring, not a branch.
 
 ✅ **AND THE GATE ADOPTION IS DISCHARGED (`217-12`).** This file's suite was in **NEITHER** count-gate knob for its entire life — which is exactly how `LibraryPage.test.tsx` sat **RED at HEAD** (an incomplete `@/lib/supabase` mock factory omitting `SUPABASE_CLIENT_REHYDRATED`, fixed in `217-04`) with nobody able to see it. It is now a TARGETS **file** entry and a BASELINE pin at **12**, both read from the gate's own printed `— 12 new` row.
 
@@ -6584,9 +6588,9 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 ### `frontend/src/pages/KnowledgeHealthPage.tsx`
 
-**Triple re-derived 2026-08-28: `11 / 5 / 571` — G-5: ⚠ FIRES.** ⚠ Absent at five phases.
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `12 / 6 / 0` — the file is DELETED.** ✅ **RETIRED by 217.1-14** — the Library's Health tab absorbed its four signals. ⚠ Absent for its entire life (row added 2026-08-28 at `11 / 5 / 571`).
 
-⚠⚠ **IT IS `ChatLayout`'s POSITIONAL FALLBACK, AND THAT IS THE MOST IMPORTANT FACT ABOUT IT.** `ChatLayout.tsx:879` renders it as the trailing `else` of the view chain, and `App.tsx:98-101` states the consequence in its own words: *"a union member with no branch **silently renders Knowledge Health**"*. **Retiring this page into the Library removes what the app shows when nothing matches** — a mis-route degrades from *wrong page* to *blank screen* unless a replacement fallback ships in the same commit.
+⚠⚠ **IT WAS `ChatLayout`'s POSITIONAL FALLBACK, AND THE RETIREMENT HAD TO REPLACE THAT FIRST.** Before 217.1-14, `ChatLayout.tsx:879` rendered it as the trailing `else` of the view chain, and `App.tsx:98-101` stated the consequence in its own words: *"a union member with no branch **silently renders Knowledge Health**"*. The retirement shipped `UnknownViewFallback` (`ChatLayout.tsx:871`) in the SAME commit, so a mis-route degrades to the honest *unknown view* card rather than a blank screen — the replacement-fallback rule was honoured, not waived.
 
 ⭐ **It already ships the four-tab shell the Library's Health tab absorbs** — `Most Retrieved · Never Retrieved · Stale · Low Confidence`, the last with a `By Document / By Query` sub-tab — plus four stat cards (`Total Docs · Coverage % · Retrieval Score · Active This Month`) and a Coverage Trend chart. It carries the app's **one shipped code-split**, which `WorkflowBuilderPage` mirrors.
 
@@ -6606,13 +6610,13 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 **The named seam:** five paginated metric helpers with near-identical shapes, plus a summary that re-invokes two of them. One windowed-aggregate helper parameterised by predicate is the cut.
 
-⚠ **217.1-11 (BE-4 / LIB-06) structurally edited `_fetch_retrieval_trend`** — it now branches into THREE series (`could_not_search` / `found_something` / `found_nothing`) while preserving `retrieval_count`'s meaning byte-for-byte (an error row is EXCLUDED from `retrieval_count`, so a provider outage can never make the shipped Coverage Trend chart rise). The characterization test in `test_2171_trend_segments.py` pinned the pre-edit meaning first (D-217.1-34) and re-proves it post-edit. Triple re-derived 2026-08-29: **`10 / 5 / 737`**.
+⚠ **217.1-11 (BE-4 / LIB-06) structurally edited `_fetch_retrieval_trend`** — it now branches into THREE series (`could_not_search` / `found_something` / `found_nothing`) while preserving `retrieval_count`'s meaning byte-for-byte (an error row is EXCLUDED from `retrieval_count`, so a provider outage can never make the shipped Coverage Trend chart rise). The characterization test in `test_2171_trend_segments.py` pinned the pre-edit meaning first (D-217.1-34) and re-proves it post-edit. Triple re-derived 2026-08-30 (Phase 217.1 close): **`11 / 6 / 737`**.
 
 ---
 
 ### `backend/app/services/tool_dispatcher.py`
 
-**Triple re-derived 2026-08-29: `66 / 29 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase.
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `67 / 28 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase. (The `66 / 29` figure counts `260529`/`260705` as phases; the recipe subtracts six-digit quick-task buckets, so the corrected count is 28.)
 
 **What 217.1-11 did (BE-4 + BE-5):**
 1. **BE-4 — the error-path `search.query` audit write.** `_handle_search_documents`'s `except` block previously returned before any audit write, so a provider outage was indistinguishable from "your library had no answer" (BUG-260815-05's blast radius: embedding has no provider fallback, so a zero balance zeroes retrieval for the WHOLE KB). The error arm now writes `document_ids: []` + `retrieval_status: "provider_error"` — the classified literal, NEVER `str(exc)` (T-217.1-15b).
