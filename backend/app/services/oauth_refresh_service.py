@@ -262,3 +262,7 @@ async def get_valid_oauth_token(
 
         # Fallback to current token if refresh didn't complete
         return decrypt_token_value(token_row["access_token_ciphertext"])
+
+
+# Alias for callers
+get_fresh_access_token = get_valid_oauth_token

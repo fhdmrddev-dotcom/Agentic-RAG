@@ -116,7 +116,7 @@ No `supabase-py` call is made in this module. Every DB touch happens inside
 `run_in_threadpool(query.execute)` (D-v2.5-01).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from supabase import Client
 
@@ -967,6 +967,117 @@ async def get_connection_oauth_token_status(
         return OAuthTokenResponse(**row)
     except connector_service.ConnectorNotFound:
         raise _NOT_FOUND
+
+
+@router.get(
+    "/connections/{connection_id}/files",
+    summary="List browseable files in connected cloud storage (ATTACH-01)",
+)
+async def list_connection_files(
+    connection_id: str,
+    query: str | None = None,
+    page_token: str | None = None,
+    page_size: int = 30,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Phase 216 (ATTACH-01 / D-216-09): Browse files in cloud storage."""
+    from app.services.cloud_storage import list_cloud_files
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        res = await list_cloud_files(conn, query=query, page_token=page_token, page_size=page_size)
+        return res
+    except Exception as exc:
+        logger.error("Failed to list files from connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Cloud storage provider returned an error: {exc}",
+        )
+
+
+@router.post(
+    "/connections/{connection_id}/files/{file_id}/import",
+    summary="Import one named file from connected cloud storage (ATTACH-01)",
+)
+async def import_connection_file(
+    connection_id: str,
+    file_id: str,
+    background_tasks: BackgroundTasks,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Phase 216 (ATTACH-01 / D-216-09): User-initiated single file import."""
+    from uuid import uuid4
+    from app.services.cloud_storage import fetch_cloud_file
+    from app.api.documents import _upload_pipeline
+    from app.dependencies import get_supabase
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        filename, raw_bytes, mime_type = await fetch_cloud_file(conn, file_id)
+    except Exception as exc:
+        logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to download cloud file: {exc}",
+        )
+
+    doc_id = str(uuid4())
+    storage_path = f"{user['id']}/{doc_id}/{filename}"
+
+    # Create document row in database
+    doc_row = {
+        "id": doc_id,
+        "user_id": user["id"],
+        "filename": filename,
+        "mime_type": mime_type,
+        "file_size": len(raw_bytes),
+        "status": "processing",
+        "storage_path": storage_path,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    await aexec(supabase.table("documents").insert(doc_row))
+
+    # Ingest in background
+    srv_supabase = get_supabase()
+    background_tasks.add_task(
+        _upload_pipeline,
+        document_id=doc_id,
+        raw=raw_bytes,
+        mime_type=mime_type,
+        filename=filename,
+        user_id=user["id"],
+        storage_path=storage_path,
+        supabase=srv_supabase,
+    )
+
+    return {
+        "id": doc_id,
+        "filename": filename,
+        "mime_type": mime_type,
+        "file_size": len(raw_bytes),
+        "status": "processing",
+    }
+
 
 
 

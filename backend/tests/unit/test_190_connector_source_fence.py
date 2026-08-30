@@ -618,6 +618,8 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
         # module's "WHY LAZY IMPORT" block — a module-scope form would join the cycle.
         "app/api/connectors.py",
         "app/services/connectors/descriptors.py",
+        # Phase 216 (CHAT-05 / D-216-04) — tool_dispatcher resolves first-party capability adapters at dispatch.
+        "app/services/tool_dispatcher.py",
     ], (
         f"the connector registry now has function-local importers in unexpected files: "
         f"{function_local_importers!r}. These do NOT open the import cycle (they run at call "
