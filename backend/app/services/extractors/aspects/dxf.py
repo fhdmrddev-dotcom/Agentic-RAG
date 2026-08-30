@@ -41,14 +41,24 @@ def extract_dxf_takeoff(raw_bytes: bytes, filename: str = "") -> dict[str, Any]:
 
     Raises ValueError if the DXF is malformed or unreadable.
     """
+    import os
+    import tempfile
     import ezdxf
 
+    tmp_path = None
     try:
-        # ezdxf.read accepts a text stream
-        text_stream = io.StringIO(raw_bytes.decode("utf-8", errors="replace"))
-        doc = ezdxf.read(text_stream)
+        with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as tmp:
+            tmp.write(raw_bytes)
+            tmp_path = tmp.name
+        doc = ezdxf.readfile(tmp_path)
     except Exception as exc:
         raise ValueError(f"Failed to parse DXF file {filename or 'unnamed'}: {exc}") from exc
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
     msp = doc.modelspace()
     unit_code = getattr(doc, "units", 0)

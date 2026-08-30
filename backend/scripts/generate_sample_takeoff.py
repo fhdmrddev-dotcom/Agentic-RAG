@@ -24,7 +24,7 @@ c_blk.add_line((0, 75), (250, 75))
 dr_blk = doc.blocks.new("DR-3684")
 dr_blk.add_circle((0, 0), 914)
 
-# Place counted instances
+# Place counted instances in modelspace
 for i in range(8):
     msp.add_blockref("W250x33", (i * 3000, 0))
 for i in range(4):
@@ -32,13 +32,18 @@ for i in range(4):
 for i in range(3):
     msp.add_blockref("DR-3684", (i * 8000, 8000))
 
-# Add dimensions
-msp.add_linear_dim(base=(0, -500), p1=(0, 0), p2=(24000, 0), dxfattribs={"layer": "DIMENSIONS"})
+# Add dimensions and render
+dim = msp.add_linear_dim(base=(0, -500), p1=(0, 0), p2=(24000, 0), dxfattribs={"layer": "DIMENSIONS"})
+dim.render()
 
-# Add engineer's specs & notes
+# Add engineer's specs & notes (MTEXT)
 msp.add_mtext(r'\A1;1/2" [12.5mm] GYPSUM BOARD\PFIRE RATED AT PARTITIONS', dxfattribs={"layer": "SPEC_NOTES"})
 msp.add_mtext(r'\A1;60 MIL EPDM ROOF MEMBRANE\POVER 2" RIGID INSULATION', dxfattribs={"layer": "ROOFING_SPEC"})
 msp.add_mtext(r'\A1;3/4" EXTERIOR PLYWOOD SHEATHING', dxfattribs={"layer": "EXTERIOR_SPEC"})
+
+# Add some lines on layers
+msp.add_line((0, 0), (24000, 0), dxfattribs={"layer": "GRID_X"})
+msp.add_line((0, 0), (0, 12000), dxfattribs={"layer": "GRID_Y"})
 
 dxf_file = os.path.join(out_dir, "sample_structural_drawing.dxf")
 doc.saveas(dxf_file)
