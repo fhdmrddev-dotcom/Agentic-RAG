@@ -722,6 +722,22 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
         from app.services.openai_service import resolve_effective_embedding_provider
         provider = resolve_effective_embedding_provider(getattr(ctx, "user_settings", None))
+        # BE-4 (217.1 / LIB-06 / D-217.1-34): a provider outage must be VISIBLE in the
+        # analytics. Without this write, a failed search is indistinguishable from "your
+        # library had no answer" — every `search.query` reader would count it (or not)
+        # exactly like a real search that found nothing. The row carries `document_ids: []`
+        # and the classified `retrieval_status: "provider_error"` literal — NEVER `str(exc)`,
+        # which stays in the ToolResult.retrieval_error response object (T-217.1-15b).
+        ctx.spawn(write_audit_entry(
+            user_id=ctx.current_user["id"],
+            action_type="search.query",
+            metadata={
+                "query_text": args["query"],
+                "document_ids": [],
+                "retrieval_status": "provider_error",
+            },
+            supabase=ctx.supabase,
+        ))
         return ToolResult(
             result=json.dumps({
                 "error": "retrieval_unavailable",
@@ -793,10 +809,25 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         for h in (results or [])
         if h.get("document_id") or h.get("id")
     })
+    # BE-5 (217.1 / LIB-07): persist the per-hit similarity the retrieval ALREADY returns
+    # (retrieval_service.py:173 — it was being thrown away before reaching audit_log.metadata,
+    # so `Average relevance` could only lie about a value the system has). Max similarity per
+    # document (a document can contribute several chunks), rounded to 3 dp — matching
+    # _fetch_low_confidence_queries' existing convention (knowledge_health.py:302).
+    _sims: dict[str, float] = {}
+    for h in (results or []):
+        _did = h.get("document_id") or h.get("id")
+        _s = h.get("similarity")
+        if _did and isinstance(_s, (int, float)):
+            _sims[_did] = max(_sims.get(_did, 0.0), round(float(_s), 3))
     ctx.spawn(write_audit_entry(
         user_id=ctx.current_user["id"],
         action_type="search.query",
-        metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
+        metadata={
+            "query_text": args["query"],
+            "document_ids": _audit_doc_ids,
+            "similarities": _sims,
+        },
         supabase=ctx.supabase,
     ))
 

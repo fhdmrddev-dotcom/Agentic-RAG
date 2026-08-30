@@ -37,6 +37,10 @@ def _run_trend(mock_builder, mock_execute_result, rows, days=7):
     return _fetch_retrieval_trend(_supabase_for(mock_builder), "user-1", days)
 
 
+def _today_row(trend):
+    return next(r for r in trend if r["date"] == datetime.now(timezone.utc).date().isoformat())
+
+
 def test_retrieval_count_means_a_search_that_ran(mock_builder, mock_execute_result):
     """PINS TODAY'S SHIPPED BEHAVIOR — every non-error row increments retrieval_count.
 
@@ -57,9 +61,50 @@ def test_retrieval_count_means_a_search_that_ran(mock_builder, mock_execute_resu
     ]
     trend = _run_trend(mock_builder, mock_execute_result, rows)
     # Both rows land on today's bucket.
-    today_row = next(r for r in trend if r["date"] == datetime.now(timezone.utc).date().isoformat())
+    today_row = _today_row(trend)
     assert today_row["retrieval_count"] == 2, (
         "retrieval_count must count every search.query row — a search that ran, "
         "success or legitimate zero-hit. Pinned BEFORE the BE-4 error-path write "
         "(D-217.1-34)."
     )
+
+
+def test_error_row_does_not_change_retrieval_count_but_increments_could_not_search(
+    mock_builder, mock_execute_result
+):
+    """POST-EDIT REGRESSION (D-217.1-34): adding one error row leaves retrieval_count
+    UNCHANGED (still 2) and increments a new could_not_search series instead.
+
+    This is the whole point of BE-4 — a provider outage must never make the shipped
+    Coverage Trend chart RISE.
+    """
+    today = _iso(0)
+    rows = [
+        {
+            "created_at": today,
+            "metadata": {"query_text": "q1", "document_ids": ["d-1", "d-2"]},
+        },
+        {
+            "created_at": today,
+            "metadata": {"query_text": "q2", "document_ids": []},
+        },
+        {
+            "created_at": today,
+            "metadata": {
+                "query_text": "q3",
+                "document_ids": [],
+                "retrieval_status": "provider_error",
+            },
+        },
+    ]
+    trend = _run_trend(mock_builder, mock_execute_result, rows)
+    today_row = _today_row(trend)
+    assert today_row["retrieval_count"] == 2, (
+        "retrieval_count must be UNCHANGED by an error row — a provider outage can never "
+        "make the Coverage Trend chart rise (D-217.1-34 / T-217.1-15a)"
+    )
+    assert today_row["could_not_search"] == 1, (
+        "the error row increments the new could_not_search series, never retrieval_count"
+    )
+    assert today_row["found_something"] == 1
+    assert today_row["found_nothing"] == 1

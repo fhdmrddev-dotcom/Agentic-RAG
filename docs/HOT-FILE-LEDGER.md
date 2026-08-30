@@ -6606,6 +6606,26 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 **The named seam:** five paginated metric helpers with near-identical shapes, plus a summary that re-invokes two of them. One windowed-aggregate helper parameterised by predicate is the cut.
 
+⚠ **217.1-11 (BE-4 / LIB-06) structurally edited `_fetch_retrieval_trend`** — it now branches into THREE series (`could_not_search` / `found_something` / `found_nothing`) while preserving `retrieval_count`'s meaning byte-for-byte (an error row is EXCLUDED from `retrieval_count`, so a provider outage can never make the shipped Coverage Trend chart rise). The characterization test in `test_2171_trend_segments.py` pinned the pre-edit meaning first (D-217.1-34) and re-proves it post-edit. Triple re-derived 2026-08-29: **`10 / 5 / 737`**.
+
+---
+
+### `backend/app/services/tool_dispatcher.py`
+
+**Triple re-derived 2026-08-29: `66 / 29 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase.
+
+**What 217.1-11 did (BE-4 + BE-5):**
+1. **BE-4 — the error-path `search.query` audit write.** `_handle_search_documents`'s `except` block previously returned before any audit write, so a provider outage was indistinguishable from "your library had no answer" (BUG-260815-05's blast radius: embedding has no provider fallback, so a zero balance zeroes retrieval for the WHOLE KB). The error arm now writes `document_ids: []` + `retrieval_status: "provider_error"` — the classified literal, NEVER `str(exc)` (T-217.1-15b).
+2. **BE-5 — the `similarities` key on the SAME success-path dict literal.** The per-hit similarity `retrieval_service.py:173` returns (and `tool_dispatcher.py` already copies into every citation) is now persisted as `{document_id: max_similarity}` on `audit_log.metadata` — it was being thrown away before reaching the analytics, so `Average relevance` could only lie about a value the system has.
+
+**What binds this file:**
+
+1. ⚠ **A SECOND `search.query` writer exists** at `:952-966` (the view/filter resolve path, tagged `via:"view"`) with its own swallowing `try/except`. 217.1-11 **DECLINED** the error-path treatment there (recorded in the plan's summary): the view/filter path's failure mode is a caught-and-absorbed resolve error that does not represent a provider outage the way the main search's `search_documents` exception does. A future LIB-06 undercount should re-open this.
+2. **The `provider_error` literal is minted ONCE** — `:738-742`'s `retrieval_error.retrieval_status` and the new audit write share the exact string; a second spelling would silently break `knowledge_health.py`'s `is_error` branch.
+3. **`retrieval_count`'s meaning is a contract** pinned by `test_2171_trend_segments.py` (D-217.1-34): every non-error `search.query` row counts, error rows never do.
+
+**Named seam (recorded, not taken):** `_handle_search_documents` (~170 lines carrying provider-error conversion, folder-scope clipping, citation accumulation AND the audit write) — the audit write is the natural extraction leaf once it becomes a two-call-site concern (the success write AND the new error write).
+
 ---
 
 ### `backend/app/api/document_governance.py`

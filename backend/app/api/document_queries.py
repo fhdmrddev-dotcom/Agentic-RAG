@@ -54,6 +54,10 @@ class DocumentQueryRow(BaseModel):
     query_text: str | None = None
     asked_at: datetime
     via: str | None = None  # "view" | "filter" | None (a plain semantic search records no `via`)
+    # BE-5 (217.1 / LIB-07): the max per-hit similarity for THIS document on THIS search,
+    # read from the persisted `metadata.similarities` map (BE-4/BE-5's write). None for a
+    # historic row that predates the key — renders "not recorded yet", never 0.
+    similarity: float | None = None
 
 
 @router.get("/{document_id}/queries", response_model=list[DocumentQueryRow])
@@ -89,6 +93,9 @@ async def list_document_queries(
                     query_text=meta.get("query_text") or None,
                     asked_at=row.get("created_at"),
                     via=meta.get("via") or None,
+                    # BE-5: the persisted per-hit similarity for THIS document. A historic
+                    # row lacking the key reads None ("not recorded yet"), never 0.
+                    similarity=(meta.get("similarities") or {}).get(document_id),
                 )
             )
         return rows
