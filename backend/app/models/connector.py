@@ -257,6 +257,8 @@ class ConnectorConnectionCreate(_StrictBase):
     """
 
     auth_type: AuthType = "static_key"
+    status: ConnectionStatus = "active"
+    error_message: str | None = None
     capability: ConnectorCapability | None = None
     service_id: ServiceId
     name: NonEmpty

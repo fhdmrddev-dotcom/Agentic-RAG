@@ -1417,8 +1417,9 @@ export function ConnectionsTab() {
 
   const handleCreate = useCallback(
     async (body: ConnectorConnectionCreate) => {
-      await createConnectorConnection(body)
+      const created = await createConnectorConnection(body)
       reload()
+      return created
     },
     [reload],
   )

@@ -697,6 +697,9 @@ async def create_connection(
         # missing key DENIES — that asymmetry is the desirable direction and must not be
         # closed by accident here.
         "discovered_tools": descriptors,
+        "auth_type": getattr(payload, "auth_type", "static_key") or "static_key",
+        "status": getattr(payload, "status", "active") or "active",
+        "error_message": getattr(payload, "error_message", None),
     }
     result = await aexec(_project(_client(supabase).table(_TABLE).insert(row)))
     created = (result.data or [None])[0]

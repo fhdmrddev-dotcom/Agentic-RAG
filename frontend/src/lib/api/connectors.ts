@@ -119,10 +119,11 @@ export async function createConnectorConnection(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to create the connection",
+      failure.message || "Failed to create the connection",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json() as Promise<ConnectorConnection>
@@ -142,10 +143,11 @@ export async function updateConnectorConnection(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to update the connection",
+      failure.message || "Failed to update the connection",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json() as Promise<ConnectorConnection>
@@ -371,10 +373,11 @@ export async function createOAuthAuthorizeUrl(
     body: JSON.stringify(payload),
   })
   if (!res.ok) {
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to start OAuth authorization",
+      failure.message || "Failed to start OAuth authorization",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json() as Promise<OAuthAuthorizeResponse>
