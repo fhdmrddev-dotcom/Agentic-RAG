@@ -892,9 +892,9 @@ async def oauth_callback(
         # If a connection_id was supplied, update its tokens
         if connection_id:
             from app.services import connector_service
-            from app.supabase_client import get_service_role_client
+            from app.dependencies import get_supabase
 
-            srv_client = get_service_role_client()
+            srv_client = get_supabase()
             # Fetch connection org_id
             conn_res = srv_client.table("connector_connections").select("org_id").eq("id", str(connection_id)).execute()
             if conn_res.data:
