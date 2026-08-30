@@ -113,6 +113,9 @@ ALLOWED_MIME_TYPES = {
     "message/rfc822",
     "application/vnd.ms-outlook",
     "application/x-msg",
+    "application/dxf",
+    "image/vnd.dxf",
+    "application/x-dxf",
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -124,6 +127,7 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".epub": "application/epub+zip",
     ".eml":  "message/rfc822",
     ".msg":  "application/vnd.ms-outlook",
+    ".dxf":  "application/dxf",
     # ⚠ BUG-260825-01 — `.docx` and `.pdf` WERE ABSENT, AND THAT IS THE OBSERVED SPLIT.
     #   Measured 2026-08-25 against the real endpoint: a `.docx` announced as
     #   `application/octet-stream`, `application/zip`, `application/msword` or with NO
@@ -508,6 +512,14 @@ def extract_text(raw: bytes, mime_type: str) -> str:
         else:
             parsed_email = parse_msg_bytes(raw)
         return format_email_text_for_retrieval(parsed_email)
+
+    if mime_type in ("application/dxf", "image/vnd.dxf", "application/x-dxf"):
+        from app.services.extractors.aspects.dxf import extract_dxf_takeoff  # noqa: PLC0415
+        try:
+            takeoff = extract_dxf_takeoff(raw)
+            return takeoff.get("text_summary", "")
+        except Exception as exc:
+            return f"CAD Drawing (unparsed DXF: {exc})"
 
     # plain text, markdown — decode as UTF-8
     decoded = raw.decode("utf-8")
@@ -2194,6 +2206,21 @@ def ingest_document(
                     metadata_dict["email_references"] = parsed_email.references
             except Exception as em_exc:
                 log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
+
+        # Phase 220 (TAKEOFF-01): DXF Takeoff extraction for CAD drawings
+        if (
+            mime_type in ("application/dxf", "image/vnd.dxf", "application/x-dxf")
+            or (filename and filename.lower().endswith(".dxf"))
+        ):
+            try:
+                from app.services.extractors.aspects.dxf import extract_dxf_takeoff  # noqa: PLC0415
+                takeoff_payload = extract_dxf_takeoff(raw, filename=filename)
+                metadata_dict = metadata_dict or {}
+                metadata_dict["_takeoff"] = takeoff_payload
+                if not metadata_dict.get("document_type"):
+                    metadata_dict["document_type"] = "cad_drawing"
+            except Exception as dxf_exc:
+                log.warning("DXF takeoff extraction warning for %s: %s", document_id, dxf_exc)
 
         # Normalize case-sensitive filter fields for consistent retrieval.
         # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
