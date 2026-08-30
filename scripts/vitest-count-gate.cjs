@@ -3000,11 +3000,9 @@ const BASELINE = {
   //    `PendingAskCard`, `Seam`, `TodosSection`, `VersionDiff`, `WorkspacePanel.derived`) —
   //    217 converts only `CsvTablePreview.tsx`, so only its suite is claimed.
   //  · `DocumentStatusBadge.test.tsx`, `FilterBar.test.tsx` and
-  //    `DocumentStatusBadge.a11y.test.tsx` — doc-space suites this gate STILL never
-  //    executes. 217 modifies neither `DocumentStatusBadge.tsx` nor `FilterBar.tsx`, so
-  //    adopting them would make this phase the owner of rot it did not cause. ⭐ NAMED
-  //    rather than left silent: Phase 218 owns the document space and, when it adopts
-  //    `src/components/metadata` at directory grain, these three are the remaining gap.
+  //    `DocumentStatusBadge.a11y.test.tsx` — DECLINED by 217 (it modified neither
+  //    `DocumentStatusBadge.tsx` nor `FilterBar.tsx`), then ADOPTED by 217.1-18, which
+  //    owns the document space. See the pins at the tail of this map.
   //
   // ⛔ BACKEND SUITES ARE NOT PINNED HERE AND CANNOT BE — this gate is vitest-only.
   // `backend/tests/test_217_document_response_fields.py`,
@@ -3012,6 +3010,29 @@ const BASELINE = {
   // `backend/tests/test_217_document_queries.py` are guarded by their plans' own pytest
   // criteria and by the backend failure-count baseline. Recorded as a DECISION rather than
   // a silence, so nobody later reads this gate's green as covering them.
+
+  // ── THE PHASE 217.1 SUITES — ADOPTED BY 217.1-18 AT ITS OWN CLOSE ────────────────────
+  // Pinned at the gate's OWN printed `actual` on the same run that this phase's closeout
+  // verified green, never while red. Two knobs: each has a named-file `TARGETS` entry above
+  // (TARGETS decides what RUNS) and a pin here (BASELINE decides what is GUARDED). The three
+  // trailing orphans close 217's deferred-§3 re-open trigger.
+  "sketchComposition.test.tsx": 47,
+  "ingestionFailureCopy.test.ts": 22,
+  "IngestionTab.test.tsx": 38,
+  "pipelineGroups.test.ts": 7,
+  "LibraryStatTiles.test.tsx": 13,
+  "viewRulePhrase.test.ts": 4,
+  "ViewCardGrid.test.tsx": 8,
+  "IndexFoldersTable.test.tsx": 6,
+  "IndexingTab.gate.test.tsx": 6,
+  "HealthTiles.test.tsx": 6,
+  "HealthSignalChips.test.tsx": 13,
+  "CheckedQueriesSection.test.tsx": 11,
+  "ChatLayout.fallback.test.tsx": 4,
+  "DocumentQueriesSection.test.tsx": 8,
+  "FilterBar.test.tsx": 10,
+  "DocumentStatusBadge.test.tsx": 19,
+  "DocumentStatusBadge.a11y.test.tsx": 19,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4158,6 +4179,33 @@ const TARGETS = [
   // The other six panel suites stay DECLINED for their already-recorded reason: 217 reads
   // none of them, and a decline must never read as an oversight.
   "src/components/panel/__tests__/CsvTablePreview.test.tsx",
+
+  // ── ⭐ THE PHASE 217.1 SUITES — ADOPTED BY 217.1-18, AT ITS OWN CLOSE ─────────────────
+  // Every suite this phase created or adopted. `src/components/library` and the metadata
+  // `__tests__/` dir have NO directory entry, so each is a NAMED FILE here (the two-knob
+  // rule: TARGETS decides what RUNS, BASELINE decides what is GUARDED). The three
+  // DocumentStatusBadge / FilterBar entries close 217's deferred-§3 re-open trigger. Pins
+  // were captured by 217.1-18 at the gate's own printed `-- N new`, never while red.
+  "src/components/library/__tests__/sketchComposition.test.tsx",
+  "src/components/library/__tests__/ingestionFailureCopy.test.ts",
+  "src/components/library/__tests__/IngestionTab.test.tsx",
+  "src/components/library/ingestion/__tests__/pipelineGroups.test.ts",
+  "src/components/library/__tests__/LibraryStatTiles.test.tsx",
+  "src/components/library/__tests__/viewRulePhrase.test.ts",
+  "src/components/library/__tests__/ViewCardGrid.test.tsx",
+  "src/components/library/__tests__/IndexFoldersTable.test.tsx",
+  "src/components/library/__tests__/IndexingTab.gate.test.tsx",
+  "src/components/library/__tests__/HealthTiles.test.tsx",
+  "src/components/library/__tests__/HealthSignalChips.test.tsx",
+  "src/components/library/__tests__/CheckedQueriesSection.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.fallback.test.tsx",
+  "src/components/metadata/__tests__/DocumentQueriesSection.test.tsx",
+  "src/components/ingestion/FilterBar.test.tsx",
+  // ⚠ This path was repointed at 217.1-18 — the file lives at `src/__tests__/components/`
+  // (the `src/components/ingestion/__tests__/` path is DEAD, which is why it never printed
+  // as `new`). The `.a11y` sibling below is genuinely under `src/components/ingestion/__tests__/`.
+  "src/__tests__/components/DocumentStatusBadge.test.tsx",
+  "src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

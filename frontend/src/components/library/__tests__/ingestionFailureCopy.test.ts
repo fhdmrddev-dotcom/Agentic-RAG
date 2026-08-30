@@ -194,21 +194,34 @@ describe("the pass-through recognises documents.py's LIVE human sentences", () =
   })
 
   it("every sentence in _EMPTY_TEXT_MESSAGES is provably human and passed through unchanged", () => {
-    // Extract the string literals from `_EMPTY_TEXT_MESSAGES`. Each value is a concatenated
-    // pair of quoted strings; we extract the full value by reading between the outer quotes.
-    // This is intentionally a light extraction — the point is that a sentence edited there
-    // survives the classifier, not that we parse Python perfectly.
+    // Reconstruct each VALUE of `_EMPTY_TEXT_MESSAGES`. The dict interleaves a MIME key
+    // before each value, and a value may be ONE quoted string (the email entries) or TWO
+    // concatenated quoted strings (the spreadsheet/CSV/PDF entries) — so neither "every
+    // other literal" nor "always a pair" holds. Walk the literals: a MIME key (a
+    // `type/subtype` string, never a sentence) starts a new value; every other literal
+    // accumulates into the current value. This is intentionally a light extraction — the
+    // point is that a sentence edited there survives the classifier, not that we parse
+    // Python perfectly.
     const block = documentsPySource.match(/_EMPTY_TEXT_MESSAGES[^}]*\{([\s\S]*?)\}/)
     expect(block).not.toBeNull()
     const body = block![1]
 
-    // Each value is a pair of adjacent string literals — collect them and concatenate.
-    const literals = [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1])
-    expect(literals.length).toBeGreaterThan(4)
+    const isMimeKey = (s: string) => /^[a-z]+\/[a-z0-9.+-]+$/.test(s)
+    const sentences: string[] = []
+    let current = ""
+    for (const m of body.matchAll(/"([^"]+)"/g)) {
+      const s = m[1]
+      if (isMimeKey(s)) {
+        if (current) sentences.push(current)
+        current = ""
+      } else {
+        current += s
+      }
+    }
+    if (current) sentences.push(current)
+    expect(sentences.length).toBeGreaterThan(4)
 
-    // Reconstruct the sentences: each _EMPTY_TEXT_MESSAGES value is TWO adjacent literals.
-    for (let i = 0; i + 1 < literals.length; i += 2) {
-      const sentence = `${literals[i]}${literals[i + 1]}`
+    for (const sentence of sentences) {
       // The sentence must be recognised as human-written and passed through unchanged.
       expect(looksHumanWritten(sentence)).toBe(true)
       expect(classifyIngestionError(sentence)).toBe(sentence)
