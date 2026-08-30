@@ -546,7 +546,10 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
 
   it("places the run-surface branch BEFORE the trailing UnknownViewFallback", () => {
     const branch = CHAT_LAYOUT_CODE.indexOf(`activeView === "workflow-run"`)
-    const fallback = CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback")
+    // ⚠ Match the JSX TAG (with the `<`), not the bare identifier — the module's IMPORT
+    // also spells `UnknownViewFallback`, and indexOf would otherwise resolve to line 13's
+    // import rather than the trailing element this ordering assertion is about.
+    const fallback = CHAT_LAYOUT_CODE.indexOf("<UnknownViewFallback")
     expect(branch).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(-1)
     expect(branch).toBeLessThan(fallback)
