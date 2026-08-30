@@ -55,7 +55,7 @@ export interface DocumentTakeoffPayload {
 }
 
 export async function fetchDocumentTakeoff(documentId: string): Promise<DocumentTakeoffPayload> {
-  const auth = await getAuthHeader()
+  const auth = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${documentId}/takeoff`, {
     headers: { ...auth },
   })
@@ -70,7 +70,7 @@ export async function matchDocumentTakeoff(
   documentId: string,
   rateSheetDocumentId: string,
 ): Promise<TakeoffBOQ> {
-  const auth = await getAuthHeader()
+  const auth = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${documentId}/takeoff/match`, {
     method: "POST",
     headers: {
@@ -91,7 +91,7 @@ export async function resolveDocumentTakeoffItem(
   itemKey: string,
   chosenRateCode: string,
 ): Promise<TakeoffBOQ> {
-  const auth = await getAuthHeader()
+  const auth = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${documentId}/takeoff/resolve`, {
     method: "PATCH",
     headers: {
