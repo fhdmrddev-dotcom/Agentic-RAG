@@ -18,6 +18,7 @@ import {
   getGovUnclassified,
   getGovLowConfidence,
 } from "@/lib/api"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 
 interface SignalChip {
   id: string
@@ -30,14 +31,21 @@ interface SignalChip {
 
 function useSignalFetch<T>(
   fetcher: () => Promise<{ items: T[]; total: number }>,
+  enabled = true,
 ): { count: number; loading: boolean; error?: string } {
   const [count, setCount] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | undefined>()
   const fetcherRef = useRef(fetcher)
   fetcherRef.current = fetcher
 
   useEffect(() => {
+    if (!enabled) {
+      setCount(0)
+      setLoading(false)
+      setError(undefined)
+      return
+    }
     let cancelled = false
     setLoading(true)
     setError(undefined)
@@ -55,10 +63,8 @@ function useSignalFetch<T>(
         }
       })
     return () => { cancelled = true }
-    // ⚠ Stable ref — intentionally empty: the fetcher is callable without
-    // being a dependency, so inline closures don't trigger infinite loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [enabled])
 
   return { count, loading, error }
 }
@@ -78,13 +84,16 @@ function ChipRow({ id, label, count, loading }: SignalChip) {
 }
 
 export function HealthSignalChips() {
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const governanceEnabled = featuresCtx?.features.governance_health === true
+
   const mostRetrieved = useSignalFetch(() => getMostRetrieved(0, 1))
   const neverRetrieved = useSignalFetch(() => getNeverRetrieved(0, 1))
   const lowConfQueries = useSignalFetch(() => getLowConfidenceQueries(0, 1))
   const staleDocs = useSignalFetch(() => getStaleDocs(0, 1))
-  const govBroken = useSignalFetch(() => getGovBroken(0, 1))
-  const govUnclassified = useSignalFetch(() => getGovUnclassified(0, 1))
-  const govLowConf = useSignalFetch(() => getGovLowConfidence(0, 1))
+  const govBroken = useSignalFetch(() => getGovBroken(0, 1), governanceEnabled)
+  const govUnclassified = useSignalFetch(() => getGovUnclassified(0, 1), governanceEnabled)
+  const govLowConf = useSignalFetch(() => getGovLowConfidence(0, 1), governanceEnabled)
 
   const chips: SignalChip[] = [
     // ── Being used group ─────────────────────────────────────────
@@ -113,30 +122,37 @@ export function HealthSignalChips() {
       ...staleDocs,
       group: "in-good-shape",
     },
-    // ⚠ These three Governance-sourced chips are UNGATED here.
-    // Plan 13 adds the chip-level governance_health gate.
-    {
-      id: "broken-links",
-      label: "Broken links",
-      ...govBroken,
-      group: "in-good-shape",
-    },
-    {
-      id: "unclassified",
-      label: "Unclassified",
-      ...govUnclassified,
-      group: "in-good-shape",
-    },
-    {
-      id: "unsure-metadata",
-      label: "Unsure metadata",
-      ...govLowConf,
-      group: "in-good-shape",
-    },
+    // ⚠ Governance-sourced chips are gated by governance_health
+    // (Plan 13 — T-217.1-04). When disabled the getGov* calls
+    // never fire and the chips never render.
+    ...(governanceEnabled
+      ? [
+          {
+            id: "broken-links" as const,
+            label: "Broken links",
+            ...govBroken,
+            group: "in-good-shape" as const,
+          },
+          {
+            id: "unclassified" as const,
+            label: "Unclassified",
+            ...govUnclassified,
+            group: "in-good-shape" as const,
+          },
+          {
+            id: "unsure-metadata" as const,
+            label: "Unsure metadata",
+            ...govLowConf,
+            group: "in-good-shape" as const,
+          },
+        ]
+      : []),
   ]
 
   const beingUsed = chips.filter((c) => c.group === "being-used")
   const inGoodShape = chips.filter((c) => c.group === "in-good-shape")
+  const expectedBeingUsed = 3
+  const expectedInGoodShape = governanceEnabled ? 4 : 1
 
   if (chips.every((c) => c.loading)) {
     return (
@@ -144,7 +160,7 @@ export function HealthSignalChips() {
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Being used</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {Array.from({ length: 3 }).map((_, i) => (
+            {Array.from({ length: expectedBeingUsed }).map((_, i) => (
               <div key={i} className="ghost-border bg-card/50 rounded-lg px-3 py-2 h-10 animate-pulse" />
             ))}
           </div>
@@ -152,7 +168,7 @@ export function HealthSignalChips() {
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">In good shape</p>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: expectedInGoodShape }).map((_, i) => (
               <div key={i} className="ghost-border bg-card/50 rounded-lg px-3 py-2 h-10 animate-pulse" />
             ))}
           </div>
