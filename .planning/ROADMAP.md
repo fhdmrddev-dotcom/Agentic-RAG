@@ -146,7 +146,7 @@ it.*
 - [ ] **Phase 215: BYO OAuth** — customer-registered client id/secret, an authorization-code consent that works self-hosted, silent refresh, a plainly-stated revoked state, and secrets unreadable at rest (OAUTH-01..03)
 - [ ] **Phase 216: Connections in Chat, and One File In by Hand** — add a service to a thread by name, see and remove what is active, tool calls that render with the real mark and name, starter prompts that actually run, and one file pulled in by hand (CHAT-05..07, CAT-04, ATTACH-01)
 - [ ] **Phase 217.1: The Library, Exactly As Sketched** — the Library rebuilt element-for-element against sketch 218: five tabs ending in Health, visible stage labels, a plain-language failure sentence, Views as cards, Indexing's three cards, and the two retired nav homes — everything drawn is built or dropped, nothing is placeheld (LIB-01..07; ⛔ **absorbs Phase 218**)
-- [ ] **Phase 220: A Drawing Becomes Quantities — SPIKE** — a DXF read for counts, dimensions and specifications, matched to a rate sheet with ambiguity escalated to a person and nothing silently priced (TAKEOFF-01..04, `SEED-226`)
+- [x] **Phase 220: A Drawing Becomes Quantities — SPIKE** — a DXF read for counts, dimensions and specifications, matched to a rate sheet with ambiguity escalated to a person and nothing silently priced (TAKEOFF-01..04, `SEED-226`) · ✅ verified 2026-08-30 (12/12 pytest tests green, 3/3 vitest green, count gate 171/171 OK)
 
 ### Phase Details
 
@@ -454,7 +454,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 217.1-01-PLAN.md — the composition gate: drive.cjs emitter + sketchComposition fence, driven RED first, baseline captured
+- [x] 217.1-01-PLAN.md — the composition gate: drive.cjs emitter + sketchComposition fence, driven RED first, baseline captured
 
 **Wave 2** *(blocked on Wave 1)*
 
