@@ -692,6 +692,59 @@ COMMENT ON COLUMN public.audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): or
 
 
 --
+-- Name: checked_queries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.checked_queries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    question text NOT NULL,
+    expected_document_id uuid NOT NULL,
+    last_rank integer,
+    previous_rank integer,
+    checked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN checked_queries.question; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.question IS 'The question to evaluate against the user''s corpus.';
+
+
+--
+-- Name: COLUMN checked_queries.expected_document_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.expected_document_id IS 'The document that SHOULD be among the top hits for this question. Validated for ownership on write.';
+
+
+--
+-- Name: COLUMN checked_queries.last_rank; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.last_rank IS 'The 1-indexed rank of expected_document_id at the most recent check. NULL = checked but the document was not found in the top N results (never 0).';
+
+
+--
+-- Name: COLUMN checked_queries.previous_rank; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.previous_rank IS 'The last_rank from the check BEFORE the most recent one, so Holding/Slipped can be derived.';
+
+
+--
+-- Name: COLUMN checked_queries.checked_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.checked_at IS 'When the most recent evaluation finished. NULL = not yet checked (a fresh create that awaits triggerCheck).';
+
+
+--
 -- Name: classification_rules; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2303,6 +2356,14 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: checked_queries checked_queries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: classification_rules classification_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2915,6 +2976,20 @@ CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
 --
 
 CREATE INDEX idx_audit_log_org_id ON public.audit_log USING btree (org_id);
+
+
+--
+-- Name: idx_checked_queries_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_checked_queries_org_user ON public.checked_queries USING btree (org_id, user_id);
+
+
+--
+-- Name: idx_checked_queries_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_checked_queries_user ON public.checked_queries USING btree (user_id);
 
 
 --
@@ -3611,6 +3686,20 @@ CREATE TRIGGER audit_log_autofill_org_id BEFORE INSERT ON public.audit_log FOR E
 
 
 --
+-- Name: checked_queries checked_queries_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER checked_queries_autofill_org_id BEFORE INSERT ON public.checked_queries FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: checked_queries checked_queries_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER checked_queries_set_updated_at BEFORE UPDATE ON public.checked_queries FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: classification_rules classification_rules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4022,6 +4111,30 @@ CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace
 
 ALTER TABLE ONLY public.audit_log
     ADD CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: checked_queries checked_queries_expected_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_expected_document_id_fkey FOREIGN KEY (expected_document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: checked_queries checked_queries_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: checked_queries checked_queries_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -5306,6 +5419,40 @@ CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tune
 --
 
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: checked_queries; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.checked_queries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: checked_queries checked_queries_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_delete ON public.checked_queries FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_insert ON public.checked_queries FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_select ON public.checked_queries FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_update ON public.checked_queries FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
 
 --
 -- Name: classification_rules; Type: ROW SECURITY; Schema: public; Owner: -
