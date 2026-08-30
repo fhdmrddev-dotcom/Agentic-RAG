@@ -37,8 +37,8 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 220 (a-drawing-becomes-quantities-spike) — **DISCUSS COMPLETE, READY FOR PLANNING, 2026-08-30**
-Plan: 0 of ? — `220-CONTEXT.md` locked. Next: `/gsd:plan-phase 220`.
+Phase: 220 (a-drawing-becomes-quantities-spike) — **PLANNED (4 plans in 4 waves), 2026-08-30**
+Plan: 0 of 4 — `220-01` to `220-04` ready. Next: `/gsd:execute-phase 220` or `/gsd:next`.
 Phase 217.1 (the-library-exactly-as-sketched) is 18/18 complete + all 4 UAT observations and visual enhancements resolved.
 ⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
 The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
