@@ -21,7 +21,7 @@ function formatDate(dateStr: string): string {
 }
 
 interface TooltipPayloadItem {
-  payload?: RetrievalTrendPoint
+  payload?: RetrievalTrendPoint & { formattedDate?: string }
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadItem[] }) {
@@ -31,8 +31,9 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   return (
     <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-md text-xs space-y-0.5">
       <p className="font-medium text-foreground">{formatDate(point.date)}</p>
-      <p className="text-muted-foreground">{point.retrieval_count} retrieval{point.retrieval_count !== 1 ? "s" : ""}</p>
-      <p className="text-muted-foreground">{point.unique_documents} unique document{point.unique_documents !== 1 ? "s" : ""}</p>
+      <p className="text-primary">{point.found_something} found</p>
+      <p className="text-muted-foreground">{point.found_nothing} not found</p>
+      <p className="text-muted-foreground/60">{point.could_not_search} could not search</p>
     </div>
   )
 }
@@ -59,15 +60,23 @@ export function RetrievalTrendChart({ data }: Props) {
     <div className="ghost-border bg-card/50 rounded-lg p-4">
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="h-4 w-4 text-primary" />
-        <h3 className="text-base font-headline font-bold">Retrieval Trend</h3>
-        <span className="text-xs text-muted-foreground ml-auto">Last 30 days</span>
+        <h3 className="text-base font-headline font-bold">Coverage Trend</h3>
+        <span className="text-xs text-muted-foreground ml-auto">Searches over time</span>
       </div>
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
           <defs>
-            <linearGradient id="retrievalGradient" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="foundSomething" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
               <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="foundNothing" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="couldNotSearch" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.2} />
+              <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
@@ -87,9 +96,24 @@ export function RetrievalTrendChart({ data }: Props) {
           <Tooltip content={<CustomTooltip />} />
           <Area
             type="monotone"
-            dataKey="retrieval_count"
+            dataKey="could_not_search"
+            stackId="s"
             stroke="none"
-            fill="url(#retrievalGradient)"
+            fill="url(#couldNotSearch)"
+          />
+          <Area
+            type="monotone"
+            dataKey="found_nothing"
+            stackId="s"
+            stroke="none"
+            fill="url(#foundNothing)"
+          />
+          <Area
+            type="monotone"
+            dataKey="found_something"
+            stackId="s"
+            stroke="none"
+            fill="url(#foundSomething)"
           />
           <Line
             type="monotone"

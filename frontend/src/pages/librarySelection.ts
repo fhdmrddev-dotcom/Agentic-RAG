@@ -90,8 +90,8 @@ export interface LibraryViewLike<F extends LibraryFilterLike = LibraryFilterLike
 
 // ── THE UNION (D-217-12) ──────────────────────────────────────────────────────────────
 
-/** The four Library tabs. The tab is part of the selection, never a variable beside it. */
-export type LibraryTab = "documents" | "views" | "ingestion" | "indexing"
+/** The five Library tabs. The tab is part of the selection, never a variable beside it. */
+export type LibraryTab = "documents" | "views" | "ingestion" | "indexing" | "health"
 
 /**
  * The selection, as ONE value.
@@ -107,6 +107,7 @@ export type LibrarySelection =
   | { tab: "views"; viewId: string | null; folderId?: never }
   | { tab: "ingestion"; folderId?: never; viewId?: never }
   | { tab: "indexing"; folderId?: never; viewId?: never }
+  | { tab: "health"; folderId?: never; viewId?: never }
 
 // ── THE STATE ─────────────────────────────────────────────────────────────────────────
 
@@ -290,6 +291,8 @@ function selectionForTab(
       return { tab: "ingestion" }
     case "indexing":
       return { tab: "indexing" }
+    case "health":
+      return { tab: "health" }
   }
 }
 

@@ -19,6 +19,7 @@ import { ViewsGroup } from "@/components/ingestion/ViewsGroup"
 import { ViewsTab } from "@/components/library/ViewsTab"
 import { IngestionTab } from "@/components/library/IngestionTab"
 import { IndexingTab } from "@/components/library/IndexingTab"
+import { HealthTab } from "@/components/library/HealthTab"
 import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
 import { LibraryBreadcrumb } from "@/components/library/LibraryBreadcrumb"
 import { DocumentsPager } from "@/components/library/DocumentsPager"
@@ -86,13 +87,14 @@ const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
 const SHED_COLUMNS_3_TO_5 =
   "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden"
 
-// Phase 217.1-06 — the tab's display name, for the breadcrumb suffix. Four members only;
-// a fifth key is the same schema change as a fifth trigger (D-217-15).
+// Phase 217.1-06 — the tab's display name, for the breadcrumb suffix. Five members only;
+// a sixth key is the same schema change as a sixth trigger (D-217-15).
 const TAB_LABELS: Record<LibraryTab, string> = {
   documents: "Documents",
   views: "Views",
   ingestion: "Ingestion",
   indexing: "Indexing",
+  health: "Health",
 }
 
 // ── The page's own reducer ────────────────────────────────────────────────────────────
@@ -120,11 +122,9 @@ function pageReducer(state: LibState, action: PageAction): LibState {
   return libraryReducer<ViewFilter, SavedView>(state, action)
 }
 
-// ⛔ FOUR TABS: Documents · Views · Ingestion · Indexing. THERE IS NO `Health` TAB — Phase
-// 218 owns it, together with the KnowledgeHealthPage merge and the nav retirement that
-// justify it (D-217-15). A Health tab shipped here would sit beside a `KnowledgeHealthPage`
-// that is still its own nav entry AND still `ChatLayout.tsx`'s positional fallback, so the
-// same surface would have two doors and one of them would be a stub.
+// ⛔ FIVE TABS: Documents, Views, Ingestion, Indexing, Health. Built incrementally through
+// Phase 217.1 plans 03-12 — each tab body is a CHILD component with its own data fetching
+// and state, so no conditional branch enters this component.
 
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(
@@ -678,13 +678,14 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           onValueChange={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
           className="flex flex-col flex-1 min-h-0"
         >
-          {/* ⛔ FOUR TRIGGERS, AND NO FIFTH. Written out rather than mapped so the set is
-              countable by eye and by grep — the absence of `Health` is the decision here. */}
+          {/* ⛔ FIVE TRIGGERS. Written out rather than mapped so the set is
+              countable by eye and by grep. */}
           <TabsList className="self-start mb-4" data-testid="documents-tabslist">
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="views">Views</TabsTrigger>
             <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
             <TabsTrigger value="indexing">Indexing</TabsTrigger>
+            <TabsTrigger value="health">Health</TabsTrigger>
           </TabsList>
 
           <div className="flex flex-row gap-6 flex-1 min-h-0">
@@ -783,6 +784,13 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
               <IndexingTab onNavigate={onNavigate} />
+            </TabsContent>
+
+            <TabsContent
+              value="health"
+              className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
+            >
+              <HealthTab />
             </TabsContent>
           </div>
         </Tabs>

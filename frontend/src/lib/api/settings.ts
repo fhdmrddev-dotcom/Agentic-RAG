@@ -380,6 +380,9 @@ export interface RetrievalTrendPoint {
   date: string
   retrieval_count: number
   unique_documents: number
+  found_something: number
+  found_nothing: number
+  could_not_search: number
 }
 
 export interface LowConfidenceQuery {
