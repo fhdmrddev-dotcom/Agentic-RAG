@@ -399,8 +399,16 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
   // When a filter/view is active the list shows the resolved set (folderId
   // undefined → DocumentList does no further folder filtering); otherwise it
-  // shows the selected folder's documents.
-  const listDocuments = filteredDocs !== null ? filteredDocs : documents
+  // scopes to the selected folder's (or Root's) documents BEFORE paging.
+  const folderScopedDocuments = useMemo(() => {
+    if (filteredDocs !== null) return filteredDocs
+    if (selectedFolderId === null) {
+      return documents.filter((d) => d.folder_id == null)
+    }
+    return documents.filter((d) => d.folder_id === selectedFolderId)
+  }, [filteredDocs, selectedFolderId, documents])
+
+  const listDocuments = folderScopedDocuments
   const listFolderId = filteredDocs !== null ? undefined : selectedFolderId
 
   // Phase 217.1-06 (LIB-01) — the Documents tab's client-side pager state. The offset
@@ -555,7 +563,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
       {/* Phase 217.1-06 (LIB-01 / D-217.1 sparkline-drop) — CHUNKS · VECTORS · FOUND BY
           A SEARCH. Numbers stand alone; an unreachable source says so. */}
-      <LibraryStatTiles documents={listDocuments} />
+      <LibraryStatTiles documents={documents} />
 
       <div className="min-w-0">
         {selectedFolderId === null ? (

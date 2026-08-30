@@ -276,6 +276,18 @@ describe("LibraryPage", () => {
     expect(screen.queryByText("research.pdf")).not.toBeInTheDocument()
   })
 
+  it("DocumentList shows folder documents when a folder is selected from the sidebar", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage />)
+    // Click on the Research folder button
+    const researchFolder = screen.getByRole("button", { name: /Research/ })
+    fireEvent.click(researchFolder)
+    // research.pdf (folder-1) is displayed
+    expect(await screen.findByText("research.pdf")).toBeInTheDocument()
+    // root-doc.txt is not in folder-1, so it is hidden
+    expect(screen.queryByText("root-doc.txt")).not.toBeInTheDocument()
+  })
+
   // ═══════════════════════════════════════════════════════════════════════════════════
   // Phase 217-09 — the SHELL's own criteria, asserted through the DOM
   // ═══════════════════════════════════════════════════════════════════════════════════
@@ -522,8 +534,8 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
     renderPage(<LibraryPage />)
     const pager = await screen.findByTestId("documents-tfoot")
     expect(within(pager).getByText(/Rows per page/)).toBeInTheDocument()
-    // 2 sample documents → "1–2 of 2".
-    expect(within(pager).getByText(/1–2 of 2/)).toBeInTheDocument()
+    // 1 sample root document → "1–1 of 1".
+    expect(within(pager).getByText(/1–1 of 1/)).toBeInTheDocument()
   })
 
   it("the pager's 'list may be larger' arm renders at/above the 1000-row ceiling", async () => {
