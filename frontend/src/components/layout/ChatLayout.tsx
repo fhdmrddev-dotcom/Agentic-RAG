@@ -8,10 +8,9 @@ import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { LibraryPage } from "@/pages/LibraryPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
-import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
-import { GovernancePage } from "@/pages/GovernancePage"
+import { UnknownViewFallback } from "./UnknownViewFallback"
 import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
 // Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
 // (governance/skill-studio precedent), reachable only via the probe-gated shield.
@@ -787,13 +786,6 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // sketch 037-A), additive BEFORE the trailing KnowledgeHealthPage else.
             // Self-fetches via listRules() — no props; three-homes, no router.
             <ClassificationRulesPage />
-          ) : activeView === "governance" ? (
-            // Phase 119 (DGOV-01/02): the Governance top-level home mounts here as
-            // a peer to Library Health (the D-119-2 navigation triad — App.tsx
-            // union + this branch + the nav-items entry, all owned in-phase so the
-            // surface is reachable; the Phase 118 built-but-unreachable lesson).
-            // Self-fetches the 3 governance signals — no props; three-homes, no router.
-            <GovernancePage />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio
             // focused full-surface mounts here (additive branch BEFORE the trailing
@@ -876,7 +868,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               }}
             />
           ) : (
-            <KnowledgeHealthPage />
+            <UnknownViewFallback view={activeView as never} />
           )}
         </main>
       )}

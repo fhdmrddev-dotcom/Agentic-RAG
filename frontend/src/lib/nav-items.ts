@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Activity, Zap, Settings, Workflow, Wand2, ShieldCheck } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -39,15 +39,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
   // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.
   { view: "classification-rules", icon: Wand2, label: "Classification" },
-  { view: "library-health", icon: Activity, label: "Library Health" },
-  // Phase 119 (DGOV-01/02): the Governance top-level home — a peer to Library
-  // Health, distinct glyph (ShieldCheck — NOT Wand2=Classification, NOT
-  // Activity=Library Health) + label distinct from "Library Health" (D-119-1).
-  // Deliberately NOT gated behind DMF-03 / document_management_enabled: 113-118
-  // all left their DM surfaces ungated (the flag is dormant at every DM surface);
-  // gating Governance alone would be the lone inconsistent surface (A8).
-  // Phase 148 (VIS-01): governed by `governance_health` (Everyone on the day-one map).
-  { view: "governance", icon: ShieldCheck, label: "Governance", feature: "governance_health" },
   // Phase 148 (VIS-01): governed by `skill_studio` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the Studio's evals/triggering/versions are
   // API-gated (148-05), so hiding the entry avoids a dead-click.

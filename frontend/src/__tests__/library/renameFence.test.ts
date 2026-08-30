@@ -3,20 +3,11 @@
  * asserted from SOURCE rather than carried by prose.
  *
  * Plan `217-04` renamed `IngestionPage.tsx` → `LibraryPage.tsx`, the nav label and the page
- * `<h1>`. Four things beside them look renameable and are not, and each is load-bearing for a
- * DIFFERENT reason:
+ * `<h1>`. Phase 217.1-14 retired the `library-health` and `governance` nav entries
+ * (absorbed into the Library's five-tab Health surface).
  *
- *   (a) `ActiveView` keeps `"documents"` — it is a KEY, never printed to a user. Renaming it
- *       spends a migration across `citationNav.tsx`, `ChatLayout` and `App.tsx` for zero
- *       user-visible gain.
- *   (b) `ChatLayout`'s trailing `) : ( <KnowledgeHealthPage /> )` is the app's POSITIONAL
- *       FALLBACK — not a `default:` that throws. Disturbing it turns an unmatched `ActiveView`
- *       into a BLANK SCREEN (T-217-15). ⚠ Phase 218 owns replacing it; 217 must not.
- *   (c) the nav label is now `Library` WHILE `view: "documents"` is unchanged. A fence that
- *       reads only one of the two cannot tell a rename from a key migration.
- *   (d) `SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"` is PERSISTED STATE. Renaming it
- *       silently resets every user's pinned sidebar (T-217-16) — a data loss that no type
- *       error and no test-of-behaviour would surface.
+ * Each retired thing is asserted GONE and its replacement is asserted PRESENT — the rename
+ * map pattern, never a silent deletion.
  *
  * ── ⭐ AND (e), WHICH IS WHY THIS FILE IMPORTS A `.py` ────────────────────────────────────
  *
@@ -143,19 +134,17 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     expect(decl?.[1]).toContain('"documents"')
     // And the union did not shrink while nobody was looking.
     const members = [...(decl?.[1] ?? "").matchAll(/"([a-z-]+)"/g)].map((m) => m[1])
-    expect(members.length).toBeGreaterThanOrEqual(12)
+    expect(members.length).toBeGreaterThanOrEqual(10)
     expect(members).toContain("documents")
   })
 
-  it("(b) ChatLayout's trailing else is still <KnowledgeHealthPage /> — the default view", () => {
-    // ⚠ T-217-15. Not a `default:` that throws: an unmatched ActiveView renders THIS.
-    // Phase 218 owns replacing it. Sketch fence `A8` reads this exact shape.
-    expect(/\)\s*:\s*\(\s*<KnowledgeHealthPage \/>\s*\)/.test(LAYOUT)).toBe(true)
-    // It is the LAST arm of the chain, not merely present somewhere in the file.
-    const lastTernary = LAYOUT.lastIndexOf("<KnowledgeHealthPage />")
-    const libraryMount = LAYOUT.indexOf("<LibraryPage")
-    expect(libraryMount).toBeGreaterThan(-1)
-    expect(lastTernary).toBeGreaterThan(libraryMount)
+  it("(b) ChatLayout's trailing else is now UnknownViewFallback — KnowledgeHealthPage is retired", () => {
+    // 217.1-14: the KnowledgeHealthPage fallback is replaced with UnknownViewFallback.
+    // Assert GONE: the old fallback no longer exists in ChatLayout.
+    expect(LAYOUT).not.toContain("<KnowledgeHealthPage />")
+    // Assert PRESENT: UnknownViewFallback with the type escape hatch is there instead.
+    expect(LAYOUT).toContain("UnknownViewFallback")
+    expect(LAYOUT).toContain("as never")
   })
 
   it("(c) the nav label reads Library while `view: \"documents\"` is unchanged", () => {
@@ -189,15 +178,15 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     expect(PAGE).not.toContain("Upload documents to give the AI context for your conversations.")
   })
 
-  it("the `library-health` and `governance` nav entries survive — 218 retires them, not 217", () => {
-    expect(NAV_CODE).toMatch(/view:\s*"library-health"/)
-    expect(NAV_CODE).toMatch(/view:\s*"governance"/)
-    // And Governance keeps its feature gate while the Library entry stays ungated. That
-    // asymmetry is the thing the 218 merge must carry explicitly rather than inherit.
-    expect(/view:\s*"governance",[\s\S]{0,140}feature:\s*"governance_health"/.test(NAV_CODE)).toBe(
-      true,
-    )
-    expect(/\{\s*view:\s*"documents",[^}]*feature:/.test(NAV_CODE)).toBe(false)
+  it("the `library-health` and `governance` nav entries are retired — 217.1-14 replaced them", () => {
+    // 217.1-14 removes both entries. Assert GONE: neither nav entry exists.
+    expect(NAV_CODE).not.toMatch(/view:\s*"library-health"/)
+    expect(NAV_CODE).not.toMatch(/view:\s*"governance"/)
+    // Assert PRESENT: the narrowed ActiveView no longer carries either member.
+    const decl = /export type ActiveView\s*=([\s\S]*?)\r?\n/.exec(APP_CODE)
+    expect(decl).not.toBeNull()
+    expect(decl?.[1]).not.toContain('"library-health"')
+    expect(decl?.[1]).not.toContain('"governance"')
   })
 
   it("the rename itself DID land — this fence is not guarding a no-op", () => {

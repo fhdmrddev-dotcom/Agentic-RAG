@@ -99,7 +99,7 @@ import { visibleNavItems } from "@/lib/nav-items"
 // FALLBACK, not a `default:` that throws, so a union member with no branch silently
 // renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
 // branch ships in the same commit as this member.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()

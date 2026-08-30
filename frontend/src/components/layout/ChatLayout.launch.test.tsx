@@ -28,11 +28,10 @@
  *     list and the workspace panel all live inside the `activeView === "chat"` branch, so
  *     a view on the else side renders none of them. Asserted with a POSITIVE CONTROL, so
  *     the absence is a measurement of the branch split and not of a broken render.
- *  6. THE POSITIONAL-FALLBACK HAZARD. The trailing `<KnowledgeHealthPage />` is a
- *     positional fallback, NOT a `default:` that throws — a union member with no branch
- *     of its own renders Knowledge Health silently (the Phase-118 built-but-unreachable
- *     lesson). Asserted, with a positive control that proves the fallback really is
- *     positional.
+ *  6. THE POSITIONAL-FALLBACK REPLACEMENT (217.1-14). The trailing else now renders
+ *     `<UnknownViewFallback view={activeView as never} />` instead of KnowledgeHealthPage.
+ *     A stale or unknown ActiveView value renders visible self-identifying text rather than
+ *     a silently-wrong product page.
  *  7. THE FALLBACK DEGRADATION. A null anchor restores the shipped behaviour rather than
  *     navigating to a run surface that cannot resolve its run.
  *  8. A SOURCE FENCE over `ChatLayout.tsx` itself, because 5 and 6 are ORDERING facts
@@ -126,9 +125,6 @@ vi.mock("@/components/chat/ChatArea", () => ({
       <textarea data-testid="composer-stub" />
     </div>
   ),
-}))
-vi.mock("@/pages/KnowledgeHealthPage", () => ({
-  KnowledgeHealthPage: () => <div data-testid="knowledge-health-stub" />,
 }))
 vi.mock("@/pages/WorkflowRunPage", () => ({
   WorkflowRunPage: ({ runId }: { runId: string | null }) => (
@@ -464,20 +460,16 @@ describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)
     expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
   })
 
-  it("a stale workflow-run view renders the fallback, never the run surface, while off", () => {
-    // The Phase-181 note deferred exactly this assertion to "the first canvas ActiveView
-    // render branch". This is it. Falling through to the positional fallback IS the
-    // byte-identical answer: a view a never-built feature would not have had behaves like
-    // any other unknown member (the `library-health` positive control above).
+  it("a stale workflow-run view renders the UnknownViewFallback, never the run surface, while off", () => {
     render(withCanvas(false, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.queryByTestId("run-page-stub")).not.toBeInTheDocument()
-    expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
+    expect(screen.getByText(/This view has no screen/)).toBeInTheDocument()
   })
 
   it("POSITIVE CONTROL — the same view with the flag ON does render the run surface", () => {
     render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
-    expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
+    expect(screen.queryByText(/This view has no screen/)).not.toBeInTheDocument()
   })
 
   it("hands the panel NO run-receipt callback while off — the receipt cannot render", () => {
@@ -510,19 +502,11 @@ describe("ChatLayout — the run surface is on the non-chat side of the split", 
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
   })
 
-  it("is NOT the Knowledge-Health positional fallback (with the positive control)", () => {
+  it("is NOT the UnknownViewFallback — the run surface renders instead", () => {
     render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
-    expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
+    expect(screen.queryByText(/This view has no screen/)).not.toBeInTheDocument()
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
     screen.getByTestId("run-page-stub").remove()
-
-    // POSITIVE CONTROL: `library-health` is a union member with NO branch of its own, so
-    // it falls THROUGH to the trailing element. That proves two things at once — the stub
-    // can render, and the trailing element really is a POSITIONAL fallback rather than a
-    // `default:` that throws. A `workflow-run` branch placed after it would be dead code.
-    const health = render(withCanvas(true, <ChatLayout {...baseProps("library-health")} />))
-    expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
-    health.unmount()
   })
 })
 
@@ -560,9 +544,9 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
     expect(sample).toMatch(/const also = 2/)
   })
 
-  it("places the run-surface branch BEFORE the trailing positional fallback", () => {
+  it("places the run-surface branch BEFORE the trailing UnknownViewFallback", () => {
     const branch = CHAT_LAYOUT_CODE.indexOf(`activeView === "workflow-run"`)
-    const fallback = CHAT_LAYOUT_CODE.indexOf("<KnowledgeHealthPage")
+    const fallback = CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback")
     expect(branch).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(-1)
     expect(branch).toBeLessThan(fallback)
@@ -585,7 +569,7 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
 
     // POSITIVE CONTROL — the "never again after it" probe really does find a tag that IS
     // present after the split point, so the -1 above is a measurement, not a tautology.
-    expect(CHAT_LAYOUT_CODE.indexOf("<KnowledgeHealthPage", elseBranch)).toBeGreaterThan(-1)
+    expect(CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
   })
 
   it("resolves the run id from the thread anchor, and names neither of the wrong-id tokens", () => {
