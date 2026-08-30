@@ -822,8 +822,14 @@ async def update_connection(
     if "tool_grants" in submitted and payload.tool_grants is not None:
         changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)
 
-    if "discovered_tools" in submitted and payload.discovered_tools is not None:
-        changes["discovered_tools"] = payload.discovered_tools
+    if "auth_type" in submitted and payload.auth_type is not None:
+        changes["auth_type"] = payload.auth_type
+
+    if "status" in submitted and payload.status is not None:
+        changes["status"] = payload.status
+
+    if "error_message" in submitted and payload.error_message is not None:
+        changes["error_message"] = payload.error_message
 
     if "secret" in submitted and payload.secret is not None:
         cipher = get_cipher()
@@ -1176,38 +1182,103 @@ async def delete_connection(
     return removed
 
 
+async def save_oauth_tokens(
+    connection_id: str,
+    org_id: str,
+    access_token: str,
+    refresh_token: str | None,
+    token_type: str,
+    scopes: list[str],
+    expires_in: int,
+    account_email: str | None,
+    account_name: str | None,
+    supabase: Client | None = None,
+) -> None:
+    """Phase 215 (OAUTH-01, OAUTH-02) — Encrypt and store OAuth tokens in connector_tokens."""
+    from datetime import datetime, timedelta, timezone
+    from app.services.connectors.oauth import encrypt_token_value
 
+    client = _client(supabase)
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    enc_access = encrypt_token_value(access_token)
+    enc_refresh = encrypt_token_value(refresh_token) if refresh_token else None
+
+    # 1. Upsert connector_tokens
+    token_row = {
+        "connection_id": str(connection_id),
+        "account_email": account_email,
+        "account_name": account_name,
+        "access_token_ciphertext": enc_access,
+        "refresh_token_ciphertext": enc_refresh,
+        "token_type": token_type or "Bearer",
+        "scopes": scopes or [],
+        "expires_at": expires_at,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await aexec(
+        client.table("connector_tokens")
+        .upsert(token_row, on_conflict="connection_id")
+    )
+
+    # 2. Update connection status and account email
+    await aexec(
+        client.table(_TABLE)
+        .update({
+            "auth_type": "oauth_byo",
+            "status": "active",
+            "error_message": None,
+        })
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))
+    )
+    logger.info("connector_service: saved encrypted OAuth tokens for connection %s (%s)", connection_id, account_email)
+
+
+async def get_oauth_token_status(
+    connection_id: str,
+    org_id: str,
+    supabase: Client | None = None,
+) -> dict[str, Any] | None:
+    """Fetch public non-secret token metadata for a connection."""
+    client = _client(supabase)
+    # Ensure connection exists and belongs to org
+    conn_res = await aexec(
+        client.table(_TABLE)
+        .select("id, status, auth_type")
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))
+    )
+    if not conn_res.data:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+
+    res = await aexec(
+        client.table("connector_tokens")
+        .select("id, connection_id, account_email, account_name, token_type, scopes, expires_at, created_at, updated_at")
+        .eq("connection_id", str(connection_id))
+    )
+    if not res.data:
+        return None
+    row = res.data[0]
+    row["status"] = conn_res.data[0].get("status", "active")
+    return row
 
 
 __all__ = [
-
     "ConnectorError",
-
     "ConnectorNotFound",
-
     "ConnectorDisabled",
-
     "ConnectorCipherUnavailable",
-
     "ConnectorSecretNotEncrypted",
-
     "ConnectorSecretUnreadable",
-
     "ResolvedConnection",
-
     "resolve_connection",
-
     "create_connection",
-
     "list_connections",
-
     "get_connection",
-
     "update_connection",
-
     "delete_connection",
-
     "record_check_verdict",
-
+    "save_oauth_tokens",
+    "get_oauth_token_status",
 ]
 

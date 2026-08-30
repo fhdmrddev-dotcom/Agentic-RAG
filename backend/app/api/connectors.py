@@ -117,6 +117,7 @@ No `supabase-py` call is made in this module. Every DB touch happens inside
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
 from supabase import Client
 
 from app.dependencies import (
@@ -133,6 +134,10 @@ from app.models.connector import (
     ConnectorConnectionUpdate,
     McpDiscoverRequest,
     McpDiscoverResponse,
+    OAuthAuthorizeRequest,
+    OAuthAuthorizeResponse,
+    OAuthProvider,
+    OAuthTokenResponse,
     ToolGrantPosture,
 )
 from app.security.egress import (
@@ -788,5 +793,159 @@ async def discover_tools_from_url(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"MCP server probe failed: {exc}",
         ) from exc
+
+
+# ── Phase 215 (OAUTH-01..03) · BYO OAuth Endpoints ──────────────────────────────
+@router.post(
+    "/oauth/authorize",
+    response_model=OAuthAuthorizeResponse,
+    dependencies=[Depends(require_visible("live_connectors")), Depends(require_org_manage)],
+    summary="Generate OAuth authorization URL with PKCE and signed state",
+)
+async def create_oauth_authorize_url(
+    payload: OAuthAuthorizeRequest,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+) -> OAuthAuthorizeResponse:
+    """Phase 215 (OAUTH-01, OAUTH-02) — Generate PKCE authorization URL for Google / Microsoft."""
+    from app.services.connectors.oauth import build_authorization_url
+    from app.config import settings
+
+    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+    redirect_uri = f"{frontend_url}/api/connectors/oauth/callback"
+
+    try:
+        auth_url, state = build_authorization_url(
+            provider=payload.provider,
+            connection_id=payload.connection_id,
+            user_id=user["id"],
+            redirect_uri=redirect_uri,
+            custom_client_id=payload.custom_client_id,
+            custom_scopes=payload.custom_scopes,
+        )
+        return OAuthAuthorizeResponse(authorization_url=auth_url, state=state)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.get(
+    "/oauth/callback",
+    summary="OAuth authorization callback endpoint",
+)
+async def oauth_callback(
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    error_description: str = Query(None),
+) -> RedirectResponse:
+    """Phase 215 (OAUTH-02) — Verify signed state, exchange code for tokens, encrypt, and redirect to settings."""
+    from app.services.connectors.oauth import (
+        exchange_code_for_tokens,
+        fetch_account_profile,
+        resolve_client_credentials,
+        verify_oauth_state,
+    )
+    from app.config import settings
+
+    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+
+    if error:
+        logger.warning("OAuth authorization returned error: %s (%s)", error, error_description)
+        return RedirectResponse(url=f"{frontend_url}/settings/connections?error={error}")
+
+    if not code or not state:
+        return RedirectResponse(url=f"{frontend_url}/settings/connections?error=missing_code_or_state")
+
+    try:
+        state_data = verify_oauth_state(state)
+        provider = state_data["prv"]
+        connection_id = state_data["cid"]
+        code_verifier = state_data["cv"]
+        custom_client_id = state_data.get("cid_ovr")
+        custom_client_secret = state_data.get("sec_ovr")
+
+        client_id, client_secret = resolve_client_credentials(
+            provider=provider,
+            custom_client_id=custom_client_id,
+            custom_client_secret=custom_client_secret,
+        )
+
+        redirect_uri = f"{frontend_url}/api/connectors/oauth/callback"
+        token_data = await exchange_code_for_tokens(
+            provider=provider,
+            code=code,
+            code_verifier=code_verifier,
+            redirect_uri=redirect_uri,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        expires_in = token_data.get("expires_in", 3600)
+        token_type = token_data.get("token_type", "Bearer")
+        scope_str = token_data.get("scope", "")
+        scopes = scope_str.split() if isinstance(scope_str, str) else []
+
+        profile = await fetch_account_profile(provider, access_token)
+
+        # If a connection_id was supplied, update its tokens
+        if connection_id:
+            from app.services import connector_service
+            from app.supabase_client import get_service_role_client
+
+            srv_client = get_service_role_client()
+            # Fetch connection org_id
+            conn_res = srv_client.table("connector_connections").select("org_id").eq("id", str(connection_id)).execute()
+            if conn_res.data:
+                org_id = conn_res.data[0]["org_id"]
+                await connector_service.save_oauth_tokens(
+                    connection_id=connection_id,
+                    org_id=org_id,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_type=token_type,
+                    scopes=scopes,
+                    expires_in=expires_in,
+                    account_email=profile.get("email"),
+                    account_name=profile.get("name"),
+                    supabase=srv_client,
+                )
+
+        target_url = f"{frontend_url}/settings/connections?connected=true"
+        if connection_id:
+            target_url += f"&id={connection_id}"
+        return RedirectResponse(url=target_url)
+
+    except Exception as exc:
+        logger.exception("OAuth callback processing failed: %s", exc)
+        return RedirectResponse(url=f"{frontend_url}/settings/connections?error=token_exchange_failed")
+
+
+@router.get(
+    "/connections/{connection_id}/oauth/token",
+    response_model=OAuthTokenResponse,
+    dependencies=[Depends(require_org_manage)],
+    summary="Get public OAuth token status and expiration for a connection",
+)
+async def get_connection_oauth_token_status(
+    connection_id: str,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> OAuthTokenResponse:
+    """Phase 215 (OAUTH-01) — Safe public metadata about a connection's OAuth tokens (no secrets!)."""
+    try:
+        row = await connector_service.get_oauth_token_status(
+            connection_id=str(connection_id),
+            org_id=str(active_org),
+            supabase=supabase,
+        )
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No OAuth tokens found for connection")
+        return OAuthTokenResponse(**row)
+    except connector_service.ConnectorNotFound:
+        raise _NOT_FOUND
+
 
 
