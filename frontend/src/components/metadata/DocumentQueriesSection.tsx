@@ -33,6 +33,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { listDocumentQueries } from "@/lib/api"
 import type { DocumentQueryRow } from "@/types"
+import { FoundPerWeekSparkline, bucketByWeek } from "@/components/library/FoundPerWeekSparkline"
 
 export interface DocumentQueriesSectionProps {
   /** The open document — the subject of the read. */
@@ -112,6 +113,24 @@ export function DocumentQueriesSection({ docId, onTotalChange }: DocumentQueries
 
   const groups = useMemo(() => groupQueries(rows), [rows])
 
+  // ── Plan 15 RETRIEVAL summary ─────────────────────────────────────────────
+  const retrievalSummary = useMemo(() => {
+    if (state !== "ready" || rows.length === 0) return null
+    const MAX_ROWS = 100
+    const timesFound = rows.length >= MAX_ROWS ? `${MAX_ROWS}+` : String(rows.length)
+    const lastFound = rows[0].asked_at
+    const lastQuestion = rows[0].query_text ?? null
+    const sims = rows.map((r) => r.similarity).filter((s): s is number => s != null)
+    const avgRelevance =
+      sims.length > 0
+        ? `${Math.round((sims.reduce((a, b) => a + b, 0) / sims.length) * 100)}%`
+        : "not recorded yet"
+    const sparklineDates = rows.map((r) => r.asked_at)
+    const weekBuckets = bucketByWeek(sparklineDates)
+
+    return { timesFound, lastFound, lastQuestion, avgRelevance, weekBuckets }
+  }, [rows, state])
+
   return (
     <div className="flex flex-col gap-3 px-4 pt-1">
       {state === "loading" && (
@@ -142,6 +161,42 @@ export function DocumentQueriesSection({ docId, onTotalChange }: DocumentQueries
 
       {state === "ready" && rows.length > 0 && (
         <>
+          {/* ── RETRIEVAL summary block (Plan 15) ─────────────────── */}
+          {retrievalSummary && (
+            <div className="flex items-start justify-between gap-4 mb-1">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs min-w-0">
+                <span className="text-panel-muted-foreground">Times found</span>
+                <span className="text-foreground text-right tabular-nums">{retrievalSummary.timesFound}</span>
+
+                <span className="text-panel-muted-foreground">Last question</span>
+                <span className="text-foreground text-right truncate max-w-[160px]">
+                  {retrievalSummary.lastQuestion
+                    ? retrievalSummary.lastQuestion.length > 30
+                      ? `${retrievalSummary.lastQuestion.slice(0, 30)}…`
+                      : retrievalSummary.lastQuestion
+                    : "Saved view / filter"}
+                </span>
+
+                <span className="text-panel-muted-foreground">Last found</span>
+                <span className="text-foreground text-right tabular-nums">
+                  {new Date(retrievalSummary.lastFound).toLocaleDateString()}
+                </span>
+
+                <span className="text-panel-muted-foreground">Average relevance</span>
+                <span className="text-foreground text-right tabular-nums">
+                  {retrievalSummary.avgRelevance}
+                </span>
+              </div>
+
+              <div className="shrink-0">
+                <div className="text-[10px] text-panel-muted-foreground mb-0.5 text-right">
+                  FOUND PER WEEK
+                </div>
+                <FoundPerWeekSparkline weeks={retrievalSummary.weekBuckets} />
+              </div>
+            </div>
+          )}
+
           <p className="text-[0.7rem] text-panel-muted-foreground-dim">
             {rows.length} {rows.length === 1 ? "search" : "searches"} in the last{" "}
             {QUERIES_WINDOW_DAYS} days

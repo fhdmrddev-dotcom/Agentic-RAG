@@ -592,11 +592,16 @@ export interface DocumentImageRow {
 /** One search that returned this document, within the backend's rolling window.
  *  ⚠ `query_text` is null on rows written by the D-115-10 view/filter path, which records a
  *  `via` and no question text. Render an honest sentence for that case — never a placeholder
- *  question, never the string "undefined". */
+ *  question, never the string "undefined".
+ *  ⚠ `similarity` is null on historic rows that predate BE-5 (Phase 217.1). Rendering the
+ *  average over only non-null values is the correct measurement; zero rows → "not recorded yet". */
 export interface DocumentQueryRow {
   query_text?: string | null
   asked_at: string
   via?: string | null
+  /** BE-5 (Phase 217.1-11): max per-hit similarity for THIS document on THIS search.
+   *  Null for historic rows predating the key — render "not recorded yet", never 0. */
+  similarity?: number | null
 }
 
 /** The document's extracted text, paged. Shape-mirrors `app.models.kb.ReadResponse` plus
