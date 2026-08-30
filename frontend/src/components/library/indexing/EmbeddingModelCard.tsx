@@ -14,13 +14,17 @@ import { kickReembed } from "@/lib/api"
 
 const UNKNOWN = "Not known yet"
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, loading }: { label: string; value?: string; loading?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
-        {value}
-      </span>
+      {loading ? (
+        <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
+      ) : (
+        <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
+          {value ?? UNKNOWN}
+        </span>
+      )}
     </div>
   )
 }
@@ -36,6 +40,7 @@ export function EmbeddingModelCard({
   /** Routes to Settings' shipped model picker — never a second picker here. */
   onNavigate?: (view: string) => void
 }) {
+  const loading = summary === null
   const model = summary?.model
   const dimensions = summary?.dimensions
   const provider = summary?.provider
@@ -80,9 +85,9 @@ export function EmbeddingModelCard({
         )}
       </div>
       <div className="mt-1">
-        <Fact label="Model" value={model ?? UNKNOWN} />
-        <Fact label="Dimensions" value={dimensions == null ? UNKNOWN : String(dimensions)} />
-        <Fact label="Provider" value={provider ?? UNKNOWN} />
+        <Fact label="Model" value={model} loading={loading} />
+        <Fact label="Dimensions" value={dimensions == null ? undefined : String(dimensions)} loading={loading} />
+        <Fact label="Provider" value={provider} loading={loading} />
       </div>
     </div>
   )

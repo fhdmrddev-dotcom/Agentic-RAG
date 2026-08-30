@@ -109,4 +109,10 @@ describe("FoldersIndexTable — the Re-index selected gate", () => {
     expect(screen.queryByTestId("reindex-f-legal")).not.toBeInTheDocument()
     expect(screen.queryByTestId("reindex-root")).not.toBeInTheDocument()
   })
+
+  it("with summary null (loading), renders skeleton placeholders rather than flashing 'Not known yet'", () => {
+    const { container } = render(<FoldersIndexTable summary={null} canManage={true} />)
+    expect(screen.queryByText("Not known yet")).not.toBeInTheDocument()
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0)
+  })
 })

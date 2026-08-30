@@ -52,7 +52,7 @@ export function IndexingTab({ onNavigate }: { onNavigate?: (view: string) => voi
   const canManage = featuresCtx?.features.model_management === true
 
   return (
-    <section data-testid="indexing-tab" className="flex flex-col gap-4 overflow-y-auto">
+    <section data-testid="indexing-tab" className="flex flex-col gap-4">
       <div>
         <h2 className="text-lg font-semibold leading-tight">Indexing</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">

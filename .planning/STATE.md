@@ -37,11 +37,11 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 217.1 (the-library-exactly-as-sketched) — **18/18 PLANS COMPLETE, 2026-08-30**
+Phase: 217.1 (the-library-exactly-as-sketched) — **18/18 PLANS COMPLETE + UAT OBSERVATIONS RESOLVED, 2026-08-30**
 Plan: 18 of 18 (closeout) — committed `60a089c6c`. Count-gate pins + BASELINE CLEARED + ledger closeout done.
-**Next: the 4 operator UAT observations from 2026-08-30 are the next work** (layout space, loading loaders,
-Match Strength 6800%, fake Re-index selected) — recorded in `.planning/reported-bugs/` candidate status
-via memory; route as fast-fix or a small plan (G-3).
+**4 operator UAT observations (2026-08-30) RESOLVED via quick task `260830-lib-address-4-library-uat-observations`**
+(layout space/scroll un-nested, skeleton loaders on in-flight fetches, Match Strength normalized to 0-100 scale,
+and folder-scoped re-index wired with JSON headers). Next: Phase 214.
 ⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
 The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
 like it. **Phase 217.1 was inserted and Phase 218 ABSORBED into it** (operator, 2026-08-29). This

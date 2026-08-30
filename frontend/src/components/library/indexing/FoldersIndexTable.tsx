@@ -32,6 +32,7 @@ export function FoldersIndexTable({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Record<string, string>>({})
 
+  const loading = summary === null
   const rows: FolderIndexRow[] = summary?.folders ?? []
 
   async function handleReindex(folder: FolderIndexRow) {
@@ -63,8 +64,21 @@ export function FoldersIndexTable({
   return (
     <div className="rounded-xl bg-card/50 ghost-border">
       <h3 className="px-4 pt-3 text-sm font-semibold leading-tight">Folders</h3>
-      {rows.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-muted-foreground">{UNKNOWN}</p>
+      {loading ? (
+        <div className="p-4 space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4">
+              <div className="h-4 w-28 animate-pulse bg-muted/30 rounded" />
+              <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
+              <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
+              <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
+              <div className="h-4 w-20 animate-pulse bg-muted/30 rounded" />
+              <div className="h-6 w-24 animate-pulse bg-muted/30 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-muted-foreground">No folders found.</p>
       ) : (
         <div className="mt-1 overflow-x-auto">
           <table className="w-full text-sm" data-testid="folders-index-table">
@@ -83,6 +97,7 @@ export function FoldersIndexTable({
                 const key = folder.folder_id ?? "root"
                 const hasChunks = (folder.chunks ?? 0) > 0
                 const msg = feedback[key]
+                const isBusy = busyId === key
                 return (
                   <tr key={key} className="border-b border-border/50" data-folder-id={key}>
                     <td className="px-4 py-3 font-medium">{folder.name}</td>
@@ -108,10 +123,10 @@ export function FoldersIndexTable({
                           type="button"
                           data-testid={`reindex-${key}`}
                           onClick={() => handleReindex(folder)}
-                          disabled={busyId === key}
+                          disabled={isBusy}
                           className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-60"
                         >
-                          Re-index selected
+                          {isBusy ? "Re-indexing..." : "Re-index selected"}
                         </button>
                       ) : (
                         /* Zero-chunk folder: NO action (Open Question 1 — a control that

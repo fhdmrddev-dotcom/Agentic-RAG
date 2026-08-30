@@ -88,24 +88,26 @@ export function LibraryStatTiles({ documents }: { documents: Document[] }) {
       <Tile
         label="Vectors"
         value={
-          vectors.error || vectors.value === null
-            ? UNKNOWN
-            : vectors.value.total !== null
-              ? vectors.value.total.toLocaleString()
-              : UNKNOWN
-        }
-        description={
           vectors.error
             ? UNKNOWN
             : vectors.value === null
               ? "…"
-              : vectors.value.model ?? UNKNOWN
+              : vectors.value.total !== null
+                ? vectors.value.total.toLocaleString()
+                : UNKNOWN
+        }
+        description={
+          vectors.error
+            ? "—"
+            : vectors.value === null
+              ? "…"
+              : vectors.value.model ?? "—"
         }
       />
       <Tile
         label="Found by a search"
         value={found.error ? UNKNOWN : found.value === null ? "…" : found.value.toLocaleString()}
-        description={found.error ? UNKNOWN : found.value === null ? "…" : "last 30 days"}
+        description={found.error ? "—" : found.value === null ? "…" : "last 30 days"}
       />
     </div>
   )

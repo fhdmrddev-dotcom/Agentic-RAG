@@ -474,7 +474,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
     >
       <div
         className={cn(
-          "flex flex-col overflow-y-auto space-y-4 min-w-0",
+          "flex flex-col space-y-4 min-w-0",
           (panelOpen || isMobile) && SHED_COLUMNS_3_TO_5,
           // On mobile the Filename column must be allowed to break a long
           // unbreakable name (e.g. "Fahed_Mrad_Defense_Presentation") instead of

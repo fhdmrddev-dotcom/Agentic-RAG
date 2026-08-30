@@ -171,7 +171,10 @@ export async function kickReembed(opts?: { folder_ids?: string[] }): Promise<Ree
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/reembed`, {
     method: "POST",
-    headers,
+    headers: {
+      ...headers,
+      ...(opts && opts.folder_ids ? { "Content-Type": "application/json" } : {}),
+    },
     body: opts && opts.folder_ids ? JSON.stringify({ folder_ids: opts.folder_ids }) : undefined,
   })
   if (!res.ok) throw new Error("Failed to start re-embed")

@@ -50,14 +50,17 @@ function toStatTiles(overview: HealthOverview, checkedCount: number | null): Sta
     {
       label: "Checked queries",
       // Plan 17: live count from listCheckedQueries().length (lifted from CheckedQueriesSection).
-      value: checkedCount ?? "Not known yet",
+      value: checkedCount !== null ? checkedCount : "—",
       description: checkedCount !== null
         ? `${checkedCount} query${checkedCount !== 1 ? "ies" : "y"} tracked`
         : "coming with checked queries",
     },
     {
       label: "MATCH STRENGTH",
-      value: overview.health_score != null ? `${Math.round(overview.health_score * 100)}%` : "—",
+      value:
+        overview.health_score != null
+          ? `${Math.round(overview.health_score > 1 ? overview.health_score : overview.health_score * 100)}%`
+          : "—",
       description: "average similarity of what searches returned",
     },
   ]
@@ -81,7 +84,7 @@ export function HealthTab() {
   const tiles = overview ? toStatTiles(overview, checkedCount) : null
 
   return (
-    <div className="flex flex-col gap-6 overflow-y-auto">
+    <div className="flex flex-col gap-6">
       {/* ── Ring + chart row ───────────────────────────────────────────── */}
       <div className="grid grid-cols-[auto_1fr] gap-6">
         <div data-testid="health-coverage-ring">
@@ -129,6 +132,8 @@ export function HealthTab() {
             array; map with an index key, no label access. */}
         {(tiles ?? Array.from({ length: 5 })).map((tile, i) => {
           const isMatchStrength = tile && tile.label === "MATCH STRENGTH"
+          const isCheckedQueries = tile && tile.label === "Checked queries"
+          const isTileLoading = !overview || (isCheckedQueries && checkedCount === null)
           return (
             <div
               key={tile ? tile.label : `skeleton-${i}`}
@@ -139,7 +144,7 @@ export function HealthTab() {
               <span className="text-xs font-medium text-muted-foreground">
                 {tile ? tile.label : "…"}
               </span>
-              {overview ? (
+              {!isTileLoading ? (
                 <>
                   <span className="text-3xl font-bold font-headline tabular-nums leading-none text-foreground">
                     {tile.value}

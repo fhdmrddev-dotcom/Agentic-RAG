@@ -12,18 +12,23 @@ import type { IndexSummary } from "@/lib/api"
 
 const UNKNOWN = "Not known yet"
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, loading }: { label: string; value?: string; loading?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-1.5">
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
-        {value}
-      </span>
+      {loading ? (
+        <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
+      ) : (
+        <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
+          {value ?? UNKNOWN}
+        </span>
+      )}
     </div>
   )
 }
 
 export function VectorStoreCard({ summary }: { summary: IndexSummary | null }) {
+  const loading = summary === null
   const vectors = summary?.vectors
   const chunks = summary?.chunks_total
   const noVectors = summary?.documents_without_vectors
@@ -33,15 +38,17 @@ export function VectorStoreCard({ summary }: { summary: IndexSummary | null }) {
     <div className="rounded-xl bg-card/50 ghost-border px-4 py-3">
       <h3 className="text-sm font-semibold leading-tight">Vector store</h3>
       <div className="mt-1">
-        <Fact label="Vectors" value={vectors == null ? UNKNOWN : vectors.toLocaleString()} />
-        <Fact label="Chunks indexed" value={chunks == null ? UNKNOWN : chunks.toLocaleString()} />
+        <Fact label="Vectors" value={vectors == null ? undefined : vectors.toLocaleString()} loading={loading} />
+        <Fact label="Chunks indexed" value={chunks == null ? undefined : chunks.toLocaleString()} loading={loading} />
         <Fact
           label="Documents with no vectors"
-          value={noVectors == null ? UNKNOWN : noVectors.toLocaleString()}
+          value={noVectors == null ? undefined : noVectors.toLocaleString()}
+          loading={loading}
         />
         <Fact
           label="Last indexed"
-          value={lastIndexed === null ? "never" : new Date(lastIndexed).toLocaleString()}
+          value={lastIndexed === null ? "never" : lastIndexed ? new Date(lastIndexed).toLocaleString() : undefined}
+          loading={loading}
         />
       </div>
     </div>
