@@ -141,7 +141,7 @@ export function CheckedQueriesSection({ onTotalChange }: CheckedQueriesSectionPr
   }
 
   return (
-    <div className="ghost-border bg-card/50 rounded-lg p-4">
+    <div className="ghost-border bg-card/50 rounded-lg p-4" data-testid="health-checks">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-headline font-bold">Checked queries</h3>
         <button

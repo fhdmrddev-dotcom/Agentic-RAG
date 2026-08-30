@@ -7,9 +7,9 @@
  * ── Phase 217-09: THE SHELL, NOT THE REDUCER ───────────────────────────────────────────
  * `src/pages/__tests__/librarySelection.test.ts` already proves every reducer transition
  * exhaustively (25 cases). These cases prove the WIRING — that both renderings of the
- * selection are handed the same value, that there are four tabs and no fifth, and that the
- * dropzone landed on the landing tab. They assert through the DOM on purpose: a passing
- * reducer suite says nothing about a page that forgot to call it.
+ * selection are handed the same value, that there are five tabs (Health added at 217.1-12),
+ * and that the dropzone landed on the landing tab. They assert through the DOM on purpose:
+ * a passing reducer suite says nothing about a page that forgot to call it.
  *
  * Mocks:
  * - @/hooks/useDocuments — returns sample documents with folder_id fields
@@ -334,11 +334,10 @@ describe("LibraryPage", () => {
   })
 
   /**
-   * D-217-15 — the sequencing must be VISIBLE, not incidental. A Health tab here would sit
-   * beside a `KnowledgeHealthPage` that is still its own nav entry and still `ChatLayout`'s
-   * positional fallback; Phase 218 ships it with the merge that retires both.
+   * D-217-15 (superseded by 217.1-12): the Health tab shipped with the merge that retires
+   * KnowledgeHealthPage/GovernancePage. Five triggers, the count assertable by eye.
    */
-  it("has exactly four tab triggers — and NO Health tab (D-217-15)", async () => {
+  it("has exactly five tab triggers — Documents · Views · Ingestion · Indexing · Health (D-217-15)", async () => {
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
 
@@ -348,10 +347,9 @@ describe("LibraryPage", () => {
       "Views",
       "Ingestion",
       "Indexing",
+      "Health",
     ])
-    expect(tabs).toHaveLength(4)
-    // The negative assertion is the point of this case.
-    expect(screen.queryByRole("tab", { name: "Health" })).toBeNull()
+    expect(tabs).toHaveLength(5)
   })
 
   /**

@@ -87,7 +87,7 @@ export function HealthDocumentBars() {
   const staleItems = items.filter((d) => d.status === "stale")
 
   return (
-    <div className="ghost-border bg-card/50 rounded-lg p-4">
+    <div className="ghost-border bg-card/50 rounded-lg p-4" data-testid="health-document-bars">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-base font-headline font-bold">Document status</h3>
         <span className="text-xs text-muted-foreground tabular-nums">

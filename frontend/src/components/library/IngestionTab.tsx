@@ -134,16 +134,20 @@ export function IngestionTab({
         {/* ── ADD FILES — the hero dropzone + folder picker ─────────────────── */}
         <TabsContent value="add-files" data-testid="ingestion-subtab-add-files">
           <div className="flex flex-col gap-4">
-            <DocumentUpload
-              onUpload={upload}
-              uploading={uploading}
-              uploadingCount={uploadingCount}
-              folderId={uploadFolderId}
-              folderName={uploadFolderName}
-              disabled={disabled}
-              variant="hero"
-            />
-            <div className="flex items-center gap-2">
+            {/* 217.1-18 — the contract's `.dropbig` block hook. */}
+            <div data-testid="ingestion-dropbig">
+              <DocumentUpload
+                onUpload={upload}
+                uploading={uploading}
+                uploadingCount={uploadingCount}
+                folderId={uploadFolderId}
+                folderName={uploadFolderName}
+                disabled={disabled}
+                variant="hero"
+              />
+            </div>
+            {/* 217.1-18 — the contract's `folder-picker` block hook. */}
+            <div className="flex items-center gap-2" data-testid="ingestion-folder-picker">
               <UploadFolderPicker
                 onSelect={(id, name) => {
                   setUploadFolderId(id)
@@ -163,7 +167,7 @@ export function IngestionTab({
               A count of the files sitting at each stage of the pipeline.
             </p>
             {/* ── THE FOUR-CARD PIPELINE ROW ──────────────────────────────────────── */}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-2" data-testid="ingestion-stagecards">
               {PIPELINE_CARDS.map((cardId, i) => (
                 <React.Fragment key={cardId}>
                   <PipelineCard key={cardId} cardId={cardId} count={stageCounts.get(cardId) ?? 0} />
@@ -178,7 +182,7 @@ export function IngestionTab({
           </div>
 
           {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
-          <div className="mt-6">
+          <div className="mt-6" data-testid="ingestion-queue">
             <h2 className="text-lg font-semibold leading-tight">
               The queue{" "}
               {inFlight.length > 0 && (
@@ -238,7 +242,7 @@ export function IngestionTab({
 
         {/* ── NEEDS ATTENTION — the same rows, re-mounted behind a sub-tab ────── */}
         <TabsContent value="needs-attention" data-testid="ingestion-subtab-needs-attention">
-          <div>
+          <div data-testid="ingestion-needs-attention">
             <h2 className="text-lg font-semibold leading-tight">Needs attention</h2>
             {failed.length === 0 ? (
               <p className="mt-0.5 text-sm text-muted-foreground">Nothing needs attention.</p>

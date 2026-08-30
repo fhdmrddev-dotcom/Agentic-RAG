@@ -84,16 +84,18 @@ export function HealthTab() {
     <div className="flex flex-col gap-6 overflow-y-auto">
       {/* ── Ring + chart row ───────────────────────────────────────────── */}
       <div className="grid grid-cols-[auto_1fr] gap-6">
-        {overview ? (
-          <CoverageRing
-            retrieved={overview.retrieved_this_month}
-            total={overview.total_documents}
-          />
-        ) : (
-          <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
-        )}
+        <div data-testid="health-coverage-ring">
+          {overview ? (
+            <CoverageRing
+              retrieved={overview.retrieved_this_month}
+              total={overview.total_documents}
+            />
+          ) : (
+            <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
+          )}
+        </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0" data-testid="health-searches-chart">
           <Suspense fallback={<ChartSkeleton />}>
             {trend ? (
               <RetrievalTrendChart data={trend} />
@@ -121,28 +123,38 @@ export function HealthTab() {
       </div>
 
       {/* ── Five stat tiles ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {(tiles ?? Array.from({ length: 5 })).map((tile) => (
-          <div
-            key={tile.label}
-            className="ghost-border bg-card/50 rounded-lg p-4 flex flex-col gap-2"
-          >
-            <span className="text-xs font-medium text-muted-foreground">{tile.label}</span>
-            {overview ? (
-              <>
-                <span className="text-3xl font-bold font-headline tabular-nums leading-none text-foreground">
-                  {tile.value}
-                </span>
-                <span className="text-xs text-muted-foreground">{tile.description}</span>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <div className="animate-pulse bg-muted/30 h-8 w-16 rounded" />
-                <div className="animate-pulse bg-muted/30 h-3 w-24 rounded" />
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3" data-testid="health-stat-tiles">
+        {/* ⚠ The skeleton arm must NOT index `Array.from({length:5})` as tile objects —
+            that yields `undefined` elements and `tile.label` throws. It is a position
+            array; map with an index key, no label access. */}
+        {(tiles ?? Array.from({ length: 5 })).map((tile, i) => {
+          const isMatchStrength = tile && tile.label === "MATCH STRENGTH"
+          return (
+            <div
+              key={tile ? tile.label : `skeleton-${i}`}
+              className="ghost-border bg-card/50 rounded-lg p-4 flex flex-col gap-2"
+              // 217.1-18 — the MATCH STRENGTH tile carries the contract's per-tile hook.
+              data-testid={isMatchStrength ? "health-match-strength-tile" : undefined}
+            >
+              <span className="text-xs font-medium text-muted-foreground">
+                {tile ? tile.label : "…"}
+              </span>
+              {overview ? (
+                <>
+                  <span className="text-3xl font-bold font-headline tabular-nums leading-none text-foreground">
+                    {tile.value}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{tile.description}</span>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <div className="animate-pulse bg-muted/30 h-8 w-16 rounded" />
+                  <div className="animate-pulse bg-muted/30 h-3 w-24 rounded" />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Seven signal chips, two groups ─────────────────────────────── */}

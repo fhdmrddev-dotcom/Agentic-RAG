@@ -179,7 +179,7 @@ export function HealthSignalChips() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+      <div className="space-y-2" data-testid="health-chipgroup-being-used">
         <p className="text-xs font-medium text-muted-foreground">Being used</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {beingUsed.map((chip) => (
@@ -187,7 +187,7 @@ export function HealthSignalChips() {
           ))}
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2" data-testid="health-chipgroup-in-good-shape">
         <p className="text-xs font-medium text-muted-foreground">In good shape</p>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
           {inGoodShape.map((chip) => (

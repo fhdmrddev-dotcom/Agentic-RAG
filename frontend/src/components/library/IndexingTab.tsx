@@ -72,10 +72,17 @@ export function IndexingTab({ onNavigate }: { onNavigate?: (view: string) => voi
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2">
-            <VectorStoreCard summary={summary} />
-            <EmbeddingModelCard summary={summary} canManage={canManage} onNavigate={onNavigate} />
+            {/* 217.1-18 — the contract's block hooks. */}
+            <div data-testid="indexing-vector-store-card">
+              <VectorStoreCard summary={summary} />
+            </div>
+            <div data-testid="indexing-embedding-model-card">
+              <EmbeddingModelCard summary={summary} canManage={canManage} onNavigate={onNavigate} />
+            </div>
           </div>
-          <FoldersIndexTable summary={summary} canManage={canManage} />
+          <div data-testid="indexing-folders-table">
+            <FoldersIndexTable summary={summary} canManage={canManage} />
+          </div>
         </>
       )}
     </section>

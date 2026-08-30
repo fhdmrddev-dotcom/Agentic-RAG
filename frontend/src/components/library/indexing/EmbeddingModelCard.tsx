@@ -10,6 +10,7 @@
  * already uses, targeting the existing `#reembed-status-card` id.
  */
 import type { IndexSummary } from "@/lib/api"
+import { kickReembed } from "@/lib/api"
 
 const UNKNOWN = "Not known yet"
 
@@ -44,23 +45,38 @@ export function EmbeddingModelCard({
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-semibold leading-tight">Embedding model</h3>
         {canManage && (
-          <button
-            type="button"
-            data-testid="change-model"
-            onClick={() => {
-              onNavigate?.("settings")
-              // Scroll the Settings re-embed card into view — the same shape
-              // LibraryPage.tsx:585-597 already uses for its deep-link.
-              setTimeout(() => {
-                document
-                  .getElementById("reembed-status-card")
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
-              }, 100)
-            }}
-            className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors"
-          >
-            Change model
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="change-model"
+              onClick={() => {
+                onNavigate?.("settings")
+                // Scroll the Settings re-embed card into view — the same shape
+                // LibraryPage.tsx:585-597 already uses for its deep-link.
+                setTimeout(() => {
+                  document
+                    .getElementById("reembed-status-card")
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                }, 100)
+              }}
+              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors"
+            >
+              Change model
+            </button>
+            {/* 217.1-18 — the sketch's "Re-index everything" (index.html:852), a sibling
+                of Change model in the Embedding model card. Unscoped re-index — the
+                same kickReembed the Settings card's "Re-index everything" fires. */}
+            <button
+              type="button"
+              data-testid="reindex-everything"
+              onClick={() => {
+                void kickReembed()
+              }}
+              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors"
+            >
+              Re-index everything
+            </button>
+          </div>
         )}
       </div>
       <div className="mt-1">

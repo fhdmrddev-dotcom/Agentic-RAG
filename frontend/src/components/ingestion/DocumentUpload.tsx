@@ -120,7 +120,7 @@ export function DocumentUpload({
           onDrop={onDrop}
           onClick={() => !uploading && !disabled && inputRef.current?.click()}
           disabled={disabled || uploading}
-          aria-label={disabled ? `Read-only folder ${targetName}` : targetLabel}
+          aria-label={disabled ? `Read-only folder ${targetName}` : "Choose files"}
           title={
             disabled
               ? "Only the folder owner can upload files here"

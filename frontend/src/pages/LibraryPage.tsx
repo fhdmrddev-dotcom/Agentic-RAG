@@ -630,7 +630,10 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
-        <div className="mb-6" data-testid="documents-pagehead">
+        {/* ⛔ THE HOOK FOLLOWS THE ACTIVE TAB (217.1-18): the pagehead is ONE shared shell
+            element, and the contract names it per-screen (`<screen>-pagehead`). Dynamic so
+            `views-pagehead`/`health-pagehead` resolve when that tab is active. */}
+        <div className="mb-6" data-testid={`${tab}-pagehead`}>
           <h1 className="text-2xl font-headline font-bold text-foreground">Library</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">
             What the agent can read, and how well it reads it.
@@ -680,7 +683,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
         >
           {/* ⛔ FIVE TRIGGERS. Written out rather than mapped so the set is
               countable by eye and by grep. */}
-          <TabsList className="self-start mb-4" data-testid="documents-tabslist">
+          <TabsList className="self-start mb-4" data-testid={`${tab}-tabslist`}>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="views">Views</TabsTrigger>
             <TabsTrigger value="ingestion">Ingestion</TabsTrigger>

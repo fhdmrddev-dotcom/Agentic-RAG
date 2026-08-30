@@ -39,7 +39,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { Document, Folder, SavedView } from "@/types"
 import composition from "../__generated__/sketchComposition.json"
 
@@ -57,6 +59,8 @@ const {
   mockResolveAdHoc,
   mockListMetadataFields,
   mockGetReembedProgress,
+  mockGetIndexSummary,
+  mockGetHealthOverview,
 } = vi.hoisted(() => ({
   mockUseDocuments: vi.fn(),
   mockUseFolders: vi.fn(),
@@ -65,6 +69,8 @@ const {
   mockResolveAdHoc: vi.fn(),
   mockListMetadataFields: vi.fn(),
   mockGetReembedProgress: vi.fn(),
+  mockGetIndexSummary: vi.fn(),
+  mockGetHealthOverview: vi.fn(),
 }))
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -76,6 +82,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     resolveAdHoc: mockResolveAdHoc,
     listMetadataFields: mockListMetadataFields,
     getReembedProgress: mockGetReembedProgress,
+    getIndexSummary: mockGetIndexSummary,
+    getHealthOverview: mockGetHealthOverview,
   }
 })
 
@@ -197,6 +205,27 @@ const SCREENS = ["documents", "views", "ingestion", "indexing", "health"] as con
 /** `data-testid="<screen>-<kind>"` — the one hook convention, stated once. */
 const hook = (screen: string, kind: string) => `${screen}-${kind}`
 
+/** The five tab-bodies all live INSIDE LibraryPage (Wave-18 tree) — the trigger label that
+ *  activates each composed screen. Shared by the block and button mounts. */
+const TAB_BY_SCREEN: Record<string, string> = {
+  documents: "Documents",
+  views: "Views",
+  ingestion: "Ingestion",
+  indexing: "Indexing",
+  health: "Health",
+}
+
+/** ⚠ Ingestion's blocks live across its FOUR SUB-TABS (add-files / in-progress /
+ *  needs-attention / history). A fresh mount lands on add-files, so the block loop passes
+ *  the kind and this activates the sub-tab that hosts it. */
+const INGESTION_SUBTAB_BY_BLOCK: Record<string, string> = {
+  dropbig: "Add files",
+  "folder-picker": "Add files",
+  stagecards: "In progress",
+  queue: "In progress",
+  "needs-attention": "Needs attention",
+}
+
 describe("sketch-composition fence — §1 the contract itself", () => {
   // ⚠ THE NON-VACUITY CONTROL. A moved or misnamed JSON import can resolve to an empty
   // object rather than throwing, and an empty contract makes every case below vacuously
@@ -249,6 +278,36 @@ describe("sketch-composition fence — §2 positive controls", () => {
       remaining: 137,
       model: "text-embedding-3-small",
       updated_at: null,
+    })
+    mockGetIndexSummary.mockResolvedValue({
+      vectors: 87,
+      chunks_total: 224,
+      documents_without_vectors: 0,
+      last_indexed: "2026-08-29T00:00:00Z",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      provider: "openai",
+      folders: [
+        {
+          folder_id: "folder-1",
+          name: "Engineering",
+          documents: 2,
+          chunks: 224,
+          vectors: 87,
+          last_indexed: "2026-08-29T00:00:00Z",
+        },
+      ],
+    })
+    mockGetHealthOverview.mockResolvedValue({
+      health_score: 0.87,
+      high_confidence_rate: 0.9,
+      total_documents: 3,
+      retrieved_this_month: 12,
+      never_retrieved_count: 1,
+      stale_count: 1,
+      low_confidence_queries_count: 2,
+      coverage_percent: 0.8,
+      avg_confidence: 0.82,
     })
   })
 
@@ -304,35 +363,48 @@ describe("sketch-composition fence — §3 every block the sketch draws", () => 
       model: "text-embedding-3-small",
       updated_at: null,
     })
+    mockGetIndexSummary.mockResolvedValue({
+      vectors: 87,
+      chunks_total: 224,
+      documents_without_vectors: 0,
+      last_indexed: "2026-08-29T00:00:00Z",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      provider: "openai",
+      folders: [
+        {
+          folder_id: "folder-1",
+          name: "Engineering",
+          documents: 2,
+          chunks: 224,
+          vectors: 87,
+          last_indexed: "2026-08-29T00:00:00Z",
+        },
+      ],
+    })
+    mockGetHealthOverview.mockResolvedValue({
+      health_score: 0.87,
+      high_confidence_rate: 0.9,
+      total_documents: 3,
+      retrieved_this_month: 12,
+      never_retrieved_count: 1,
+      stale_count: 1,
+      low_confidence_queries_count: 2,
+      coverage_percent: 0.8,
+      avg_confidence: 0.82,
+    })
   })
 
-  /** Mount the live body for one screen. Each arm is the CURRENT tree's answer — which for
-   *  `health` is "there is no such tab", and that is a correct RED assertion rather than an
-   *  import error. `librarySelection.ts` types `LibraryTab` as the four that exist. */
-  async function mountScreen(screen: string) {
-    if (screen === "documents" || screen === "health") {
-      const { LibraryPage } = await import("@/pages/LibraryPage")
-      return renderUI(<LibraryPage />)
+  async function mountScreen(screenName: string, blockKind?: string) {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderUI(<LibraryPage />)
+    // Radix Tabs needs pointer events — userEvent.click, not fireEvent.click (measured).
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("tab", { name: TAB_BY_SCREEN[screenName] }))
+    if (screenName === "ingestion" && blockKind && INGESTION_SUBTAB_BY_BLOCK[blockKind]) {
+      const subTab = INGESTION_SUBTAB_BY_BLOCK[blockKind]
+      await user.click(screen.getByRole("tab", { name: subTab }))
     }
-    if (screen === "views") {
-      const { ViewsTab } = await import("../ViewsTab")
-      return renderUI(
-        <ViewsTab
-          views={sampleViews}
-          selectedViewId={null}
-          onSelectView={vi.fn()}
-          onEditView={vi.fn()}
-          onRenameView={vi.fn()}
-          onDeleted={vi.fn()}
-        />,
-      )
-    }
-    if (screen === "ingestion") {
-      const { IngestionTab } = await import("../IngestionTab")
-      return renderUI(<IngestionTab documents={sampleDocuments} />)
-    }
-    const { IndexingTab } = await import("../IndexingTab")
-    return renderUI(<IndexingTab />)
   }
 
   for (const screenName of SCREENS) {
@@ -341,7 +413,7 @@ describe("sketch-composition fence — §3 every block the sketch draws", () => 
 
       for (const block of blocks) {
         it(`renders the \`${block.kind}\` block as [data-testid="${hook(screenName, block.kind)}"]`, async () => {
-          await mountScreen(screenName)
+          await mountScreen(screenName, block.kind)
           expect(screen.getByTestId(hook(screenName, block.kind))).toBeInTheDocument()
         })
       }
@@ -387,37 +459,66 @@ describe("sketch-composition fence — §4 every named button", () => {
       model: "text-embedding-3-small",
       updated_at: null,
     })
+    mockGetIndexSummary.mockResolvedValue({
+      vectors: 87,
+      chunks_total: 224,
+      documents_without_vectors: 0,
+      last_indexed: "2026-08-29T00:00:00Z",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      provider: "openai",
+      folders: [
+        {
+          folder_id: "folder-1",
+          name: "Engineering",
+          documents: 2,
+          chunks: 224,
+          vectors: 87,
+          last_indexed: "2026-08-29T00:00:00Z",
+        },
+      ],
+    })
+    mockGetHealthOverview.mockResolvedValue({
+      health_score: 0.87,
+      high_confidence_rate: 0.9,
+      total_documents: 3,
+      retrieved_this_month: 12,
+      never_retrieved_count: 1,
+      stale_count: 1,
+      low_confidence_queries_count: 2,
+      coverage_percent: 0.8,
+      avg_confidence: 0.82,
+    })
   })
 
   // ⚠ THE INDEXING BUTTONS ARE OPERATOR-ONLY (D-217.1-27) and render as ABSENT for everyone
-  // else — never as dead controls. This case therefore measures the SHAPE the contract
-  // names; the wave that builds them owns the gate, and it will need a mock that grants
-  // `model_management` before this can go green.
+  // else — never as dead controls. The wave that builds them owns the gate, so THIS mount
+  // grants `model_management` (the gate the plan-10 wave owns) to prove the buttons exist.
+  // Every OTHER screen mounts the composed tree ungated.
+  const GRANTED_FEATURES = {
+    model_management: true,
+    governance_health: true,
+  }
   for (const screenName of SCREENS) {
     const buttons = CONTRACT[screenName]?.buttons ?? []
     for (const label of buttons) {
       it(`${screenName} · offers the "${label}" control`, async () => {
-        if (screenName === "views") {
-          const { ViewsTab } = await import("../ViewsTab")
-          renderUI(
-            <ViewsTab
-              views={sampleViews}
-              selectedViewId={null}
-              onSelectView={vi.fn()}
-              onEditView={vi.fn()}
-              onRenameView={vi.fn()}
-              onDeleted={vi.fn()}
-            />,
-          )
-        } else if (screenName === "ingestion") {
-          const { IngestionTab } = await import("../IngestionTab")
-          renderUI(<IngestionTab documents={sampleDocuments} />)
-        } else if (screenName === "indexing") {
-          const { IndexingTab } = await import("../IndexingTab")
-          renderUI(<IndexingTab />)
-        } else {
-          const { LibraryPage } = await import("@/pages/LibraryPage")
-          renderUI(<LibraryPage />)
+        const { LibraryPage } = await import("@/pages/LibraryPage")
+        const ui = (
+          <EffectiveFeaturesProvider
+            value={{ features: GRANTED_FEATURES, loading: false, refetch: () => {} }}
+          >
+            <LibraryPage />
+          </EffectiveFeaturesProvider>
+        )
+        renderUI(ui)
+        // Radix Tabs needs pointer events — userEvent.click, not fireEvent.click.
+        const user = userEvent.setup()
+        await user.click(screen.getByRole("tab", { name: TAB_BY_SCREEN[screenName] }))
+        // Ingestion's "Try again" lives in the needs-attention SUB-tab; "Choose files" is
+        // on add-files (the default). Navigate to where each control actually sits.
+        if (screenName === "ingestion" && label === "Try again") {
+          await user.click(screen.getByRole("tab", { name: "Needs attention" }))
         }
         expect(screen.getByRole("button", { name: label })).toBeInTheDocument()
       })
