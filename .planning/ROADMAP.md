@@ -346,7 +346,15 @@ than assume CSS. **G-5**: `WorkflowBuilderPage.tsx`, `PhaseFormPanel.tsx`, `buil
   3. A connection whose grant was revoked, or cannot be refreshed, says so **as a connection state in plain words** — never as a tool error in the middle of a run (OAUTH-02).
   4. Client secrets and refresh tokens are unreadable at rest and to any database role that does not need them — verified the same way migration 118 verified `secret_ciphertext` (OAUTH-03).
 
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves
+
+Plans:
+
+- [x] 215-01-PLAN.md - migration 129: connector_tokens table with column privileges + auth_type/status on connector_connections + OAuth Pydantic models
+- [x] 215-02-PLAN.md - OAuth engine: PKCE (S256), HMAC-signed state tokens, provider authorization URL generation, token exchange, and connector API routes
+- [x] 215-03-PLAN.md - Background refresh engine: atomic claim lease locking (refresh_claimed_until) + provider refresh + invalid_grant revocation handling
+- [x] 215-04-PLAN.md - Frontend OAuth UI: 1-click connect card, custom client credentials accordion, revoked state badge/reconnect flow, and servicesCatalog shape update
+- [x] 215-05-PLAN.md - E2E integration test suite, security threat model verification report (215-VERIFICATION.md), and vitest count gate confirmation
 
 **UI hint**: yes
 **Flags**: **D-v3.9-01 binds this phase**: BYO first, we-own-the-app later. ⚠ **G-2 sketch owed, but `screenshots/` is NOT its bar** — Claude.ai's 2-click Connect exists because *Anthropic* registered the app; our redirect URI would point at our cloud and exclude every self-hosted install. **Do not let a sketch promise it.** The honest comparison is n8n / Windmill's per-operator registration (8+ steps for Google), and the design job is making that *tolerable and legible*, not pretending it is two clicks. **Threat model MANDATORY** — ⚠ **this is exactly the defect class migration 118 closed for `secret_ciphertext`; do not re-introduce it by copying an RLS shape from a table with no secret column**, and remember the measured trap that mig 118 granted SELECT *column by column*, so a NEW column is unreadable by default and the failure looks like an outage. **Migration** for access token + refresh token + expiry + scope set + provider account identity — ⚠ the `enc:v1:` envelope generalises, **the column shape does not**; this is the migration `SEED-146` warns about, so commit it once. **Refresh must be claim-based**: `WORKER_COUNT=2` with no leader, so two workers racing a rotation invalidates each other's token. **New public callback route + `state` CSRF param + per-org binding** — ⚠ the frontend has no URL router (`SEED-185`), which is a real cost to size at discuss-phase. **Deployment-artifact parity in the same commit** (the redirect URI is a new env var → `deploy/onebox.env.example`, `docs/OPERATOR.md`, `scripts/check-deploy-drift.sh`). ⚠ **MCP defers OAuth, it does not remove it** — a remote MCP server fronting Google holds a live grant we do not control, which is a credential concentration our egress guard does not answer.

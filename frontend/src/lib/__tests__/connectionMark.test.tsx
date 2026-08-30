@@ -395,7 +395,7 @@ describe("source fences over the module's own text", () => {
     // rather than against a literal, and the fence that actually protects the render is the
     // wordmark one below.
     const brandImports = (markSource.match(/~icons\/logos\//g) ?? []).length
-    expect(brandImports).toBe(11)
+    expect(brandImports).toBe(12)
     expect((markSource.match(/from "lucide-react"/g) ?? []).length).toBe(1)
   })
 
@@ -414,6 +414,7 @@ describe("source fences over the module's own text", () => {
       "logos/github",
       "logos/notion",
       "logos/google",
+      "logos/microsoft",
       "logos/linear",
       "logos/sentry",
       "logos/intercom",

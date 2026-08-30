@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-08-30T06:41:46.084Z"
-last_activity: 2026-08-29
+last_updated: "2026-08-30T22:10:00.000Z"
+last_activity: 2026-08-30
 progress:
   total_phases: 13
-  completed_phases: 6
-  total_plans: 70
-  completed_plans: 64
-  percent: 46
+  completed_phases: 8
+  total_plans: 75
+  completed_plans: 73
+  percent: 62
 ---
 
 # Project State
@@ -32,13 +32,14 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 220 — a-drawing-becomes-quantities-spike (COMPLETED & VERIFIED)
+**Current focus:** Phase 215 — BYO OAuth (COMPLETED & VERIFIED)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 220 (a-drawing-becomes-quantities-spike) — **COMPLETED & VERIFIED (4 of 4 plans executed, 12/12 pytest tests green, 3/3 vitest green, count gate 171/171 OK)**, 2026-08-30
-Plan: 4 of 4 — `220-01` to `220-04` complete and verified. Next: Select next phase from milestone roadmap.
+Phase: 215 (BYO OAuth) — **COMPLETED & VERIFIED (5 of 5 plans executed, 20/20 pytest tests green, 5/5 vitest OAuth green, count gate 171/171 OK, 6929/6929 tests green)**, 2026-08-30
+Plan: 5 of 5 — `215-01` to `215-05` complete and verified with threat model verification in `215-VERIFICATION.md`. Next: Phase 216.
+Phase 220 (a-drawing-becomes-quantities-spike) is 4/4 complete and verified.
 Phase 217.1 (the-library-exactly-as-sketched) is 18/18 complete + all 4 UAT observations and visual enhancements resolved.
 ⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
 The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
