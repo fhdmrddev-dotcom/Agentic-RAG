@@ -96,9 +96,9 @@ export function ViewCard({
       <p className="text-[11.5px] leading-relaxed text-muted-foreground">{rule}</p>
 
       {/* The rule bar — a proportion of the corpus the view matches, never a health grade. */}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
         <div
-          className={["h-full rounded-full", zeroMatch ? "bg-amber-400/40" : "bg-primary/60"].join(" ")}
+          className={["h-full rounded-full transition-all duration-300", zeroMatch ? "bg-amber-400/60" : "bg-gradient-to-r from-primary/60 to-primary"].join(" ")}
           style={{ width: `${pct}%` }}
         />
       </div>

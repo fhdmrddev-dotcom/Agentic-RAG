@@ -106,21 +106,29 @@ export function HealthTab() {
               <div className="ghost-border bg-card/50 rounded-lg p-4 h-64 animate-pulse" />
             )}
           </Suspense>
-          <div className="flex gap-2 mt-2">
-            {[7, 30, 90].map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setTrendDays(d)}
-                className={`text-xs px-2 py-1 rounded ${
-                  trendDays === d
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <div className="flex gap-2">
+              {[7, 30, 90].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setTrendDays(d)}
+                  className={`text-xs px-2 py-1 rounded ${
+                    trendDays === d
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            {overview && overview.high_confidence_rate != null && (
+              <span className="text-[11px] text-muted-foreground hidden sm:inline-flex items-center gap-1.5 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {Math.round(overview.high_confidence_rate * 100)}% high confidence
+              </span>
+            )}
           </div>
         </div>
       </div>

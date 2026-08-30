@@ -108,7 +108,26 @@ export function FoldersIndexTable({
                       {hasChunks ? folder.chunks : "–"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {hasChunks ? folder.vectors : "–"}
+                      {hasChunks ? (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span>{folder.vectors}</span>
+                            <span className="text-[10px] text-muted-foreground/70">
+                              {Math.round(((folder.vectors ?? 0) / (folder.chunks || 1)) * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-20 h-1 rounded-full bg-muted/50 overflow-hidden">
+                            <div
+                              className="h-full bg-primary transition-all duration-300 rounded-full"
+                              style={{
+                                width: `${Math.min(100, Math.round(((folder.vectors ?? 0) / (folder.chunks || 1)) * 100))}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        "–"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {folder.last_indexed

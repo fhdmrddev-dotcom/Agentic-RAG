@@ -51,14 +51,21 @@ function RankCell({ row }: { row: CheckedQueryRow }) {
 
 function VerdictBadge({ row }: { row: CheckedQueryRow }) {
   const verdict = verdictFor(row)
-  const color =
-    verdict === "Slipped"
-      ? "bg-red-400/10 text-red-400"
-      : verdict === "Holding"
-        ? "bg-emerald-400/10 text-emerald-400"
-        : "bg-muted text-muted-foreground"
+  const isSlipped = verdict === "Slipped"
+  const isHolding = verdict === "Holding"
+  const color = isSlipped
+    ? "bg-red-400/10 text-red-400 border border-red-400/20"
+    : isHolding
+      ? "bg-emerald-400/10 text-emerald-400 border border-emerald-400/20"
+      : "bg-muted text-muted-foreground border border-border/40"
+  const dotColor = isSlipped
+    ? "bg-red-400"
+    : isHolding
+      ? "bg-emerald-400"
+      : "bg-muted-foreground/60"
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 tabular-nums ${color}`}>
+    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full shrink-0 font-medium tabular-nums ${color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {verdict}
     </span>
   )
