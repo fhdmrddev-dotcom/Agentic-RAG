@@ -81,6 +81,7 @@ _EXPECTED_MODULES = frozenset({
     "descriptors.py",
     "args.py",
     "grants.py",
+    "chat_tools.py",
 })
 
 #: D-05 expressed as PROPERTIES. Each entry is ``name -> matcher``; the name is what a

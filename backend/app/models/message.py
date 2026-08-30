@@ -71,6 +71,8 @@ class MessageCreate(BaseModel):
     #     to the two-rows model, the create-before-spawn ordering, the template-upload
     #     sequencing or the orphan cleanup. The amendment is exactly one request field
     #     and one dict literal (twice).
+    # Phase 216 (CHAT-05 / CHAT-06): active connector connection IDs for this message / thread turn.
+    active_connector_ids: list[UUID] | None = None
     inputs: dict[str, str] | None = None
 
 
