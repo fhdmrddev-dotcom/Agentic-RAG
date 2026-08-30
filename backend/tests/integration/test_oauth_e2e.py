@@ -9,7 +9,7 @@ from app.models.connector import (
     ConnectionStatus,
     AuthType,
 )
-from app.services.connectors.oauth import (
+from app.services.oauth_service import (
     generate_pkce_pair,
     build_authorization_url,
     verify_oauth_state,
@@ -17,7 +17,7 @@ from app.services.connectors.oauth import (
     fetch_account_profile,
     encrypt_token_value,
 )
-from app.services.connectors.oauth_refresh import (
+from app.services.oauth_refresh_service import (
     get_valid_oauth_token,
     refresh_oauth_token_at_provider,
     OAuthRevokedError,
@@ -37,7 +37,7 @@ async def test_oauth_full_authorization_and_token_storage_lifecycle():
     redirect_uri = "https://app.example.com/api/v1/connectors/oauth/callback"
 
     # Step 1: Authorization URL generation
-    with patch("app.services.connectors.oauth.resolve_client_credentials", return_value=("mock-client-id", "mock-client-secret")):
+    with patch("app.services.oauth_service.resolve_client_credentials", return_value=("mock-client-id", "mock-client-secret")):
         auth_url, state_token = build_authorization_url(
             provider="google",
             connection_id=connection_id,
@@ -217,7 +217,7 @@ async def test_oauth_claim_refresh_concurrency_two_workers():
             "expires_in": 3600,
         }
 
-    with patch("app.services.connectors.oauth_refresh.refresh_oauth_token_at_provider", side_effect=mock_refresh_provider):
+    with patch("app.services.oauth_refresh_service.refresh_oauth_token_at_provider", side_effect=mock_refresh_provider):
         worker_1_task = asyncio.create_task(
             get_valid_oauth_token(connection_id, org_id=org_id, supabase=mock_supabase)
         )
@@ -271,6 +271,6 @@ async def test_oauth_revocation_on_invalid_grant():
     update_builder.eq.return_value.filter.return_value.execute.return_value = MagicMock(data=[token_row])
     conn_table_mock.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[conn_row])
 
-    with patch("app.services.connectors.oauth_refresh.refresh_oauth_token_at_provider", side_effect=OAuthRevokedError("Revoked by provider")):
+    with patch("app.services.oauth_refresh_service.refresh_oauth_token_at_provider", side_effect=OAuthRevokedError("Revoked by provider")):
         with pytest.raises(OAuthRevokedError):
             await get_valid_oauth_token(connection_id, org_id=org_id, supabase=mock_supabase)

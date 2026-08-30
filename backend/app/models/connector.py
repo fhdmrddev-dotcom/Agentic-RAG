@@ -50,9 +50,12 @@ from typing import Annotated, Any, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-# The runtime home of the closed capability set. Imported for the static agreement assert
-# below — this module never calls into the service layer at request time.
-from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+# The closed external action capability set (Phase 190 / D-04).
+EXTERNAL_ACTION_CAPABILITIES: frozenset[str] = frozenset({
+    "send_email",
+    "create_ticket",
+    "post_message",
+})
 
 
 class _StrictBase(BaseModel):

@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.services.connectors.oauth import encrypt_token_value
-from app.services.connectors.oauth_refresh import (
+from app.services.oauth_service import encrypt_token_value
+from app.services.oauth_refresh_service import (
     OAuthError,
     OAuthRevokedError,
     OAuthTokenUnavailable,
@@ -91,7 +91,7 @@ async def test_get_valid_oauth_token_expired_triggers_refresh():
         "token_type": "Bearer",
     }
 
-    with patch("app.services.connectors.oauth_refresh.refresh_oauth_token_at_provider", new_callable=AsyncMock) as mock_refresh:
+    with patch("app.services.oauth_refresh_service.refresh_oauth_token_at_provider", new_callable=AsyncMock) as mock_refresh:
         mock_refresh.return_value = mock_refresh_resp
 
         token = await get_valid_oauth_token("conn-1", "org-1", supabase=mock_db)

@@ -133,10 +133,11 @@ assert "secret_ciphertext" not in _RESPONSE_KEYS and "secret" not in _RESPONSE_K
 #   POST …&select=<the list below>    -> 403 "new row violates row-level security policy"
 #                                        (i.e. it got PAST the privilege check to the row gate)
 #
-# DERIVED from the response model, never retyped: a column added to the table tomorrow cannot
-# enter a projection unless somebody adds a field to `ConnectorConnectionResponse`, in a diff
-# a reviewer reads. That is the same single source of truth `_to_response` already uses.
-_SELECTABLE_COLUMNS: str = ",".join(_RESPONSE_KEYS)
+# DERIVED from the response model, excluding virtual/joined fields that live on other tables
+# (e.g. `account_email` and `account_name` which live in `connector_tokens` table):
+_NON_TABLE_RESPONSE_KEYS: frozenset[str] = frozenset({"account_email", "account_name"})
+_TABLE_SELECTABLE_KEYS: tuple[str, ...] = tuple(k for k in _RESPONSE_KEYS if k not in _NON_TABLE_RESPONSE_KEYS)
+_SELECTABLE_COLUMNS: str = ",".join(_TABLE_SELECTABLE_KEYS)
 
 
 # ── refusals ─────────────────────────────────────────────────────────────────────────────
@@ -366,6 +367,10 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
     is dropped here AND would be rejected by `extra='forbid'` if it somehow got through.
     """
     d = {key: row.get(key) for key in _RESPONSE_KEYS}
+    if d.get("auth_type") is None:
+        d["auth_type"] = "mcp" if row.get("mcp_server_url") else "static_key"
+    if d.get("status") is None:
+        d["status"] = "active"
     if d.get("tool_grants") is None:
         d["tool_grants"] = {}
     if d.get("discovered_tools") is None:
@@ -374,6 +379,12 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["config"] = {}
     if d.get("default_approval_posture") is None:
         d["default_approval_posture"] = "ask"
+    cfg = d.get("config")
+    if isinstance(cfg, dict):
+        if not d.get("account_email") and cfg.get("account_email"):
+            d["account_email"] = cfg.get("account_email")
+        if not d.get("account_name") and cfg.get("account_name"):
+            d["account_name"] = cfg.get("account_name")
     return ConnectorConnectionResponse.model_validate(d)
 
 
@@ -1196,7 +1207,7 @@ async def save_oauth_tokens(
 ) -> None:
     """Phase 215 (OAUTH-01, OAUTH-02) — Encrypt and store OAuth tokens in connector_tokens."""
     from datetime import datetime, timedelta, timezone
-    from app.services.connectors.oauth import encrypt_token_value
+    from app.services.oauth_service import encrypt_token_value
 
     client = _client(supabase)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()

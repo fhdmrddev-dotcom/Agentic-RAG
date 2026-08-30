@@ -5,7 +5,7 @@ import json
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from app.services.connectors.oauth import (
+from app.services.oauth_service import (
     build_authorization_url,
     decrypt_token_value,
     encrypt_token_value,

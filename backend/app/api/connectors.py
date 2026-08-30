@@ -808,7 +808,7 @@ async def create_oauth_authorize_url(
     user: dict = Depends(get_current_user),
 ) -> OAuthAuthorizeResponse:
     """Phase 215 (OAUTH-01, OAUTH-02) — Generate PKCE authorization URL for Google / Microsoft."""
-    from app.services.connectors.oauth import build_authorization_url
+    from app.services.oauth_service import build_authorization_url
     from app.config import settings
 
     frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
@@ -839,7 +839,7 @@ async def oauth_callback(
     error_description: str = Query(None),
 ) -> RedirectResponse:
     """Phase 215 (OAUTH-02) — Verify signed state, exchange code for tokens, encrypt, and redirect to settings."""
-    from app.services.connectors.oauth import (
+    from app.services.oauth_service import (
         exchange_code_for_tokens,
         fetch_account_profile,
         resolve_client_credentials,

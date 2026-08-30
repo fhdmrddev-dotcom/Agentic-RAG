@@ -79,6 +79,8 @@ _EXPECTED_MODULES = frozenset({
     # a module under this package that the fence does not visit is a module D-05 does not
     # cover, and "it only builds a dict today" is a property of today.
     "descriptors.py",
+    "args.py",
+    "grants.py",
 })
 
 #: D-05 expressed as PROPERTIES. Each entry is ``name -> matcher``; the name is what a

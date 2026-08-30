@@ -16,7 +16,7 @@ from supabase import Client
 from app.dependencies import get_supabase
 from app.models.connector import OAuthProvider
 from app.security.secret_cipher import decrypt_secret, encrypt_secret, get_cipher, is_encrypted
-from app.services.connectors.oauth import (
+from app.services.oauth_service import (
     OAUTH_PROVIDERS,
     decrypt_token_value,
     encrypt_token_value,
