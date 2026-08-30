@@ -25,6 +25,9 @@ import re
 import sys
 from collections import Counter, defaultdict
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # ezdxf `$INSUNITS`. 0 means UNITLESS, which is a REFUSAL case, not a default.
