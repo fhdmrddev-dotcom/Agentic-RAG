@@ -2,14 +2,13 @@
  * TakeoffSection — CAD Drawing Quantities & Grounded BOQ Table (Phase 220, TAKEOFF-04).
  */
 import { useEffect, useState } from "react"
-import { Calculator, Download, AlertTriangle, CheckCircle2, HelpCircle, Loader2, FileSpreadsheet } from "lucide-react"
+import { Calculator, Download, AlertTriangle, CheckCircle2, Loader2, FileSpreadsheet } from "lucide-react"
 import { listDocuments } from "@/lib/api"
 import {
   fetchDocumentTakeoff,
   matchDocumentTakeoff,
   resolveDocumentTakeoffItem,
   type DocumentTakeoffPayload,
-  type TakeoffBOQ,
 } from "@/lib/api/takeoff"
 import type { Document } from "@/types"
 import { cn } from "@/lib/utils"

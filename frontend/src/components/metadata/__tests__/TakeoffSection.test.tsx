@@ -29,6 +29,9 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
     updated_at: "2026-08-30T10:00:00Z",
     is_latest: true,
     version_number: 1,
+    folder_id: null,
+    error_message: null,
+    content_hash: null,
     metadata: {
       _takeoff: {
         units: "mm",
@@ -100,6 +103,10 @@ describe("TakeoffSection Component (Phase 220, TAKEOFF-04)", () => {
       updated_at: "2026-08-30T10:00:00Z",
       is_latest: true,
       version_number: 1,
+      folder_id: null,
+      error_message: null,
+      content_hash: null,
+      metadata: {},
     },
   ]
 
