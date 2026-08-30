@@ -185,6 +185,8 @@ export const SERVICE_TO_SHAPE: Record<string, ConnectionShape> = {
   custom: "mcp",
   custom_mcp: "mcp",
   mcp: "mcp",
+  google: "oauth",
+  microsoft: "oauth",
 }
 
 // ⚠ THIS MAP IS DELIBERATELY *NOT* GENERATED FROM `CATALOG_SERVICES`, and D-5 was briefly
@@ -275,6 +277,7 @@ export function shapeForService(serviceId: string, endpoint: string = ""): Conne
   // changed for one reason and break the other.
   const curated = getCuratedServiceEntry(serviceId)
   if (curated?.shape === "mcp") return "mcp"
+  if (curated?.shape === "oauth") return "oauth"
 
   // 3 · An identity nothing knows about names a service and no way to reach it yet. A real
   //     shape, not an error state — Phase 215's OAuth is what gives it a way through.
@@ -443,6 +446,7 @@ export const FIELD_COUNTS: Record<ConnectionShape, number> = {
   post_message: 3,
   mcp: 3,
   service: 1,
+  oauth: 1,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -482,7 +486,7 @@ export const FIELD_COUNTS: Record<ConnectionShape, number> = {
  * not curated yet. `EMPTY_DRAFT` starts here, so the create form has no capability default —
  * *a default is not a way through a gate*.
  */
-export type ConnectionShape = ConnectorCapability | "mcp" | "service"
+export type ConnectionShape = ConnectorCapability | "mcp" | "service" | "oauth"
 
 /**
  * Everything the form holds, flat and all-string.
@@ -493,26 +497,7 @@ export type ConnectionShape = ConnectorCapability | "mcp" | "service"
  * on this surface that disagreement is the whole threat (T-190-17-DEST).
  */
 export interface ConnectionDraft {
-  /**
-   * ⚠ PHASE 211 — THIS IS NOW A **DERIVED** FIELD, NEVER A CHOSEN ONE, and that distinction
-   * is what keeps the docblock above's rejection of alternative (a) intact.
-   *
-   * `serviceId` is the connection's IDENTITY (what a person supplies); `capability` is the
-   * FIELD SET that follows from it (what the form renders). They are two different facts, so
-   * this is not the "separate `shape` field beside `capability`" that (a) rejected — the two
-   * cannot disagree about the same thing because they are not about the same thing.
-   *
-   * It is recomputed by `shapeForService` at exactly ONE derivation site in the panel, which
-   * both the service field and the endpoint field call. Nothing else assigns it in create
-   * mode. On EDIT it is still seeded from the ROW by `draftFromConnection`, which is a
-   * positive fact about a stored connection rather than a derivation from a keystroke.
-   */
   capability: ConnectionShape
-  /**
-   * Phase 211 (D-211-01) — the SERVICE this connection reaches, as typed. FREE TEXT, and it
-   * must never become a union: a closed set here would be migration 116's `capability`
-   * mistake moved to a nicer axis (SEED-207). Flat and all-string like every other field.
-   */
   serviceId: string
   name: string
   /** send_email */
@@ -530,14 +515,16 @@ export interface ConnectionDraft {
   mcpServerUrl: string
   /** Write-only, at this boundary and nowhere else. Never populated from a read. */
   secret: string
+  /** Phase 215 (OAUTH-01..04) OAuth fields */
+  authType?: "static_key" | "oauth_byo" | "mcp"
+  customClientId?: string
+  customClientSecret?: string
+  customScopes?: string
+  accountName?: string
+  status?: "active" | "revoked" | "error"
 }
 
 export const EMPTY_DRAFT: ConnectionDraft = {
-  // ⚠ IT USED TO READ `send_email`, AND THAT WAS THE DEFAULT SC#1 EXISTS TO KILL. A create
-  // form that starts pointed at one of the three verbs is a form that can submit a capability
-  // nobody chose — *a default is not a way through a gate* (`phase_types.py`'s preamble
-  // records the same defect from the other end). It now starts in the shape that asserts
-  // nothing: an identity has not been named yet, so no field set is claimed.
   capability: "service",
   serviceId: "",
   name: "",
@@ -550,16 +537,16 @@ export const EMPTY_DRAFT: ConnectionDraft = {
   channel: "",
   mcpServerUrl: "",
   secret: "",
+  authType: "static_key",
+  customClientId: "",
+  customClientSecret: "",
+  customScopes: "",
+  accountName: "",
+  status: "active",
 }
 
 /**
  * A draft from a stored row.
- *
- * ⚠ `secret` IS ALWAYS THE EMPTY STRING and that is not a defensive habit — there is
- * nothing to copy. `ConnectorConnection` declares no credential field, so this function
- * COULD NOT pre-fill one even if a later edit wanted it to. Read defensively through
- * `unknown` because `config` is a three-member union and this reader is deliberately TOTAL
- * over it (`connectionsCopy.destinationFactsOf`'s argument, one surface across).
  */
 export function draftFromConnection(connection: ConnectorConnection): ConnectionDraft {
   const config = connection.config as unknown as Record<string, unknown>
@@ -567,32 +554,9 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     typeof config[key] === "string" ? (config[key] as string) : ""
   return {
     ...EMPTY_DRAFT,
-    // ┌─ SUPERSEDED 2026-08-25 (206.1 / D-206.1-22) — KEPT VERBATIM, DO NOT RE-APPLY ────────┐
-    // │ "An MCP connection carries no capability (206), and this draft describes the        │
-    // │  CAPABILITY form. Falling back to the empty draft's own default keeps the form      │
-    // │  constructable rather than inventing a capability the row does not have."           │
-    // └────────────────────────────────────────────────────────────────────────────────────┘
-    // ⚠ THAT PARAGRAPH READS AS A DECISION AND IS IN FACT A STATEMENT OF A DEFECT. The
-    // fallback did keep the form constructable — as the SMTP form. Measured: opening a stored
-    // MCP row rendered `Send an email`, SMTP host/port fields and an `App password` label, and
-    // its Save composed a `SendEmailConfig` that the API refused with a generic
-    // "Couldn’t save that — try again." A person could not attribute that failure to anything.
-    //
-    // THE CORRECTED RULE: the shape is read from the ROW — `connection.mcp_server_url != null`
-    // — and NEVER from a missing capability. Absence read as a default is precisely the shape
-    // D-206.1-11 forbids, and `capability === null` would be that same mistake pointed the
-    // other way: a future row that legitimately lacks a capability for some third reason would
-    // be dragged into the MCP form.
-    //
-    // ⚠ A ROW CARRYING BOTH SEEDS MCP. The URL wins because MCP is a SHAPE, not a capability:
-    // the server's own validator returns on `mcp_server_url` before it ever looks at the
-    // capability arm, so the URL is what the wire will act on.
-    capability: connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability),
-    // ⚠ PHASE 211 — READ VERBATIM OFF THE ROW, NEVER DERIVED FROM THE URL OR THE CAPABILITY.
-    // D-211-01 rejected URL-derived identity outright (it breaks for two connections to the
-    // same service, and for a generic SMTP host). Migration 127 derives from a host ONCE, for
-    // rows that predate the column, and nothing downstream re-derives — so a row whose
-    // identity disagrees with its endpoint still reads back its own stored value.
+    capability: connection.auth_type === "oauth_byo"
+      ? "oauth"
+      : (connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability)),
     serviceId: connection.service_id,
     mcpServerUrl: connection.mcp_server_url ?? "",
     name: connection.name,
@@ -601,9 +565,15 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     fromAddress: text("from_address"),
     baseUrl: text("base_url"),
     projectKey: text("project_key"),
-    accountEmail: text("account_email"),
+    accountEmail: connection.account_email ?? text("account_email"),
+    accountName: connection.account_name ?? text("account_name"),
     channel: text("default_channel"),
     secret: "",
+    authType: connection.auth_type ?? "static_key",
+    customClientId: text("custom_client_id"),
+    customClientSecret: text("custom_client_secret"),
+    customScopes: text("custom_scopes"),
+    status: connection.status ?? "active",
   }
 }
 
@@ -685,6 +655,13 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
   // ladder does not know falls to the neutral below instead of silently inheriting Slack's.
   if (draft.capability === "post_message") {
     return { default_channel: draft.channel.trim() }
+  }
+
+  if (draft.capability === "oauth") {
+    const oauthConfig: Record<string, unknown> = {}
+    if (draft.customClientId?.trim()) oauthConfig.custom_client_id = draft.customClientId.trim()
+    if (draft.customClientSecret?.trim()) oauthConfig.custom_client_secret = draft.customClientSecret.trim()
+    return oauthConfig
   }
 
   // The NEUTRAL terminal. It claims no kind's facts. `McpConnectionConfig` declares `headers`

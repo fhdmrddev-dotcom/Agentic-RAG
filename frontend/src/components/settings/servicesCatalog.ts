@@ -25,21 +25,9 @@ export interface CatalogServiceEntry {
   markKey: string
   /**
    * Which WIRE this service reaches over — the shape `shapeForService` resolves.
-   *
-   * ⚠ SEPARATED FROM `markKey` ON 2026-08-27 (SEED-215), AND THE REASON IS A DEFECT THAT WAS
-   * REINTRODUCED BY EXACTLY THIS CONFLATION. Phase 212's D-5 keyed the shape on
-   * `markKey === "mcp"`, which worked only while every MCP-backed vendor happened to be
-   * drawing the generic MCP plug. The moment `github`, `notion` and `google` were given
-   * their OWN logos, all three fell through to the `"service"` shape — whose field set is
-   * Name and NOTHING ELSE — so the panel opened with nowhere to type a URL or a token. That
-   * is byte-for-byte the defect D-5 was written to fix, caused by a purely visual change.
-   *
-   * The two facts were never the same fact: `markKey` answers *what do I draw*, `shape`
-   * answers *what does this talk to*. A vendor can have its own logo AND speak MCP, which is
-   * the normal case rather than the exception. This file already warned that keying a SHAPE
-   * on `markKey` is "catastrophic"; the warning was right and pointed at the wrong column.
    */
-  shape?: "mcp"
+  shape?: "mcp" | "oauth"
+  oauthProvider?: "google" | "microsoft" | "github"
   isPopular: boolean
   category: ServiceCategory
   defaultHost?: string
@@ -93,6 +81,38 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     ],
   },
   {
+    serviceId: "google",
+    name: "Google Workspace",
+    tagline: "Drive, Docs, Sheets, and Gmail via OAuth.",
+    description: "Connect to Google Workspace with 1-click OAuth to access Google Drive files, search docs, and automate workflows.",
+    markKey: "google",
+    shape: "oauth",
+    oauthProvider: "google",
+    isPopular: true,
+    category: "productivity",
+    defaultHost: "googleapis.com",
+    starterPrompts: [
+      "Search shared Google Drive files",
+      "Read team Google Docs documentation",
+    ],
+  },
+  {
+    serviceId: "microsoft",
+    name: "Microsoft 365",
+    tagline: "OneDrive, SharePoint, and Graph via OAuth.",
+    description: "Connect to Microsoft 365 with 1-click OAuth to access OneDrive files, SharePoint libraries, and Microsoft Graph resources.",
+    markKey: "microsoft",
+    shape: "oauth",
+    oauthProvider: "microsoft",
+    isPopular: true,
+    category: "productivity",
+    defaultHost: "graph.microsoft.com",
+    starterPrompts: [
+      "Search OneDrive documents and spreadsheets",
+      "Sync SharePoint engineering libraries",
+    ],
+  },
+  {
     serviceId: "jira",
     name: "Jira",
     tagline: "Raise and track issues for your team.",
@@ -118,21 +138,6 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     starterPrompts: [
       "Email executive summary to stakeholders",
       "Send alert notifications on workflow failure",
-    ],
-  },
-  {
-    serviceId: "google",
-    name: "Google Workspace",
-    tagline: "Document collaboration and drive assets.",
-    description: "Access shared Google Drive files, search documents, and read team collaboration resources.",
-    markKey: "google",
-    shape: "mcp",
-    isPopular: true,
-    category: "productivity",
-    defaultHost: "googleapis.com",
-    starterPrompts: [
-      "Summarize shared team documentation",
-      "Search team drive for architectural specs",
     ],
   },
   {

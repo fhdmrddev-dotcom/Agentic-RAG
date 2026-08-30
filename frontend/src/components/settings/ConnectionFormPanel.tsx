@@ -89,6 +89,7 @@ import { Check, Loader2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   ConnectorApiError,
+  createOAuthAuthorizeUrl,
   discoverConnectorTools,
   probeMcpServer,
   updateConnectorGrants,
@@ -100,6 +101,7 @@ import type {
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
   McpDiscoveredTool,
+  OAuthProvider,
   ToolGrantPosture,
 } from "@/lib/api"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
@@ -849,66 +851,80 @@ export function ConnectionFormPanel({
     }
   }
 
+  const [authorizingOAuth, setAuthorizingOAuth] = useState(false)
+  const [oauthError, setOauthError] = useState<string | null>(null)
+
+  async function handleOAuthAuthorize() {
+    setAuthorizingOAuth(true)
+    setOauthError(null)
+    try {
+      let connId = connection?.id
+      if (!connId && mode === "create") {
+        const body: ConnectorConnectionCreate = {
+          service_id: draft.serviceId.trim(),
+          name: draft.name.trim() || serviceLabelOf(draft.serviceId),
+          config: configFromDraft(draft),
+          auth_type: "oauth_byo",
+          status: "active",
+        }
+        const created = await onCreate?.(body)
+        if (created && typeof created === "object" && "id" in created) {
+          connId = created.id
+        }
+      }
+
+      const prov: OAuthProvider = (draft.serviceId.toLowerCase().includes("microsoft") || draft.serviceId.toLowerCase().includes("onedrive"))
+        ? "microsoft"
+        : (draft.serviceId.toLowerCase().includes("github") ? "github" : "google")
+
+      const res = await createOAuthAuthorizeUrl({
+        provider: prov,
+        connection_id: connId || null,
+        custom_client_id: draft.customClientId?.trim() || null,
+        custom_client_secret: draft.customClientSecret?.trim() || null,
+      })
+      if (res.authorization_url) {
+        window.location.href = res.authorization_url
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to initiate OAuth authorization"
+      setOauthError(msg)
+      setAuthorizingOAuth(false)
+    }
+  }
+
   async function handleSave() {
     if (saving) return
     setSaving(true)
     setSaveRefusal(null)
     try {
       if (mode === "create") {
-        // ══ 211 · THE CREATE BODY — ONE COMPOSER, THREE SHAPES ═══════════════════════════
-        // ⚠ ITS KEY SET IS THE CONTRACT, and the three shapes' key sets are DIFFERENT rather
-        // than nested. Measured at the model: `_validate_connection_shape` branches on
-        // `mcp_server_url` FIRST and RETURNS before the capability arm, so a `capability` sent
-        // alongside a URL is at best ignored and at worst refused (`"mcp"` is not a member of
-        // the server's closed `ConnectorCapability`). `McpConfig` is `extra="forbid"` with
-        // exactly one field, so a `SendEmailConfig`-shaped config there is a 422 no
-        // client-side type can see.
-        //
-        // ⭐ `service_id` IS ON EVERY SHAPE, and it is the only key that is. 211-02 made it
-        // REQUIRED on the wire because migration 127's
-        // `connector_connections_has_a_service_identity` makes it required in the database —
-        // the client type and the column agree exactly, so a body without one cannot compile.
         const body: ConnectorConnectionCreate = {
           service_id: draft.serviceId.trim(),
           name: draft.name.trim(),
           config: configFromDraft(draft),
         }
 
-        // ⚠ EXACTLY ONE OF THE TWO REACHABLE PATHS, NEVER BOTH. Migration 127's
-        // `connector_connections_shape_is_not_ambiguous` and 211-02's model arm each refuse a
-        // row wearing both shapes, and the panel must not be the thing that discovers that.
-        // The `else if` is what makes "never both" structural rather than merely intended.
         if (draft.capability === "mcp") {
           body.mcp_server_url = draft.mcpServerUrl.trim()
           body.default_approval_posture = defaultPosture
+        } else if (draft.capability === "oauth") {
+          body.auth_type = "oauth_byo"
+          body.status = "active"
         } else if (
           draft.capability === "send_email" ||
           draft.capability === "create_ticket" ||
           draft.capability === "post_message"
         ) {
-          // ⚠ EACH MEMBER NAMED, AND NO TRAILING `else`. *A default is not a way through a
-          // gate*: a positional fallback here would send `send_email` for a service nobody
-          // curated — the elevation T-211-17a is about, and the exact defect
-          // `phase_types.py`'s preamble records from the other end. A `"service"` draft
-          // therefore emits NO `capability` KEY AT ALL, which is CONN-08's whole row.
           body.capability = draft.capability
         }
 
-        // ⚠ AN EMPTY CREDENTIAL IS OMITTED, NOT SENT AS "" — the server's `NonEmpty` rejects
-        // an empty string as a PRESENT value, and D-206.1-06 makes the credential optional for
-        // the endpoint shape while the service shape has no credential field at all. Sending
-        // it would also be a pointless plaintext round trip for a value that is not there.
-        // The three capability shapes keep their shipped behaviour: their credential is
-        // required, and a blank one travels so the server refuses it in its own words.
-        if (draft.capability === "mcp" || draft.capability === "service") {
+        if (draft.capability === "mcp" || draft.capability === "service" || draft.capability === "oauth") {
           if (draft.secret.trim() !== "") body.secret = draft.secret
         } else {
           body.secret = draft.secret
         }
         const created = await onCreate?.(body)
-        // ⚠ SHAPE GATE REMOVED HERE TOO — a capability connection created with a posture
-        // already set would otherwise arrive with none of it, and the person would have to
-        // set it a second time on a screen that had already accepted it once.
         if (created && typeof created === "object" && "id" in created && Object.keys(toolGrants).length > 0) {
           try {
             await updateConnectorGrants(created.id, toolGrants)
@@ -923,6 +939,7 @@ export function ConnectionFormPanel({
           default_approval_posture: defaultPosture,
         }
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
+        if (draft.capability === "oauth") body.auth_type = "oauth_byo"
         if (replacing && draft.secret !== "") body.secret = draft.secret
 
         // ⚠ OPERATOR-DRIVEN ORDERING FIX, 2026-08-27 — THE GRANTS ARE WRITTEN **BEFORE**
@@ -1555,16 +1572,77 @@ export function ConnectionFormPanel({
           </Field>
         )}
 
-        {/* ── 3 · The write-only secret (§3d / T-190-17-SECRET).
-               ⚠ 211 — ABSENT FOR THE `service` SHAPE, AND ONLY FOR IT. An identified row
-               with no reachable path has nothing to authenticate with until OAuth lands in
-               Phase 215, so a credential box here would be an input offering to hold a value
-               nothing can spend. ⚠ THE SYNTHETIC UNKNOWN SHAPE STILL GETS ONE, with the
-               neutral noun: `"service"` is a KNOWN shape meaning *identified, no path yet*,
-               while an unrecognised `capability` value is a row we cannot describe — and
-               removing a person's ability to replace a credential on a row we merely fail to
-               recognise would be a worse answer than a neutral label. ── */}
-        {capability !== "service" && (
+        {capability === "oauth" && (
+          <div className="mb-4 rounded-lg border border-border bg-card/60 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-foreground">OAuth 2.0 Authorization</span>
+              {draft.accountEmail && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <Check className="h-3 w-3" />
+                  {draft.accountEmail}
+                </span>
+              )}
+            </div>
+
+            {draft.status === "revoked" && (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+                <span className="font-semibold">Authorization Revoked:</span> The provider reported that OAuth access was revoked. Please reconnect.
+              </div>
+            )}
+
+            <p className="text-[11px] leading-relaxed text-muted-foreground mb-3">
+              Authorize this connection with {serviceLabelOf(draft.serviceId)} using secure 1-click OAuth. Credentials and tokens are encrypted at rest with AES-256-GCM.
+            </p>
+
+            <button
+              type="button"
+              disabled={authorizingOAuth || readOnly}
+              onClick={() => void handleOAuthAuthorize()}
+              data-testid="connection-oauth-authorize-btn"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {authorizingOAuth && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {draft.accountEmail ? `Reconnect with ${serviceLabelOf(draft.serviceId)}` : `Connect with ${serviceLabelOf(draft.serviceId)}`}
+            </button>
+
+            {oauthError && (
+              <p className="mt-2 text-[11px] text-destructive">{oauthError}</p>
+            )}
+
+            <div className="mt-4 border-t border-border/60 pt-3">
+              <details className="text-[11px] text-muted-foreground">
+                <summary className="cursor-pointer font-medium hover:text-foreground">
+                  Advanced: Custom OAuth App Credentials (Optional)
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-foreground">Custom Client ID</label>
+                    <input
+                      type="text"
+                      value={draft.customClientId || ""}
+                      onChange={(e) => set({ customClientId: e.target.value })}
+                      placeholder="e.g. 12345-abcde.apps.googleusercontent.com"
+                      className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-foreground">Custom Client Secret</label>
+                    <input
+                      type="password"
+                      value={draft.customClientSecret || ""}
+                      onChange={(e) => set({ customClientSecret: e.target.value })}
+                      placeholder="Custom Client Secret"
+                      className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                    />
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        )}
+
+        {/* ── 3 · The write-only secret (§3d / T-190-17-SECRET). ── */}
+        {capability !== "service" && capability !== "oauth" && (
         <Field label={secretLabel} htmlFor={`${fieldId}-secret`}>
           {mode === "create" || replacing ? (
             <>

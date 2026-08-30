@@ -115,6 +115,7 @@ import McpIcon from "~icons/logos/model-context-protocol-icon"
 import GithubIcon from "~icons/logos/github-icon"
 import NotionIcon from "~icons/logos/notion-icon"
 import GoogleIcon from "~icons/logos/google-icon"
+import MicrosoftIcon from "~icons/logos/microsoft-icon"
 import FigmaIcon from "~icons/logos/figma"
 import LinearIcon from "~icons/logos/linear-icon"
 import SentryIcon from "~icons/logos/sentry-icon"
@@ -192,6 +193,7 @@ const SERVICE_MARKS: Record<string, ConnectionMarkEntry> = {
   github: { key: "github", Mark: GithubIcon, ink: "self" },
   notion: { key: "notion", Mark: NotionIcon, ink: "self" },
   google: { key: "google", Mark: GoogleIcon, ink: "self" },
+  microsoft: { key: "microsoft", Mark: MicrosoftIcon, ink: "self" },
   figma: { key: "figma", Mark: FigmaIcon, ink: "self" },
   linear: { key: "linear", Mark: LinearIcon, ink: "self" },
   sentry: { key: "sentry", Mark: SentryIcon, ink: "self" },

@@ -111,9 +111,10 @@ export const CONNECTION_STATE_READY = "✓ Ready"
 export const CONNECTION_STATE_NOT_CHECKED = "◌ Not checked"
 export const CONNECTION_STATE_CREDENTIAL_FAILED = "✕ Credential failed"
 export const CONNECTION_STATE_DISABLED = "⏻ Disabled"
+export const CONNECTION_STATE_REVOKED = "⚠ Revoked"
 
-/** The four states this surface can render, as a closed union. */
-export type ConnectionStateKind = "ready" | "not_checked" | "failed" | "disabled"
+/** The states this surface can render, as a closed union. */
+export type ConnectionStateKind = "ready" | "not_checked" | "failed" | "disabled" | "revoked"
 
 /** Every state word, keyed by kind — so the suite can walk all four rather than name
  *  four literals it might later disagree with. */
@@ -122,45 +123,19 @@ export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
   not_checked: CONNECTION_STATE_NOT_CHECKED,
   failed: CONNECTION_STATE_CREDENTIAL_FAILED,
   disabled: CONNECTION_STATE_DISABLED,
+  revoked: CONNECTION_STATE_REVOKED,
 }
 
 /**
  * The row's state, derived during render and never stored.
- *
- * ⚠ `is_enabled === false` WINS over any verdict, and that ordering is the honest one: a
- * disabled connection sends nothing whatever its credential last did, so reading it as
- * `✓ Ready` would be the over-claim this phase exists to avoid. An ABSENT verdict is
- * `not_checked`, not `failed` — an unchecked connection is not a failing one (the same
- * narrowness `ConnectionPicker.isFailing` keeps).
  */
 export function connectionStateOf(connection: ConnectorConnection): ConnectionStateKind {
   if (!connection.is_enabled) return "disabled"
+  if (connection.status === "revoked") return "revoked"
+  if (connection.auth_type === "oauth_byo" && connection.status === "active") return "ready"
   if (connection.last_check_verdict === "failed") return "failed"
   if (connection.last_check_verdict === "ok") return "ready"
 
-  // ── An MCP row's evidence is its DISCOVERY, because it has no credential check ─────────
-  //
-  // ⚠ ADDED 2026-08-28, OPERATOR-DRIVEN: a GitHub connection that had just discovered its
-  // tools still read "◌ Not checked". That was not a stale badge — it was a PERMANENT one.
-  // `POST /connections/{id}/check` refuses an MCP row outright with a 409
-  // (`check_not_available_for_mcp`, `api/connectors.py:200`) because there is no adapter and
-  // no credential to check, so `last_check_verdict` can NEVER become `"ok"` on this shape.
-  // Every MCP connection ever created was pinned to "Not checked" for life, however well it
-  // worked.
-  //
-  // The refusal names the remedy itself — *"Bind it to a step and use Discover tools to
-  // confirm the server answers."* So discovery IS this shape's check, and a non-empty
-  // `discovered_tools` is the record that the server answered. Reading it here makes the
-  // badge mean the same thing on both shapes: *we reached this, and it responded*.
-  //
-  // ⚠ IT IS HISTORICAL EVIDENCE, AND SO IS THE OTHER ARM. `last_check_verdict === "ok"` is
-  // also a past tense — the two-day-old-verdict rule (`test_190_connector_check.py`) exists
-  // precisely because a verdict does not describe now. This arm claims no more than that arm
-  // does, which is the only reason it may share the same word.
-  //
-  // ⚠ AN EMPTY LIST IS NOT EVIDENCE. A row whose discovery returned nothing, or which has
-  // never discovered, stays "not_checked" — absence read as success is the `destinationFactsOf`
-  // defect this file's own history records.
   if (
     (connection.mcp_server_url ?? "").trim().length > 0 &&
     (connection.discovered_tools?.length ?? 0) > 0
@@ -465,6 +440,11 @@ export function credentialReadingOf(
   connection: ConnectorConnection,
   now: number = Date.now(),
 ): string {
+  if (connection.auth_type === "oauth_byo") {
+    if (connection.status === "revoked") return "OAuth (revoked)"
+    if (connection.account_email) return connection.account_email
+    return "OAuth connected"
+  }
   if (connection.mcp_server_url) return CREDENTIAL_NO_CHECK_FOR_KIND
   return credentialLabel(connection.last_checked_at, now)
 }

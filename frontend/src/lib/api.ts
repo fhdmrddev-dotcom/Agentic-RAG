@@ -428,12 +428,18 @@ export {
   discoverConnectorTools,
   probeMcpServer,
   updateConnectorGrants,
+  createOAuthAuthorizeUrl,
+  getConnectionOAuthToken,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
   ConnectorCheckResult,
   McpProbeRequest,
   McpProbeResponse,
+  OAuthProvider,
+  OAuthAuthorizeRequest,
+  OAuthAuthorizeResponse,
+  OAuthTokenResponse,
 } from "./api/connectors"
 
 // ── schedules ─────────────────────────────────────────────────────────

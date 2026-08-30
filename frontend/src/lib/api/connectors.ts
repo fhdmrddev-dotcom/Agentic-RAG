@@ -332,30 +332,70 @@ export async function updateConnectorGrants(
   return res.json() as Promise<ConnectorConnection>
 }
 
-// ── Phase 204 (SCHED-01 / D-204-11) — the workflow-schedule client ────────────────────────
-//
-// ⚠ THE 197 G-5 DECLINE ON THIS FILE IS RE-DECLINED HERE, IN WRITING, WITH A FRESH TRIGGER.
-// The old trigger — *"the next phase that adds a RUNTIME export to this file, or a second
-// concern to it"* — FIRED at Phase 200.2 (`getWorkflowRunPhaseCitations`) and was never
-// answered; these six functions are its SECOND firing. Carrying the old "it did not fire"
-// sentence forward was not available, so:
-//
-//   RE-DECLINED. The named seam (a per-domain split under `lib/api/` behind a re-exporting
-//   barrel) is NOT taken by 204-03, because this plan's frontend share is six additive
-//   functions and a modal, and a 6,600-line module split is a phase rather than a task —
-//   taking it here would put a refactor of the app's single hottest file into the same commit
-//   as a net-new feature, which is the shape that makes a bisect useless.
-//
-//   FRESH TRIGGER, deliberately stronger than the one it replaces because the old one fired
-//   twice without consequence: **the NEXT phase that adds a runtime export here takes the
-//   split, or escalates it to the operator as a phase of its own. It may not re-decline.**
-//
-// ⚠ AND THE MEASURED BUDGET IS SPENT IN THIS SAME COMMIT. A new RUNTIME export throws at
-// MOUNT — not at call — in every suite that stubs `@/lib/api` with an explicit whole-module
-// factory. `196-08` cost 249 red tests that way. Twelve suites mount `WorkflowsPage` and mock
-// this module; all twelve gained the six names alongside this change.
-//
-// The six share `getAuthHeaders` + `ApiError` with every other call here; none invents a
-// transport of its own.
+// ── Phase 215 (OAUTH-01..03) — OAuth authorization & token status clients ───────
 
-/** Every schedule the caller owns, across every workflow (carries `workflow_name`). */
+export type OAuthProvider = "google" | "microsoft" | "github"
+
+export interface OAuthAuthorizeRequest {
+  provider: OAuthProvider
+  connection_id?: string | null
+  custom_client_id?: string | null
+  custom_client_secret?: string | null
+  custom_scopes?: string[]
+}
+
+export interface OAuthAuthorizeResponse {
+  authorization_url: string
+  state: string
+}
+
+export interface OAuthTokenResponse {
+  id: string
+  connection_id: string
+  account_email?: string | null
+  account_name?: string | null
+  token_type: string
+  scopes: string[]
+  expires_at: string
+  status: string
+}
+
+/** Generate an OAuth authorization URL with PKCE and signed state. */
+export async function createOAuthAuthorizeUrl(
+  payload: OAuthAuthorizeRequest,
+): Promise<OAuthAuthorizeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/oauth/authorize`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to start OAuth authorization",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<OAuthAuthorizeResponse>
+}
+
+/** Get public token status and expiration info for an OAuth connection. */
+export async function getConnectionOAuthToken(
+  connectionId: string,
+): Promise<OAuthTokenResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/oauth/token`,
+    { headers },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to get OAuth token status",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<OAuthTokenResponse>
+}
+

@@ -683,24 +683,29 @@ describe("the per-capability field sets (§3b / D-32 / T-190-17-SCOPE)", () => {
     expect(screen.queryByLabelText("Channel")).not.toBeInTheDocument()
   })
 
-  it("⭐ D-5 — curated Popular MCP services (github, notion, google) reveal MCP URL and Access token fields", async () => {
+  it("⭐ D-5 — curated Popular MCP services (github, notion) reveal MCP URL and Access token fields", async () => {
     const user = userEvent.setup({ delay: null })
-    // ⚠ `cleanup()` INSIDE THE LOOP, and its absence is what made the first draft of this case
-    // fail: three `renderPanel()` calls with no unmount leave three panels in one document, so
-    // `getByLabelText` throws `found multiple elements` — a failure that reads exactly like the
-    // defect under test and is not it. Same idiom as the four sibling loops in this file.
-    for (const serviceId of ["github", "notion", "google"]) {
+    for (const serviceId of ["github", "notion"]) {
       renderPanel()
       await chooseService(user, serviceId)
 
       expect(screen.getByLabelText("MCP server URL")).toBeInTheDocument()
       expect(screen.getByTestId("connection-probe-mcp-btn")).toBeInTheDocument()
       expect(screen.getByLabelText("Access token")).toBeInTheDocument()
-      // The MCP shape's bound count, read from the module rather than retyped — this is the
-      // half that proves the field set SWAPPED rather than merely gained a node.
       expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.mcp)
       cleanup()
     }
+  })
+
+  it("⭐ D-215 — curated OAuth services (google) reveal OAuth authorization card", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseService(user, "google")
+
+    expect(screen.getByText(/OAuth 2\.0 Authorization/i)).toBeInTheDocument()
+    expect(screen.getByTestId("connection-oauth-authorize-btn")).toBeInTheDocument()
+    expect(screen.getByText(/Connect with Google Workspace/i)).toBeInTheDocument()
+    cleanup()
   })
 
   it("⭐ D-5's NEGATIVE CONTROL — an UNCURATED identity still binds the service shape, so the catalog did not swallow CONN-08", async () => {
@@ -1900,10 +1905,12 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
     //
     // The catalog now carries `shape` beside `markKey`, and this pins that they are read
     // independently. It fails the moment someone keys a wire off a picture again.
-    for (const vendor of ["github", "notion", "google", "figma", "linear", "sentry", "intercom", "miro"]) {
+    for (const vendor of ["github", "notion", "figma", "linear", "sentry", "intercom", "miro"]) {
       expect(FORM_COPY.shapeForService(vendor, "")).toBe("mcp")
-      // …AND the mark is the vendor's own, not the plug. Asserting only the shape would pass
-      // on a revert of the logos; asserting only the mark would pass on a revert of `shape`.
+      expect(connectionMark({ service_id: vendor }).key).toBe(vendor)
+    }
+    for (const vendor of ["google", "microsoft"]) {
+      expect(FORM_COPY.shapeForService(vendor, "")).toBe("oauth")
       expect(connectionMark({ service_id: vendor }).key).toBe(vendor)
     }
     // The adapter-backed three are untouched by any of it — arm 1 still answers first.
@@ -1917,14 +1924,15 @@ describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 /
     expect(FORM_COPY.shapeForService("a-service-nobody-here-has-heard-of", "http://mcp.example.com/mcp")).toBe("service")
   })
 
-  it("`FIELD_COUNTS` is TOTAL over all FIVE shapes and binds MCP at exactly 3", () => {
+  it("`FIELD_COUNTS` is TOTAL over all SIX shapes and binds MCP at exactly 3", () => {
     expect(FORM_COPY.FIELD_COUNTS.mcp).toBe(3)
-    for (const shape of ["send_email", "create_ticket", "post_message", "mcp", "service"] as const) {
+    for (const shape of ["send_email", "create_ticket", "post_message", "mcp", "service", "oauth"] as const) {
       expect(typeof FORM_COPY.FIELD_COUNTS[shape]).toBe("number")
     }
     expect(Object.keys(FORM_COPY.FIELD_COUNTS).sort()).toEqual([
       "create_ticket",
       "mcp",
+      "oauth",
       "post_message",
       "send_email",
       "service",

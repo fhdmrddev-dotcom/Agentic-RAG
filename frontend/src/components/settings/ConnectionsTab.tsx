@@ -210,6 +210,7 @@ const STATE_TONE: Record<ConnectionStateKind, string> = {
   not_checked: "text-warning",
   failed: "text-destructive",
   disabled: "text-muted-foreground",
+  revoked: "text-amber-500",
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -1211,7 +1212,9 @@ function ConnectionRow({
                       ? "bg-muted-foreground"
                       : state === "failed"
                         ? "bg-destructive"
-                        : "bg-warning",
+                        : state === "revoked"
+                          ? "bg-amber-500"
+                          : "bg-warning",
                 )}
                 aria-hidden="true"
               />

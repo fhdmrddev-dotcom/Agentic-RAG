@@ -483,21 +483,6 @@ export interface ConnectorConnection {
   id: string
   org_id: string
   capability?: ConnectorCapability | null
-  /** Phase 211 (D-211-01) — the SERVICE this connection reaches. FREE TEXT: `slack`, `jira`,
-   *  `smtp`, `notion`, anything. **NOT** a union type, and it must never become one — a closed
-   *  set here would be migration 116's `capability` mistake moved to a nicer axis, where every
-   *  unknown service is again invisible or has to squeeze into a known name (SEED-207).
-   *
-   *  ⚠ REQUIRED, not optional, and that mirrors the server exactly: migration 127's
-   *  `connector_connections_has_a_service_identity` guarantees a non-blank value on every row,
-   *  and `ConnectorConnectionResponse` declares it `str`. A `?` here would invite a component
-   *  to branch on an absence the server cannot produce.
-   *
-   *  ⚠ Phase 212's curated "Popular" set is a PRESENTATION LOOKUP KEYED BY THIS VALUE
-   *  (D-211-02), never a constraint on it — and it must be read through an `own(MAP, key)`
-   *  guard rather than `MAP[key]`, because this is free text arriving from the server and a
-   *  bare index into an object literal reaches `Object.prototype`. A miss degrades to a
-   *  generic mark: never a refusal, never a hidden row. */
   service_id: string
   name: string
   config: ConnectorConnectionConfig
