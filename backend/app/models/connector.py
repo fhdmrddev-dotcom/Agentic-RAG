@@ -369,6 +369,7 @@ class OAuthAuthorizeRequest(_StrictBase):
     provider: OAuthProvider
     connection_id: str | None = None
     custom_client_id: str | None = None
+    custom_client_secret: str | None = None
     custom_scopes: list[str] = Field(default_factory=list)
 
 

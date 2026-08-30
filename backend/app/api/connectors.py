@@ -806,6 +806,7 @@ async def create_oauth_authorize_url(
     payload: OAuthAuthorizeRequest,
     active_org: str = Depends(get_active_org_id),
     user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
 ) -> OAuthAuthorizeResponse:
     """Phase 215 (OAUTH-01, OAUTH-02) — Generate PKCE authorization URL for Google / Microsoft."""
     from app.services.oauth_service import build_authorization_url
@@ -814,13 +815,33 @@ async def create_oauth_authorize_url(
     frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
     redirect_uri = f"{frontend_url}/api/connectors/oauth/callback"
 
+    cid = payload.custom_client_id
+    csec = payload.custom_client_secret
+
+    if (not cid or not csec) and payload.connection_id:
+        try:
+            conn_res = await aexec(
+                supabase.table("connector_connections")
+                .select("config")
+                .eq("id", str(payload.connection_id))
+                .eq("org_id", str(active_org))
+                .limit(1)
+            )
+            if conn_res.data:
+                cfg = conn_res.data[0].get("config") or {}
+                cid = cid or cfg.get("custom_client_id")
+                csec = csec or cfg.get("custom_client_secret")
+        except Exception:
+            pass
+
     try:
         auth_url, state = build_authorization_url(
             provider=payload.provider,
             connection_id=payload.connection_id,
             user_id=user["id"],
             redirect_uri=redirect_uri,
-            custom_client_id=payload.custom_client_id,
+            custom_client_id=cid,
+            custom_client_secret=csec,
             custom_scopes=payload.custom_scopes,
         )
         return OAuthAuthorizeResponse(authorization_url=auth_url, state=state)
