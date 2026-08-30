@@ -16,6 +16,7 @@ import type { HealthOverview, RetrievalTrendPoint } from "@/lib/api"
 import { CoverageRing } from "./CoverageRing"
 import { HealthSignalChips } from "./HealthSignalChips"
 import { HealthDocumentBars } from "./HealthDocumentBars"
+import { CheckedQueriesSection } from "./CheckedQueriesSection"
 
 const RetrievalTrendChart = lazy(() =>
   import("@/components/health/RetrievalTrendChart").then((m) => ({
@@ -29,7 +30,7 @@ interface StatTile {
   description: string
 }
 
-function toStatTiles(overview: HealthOverview, checkedCount?: number): StatTile[] {
+function toStatTiles(overview: HealthOverview, checkedCount: number | null): StatTile[] {
   return [
     {
       label: "Documents",
@@ -48,8 +49,9 @@ function toStatTiles(overview: HealthOverview, checkedCount?: number): StatTile[
     },
     {
       label: "Checked queries",
+      // Plan 17: live count from listCheckedQueries().length (lifted from CheckedQueriesSection).
       value: checkedCount ?? "Not known yet",
-      description: checkedCount !== undefined
+      description: checkedCount !== null
         ? `${checkedCount} query${checkedCount !== 1 ? "ies" : "y"} tracked`
         : "coming with checked queries",
     },
@@ -65,6 +67,8 @@ export function HealthTab() {
   const [overview, setOverview] = useState<HealthOverview | null>(null)
   const [trend, setTrend] = useState<RetrievalTrendPoint[] | null>(null)
   const [trendDays, setTrendDays] = useState(30)
+  // Plan 17: the live checked-queries count, lifted from CheckedQueriesSection's own fetch.
+  const [checkedCount, setCheckedCount] = useState<number | null>(null)
 
   useEffect(() => {
     getHealthOverview().then(setOverview).catch(() => setOverview(null))
@@ -74,7 +78,7 @@ export function HealthTab() {
     getRetrievalTrend(trendDays).then(setTrend).catch(() => setTrend(null))
   }, [trendDays])
 
-  const tiles = overview ? toStatTiles(overview) : null
+  const tiles = overview ? toStatTiles(overview, checkedCount) : null
 
   return (
     <div className="flex flex-col gap-6 overflow-y-auto">
@@ -146,6 +150,9 @@ export function HealthTab() {
 
       {/* ── Per-document bars ──────────────────────────────────────────── */}
       <HealthDocumentBars />
+
+      {/* ── Checked queries table (Plan 17) ───────────────────────────── */}
+      <CheckedQueriesSection onTotalChange={setCheckedCount} />
     </div>
   )
 }

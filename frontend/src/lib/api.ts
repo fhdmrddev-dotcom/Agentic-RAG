@@ -239,10 +239,16 @@ export type {
 // ── library ─────────────────────────────────────────────────────────
 export {
   getIndexSummary,
+  listCheckedQueries,
+  createCheckedQuery,
+  triggerCheck,
+  triggerCheckAll,
+  deleteCheckedQuery,
 } from "./api/library"
 export type {
   IndexSummary,
   FolderIndexRow,
+  CheckedQueryRow,
 } from "./api/library"
 
 // ── workflows ─────────────────────────────────────────────────────────
