@@ -909,6 +909,34 @@ export function makeStreamCallbacks(opts: {
         prev.map((m) => (m.id === assistantId ? { ...m, iterationCount: iteration } : m)),
       )
     },
+    onToolApprovalRequired: (approval) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const existingCalls = m.tool_calls ?? []
+          const toolFullName = `${approval.serviceId}__${approval.toolName}`
+          const matchingIdx = existingCalls.findIndex(
+            (tc) => tc.name === toolFullName || tc.name === approval.toolName,
+          )
+          const approvalCall: ToolCall = {
+            id: approval.callId,
+            name: toolFullName,
+            args: approval.args,
+            status: "interrupted",
+            sub_agent: undefined,
+          }
+          const updatedCalls =
+            matchingIdx >= 0
+              ? existingCalls.map((tc, i) => (i === matchingIdx ? { ...tc, ...approvalCall } : tc))
+              : [...existingCalls, approvalCall]
+          return {
+            ...m,
+            tool_calls: updatedCalls,
+            toolApproval: approval,
+          }
+        }),
+      )
+    },
     onFallbackModel: (original: string, fallback: string) => {
       // Plan 075.4-01 D-075.4-A1: per-thread fallbackNotice. Copy-then-mutate
       // the Map so React/Zustand sees a fresh reference. Closure-captured
@@ -2191,6 +2219,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               agentMode: opts?.agentMode,
               // Phase 092 (D-02): kickoff field — only present on a Harness send.
               workflowDefinitionId: opts?.workflowDefinitionId,
+              // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn.
+              activeConnectorIds: opts?.activeConnectorIds,
             })
             registeredRunId = run_id
 

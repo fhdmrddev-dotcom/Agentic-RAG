@@ -1068,6 +1068,15 @@ function ConnectionRow({
           )}
 
           <DropdownMenuItem
+            data-testid="connections-action-try-chat"
+            onSelect={() => {
+              window.location.hash = "#chat"
+            }}
+          >
+            Try in Chat
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
             data-testid="connections-action-delete"
             onSelect={() => setConfirm("delete")}
             className="text-destructive focus:text-destructive"

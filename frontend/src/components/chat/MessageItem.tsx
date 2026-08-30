@@ -16,10 +16,10 @@ import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
 import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
-import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+import { ChatToolApprovalCard } from "./ChatToolApprovalCard"
 // Phase 153-05 (CITE-01 / G-5 additive): the cited-answer render path. Swapped in
 // ONLY on the settled cited-assistant branch (message.citations?.length); every
 // other path stays byte-identical on the shared MarkdownRenderer (D-12/D-14).
@@ -518,6 +518,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         />
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />
+        )}
+        {/* Phase 216 (GRANT-03 / CHAT-07): inline tool approval decision card */}
+        {message.toolApproval && (
+          <ChatToolApprovalCard
+            threadId={message.thread_id}
+            approval={message.toolApproval}
+          />
         )}
         {/* Phase 087-05 (D-05 / chat-panel-seam.md D2) — ADDITIVE live seam.
             While THIS run is streaming, panel-owned tools render as quiet

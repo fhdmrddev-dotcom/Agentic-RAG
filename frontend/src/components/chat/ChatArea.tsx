@@ -274,7 +274,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // is the stable identity passed to MessageList → MessageItem (suggestion
   // pill onSelect). onResume mirrors the same useCallback-stabilization
   // pattern for the Resume button on failed/timed_out assistant messages.
-  const handleSend = useCallback(async (content: string) => {
+  const handleSend = useCallback(async (content: string, activeConnectorIds?: string[]) => {
     let activeThread = thread
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
@@ -305,6 +305,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onTitleUpdate,
       agentMode,
       selectedProvider || undefined,
+      undefined,
+      activeConnectorIds,
     )
   }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, streamActions])
 

@@ -19,6 +19,12 @@ export function toolLabel(name: string): string {
   if (name === "load_skill") return "Loading skill"
   if (name === "save_skill") return "Saving skill"
   if (name === "read_skill_file") return "Reading skill file"
+  if (name.includes("__")) {
+    const [svc, act] = name.split("__")
+    const formattedSvc = svc.charAt(0).toUpperCase() + svc.slice(1).replace(/_/g, " ")
+    const formattedAct = act.replace(/_/g, " ")
+    return `${formattedSvc} · ${formattedAct}`
+  }
   return name
 }
 
@@ -33,6 +39,14 @@ export function toolSummary(name: string, args: Record<string, unknown>): string
   if (name === "load_skill" && args.skill_name) return args.skill_name as string
   if (name === "save_skill" && args.name) return args.name as string
   if (name === "analyze_document" && args.filename) return args.filename as string
+  if (name.includes("__")) {
+    if (args.message) return String(args.message)
+    if (args.subject) return String(args.subject)
+    if (args.summary) return String(args.summary)
+    if (args.title) return String(args.title)
+    if (args.query) return String(args.query)
+    if (args.file_id) return `File: ${args.file_id}`
+  }
   if (args.query) return args.query as string
   if (args.filename) return args.filename as string
   return null

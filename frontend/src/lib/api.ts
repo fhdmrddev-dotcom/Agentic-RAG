@@ -430,6 +430,8 @@ export {
   updateConnectorGrants,
   createOAuthAuthorizeUrl,
   getConnectionOAuthToken,
+  listCloudFiles,
+  importCloudFile,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
@@ -440,7 +442,11 @@ export type {
   OAuthAuthorizeRequest,
   OAuthAuthorizeResponse,
   OAuthTokenResponse,
+  CloudFileItem,
+  CloudFileListResponse,
 } from "./api/connectors"
+
+export { submitToolApproval } from "./api/threads"
 
 // ── schedules ─────────────────────────────────────────────────────────
 export {

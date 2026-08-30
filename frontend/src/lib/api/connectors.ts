@@ -402,3 +402,67 @@ export async function getConnectionOAuthToken(
   return res.json() as Promise<OAuthTokenResponse>
 }
 
+export interface CloudFileItem {
+  id: string
+  name: string
+  mime_type?: string | null
+  size?: number | null
+  modified_at?: string | null
+  icon_url?: string | null
+  web_view_url?: string | null
+}
+
+export interface CloudFileListResponse {
+  files: CloudFileItem[]
+  next_page_token?: string | null
+}
+
+/** Phase 216 (ATTACH-01): Browse files in cloud storage connection. */
+export async function listCloudFiles(
+  connectionId: string,
+  query?: string,
+  pageToken?: string,
+): Promise<CloudFileListResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (query) params.set("query", query)
+  if (pageToken) params.set("page_token", pageToken)
+  const qs = params.toString() ? `?${params.toString()}` : ""
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/files${qs}`,
+    { headers },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to list cloud files",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<CloudFileListResponse>
+}
+
+/** Phase 216 (ATTACH-01): Import one named file from connected cloud storage. */
+export async function importCloudFile(
+  connectionId: string,
+  fileId: string,
+): Promise<{ id: string; filename: string; mime_type: string; file_size: number; status: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/files/${fileId}/import`,
+    {
+      method: "POST",
+      headers,
+    },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to import cloud file",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json()
+}
+
+

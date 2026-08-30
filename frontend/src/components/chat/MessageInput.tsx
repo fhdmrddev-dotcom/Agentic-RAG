@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, Layers } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, HardDrive, Layers, Plus } from "lucide-react"
 // Phase 194.1 Plan 04 (RUN-01 / R1) — the composer's Stop is now the ONE shared
 // `StopControl` every mount renders. The lucide `Square` moved WITH it (it is
 // still the Stop control's mark on every variant, D-18); it is dropped from this
@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
@@ -21,6 +22,10 @@ import { cn } from "@/lib/utils"
 // helper. Additive DISPLAY strings only — no render-flow / stream logic; the
 // "default"/"explorer" enum + MessageItem.tsx / StreamsProvider.tsx stay untouched (G-5).
 import { TERM_MAP, usePlainLabel } from "@/lib/termMap"
+import { ConnectorsFlyout } from "./ConnectorsFlyout"
+import { ActiveConnectorChips } from "./ActiveConnectorChips"
+import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
+import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
 
 interface Provider {
   id: string
@@ -30,31 +35,8 @@ interface Provider {
 }
 
 interface Props {
-  onSend: (content: string) => void
-  /** ⚠ Phase 194.1 Plan 04 REMOVED THE OPTIONAL STOP-DISPATCHER PROP from this
-   *  interface (16 members → 15). The composer no longer carries its own Stop
-   *  dispatcher: `StopControl` calls `stopThread(threadId)` off the store, and
-   *  `ChatArea.tsx` correspondingly stopped passing one down.
-   *
-   *  ⚠ THE PROP'S NAME IS SPELLED NOWHERE IN THIS FILE, INCLUDING IN THIS SENTENCE
-   *  EXPLAINING ITS ABSENCE — deliberately, so that a raw grep for it stays
-   *  DISCRIMINATING and any occurrence at all means the prop came back. That is the
-   *  same discipline `backend/app/services/run_lifecycle.py` keeps about the
-   *  app-shutdown gate, and it is written down because a later editor who "tidies"
-   *  this docblock by naming the prop would break a real needle silently. The name
-   *  is recorded in `194.1-04-SUMMARY.md` and in `StopControl.baseline.test.tsx`'s
-   *  superseded block, where spelling it costs nothing.
-   *
-   *  ⚠ `stopStream` ITSELF SURVIVES and was deliberately NOT deleted — it is
-   *  exported through `useMessages`' action surface and removing it is a DEEP-path
-   *  change. RESEARCH records that as a DEFERRAL with a trigger: *"a phase that
-   *  touches `useMessages`' action surface."* A deferral that lives only in a
-   *  deleted line is exactly as invisible as one never written (193.2 WR-05). */
+  onSend: (content: string, activeConnectorIds?: string[]) => void
   disabled: boolean
-  /** 099-08 follow-up (per-thread drafts): the thread this composer is serving.
-   *  Switching threads saves the current text under the OUTGOING thread and
-   *  restores the INCOMING thread's saved draft (new chat = empty). Without
-   *  this, one global composer value follows the user across threads. */
   threadId?: string | null
   providers?: Provider[]
   selectedProvider?: string
@@ -62,19 +44,11 @@ interface Props {
   models?: string[]
   selectedModel?: string
   onModelChange?: (model: string) => void
-  /** Phase 149 (D-149-05): model_ids flagged `deprecated` in the registry. Members
-   *  render an informational `deprecated` badge but stay selectable. Optional —
-   *  absent → empty set → no badge (defensive; lights up once wired to the payload). */
   deprecatedModels?: Set<string>
   agentMode?: "default" | "explorer"
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
   onClearPrefill?: () => void
-  /** Phase 121 (IA-01 / D-03/D-05) — true while this thread is workflow-locked.
-   *  When true the General/Explorer selector is disabled-with-tooltip (NOT hidden
-   *  — avoids the layout jump), the textarea is disabled, the placeholder swaps to
-   *  the running copy, and Send is gated. Derived by the parent from
-   *  useWorkflowLockForThread(owningThreadId) — never a global flag (SC#3). */
   workflowLocked?: boolean
 }
 
@@ -118,6 +92,34 @@ export function MessageInput({
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
+  const [connections, setConnections] = useState<ConnectorConnection[]>([])
+  const [activeConnectorIds, setActiveConnectorIds] = useState<string[]>([])
+  const [filePickerOpen, setFilePickerOpen] = useState(false)
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    listConnectorConnections()
+      .then((conns) => {
+        if (!cancelled) setConnections(conns.filter((c) => c.is_enabled !== false))
+      })
+      .catch((err) => console.error("Failed to load connections", err))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleToggleConnector = useCallback((id: string) => {
+    setActiveConnectorIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    )
+  }, [])
+
+  const handleRemoveConnector = useCallback((id: string) => {
+    setActiveConnectorIds((prev) => prev.filter((item) => item !== id))
+  }, [])
+
   // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
   // text and restore the incoming thread's stash (or empty). First mount is a
   // no-op (prevDraftKeyRef seeds to the current key). valueRef mirrors `value`
@@ -158,11 +160,8 @@ export function MessageInput({
 
   const handleSend = () => {
     const trimmed = value.trim()
-    // Phase 092 (092-06 / F3 — D-05): a locked thread cannot type/send. The
-    // client disable is a COURTESY; the server 409 lock-refusal stays the
-    // authority (StreamsProvider rolls back both optimistic bubbles on a 409).
     if (!trimmed || disabled || workflowLocked) return
-    onSend(trimmed)
+    onSend(trimmed, activeConnectorIds.length > 0 ? activeConnectorIds : undefined)
     setValue("")
     // Per-thread drafts: a successful hand-off consumes the draft.
     composerDraftsByThread.delete(draftKey)
@@ -192,13 +191,17 @@ export function MessageInput({
     ? (PROVIDER_LABELS[selectedProvider] ?? selectedProvider)
     : null
 
-  // Model-icons (extends the Phase 127 ICON CONVENTION) — the FOLDED selected-state marks:
-  // the collapsed provider pill shows the selected provider's logo, the collapsed
-  // model pill shows the selected model's OWN family mark (Claude sunburst / Gemini
-  // star / …), falling back to the provider mark, then the generic lucide glyph.
-  // Single-source @lobehub via providerLogo/modelLogo (Phase 127 ICON CONVENTION).
   const SelectedProviderMark = providerLogo(selectedProvider)
   const SelectedModelMark = modelLogo(selectedModel) ?? providerLogo(selectedProvider)
+
+  // Cloud storage connections check
+  const hasCloudStorage = connections.some(
+    (c) =>
+      c.service_id.includes("google") ||
+      c.service_id.includes("workspace") ||
+      c.service_id.includes("drive") ||
+      c.service_id.includes("onedrive"),
+  )
 
   return (
     <div className="px-4 pb-3 bg-transparent">
@@ -209,15 +212,22 @@ export function MessageInput({
             "focus-within:ring-2 focus-within:ring-primary/30 focus-within:shadow-lg focus-within:shadow-primary/5",
           )}
         >
+          {/* Active Connector Chips Bar */}
+          <div className="px-3 pt-2">
+            <ActiveConnectorChips
+              connections={connections}
+              activeConnectorIds={activeConnectorIds}
+              onRemoveConnector={handleRemoveConnector}
+            />
+          </div>
+
           {/* Text area */}
-          <div className="px-4 pt-3 pb-1">
+          <div className="px-4 pt-1 pb-1">
             <Textarea
               ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              // Phase 092 (092-06 / F3 — D-05): a locked thread shows the
-              // "cancel to switch back" hint instead of the usual prompt.
               placeholder={workflowLocked ? "Workflow running — Cancel to switch back" : "Ask anything…"}
               title={workflowLocked ? "Workflow running — Cancel to switch back" : undefined}
               disabled={disabled || workflowLocked}
@@ -228,8 +238,47 @@ export function MessageInput({
 
           {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-2 pb-2 pt-1">
-            {/* Left: provider + model + agent mode */}
-            <div className="flex items-center gap-0.5">
+            {/* Left: Plus menu + provider + model + agent mode */}
+            <div className="flex items-center gap-1">
+              {/* Plus Button Menu (Claude.ai style) */}
+              <DropdownMenu open={plusMenuOpen} onOpenChange={setPlusMenuOpen} modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Add content and tools"
+                    data-testid="composer-plus-btn"
+                    className={cn(
+                      "flex items-center justify-center h-7 w-7 rounded-full text-muted-foreground",
+                      "hover:text-foreground hover:bg-muted/60 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      plusMenuOpen && "bg-muted text-foreground",
+                      activeConnectorIds.length > 0 && "text-primary",
+                    )}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="p-0 border-border/80 shadow-xl overflow-hidden mb-1">
+                  {hasCloudStorage && (
+                    <div className="p-1 border-b border-border/50">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setPlusMenuOpen(false)
+                          setFilePickerOpen(true)
+                        }}
+                        className="text-xs cursor-pointer gap-2 py-1.5"
+                      >
+                        <HardDrive className="h-4 w-4 text-primary" />
+                        <span>Import from Cloud Storage...</span>
+                      </DropdownMenuItem>
+                    </div>
+                  )}
+                  <ConnectorsFlyout
+                    activeConnectorIds={activeConnectorIds}
+                    onToggleConnector={handleToggleConnector}
+                    onClose={() => setPlusMenuOpen(false)}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* Provider selector */}
               {showProviderSelector ? (
@@ -473,6 +522,15 @@ export function MessageInput({
           AI can make mistakes. Verify important information.
         </p>
       </div>
+
+      <ConnectedFilePickerModal
+        open={filePickerOpen}
+        onOpenChange={setFilePickerOpen}
+        connections={connections}
+        onFileImported={(doc) => {
+          setValue((prev) => (prev ? `${prev}\nAttached file: ${doc.filename}` : `Please analyze attached file: ${doc.filename}`))
+        }}
+      />
     </div>
   )
 }

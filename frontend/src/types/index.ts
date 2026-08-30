@@ -218,6 +218,14 @@ export interface Message {
    * Render-only, no persistence, no migration — the 403 authz stays server-side; this only
    * makes the refusal honest instead of a blank workflow card. Sibling of `modelFallbackNotice`. */
   blockedNotice?: { message: string }
+  /** Phase 216 (GRANT-03 / CHAT-07): tool approval request requiring human decision in chat. */
+  toolApproval?: {
+    callId: string
+    serviceId: string
+    serviceName: string
+    toolName: string
+    args: Record<string, any>
+  }
 }
 
 export interface DocumentMetadata {

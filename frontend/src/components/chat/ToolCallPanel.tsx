@@ -15,6 +15,7 @@ import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 import { dedupToolCalls } from "@/lib/stepCount"
+import { ConnectionMarkGlyph } from "@/lib/connectionMark"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -34,6 +35,10 @@ interface Props {
 
 function toolIcon(name: string) {
   const cls = "w-3.5 h-3.5"
+  if (name.includes("__")) {
+    const serviceId = name.split("__")[0]
+    return <ConnectionMarkGlyph shape={{ service_id: serviceId }} size="chip" />
+  }
   if (name === "search_documents") return <Search className={cls} />
   if (name === "query_documents") return <Database className={cls} />
   if (name === "web_search") return <Globe className={cls} />

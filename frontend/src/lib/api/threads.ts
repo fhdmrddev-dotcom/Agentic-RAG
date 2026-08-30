@@ -355,7 +355,15 @@ export interface StreamCallbacks {
   onTaskStart?: (subRunId: string, description: string, tools: string[], maxSteps: number) => void
   /** sub_agent_done TASK variant (has sub_run_id) — distinct from the legacy
    *  analyze_document onSubAgentDone no-arg path. */
-  onTaskDone?: (subRunId: string, status: string, summary: string) => void
+  onTaskDone?: (subRunId: string, status: string, summary?: string) => void
+  /** Phase 216 (GRANT-03 / CHAT-07): tool_approval_required SSE event when a connector tool pauses on 'ask' posture. */
+  onToolApprovalRequired?: (approval: {
+    callId: string
+    serviceId: string
+    serviceName: string
+    toolName: string
+    args: Record<string, any>
+  }) => void
   // ──────────────────────────────────────────────────────────────────────────
   // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle SSE
   // callbacks. The 6 new event types (phase_started / phase_completed /
@@ -474,6 +482,8 @@ export async function postMessage(
      *  keeps every ordinary Deep chat send unchanged. Values are strings: the server
      *  declares `dict[str, str]`, so a non-string arrives as a 422 rather than as a
      *  nested object on a flat path. */
+    /** Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn. */
+    activeConnectorIds?: string[]
     inputs?: Record<string, string>
   } = {},
 ): Promise<PostMessageResponse> {
@@ -500,6 +510,10 @@ export async function postMessage(
       ...(options.inputs && Object.keys(options.inputs).length > 0
         ? { inputs: options.inputs }
         : {}),
+      // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this message
+      ...(options.activeConnectorIds && options.activeConnectorIds.length > 0
+        ? { active_connector_ids: options.activeConnectorIds }
+        : {}),
     }),
   })
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
@@ -518,6 +532,28 @@ export async function postMessage(
     )
   }
   return (await res.json()) as PostMessageResponse
+}
+
+/** Phase 216 (GRANT-03 / CHAT-07): Submit human approval decision for paused tool call. */
+export async function submitToolApproval(
+  threadId: string,
+  callId: string,
+  decision: "allow" | "reject",
+): Promise<{ status: string; call_id: string; decision: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/tool-approval`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ call_id: callId, decision }),
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      typeof body?.detail === "string" ? body.detail : "Failed to submit tool approval",
+      res.status,
+    )
+  }
+  return (await res.json()) as { status: string; call_id: string; decision: string }
 }
 
 /** Phase 063 (D-063-02): open GET /runs/{runId}/stream?since={since} and
@@ -655,6 +691,14 @@ export async function subscribeToRun(
         }
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
+        else if (t === "tool_approval_required" && callbacks.onToolApprovalRequired)
+          callbacks.onToolApprovalRequired({
+            callId: (parsed.call_id ?? parsed.callId) as string,
+            serviceId: (parsed.service_id ?? parsed.serviceId) as string,
+            serviceName: (parsed.service_name ?? parsed.serviceName) as string,
+            toolName: (parsed.tool_name ?? parsed.toolName) as string,
+            args: (parsed.args ?? {}) as Record<string, any>,
+          })
         // Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice.
         // Informational branch (mirrors skill_activated) — carries NO `return`, so the
         // cursor-advance below still fires. Pre-fix this event fell through the ladder and
