@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
-status: ready_to_plan
-last_updated: 2026-08-29T07:22:01.465Z
+status: executing
+last_updated: "2026-08-30T06:41:46.084Z"
 last_activity: 2026-08-29
 progress:
-  total_phases: 19
-  completed_phases: 5
-  total_plans: 52
-  completed_plans: 47
-  percent: 26
-stopped_at: Phase 217 complete (12/12) — ready to discuss Phase 218
+  total_phases: 13
+  completed_phases: 6
+  total_plans: 70
+  completed_plans: 64
+  percent: 46
 ---
 
 # Project State
@@ -33,14 +32,16 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 218 — the library knows how it is used
+**Current focus:** Phase 217.1 — the-library-exactly-as-sketched
 Phase numbering continues at **210**.
 
 ## Current Position
 
-Phase: 217.1
-Plan: **PLANNED — 18 plans in 16 waves, ready to execute**
-**Next: `/clear`, then `/gsd:execute-phase 217.1`.**
+Phase: 217.1 (the-library-exactly-as-sketched) — **18/18 PLANS COMPLETE, 2026-08-30**
+Plan: 18 of 18 (closeout) — committed `60a089c6c`. Count-gate pins + BASELINE CLEARED + ledger closeout done.
+**Next: the 4 operator UAT observations from 2026-08-30 are the next work** (layout space, loading loaders,
+Match Strength 6800%, fake Re-index selected) — recorded in `.planning/reported-bugs/` candidate status
+via memory; route as fast-fix or a small plan (G-3).
 ⚠ **SESSION 2026-08-29 (later) — Phase 217 SHIPPED (12/12) AND ITS RESULT WAS REJECTED ON SIGHT.**
 The operator compared `screenshots/1-4.png` against the sketch and found the Library does not look
 like it. **Phase 217.1 was inserted and Phase 218 ABSORBED into it** (operator, 2026-08-29). This
@@ -103,20 +104,23 @@ citation. ⭐ **An unmeasured claim inside a locked decision would have sent a p
 that does not exist.**
 
 ⚠ **Carried into execution, unresolved by design:**
+
 - **The count gate is VIOLATED at this phase's base** — `total 6666 · failed 1 · pinned 5932`, on
   `WorkflowBuilderPage.canvas.test.tsx`, a named SEED-171 suite, **provably byte-unchanged**. CLAUDE.md's
   published `6355 / 5266` is the **sixth rot**.
+
 - **`tool_dispatcher.py` (66/29/4305), `documents.py` (71/29/2531) and `ViewsGroup.tsx` (5/3/259) have no
   ledger row at all**; three more rows measured stale. Plans 11 and 18 close them.
+
 - **The backend↔frontend seam test is approximated**, not literal — mitigated by the fact that every such
   seam here is sequentially `depends_on`-chained, so the frontend executor sees the landed response shape
   rather than an assumed contract. ⚠ Ruled acceptable, not solved.
+
 - **16 owed UAT rows from Phase 217** overlap this phase's G-4 drive; `G4-4` is the row to drive first.
 
 ⚠ **LIB-08 / LIB-09 / LIB-10 (Phase 219) are still absent from `REQUIREMENTS.md`** — the same gap LIB-05..07
 had until this session. **Not this phase's job, but the milestone audit will otherwise read 32/32 as
 verified when three requirements have no row.**
-
 
 **Artifacts** — `217-RESEARCH.md` (1712 L) · `217-VALIDATION.md` · `217-PATTERNS.md` (1070 L) ·
 `217-01..12-PLAN.md`. Commits: `4d254b62d` research+validation+rulings · `b435bb812` REQUIREMENTS ·
@@ -480,7 +484,7 @@ refactor by construction: the gate leaves into `backend/app/services/connectors/
 prose pointed at them). `SEED-214` → `status: partially-folded`, with the unlock/filling split
 recorded and triggers 2–4 named as still live. `SEED-188` (prompt injection) left planted with
 **216** as its trigger — 213 ships no read path.
-Status: Ready to plan
+Status: Executing Phase 217.1
 It shipped, was closed, was **re-opened the same day by a live operator drive**, and closed again on
 the operator's ruling that D-4 and D-5 be fixed *in* 212 rather than carried to 213. 7 plans / 6
 waves + 2 gap-closure rounds + 5 defect fixes. Full record:
@@ -907,7 +911,6 @@ plan needs a sketch before it ships.
 inject `supabase db push`; `CLAUDE.md` forbids it. The `[BLOCKING]` task is instead *paste into the
 Supabase SQL editor, then `bash scripts/regenerate-full-schema.sh`* (no `--reset`). Not a discretionary
 call — the generic gate is simply wrong for this repo.
-
 
 **`BUG-260828-09` — G-2, OVERRIDDEN 2026-08-28 on the operator's explicit "proceed".** The gate
 fires correctly: the fix ships a new UI surface (`PublishBlockedStepCard.tsx`) and **no
