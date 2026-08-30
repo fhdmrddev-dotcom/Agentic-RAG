@@ -48,7 +48,13 @@ import redis.asyncio as aioredis
 from redis.exceptions import RedisError, ResponseError
 from app.models.message import RESERVED_RUN_INPUT_KEYS, MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
-from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
+from app.models.thread import (
+    ThreadCreate,
+    ThreadResponse,
+    ThreadSnapshotResponse,
+    ThreadUpdate,
+    ToolApprovalDecisionRequest,
+)
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
@@ -1406,3 +1412,35 @@ async def get_thread_workflow(
         last_run_updated_at=last_run_updated_at,
         phases=phases_list,
     )
+
+
+@router.post("/{thread_id}/tool-approval")
+async def handle_tool_approval(
+    thread_id: UUID,
+    payload: ToolApprovalDecisionRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Phase 216 (GRANT-03 / CHAT-07 / D-216-04): Publish human approval decision for paused tool call."""
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    if not (thread_resp and thread_resp.data):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    approval_channel = f"tool_approval:{thread_id}:{payload.call_id}"
+    await redis.publish(
+        approval_channel,
+        json.dumps({
+            "call_id": payload.call_id,
+            "decision": payload.decision,
+            "user_id": current_user["id"],
+        }),
+    )
+    return {"status": "ok", "call_id": payload.call_id, "decision": payload.decision}
+

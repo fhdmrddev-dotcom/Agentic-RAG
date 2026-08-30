@@ -436,3 +436,9 @@ class ThreadWorkflowState(BaseModel):
     # None for Deep / no run. Additive PURE read (one extra ordered SELECT on
     # workflow_phases, owner-scoped via the existing ownership gate; no write).
     phases: list[WorkflowPhaseState] | None = None
+
+
+class ToolApprovalDecisionRequest(BaseModel):
+    """Phase 216 (GRANT-03 / CHAT-07): Payload for human decision on a paused tool call."""
+    call_id: str
+    decision: Literal["allow", "reject"]

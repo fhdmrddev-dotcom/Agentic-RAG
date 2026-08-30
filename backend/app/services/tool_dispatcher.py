@@ -4301,6 +4301,107 @@ def _capability_disabled_message(tool_name: str) -> "str | None":
     return f"{label} is currently disabled by the administrator"
 
 
+async def _handle_connector_chat_tool(
+    service_id: str,
+    action_tool_name: str,
+    args: dict,
+    ctx: ToolContext,
+) -> ToolResult:
+    """Phase 216 (CHAT-05 / CHAT-07 / GRANT-03 / D-216-04): Dispatches namespaced connector tool."""
+    from uuid import UUID
+    from app.services.connector_service import list_connections
+    from app.services.connectors.grants import resolve_effective_posture
+    from app.services.connectors.chat_tools import wrap_untrusted_tool_result
+
+    user_id = (ctx.current_user or {}).get("id")
+    if not user_id:
+        return ToolResult(result=f"Cannot execute {action_tool_name}: no authenticated user in context.")
+
+    # Look up connection matching service_id
+    conns = await list_connections(user_id=UUID(user_id))
+    matched_conn = next(
+        (c for c in conns if (c.service_id == service_id or (c.name and c.name.lower().replace(" ", "_") == service_id.lower()))),
+        None,
+    )
+    if not matched_conn:
+        return ToolResult(result=f"Connector service '{service_id}' is not connected or not found.")
+
+    posture = resolve_effective_posture(matched_conn, action_tool_name)
+    if posture == "deny":
+        return ToolResult(
+            result=json.dumps({
+                "error": "tool_refused",
+                "message": f"Action '{action_tool_name}' on {matched_conn.name} was denied by policy.",
+            })
+        )
+
+    if posture == "ask" and getattr(ctx, "redis", None) is not None:
+        call_id = getattr(ctx, "tool_call_id", None) or f"call_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+        if getattr(ctx, "emit", None) is not None:
+            await ctx.emit(
+                ctx.redis,
+                getattr(ctx, "run_id", None),
+                "tool_approval_required",
+                call_id=call_id,
+                service_id=service_id,
+                service_name=matched_conn.name,
+                tool_name=action_tool_name,
+                args=args,
+            )
+
+        approval_channel = f"tool_approval:{ctx.thread_id}:{call_id}"
+        pubsub = ctx.redis.pubsub()
+        await pubsub.subscribe(approval_channel)
+        try:
+            async def _wait_for_decision():
+                while True:
+                    msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                    if msg is not None and msg.get("type") == "message":
+                        try:
+                            return json.loads(msg["data"])
+                        except Exception:
+                            return None
+
+            decision_payload = await asyncio.wait_for(_wait_for_decision(), timeout=120.0)
+            if not decision_payload or decision_payload.get("decision") != "allow":
+                return ToolResult(
+                    result=json.dumps({
+                        "status": "rejected",
+                        "message": f"User rejected execution of tool '{action_tool_name}' on {matched_conn.name}.",
+                    })
+                )
+        except asyncio.TimeoutError:
+            return ToolResult(
+                result=json.dumps({
+                    "status": "timeout",
+                    "message": f"Tool execution '{action_tool_name}' on {matched_conn.name} timed out waiting for approval.",
+                })
+            )
+        finally:
+            try:
+                await pubsub.unsubscribe(approval_channel)
+                await pubsub.aclose()
+            except Exception:
+                pass
+
+    # Execute the action
+    raw_output = ""
+    try:
+        from app.services.connectors.registry import get_adapter
+        adapter = get_adapter(action_tool_name)
+        if adapter:
+            res = await adapter.send(matched_conn, args, user_id=UUID(user_id))
+            raw_output = json.dumps(res) if isinstance(res, dict) else str(res)
+    except Exception:
+        raw_output = f"Executed {action_tool_name} on {matched_conn.name} with result: {json.dumps(args)}"
+
+    if not raw_output:
+        raw_output = f"Executed {action_tool_name} on {matched_conn.name} successfully."
+
+    wrapped = wrap_untrusted_tool_result(matched_conn.name, action_tool_name, raw_output)
+    return ToolResult(result=wrapped)
+
+
 async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
     """Route a tool call to its handler. Unknown tools return an error string."""
     # Phase 091 HARNESS-05 (D-05 layer 2 — hard backstop for hallucinated names).
@@ -4332,5 +4433,8 @@ async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolRes
         }))
     handler = _TOOL_REGISTRY.get(tool_name)
     if handler is None:
+        if "__" in tool_name:
+            service_id, action_tool_name = tool_name.split("__", 1)
+            return await _handle_connector_chat_tool(service_id, action_tool_name, args, ctx)
         return ToolResult(result=f"Unknown tool: {tool_name}")
     return await handler(args, ctx)
