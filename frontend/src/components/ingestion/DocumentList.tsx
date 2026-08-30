@@ -158,6 +158,7 @@ export function DocumentList({
                 key={doc.id}
                 doc={doc}
                 folders={folders}
+                showFolderPill={folderId === undefined}
                 maxChunkCount={maxChunkCount}
                 isExpanded={expanded.has(doc.id)}
                 onToggleExpand={toggle}

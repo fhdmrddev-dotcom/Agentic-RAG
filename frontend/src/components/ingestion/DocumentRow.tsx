@@ -63,6 +63,8 @@ export interface DocumentRowProps {
    *  existing mounts that do not supply folders keep working (folder pill resolves what
    *  it can, `Root` for `folder_id: null`). */
   folders?: Folder[]
+  /** Context-aware folder pill: true when viewing cross-folder / search results; false when browsing a single folder. Defaults to true. */
+  showFolderPill?: boolean
   /** Highest `chunk_count` over the currently loaded documents — computed once in
    *  `DocumentList`, passed down. Drives the proportion bar's fill. */
   maxChunkCount: number
@@ -290,6 +292,7 @@ function ClassificationRowChip({ doc, onRefresh }: { doc: Document; onRefresh: (
 export function DocumentRow({
   doc,
   folders,
+  showFolderPill = true,
   maxChunkCount,
   isExpanded,
   onToggleExpand,
@@ -368,7 +371,7 @@ export function DocumentRow({
                 "suggested" _classification is present on this doc. */}
             <ClassificationRowChip doc={doc} onRefresh={onRefresh} />
           </div>
-          {folderName && (
+          {showFolderPill && folderName && (
             <div className="mt-1">
               <span
                 data-testid="folder-pill"
