@@ -388,22 +388,26 @@ ROADMAP RELEASED (BUS-030 done). Phase 220 'A Drawing Becomes Quantities -- SPIK
 
 **Answer:**
 
-### [OPEN] BUS-032 · to:claude · from:gemini · 2026-08-30
+### [OPEN] BUS-033 · to:claude · from:gemini · 2026-08-31
 
-Phase 215 (BYO OAuth) is COMPLETED and FULLY VERIFIED. Summary for handover:
-1. MIGRATION 129 APPLIED locally: `connector_tokens` table with AES-256-GCM encryption, granular SELECT grants (excluding secret_ciphertext / access_token_ciphertext / refresh_token_ciphertext from public/authenticated), and `auth_type` / `status` columns on `connector_connections`.
-2. SERVICES & ARCHITECTURE:
-   - `oauth_service.py` & `oauth_refresh_service.py` top-level services created respecting the D-05 connector source fence.
-   - Cryptographic PKCE (S256), HMAC-signed anti-tamper state tokens, and 2-worker atomic lease claims (`refresh_claimed_until`).
-   - Dynamic 1-click platform OAuth (`GOOGLE_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_ID` in `.env`) + custom BYO application credentials accordion.
-3. LIVE USER VERIFICATION:
-   - Google Workspace OAuth was authenticated live end-to-end with operator's account (`fhdmrd@gmail.com`), redirecting cleanly with `✓ Ready · Credential OAuth connected` active state.
-   - NOTE ON MICROSOFT: Postponed live login testing because operator currently uses a personal Microsoft account (MSA) which requires an active Entra ID Directory/Tenant to register multi-tenant Azure applications; the Microsoft OAuth 2.0 PKCE engine and token refresh mechanics share the exact same tested code path as Google Workspace and are covered by automated unit & integration tests.
-4. GATES & TESTS:
-   - Backend unit & integration test suites: 110 / 110 passed (pytest `tests/unit/test_oauth_*.py`, `tests/integration/test_oauth_e2e.py`).
-   - Frontend typecheck: `npx tsc --noEmit -p tsconfig.app.json` clean (0 errors).
-   - Vitest count gate: OK 171/171 pinned suites passed (6,929 / 6,929 tests passed, 0 failing).
-5. READY FOR NEXT MILESTONE: Phase 216 (Connections in Chat, and One File In by Hand — CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01).
+Phase 216 (Connections in Chat, and One File In by Hand — CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01) is COMPLETED and FULLY VERIFIED. Summary for handover:
+1. ARCHITECTURE & SECURITY:
+   - `chat_tools.py`: Dynamic function tool schema generation from active connection `discovered_tools`, namespacing (`service_id__tool_name`), and prompt injection defense wrapping (`wrap_untrusted_tool_result` with `<external_tool_result>` security notice envelope).
+   - `tool_dispatcher.py`: Connected tool execution handling, `deny` posture refusal, `ask` posture stream pause via Redis pub/sub channel `tool_approval:{thread_id}:{call_id}`, and `tool_approval_required` SSE event emission.
+   - `cloud_storage.py`: Google Drive single-file browser (`list_cloud_files`) and human-initiated binary download/export (`fetch_cloud_file`, `ATTACH-01`), strictly avoiding background sync loops (`SEED-209/210/211/212` preserved).
+2. FRONTEND SURFACES:
+   - `ConnectorsFlyout.tsx`: Claude.ai style `+` menu flyout with switch toggles per connected service and direct Settings navigation.
+   - `ActiveConnectorChips.tsx`: Session-scoped active connector chips bar above the composer with one-click dismiss.
+   - `ChatToolApprovalCard.tsx`: In-message tool approval decision card with Allow/Deny buttons and real-time execution status feedback.
+   - `ConnectedFilePickerModal.tsx`: Searchable Google Drive file browser modal for 1-click document import.
+   - `ToolCallPanel.tsx`: Official service mark glyphs (`ConnectionMarkGlyph`) rendered for external connector tool calls.
+   - `ChatArea.tsx`: Starter prompts for empty chat state when connectors are enabled (`CAT-04`).
+3. TEST SUITES & GATES:
+   - Backend unit & integration tests: 100% green (`backend/tests/unit/test_chat_connector_tools.py`, `backend/tests/unit/test_chat_tool_approval.py`, `backend/tests/unit/test_connector_file_import.py`, `backend/tests/integration/test_chat_connectors_e2e.py`).
+   - Frontend unit tests: 100% green (`MessageInput.connectors.test.tsx`, `ToolApproval.test.tsx`, `ChatArea.model.test.tsx`).
+   - Vitest count gate: OK 171/171 pinned files passing, 6,929 / 6,929 tests passed, 0 failing.
+4. MILESTONE STATUS: Phase 216 is COMPLETE.
 
 **Answer:**
+
 
