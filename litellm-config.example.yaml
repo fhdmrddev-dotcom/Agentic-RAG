@@ -1,0 +1,62 @@
+# LiteLLM local proxy — EXAMPLE. Copy to `litellm-config.yaml` (gitignored) and set
+# the two variables below in your shell or a root `.env`:
+#
+#   LITELLM_MASTER_KEY            the proxy's own bearer token (any value you choose)
+#   LITELLM_OPENROUTER_API_KEY    your OpenRouter key
+#
+# ⚠ THE REAL FILE WAS TRACKED UNTIL 2026-08-31 AND ITS KEYS ARE STILL IN HISTORY.
+# Untracking a file does not unpublish what it already published — commit e5977a24
+# holds a Zhipu/GLM key and a Moonshot/Kimi key in plaintext. REVOKING THEM AT THE
+# PROVIDER is the only thing that makes that history harmless — this commit does not
+# and cannot do it. Never put a literal key back in this file: `os.environ/VAR` is
+# resolved by LiteLLM itself.
+#
+# Nothing in backend/ or frontend/ reads this file — it is local dev tooling only
+# (it points Claude Code at Qwen through OpenRouter), so it carries no deploy-drift
+# obligation and appears in no OMITTED_FROM_ONEBOX list.
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true
+  use_chat_completions_url_for_anthropic_messages: true
+
+router_settings:
+  num_retries: 2
+  fallbacks:
+    - "*":       ["qwen-max"]
+    - "claude-*": ["qwen-max"]
+
+model_list:
+  # PRIMARY: qwen3.8-27b
+  - model_name: "*"
+    litellm_params:
+      model: openrouter/qwen/qwen3.8-27b
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/LITELLM_OPENROUTER_API_KEY
+
+  - model_name: "claude-*"
+    litellm_params:
+      model: openrouter/qwen/qwen3.8-27b
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/LITELLM_OPENROUTER_API_KEY
+
+  # ALIASES for explicit model switching via ANTHROPIC_MODEL
+  - model_name: "claude-qwen-big"
+    litellm_params:
+      model: openrouter/qwen/qwen3.8-27b
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/LITELLM_OPENROUTER_API_KEY
+
+  - model_name: "claude-qwen-max"
+    litellm_params:
+      model: openrouter/qwen/qwen3.8-max
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/LITELLM_OPENROUTER_API_KEY
+
+  # FALLBACK: qwen3.8-max
+  - model_name: "qwen-max"
+    litellm_params:
+      model: openrouter/qwen/qwen3.8-max
+      api_base: https://openrouter.ai/api/v1
+      api_key: os.environ/LITELLM_OPENROUTER_API_KEY

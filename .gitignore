@@ -91,3 +91,6 @@ nul
 scripts/.sse_after_run1/
 scripts/_uat111_1/
 scripts/pm-pack/out/
+
+# Local LiteLLM proxy config — holds real provider keys. Template: litellm-config.example.yaml
+litellm-config.yaml
