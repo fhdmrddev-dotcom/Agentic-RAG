@@ -762,6 +762,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               onOpenStudio={onOpenStudio}
               onReviewEvals={onReviewEvals}
             />
+          ) : activeView === "connections" ? (
+            // The ungoverned Connections door (`nav-items.ts`). It mounts the SAME
+            // SettingsPage pinned to the Connections tab, rather than a second copy of
+            // the surface — one home per concern. `initialTab` is a pin, not a lock: a
+            // member can still reach Memory and Audit Log from the tab strip, and the
+            // model_management tabs are absent for them there (SettingsPage decides).
+            <SettingsPage initialTab="5" />
           ) : activeView === "settings" ? (
             <SettingsPage />
           ) : activeView === "workflows" ? (

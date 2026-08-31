@@ -1,0 +1,53 @@
+/**
+ * The connections surface must be reachable by a caller who is not an operator.
+ *
+ * ⚠ THE DEFECT THIS PINS SHIPPED THROUGH FIVE PHASES AND WAS FOUND BY THE OPERATOR.
+ * `NAV_ITEMS`' Settings entry carries `feature: "model_management"`, which
+ * `backend/app/api/features.py:21` classifies Operators-only. `visibleNavItems` drops a
+ * governed entry whose key is not strictly `true`, so for every member the Settings entry
+ * vanished — and with it Connections, the whole point of Phases 211-216.
+ *
+ * The tag was CORRECT when Settings held only model management. It stopped being correct
+ * when Settings grew a per-user tab, and nothing noticed because no test asked this
+ * question: *can a member reach connections at all?*
+ *
+ * ⚠ THE ASSERTION IS DELIBERATELY ABOUT REACHABILITY, NOT ABOUT A LABEL. It does not care
+ * which entry provides the door or what it is called — only that a fail-closed map still
+ * leaves one. Renaming the entry keeps this green; re-governing it goes red, which is the
+ * only behaviour worth pinning.
+ */
+import { describe, it, expect } from "vitest"
+import { NAV_ITEMS, visibleNavItems } from "@/lib/nav-items"
+import type { EffectiveFeatures } from "@/lib/api"
+
+/** The map's fail-closed shape: every governed feature hidden (a member, or a blip). */
+const MEMBER: EffectiveFeatures = {} as EffectiveFeatures
+
+describe("connections reachability for a non-operator", () => {
+  it("leaves a connections door standing when every governed feature is hidden", () => {
+    const visible = visibleNavItems(MEMBER)
+    expect(visible.some((i) => i.view === "connections")).toBe(true)
+  })
+
+  it("keeps that door UNGOVERNED — a feature tag here would re-strand it", () => {
+    const entry = NAV_ITEMS.find((i) => i.view === "connections")
+    expect(entry).toBeDefined()
+    // ⚠ If connections ever need governing they get their OWN key. Tagging this entry
+    // `model_management` — whose audience is about MODELS — is the exact mistake above.
+    expect(entry?.feature).toBeUndefined()
+  })
+
+  it("still hides the model_management Settings entry from a member", () => {
+    // The original decision is not reverted: Settings itself stays operator-only,
+    // because GET/PUT /settings carry require_visible("model_management").
+    const visible = visibleNavItems(MEMBER)
+    expect(visible.some((i) => i.view === "settings")).toBe(false)
+  })
+
+  it("shows both entries to an operator", () => {
+    const operator = { model_management: true } as unknown as EffectiveFeatures
+    const visible = visibleNavItems(operator)
+    expect(visible.some((i) => i.view === "settings")).toBe(true)
+    expect(visible.some((i) => i.view === "connections")).toBe(true)
+  })
+})

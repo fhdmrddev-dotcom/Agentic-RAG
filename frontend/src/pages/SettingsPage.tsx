@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 
 /**
  * The Settings tab trigger, spelled ONCE.
@@ -517,7 +518,27 @@ function AuditLogSection() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export function SettingsPage() {
+/**
+ * ⚠ THREE OF THIS PAGE'S SIX TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
+ * BY ABSENCE. `GET /settings`, `PUT /settings` and the re-embed routes all carry
+ * `require_visible("model_management")` (`api/settings.py:331,341,560,589`), which
+ * `api/features.py:21` classifies Operators-only. Rendering AI Model, Search or
+ * Integrations to a member offers a control whose every call is a 403 — the
+ * locked/badged placeholder Phase 148 (sketch 069-A) explicitly rejected in favour of the
+ * VANISH. Connections, Memory and Audit Log fetch through their own endpoints and stay.
+ *
+ * ⚠ THE MAP FAILS TO `{}`, WHICH IS WHY THE TEST IS `=== true` AND NOT A TRUTHINESS CHECK:
+ * a blip must hide a governed tab, never flash one. Same rule `visibleNavItems` follows.
+ *
+ * `initialTab` is the ungoverned Connections door's pin (`ChatLayout`). It wins over the
+ * persisted choice on mount and is then forgotten — a member who clicks Memory stays on
+ * Memory. It is NOT a lock, and it is NOT a permission: the gate below is what decides
+ * what exists, and the API is what decides what works.
+ */
+export function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canManageModels = featuresCtx?.features.model_management === true
+  const featuresLoading = featuresCtx?.loading ?? false
   const [s, setS] = useState<FullAppSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -542,8 +563,17 @@ export function SettingsPage() {
 
   // Tab persistence
   const [activeTab, setActiveTab] = useState<string>(() => {
+    if (initialTab) return initialTab
     return localStorage.getItem("settings_active_tab") ?? "0"
   })
+
+  // ⚠ A PERSISTED CHOICE CAN NAME A TAB THIS CALLER NO LONGER HAS. `settings_active_tab`
+  // outlives a permission change, so an ex-operator (or anyone whose map has not resolved
+  // yet) would land on a `TabsContent` with no trigger — a blank panel under a strip that
+  // does not mark anything active. Land them on Connections instead: it is the one tab
+  // every caller can use, and it is this page's only ungoverned door.
+  const MODEL_TABS = ["0", "1", "2"]
+  const effectiveTab = !canManageModels && MODEL_TABS.includes(activeTab) ? "5" : activeTab
 
   function handleTabChange(value: string) {
     setActiveTab(value)
@@ -688,12 +718,26 @@ export function SettingsPage() {
     setDeprecatedModels(new Set(data.deprecated_models ?? []))
   }
 
+  // ⚠ `GET /settings` IS ITSELF `model_management`-GATED, so this fetch is a 403 for a
+  // member — and `if (error && !s)` below turns any fetch failure into a FULL-PAGE error,
+  // which would make the ungoverned Connections door land on a red sentence. Skip the
+  // call entirely rather than calling and swallowing: a request we know will be refused
+  // is not diagnostics, it is noise in the audit log.
+  //
+  // ⚠ WAIT FOR THE MAP FIRST. It fails CLOSED to `{}`, so during `loading` an operator
+  // reads as a member; firing then would skip the fetch and never retry. The effect
+  // depends on both flags and runs again the moment the map resolves.
   useEffect(() => {
+    if (featuresLoading) return
+    if (!canManageModels) {
+      setLoading(false)
+      return
+    }
     getSettings()
       .then(hydrate)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [canManageModels, featuresLoading])
 
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
@@ -830,7 +874,9 @@ export function SettingsPage() {
     )
   }
 
-  if (error && !s) {
+  // `canManageModels` is load-bearing: for a member `s` is legitimately null (the fetch
+  // above never ran), and without this guard the absence would render as a failure.
+  if (error && !s && canManageModels) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-destructive">{error}</p>
@@ -916,7 +962,7 @@ export function SettingsPage() {
           <p className="text-sm text-destructive bg-destructive/10 px-4 py-2.5 rounded-lg">{error}</p>
         )}
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs value={effectiveTab} onValueChange={handleTabChange} className="w-full">
           {/* ── The tab strip wears the same container as the cards below it ────────────
               ⚠ OPERATOR-DRIVEN, 2026-08-28: *"can you make tab labels as same with the page
               itself or the card of the connection itself container"*. The strip sat on a
@@ -945,12 +991,12 @@ export function SettingsPage() {
               one. Equal shares fill the row end to end and keep every label the same
               target size, so no tab is easier to hit than its neighbour. */}
           <TabsList className="mb-6 flex h-auto w-full gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
-            <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>}
             {/* D-04: display-only relabel via the term-map (Search by default, the
                 shipped "Search & Retrieval" under the reveal). value="1" — the tab
                 ROUTING key — is unchanged (D-02a / no contract break). */}
-            <TabsTrigger className={SETTINGS_TAB_CLASS} value="1">{retrievalTabLabel}</TabsTrigger>
-            <TabsTrigger className={SETTINGS_TAB_CLASS} value="2">Integrations</TabsTrigger>
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="1">{retrievalTabLabel}</TabsTrigger>}
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="2">Integrations</TabsTrigger>}
             {/* Phase 190-16 (CONN-02 / D-25 / UI-SPEC §2a, U-01) — Connections.
                 ROUTING KEY "5" is the next FREE key, deliberately: appending renumbers
                 nothing, so every user's persisted `settings_active_tab` keeps pointing at

@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2 } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -39,6 +39,23 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
   // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.
   { view: "classification-rules", icon: Wand2, label: "Classification" },
+  // ⚠ UNGOVERNED, AND DELIBERATELY SO — this entry exists because the Settings one
+  // below CANNOT carry Connections. `Settings` is tagged `model_management`, which
+  // `backend/app/api/features.py:21` classifies Operators-only, so `visibleNavItems`
+  // dropped it for every member — and with it the whole connections surface Phases
+  // 211-216 shipped. That tag was CORRECT when Settings held only model management;
+  // it stopped being correct when Settings grew a per-user tab.
+  //
+  // Un-tagging Settings was the other candidate and is the WRONG fix: `GET /settings`
+  // and `PUT /settings` themselves carry `require_visible("model_management")`
+  // (`api/settings.py:331,341`), so a member reaching the page would meet a 403 on
+  // mount. This entry opens the SAME page pinned to the Connections tab, which fetches
+  // its own rows through `listConnectorConnections()` and needs neither endpoint.
+  //
+  // ⚠ It is ungoverned by DESIGN, not by omission: a connection is a per-user asset,
+  // like a thread. If connections ever need governing they get their OWN feature key —
+  // never `model_management`, whose audience is about models.
+  { view: "connections", icon: Plug, label: "Connections" },
   // Phase 148 (VIS-01): governed by `skill_studio` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the Studio's evals/triggering/versions are
   // API-gated (148-05), so hiding the entry avoids a dead-click.

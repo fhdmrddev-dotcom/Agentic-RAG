@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, within, waitFor, cleanup } from "@testing-library/react"
 import type { FullAppSettings } from "@/lib/api"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
 const { mockGetSettings, mockUpdateSettings, mockGetReembedProgress, mockGetAuditLogs } =
   vi.hoisted(() => ({
@@ -49,12 +50,32 @@ import { SettingsPage } from "./SettingsPage"
 // helper — mirrors the 154-01 ControlRoomPage.test fix). Default OFF (plain).
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
-function renderSettings() {
+/**
+ * ⚠ THE PROVIDER IS NOT DECORATION — IT IS THE PRECONDITION FOR THE TAB UNDER TEST.
+ *
+ * `SettingsPage` renders AI Model, Search and Integrations ONLY when the effective-features
+ * map resolves `model_management` true, because all three tabs are backed by endpoints
+ * carrying `require_visible("model_management")`. A NULL context is fail-closed by the
+ * contract App.tsx states at its provider mount, so an unwrapped render has NO AI Model tab
+ * and every assertion below would fail on an absence rather than on a defect.
+ *
+ * `model_management: true` therefore states what these cases have always assumed: an
+ * OPERATOR is looking at the page. `renderAsMember` below is the other half — without it,
+ * nothing would prove the gate does anything.
+ */
+function renderSettings(features: Record<string, boolean> = { model_management: true }) {
   return render(
-    <TechnicalNamesProvider>
-      <SettingsPage />
-    </TechnicalNamesProvider>,
+    <EffectiveFeaturesProvider value={{ features, loading: false, refetch: () => {} }}>
+      <TechnicalNamesProvider>
+        <SettingsPage />
+      </TechnicalNamesProvider>
+    </EffectiveFeaturesProvider>,
   )
+}
+
+/** A caller whose map does NOT carry `model_management` — the shape a member has. */
+function renderAsMember() {
+  return renderSettings({})
 }
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
@@ -198,5 +219,47 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
       expect(screen.getByLabelText(/skill-builder model/i)).toBeInTheDocument()
     })
     expect(screen.getAllByText(/claude-haiku-4-5/i).length).toBeGreaterThan(0)
+  })
+})
+
+describe("the ungoverned Connections door (a member reaching Settings)", () => {
+  /**
+   * ⚠ THE DEFECT THIS PINS SHIPPED AND WAS FOUND BY THE OPERATOR, NOT BY A TEST.
+   *
+   * `nav-items.ts` tagged the Settings entry `model_management`, which is Operators-only
+   * (`api/features.py:21`), so `visibleNavItems` dropped it for every member — taking the
+   * whole connections surface Phases 211-216 shipped with it. The tag was correct when
+   * Settings held only model management and stopped being correct when it grew a per-user
+   * tab. Nothing failed, because no test had ever rendered this page AS a member.
+   */
+  it("shows Connections, Memory and Audit Log to a member", async () => {
+    renderAsMember()
+    expect(await screen.findByRole("tab", { name: /connections/i })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /memory/i })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /audit log/i })).toBeInTheDocument()
+  })
+
+  it("hides the three model_management tabs from a member", async () => {
+    renderAsMember()
+    await screen.findByRole("tab", { name: /connections/i })
+    // ABSENT, never disabled — the sketch-069-A vanish. A locked tab is a control whose
+    // every call would 403, which is what Phase 148 rejected.
+    expect(screen.queryByRole("tab", { name: /^ai model$/i })).toBeNull()
+    expect(screen.queryByRole("tab", { name: /integrations/i })).toBeNull()
+  })
+
+  it("does not call GET /settings for a member", async () => {
+    // The endpoint carries require_visible("model_management"): calling it would 403,
+    // and `if (error && !s)` would turn that into a full-page error where the door lands.
+    renderAsMember()
+    await screen.findByRole("tab", { name: /connections/i })
+    expect(mockGetSettings).not.toHaveBeenCalled()
+  })
+
+  it("still shows every tab to an operator", async () => {
+    renderSettings()
+    expect(await screen.findByRole("tab", { name: /^ai model$/i })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /connections/i })).toBeInTheDocument()
+    expect(mockGetSettings).toHaveBeenCalled()
   })
 })
