@@ -1489,37 +1489,50 @@ async def run_agent_loop(
             try:
                 conns = await list_connections(org_id=str(org_id), supabase=supabase)
             except Exception:
+                # A read failure must be distinguishable in the log from "this org has
+                # no connections" — both leave `conns` empty, but only one is a fault.
+                logger.warning(
+                    "Failed to list connector connections for org %s — chat continues "
+                    "with built-in tools only", org_id, exc_info=True,
+                )
                 conns = []
-                active_conns = []
-                if getattr(body, "active_connector_ids", None):
-                    allowed_ids = {str(cid) for cid in body.active_connector_ids}
-                    active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
-                else:
-                    # Include all enabled connections with discovered tools or external capabilities
-                    active_conns = [c for c in conns if c.is_enabled and (c.discovered_tools or c.capability)]
 
-                if active_conns:
-                    connector_tools = build_chat_tools_for_connectors(active_conns)
-                    if connector_tools:
-                        base_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
-                        active_tools = base_tools + connector_tools
+            # ⚠ THIS BLOCK MUST STAY OUT OF THE `except` ARM ABOVE. It lived inside it
+            # from c0a09c728 until this fix, which made every line below unreachable on
+            # the success path and vacuous on the failure path (`conns` is `[]` there),
+            # so `build_chat_tools_for_connectors` — whose ONLY production call site is
+            # here — never ran and chat never saw a connector tool. Every Phase 216 test
+            # calls that helper directly, so 6929 green tests could not see it.
+            active_conns = []
+            if getattr(body, "active_connector_ids", None):
+                allowed_ids = {str(cid) for cid in body.active_connector_ids}
+                active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
+            else:
+                # Include all enabled connections with discovered tools or external capabilities
+                active_conns = [c for c in conns if c.is_enabled and (c.discovered_tools or c.capability)]
 
-                        service_lines = []
-                        for c in active_conns:
-                            t_names = [t.get("name") for t in (c.discovered_tools or []) if isinstance(t, dict) and t.get("name")]
-                            if not t_names and c.capability:
-                                t_names = [c.capability]
-                            if t_names:
-                                service_lines.append(f"- **{c.name}** (service_id: `{c.service_id}`, tools: {', '.join(t_names[:10])}{'...' if len(t_names) > 10 else ''})")
-                        if service_lines:
-                            connector_note = (
-                                "\n\n## Connected Services & External Tools\n"
-                                "The following external services are connected and available in this chat. "
-                                "When the user asks to query, search, view, create, or act on these services (e.g. GitHub, Slack, Jira, Notion, Google), "
-                                "you MUST use their corresponding namespaced function tools:\n"
-                                + "\n".join(service_lines)
-                            )
-                            active_system_prompt = active_system_prompt + connector_note
+            if active_conns:
+                connector_tools = build_chat_tools_for_connectors(active_conns)
+                if connector_tools:
+                    base_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
+                    active_tools = base_tools + connector_tools
+
+                    service_lines = []
+                    for c in active_conns:
+                        t_names = [t.get("name") for t in (c.discovered_tools or []) if isinstance(t, dict) and t.get("name")]
+                        if not t_names and c.capability:
+                            t_names = [c.capability]
+                        if t_names:
+                            service_lines.append(f"- **{c.name}** (service_id: `{c.service_id}`, tools: {', '.join(t_names[:10])}{'...' if len(t_names) > 10 else ''})")
+                    if service_lines:
+                        connector_note = (
+                            "\n\n## Connected Services & External Tools\n"
+                            "The following external services are connected and available in this chat. "
+                            "When the user asks to query, search, view, create, or act on these services (e.g. GitHub, Slack, Jira, Notion, Google), "
+                            "you MUST use their corresponding namespaced function tools:\n"
+                            + "\n".join(service_lines)
+                        )
+                        active_system_prompt = active_system_prompt + connector_note
         except Exception:
             logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
 
