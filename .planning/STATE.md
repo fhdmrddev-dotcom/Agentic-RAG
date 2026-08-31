@@ -37,6 +37,42 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+⚠ **SESSION 2026-08-31 (session 2, Claude + operator driving together) — FIVE DEFECTS, EACH
+ONE BLOCKING THE NEXT, ALL FOUND BY THE OPERATOR PRESSING A BUTTON.** Full detail: `BUS-037`.
+
+| # | Symptom the operator saw | Root cause | Commit |
+|---|---|---|---|
+| 1 | `Failed to fetch` on Connect | `logger` was an UNDEFINED NAME in `api/connectors.py` — six uses, zero definitions. The raise lands after the response begins, so there is no status, no CORS header and **nothing in the log** | `e2952b0e7` |
+| 2 | Consent completed, nothing happened | `redirect_uri` was `{frontend_url}/api/...`, a path Vite answers **200** with its SPA fallback. The handler is a backend route; there is no proxy and no router | `f4a453c41` |
+| 3 | *"why must I fill in Advanced?"* | `resolve_client_credentials` read `settings.google_oauth_client_id` through `getattr(..., "")` and **the field was never declared** — the env-var path was dead code and the error named variables nothing read | `61128de89` |
+| 4 | *"no way to reach it yet"* on Refresh actions | An `oauth_byo` row has no capability and no `mcp_server_url`, so both discover arms missed. The refused test's own docstring predicted it: *"OAuth (Phase 215) does"* | `01e25fc26` |
+| 5 | *"why is Skills hidden?"* | `skill_studio` gates evals/test-cases/tuner while `api/skills.py` — create, upload, edit — is UNGATED. A member could make a skill and had no door to it | `f4a453c41` |
+
+⚠ **AND ONE NOBODY ASKED ABOUT.** `cloud_storage.py` reached `googleapis.com` with a RAW
+`httpx.AsyncClient` — no scheme check, no allow-list, no DNS pin, no redirect refusal, no size
+cap — on the path that **downloads a file by id**. It sits OUTSIDE `services/connectors/`, so
+the D-05 source fence never walked it and the guard written for exactly this was blind to it.
+Both calls now go through the binder under a new narrow `drive_read` key, 25 MB cap.
+
+⭐ **THE PATTERN ACROSS ALL FIVE, AND IT IS THE FINDING:** every one was on a path no test
+executes and no typecheck reaches — an undefined name, an undeclared setting, a URL nobody
+fetched, a fourth branch of a three-branch ladder. **6929 green frontend tests and 3180 green
+backend tests saw none of them.** Each was found within a minute of a person pressing the
+button. That is the argument for G-4, made five times in one session.
+
+**Live state:** Google Workspace `46c8adc7` holds a token for `fhdmrd.dev@gmail.com`
+(`drive.readonly`), advertises `search_files` + `read_file`, posture `ask`, both callable in
+chat. The empty duplicate was deleted after checking refs and tokens.
+
+**Owed, in order:** (A) the OAuth panel still shows capability-shaped noise — *Check
+credential* answers `nothing_to_check_yet`, the footer says *"fill the fields above"* when
+there are none. (B) Gmail/Calendar is ONE connection with more scopes and more tools, never a
+second row. (C) **the chat end-to-end drive was never run** — the tools are wired and callable,
+but no live model call has exercised them.
+
+**Measured:** count gate **171/171 · 6929 · 0 failing**; backend unit **70 / 3180** (baseline
+unchanged); `tsc` **90**. Migration 150 applied locally and in cloud by the operator.
+
 ⚠ **SESSION 2026-08-31 (Claude, autonomous) — FOUR OPERATOR OBSERVATIONS CLOSED, AND THREE
 DEFECTS FOUND ON THE WAY THAT NO GATE COULD SEE.** Six commits on `develop`; full detail in
 `BUS-036`. Hand-edited; the `state.*` SDK verbs are forbidden here.
