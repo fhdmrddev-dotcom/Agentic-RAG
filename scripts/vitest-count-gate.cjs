@@ -2823,6 +2823,12 @@ const BASELINE = {
   // the D-221-06 rendering case. Read from the gate's own printed column.
   "ConnectionGrantsList.grouping.test.tsx": 18,
   "connectionRowVerdict.test.ts": 14,
+  "statusWord.honesty.test.ts": 5,
+  // ⚠ FOUND UNPINNED 2026-09-01 while fixing the ask-card defect: the gate RUNS this
+  // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
+  // every case and the gate would still have said OK. The twelfth suite found in this
+  // state in a week — see SEED-229, which proposes the gate self-check that would end it.
+  "PendingAskCard.test.tsx": 45,
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
   // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
@@ -4124,6 +4130,13 @@ const TARGETS = [
   "src/components/settings/toolGroups.test.ts",
   "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
   "src/components/settings/connectionRowVerdict.test.ts",
+  // Added 2026-09-01 with the two honest-failure fixes the operator drove out.
+  "src/components/chat/__tests__/statusWord.honesty.test.ts",
+  // ⚠ FOUND IN NEITHER KNOB 2026-09-01 — the gate never RAN it and nothing guarded it,
+  // on the suite covering the APPROVAL CARD, which is the product's trust boundary. The
+  // panel __tests__ entries here are FILE-LEVEL, so this file was invisible until its
+  // name was typed. Twelfth such suite in a week; SEED-229 has the structural fix.
+  "src/components/panel/__tests__/PendingAskCard.test.tsx",
   // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
   // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
   // ── whole script returned NOTHING before this line was written. `src/components/metadata`

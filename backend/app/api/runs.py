@@ -690,6 +690,26 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     return True
 
 
+#: The four statuses a `runs` row can hold once it is over. Read from the live table
+#: (`select distinct status from runs`) rather than transcribed from memory.
+#:
+#: ⚠ A STATUS ABSENT FROM THIS SET IS TREATED AS ALIVE, which is the safe direction here:
+#: refusing a live answer would lose work a person did, while accepting a dead one only
+#: writes a message nobody reads. The asymmetry is deliberate.
+_TERMINAL_RUN_STATUSES: frozenset[str] = frozenset(
+    {"completed", "failed", "cancelled", "timed_out"}
+)
+
+#: The word each terminal status says to a person. Not the status itself — "timed_out" is
+#: not a sentence.
+_TERMINAL_RUN_WORDS: dict[str, str] = {
+    "completed": "finished",
+    "failed": "stopped because it failed",
+    "cancelled": "been stopped",
+    "timed_out": "timed out",
+}
+
+
 @router.post("/{run_id}/ask_user_response", status_code=200)
 async def submit_ask_user_response(
     run_id: UUID,
@@ -777,6 +797,35 @@ async def submit_ask_user_response(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Run not found",
+        )
+
+    # ── Step 1b: THE RUN MUST STILL BE ALIVE (operator-reported, 2026-09-01) ──────────
+    #
+    # ⚠ THIS ENDPOINT USED TO ACCEPT AN ANSWER TO A DEAD RUN AND RETURN 200. Step 1 selects
+    # `status` and never looked at it, so answering a `cancelled` run persisted a message,
+    # emitted an SSE and published to a channel nobody was subscribed to — every layer
+    # reporting success for an answer that could not reach anything.
+    #
+    # ⚠ MEASURED, from the operator's own thread `c04c8245`: the ask was posted at 21:51:25,
+    # the run was CANCELLED at 21:51:45, and the card was still offering `Send Answer` a
+    # minute later. The client cannot detect this on its own — `PendingAskStack`'s
+    # `runIsOver` requires `phases.length > 0`, i.e. WORKFLOW phases, so it is structurally
+    # always false for a chat run. **The server is the only party that knows, so the server
+    # is what says so.**
+    #
+    # ⚠ 409, NOT 404. A 404 means *"no such run, or not yours"* and is deliberately
+    # indistinguishable between those two — an existence guarantee this route protects. This
+    # run provably EXISTS and is provably the caller's; what is wrong is its STATE, and
+    # saying so leaks nothing they did not already know.
+    #
+    # ⚠ The harness fallback below synthesizes `status: None`, so this check is written to
+    # pass on None rather than to guess. A workflow pause has its own liveness rules and
+    # this is not the place to invent a second set.
+    _run_status = (row.get("status") or "").strip().lower()
+    if _run_status in _TERMINAL_RUN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This run has already {_TERMINAL_RUN_WORDS.get(_run_status, 'ended')}.",
         )
 
     # ── Step 2: persist messages row FIRST (durability — RESEARCH §A.7) ──

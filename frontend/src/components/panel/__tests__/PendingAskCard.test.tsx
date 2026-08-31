@@ -435,12 +435,52 @@ describe("PendingAskCard (096-04) — 404 honesty + created_at-derived countdown
     render(<PendingAskCard ask={mockPendingAskCreatedAgo(5)} reconcile={noopReconcile} />)
     await user.click(screen.getAllByRole("radio")[0])
     await user.click(screen.getByRole("button", { name: /send answer/i }))
-    // Visible, constant-string error — never silent, never raw server text.
+    // ⚠ SENTENCE AMENDED 2026-09-01; the BEHAVIOUR this test guards is unchanged.
+    // It read "Couldn't submit your answer — try again." for every non-404 failure. The
+    // operator hit that line on a run that had been CANCELLED 45 seconds earlier, where
+    // trying again could never work. A 500 means the answer was NOT recorded, and saying
+    // so is the difference between retrying usefully and retrying blindly.
+    // Still visible, still a constant string, still never raw server text.
     expect(
-      await screen.findByText("Couldn't submit your answer — try again."),
+      await screen.findByText("The server couldn't record your answer. It has not been saved."),
     ).toBeInTheDocument()
     // Still the pending card; the submit button is re-enabled for retry.
     expect(screen.getByText("Needs you")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send answer/i })).toBeEnabled()
+  })
+
+  it("⭐ RETIRES on ApiError(409) — the run is over, so a retry is not offered", async () => {
+    // ⚠ THE OPERATOR'S DEFECT, 2026-09-01. A chat run was cancelled 20 seconds after its
+    // ask posted and this card still offered `Send Answer` a minute later, then said
+    // "try again" when the submit failed. `PendingAskStack`'s `runIsOver` cannot catch it —
+    // it requires `phases.length > 0`, i.e. WORKFLOW phases, so it is structurally always
+    // false for a chat run. The SERVER now refuses a terminal run with 409, and the card
+    // retires on it instead of inviting a retry that can never succeed.
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(
+      new ApiError("Failed to submit ask_user answer", 409),
+    )
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(5)} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+
+    expect(
+      await screen.findByText("This run has already ended — your answer was not saved"),
+    ).toBeInTheDocument()
+    // ⚠ No retry affordance at all — that is the whole point.
+    expect(screen.queryByRole("button", { name: /send answer/i })).toBeNull()
+    expect(screen.queryByText(/try again/i)).toBeNull()
+  })
+
+  it("says the request never ARRIVED when there is no status — the one case retrying helps", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new Error("NetworkError"))
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(5)} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    expect(
+      await screen.findByText("Couldn't reach the server — check your connection and try again."),
+    ).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /send answer/i })).toBeEnabled()
   })
 

@@ -654,16 +654,35 @@ function statusGlyph(s: Message["runStatus"]): string {
   return "✓"
 }
 
+/** The suffix a category earns, or nothing.
+ *
+ * ⚠ **OPERATOR-REPORTED 2026-09-01: a run read `✗ failed - failed`.** The composition was
+ * `${statusWord} - ${categorizeError(err).shortLabel}`, and `DEFAULT_CATEGORY.shortLabel`
+ * is the literal string `"failed"` — so every UNRECOGNISED error printed the status word
+ * twice with a dash between them.
+ *
+ * ⚠ THE DEFAULT IS NOT THE BUG AND IS NOT CHANGED. `"failed"` is the right *label* for an
+ * uncategorised error wherever a category is shown on its own; what was wrong is appending
+ * it to a word that already says it. A category that merely repeats the status has told the
+ * reader nothing, so it is omitted — the row then reads `✗ failed`, which is the honest
+ * amount of information we actually have.
+ *
+ * ⚠ Compared case-insensitively and on the trimmed value, because this guards against a
+ * MEANING collision rather than a byte one: `timed out` vs `Timed out` would otherwise slip
+ * through and print `timed out - Timed out`.
+ */
+function categorySuffix(word: string, runError?: string): string {
+  if (!runError) return ""
+  const label = categorizeError(runError).shortLabel.trim()
+  if (!label) return ""
+  if (label.toLowerCase() === word.trim().toLowerCase()) return ""
+  return ` - ${label}`
+}
+
 function statusWord(s: Message["runStatus"], runError?: string): string {
   if (s === "completed" || s === undefined) return "done"
-  if (s === "failed") {
-    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
-    return `failed${suffix}`
-  }
-  if (s === "timed_out") {
-    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
-    return `timed out${suffix}`
-  }
+  if (s === "failed") return `failed${categorySuffix("failed", runError)}`
+  if (s === "timed_out") return `timed out${categorySuffix("timed out", runError)}`
   if (s === "cancelled") return "cancelled"
   return "done"
 }

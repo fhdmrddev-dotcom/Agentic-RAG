@@ -618,3 +618,29 @@ def test_the_transport_refuses_a_request_carrying_two_bodies():
                 json={"a": 1}, content=b"bytes", timeout=1.0, max_bytes=1024,
             )
         )
+
+
+# ── 9 · answering a DEAD run (operator-reported, 2026-09-01) ──────────────────────────
+
+
+def test_the_terminal_status_set_matches_the_live_table():
+    """⚠ Read from `select distinct status from runs`, not transcribed from memory."""
+    from app.api.runs import _TERMINAL_RUN_STATUSES, _TERMINAL_RUN_WORDS
+
+    assert _TERMINAL_RUN_STATUSES == {"completed", "failed", "cancelled", "timed_out"}
+    # Every terminal status must have a human word — "timed_out" is not a sentence.
+    for status_name in _TERMINAL_RUN_STATUSES:
+        assert _TERMINAL_RUN_WORDS.get(status_name), status_name
+        assert "_" not in _TERMINAL_RUN_WORDS[status_name], status_name
+
+
+def test_an_unknown_status_is_treated_as_ALIVE():
+    """⚠ The asymmetry is deliberate and is the safe direction.
+
+    Refusing a live answer loses work a person did; accepting a dead one only writes a
+    message nobody reads. So anything not provably terminal is answerable.
+    """
+    from app.api.runs import _TERMINAL_RUN_STATUSES
+
+    for alive in ("running", "paused", "queued", "", "streaming"):
+        assert alive not in _TERMINAL_RUN_STATUSES

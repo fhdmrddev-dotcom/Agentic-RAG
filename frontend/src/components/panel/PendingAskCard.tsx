@@ -361,16 +361,45 @@ export function PendingAskCard({
     } catch (err) {
       // Never crash the panel — and never stay silent (096-04 / BUG-260605-01).
       setSubmitting(false)
-      if (err instanceof ApiError && err.status === 404) {
-        // D-06: the run is terminal — the 404 is the backend's correct
+      const status = err instanceof ApiError ? err.status : null
+      if (status === 404) {
+        // D-06: the run is absent or not ours — the 404 is the backend's correct
         // IDOR-safe answer (runs.py anchor-confirm); surface it honestly as
         // the calm expired state instead of a dead-but-submittable card.
         setExpiredMessage("This prompt has expired — the run is no longer active")
         setState("expired")
+      } else if (status === 409) {
+        // ⚠ THE RUN IS OVER, AND THE SERVER IS THE ONLY PARTY THAT KNOWS.
+        //
+        // Operator-reported 2026-09-01: a chat run was cancelled 20 seconds after its ask
+        // posted, and this card was still offering `Send Answer` a minute later. The stack's
+        // `runIsOver` cannot catch it — it requires `phases.length > 0`, i.e. WORKFLOW
+        // phases, so it is structurally always false for a chat run. The server now refuses
+        // with 409.
+        //
+        // ⚠ THE SERVER'S OWN SENTENCE IS NOT SHOWN, AND THE COMMENT SAYING IT WAS HAS BEEN
+        // CORRECTED. `answerAskUser` throws `new ApiError("Failed to submit ask_user
+        // answer", res.status)` — a CONSTANT — so `err.message` carries the client's own
+        // placeholder, never the server's `detail`. Rendering it would have shown a person
+        // "Failed to submit ask_user answer", which is exactly the uninformative shape this
+        // change exists to remove. Surfacing the real detail means teaching the client to
+        // read the body; that is a separate change and is not pretended at here.
+        //
+        // ⚠ It retires rather than erroring, because a dead run is not a failure the person
+        // can act on — offering a retry on it is the defect this replaces.
+        setExpiredMessage("This run has already ended — your answer was not saved")
+        setState("expired")
+      } else if (status !== null && status >= 500) {
+        // ⚠ NAMED, NOT "try again". A 500 means the answer was NOT recorded, and clicking
+        // the same button again will do the same thing. Saying which half failed is the
+        // difference between a person retrying usefully and retrying blindly.
+        setSubmitError("The server couldn't record your answer. It has not been saved.")
+      } else if (status !== null) {
+        setSubmitError(`Your answer was refused (${status}). It has not been saved.`)
       } else {
-        // Transient/unknown failure — leave the card pending so the user can
-        // retry, with a visible constant-string error line.
-        setSubmitError("Couldn't submit your answer — try again.")
+        // No status at all — the request never reached the server (offline, dropped,
+        // aborted). This is the ONE case where trying again is genuinely the right advice.
+        setSubmitError("Couldn't reach the server — check your connection and try again.")
       }
     }
   }
