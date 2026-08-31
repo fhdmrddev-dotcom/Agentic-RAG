@@ -2668,7 +2668,17 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # ── GATE 5.5 · Tool Posture & Grants Check (Phase 213 / GRANT-02 / D-213-00 / SEC-1) ─
     # Evaluated BEFORE the shape fork (Gate 6/7) to close BUG-260827-02.
     effective_tool_name = getattr(phase.config, "tool_name", None) or capability
-    posture = resolve_effective_posture(connection, effective_tool_name)
+    # Phase 221 (D-221-05 / D-221-06) — the APPLICATION rung. See the identical wire in
+    # `tool_dispatcher.py`: both gates must resolve the same pair, or a write capped in chat
+    # is armed on the canvas and nothing reports the difference.
+    from app.services.connectors.service_tools import tool_facet
+
+    _application, _is_write = tool_facet(
+        getattr(connection, "service_id", None), effective_tool_name
+    )
+    posture = resolve_effective_posture(
+        connection, effective_tool_name, application=_application, is_write=_is_write
+    )
     grants = getattr(connection, "tool_grants", None) or {}
     was_explicitly_set = isinstance(grants, dict) and effective_tool_name in grants
 

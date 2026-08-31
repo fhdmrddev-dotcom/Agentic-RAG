@@ -559,6 +559,7 @@ async def _resolve_allowed_vocabulary(
 
     from app.services.connector_service import list_connections  # function-local (Pitfall 4)
     from app.services.connectors.grants import is_tool_allowed  # function-local
+    from app.services.connectors.service_tools import tool_facet as _facet
     from app.utils.folder_utils import _resolve_caller_org_ids  # function-local
 
     wanted = {str(cid) for cid in allowed_connection_ids}
@@ -584,7 +585,19 @@ async def _resolve_allowed_vocabulary(
                 vocabulary[cid] = {
                     "name": getattr(conn, "name", None),
                     "service_id": getattr(conn, "service_id", None),
-                    "actions": [a for a in candidates if is_tool_allowed(conn, a)],
+                    # Phase 221 — the application rung here too, so the authoring picker
+                    # offers exactly what the executor will permit. A tool listed here and
+                    # refused at run time is the worst of both.
+                    "actions": [
+                        a
+                        for a in candidates
+                        if is_tool_allowed(
+                            conn,
+                            a,
+                            application=_facet(getattr(conn, "service_id", None), a)[0],
+                            is_write=_facet(getattr(conn, "service_id", None), a)[1],
+                        )
+                    ],
                 }
     except Exception:  # noqa: BLE001 — an unreadable set NARROWS the vocabulary, never widens it
         logger.warning(

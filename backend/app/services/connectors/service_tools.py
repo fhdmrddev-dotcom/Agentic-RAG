@@ -857,6 +857,40 @@ def extra_descriptors_for_service(service_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def tool_facet(service_id: str | None, tool_name: str | None) -> tuple[str | None, bool]:
+    """``(application, is_write)`` for one advertised action — the pair the grant ladder needs.
+
+    ⚠ **THIS EXISTS BECAUSE THE WRITE CAP WAS INERT.** Phase 221 built D-221-06 — *an
+    application-level ``allow`` never arms a write* — tested it against a planted spec, and
+    wired it into NOTHING. All three enforcement sites called
+    ``resolve_effective_posture(connection, tool_name)`` with two positional arguments, so
+    ``application`` was ``None``, the middle rung never ran, and the cap could not fire.
+    A guard that is tested and unreachable is the failure class this repository keeps
+    finding; it is fixed HERE, before the first write tool exists, rather than after.
+
+    ── FAIL CLOSED, AND THE DIRECTION IS THE HALF THAT MATTERS ──────────────────────────
+    An action this table has never heard of returns ``(None, True)``:
+
+      * ``application`` is ``None`` — *"this connector has one unnamed application"*, which
+        makes the application rung a no-op. It must NOT be guessed: inventing an application
+        for an unknown tool would let an unrelated ``app:`` grant answer for it.
+      * ``is_write`` is ``True`` — the MCP specification's own instruction for an
+        unannotated tool, and the only safe default for a cap whose entire job is to
+        withhold ``allow``. Guessing ``False`` here would hand a write the permission the
+        cap exists to deny.
+
+    ⚠ Read from ``SERVICE_TOOL_SPECS`` and never from ``discovered_tools``. That column is a
+    CACHE — the same one that made the operator's grouping vanish on 2026-08-31 — and a
+    stale copy deciding whether something is a write would be a permission decision made
+    from a stale fact.
+    """
+    spec = spec_for(service_id or "", tool_name or "")
+    if spec is None:
+        return None, True
+    app = spec.get("app")
+    return (app if isinstance(app, str) and app.strip() else None), bool(spec.get("writes"))
+
+
 def backfill_application_keys(
     service_id: str | None, tools: list[dict[str, Any]] | None
 ) -> list[dict[str, Any]]:

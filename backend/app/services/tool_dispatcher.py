@@ -4387,7 +4387,16 @@ async def _handle_connector_chat_tool(
         # now true when it is said, which it was not before.
         return ToolResult(result=f"Connector service '{service_id}' is not connected or not found.")
 
-    posture = resolve_effective_posture(matched_conn, action_tool_name)
+    # Phase 221 (D-221-05 / D-221-06) — the APPLICATION rung, resolved from the spec table.
+    # ⚠ Without these two keywords the middle rung is a no-op and the write cap CANNOT FIRE:
+    # `application` defaults to None, so `app:drive` is never consulted and an application
+    # `allow` would arm a write. The cap shipped tested-and-unreachable; this is the wire.
+    from app.services.connectors.service_tools import tool_facet
+
+    _application, _is_write = tool_facet(getattr(matched_conn, "service_id", None), action_tool_name)
+    posture = resolve_effective_posture(
+        matched_conn, action_tool_name, application=_application, is_write=_is_write
+    )
     if posture == "deny":
         return ToolResult(
             result=json.dumps({

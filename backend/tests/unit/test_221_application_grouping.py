@@ -269,3 +269,76 @@ def test_the_response_projection_heals_a_stale_row():
     for t in resp.discovered_tools:
         counts[t["app"]] = counts.get(t["app"], 0) + 1
     assert counts == EXPECTED_COUNTS
+
+
+# ── 6 · THE CAP IS REACHABLE — the half that was missing ──────────────────────────────
+#
+# ⚠ D-221-06 shipped TESTED AND UNREACHABLE. Every enforcement site called
+# `resolve_effective_posture(connection, tool_name)` with two positional arguments, so
+# `application` was None, the middle rung never ran, and an application `allow` would have
+# armed a write for real. Section 3 above proved the RULE; nothing proved it was CALLED.
+#
+# A guard nobody has seen fire is not a guard — and a guard nothing invokes is not even that.
+
+
+def test_tool_facet_resolves_the_pair_both_gates_need():
+    from app.services.connectors.service_tools import tool_facet
+
+    assert tool_facet("google", "search_files") == ("drive", False)
+    assert tool_facet("google", "read_email") == ("gmail", False)
+
+
+def test_tool_facet_fails_closed_on_anything_it_does_not_know():
+    """⚠ Unknown ⇒ (no application, IS a write).
+
+    `application=None` makes the rung a no-op rather than letting an unrelated `app:` grant
+    answer for a tool nobody declared. `is_write=True` is the MCP spec's own instruction and
+    the only safe default for a cap whose whole job is to withhold `allow`.
+    """
+    from app.services.connectors.service_tools import tool_facet
+
+    for args in [("google", "not_a_tool"), ("nosuchservice", "x"), (None, None), ("", "")]:
+        assert tool_facet(*args) == (None, True), args
+
+
+def test_tool_facet_cannot_read_the_cache_because_it_is_never_handed_one():
+    """`discovered_tools` is a CACHE — a stale copy must never decide a permission.
+
+    ⚠ ASSERTED ON THE SIGNATURE, NOT ON THE SOURCE TEXT. The first cut of this test grepped
+    the function body for the word and went RED against its own docstring — the 187-24 trap,
+    where a source-reading criterion counts its own prose. The signature is the real
+    property and no comment can satisfy it: a function handed only a service id and a tool
+    name has no cache to consult.
+    """
+    import inspect
+
+    from app.services.connectors.service_tools import tool_facet
+
+    params = list(inspect.signature(tool_facet).parameters)
+    assert params == ["service_id", "tool_name"], params
+
+
+@pytest.mark.parametrize(
+    "module_path,symbol",
+    [
+        ("app.services.tool_dispatcher", "tool_facet"),
+        ("app.services.harness.phase_types", "tool_facet"),
+        ("app.services.workflow_authoring", "tool_facet"),
+    ],
+)
+def test_every_enforcement_gate_resolves_the_application(module_path, symbol):
+    """⚠ THE REACHABILITY ASSERTION, and it is deliberately a SOURCE read.
+
+    A runtime assertion would need each gate's whole context (a live connection, a phase, an
+    org); this asserts the property that was actually missing — that the site resolves the
+    pair at all — and it goes RED the moment somebody reverts a call to the two-argument
+    form, which is exactly how the cap became unreachable the first time.
+    """
+    import importlib
+    import inspect
+
+    module = importlib.import_module(module_path)
+    src = inspect.getsource(module)
+    assert symbol in src, f"{module_path} never resolves the application/direction pair"
+    # ...and it must actually PASS them, not merely import them.
+    assert "application=" in src and "is_write=" in src, module_path
