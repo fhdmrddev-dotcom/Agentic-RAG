@@ -238,6 +238,12 @@ class ResolvedConnection:
     # a native send with a missing credential — see the resolver's own block.
     secret_ciphertext: str | None
     mcp_server_url: str | None = None
+    #: The service this row IS (migration 127). Carried so a caller that resolved a
+    #: connection can ask what it advertises without a second read — the descriptor list
+    #: is per-SERVICE now, not per-capability, and `discover_connection_tools` had only
+    #: the verb to go on. Optional because rows created before migration 127 may carry
+    #: none, and a missing service simply falls back to the capability descriptor alone.
+    service_id: str | None = None
     default_approval_posture: str = "ask"
     tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
@@ -559,6 +565,7 @@ async def resolve_connection(
             connection_id=str(row["id"]),
             org_id=str(row["org_id"]),
             capability=row.get("capability"),
+            service_id=row.get("service_id"),
             name=str(row.get("name") or ""),
             config=dict(row.get("config") or {}),
             secret_ciphertext=None,
@@ -605,6 +612,7 @@ async def resolve_connection(
         connection_id=str(row["id"]),
         org_id=str(row["org_id"]),
         capability=row.get("capability"),
+        service_id=row.get("service_id"),
         name=str(row.get("name") or ""),
         config=dict(row.get("config") or {}),
         secret_ciphertext=raw,
@@ -667,7 +675,7 @@ async def create_connection(
     if payload.capability:
         from app.services.connectors.descriptors import static_descriptors_for_capability
 
-        descriptors = static_descriptors_for_capability(payload.capability)
+        descriptors = static_descriptors_for_capability(payload.capability, payload.service_id)
     else:
         # A service-only row genuinely HAS no action until OAuth (Phase 215) gives it one.
         # An empty list is the honest answer; a placeholder action would be a lie a picker
@@ -915,7 +923,7 @@ async def discover_connection_tools(
         # graph until a send happens.
         from app.services.connectors.descriptors import static_descriptors_for_capability
 
-        tools = static_descriptors_for_capability(resolved.capability)
+        tools = static_descriptors_for_capability(resolved.capability, resolved.service_id)
     else:
         raise ConnectorNothingToDiscover(
             "this connection names a service but no way to reach it yet, so there is nothing "

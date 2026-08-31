@@ -728,16 +728,34 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         # exactly like a real search that found nothing. The row carries `document_ids: []`
         # and the classified `retrieval_status: "provider_error"` literal — NEVER `str(exc)`,
         # which stays in the ToolResult.retrieval_error response object (T-217.1-15b).
-        ctx.spawn(write_audit_entry(
-            user_id=ctx.current_user["id"],
-            action_type="search.query",
-            metadata={
-                "query_text": args["query"],
-                "document_ids": [],
-                "retrieval_status": "provider_error",
-            },
-            supabase=ctx.supabase,
-        ))
+        # THE WRITE IS FIRE-AND-FORGET DIAGNOSTICS AND MUST NOT BE ABLE TO KILL THE
+        # HONEST RESULT BELOW - which is exactly what it did. 217.1-11 added this call
+        # and the four Phase 210 tests that guard RAG-09 went RED with
+        # "'ToolContext' object has no attribute 'spawn'", raised from INSIDE the
+        # except arm: the AttributeError propagated past the `return`, so a provider
+        # outage stopped producing `retrieval_unavailable` at all and raised into the
+        # agent loop instead - the precise outcome the test named
+        # `..._does_not_raise_into_the_agent_loop` exists to forbid.
+        #
+        # The ordering is the fix: an analytics row is worth having, and it is worth
+        # strictly less than the sentence that tells a person their library could not be
+        # searched. So the failure is logged and swallowed HERE, and nowhere else.
+        try:
+            ctx.spawn(write_audit_entry(
+                user_id=ctx.current_user["id"],
+                action_type="search.query",
+                metadata={
+                    "query_text": args["query"],
+                    "document_ids": [],
+                    "retrieval_status": "provider_error",
+                },
+                supabase=ctx.supabase,
+            ))
+        except Exception:  # noqa: BLE001 - diagnostics may never mask the outage
+            logger.warning(
+                "search_documents: the provider-error audit row could not be scheduled; "
+                "the retrieval failure itself is still reported", exc_info=True,
+            )
         return ToolResult(
             result=json.dumps({
                 "error": "retrieval_unavailable",
@@ -4405,31 +4423,139 @@ async def _handle_connector_chat_tool(
             except Exception:
                 pass
 
-    # Execute the action
+    # ══════════════════════════════════════════════════════════════════════════════════
+    # Execute the action — THREE SHAPES, ONE HONEST FAILURE
+    # ══════════════════════════════════════════════════════════════════════════════════
+    #
+    # ⚠ THE VERSION THIS REPLACES TOLD THE MODEL EVERY FAILURE HAD SUCCEEDED. It caught
+    # `Exception` and answered `f"Executed {tool} on {name} with result/note: {exc}"`, so an
+    # expired token, a 404 and a timeout all reached the model as a COMPLETED ACTION with a
+    # note attached — and the model then reported to the person that the message was posted.
+    # Its `if not raw_output` fallback said "successfully." for the same reason. A refusal
+    # must READ as a refusal: the phase executor's own contract (`phase_types.py:2865`) is
+    # that only the adapter's verdict produces `completed`, and this path now matches it.
+    #
+    # ⚠ AND THE NATIVE BRANCH COULD NEVER HAVE RUN. It called
+    # `adapter.send(matched_conn, args, user_id=...)` against a protocol whose `send` is
+    # KEYWORD-ONLY (`args`, `credential`, `config`, `capability`) — an immediate `TypeError`,
+    # swallowed by the same handler into an "Executed …" sentence. Slack, Jira and SMTP have
+    # never once been callable from chat, and nothing failed, because the lie caught the
+    # evidence.
     raw_output = ""
+    failure: str | None = None
+
     try:
+        from app.services.connector_service import resolve_connection
+
+        # ONE resolve for all three shapes. It is also the org-scoping gate and the D-11
+        # credential read, so no branch below can reach a wire without passing it.
+        resolved_conn = await resolve_connection(matched_conn.id, matched_conn.org_id)
+
         if getattr(matched_conn, "mcp_server_url", None):
-            from app.services.connector_service import resolve_connection
             from app.services import mcp_client
-            resolved_conn = await resolve_connection(matched_conn.id, matched_conn.org_id)
+
             tool_res = await mcp_client.call_tool(
                 resolved_conn.mcp_server_url,
                 tool_name=action_tool_name,
                 arguments=args,
                 secret=resolved_conn.secret,
             )
-            raw_output = tool_res.get("text") or json.dumps(tool_res.get("content") or tool_res)
+            # ⚠ `isError` IS THE SERVER SAYING NO, and reading only `text` treats its refusal
+            # as its answer — the same shape as the "Executed …" lie one level up.
+            if isinstance(tool_res, dict) and tool_res.get("isError"):
+                failure = str(tool_res.get("text") or "the server refused the call")
+            else:
+                raw_output = tool_res.get("text") or json.dumps(
+                    tool_res.get("content") or tool_res
+                )
         else:
-            from app.services.connectors.registry import get_adapter
-            adapter = get_adapter(action_tool_name) or (get_adapter(matched_conn.capability) if getattr(matched_conn, "capability", None) else None)
-            if adapter:
-                res = await adapter.send(matched_conn, args, user_id=UUID(user_id))
-                raw_output = json.dumps(res) if isinstance(res, (dict, list)) else str(res)
-    except Exception as exc:
-        raw_output = f"Executed {action_tool_name} on {matched_conn.name} with result/note: {exc}"
+            from app.services.connectors.service_tools import (
+                ServiceToolError,
+                execute_service_tool,
+                spec_for,
+            )
+
+            spec = spec_for(getattr(matched_conn, "service_id", "") or "", action_tool_name)
+            if spec is not None:
+                # One of the SERVICE's advertised actions (Phase 216 follow-up). Same host and
+                # same egress key as the capability it hangs off; no allow-list is widened.
+                try:
+                    result = await execute_service_tool(
+                        matched_conn.service_id,
+                        action_tool_name,
+                        args,
+                        secret=resolved_conn.secret,
+                        config=resolved_conn.config,
+                    )
+                    raw_output = json.dumps(result)
+                except ServiceToolError as exc:
+                    failure = str(exc)
+            elif getattr(matched_conn, "capability", None) == action_tool_name:
+                # The row's own capability verb — the ONE action with a first-party adapter.
+                from app.services.connectors.registry import get_adapter
+
+                adapter = get_adapter(action_tool_name)
+                send_args = {
+                    key: value
+                    for key, value in args.items()
+                    if key in adapter.INPUT_SCHEMA.get("properties", {})
+                }
+                result = await adapter.send(
+                    args=send_args,
+                    credential=resolved_conn,
+                    config=resolved_conn.config,
+                    capability=action_tool_name,
+                )
+                # ⚠ ONLY THE ADAPTER'S OWN VERDICT MEANS DONE. Slack answers HTTP 200 with
+                # `{"ok": false}` for a message nobody received; `phase_types.py` states this
+                # at length and chat must not disagree with the canvas about the same send.
+                if not getattr(result, "ok", False):
+                    failure = (
+                        getattr(result, "provider_message", "")
+                        or getattr(result, "detail", "")
+                        or "the destination refused it"
+                    )
+                else:
+                    raw_output = json.dumps(
+                        {
+                            "performed": action_tool_name,
+                            "detail": getattr(result, "detail", "") or "",
+                            "provider_message": getattr(result, "provider_message", "") or "",
+                        }
+                    )
+            else:
+                failure = (
+                    f"{matched_conn.name} does not advertise an action called "
+                    f"{action_tool_name!r}"
+                )
+    except Exception as exc:  # noqa: BLE001 — a transport/credential boundary
+        logger.warning(
+            "connector chat tool %s on %s failed", action_tool_name, matched_conn.name,
+            exc_info=True,
+        )
+        failure = str(exc) or exc.__class__.__name__
+
+    if failure is not None:
+        # Not wrapped: this sentence is OURS, not third-party text, and putting our own words
+        # inside the untrusted-content envelope would teach the model to distrust them.
+        return ToolResult(
+            result=json.dumps(
+                {
+                    "error": "tool_failed",
+                    "service": matched_conn.name,
+                    "tool": action_tool_name,
+                    "message": (
+                        f"{action_tool_name} on {matched_conn.name} was NOT performed: "
+                        f"{failure}"
+                    ),
+                }
+            )
+        )
 
     if not raw_output:
-        raw_output = f"Executed {action_tool_name} on {matched_conn.name} successfully."
+        # A success with no body is still a success, and saying so is not the old lie: this
+        # line is now reachable ONLY when no failure was recorded.
+        raw_output = json.dumps({"performed": action_tool_name, "detail": ""})
 
     wrapped = wrap_untrusted_tool_result(matched_conn.name, action_tool_name, raw_output)
     return ToolResult(result=wrapped)

@@ -581,6 +581,16 @@ async def send_pinned_http(
     *,
     json: Any | None = None,
     headers: Mapping[str, str] | None = None,
+    #: Query parameters, encoded by the transport rather than by the caller.
+    #:
+    #: ⚠ THE ENCODING BELONGS HERE AND NOT IN A CALLER, for a reason the connector
+    #: source fence states as a rule: no module under `services/connectors/` may import
+    #: `urllib` (or any transport), so a caller that needed one query parameter had to
+    #: either hand-roll percent-encoding or trip the fence. Both are worse than this
+    #: line. Validation is unaffected — `validate_destination` drops query and fragment
+    #: before it looks at anything, so a parameter can never influence the host that was
+    #: pinned.
+    params: Mapping[str, str] | None = None,
     auth: tuple[str, str] | None = None,
     timeout: float,
     max_bytes: int,
@@ -651,6 +661,7 @@ async def send_pinned_http(
             method,
             target,
             json=json,
+            params=dict(params) if params else None,
             headers=outgoing,
             timeout=explicit_timeout,
         )

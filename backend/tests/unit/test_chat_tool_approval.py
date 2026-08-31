@@ -5,6 +5,8 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+from types import SimpleNamespace
+
 import pytest
 from app.models.connector import ConnectorConnectionResponse, PostMessageConfig
 from app.services.tool_dispatcher import ToolContext, _handle_connector_chat_tool
@@ -110,9 +112,33 @@ async def test_tool_approval_ask_emits_event_and_pauses():
             "app.services.connector_service.list_connections",
             AsyncMock(return_value=[mock_conn]),
         )
+        # ⚠ `resolve_connection` MUST BE MOCKED, and its absence used to be INVISIBLE.
+        # The dispatcher resolves the connection before it sends — that call is the
+        # org-scoping gate and the credential read — so without this the test reached a
+        # real network and failed at DNS. It passed anyway, because the handler caught
+        # every exception and answered "Executed post_message on Slack Ops with
+        # result/note: …" inside the untrusted-content envelope. The assertion below
+        # then found `<external_tool_result` in a sentence describing a FAILURE.
+        mp.setattr(
+            "app.services.connector_service.resolve_connection",
+            AsyncMock(return_value=SimpleNamespace(
+                connection_id=str(mock_conn.id),
+                org_id=str(mock_conn.org_id),
+                capability="post_message",
+                service_id="slack",
+                config={"default_channel": "#ops"},
+                secret="xoxb-test",
+                mcp_server_url=None,
+            )),
+        )
         mp.setattr(
             "app.services.connectors.registry.get_adapter",
-            lambda cap: MagicMock(send=AsyncMock(return_value={"ok": True})),
+            lambda cap: SimpleNamespace(
+                INPUT_SCHEMA={"properties": {"text": {"type": "string"}}},
+                send=AsyncMock(return_value=SimpleNamespace(
+                    ok=True, provider_message="", detail="posted to #ops",
+                )),
+            ),
         )
 
         res = await _handle_connector_chat_tool(
@@ -129,6 +155,12 @@ async def test_tool_approval_ask_emits_event_and_pauses():
         assert call_kwargs["service_name"] == "Slack Ops"
         assert call_kwargs["tool_name"] == "post_message"
 
-        # Assert result was returned after allow decision
+        # Assert result was returned after allow decision.
+        # ⚠ THE SECOND LINE IS THE ONE THAT MATTERS AND IT IS NEW. The envelope alone
+        # proves nothing: the shipped handler wrapped its own FAILURES in it too, so this
+        # assertion was satisfied by a send that never left the process. `ok=True` from
+        # the adapter is now the only thing that produces a wrapped result.
         assert "<external_tool_result" in res.result
         assert "Slack Ops" in res.result
+        assert "tool_failed" not in res.result
+        assert "posted to #ops" in res.result

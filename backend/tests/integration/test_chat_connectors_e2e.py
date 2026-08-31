@@ -1,6 +1,8 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+from types import SimpleNamespace
+
 import pytest
 import httpx
 
@@ -96,8 +98,31 @@ async def test_e2e_chat_connector_flow():
         tool_call_id="call_9988",
     )
 
+    # THIS BLOCK USED TO MOCK NEITHER `resolve_connection` NOR THE ADAPTER CONTRACT,
+    # AND THE TEST PASSED ANYWAY - which is the finding, not the fix. The send reached a
+    # real DNS lookup, failed, and the handler answered "Executed post_message on Slack
+    # Operations with result/note: [Errno 11001] getaddrinfo failed" INSIDE the untrusted
+    # envelope. Both assertions below were satisfied by a call that never left the
+    # process, so the one test named as this feature end-to-end proof was green on a
+    # path that had never once worked.
+    resolved = SimpleNamespace(
+        connection_id=str(mock_conn.id),
+        org_id=str(mock_conn.org_id),
+        capability="post_message",
+        service_id="slack",
+        config={"default_channel": "#ops"},
+        secret="xoxb-test",
+        mcp_server_url=None,
+    )
+    adapter = SimpleNamespace(
+        INPUT_SCHEMA={"properties": {"text": {"type": "string"}}},
+        send=AsyncMock(return_value=SimpleNamespace(
+            ok=True, provider_message="", detail="posted to #ops",
+        )),
+    )
     with patch("app.services.connector_service.list_connections", AsyncMock(return_value=[mock_conn])), \
-         patch("app.services.connectors.registry.get_adapter", lambda cap: MagicMock(send=AsyncMock(return_value={"status": "sent", "channel": "ops"}))):
+         patch("app.services.connector_service.resolve_connection", AsyncMock(return_value=resolved)), \
+         patch("app.services.connectors.registry.get_adapter", lambda cap: adapter):
 
         res = await dispatch_tool(
             "slack__post_message",
@@ -110,6 +135,68 @@ async def test_e2e_chat_connector_flow():
     assert mock_emit.call_args[0][2] == "tool_approval_required"
     assert '<external_tool_result service="Slack Operations" tool="post_message">' in res.result
     assert "untrusted external data retrieved from Slack Operations" in res.result
+    # The envelope alone is not evidence of a send. The adapter OWN verdict is.
+    assert "tool_failed" not in res.result
+    adapter.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_a_refused_send_reads_as_a_refusal_not_as_a_completed_action():
+    """THE FENCE FOR THE DEFECT THE TEST ABOVE WAS HIDING.
+
+    Slack answers HTTP 200 with ``{"ok": false}`` for a message nobody received, and the
+    adapter turns that into ``ok=False`` with the vendor own words. The chat dispatcher
+    used to render every such outcome - and every exception - as "Executed post_message
+    on ...", so a model was told the message had been posted and told the person so in
+    turn.
+
+    ``phase_types.py`` already states the rule for the canvas: only the adapter own
+    verdict produces ``completed``. Chat must not disagree with the canvas about the same
+    send, which is what this pins.
+    """
+    from app.services.tool_dispatcher import _handle_connector_chat_tool
+
+    conn_id = uuid4()
+    org_id = uuid4()
+    user_id = str(uuid4())
+    conn = SimpleNamespace(
+        id=conn_id, org_id=org_id, name="Slack Operations", service_id="slack",
+        capability="post_message", is_enabled=True, mcp_server_url=None,
+        discovered_tools=[{"name": "post_message"}],
+        tool_grants={"post_message": "allow"}, default_approval_posture="allow",
+    )
+    resolved = SimpleNamespace(
+        connection_id=str(conn_id), org_id=str(org_id), capability="post_message",
+        service_id="slack", config={"default_channel": "#ops"}, secret="xoxb-test",
+        mcp_server_url=None,
+    )
+    refused = SimpleNamespace(
+        ok=False, provider_message="channel_not_found", detail="nothing was posted",
+    )
+    ctx = ToolContext(
+        redis=None, run_id=uuid4(), thread_id=str(uuid4()), supabase=MagicMock(),
+        pool=None, user_settings=MagicMock(), current_user={"id": user_id},
+        folder_subtree_ids=None, scoped_folder_path=None, emit=AsyncMock(),
+        spawn=MagicMock(), tool_call_id="call_refused",
+    )
+
+    with patch("app.services.connector_service.list_connections", AsyncMock(return_value=[conn])), \
+         patch("app.services.connector_service.resolve_connection", AsyncMock(return_value=resolved)), \
+         patch("app.services.connectors.registry.get_adapter", lambda cap: SimpleNamespace(
+             INPUT_SCHEMA={"properties": {"text": {"type": "string"}}},
+             send=AsyncMock(return_value=refused),
+         )):
+        res = await _handle_connector_chat_tool("slack", "post_message", {"text": "hi"}, ctx)
+
+    payload = json.loads(res.result)
+    assert payload["error"] == "tool_failed"
+    assert "was NOT performed" in payload["message"]
+    assert "channel_not_found" in payload["message"]
+    # The refusal is OURS, so it must NOT wear the untrusted-content envelope - teaching
+    # a model to distrust our own sentences is how it learns to ignore them.
+    assert "<external_tool_result" not in res.result
+    # The exact word the shipped defect used. Its absence is the regression pin.
+    assert "Executed" not in res.result
 
 
 @pytest.mark.asyncio

@@ -170,12 +170,52 @@ def descriptor_for(capability: str) -> dict[str, Any]:
     }
 
 
-def static_descriptors_for_capability(capability: str) -> list[dict[str, Any]]:
-    """The same descriptor in the shape ``discovered_tools`` actually holds — a LIST.
+def static_descriptors_for_capability(
+    capability: str, service_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Everything this connection advertises, in the shape ``discovered_tools`` holds.
 
-    One element, always. SEED-207's wording is *"present a native connection as a connection
-    with exactly ONE available tool"*: a capability connection performs one action, and every
-    downstream reader of ``discovered_tools`` iterates a JSON array rather than reading a
-    single object. Returning the list form here means no caller has to know that.
+    The capability descriptor is ALWAYS first and always present. It is the row's
+    identity: the grant key every bound workflow step already carries, the value stored
+    on `ExternalActionPhaseConfig.capability`, and the one action whose adapter the
+    executor reaches through `get_adapter`. Nothing about it changes here.
+
+    ⚠ **IT IS NO LONGER THE ONLY ONE, AND THE ONE-ELEMENT WORDING ABOVE IT WAS A
+    MEASUREMENT OF THE PROBLEM RATHER THAN A REQUIREMENT.** SEED-207 asked for *"present
+    a native connection as a connection with exactly ONE available tool"*, and that was
+    the right first step — a service that could not SAY what it did was the defect Phase
+    211 closed. But the operator, driving chat after Phase 216, met the next one: a Jira
+    connection that worked, was credentialled and was enabled still answered *"there is no
+    Jira integration"*, because create_ticket was not the action that moment needed and
+    there was no second one to reach for. GitHub advertised 44 tools beside it; Slack,
+    Jira and SMTP advertised one each.
+
+    So when the caller knows the SERVICE, the service's own action list follows the
+    capability descriptor — `service_tools.SERVICE_TOOL_SPECS`, which adds no verb to the
+    closed capability set and no host to the egress allow-list.
+
+    ⚠ `service_id` DEFAULTS TO None AND THAT ARM IS PRESERVED DELIBERATELY. A caller who
+    genuinely holds only a capability — and there are such callers — gets exactly the
+    one-element list it got before, byte for byte. Adding an argument must not change the
+    answer to the question that was already being asked.
+
+    ⚠ ADVERTISING IS NOT GRANTING. Every extra action arrives with no `tool_grants` key,
+    and the executor DENIES on a missing key (T-211-05). A connection that gains nine
+    actions here has gained nine rows on a grant list and zero new powers.
     """
-    return [descriptor_for(capability)]
+    descriptors = [descriptor_for(capability)]
+    if service_id:
+        # Function-local for the reason this module's header states about the registry:
+        # nothing that merely asks WHAT a connection advertises should drag a vendor
+        # module into the import graph. `service_tools` imports its transport lazily too.
+        from app.services.connectors.service_tools import extra_descriptors_for_service
+
+        advertised = {d["name"] for d in descriptors}
+        descriptors.extend(
+            extra for extra in extra_descriptors_for_service(service_id)
+            # The capability descriptor wins any name collision: its `inputSchema` is
+            # DERIVED from the adapter that will actually run it, so a same-named spec
+            # here could only ever disagree with the code.
+            if extra["name"] not in advertised
+        )
+    return descriptors

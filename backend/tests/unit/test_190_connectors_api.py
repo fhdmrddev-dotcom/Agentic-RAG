@@ -732,9 +732,34 @@ def test_a_new_capability_row_is_born_advertising_its_own_action(
     insert_row = _last_insert_row(mock_builder)
     assert insert_row["service_id"] == "slack", insert_row
     tools = insert_row["discovered_tools"]
-    assert len(tools) == 1, tools
+    # THE CAPABILITY DESCRIPTOR IS STILL FIRST AND STILL EXACT. It is the row identity:
+    # the grant key every bound workflow step carries and the one action with a
+    # first-party adapter behind it, and none of that changes.
     assert tools[0]["name"] == "post_message", tools
     assert tools[0]["inputSchema"]["required"] == ["text"], tools
+
+    # THE `len(tools) == 1` THIS REPLACES WAS A MEASUREMENT OF THE PROBLEM, NOT A
+    # REQUIREMENT, and it is recorded here rather than quietly deleted. SEED-207 asked for
+    # "exactly ONE available tool" and that was the right first step - a service that
+    # could not SAY what it did was the defect Phase 211 closed. The operator met the next
+    # one while driving chat after Phase 216: a working, credentialled, enabled Jira
+    # connection still answered "there is no JIRA integration", because create_ticket was
+    # not the action that moment needed and there was no second one to reach for. GitHub
+    # advertised 44 tools beside it.
+    #
+    # So a SERVICE now advertises its whole action list. The assertion below is written
+    # about the PROPERTY rather than the count, because a count goes stale the first time
+    # anyone adds a tool - which is exactly how this test came to pin the wrong fact.
+    names = [t["name"] for t in tools]
+    assert len(names) == len(set(names)), names
+    assert names[0] == "post_message", names
+    assert "list_channels" in names, names
+    assert all(t.get("title") and t.get("description") for t in tools), tools
+    assert all("inputSchema" in t for t in tools), tools
+    # Every descriptor carries the four keys a sanitized tool carries, and NOTHING else -
+    # the execution fields (http method, api method, path) are ours and never leave
+    # `service_tools.py`. A URL path on a grant list is a leak of our own plumbing.
+    assert all(set(t) == {"name", "title", "description", "inputSchema"} for t in tools), tools
     # A descriptor ADVERTISES an action; it does not GRANT one. The executor's gate denies on
     # a missing grant key by design, and that asymmetry is the desirable direction.
     assert insert_row["tool_grants"] == {}, insert_row
