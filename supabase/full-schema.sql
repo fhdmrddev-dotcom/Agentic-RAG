@@ -813,12 +813,18 @@ CREATE TABLE public.connector_connections (
     discovered_tools jsonb DEFAULT '[]'::jsonb NOT NULL,
     service_id text,
     default_approval_posture text DEFAULT 'ask'::text NOT NULL,
+    auth_type text DEFAULT 'static_key'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    error_message text,
+    oauth_client_secret_ciphertext text,
+    CONSTRAINT connector_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['static_key'::text, 'oauth_byo'::text, 'mcp'::text]))),
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
     CONSTRAINT connector_connections_default_posture_check CHECK ((default_approval_posture = ANY (ARRAY['allow'::text, 'ask'::text, 'deny'::text]))),
     CONSTRAINT connector_connections_has_a_service_identity CHECK (((service_id IS NOT NULL) AND (length(btrim(service_id)) > 0))),
     CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
     CONSTRAINT connector_connections_mcp_url_is_https CHECK (((mcp_server_url IS NULL) OR (mcp_server_url ~~ 'https://%'::text))),
-    CONSTRAINT connector_connections_shape_is_not_ambiguous CHECK ((NOT ((capability IS NOT NULL) AND (mcp_server_url IS NOT NULL))))
+    CONSTRAINT connector_connections_shape_is_not_ambiguous CHECK ((NOT ((capability IS NOT NULL) AND (mcp_server_url IS NOT NULL)))),
+    CONSTRAINT connector_connections_status_check CHECK ((status = ANY (ARRAY['active'::text, 'revoked'::text, 'error'::text])))
 );
 
 
@@ -876,6 +882,75 @@ COMMENT ON COLUMN public.connector_connections.service_id IS 'Phase 211 (D-211-0
 --
 
 COMMENT ON COLUMN public.connector_connections.default_approval_posture IS 'Phase 213 (D-213-06, D-213-08): The connection-level default approval posture (''allow'', ''ask'', ''deny''). Newly discovered or unconfigured tools inherit this posture until explicitly overridden in tool_grants.';
+
+
+--
+-- Name: COLUMN connector_connections.auth_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.auth_type IS 'Phase 215 (D-215-01): The authentication mechanism used by the connection (static_key, oauth_byo, mcp).';
+
+
+--
+-- Name: COLUMN connector_connections.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.status IS 'Phase 215 (D-215-05): Connection operational status (active, revoked, error).';
+
+
+--
+-- Name: COLUMN connector_connections.oauth_client_secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.oauth_client_secret_ciphertext IS 'Phase 215 follow-up (2026-08-31): the customer-registered OAuth application secret, encrypted (enc:v1: AES-256-GCM) exactly as secret_ciphertext is. NEVER granted SELECT to authenticated or anon — it is deliberately absent from the GRANT below and from _SELECTABLE_COLUMNS. It previously lived in config.custom_client_secret as PLAINTEXT, in a column every org member can read.';
+
+
+--
+-- Name: connector_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    account_email text,
+    account_name text,
+    access_token_ciphertext text NOT NULL,
+    refresh_token_ciphertext text,
+    token_type text DEFAULT 'Bearer'::text NOT NULL,
+    scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    refresh_claimed_until timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE connector_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.connector_tokens IS 'Phase 215 (OAUTH-01..03): Encrypted OAuth tokens and claim-based refresh leases for connector connections.';
+
+
+--
+-- Name: COLUMN connector_tokens.access_token_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.access_token_ciphertext IS 'Phase 215 (SEC-1): Encrypted access token envelope (enc:v1: AES-256-GCM). Must NEVER be granted SELECT to authenticated or anon.';
+
+
+--
+-- Name: COLUMN connector_tokens.refresh_token_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.refresh_token_ciphertext IS 'Phase 215 (SEC-1): Encrypted refresh token envelope (enc:v1: AES-256-GCM). Must NEVER be granted SELECT to authenticated or anon.';
+
+
+--
+-- Name: COLUMN connector_tokens.refresh_claimed_until; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.refresh_claimed_until IS 'Phase 215 (D-215-04): Timestamp lease for multi-worker atomic refresh locking (WORKER_COUNT=2).';
 
 
 --
@@ -2388,6 +2463,22 @@ ALTER TABLE ONLY public.connector_connections
 
 
 --
+-- Name: connector_tokens connector_tokens_connection_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_connection_id_key UNIQUE (connection_id);
+
+
+--
+-- Name: connector_tokens connector_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: departments departments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3039,6 +3130,20 @@ CREATE INDEX idx_connector_connections_org_id ON public.connector_connections US
 --
 
 CREATE INDEX idx_connector_connections_org_service ON public.connector_connections USING btree (org_id, service_id);
+
+
+--
+-- Name: idx_connector_tokens_connection_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_tokens_connection_id ON public.connector_tokens USING btree (connection_id);
+
+
+--
+-- Name: idx_connector_tokens_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_tokens_expires_at ON public.connector_tokens USING btree (connection_id, expires_at);
 
 
 --
@@ -4183,6 +4288,14 @@ ALTER TABLE ONLY public.connector_connections
 
 ALTER TABLE ONLY public.connector_connections
     ADD CONSTRAINT connector_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_tokens connector_tokens_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.connector_connections(id) ON DELETE CASCADE;
 
 
 --
@@ -5499,6 +5612,12 @@ CREATE POLICY connector_connections_select ON public.connector_connections FOR S
 
 CREATE POLICY connector_connections_update ON public.connector_connections FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
 
+
+--
+-- Name: connector_tokens; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_tokens ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: departments; Type: ROW SECURITY; Schema: public; Owner: -

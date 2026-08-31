@@ -107,7 +107,12 @@ async def get_valid_oauth_token(
     client = supabase or get_supabase()
 
     # 1. Fetch connection details and token row
-    conn_query = client.table("connector_connections").select("id, org_id, service_id, status, config").eq("id", str(connection_id))
+    conn_query = client.table("connector_connections").select(
+        # `oauth_client_secret_ciphertext` is ungranted to `authenticated` (migration
+        # 150); this query runs on the SERVICE-ROLE client, which is the only role
+        # that may name it — the same arrangement `secret_ciphertext` has always had.
+        "id, org_id, service_id, status, config, oauth_client_secret_ciphertext"
+    ).eq("id", str(connection_id))
     if org_id:
         conn_query = conn_query.eq("org_id", str(org_id))
     conn_res = await aexec(conn_query)
@@ -154,7 +159,17 @@ async def get_valid_oauth_token(
     provider: OAuthProvider = "google" if "google" in service_id or "gmail" in service_id else ("microsoft" if "microsoft" in service_id or "onedrive" in service_id else "google")
     config = conn.get("config") or {}
     custom_cid = config.get("custom_client_id")
-    custom_sec = config.get("custom_client_secret")
+    # ⚠ THE SECRET IS NO LONGER IN `config`, AND IT WAS NEVER ACTUALLY THERE. Phase 215
+    # declared `custom_client_secret` on the OAuth config model but nothing ever wrote it,
+    # so this read returned None on every row and silent refresh (OAUTH-02) raised
+    # "OAuth credentials missing" for any connection using a customer-registered app.
+    # It now lives encrypted in `oauth_client_secret_ciphertext` (migration 150), out of a
+    # column every org member can SELECT.
+    custom_sec = conn.get("oauth_client_secret_ciphertext")
+    if custom_sec:
+        custom_sec = decrypt_token_value(custom_sec)
+    else:
+        custom_sec = None
 
     try:
         client_id, client_secret = resolve_client_credentials(provider, custom_cid, custom_sec)

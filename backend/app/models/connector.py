@@ -198,11 +198,32 @@ OAuthProvider = Literal["google", "microsoft", "github"]
 
 
 class OAuthConnectionConfig(_StrictBase):
-    """Configuration facts for an OAuth-authenticated connection (Phase 215)."""
+    """Configuration facts for an OAuth-authenticated connection (Phase 215).
+
+    ⚠ `custom_client_secret` WAS DECLARED HERE AND WAS A CREDENTIAL EXPOSURE. This
+    module's own contract, quoted from migration 116's `COMMENT ON COLUMN`, is that
+    `config` holds *"host, port, base_url, from_address, default_channel, project_key. No
+    token, no password, no API key ever lands here"* — and the header above explains that
+    the per-capability `extra='forbid'` models exist so that "a password key in `config`
+    is UNCONSTRUCTABLE rather than merely discouraged". This model declared one anyway.
+
+    Measured 2026-08-31 against the live database:
+    `has_column_privilege('authenticated', ..., 'config', 'SELECT')` is TRUE while the
+    same call for `secret_ciphertext` is FALSE — so a client secret written here is
+    returned to every member of the org by the ordinary connections list. Same class as
+    CR-01, one column over.
+
+    It now lives in `connector_connections.oauth_client_secret_ciphertext` (migration
+    150), encrypted, and ungranted to `authenticated` exactly as `secret_ciphertext` is.
+
+    ⚠ `custom_client_id` STAYS, and that is not an oversight. An OAuth client id is not a
+    secret: it travels in the authorization URL, through the browser, in the address bar.
+    Protecting it would imply it needed protecting and would make showing an author which
+    application their connection uses cost a decryption round trip.
+    """
 
     provider: OAuthProvider
     custom_client_id: str | None = None
-    custom_client_secret: str | None = None
     scopes: list[str] = Field(default_factory=list)
     redirect_uri: str | None = None
     account_email: str | None = None

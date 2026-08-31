@@ -421,6 +421,101 @@ async def _fetch_connection_row(connection_id: str, org_id: str) -> dict | None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
+# THE BYO-OAUTH APPLICATION SECRET (migration 150)
+# ══════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ IT HAS ITS OWN COLUMN BECAUSE IT USED TO LIVE IN `config`, WHICH EVERY ORG MEMBER CAN
+# READ. Measured 2026-08-31 on the live database:
+# `has_column_privilege('authenticated', 'public.connector_connections', 'config',
+# 'SELECT')` is TRUE, while the same call for `secret_ciphertext` is FALSE. Phase 215
+# declared `custom_client_secret` as a field of the OAuth config model, so a customer's
+# application secret was returned by the ordinary connections list.
+#
+# Both functions run on the SERVICE-ROLE client and take `org_id` with no default, for the
+# reason `resolve_connection` states at length: an optional org scope is the id-only query
+# wearing a disguise.
+
+
+async def store_oauth_client_credentials(
+    connection_id: str,
+    org_id: str,
+    *,
+    client_id: str | None,
+    client_secret: str | None,
+) -> None:
+    """Persist a customer-registered OAuth application, so Connect works a second time.
+
+    ⚠ A BLANK VALUE NEVER OVERWRITES A STORED ONE. The form cannot show a secret back (it
+    is not readable), so every reopen submits an empty field — and treating that as "clear
+    it" would destroy the credential the moment somebody opened the panel to look.
+
+    The id is a plain `config` fact; the secret is encrypted into its own ungranted column.
+    """
+    updates: dict[str, object] = {}
+
+    if client_id and client_id.strip():
+        row = await _fetch_connection_row(connection_id, org_id)
+        if row is None:
+            raise ConnectorNotFound(f"no connection {connection_id}")
+        config = dict(row.get("config") or {})
+        config["custom_client_id"] = client_id.strip()
+        # ⚠ SWEPT ON EVERY WRITE, not only by the migration. A row that still carries the
+        # old plaintext key gets it removed the next time anybody touches this connection,
+        # so the exposure closes without waiting for a deploy of the migration everywhere.
+        config.pop("custom_client_secret", None)
+        updates["config"] = config
+
+    if client_secret and client_secret.strip():
+        from app.services.oauth_service import encrypt_token_value
+
+        updates["oauth_client_secret_ciphertext"] = encrypt_token_value(client_secret.strip())
+
+    if not updates:
+        return
+
+    await aexec(
+        _client(None)
+        .table(_TABLE)
+        .update(updates)
+        .eq("id", connection_id)
+        .eq("org_id", org_id)  # D-14 — the scope. Removing this term is the leak.
+    )
+    logger.info(
+        "connector_service: stored OAuth application credentials for connection %s "
+        "(client_id=%s, secret=%s)",
+        connection_id, bool(client_id), bool(client_secret),
+    )
+
+
+async def read_oauth_client_secret(connection_id: str, org_id: str) -> str | None:
+    """The plaintext application secret, or ``None`` when this connection has none.
+
+    ⚠ `None` IS A REAL ANSWER AND MUST NOT BE MADE INTO AN ERROR. A connection using the
+    install-wide credentials from the environment legitimately has no stored application,
+    and `resolve_client_credentials` falls back to those — so raising here would break the
+    non-BYO path that has always worked.
+    """
+    row = await _fetch_connection_row(connection_id, org_id)
+    if row is None:
+        return None
+    ciphertext = row.get("oauth_client_secret_ciphertext")
+    if not isinstance(ciphertext, str) or not ciphertext:
+        return None
+
+    from app.services.oauth_service import decrypt_token_value
+
+    try:
+        return decrypt_token_value(ciphertext)
+    except Exception:
+        # A credential no configured key can read is ABSENT, not empty. Returning "" would
+        # be sent to the provider as a secret and refused with a confusing message.
+        logger.error(
+            "connector_service: connection %s has an OAuth application secret that no "
+            "configured key can decrypt (fail closed)", connection_id,
+        )
+        return None
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
 # THE RESOLVER (D-14) — ⭐ the headline security gate of Phase 190
 # ══════════════════════════════════════════════════════════════════════════════════════════
 #

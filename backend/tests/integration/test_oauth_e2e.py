@@ -139,7 +139,16 @@ async def test_oauth_claim_refresh_concurrency_two_workers():
         "org_id": org_id,
         "service_id": "google",
         "status": "active",
-        "config": {"custom_client_id": "cid", "custom_client_secret": "csec"},
+        # THE SECRET MOVED OUT OF `config` AND INTO ITS OWN ENCRYPTED COLUMN
+        # (migration 150). `config` is SELECT-granted to `authenticated` while
+        # `oauth_client_secret_ciphertext` is not, so the old shape returned a
+        # customer application secret to every member of the org.
+        #
+        # This fixture asserted the exposed shape and passed, which is why nothing
+        # caught it. The plaintext here is what `decrypt_token_value` returns for a
+        # value that carries no `enc:v1:` envelope, so no cipher key is needed.
+        "config": {"custom_client_id": "cid"},
+        "oauth_client_secret_ciphertext": "csec",
     }
     initial_token_row = {
         "id": "tok-1",
@@ -243,7 +252,16 @@ async def test_oauth_revocation_on_invalid_grant():
         "org_id": org_id,
         "service_id": "google",
         "status": "active",
-        "config": {"custom_client_id": "cid", "custom_client_secret": "csec"},
+        # THE SECRET MOVED OUT OF `config` AND INTO ITS OWN ENCRYPTED COLUMN
+        # (migration 150). `config` is SELECT-granted to `authenticated` while
+        # `oauth_client_secret_ciphertext` is not, so the old shape returned a
+        # customer application secret to every member of the org.
+        #
+        # This fixture asserted the exposed shape and passed, which is why nothing
+        # caught it. The plaintext here is what `decrypt_token_value` returns for a
+        # value that carries no `enc:v1:` envelope, so no cipher key is needed.
+        "config": {"custom_client_id": "cid"},
+        "oauth_client_secret_ciphertext": "csec",
     }
     token_row = {
         "id": "tok-1",

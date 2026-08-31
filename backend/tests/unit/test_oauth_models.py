@@ -46,7 +46,7 @@ def test_oauth_connection_config_valid():
     config = OAuthConnectionConfig(
         provider="google",
         custom_client_id="my-google-app-id",
-        custom_client_secret="my-google-app-secret",
+
         scopes=["drive.readonly", "gmail.send"],
     )
     assert config.provider == "google"
@@ -87,3 +87,30 @@ def test_oauth_authorize_request_and_response():
     )
     assert "https://login.microsoftonline.com" in res.authorization_url
     assert res.state == "signed-state-token-123"
+
+def test_a_client_secret_is_unconstructable_inside_config():
+    """The module's own contract, quoted from migration 116's COMMENT ON COLUMN:
+    "No token, no password, no API key ever lands here". The per-capability
+    `extra='forbid'` models exist so that a password key in `config` is UNCONSTRUCTABLE
+    rather than merely discouraged — and Phase 215 declared one anyway.
+
+    Measured 2026-08-31 on the live database: `config` IS SELECT-granted to
+    `authenticated` while `secret_ciphertext` is not, so a client secret written there
+    was returned to every member of the org by the ordinary connections list. It now
+    lives in `oauth_client_secret_ciphertext` (migration 150), encrypted and ungranted.
+
+    This test is the fence: the model must REFUSE the key, so the exposure cannot come
+    back as a one-line field addition.
+    """
+    import pytest
+    from pydantic import ValidationError
+
+    from app.models.connector import OAuthConnectionConfig
+
+    with pytest.raises(ValidationError):
+        OAuthConnectionConfig(provider="google", custom_client_secret="leaked")
+
+    assert "custom_client_secret" not in OAuthConnectionConfig.model_fields
+    # The id is NOT a secret and deliberately stays: it travels in the authorization URL,
+    # through the browser, in the address bar.
+    assert "custom_client_id" in OAuthConnectionConfig.model_fields

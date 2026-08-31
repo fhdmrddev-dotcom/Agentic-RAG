@@ -571,7 +571,11 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
     secret: "",
     authType: connection.auth_type ?? "static_key",
     customClientId: text("custom_client_id"),
-    customClientSecret: text("custom_client_secret"),
+    // ⚠ ALWAYS BLANK ON HYDRATE, exactly like `secret` two lines up, and for the same
+    // reason: the server never returns it (migration 150 leaves the column ungranted to
+    // `authenticated`). Reading it from `config` used to "work" only because the secret
+    // was sitting there in plaintext where every org member could read it.
+    customClientSecret: "",
     customScopes: text("custom_scopes"),
     status: connection.status ?? "active",
   }
@@ -660,7 +664,18 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
   if (draft.capability === "oauth") {
     const oauthConfig: Record<string, unknown> = {}
     if (draft.customClientId?.trim()) oauthConfig.custom_client_id = draft.customClientId.trim()
-    if (draft.customClientSecret?.trim()) oauthConfig.custom_client_secret = draft.customClientSecret.trim()
+    // ⚠ THE SECRET DOES NOT GO IN `config`, AND SENDING IT HERE IS NOW A 422. `config` is
+    // SELECT-granted to `authenticated` while `secret_ciphertext` is not (measured
+    // 2026-08-31), so a client secret written there was returned to every member of the
+    // org by the ordinary connections list. `OAuthConnectionConfig` is `extra="forbid"`
+    // and no longer declares the key, which makes the exposure unconstructable rather
+    // than merely discouraged — the rule that model's header states for every other
+    // capability and that this one had been exempt from.
+    //
+    // The secret still travels, on the AUTHORIZE call, where the server encrypts it into
+    // `oauth_client_secret_ciphertext` (migration 150). That is also what makes Connect
+    // work a second time: nothing used to persist it, so reopening a saved connection and
+    // pressing Connect asked for the id and secret again.
     return oauthConfig
   }
 

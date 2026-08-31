@@ -818,6 +818,17 @@ async def create_oauth_authorize_url(
     cid = payload.custom_client_id
     csec = payload.custom_client_secret
 
+    # ⚠ THE READ-BACK USED TO BE THE ONLY HALF OF THIS THAT EXISTED, AND NOTHING EVER
+    # WROTE WHAT IT READ. The operator entered a Google client id and secret, pressed
+    # Connect, and was asked for them again — because `configFromDraft` never persisted
+    # them, so this lookup found `config = {"headers": {}}` and
+    # `resolve_client_credentials` raised. Reproduced through the live API on 2026-08-31:
+    # HTTP 422, "OAuth credentials not configured for provider 'google'". Silent refresh
+    # (OAUTH-02) reads the same absent value, so it could not have worked either.
+    #
+    # ⚠ THE SECRET IS READ THROUGH THE SERVICE ROLE AND NEVER THROUGH `supabase`. Its
+    # column is ungranted to `authenticated` (migration 150), which is the point of it
+    # having a column at all — a user-JWT client must not be able to name it.
     if (not cid or not csec) and payload.connection_id:
         try:
             conn_res = await aexec(
@@ -830,9 +841,34 @@ async def create_oauth_authorize_url(
             if conn_res.data:
                 cfg = conn_res.data[0].get("config") or {}
                 cid = cid or cfg.get("custom_client_id")
-                csec = csec or cfg.get("custom_client_secret")
         except Exception:
-            pass
+            logger.warning(
+                "oauth authorize: could not read the stored client id for connection %s",
+                payload.connection_id, exc_info=True,
+            )
+        if not csec:
+            csec = await connector_service.read_oauth_client_secret(
+                str(payload.connection_id), str(active_org)
+            )
+
+    # Persist what the person just typed, so the NEXT Connect and every silent refresh
+    # can find it. Only on the way in, and only when they supplied it: a blank field must
+    # never overwrite a stored credential with nothing.
+    if payload.connection_id and (payload.custom_client_id or payload.custom_client_secret):
+        try:
+            await connector_service.store_oauth_client_credentials(
+                str(payload.connection_id),
+                str(active_org),
+                client_id=payload.custom_client_id,
+                client_secret=payload.custom_client_secret,
+            )
+        except Exception:
+            # The authorization can still proceed on the values in hand; what is lost is
+            # only the ability to do it again without retyping. Saying so beats failing.
+            logger.warning(
+                "oauth authorize: could not persist client credentials for connection %s",
+                payload.connection_id, exc_info=True,
+            )
 
     try:
         auth_url, state = build_authorization_url(

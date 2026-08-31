@@ -74,7 +74,16 @@ async def test_get_valid_oauth_token_expired_triggers_refresh():
             "org_id": "org-1",
             "service_id": "google-drive",
             "status": "active",
-            "config": {"custom_client_id": "cid", "custom_client_secret": "sec"},
+            # THE SECRET MOVED OUT OF `config` AND INTO ITS OWN ENCRYPTED COLUMN
+            # (migration 150). `config` is SELECT-granted to `authenticated` while
+            # `oauth_client_secret_ciphertext` is not, so the old shape returned a
+            # customer application secret to every member of the org.
+            #
+            # This fixture asserted the exposed shape and passed, which is why nothing
+            # caught it. The plaintext here is what `decrypt_token_value` returns for a
+            # value that carries no `enc:v1:` envelope, so no cipher key is needed.
+            "config": {"custom_client_id": "cid"},
+            "oauth_client_secret_ciphertext": "sec",
         }],
         token_data=[{
             "id": "tok-1",
