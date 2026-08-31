@@ -368,8 +368,18 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               REAL resolved `{provider} · {model} · turn N` (message.provider/model
               from the additive enrich); falls back to `turn N` for legacy/no-run
               messages. Rendered as React text children only (T-095.1-03-01). */}
-          <div className="font-mono text-xs text-muted-foreground truncate">
-            {runSub}
+          {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item A5) — KEPT, but as a title.
+                 `anthropic · claude-sonnet-4-5-20250929 · turn 1` is REAL attribution and
+                 the one place a reload can prove which model actually answered — so it is
+                 not deleted. It is also, on almost every card, the composer's own setting
+                 restated in 45 monospace characters. It now shows the model alone, with
+                 the provider and turn on hover: the fact stays reachable, the line stops
+                 being the widest thing on a card whose subject is the run. */}
+          <div
+            className="font-mono text-xs text-muted-foreground truncate"
+            title={runSub}
+          >
+            {message.model || runSub}
           </div>
           {/* ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 2) — the step
                  in flight, said as an identity. `size="chip"` is the sketch's `xs`, which is
@@ -430,26 +440,24 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           aria-label="Expand run details"
         >
           <Bot className="w-4 h-4 text-primary/60 flex-shrink-0" />
-          {/* D-04: same unifiedStepCount as the header + strip — relabeled
-              "N tool calls" → "N steps" per SKETCH-CONSISTENCY (the three
-              sites can never disagree). */}
-          <span>
-            Run · {stepCount} step{stepCount === 1 ? "" : "s"}
-          </span>
-          <span aria-hidden="true">·</span>
+          {/* ── ⚠ NOISE AUDIT 2026-08-31 (operator, items A2 + A3) ──────────────────
+                 This row used to read `Run · 2 steps · ✓ done · 18.3s` while sitting DIRECTLY
+                 BELOW a header already saying `Run · 2 steps` and `18.3s`. Measured in the
+                 running app, a collapsed card read:
+
+                   Run · 2 steps / anthropic · claude-sonnet-4-5 · turn 1 / ⏱ 18.3s / Step 2
+                   Run · 2 steps · ✓ done · 18.3s
+
+                 — the step count three times and the duration twice, in nine lines.
+
+                 ⚠ THE COUNT AND THE DURATION STAY IN THE HEADER, NOT HERE, because the
+                 header is present in BOTH states and this row is collapsed-only. Deleting
+                 the header copy instead would make an expanded run lose its duration
+                 entirely. What this row keeps is the one fact the header cannot carry: the
+                 VERDICT, which is also the reason a person would open it. */}
           <span title={message.runError || undefined}>
             {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
-          {/* D-095.1-05 honesty rule: only show the elapsed segment when there
-              is a TRUE duration (persisted completedAt − startedAt, or a
-              same-session frozen end). A terminal run with no real end-time
-              shows the status word but NO fabricated duration. */}
-          {hasElapsed && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono">{elapsedLabel}</span>
-            </>
-          )}
           <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
         </button>
       )}

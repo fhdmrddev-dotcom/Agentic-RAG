@@ -24,7 +24,18 @@ export const GRANTS_COPY = {
   SEARCH_PLACEHOLDER: (n: number) => `Search ${n} actions`,
   LIST_EMPTY: "No action matches that.",
 
-  OVERRIDDEN_LABEL: "You changed this",
+  // ── ⚠ NOISE AUDIT 2026-08-31 (operator, item C1) ──────────────────────────
+  // `OVERRIDDEN_LABEL` was the words "You changed this", printed on every overridden
+  // row — beside `OVERRIDDEN_RESET` ("Use the default"), which ONLY EXISTS on an
+  // overridden row and therefore already says it. On a 44-action GitHub grant list that
+  // is two controls where one carries the meaning, repeated down the column.
+  //
+  // ⚠ THE FACT IS NOT LOST, ONLY THE SENTENCE. The reset affordance is still rendered
+  // and still only when overridden, so its mere presence carries exactly what the tag
+  // spelled out. A tooltip was tried and REJECTED: `ConnectionGrantsList`'s Invariant 8
+  // forbids `title` attributes outright, because a tooltip is unreachable by touch and
+  // by keyboard — parking meaning there removes it for some readers entirely.
+  OVERRIDDEN_LABEL: "",
   OVERRIDDEN_RESET: "Use the default",
 
   DIRECTION_READS: "Reads",

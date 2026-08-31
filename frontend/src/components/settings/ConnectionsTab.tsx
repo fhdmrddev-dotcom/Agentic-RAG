@@ -826,12 +826,15 @@ function CatalogServiceRow({
           </div>
 
           <div
+            // ⚠ NOISE AUDIT 2026-08-31 (operator, item B2) — the 🔒 that used to open this
+            // cell is GONE from all four render sites. It was on EVERY row, so it
+            // distinguished nothing: a mark that is always present carries no signal and
+            // only competes with the destination it sits beside. The column already means
+            // "where this sends", and the egress binder — not a glyph — is what makes it
+            // true. If a row ever gains an UNVERIFIED destination, mark THAT one.
             data-testid="connections-row-destination"
             className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
           >
-            <span aria-hidden="true" className="flex-none">
-              🔒
-            </span>
             <span className="min-w-0 whitespace-normal break-all">{destination}</span>
           </div>
 
@@ -861,7 +864,13 @@ function CatalogServiceRow({
                 data-testid="connections-row-credential"
                 className="font-mono text-muted-foreground"
               >
-                Not set
+                {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item B3) — was the literal `Not set`.
+                        A row in the catalog that is NOT CONNECTED cannot have a credential;
+                        the State column one cell over already says `Not connected`, so this
+                        said the same thing a second time, in different words, on the same
+                        line. The em dash reads as "nothing here", which is the whole truth
+                        for a service nobody has set up. */}
+                    —
               </span>
             </span>
           </div>
@@ -896,7 +905,6 @@ function CatalogServiceRow({
             data-testid="connections-row-destination"
             className="flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground"
           >
-            <span aria-hidden="true">🔒</span>
             <span className="truncate">{destination}</span>
           </div>
 
@@ -913,7 +921,13 @@ function CatalogServiceRow({
             data-testid="connections-row-credential"
             className="w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground"
           >
-            Not set
+            {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item B3) — was the literal `Not set`.
+                    A row in the catalog that is NOT CONNECTED cannot have a credential;
+                    the State column one cell over already says `Not connected`, so this
+                    said the same thing a second time, in different words, on the same
+                    line. The em dash reads as "nothing here", which is the whole truth
+                    for a service nobody has set up. */}
+            —
           </div>
 
           {/* 5 · State */}
@@ -1114,9 +1128,6 @@ function ConnectionRow({
             data-testid="connections-row-destination"
             className="flex min-w-0 items-start gap-1.5 font-mono text-[11px] text-muted-foreground"
           >
-            <span aria-hidden="true" className="flex-none">
-              🔒
-            </span>
             <span className="min-w-0 whitespace-normal break-all">{facts.join(" · ")}</span>
             {isSlack && (
               <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">
@@ -1181,7 +1192,6 @@ function ConnectionRow({
             data-testid="connections-row-destination"
             className="flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground"
           >
-            <span aria-hidden="true">🔒</span>
             <span className="truncate">{facts.join(" · ")}</span>
             {isSlack && (
               <span className="flex-none rounded border border-border px-1 text-[11px] text-muted-foreground">

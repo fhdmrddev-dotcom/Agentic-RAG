@@ -416,12 +416,25 @@ function ToolEssenceLine({
         // chip; no separate ElapsedTimer span on the active essence row.
         <StatusPill status="running" liveStartedAt={tc.startedAt ?? undefined} />
       ) : (
-        <StatusPill
-          status={pillStatus(tc.status)}
-          duration={
-            tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
-          }
-        />
+        /* ── ⚠ NOISE AUDIT 2026-08-31 (operator, item A6) ────────────────────────
+              A green `DONE` on every row of a run whose own header already says
+              `✓ done` is a column of identical stickers. Measured: a two-step run showed
+              `DONE` twice under one `✓ done`, and the pills were the only colour on the
+              list — so the eye went to the least informative thing on it.
+
+              ⚠ SUCCESS IS THE DEFAULT AND DEFAULTS ARE NOT WORTH SAYING; A FAILURE IS NOT.
+              `failed` and `interrupted` keep their pill, loudly, because those are the
+              rows a person is scanning FOR and the run header cannot say WHICH step it
+              was. The duration goes with the pill on a plain success — it is already in
+              the run's own elapsed, and a per-step timing belongs to the expanded body. */
+        pillStatus(tc.status) !== "done" && (
+          <StatusPill
+            status={pillStatus(tc.status)}
+            duration={
+              tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
+            }
+          />
+        )
       )}
       <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
     </button>

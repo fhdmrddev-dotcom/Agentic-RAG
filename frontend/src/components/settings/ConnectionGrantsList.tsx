@@ -256,22 +256,28 @@ function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyH
                       </span>
                     )}
 
-                    {/* Override Tag & Reset Link */}
-                    {isOverridden && (
-                      <>
-                        <span className="tag mine rounded border border-primary/45 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                          {GRANTS_COPY.OVERRIDDEN_LABEL}
-                        </span>
-                        {!readOnly && grantsArePersisted && (
-                          <button
-                            type="button"
-                            onClick={() => onResetToolGrant(tool.name)}
-                            className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground cursor-pointer"
-                          >
-                            {GRANTS_COPY.OVERRIDDEN_RESET}
-                          </button>
-                        )}
-                      </>
+                    {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item C1) — the "You changed
+                        this" TAG is gone. It sat beside a reset link that only ever
+                        appears on an overridden row, so the link already carried the
+                        fact; down a 44-action list that was two controls where one means
+                        something.
+
+                        ⚠ AND NO `title` REPLACES IT. The first attempt put the sentence on
+                        a tooltip and went RED against this file's own Invariant 8 — "zero
+                        [title] attributes in the rendered output" — which exists because a
+                        tooltip is unreachable by touch and by keyboard, so meaning parked
+                        there is meaning removed for some people. The link's own words are
+                        the explanation: a control that says "Use the default" and appears
+                        only when you are not on it needs no second sentence. */}
+                    {isOverridden && !readOnly && grantsArePersisted && (
+                      <button
+                        type="button"
+                        onClick={() => onResetToolGrant(tool.name)}
+                        data-testid="grant-reset"
+                        className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground cursor-pointer"
+                      >
+                        {GRANTS_COPY.OVERRIDDEN_RESET}
+                      </button>
                     )}
                   </div>
 

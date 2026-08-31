@@ -196,8 +196,15 @@ describe("RunCard — D-04 model attribution (run-sub)", () => {
       />,
     )
     const card = screen.getByTestId("run-card")
-    expect(card.textContent).toContain("google · gemini-3.5-flash")
-    expect(card.textContent).toContain("turn 1")
+    // ⚠ NOISE AUDIT 2026-08-31 (operator, item A5). The VISIBLE text is the model alone;
+    // the full `{provider} · {model} · turn N` moved to the element's `title`. The fact
+    // this case guards — that real attribution is present and reachable — is unchanged.
+    expect(card.textContent).toContain("gemini-3.5-flash")
+    const sub = Array.from(card.querySelectorAll("div")).find(
+      (d) => /turn \d+/.test(d.getAttribute("title") ?? ""),
+    )!
+    expect(sub.getAttribute("title")).toContain("google · gemini-3.5-flash")
+    expect(sub.getAttribute("title")).toContain("turn 1")
   })
 
   it("(f) provider/model absent → run-sub is just `turn N` (graceful legacy)", () => {

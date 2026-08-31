@@ -359,9 +359,25 @@ export function usageCountsFrom(workflows: PublishedWorkflow[]): Record<string, 
   return counts
 }
 
-/** `N steps` — and at zero, the honest reading of a caller-scoped count. */
+/** `N steps` — and NOTHING at zero.
+ *
+ * ── ⚠ NOISE AUDIT 2026-08-31 (operator, item B1) ─────────────────────────────
+ * This returned the words `none you can see`, and on this install SEVEN consecutive rows
+ * said exactly that — one identical sentence per connected service, in a column whose
+ * every value was the same. Prose repeated on every row is read once and then never
+ * again, which makes it worse than blank: it occupies the place a real value would go.
+ *
+ * ⚠ THE SCOPING CAVEAT IS NOT LOST, and that is the only reason this can be deleted.
+ * `CONNECTIONS_USED_BY_SCOPE_NOTE` states it ONCE beneath the table — *"counts published
+ * workflow steps you can see; a colleague's published workflow is not counted here"* —
+ * which is where a caveat about a whole column belongs. The per-row echo of it was the
+ * same fact said eight times.
+ *
+ * ⚠ AND EMPTY IS NOT A LIE HERE. The column reads `Used by`; a blank cell under it says
+ * "by nothing", which is precisely what a zero count means. Returning "" rather than a
+ * dash keeps the row quiet instead of drawing the eye to an absence. */
 export function usedByLabel(count: number): string {
-  if (count <= 0) return "none you can see"
+  if (count <= 0) return ""
   return `${count} ${count === 1 ? "step" : "steps"}`
 }
 
@@ -414,7 +430,15 @@ export function credentialLabel(
  * does not exist — one word standing in for two facts, which is the `runFacts.ts` CR-01 /
  * `DecisionsList` D-20 defect for the fifth recorded time on this codebase.
  */
-export const CREDENTIAL_NO_CHECK_FOR_KIND = "no check for this kind"
+// ⚠ NOISE AUDIT 2026-08-31 (operator, item B4). Was `no check for this kind`. The
+// distinction the block above defends — *nobody has checked it* vs *it cannot be checked*
+// — is real and is KEPT; what changed is that it stops being said in words that describe
+// OUR implementation ("this kind" is a shape in our code, not a thing the reader has).
+// An em dash reads as "nothing to report here", which is the true and complete meaning
+// for a row whose credential simply has no check path, and the tooltip carries the rest.
+export const CREDENTIAL_NO_CHECK_FOR_KIND = "\u2014"
+export const CREDENTIAL_NO_CHECK_FOR_KIND_TITLE =
+  "This kind of connection has no credential check to run."
 
 /**
  * The credential cell's reading, by SHAPE.

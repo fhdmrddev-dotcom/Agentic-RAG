@@ -54,13 +54,18 @@ describe("099-08 per-thread composer drafts", () => {
     fireEvent.change(textarea(), { target: { value: "send me" } })
     fireEvent.keyDown(textarea(), { key: "Enter" })
     // ⚠ THE SECOND ARGUMENT IS PHASE 216's, and it is `undefined` rather than absent:
-    // `onSend(trimmed, activeConnectorIds.length > 0 ? activeConnectorIds : undefined)`.
+    // `onSend(trimmed, activeConnectorIds)` — ⚠ CORRECTED 2026-08-31. It used to read
+// `ids.length > 0 ? ids : undefined`, and that `undefined` reached a backend arm that
+// treated ABSENT as EVERY enabled connection: selecting nothing asked for everything.
+// An empty selection is now sent AS an empty array, and these cases assert that.
+// ⚠ They went red at the fix and were not noticed for hours, because this suite is in
+// neither `vitest-count-gate` knob — the third chat suite found in that state today.
     // `toHaveBeenCalledWith('x')` compares the whole argument LIST, so a call carrying a
     // trailing `undefined` does not match a one-argument expectation — which is why these
     // two cases have been red since that phase, over a change that has nothing to do with
     // drafts. Asserted with the second argument named, so a future third one fails loudly
     // rather than silently.
-    expect(onSend).toHaveBeenCalledWith("send me", undefined)
+    expect(onSend).toHaveBeenCalledWith("send me", [])
     expect(textarea().value).toBe("")
 
     // away and back — no resurrected draft
@@ -102,7 +107,7 @@ describe("099-08 per-thread composer drafts", () => {
     // Type + send → the box is cleared synchronously by handleSend.
     fireEvent.change(textarea(), { target: { value: "dropped message" } })
     fireEvent.keyDown(textarea(), { key: "Enter" })
-    expect(onSend).toHaveBeenCalledWith("dropped message", undefined)
+    expect(onSend).toHaveBeenCalledWith("dropped message", [])
     expect(textarea().value).toBe("")
 
     // The send-drop recovery restores the stashed draft through the prefill seam.

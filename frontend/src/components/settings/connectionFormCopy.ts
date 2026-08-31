@@ -30,6 +30,8 @@
  * `GovernanceSection.tsx:10-17` idiom). A sentence that lives inline inside JSX is a
  * sentence nobody can test for drift.
  */
+import { CONNECTIONS_NON_ADMIN_NOTE } from "./connectionsCopy"
+
 import type {
   ConnectorCapability,
   ConnectorConnection,
@@ -965,7 +967,10 @@ export const ORG_SHARED_FALLBACK_NAME = "your organisation"
 /** U-02. The same sentence the table's header carries, deliberately — one fact, one
  *  wording, two places a person can meet it. */
 export const PANEL_NON_ADMIN_NOTE =
-  "Only an organisation admin can add or change a connection. You can bind an existing one to a workflow step."
+  // ⚠ NOISE AUDIT 2026-08-31 (operator, item B5) — the SAME sentence lives in
+  // `connectionsCopy.ts`, which is the table's copy table. Two spellings of one rule is
+  // how they drift; this one is re-exported so there is exactly one string to edit.
+  CONNECTIONS_NON_ADMIN_NOTE
 
 export const PANEL_OFF_GLYPH = "⛨"
 export const PANEL_OFF_HEADING = "Live sending is off for this platform"

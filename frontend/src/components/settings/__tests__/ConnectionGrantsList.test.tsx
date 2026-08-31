@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ConnectionGrantsList } from "../ConnectionGrantsList"
@@ -184,7 +184,16 @@ describe("ConnectionGrantsList Component (BUILD-CONTRACT §3 Invariants)", () =>
     expect(elementsWithTitle).toHaveLength(0)
   })
 
-  it("Invariant 10: every overridden row carries the words 'You changed this'", () => {
+  it("Invariant 10: an overridden row offers a RESET, and an inherited one does not", () => {
+    // ⚠ NOISE AUDIT 2026-08-31 (operator, item C1). This asserted the words "You
+    // changed this" on every overridden row — a tag printed beside a reset link that
+    // ONLY EXISTS on an overridden row, so the link already carried the fact. Down a
+    // 44-action list that was two controls where one means something.
+    //
+    // ⚠ THE INVARIANT ITSELF SURVIVES, and it is the stronger half: an overridden row
+    // must be DISTINGUISHABLE from an inherited one. That is now asserted on the
+    // affordance rather than on a sentence — a control a person can act on, not words
+    // they must read. A tooltip was tried and rejected: Invariant 8 forbids `title`.
     render(
       <ConnectionGrantsList
         tools={mockTools}
@@ -199,8 +208,9 @@ describe("ConnectionGrantsList Component (BUILD-CONTRACT §3 Invariants)", () =>
     const overriddenRow = screen.getByTestId("action-row-read_repository_metadata")
     const inheritedRow = screen.getByTestId("action-row-search_code")
 
-    expect(overriddenRow).toHaveTextContent(GRANTS_COPY.OVERRIDDEN_LABEL)
-    expect(inheritedRow).not.toHaveTextContent(GRANTS_COPY.OVERRIDDEN_LABEL)
+    // The affordance, not a sentence: a control a person can act on.
+    expect(within(overriddenRow).getByTestId("grant-reset")).toBeTruthy()
+    expect(within(inheritedRow).queryByTestId("grant-reset")).toBeNull()
   })
 
   it("search filtering filters rows and displays empty state when no tool matches", async () => {

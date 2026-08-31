@@ -95,8 +95,17 @@ export function RunStatusStrip({
         </>
       )}
 
-      {/* Step N — the D-04 unifiedStepCount, identical to the header/collapsed-row */}
-      <span>Step {stepCount}</span>
+      {/* ── ⚠ NOISE AUDIT 2026-08-31 (operator, item A4) ──────────────────────────
+             `Step N` is PROGRESS, and progress is only information while something is
+             progressing. On a finished run it restated a number already in the title
+             (`Run · 2 steps`), in the collapsed row, and — once expanded — beside every
+             numbered step in the list. Four spellings of one integer.
+
+             ⚠ IT IS GATED ON `activityVerb`, NOT ON A NEW PROP. That verb is non-null
+             exactly while the run is live (`RunCard` passes `null` the moment it is
+             terminal), so this reads "while running" from the value already here rather
+             than adding a second source that could disagree with the first. */}
+      {activityVerb && <span>Step {stepCount}</span>}
 
       {/* activity verb — only while live; the bouncing dot signals motion */}
       {activityVerb && (

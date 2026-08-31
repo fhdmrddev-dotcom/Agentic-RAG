@@ -213,6 +213,7 @@ const BASELINE = {
   "ChatArea.model.test.tsx": 2,
   "MessageInput.connectors.test.tsx": 5,
   "ToolApproval.test.tsx": 15,
+  "MessageInputDrafts.test.tsx": 5,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -4061,6 +4062,11 @@ const TARGETS = [
   // neither knob. The three-button card writes a real grant; a fence the gate does not
   // execute would not notice that button losing its wiring.
   "src/components/chat/__tests__/ToolApproval.test.tsx",
+  // ⚠ ADOPTED 2026-08-31 (noise audit). Found RED for hours after the connector-toggle
+  // fix changed `onSend`'s second argument from `undefined` to `[]` — and nobody saw it,
+  // because this suite was in NEITHER knob. The THIRD chat suite found in that state on
+  // one day. TARGETS decides what runs; BASELINE decides what is guarded.
+  "src/components/chat/__tests__/MessageInputDrafts.test.tsx",
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT as its BASELINE pin above ─────────
   //
   // The ELEVENTH occurrence of the two-knob trap this script documents. `src/lib/` is reached
