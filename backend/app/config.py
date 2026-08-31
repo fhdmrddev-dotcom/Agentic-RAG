@@ -1262,6 +1262,21 @@ class Settings(BaseSettings):
     langsmith_tracing: str = "true"
 
     frontend_url: str = "http://localhost:5173"
+    #: Where a THIRD PARTY reaches this API from a browser. Used for one thing: the OAuth
+    #: redirect_uri.
+    #:
+    #: ⚠ IT CANNOT BE `frontend_url`, AND THAT IS THE DEFECT THIS CLOSES. Phase 215 built
+    #: the redirect as `{frontend_url}/api/connectors/oauth/callback`, but the handler is a
+    #: BACKEND route (`GET /connectors/oauth/callback`) and there is no dev proxy and no
+    #: router in the app (SEED-185). Measured 2026-08-31: that URL answers **200** — Vite's
+    #: SPA fallback serving index.html — so Google redirected the person to a page that
+    #: quietly did nothing with the `code`, and the connection never completed.
+    #:
+    #: ⚠ CHANGING THIS MEANS UPDATING THE AUTHORISED REDIRECT URI IN THE PROVIDER CONSOLE.
+    #: The value here and the one registered with Google/Microsoft must match EXACTLY, and
+    #: it is sent twice — on authorize and again on the token exchange — where a mismatch
+    #: is `redirect_uri_mismatch` rather than anything that names this setting.
+    backend_public_url: str = "http://localhost:8000"
 
     # Phase 167 (INV-01, D-167-02) — env-switched invitation email delivery. The DEFAULT is
     # ``none``: the app just LOGS the invite link (offline/self-hosted safe — no email service

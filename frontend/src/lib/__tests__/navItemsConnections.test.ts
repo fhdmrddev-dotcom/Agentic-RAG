@@ -51,3 +51,17 @@ describe("connections reachability for a non-operator", () => {
     expect(visible.some((i) => i.view === "connections")).toBe(true)
   })
 })
+
+describe("a member can reach the skills home", () => {
+  it("leaves the Skills entry standing when every governed feature is hidden", () => {
+    // ⚠ `skill_studio` gates api/evals.py, api/skill_test_cases.py and api/skill_tuner.py.
+    // `api/skills.py` — create, upload, edit, all twelve routes — is UNGATED, so a member
+    // has always been allowed to make a skill and has never had a door to it.
+    expect(visibleNavItems(MEMBER).some((i) => i.view === "skills")).toBe(true)
+  })
+
+  it("does not put the Studio in the primary nav at all", () => {
+    // It is a separate ActiveView reached from a skill, and it stays gated at its own API.
+    expect(NAV_ITEMS.some((i) => i.view === "skill-studio")).toBe(false)
+  })
+})

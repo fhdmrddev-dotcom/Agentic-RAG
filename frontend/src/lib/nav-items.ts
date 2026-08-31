@@ -56,10 +56,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // like a thread. If connections ever need governing they get their OWN feature key —
   // never `model_management`, whose audience is about models.
   { view: "connections", icon: Plug, label: "Connections" },
-  // Phase 148 (VIS-01): governed by `skill_studio` (Operators-only on the day-one
-  // map) — vanishes for a non-operator; the Studio's evals/triggering/versions are
-  // API-gated (148-05), so hiding the entry avoids a dead-click.
-  { view: "skills", icon: Zap, label: "Skills", feature: "skill_studio" },
+  // ⚠ UNGOVERNED SINCE 2026-08-31, AND THE TAG IT LOST WAS GATING THE WRONG THING.
+  //
+  // The note this replaces is preserved because its reasoning was sound and its SCOPE was
+  // not: *"governed by `skill_studio` (Operators-only) — the Studio's evals/triggering/
+  // versions are API-gated, so hiding the entry avoids a dead-click."* True of the STUDIO.
+  // But `skill_studio` gates `api/evals.py`, `api/skill_test_cases.py` and
+  // `api/skill_tuner.py` — and `api/skills.py`, all TWELVE routes of it, is UNGATED. So
+  // creating, uploading and editing a skill has always been open to a member at the API
+  // while the only door to it was hidden from them.
+  //
+  // The operator put it plainly: *"skills, we should have it absent? At least to upload a
+  // skill or create a skill."* Same shape as the Settings entry two lines down: one
+  // feature key gating a whole HOME whose scope grew past the feature.
+  //
+  // ⚠ The Studio itself stays gated where it already is — at its own API, and at the
+  // entry point on `SkillsPage` (`onOpenStudio`), which is a separate `ActiveView` and is
+  // deliberately NOT in this array.
+  { view: "skills", icon: Zap, label: "Skills" },
   // Phase 148 (VIS-01): governed by `model_management` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the chat model picker (GET /settings/providers)
   // is an ungated Run carve-out (148-05), so chat/run never breaks by hiding Settings.

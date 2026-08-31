@@ -813,7 +813,10 @@ async def create_oauth_authorize_url(
     from app.config import settings
 
     frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
-    redirect_uri = f"{frontend_url}/api/connectors/oauth/callback"
+    # ⚠ THE BACKEND, NOT THE FRONTEND. This route is `GET /connectors/oauth/callback` on
+    # THIS service; the frontend has no router and no dev proxy, so the old value pointed
+    # Google at Vite's SPA fallback, which answered 200 and did nothing with the code.
+    redirect_uri = f"{settings.backend_public_url.rstrip('/')}/connectors/oauth/callback"
 
     cid = payload.custom_client_id
     csec = payload.custom_client_secret
@@ -908,10 +911,14 @@ async def oauth_callback(
 
     if error:
         logger.warning("OAuth authorization returned error: %s (%s)", error, error_description)
-        return RedirectResponse(url=f"{frontend_url}/settings/connections?error={error}")
+        # ⚠ `/settings/connections` WAS NOT A ROUTE EITHER — this app navigates by
+        # `useState<ActiveView>` and has no router (SEED-185), so every landing below used
+        # to drop the person on the SPA fallback with their result in a URL nothing reads.
+        # The app root plus a query the shell can act on is the honest target.
+        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error={error}")
 
     if not code or not state:
-        return RedirectResponse(url=f"{frontend_url}/settings/connections?error=missing_code_or_state")
+        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=missing_code_or_state")
 
     try:
         state_data = verify_oauth_state(state)
@@ -927,7 +934,9 @@ async def oauth_callback(
             custom_client_secret=custom_client_secret,
         )
 
-        redirect_uri = f"{frontend_url}/api/connectors/oauth/callback"
+        # ⚠ MUST BE BYTE-IDENTICAL TO THE ONE SENT ON AUTHORIZE. The provider compares them
+        # and answers `redirect_uri_mismatch`, which names neither setting.
+        redirect_uri = f"{settings.backend_public_url.rstrip('/')}/connectors/oauth/callback"
         token_data = await exchange_code_for_tokens(
             provider=provider,
             code=code,
@@ -969,14 +978,14 @@ async def oauth_callback(
                     supabase=srv_client,
                 )
 
-        target_url = f"{frontend_url}/settings/connections?connected=true"
+        target_url = f"{frontend_url}/?connections=1&oauth_connected=1"
         if connection_id:
             target_url += f"&id={connection_id}"
         return RedirectResponse(url=target_url)
 
     except Exception as exc:
         logger.exception("OAuth callback processing failed: %s", exc)
-        return RedirectResponse(url=f"{frontend_url}/settings/connections?error=token_exchange_failed")
+        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=token_exchange_failed")
 
 
 @router.get(
