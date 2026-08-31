@@ -41,6 +41,45 @@ async def list_cloud_files(
     }
 
 
+# ── The one safe half of a Google error body ───────────────────────────────────────────
+#
+# ⚠ THE BODY STAYS UNLOGGED AND UNQUOTED — that rule is not being relaxed. A Drive error
+# body echoes the `q` parameter, which carries whatever the person searched for, so
+# neither `error.message` nor the raw text may travel. But Google also returns two
+# machine-readable ENUMS beside it — `error.status` (`PERMISSION_DENIED`) and
+# `error.errors[].reason` (`accessNotConfigured`, `authError`, `insufficientPermissions`,
+# `userRateLimitExceeded`, `notFound`) — and those are a closed vocabulary that can never
+# contain user text.
+#
+# ⚠ AND THE DIFFERENCE IS NOT COSMETIC. Measured 2026-08-31: with the Drive API disabled
+# in the Cloud project, a real chat run reached the model as bare `HTTP 403`, and the
+# model told the operator to "reconnect Google Workspace with the correct scopes" — the
+# scopes were already granted and correct, and re-consenting could never have fixed it.
+# `accessNotConfigured` is the word that makes that answer impossible to give.
+_SAFE_GOOGLE_ERROR_FIELDS = ("status", "reason")
+
+
+def _google_error_reason(body: bytes | str | None) -> str:
+    """Return `` (reason)`` built only from Google's enum fields, or `""`.
+
+    Never raises: a diagnostic that can fail is a second fault on an existing one.
+    """
+    try:
+        data = jsonlib.loads(body) if body else {}
+        err = data.get("error") or {}
+        parts: list[str] = []
+        status = err.get("status")
+        if isinstance(status, str) and status.replace("_", "").isalnum():
+            parts.append(status)
+        for entry in err.get("errors") or []:
+            reason = (entry or {}).get("reason") if isinstance(entry, dict) else None
+            if isinstance(reason, str) and reason.isalnum() and reason not in parts:
+                parts.append(reason)
+        return f" ({' / '.join(parts)})" if parts else ""
+    except Exception:  # noqa: BLE001 — a best-effort read of a body we already distrust
+        return ""
+
+
 async def _list_google_drive_files(
     connection_id: str | UUID,
     query: str | None = None,
@@ -87,8 +126,11 @@ async def _list_google_drive_files(
     if resp.status_code != 200:
         # ⚠ THE BODY IS NOT LOGGED. It used to be, and a Drive error body echoes the query
         # — which carries whatever the person searched for.
-        logger.error("Google Drive list files failed (%s)", resp.status_code)
-        raise ValueError(f"Failed to list Google Drive files: HTTP {resp.status_code}")
+        reason = _google_error_reason(resp.body)
+        logger.error("Google Drive list files failed (%s)%s", resp.status_code, reason)
+        raise ValueError(
+            f"Failed to list Google Drive files: HTTP {resp.status_code}{reason}"
+        )
 
     data = jsonlib.loads(resp.body)
     files = []
@@ -143,7 +185,10 @@ async def _fetch_google_drive_file(
         timeout=30.0, max_bytes=64 * 1024,
     )
     if meta_resp.status_code != 200:
-        raise ValueError(f"Failed to fetch file metadata: HTTP {meta_resp.status_code}")
+        raise ValueError(
+            "Failed to fetch file metadata: HTTP "
+            f"{meta_resp.status_code}{_google_error_reason(meta_resp.body)}"
+        )
     meta = jsonlib.loads(meta_resp.body)
     filename = meta.get("name", f"file_{file_id}")
     mime_type = meta.get("mimeType", "application/octet-stream")
@@ -161,7 +206,10 @@ async def _fetch_google_drive_file(
             headers=headers, timeout=30.0, max_bytes=max_bytes,
         )
         if export_resp.status_code != 200:
-            raise ValueError(f"Failed to export {kind}: HTTP {export_resp.status_code}")
+            raise ValueError(
+                f"Failed to export {kind}: HTTP "
+                f"{export_resp.status_code}{_google_error_reason(export_resp.body)}"
+            )
         return f"{filename}.pdf", export_resp.body, "application/pdf"
 
     dl_resp = await send_pinned_http(
@@ -170,5 +218,8 @@ async def _fetch_google_drive_file(
         headers=headers, timeout=30.0, max_bytes=max_bytes,
     )
     if dl_resp.status_code != 200:
-        raise ValueError(f"Failed to download file content: HTTP {dl_resp.status_code}")
+        raise ValueError(
+            "Failed to download file content: HTTP "
+            f"{dl_resp.status_code}{_google_error_reason(dl_resp.body)}"
+        )
     return filename, dl_resp.body, mime_type

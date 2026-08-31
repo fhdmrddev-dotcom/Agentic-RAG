@@ -4330,39 +4330,61 @@ async def _handle_connector_chat_tool(
     from app.services.connector_service import list_connections
     from app.services.connectors.grants import resolve_effective_posture
     from app.services.connectors.chat_tools import wrap_untrusted_tool_result
+    from app.services.connectors.org_scope import resolve_connector_org
 
     user_id = (ctx.current_user or {}).get("id")
     if not user_id:
         return ToolResult(result=f"Cannot execute {action_tool_name}: no authenticated user in context.")
 
-    org_id = (ctx.current_user or {}).get("org_id")
-    if not org_id and getattr(ctx, "supabase", None):
-        try:
-            org_res = await aexec(
-                ctx.supabase.table("org_members")
-                .select("org_id")
-                .eq("user_id", str(user_id))
-                .order("created_at")
-                .limit(1)
-            )
-            if org_res and hasattr(org_res, "data") and isinstance(org_res.data, list) and len(org_res.data) > 0:
-                org_id = org_res.data[0].get("org_id")
-        except Exception:
-            pass
-
-    if not org_id:
-        org_id = str(user_id)
+    # ── ⚠ THREE DIFFERENT FAULTS USED TO ARRIVE AS ONE INNOCENT SENTENCE ──────────────
+    # This function resolved the org with a swallowed `except: pass` followed by
+    # `org_id = str(user_id)`, and then listed connections under `except: conns = []`.
+    # A user id matches no `connector_connections.org_id`, so an RLS denial, a dropped
+    # connection, an org-less account and a genuinely absent connection ALL ended at
+    # `"Connector service 'x' is not connected or not found."` — a refusal that names
+    # the wrong cause is worse than one that says it does not know, because the model
+    # then relays the wrong remedy to the person. (Measured 2026-08-31 one level up:
+    # given only `HTTP 403`, the model told the operator to re-consent scopes that were
+    # already granted.) Each arm below now says which one it was.
+    scope = await resolve_connector_org(ctx.current_user, getattr(ctx, "supabase", None))
+    if not scope.ok:
+        return ToolResult(result=json.dumps({
+            "error": "connector_scope_unresolved",
+            "tool": action_tool_name,
+            "message": (
+                f"{action_tool_name} was NOT performed: {scope.problem}. This is not the "
+                f"same as {service_id!r} being disconnected — the connection was never "
+                "looked up."
+            ),
+        }))
+    org_id = scope.org_id
 
     # Look up connection matching service_id
     try:
         conns = await list_connections(org_id=str(org_id), supabase=ctx.supabase)
-    except Exception:
-        conns = []
+    except Exception as exc:  # noqa: BLE001 — a DB/RLS boundary
+        # ⚠ NOT `conns = []`. An unreadable list is not an empty one, and only this arm
+        # can tell them apart.
+        logger.warning(
+            "connector chat tool %s: listing connections for org %s failed",
+            action_tool_name, org_id, exc_info=True,
+        )
+        return ToolResult(result=json.dumps({
+            "error": "connector_lookup_failed",
+            "tool": action_tool_name,
+            "message": (
+                f"{action_tool_name} was NOT performed: your connected services could "
+                f"not be read ({exc.__class__.__name__}). {service_id!r} may well be "
+                "connected — this is a lookup failure, not a missing connection."
+            ),
+        }))
     matched_conn = next(
         (c for c in conns if (c.service_id == service_id or (c.name and c.name.lower().replace(" ", "_") == service_id.lower()))),
         None,
     )
     if not matched_conn:
+        # Reached ONLY after a successful read of a resolved org — so this sentence is
+        # now true when it is said, which it was not before.
         return ToolResult(result=f"Connector service '{service_id}' is not connected or not found.")
 
     posture = resolve_effective_posture(matched_conn, action_tool_name)

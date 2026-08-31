@@ -112,6 +112,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _NoConnectorScope(Exception):
+    """This chat turn has no resolvable org, so no connector tool can be offered.
+
+    ⚠ A CONTROL-FLOW SIGNAL, NOT A FAULT — and it is caught SEPARATELY from the broad
+    handler below on purpose. Folded into that handler it would be logged as "Failed to
+    wire connector tools", which is the same kind of lie this whole change removes: not
+    being in an org is a fact about the account, not a failure of the wiring. The reason
+    is already logged, in words, at the raise site.
+    """
+
+
+
 # XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
 # DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
 # the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
@@ -1465,26 +1477,22 @@ async def run_agent_loop(
         try:
             from app.services.connector_service import list_connections
             from app.services.connectors.chat_tools import build_chat_tools_for_connectors
+            from app.services.connectors.org_scope import resolve_connector_org
             from app.services.openai_service import get_tools
 
-            user_id_str = str(current_user["id"])
-            org_id = current_user.get("org_id")
-            if not org_id and getattr(supabase, "table", None):
-                try:
-                    org_res = await aexec(
-                        supabase.table("org_members")
-                        .select("org_id")
-                        .eq("user_id", user_id_str)
-                        .order("created_at")
-                        .limit(1)
-                    )
-                    if org_res and hasattr(org_res, "data") and isinstance(org_res.data, list) and len(org_res.data) > 0:
-                        org_id = org_res.data[0].get("org_id")
-                except Exception:
-                    pass
-
-            if not org_id:
-                org_id = user_id_str
+            # ⚠ NO `org_id = user_id` FALLBACK ANY MORE (2026-08-31). This block used to
+            # swallow the membership read's exception and then substitute the USER id for
+            # the ORG id — which matches no connection row, so a read failure and an
+            # org-less account both arrived as "this chat has no connected services".
+            # `resolve_connector_org` returns the fault AS a fault; the loop's answer to
+            # one is to offer the built-in tools and say why in the log, never to guess.
+            scope = await resolve_connector_org(current_user, supabase)
+            if not scope.ok:
+                logger.warning(
+                    "Connector tools are not offered in this chat: %s", scope.problem,
+                )
+                raise _NoConnectorScope(scope.problem or "no organisation scope")
+            org_id = scope.org_id
 
             try:
                 conns = await list_connections(org_id=str(org_id), supabase=supabase)
@@ -1533,6 +1541,10 @@ async def run_agent_loop(
                             + "\n".join(service_lines)
                         )
                         active_system_prompt = active_system_prompt + connector_note
+        except _NoConnectorScope:
+            # Already logged with its reason at the raise site. Chat continues with the
+            # built-in tools, which is the correct outcome — just not a silent one.
+            pass
         except Exception:
             logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
 

@@ -6614,9 +6614,29 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 ---
 
+### `backend/app/services/agent_loop.py`
+
+**Triple derived 2026-08-31: `39 / 20 / 3154` — G-5: ⚠ FIRES.** ⚠ **Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE, at twenty phases** — the same failure `api.ts` (97 phases), `config.py` (42) and `ChatArea.tsx` (28) each suffered: a hot file with no row is permanently invisible to its own guardrail, and G-5 could never have fired on it at any count. Row added by the 2026-08-31 honest-refusal pass, the first change to touch its connector block since Phase 216.
+
+**What 2026-08-31 did:** the connector-tool wiring block no longer resolves the org itself. It calls `connectors/org_scope.resolve_connector_org` and, on an unresolved scope, raises the module-local `_NoConnectorScope` — caught in its OWN `except` arm, ahead of the broad one, so "you are in no org" is not logged as "Failed to wire connector tools". The `org_id = user_id_str` fallback is **deleted**, not moved.
+
+**What binds this file:**
+
+1. ⚠ **THE CONNECTOR BLOCK'S ONLY PRODUCTION CALL SITE OF `build_chat_tools_for_connectors` IS HERE**, which is why `test_216_connector_wiring_reachable.py` exists as an AST fence: commit `c0a09c728` moved the whole block inside an `except` arm and **6929 green tests could not see it**, because every Phase 216 test calls the helper directly. Any edit that changes this block's nesting must keep that fence green.
+2. **`_NoConnectorScope` is control flow, never a fault.** Folding it into the broad `except Exception` would restore the exact class of lie this change removed — a fact about the account reported as a failure of the wiring.
+3. **A chat turn carries no `X-Org-Id`.** The REST surface resolves the active org from that header (`get_active_org_id`); streaming chat cannot, so it takes the caller's OLDEST membership. An account in two orgs therefore sees only one org's connections in chat, silently. `OrgScope.membership_count` makes that legible; **choosing differently is a product decision and was not taken here.**
+
+**Named seam (recorded, not taken):** the B1 setup block — folder scope, prompt selection, skills/memory injection, disabled-tools, and now connector wiring — is five unrelated concerns assembling one system prompt. The connector wiring is the cleanest first extraction: it already has a leaf (`org_scope`) and a fence.
+
+---
+
 ### `backend/app/services/tool_dispatcher.py`
 
-**Triple re-derived 2026-08-30 (Phase 217.1 close): `67 / 28 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase. (The `66 / 29` figure counts `260529`/`260705` as phases; the recipe subtracts six-digit quick-task buckets, so the corrected count is 28.)
+**Triple re-derived 2026-08-31: `72 / 29 / 4624` — G-5: ⚠ FIRES.** ⚠ The row read `67 / 28 / 4336` one day earlier; the file is being edited faster than its row is re-derived, which is this ledger's own recurring finding rather than a new one.
+
+**What 2026-08-31 did (the honest-refusal pass, `_handle_connector_chat_tool`):** `resolve_connector_org` replaces a swallowed `except: pass` + `org_id = str(user_id)`, and `except: conns = []` becomes a named `connector_lookup_failed`. Three faults that shared one innocent sentence now each say which they were. **Honoured by construction** — the org resolution EXTRACTED to `connectors/org_scope.py` (a new leaf, 124 L) rather than growing here; the net addition is two refusal literals. Guarded by `tests/unit/test_connector_org_scope_and_refusals.py`, **5 of whose 12 cases were driven RED against HEAD** before the fix.
+
+**Triple as of the 217.1 close: `67 / 28 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase. (The `66 / 29` figure counts `260529`/`260705` as phases; the recipe subtracts six-digit quick-task buckets, so the corrected count is 28.)
 
 **What 217.1-11 did (BE-4 + BE-5):**
 1. **BE-4 — the error-path `search.query` audit write.** `_handle_search_documents`'s `except` block previously returned before any audit write, so a provider outage was indistinguishable from "your library had no answer" (BUG-260815-05's blast radius: embedding has no provider fallback, so a zero balance zeroes retrieval for the WHOLE KB). The error arm now writes `document_ids: []` + `retrieval_status: "provider_error"` — the classified literal, NEVER `str(exc)` (T-217.1-15b).
