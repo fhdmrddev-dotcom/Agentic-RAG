@@ -984,6 +984,23 @@ async def update_connection(
     return _to_response(updated)
 
 
+def _service_advertises_actions(service_id: str | None) -> bool:
+    """Does this SERVICE have an action list of its own, independent of any capability?
+
+    Kept as a named predicate rather than an inline truth test so the discover ladder reads
+    as three routes to the same answer — a remote server, a capability adapter, a service —
+    rather than two routes and an exception.
+
+    ⚠ The import is function-local for the reason `descriptors.py` states: nothing that
+    merely asks WHAT a connection advertises should drag a vendor module into the graph.
+    """
+    if not service_id:
+        return False
+    from app.services.connectors.service_tools import extra_descriptors_for_service
+
+    return bool(extra_descriptors_for_service(service_id))
+
+
 async def discover_connection_tools(
     connection_id: str,
     org_id: str,
@@ -1019,6 +1036,16 @@ async def discover_connection_tools(
         from app.services.connectors.descriptors import static_descriptors_for_capability
 
         tools = static_descriptors_for_capability(resolved.capability, resolved.service_id)
+    elif _service_advertises_actions(getattr(resolved, "service_id", None)):
+        # ⚠ THE OAUTH ARM, AND ITS ABSENCE IS WHAT THE OPERATOR MET. A `oauth_byo` row has
+        # NO `capability` and NO `mcp_server_url`, so both branches above missed and the
+        # refusal below fired: *"This connection names a service but no way to reach it
+        # yet."* That sentence was written for CONN-08 — a row naming a service with no
+        # credential — and it stopped being true the moment Phase 215 gave the row a token.
+        # The row IS reachable; it is reachable by a third route the ladder did not know.
+        from app.services.connectors.service_tools import extra_descriptors_for_service
+
+        tools = extra_descriptors_for_service(resolved.service_id)
     else:
         raise ConnectorNothingToDiscover(
             "this connection names a service but no way to reach it yet, so there is nothing "

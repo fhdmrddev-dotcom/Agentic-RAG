@@ -109,16 +109,33 @@ def test_a_read_is_marked_as_a_read_and_a_write_is_not():
         assert annotations["readOnlyHint"] is False
 
 
-def test_every_spec_hangs_off_an_existing_capability_and_adds_no_verb():
-    """⚠ THE ROADMAP'S STANDING INSTRUCTION IS *"do not add a fifth verb"*. The capability set
-    is CLOSED and spelled in four places held in agreement by two module-scope asserts; a spec
-    naming a capability outside it would also name an egress allow-list key that does not
-    exist, and the binder would refuse at the socket rather than here."""
+def test_no_spec_adds_a_verb_to_the_closed_capability_set():
+    """⚠ THE ROADMAP'S STANDING INSTRUCTION IS *"do not add a fifth verb"*.
+
+    ⚠ THIS TEST USED TO ASSERT THE CONVERSE — that every spec's `capability` IS one of the
+    closed verbs — and that was too strong, which the Google set proved. An `oauth_byo` row
+    has NO capability at all, so its tools hang off an EGRESS KEY (`drive_read`) that is
+    deliberately not a verb: nothing writes it to a column, no `CHECK` constrains it, and no
+    bound workflow step can name it.
+
+    The property that actually matters is the one below, and it is stricter about the thing
+    the instruction protects: the closed set must not GROW. Its companion asserts the key
+    still resolves to an allow-list entry, so a spec can never reach an unguarded host.
+    """
     from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+
+    assert set(EXTERNAL_ACTION_CAPABILITIES) == {
+        "send_email", "create_ticket", "post_message",
+    }, "the closed capability set grew — that is a migration, four spellings and a CHECK"
 
     for service, specs in SERVICE_TOOL_SPECS.items():
         for spec in specs:
-            assert spec["capability"] in EXTERNAL_ACTION_CAPABILITIES, (service, spec["name"])
+            if spec["capability"] not in EXTERNAL_ACTION_CAPABILITIES:
+                # A non-verb key is allowed, and must be an EGRESS key or the binder would
+                # raise a KeyError at the socket instead of refusing a host here.
+                from app.security.egress import ALLOWED_HOST_SUFFIXES
+
+                assert spec["capability"] in ALLOWED_HOST_SUFFIXES, (service, spec["name"])
 
 
 def test_no_spec_reaches_a_host_outside_the_existing_allow_list():

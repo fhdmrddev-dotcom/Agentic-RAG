@@ -818,6 +818,14 @@ def test_discover_refuses_a_service_only_row_by_name_never_as_a_bad_gateway(
         connection_id="99999999-9999-4999-8999-999999999999",
         org_id=ACTIVE_ORG,
         name="Notion",
+        # ⚠ NAMED EXPLICITLY SINCE 2026-08-31, and the choice is load-bearing. The
+        # discover ladder gained a THIRD route — a service with an action list of its own,
+        # which is how an oauth_byo row (no capability, no mcp_server_url) reaches its
+        # tools. This test's own docstring predicted it: *"OAuth (Phase 215) does."*
+        # Notion advertises nothing, so the worded refusal is still the honest answer for
+        # it — but a stub with NO service_id at all would now be testing an absence rather
+        # than the contract.
+        service_id="notion",
         capability=None,
         mcp_server_url=None,
         config={},

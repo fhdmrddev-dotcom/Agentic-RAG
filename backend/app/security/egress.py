@@ -245,12 +245,24 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # Empty on purpose: the allowed host is the org-configured one, supplied per call. An
     # entry here would be a second, staler source of truth for it.
     "send_email": (),
+    # ⚠ A NEW HOST, ADDED DELIBERATELY AND NARROWLY (2026-08-31). Every other entry here
+    # belongs to a capability VERB; this one belongs to a SERVICE reached with an OAuth
+    # access token. It exists because `services/cloud_storage.py` was calling
+    # googleapis.com with a RAW `httpx.AsyncClient` — no scheme check, no allow-list, no
+    # DNS pin, no redirect refusal, no size cap — on a path that downloads a file a
+    # person names. That module sits OUTSIDE `services/connectors/`, so the D-05 source
+    # fence never walked it and the gap was invisible to the guard written for it.
+    #
+    # SUFFIX-matched, so `www.googleapis.com` and `oauth2.googleapis.com` pass while
+    # `evilgoogleapis.com` does not — the leading-dot rule `_host_is_allowed` documents.
+    "drive_read": ("googleapis.com",),
 }
 
 _HOST_MATCH: dict[str, str] = {
     "post_message": _EXACT,
     "create_ticket": _SUFFIX,
     "send_email": _CALLER,
+    "drive_read": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -259,6 +271,7 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "post_message": frozenset({"https"}),
     "create_ticket": frozenset({"https"}),
     "send_email": frozenset({"smtps", "smtp+starttls"}),
+    "drive_read": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {

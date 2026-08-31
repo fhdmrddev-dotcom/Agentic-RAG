@@ -4,7 +4,6 @@ from uuid import uuid4
 from types import SimpleNamespace
 
 import pytest
-import httpx
 
 from app.models.connector import (
     ConnectorConnectionResponse,
@@ -209,51 +208,55 @@ async def test_e2e_cloud_file_import_flow():
         "name": "Corporate Google Drive",
     }
 
-    mock_list_response = httpx.Response(
-        200,
-        json={
-            "files": [
-                {
-                    "id": "g-file-1",
-                    "name": "Q3_Report.pdf",
-                    "mimeType": "application/pdf",
-                    "size": "10240",
-                    "modifiedTime": "2026-08-30T12:00:00Z",
-                }
-            ],
-            "nextPageToken": None,
-        },
-    )
+    # ⚠ THE SEAM MOVED FROM httpx TO THE EGRESS BINDER, AND THAT IS THE FIX BEING TESTED.
+    # `cloud_storage` used to open a RAW `httpx.AsyncClient` against googleapis.com — no
+    # scheme check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path
+    # that downloads a file a caller names. It sits outside `services/connectors/`, so the
+    # D-05 source fence never walked it and the gap was invisible to the guard written for
+    # exactly this. It now goes through `send_pinned_http` under the `drive_read` key.
+    #
+    # ⚠ A PinnedResponse carries `.body` (bytes) — not `.json()`, not `.content`.
+    def _pinned(status, body):
+        return SimpleNamespace(status_code=status, body=body)
 
-    mock_meta_response = httpx.Response(
-        200,
-        json={
-            "id": "g-file-1",
-            "name": "Q3_Report.pdf",
-            "mimeType": "application/pdf",
-            "size": "10240",
-        },
-    )
+    mock_list_response = _pinned(200, json.dumps({
+        "files": [
+            {
+                "id": "g-file-1",
+                "name": "Q3_Report.pdf",
+                "mimeType": "application/pdf",
+                "size": "10240",
+                "modifiedTime": "2026-08-30T12:00:00Z",
+            }
+        ],
+        "nextPageToken": None,
+    }))
 
-    mock_dl_response = httpx.Response(
-        200,
-        content=b"%PDF-1.4 Mock PDF Content",
-    )
+    mock_meta_response = _pinned(200, json.dumps({
+        "id": "g-file-1",
+        "name": "Q3_Report.pdf",
+        "mimeType": "application/pdf",
+        "size": "10240",
+    }))
 
-    async def mock_get(url, *args, **kwargs):
+    mock_dl_response = _pinned(200, b"%PDF-1.4 Mock PDF Content")
+
+    async def mock_send(capability, method, url, **kwargs):
+        # The key is asserted, not ignored: reaching Google under any OTHER capability would
+        # be reaching it under an allow-list that does not name googleapis.com.
+        assert capability == "drive_read", capability
         url_str = str(url)
         params = kwargs.get("params") or {}
         if url_str.endswith("/files"):
             return mock_list_response
-        elif params.get("alt") == "media":
+        if params.get("alt") == "media":
             return mock_dl_response
-        elif url_str.endswith("/files/g-file-1"):
+        if url_str.endswith("/files/g-file-1"):
             return mock_meta_response
-        else:
-            return mock_dl_response
+        return mock_dl_response
 
     with patch("app.services.cloud_storage.get_fresh_access_token", AsyncMock(return_value="valid-oauth-token")), \
-         patch("httpx.AsyncClient.get", side_effect=mock_get):
+         patch("app.services.cloud_storage.send_pinned_http", side_effect=mock_send):
 
         # 1. Listing files
         res = await list_cloud_files(

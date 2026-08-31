@@ -3,6 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import json as jsonlib
+
 import pytest
 from app.models.connector import ConnectorConnectionResponse, McpConfig
 from app.services.cloud_storage import fetch_cloud_file, list_cloud_files
@@ -23,7 +25,7 @@ async def test_list_cloud_files_google_drive():
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.json.return_value = {
+    mock_resp.body = jsonlib.dumps({
         "nextPageToken": "token_abc",
         "files": [
             {
@@ -36,21 +38,23 @@ async def test_list_cloud_files_google_drive():
                 "webViewLink": "https://drive.google.com/file/123",
             }
         ],
-    }
-
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=mock_resp)
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    })
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
             "app.services.cloud_storage.get_fresh_access_token",
             AsyncMock(return_value="valid_token"),
         )
+        # ⚠ THE SEAM MOVED, AND THAT IS THE POINT OF THE CHANGE. This used to patch
+        # `httpx.AsyncClient`, because `cloud_storage` opened a RAW client — no scheme
+        # check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path
+        # that downloads a file a caller names. It now goes through the egress binder
+        # under the `drive_read` key, so the binder is what a test replaces.
+        #
+        # ⚠ A PinnedResponse carries `.body` (bytes), not `.json()` and not `.content`.
         mp.setattr(
-            "httpx.AsyncClient",
-            lambda **kwargs: mock_client,
+            "app.services.cloud_storage.send_pinned_http",
+            AsyncMock(return_value=mock_resp),
         )
 
         res = await list_cloud_files(mock_conn, query="Report")
@@ -78,29 +82,31 @@ async def test_fetch_cloud_file_google_drive_binary():
 
     meta_resp = MagicMock()
     meta_resp.status_code = 200
-    meta_resp.json.return_value = {
+    meta_resp.body = jsonlib.dumps({
         "id": "file_123",
         "name": "Design.png",
         "mimeType": "image/png",
-    }
+    })
 
     dl_resp = MagicMock()
     dl_resp.status_code = 200
-    dl_resp.content = b"fake_png_bytes"
-
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(side_effect=[meta_resp, dl_resp])
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    dl_resp.body = b"fake_png_bytes"
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
             "app.services.cloud_storage.get_fresh_access_token",
             AsyncMock(return_value="valid_token"),
         )
+        # ⚠ THE SEAM MOVED, AND THAT IS THE POINT OF THE CHANGE. This used to patch
+        # `httpx.AsyncClient`, because `cloud_storage` opened a RAW client — no scheme
+        # check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path
+        # that downloads a file a caller names. It now goes through the egress binder
+        # under the `drive_read` key, so the binder is what a test replaces.
+        #
+        # ⚠ A PinnedResponse carries `.body` (bytes), not `.json()` and not `.content`.
         mp.setattr(
-            "httpx.AsyncClient",
-            lambda **kwargs: mock_client,
+            "app.services.cloud_storage.send_pinned_http",
+            AsyncMock(side_effect=[meta_resp, dl_resp]),
         )
 
         filename, content, mime = await fetch_cloud_file(mock_conn, "file_123")

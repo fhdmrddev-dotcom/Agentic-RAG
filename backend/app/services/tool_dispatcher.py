@@ -4486,6 +4486,9 @@ async def _handle_connector_chat_tool(
                         args,
                         secret=resolved_conn.secret,
                         config=resolved_conn.config,
+                        # The OAuth arm mints its own access token from the row; it cannot
+                        # use `secret`, which for an oauth_byo connection is None.
+                        connection_id=str(matched_conn.id),
                     )
                     raw_output = json.dumps(result)
                 except ServiceToolError as exc:
