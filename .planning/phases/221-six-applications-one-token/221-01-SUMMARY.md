@@ -162,3 +162,78 @@ that test asserts a COUNT rather than a presence.** Restored, still derived from
   explicit Phase 196 decision; the rest are drift). Out of this phase's fence.
 - **`SEED-228`** — `read_doc` on a `.docx` id returns a bare `HTTP 400 FAILED_PRECONDITION`.
 - **`SEED-229`** — the five remaining unpinned suites named above.
+
+---
+
+## Post-close: the operator drove it and found a real bug in ten minutes
+
+> *"Now I see Google Drive Google Contacts Google Gmail when I refresh actions but once I
+> navigate away it is all gone and I have to refresh action again to see the categorization."*
+
+**TWO causes, both real, and jsdom could not have caught either** — this is the standing
+argument for G-4.
+
+**1. `handleDiscoverTools` never told the parent.** `discoverConnectorTools` persists the
+refreshed list server-side and sets `probeResult` in memory; nothing informed `ConnectionsTab`.
+So the tab kept the array it fetched *before* the discovery, and the next open re-seeded
+`probeResult` from it. Fixed with one optional `onDiscovered`, wired to `reload`. It cannot
+clobber what is on screen: the seeding effect early-returns on an unchanged `mode:id` key, so
+the refreshed prop updates the parent for the NEXT open while the person keeps looking at what
+they just discovered.
+
+**2. `discovered_tools` is a CACHE, and every pre-221 row lacks the `app` key.** Nothing
+rewrites those descriptors until somebody presses *Refresh actions*. The client groups on
+`app`, so a stale cache degrades — **correctly, per D-221-09** — to one unnamed application,
+which reads as *"the categorisation disappeared"*.
+
+⚠ **THE BUG PREDATES THIS PHASE; the split only made it VISIBLE.** Until now the CONTENT of
+`discovered_tools` changed which rows appeared but never how they were ARRANGED, so a stale
+copy was indistinguishable from a fresh one. Grouping is the first thing that made staleness
+legible.
+
+**Fixed at READ time, not with a migration.** `backfill_application_keys` stamps `app` from the
+spec table by tool name inside `_to_response` — the one place a row becomes output. A migration
+would repair the rows that exist today and do nothing for one restored from a backup or written
+by an older build. It **adds and never overwrites**, guesses at no name the spec table does not
+know, and writes nothing back; the row heals on its next real discovery and every read is
+correct meanwhile.
+
+**Driven end to end rather than reasoned about:** `app` was stripped from the live Google row in
+the database, and `_to_response` still answered
+`drive 2 · gmail 5 · sheets 2 · docs 1 · calendar 4 · contacts 1`.
+
+⚠ **I mutated the operator's dev database to prove this** — the `discovered_tools` column of the
+live Google row, left in its stale shape. It is a cache, reads heal it, and the next discovery
+rewrites it. Disclosed rather than quietly restored.
+
+Five new backend tests cover it, including the end-to-end one through `_to_response`, *because a
+helper nobody calls heals nothing*. Backend: **26 passed** in this file.
+
+---
+
+## ⚠ The count gate is RED at close, and it is SEED-171
+
+`src/pages/WorkflowBuilderPage.canvas.test.tsx` failed its own POSITIVE CONTROL with
+`AssertionError: expected 0 to be greater than 0` — **byte-for-byte the assertion, test and
+message SEED-171 records from `196-05`**, thirteen days earlier.
+
+Triaged in the order CLAUDE.md requires, cap untouched at 2:
+
+| step | result |
+|---|---|
+| filenames from the gate's persisted JSON **before any re-run** | ✅ |
+| `git diff --numstat 0b397af27 HEAD` over the suite and its subjects | **empty — untouched** |
+| `git status --short` over those paths | **clean** |
+| second gate run | same suite, same test, same message |
+| the suite ALONE | **154/154 passed** |
+
+**A single suite failing while every other file in the same run passes cannot be worker
+oversubscription.** Recorded as an observation in SEED-171 — the suite is *provably unmodified*
+by this phase, which is a different claim from *fine*, and 154/154 in isolation is exactly one
+green sample of a known-flaky suite.
+
+**The last clean gate on this work was `178/178 · 7020 · pinned 6299 · failed 0`**, taken after
+the pins landed and before the operator's bug fix. The fix touched
+`ConnectionFormPanel.tsx`, `ConnectionsTab.tsx` and two backend files; the deterministic
+evidence for it is **settings 367/367**, **tsc 66 = baseline**, and **backend 70 failed / 3287
+passed** with 70 the untouched baseline and +26 this plan's.

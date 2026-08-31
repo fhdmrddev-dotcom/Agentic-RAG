@@ -235,3 +235,45 @@ every conflicted file was restored to HEAD and the ancient stash's content disca
 lesson is cheap to record and expensive to relearn: **on a repo with a pre-existing stash, and
 with a sibling agent committing to the same branch, do not use `stash push`/`pop` as a
 counterfactual.** Copy the file aside, or read the prior version with `git show HEAD:<path>`.
+
+---
+
+## Sighting — 2026-08-31, Phase 221-01 close
+
+**`src/pages/WorkflowBuilderPage.canvas.test.tsx`**, the fifth suite on this list, failed its
+own POSITIVE CONTROL again:
+
+```
+WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)
+  POSITIVE CONTROL — with the flag ON the very same read finds the key
+AssertionError: expected 0 to be greater than 0
+```
+
+⚠ **Byte-for-byte the assertion and the message recorded at `196-05`.** Same suite, same test,
+same expectation. That is now two independent sightings of one control, thirteen days apart.
+
+**Triage, in the order CLAUDE.md requires:**
+
+| step | result |
+|---|---|
+| filenames captured from the gate's own persisted JSON **before any re-run** | ✅ |
+| `git diff --numstat <phase base> HEAD` over the suite and its subjects | **empty — untouched** |
+| `git status --short` over `src/pages/` and `src/components/workflows/` | **clean** |
+| second gate run | **same suite, same test, same message** |
+| the suite ALONE, nothing else on the box | **154/154 passed** |
+| cap touched | **no** — it held at 2 throughout |
+
+⚠ **A suite that fails IN ISOLATION-adjacent conditions and passes alone, on an unchanged
+tree, is the shape this seed exists to name.** Worker oversubscription cannot explain a single
+suite failing while every other file in the same run passes.
+
+⚠ **Recorded as an observation, never as innocence.** The suite is *provably unmodified* by
+Phase 221; that is a different claim from *fine*. **One green sample of a flaky suite proves
+nothing**, and 154/154 in isolation is exactly one green sample.
+
+**The standing consequence, restated because this sighting demonstrates it:** `count gate OK`
+is **not reliably reachable on demand**, so a phase whose acceptance criterion is *"the gate is
+green"* has written a criterion that can fail for reasons no plan controls. 221-01's
+deterministic evidence is the per-file figures and the explicitly-run in-scope suites —
+settings 367/367, `tsc` 66 = baseline, backend `70 failed / 3287 passed` with 70 the untouched
+baseline.
