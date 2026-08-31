@@ -37,6 +37,47 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+⚠ **SESSION 2026-08-31 (Claude, autonomous) — FOUR OPERATOR OBSERVATIONS CLOSED, AND THREE
+DEFECTS FOUND ON THE WAY THAT NO GATE COULD SEE.** Six commits on `develop`; full detail in
+`BUS-036`. Hand-edited; the `state.*` SDK verbs are forbidden here.
+
+| # | What the operator saw | Root cause | Commit |
+|---|---|---|---|
+| 1 | A member cannot reach Settings | `NAV_ITEMS` tagged Settings `model_management`, which `api/features.py:21` classifies Operators-only — so `visibleNavItems` dropped it for everyone else and took the whole connections surface of 211-216 with it | `235a0f9ff` |
+| 2 | Chat 'stuck' on a GitHub thread | Not stuck: 43 of GitHub's 44 tools sit at `ask`, and each blocks 120 s waiting for an approval decision (`tool_dispatcher.py:4386`). Every recent run reads `completed` | — |
+| 3 | Slack/Jira/Email hold one tool each | The per-service action lists were the work Phase 213 explicitly deferred. Slack now 6, Jira 5; SMTP stays 1 because it is one-way | `d68b75b5f` |
+| 4 | Google OAuth re-asks for the client id/secret | Nothing ever persisted them. Reproduced live: HTTP 422, the operator's exact sentence | `94fc753e9` |
+
+⭐ **THE THREE THAT NOBODY REPORTED, AND EACH ONE WAS INVISIBLE FOR A STRUCTURAL REASON:**
+
+1. **Chat connector tools were DEAD CODE at HEAD** (`cc4befa56`). `c0a09c728` moved the whole
+   wiring block inside the `except` arm of the `list_connections` read; on success nothing ran,
+   on failure `conns` is `[]`. **6929 green tests could not see it** because every Phase 216
+   test calls `build_chat_tools_for_connectors` DIRECTLY and nothing drives `run_agent_loop`.
+2. **Every connector failure was reported to the model as a SUCCESS** — `f"Executed {tool} on
+   {name} with result/note: {exc}"` — and the native branch called `adapter.send()`
+   positionally against a keyword-only protocol. **Slack, Jira and SMTP had never once been
+   callable from chat, and nothing failed, because the lie caught the evidence.** Phase 216's
+   named E2E proof was green on that path: it mocked neither `resolve_connection` nor the
+   adapter, hit real DNS, and the lie wrapped the failure in the success envelope.
+3. ⚠ **A CREDENTIAL EXPOSURE.** `OAuthConnectionConfig` declared `custom_client_secret` inside
+   `config`. Measured: `has_column_privilege('authenticated', ..., 'config', 'SELECT')` is
+   **True** while the same call for `secret_ciphertext` is **False** — so the design returned a
+   customer's OAuth application secret to every member of the org. Same class as CR-01, one
+   column over. **Migration 150** gives it an encrypted, ungranted column and the model now
+   REFUSES the key. ⚠ **150 is applied LOCALLY ONLY — it must be pasted into cloud Supabase
+   before this ships.** `full-schema.sql` regenerated.
+
+**Owed to the operator, and it is a DECISION not a defect:** the nine new actions arrive
+UNGRANTED, which is the correct posture — *advertising is not granting*, and `tool_grants`
+denies on a missing key by design. Both rows carry a connection default of `deny`, so today
+**Jira advertises 5 / callable 1** and **Slack advertises 6 / callable 1**. Setting the
+default to *Ask first*, or allowing individual reads, is the operator's call.
+
+**Measured at close:** count gate **171/171 OK · 6929 · 0 failing**; backend unit **70 failed
+/ 3178 passed** (down from 74; the remainder is April–June rot); `tsc` **90** (down from 92).
+ROADMAP checkboxes for 210 / 211 / 214 / 214.1 / 215 / 216 / 217.1 ticked — they were stale.
+
 Phase: 216 (connections-in-chat-and-one-file-in-by-hand) — **COMPLETED & VERIFIED (5 of 5 plans executed across 3 waves, 216-01..05-SUMMARY.md, backend unit & E2E integration suites green, vitest suites green, count gate 171/171 OK, 6929/6929 tests green)**, 2026-08-31
 Next: Milestone Review & Handoff / Next Milestone Planning
 Prior Phase: 215 (BYO OAuth) — COMPLETED & VERIFIED (5 of 5 plans executed, 20/20 pytest tests green, 5/5 vitest OAuth green, count gate 171/171 OK, 6929/6929 tests green), live Google OAuth verified.
