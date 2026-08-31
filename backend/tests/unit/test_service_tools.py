@@ -375,3 +375,50 @@ def test_spec_for_answers_none_rather_than_raising_on_a_miss():
     assert spec_for("slack", "post_message") is None  # the CAPABILITY, not a service tool
     assert spec_for("nosuchservice", "list_channels") is None
     assert spec_for("slack", "list_channels") is not None
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# An empty Drive search says it SUCCEEDED (2026-08-31)
+# ══════════════════════════════════════════════════════════════════════════════════════
+@pytest.mark.asyncio
+async def test_an_empty_drive_search_says_it_ran_rather_than_returning_a_bare_list(
+    monkeypatch,
+):
+    """⚠ MEASURED AGAINST A GENUINELY EMPTY DRIVE (`usageInDrive: 0`), NOT IMAGINED.
+
+    Handed a bare `{"files": []}`, the model answered *"your Drive is empty, OR the
+    connector lacks permission, OR there is a scope/authorization issue"* and advised
+    re-authorising. Two of those three are impossible on this path: the search SUCCEEDED,
+    and a permission or scope fault RAISES rather than returning a list. This is the same
+    family as the `HTTP 403` refusal that sent the operator to re-consent scopes that
+    were already correct — an answer that does not say what it means gets guessed at.
+    """
+    async def _empty(_cid, query=None, page_size=30):
+        return {"files": [], "next_page_token": None}
+
+    monkeypatch.setattr(
+        "app.services.cloud_storage._list_google_drive_files", _empty, raising=True
+    )
+    out = await execute_service_tool(
+        "google", "search_files", {"limit": 5},
+        secret="", config={}, connection_id="c-1",
+    )
+    assert out["files"] == []
+    assert out["searched"] is True
+    assert "ran successfully" in out["note"]
+    assert "not a permission or authorisation problem" in out["note"]
+
+
+@pytest.mark.asyncio
+async def test_a_NON_empty_drive_search_carries_no_note(monkeypatch):
+    """The positive control — the note must not become noise on every successful search."""
+    async def _one(_cid, query=None, page_size=30):
+        return {"files": [{"id": "f1", "name": "Q3.pdf"}], "next_page_token": None}
+
+    monkeypatch.setattr(
+        "app.services.cloud_storage._list_google_drive_files", _one, raising=True
+    )
+    out = await execute_service_tool(
+        "google", "search_files", {}, secret="", config={}, connection_id="c-1",
+    )
+    assert out == {"files": [{"id": "f1", "name": "Q3.pdf"}]}

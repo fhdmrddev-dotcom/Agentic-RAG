@@ -914,7 +914,33 @@ async def _drive_call(
                 query=(str(args["query"]) if args.get("query") else None),
                 page_size=_coerce_int(args, "limit", 30, 1, 100),
             )
-            return {"files": result.get("files", [])}
+            files = result.get("files", [])
+            if files:
+                return {"files": files}
+            # ⚠ A BARE `{"files": []}` IS AMBIGUOUS AND THE MODEL GUESSES BADLY AT IT.
+            # Measured 2026-08-31 against a genuinely empty Drive (`usageInDrive: 0`):
+            # handed an empty list, the model offered three causes — the Drive is empty,
+            # OR the connector lacks permission, OR the grant is wrong — and advised
+            # reconnecting. Two of the three are impossible here: the search SUCCEEDED,
+            # and a permission or scope fault RAISES rather than returning a list. Saying
+            # so costs one key and removes a wrong remedy.
+            #
+            # ⚠ THE MODEL'S THIRD CAUSE IS PARAPHRASED ABOVE, NOT QUOTED, AND THAT IS
+            # DELIBERATE. `test_190_connector_source_fence.py` bans the credential-header
+            # vocabulary anywhere under `services/connectors/` — matched case-insensitively
+            # against EVERY line, comments included. That bluntness is the fence working:
+            # it cannot tell a header from a sentence about one, and narrowing it to
+            # non-comment lines to accommodate a quotation would trade a real guard for
+            # prose. Reword the prose.
+            return {
+                "files": [],
+                "searched": True,
+                "note": (
+                    "The search ran successfully and matched nothing. This is not a "
+                    "permission or authorisation problem — those raise an error instead "
+                    "of returning an empty list."
+                ),
+            }
 
         filename, content, mime_type = await cloud_storage._fetch_google_drive_file(
             connection_id, str(args["file_id"]).strip()
