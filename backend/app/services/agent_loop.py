@@ -1460,6 +1460,49 @@ async def run_agent_loop(
             )
             active_system_prompt = active_system_prompt + disabled_note
 
+        # Phase 216 (CHAT-05 / D-216-04) — Connector tools in chat:
+        # Load active connector connections for the user and register their function tools
+        try:
+            from uuid import UUID
+            from app.services.connector_service import list_connections
+            from app.services.connectors.chat_tools import build_chat_tools_for_connectors
+            from app.services.openai_service import get_tools
+
+            user_uuid = UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"]
+            conns = await list_connections(user_id=user_uuid)
+            active_conns = []
+            if getattr(body, "active_connector_ids", None):
+                allowed_ids = {str(cid) for cid in body.active_connector_ids}
+                active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
+            else:
+                # Include all enabled connections with discovered tools or external capabilities
+                active_conns = [c for c in conns if c.is_enabled and (c.discovered_tools or c.capability)]
+
+            if active_conns:
+                connector_tools = build_chat_tools_for_connectors(active_conns)
+                if connector_tools:
+                    base_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
+                    active_tools = base_tools + connector_tools
+
+                    service_lines = []
+                    for c in active_conns:
+                        t_names = [t.get("name") for t in (c.discovered_tools or []) if isinstance(t, dict) and t.get("name")]
+                        if not t_names and c.capability:
+                            t_names = [c.capability]
+                        if t_names:
+                            service_lines.append(f"- **{c.name}** (service_id: `{c.service_id}`, tools: {', '.join(t_names[:10])}{'...' if len(t_names) > 10 else ''})")
+                    if service_lines:
+                        connector_note = (
+                            "\n\n## Connected Services & External Tools\n"
+                            "The following external services are connected and available in this chat. "
+                            "When the user asks to query, search, view, create, or act on these services (e.g. GitHub, Slack, Jira, Notion, Google), "
+                            "you MUST use their corresponding namespaced function tools:\n"
+                            + "\n".join(service_lines)
+                        )
+                        active_system_prompt = active_system_prompt + connector_note
+        except Exception:
+            logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
+
     messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
     # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature
     # as a top-level field; google_service.py reads it in

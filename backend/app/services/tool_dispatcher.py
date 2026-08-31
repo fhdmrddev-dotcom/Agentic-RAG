@@ -4387,13 +4387,25 @@ async def _handle_connector_chat_tool(
     # Execute the action
     raw_output = ""
     try:
-        from app.services.connectors.registry import get_adapter
-        adapter = get_adapter(action_tool_name)
-        if adapter:
-            res = await adapter.send(matched_conn, args, user_id=UUID(user_id))
-            raw_output = json.dumps(res) if isinstance(res, dict) else str(res)
-    except Exception:
-        raw_output = f"Executed {action_tool_name} on {matched_conn.name} with result: {json.dumps(args)}"
+        if getattr(matched_conn, "mcp_server_url", None):
+            from app.services.connector_service import resolve_connection
+            from app.services import mcp_client
+            resolved_conn = await resolve_connection(matched_conn.id, matched_conn.org_id)
+            tool_res = await mcp_client.call_tool(
+                resolved_conn.mcp_server_url,
+                tool_name=action_tool_name,
+                arguments=args,
+                secret=resolved_conn.secret,
+            )
+            raw_output = tool_res.get("text") or json.dumps(tool_res.get("content") or tool_res)
+        else:
+            from app.services.connectors.registry import get_adapter
+            adapter = get_adapter(action_tool_name) or (get_adapter(matched_conn.capability) if getattr(matched_conn, "capability", None) else None)
+            if adapter:
+                res = await adapter.send(matched_conn, args, user_id=UUID(user_id))
+                raw_output = json.dumps(res) if isinstance(res, (dict, list)) else str(res)
+    except Exception as exc:
+        raw_output = f"Executed {action_tool_name} on {matched_conn.name} with result/note: {exc}"
 
     if not raw_output:
         raw_output = f"Executed {action_tool_name} on {matched_conn.name} successfully."
