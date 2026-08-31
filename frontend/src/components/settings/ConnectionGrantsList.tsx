@@ -1,13 +1,40 @@
 /**
- * ConnectionGrantsList: Per-tool approval posture and grant controls for a connection.
- * Phase 213 (GRANT-01 · GRANT-02 / D-213-00 / D-213-05..D-213-10).
+ * ConnectionGrantsList: per-application, per-action approval posture for a connection.
+ * Phase 213 (GRANT-01 · GRANT-02 / D-213-00 / D-213-05..D-213-10) ·
+ * Phase 221 (D-221-02 · D-221-03 · D-221-05 · D-221-09 · D-221-10 · D-221-11).
  *
- * Implements the 10 invariants from .planning/sketches/213-grants-and-the-approval-moment/BUILD-CONTRACT.generated.md.
+ * Implements the 10 invariants from
+ * `.planning/sketches/213-grants-and-the-approval-moment/BUILD-CONTRACT.generated.md`
+ * and the composition from `.planning/sketches/221-six-applications-one-token/index.html`.
+ *
+ * ── ⚠ THIS FILE COMPOSES. IT OWNS NO ROW MARKUP, AND THAT IS ENFORCED BY A LINE COUNT ──
+ * At Phase 221's open this file was **344 lines and one phase old**, so G-5 could not fire
+ * on it — and the six-application split would have roughly doubled it, which is how every
+ * file in `docs/HOT-FILE-LEDGER.md` became hot in the first place. A guardrail that fires
+ * two phases late is not a guardrail, so the seam was ARGUED rather than triggered and
+ * taken inside 221 rather than deferred to a refactor phase that would first have had to
+ * undo a ~700-line component.
+ *
+ * What it keeps: the connection-level default control, the search box, and the arrangement.
+ * What it hands to children: every application (`ApplicationGroup`), every band
+ * (`DirectionBand`), every row (`ActionRow`), and every decision about grouping and
+ * posture resolution (`toolGroups.ts`, pure).
+ *
+ * ⚠ **The acceptance criterion is falsifiable: this file must measure BELOW 344 lines.** If
+ * it grows, the disposition recorded in the ledger was not honoured — that is the report,
+ * not "the plan turned out bigger than expected".
+ *
+ * ── D-221-10 · ONE SEARCH BOX, ABOVE THE GROUPS ────────────────────────────────────────
+ * It filters across every application and hides a group that matches nothing. Google at 15
+ * actions does not need it and Google at ~30 will once writes land; one behaviour at 15 and
+ * at GitHub's 44 beats a control that appears at a threshold nobody can predict.
  */
 
 import { useMemo, useState } from "react"
 import type { McpDiscoveredTool, ToolGrantPosture } from "@/lib/api"
+import { ApplicationGroup } from "./ApplicationGroup"
 import { GRANTS_COPY } from "./grantsVocabulary"
+import { directionHint, groupToolsByApplication } from "./toolGroups"
 import { cn } from "@/lib/utils"
 
 export interface ConnectionGrantsListProps {
@@ -17,23 +44,26 @@ export interface ConnectionGrantsListProps {
   onChangeDefaultPosture?: (posture: ToolGrantPosture) => void
   onChangeToolGrant: (toolName: string, posture: ToolGrantPosture) => void
   onResetToolGrant: (toolName: string) => void
+  /** Phase 221 (D-221-05) — the middle rung. Absent on a surface that cannot persist it. */
+  onChangeApplicationGrant?: (application: string, posture: ToolGrantPosture) => void
   readOnly?: boolean
   grantsArePersisted?: boolean
   connectionName?: string
 }
 
-function resolveItemPosture(
-  toolName: string,
-  toolGrants: Record<string, ToolGrantPosture | boolean>,
-  defaultPosture: ToolGrantPosture,
-): { posture: ToolGrantPosture; isOverridden: boolean } {
-  if (toolName in toolGrants) {
-    const raw = toolGrants[toolName]
-    if (raw === "allow" || raw === true) return { posture: "allow", isOverridden: true }
-    if (raw === "deny" || raw === false) return { posture: "deny", isOverridden: true }
-    if (raw === "ask") return { posture: "ask", isOverridden: true }
-  }
-  return { posture: defaultPosture || "ask", isOverridden: false }
+const POSTURES: readonly ToolGrantPosture[] = ["allow", "ask", "deny"] as const
+const POSTURE_WORD: Record<ToolGrantPosture, string> = {
+  allow: GRANTS_COPY.POSTURE_ALLOW,
+  ask: GRANTS_COPY.POSTURE_ASK,
+  deny: GRANTS_COPY.POSTURE_DENY,
+}
+
+function matchesQuery(tool: McpDiscoveredTool, q: string): boolean {
+  return (
+    tool.name.toLowerCase().includes(q) ||
+    (tool.title || "").toLowerCase().includes(q) ||
+    (tool.description || "").toLowerCase().includes(q)
+  )
 }
 
 export function ConnectionGrantsList({
@@ -43,127 +73,84 @@ export function ConnectionGrantsList({
   onChangeDefaultPosture,
   onChangeToolGrant,
   onResetToolGrant,
+  onChangeApplicationGrant,
   readOnly = false,
   grantsArePersisted = true,
 }: ConnectionGrantsListProps) {
   const [search, setSearch] = useState("")
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const filteredTools = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return tools
-    return tools.filter((tool) => {
-      const name = tool.name.toLowerCase()
-      const title = (tool.title || "").toLowerCase()
-      const desc = (tool.description || "").toLowerCase()
-      return name.includes(q) || title.includes(q) || desc.includes(q)
-    })
+    return tools.filter((tool) => matchesQuery(tool, q))
   }, [tools, search])
 
-/** The direction hint, read from BOTH places it can legally live.
- *
- * ⚠ THE `annotations` ARM WAS MISSING AND THAT MADE PHASE 209 HALF-DEAD. `mcp_client.py`
- * forwards a server's `annotations` object verbatim *"so `readOnlyHint` reaches the
- * frontend"* — and nothing here ever looked inside it, so a server that DID annotate its
- * tools still rendered "this server does not say". The top-level field is read first
- * because it is the flatter, more specific spelling; the specification puts the hint
- * inside `annotations`, which is why the fallback is the one that fires in practice.
- *
- * ⚠ ABSENCE STILL MEANS UNKNOWN, AND UNKNOWN STILL MEANS TREAT AS DESTRUCTIVE. This
- * resolves where to LOOK, never what to assume — `?? undefined` rather than `?? false`,
- * because a hint nobody gave is not a hint that says no.
- */
-function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyHint?: boolean } }) {
-  return tool.readOnlyHint ?? tool.annotations?.readOnlyHint
-}
+  // ⚠ Grouped from the FILTERED set, so a group matching nothing is absent from the DOM
+  // rather than rendered empty — the sketch's rule, and the reason the search box can sit
+  // above the groups without leaving a row of empty headers behind it.
+  const groups = useMemo(() => groupToolsByApplication(filteredTools), [filteredTools])
 
-  /** Does ANY action on this connection have an unknown direction?
+  /** Does ANY action on this connection have an unknown direction? (Phase 213, Invariant 7)
    *
    *  ⚠ Derived from `tools`, NOT from `filteredTools`: the sentence explains a property of
    *  the SERVER, and that property does not change because someone typed in the search box.
    *  Keying it to the filter would make the explanation flicker in and out while a person
-   *  narrows a 44-row list — the same "is it still true?" jitter the reserved edge lane
-   *  exists to prevent one grain down. */
+   *  narrows a 44-row list.
+   *
+   *  ⚠ And it is rendered ONCE, beside the default control — the TAG is a fact about one
+   *  action and stays on its row; the EXPLANATION is a fact about the server. Phase 221's
+   *  extraction dropped this line and `ConnectionGrantsList.test.tsx` caught it, which is
+   *  the whole argument for that suite asserting a COUNT rather than a presence. */
   const anyUnknownDirection = useMemo(
     () => tools.some((tool) => directionHint(tool) == null),
     [tools],
   )
 
+  // D-221-09 — one application means no header and no chevron; the bands rise to the top.
+  const headless = groups.length === 1 && groups[0].key === null
+
   return (
     <div data-testid="connection-grants-list" className="flex flex-col gap-3">
-      {/* ── 1. The Connection-Level Default Posture Control (GRANT-02) ── */}
+      {/* ── 1. The connection-level default posture control (GRANT-02) ── */}
       <div className="rounded-lg border border-border bg-muted/40 p-3">
         <div className="text-[11px] font-medium text-foreground">
           {GRANTS_COPY.DEFAULT_POSTURE_LABEL}
         </div>
         <div className="mt-1.5 flex items-center">
           <div
-            className="inline-flex rounded-md border border-border overflow-hidden bg-card"
+            className="inline-flex overflow-hidden rounded-md border border-border bg-card"
             role="group"
             aria-label={GRANTS_COPY.DEFAULT_POSTURE_LABEL}
           >
-            <button
-              type="button"
-              disabled={readOnly || !grantsArePersisted}
-              aria-pressed={defaultPosture === "allow"}
-              onClick={() => onChangeDefaultPosture?.("allow")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                defaultPosture === "allow"
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              {GRANTS_COPY.POSTURE_ALLOW}
-            </button>
-            <button
-              type="button"
-              disabled={readOnly || !grantsArePersisted}
-              aria-pressed={defaultPosture === "ask"}
-              onClick={() => onChangeDefaultPosture?.("ask")}
-              className={cn(
-                "border-l border-border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                defaultPosture === "ask"
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              {GRANTS_COPY.POSTURE_ASK}
-            </button>
-            <button
-              type="button"
-              disabled={readOnly || !grantsArePersisted}
-              aria-pressed={defaultPosture === "deny"}
-              onClick={() => onChangeDefaultPosture?.("deny")}
-              className={cn(
-                "border-l border-border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                defaultPosture === "deny"
-                  ? "bg-destructive text-white font-semibold"
-                  : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
-              )}
-            >
-              {GRANTS_COPY.POSTURE_DENY}
-            </button>
+            {POSTURES.map((posture, i) => (
+              <button
+                key={posture}
+                type="button"
+                disabled={readOnly || !grantsArePersisted}
+                aria-pressed={defaultPosture === posture}
+                onClick={() => onChangeDefaultPosture?.(posture)}
+                className={cn(
+                  "cursor-pointer px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  i > 0 && "border-l border-border",
+                  defaultPosture !== posture &&
+                    "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  defaultPosture === posture &&
+                    posture === "deny" &&
+                    "bg-destructive font-semibold text-white",
+                  defaultPosture === posture &&
+                    posture !== "deny" &&
+                    "bg-primary font-semibold text-primary-foreground",
+                )}
+              >
+                {POSTURE_WORD[posture]}
+              </button>
+            ))}
           </div>
         </div>
         <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-          {GRANTS_COPY.DEFAULT_POSTURE_HELP}
+          {headless ? GRANTS_COPY.DEFAULT_POSTURE_HELP : GRANTS_COPY.APPLICATION_INHERITS}
         </p>
-
-        {/* ── The "Unknown" explanation, ONCE ─────────────────────────────────────────────
-            ⚠ OPERATOR-DRIVEN, 2026-08-27: this sentence used to render INSIDE EVERY
-            unknown row. `readOnlyHint` is measured ABSENT on the one server we can reach,
-            so on a 44-tool connection nearly every row is Unknown and the same sentence was
-            printed ~44 times — *"directing the user is good but contaminating the UI is
-            not"*.
-
-            The split is by GRAIN, not by taste: the **tag** is a fact about ONE action and
-            stays on its row; the **explanation** is a fact about the SERVER and belongs
-            once, beside the other line that explains how this screen works.
-
-            Invariant #7 still holds — an unknown direction still "explains itself in real
-            DOM text". What changed is that it explains itself ONCE, which is what the
-            amended test now pins (and it asserts the count, so a regression to per-row
-            cannot pass). */}
         {anyUnknownDirection && (
           <p
             data-testid="grants-unknown-direction-help"
@@ -174,7 +161,7 @@ function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyH
         )}
       </div>
 
-      {/* ── 2. Search Input ── */}
+      {/* ── 2. Search (D-221-10) ── */}
       {tools.length > 0 && (
         <div>
           <input
@@ -188,8 +175,8 @@ function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyH
         </div>
       )}
 
-      {/* ── 3. Empty Search State ── */}
-      {filteredTools.length === 0 && (
+      {/* ── 3. Empty search state ── */}
+      {groups.length === 0 && (
         <div
           data-state="empty"
           className="rounded-lg border border-border bg-card p-4 text-center text-[12px] text-muted-foreground"
@@ -198,143 +185,34 @@ function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyH
         </div>
       )}
 
-      {/* ── 4. Action Rows List ── */}
-      {filteredTools.length > 0 && (
-        <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
-          {filteredTools.map((tool) => {
-            const { posture, isOverridden } = resolveItemPosture(
-              tool.name,
-              toolGrants,
-              defaultPosture,
-            )
-
-            // Direction calculation — one resolver, so the row and the summary sentence
-            // above it can never disagree about the same tool.
-            const hint = directionHint(tool)
-            const isRead = hint === true
-            const isChange = hint === false
-            const isUnknown = hint == null
-
-            return (
-              <div
-                key={tool.name}
-                data-testid={`action-row-${tool.name}`}
-                className={cn(
-                  "arow flex items-start gap-3 p-2.5 transition-colors",
-                  "border-l-2",
-                  isOverridden
-                    ? "overridden border-l-primary bg-primary/[0.06]"
-                    : "border-l-transparent bg-card",
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[12px] font-medium text-foreground">
-                      {tool.name}
-                    </span>
-                  </div>
-                  {tool.description && (
-                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
-                      {tool.description}
-                    </p>
-                  )}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {/* Direction Tags */}
-                    {isRead && (
-                      <span className="tag rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {GRANTS_COPY.DIRECTION_READS}
-                      </span>
-                    )}
-                    {isChange && (
-                      <span className="tag changes rounded border border-warning/35 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                        {GRANTS_COPY.DIRECTION_CHANGES}
-                      </span>
-                    )}
-                    {isUnknown && (
-                      <span className="tag unknown rounded border border-warning/35 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                        {GRANTS_COPY.DIRECTION_UNKNOWN}
-                      </span>
-                    )}
-
-                    {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item C1) — the "You changed
-                        this" TAG is gone. It sat beside a reset link that only ever
-                        appears on an overridden row, so the link already carried the
-                        fact; down a 44-action list that was two controls where one means
-                        something.
-
-                        ⚠ AND NO `title` REPLACES IT. The first attempt put the sentence on
-                        a tooltip and went RED against this file's own Invariant 8 — "zero
-                        [title] attributes in the rendered output" — which exists because a
-                        tooltip is unreachable by touch and by keyboard, so meaning parked
-                        there is meaning removed for some people. The link's own words are
-                        the explanation: a control that says "Use the default" and appears
-                        only when you are not on it needs no second sentence. */}
-                    {isOverridden && !readOnly && grantsArePersisted && (
-                      <button
-                        type="button"
-                        onClick={() => onResetToolGrant(tool.name)}
-                        data-testid="grant-reset"
-                        className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground cursor-pointer"
-                      >
-                        {GRANTS_COPY.OVERRIDDEN_RESET}
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-
-                {/* Tri-state Segmented Posture Control for this tool */}
-                <div
-                  className="inline-flex rounded-md border border-border overflow-hidden bg-card flex-none"
-                  role="group"
-                  aria-label={`${tool.name} permission posture`}
-                >
-                  <button
-                    type="button"
-                    disabled={readOnly || !grantsArePersisted}
-                    aria-pressed={posture === "allow"}
-                    onClick={() => onChangeToolGrant(tool.name, "allow")}
-                    className={cn(
-                      "px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                      posture === "allow"
-                        ? "bg-primary text-primary-foreground font-semibold"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    {GRANTS_COPY.POSTURE_ALLOW}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={readOnly || !grantsArePersisted}
-                    aria-pressed={posture === "ask"}
-                    onClick={() => onChangeToolGrant(tool.name, "ask")}
-                    className={cn(
-                      "border-l border-border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                      posture === "ask"
-                        ? "bg-primary text-primary-foreground font-semibold"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )}
-                  >
-                    {GRANTS_COPY.POSTURE_ASK}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={readOnly || !grantsArePersisted}
-                    aria-pressed={posture === "deny"}
-                    onClick={() => onChangeToolGrant(tool.name, "deny")}
-                    className={cn(
-                      "border-l border-border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                      posture === "deny"
-                        ? "bg-destructive text-white font-semibold"
-                        : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
-                    )}
-                  >
-                    {GRANTS_COPY.POSTURE_DENY}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+      {/* ── 4. Applications, each owning its own bands and rows ── */}
+      {groups.length > 0 && (
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {groups.map((group) => (
+            <ApplicationGroup
+              key={group.key ?? "__single__"}
+              group={group}
+              headless={headless}
+              // ⚠ Open by default. A person who came here to change a permission should not
+              // have to discover six chevrons first; collapsing is the deliberate act.
+              expanded={!collapsed[group.key ?? "__single__"]}
+              onToggle={() =>
+                setCollapsed((prev) => {
+                  const k = group.key ?? "__single__"
+                  return { ...prev, [k]: !prev[k] }
+                })
+              }
+              toolGrants={toolGrants}
+              defaultPosture={defaultPosture}
+              readOnly={readOnly}
+              grantsArePersisted={grantsArePersisted}
+              onChangeToolGrant={onChangeToolGrant}
+              onResetToolGrant={onResetToolGrant}
+              onChangeApplicationGrant={(application, posture) =>
+                onChangeApplicationGrant?.(application, posture)
+              }
+            />
+          ))}
         </div>
       )}
     </div>

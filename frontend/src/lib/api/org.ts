@@ -462,6 +462,26 @@ export interface McpDiscoveredTool {
     readOnlyHint?: boolean
     [key: string]: unknown
   }
+  /**
+   * Phase 221 (D-221-07) — which APPLICATION this action belongs to, when the service has
+   * more than one. Google Workspace is one connection and one token covering six:
+   * `drive` | `gmail` | `sheets` | `docs` | `calendar` | `contacts`.
+   *
+   * ⚠ **THIS IS NOT `capability`, AND THAT DISTINCTION IS THE WHOLE DECISION.**
+   * `extra_descriptors_for_service` STRIPS `capability`, `http_method`, `path`,
+   * `api_method` and `writes` on purpose — *"they are ours, they are not part of any tool
+   * contract"* — and un-stripping `capability` to obtain the grouping would have shipped
+   * `googleapis.com` hosts and HTTP verbs to every picker and grant list in the product.
+   * `app` names a PRODUCT and carries no host, no path and no method.
+   *
+   * ⚠ **OPTIONAL, AND ITS ABSENCE IS MEANINGFUL RATHER THAN EMPTY.** The server omits the
+   * key entirely for a single-product service (GitHub, Jira, Notion, every MCP server)
+   * rather than sending `null`, so there is exactly ONE absent-shape for a consumer to
+   * handle. `groupToolsByApplication` reads absence as *"one unnamed application"* and
+   * renders a single collapsed group — which is how the same component draws the
+   * Rovo-shaped screen (D-221-09).
+   */
+  app?: string
 }
 
 /** What a client is allowed to learn about a connection.

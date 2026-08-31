@@ -38,6 +38,19 @@ export const GRANTS_COPY = {
   OVERRIDDEN_LABEL: "",
   OVERRIDDEN_RESET: "Use the default",
 
+  // ── Phase 221 · the application axis (D-221-01 / D-221-02) ────────────────────────────
+  APPLICATION_COUNT: (n: number) => `${n} ${n === 1 ? "action" : "actions"}`,
+  APPLICATION_POSTURE_LABEL: (app: string) => `Default for every ${app} action`,
+  // ⚠ The sentence that makes the three-rung ladder legible without a diagram.
+  APPLICATION_INHERITS: "Applications inherit this. An action inherits its application.",
+
+  // ── Phase 221 · the direction band (D-221-03) ─────────────────────────────────────────
+  // ⚠ These are HEADINGS on a band that carries no control — see `DirectionBand.tsx`. They
+  // read as a statement about the group, not as a thing to press. The per-row chips below
+  // (`DIRECTION_*`) stay as they are: same fact, different grain.
+  BAND_READS: "Only reads",
+  BAND_CHANGES: "Changes something",
+
   DIRECTION_READS: "Reads",
   DIRECTION_CHANGES: "Changes things",
   DIRECTION_UNKNOWN: "Unknown",

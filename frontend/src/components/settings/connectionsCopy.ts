@@ -33,6 +33,7 @@
  * no such field in either form, deliberately (`lib/api.ts:5535-5547`).
  */
 import type { ConnectorConnection, EffectiveFeatures, PublishedWorkflow } from "@/lib/api"
+import { connectionRowVerdict } from "./connectionRowVerdict"
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 0 · READING `live_connectors` OUT OF THE EFFECTIVE-FEATURES MAP
@@ -113,13 +114,39 @@ export const CONNECTION_STATE_CREDENTIAL_FAILED = "✕ Credential failed"
 export const CONNECTION_STATE_DISABLED = "⏻ Disabled"
 export const CONNECTION_STATE_REVOKED = "⚠ Revoked"
 
+/** Phase 221 (D-221-12) — a connection that is genuinely connected and can do NOTHING.
+ *
+ * ⚠ **THIS WORD EXISTS BECAUSE `✓ Ready` WAS A LIE ON A REAL ROW.** Measured 2026-08-30/31:
+ * Microsoft 365 read `OAuth connected · ✓ Ready` while advertising **zero** actions — an
+ * `oauth_byo` row whose discovery never completed. The credential is real, the status is
+ * `active`, and the row cannot perform a single thing.
+ *
+ * It is NOT `✕ Credential failed` (nothing failed) and NOT `◌ Not checked` (the check is
+ * not what is missing — the ACTIONS are). It is its own fact and gets its own word. */
+export const CONNECTION_STATE_UNUSABLE = "⚠ Not usable"
+
+/** Phase 221 (D-221-12) — some of this connection's applications cannot run.
+ *
+ * ⚠ Unreachable until plan 02 supplies `blockedApplicationCount`; it is declared here with
+ * its siblings rather than bolted on later, so the union is complete in one place. */
+export const CONNECTION_STATE_PARTLY = "⚠ Partly ready"
+
 /** The states this surface can render, as a closed union. */
-export type ConnectionStateKind = "ready" | "not_checked" | "failed" | "disabled" | "revoked"
+export type ConnectionStateKind =
+  | "ready"
+  | "partly"
+  | "unusable"
+  | "not_checked"
+  | "failed"
+  | "disabled"
+  | "revoked"
 
 /** Every state word, keyed by kind — so the suite can walk all four rather than name
  *  four literals it might later disagree with. */
 export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
   ready: CONNECTION_STATE_READY,
+  partly: CONNECTION_STATE_PARTLY,
+  unusable: CONNECTION_STATE_UNUSABLE,
   not_checked: CONNECTION_STATE_NOT_CHECKED,
   failed: CONNECTION_STATE_CREDENTIAL_FAILED,
   disabled: CONNECTION_STATE_DISABLED,
@@ -128,11 +155,57 @@ export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
 
 /**
  * The row's state, derived during render and never stored.
+ *
+ * ── Phase 221 (D-221-12) · AN OAUTH ROW WITH NO ACTIONS IS NEVER `Ready` ───────────────
+ * ⚠ **THE CHECK IS SCOPED TO THE `oauth_byo` ARM, AND THE SCOPE IS THE WHOLE CORRECTNESS
+ * OF IT.** That arm — `auth_type === "oauth_byo" && status === "active"` — is what made
+ * Microsoft 365 read `✓ Ready` with zero tools: an OAuth row that connected and never
+ * completed discovery satisfies both halves. *Nothing is broken* and *nothing works* are
+ * different facts, and that arm could not tell them apart.
+ *
+ * ⚠ **A FIRST CUT APPLIED IT TO EVERY SHAPE AND WAS MEASURABLY WRONG. Nine tests caught
+ * it, three of them byte-for-byte row pins, and they were RIGHT.** A CAPABILITY row
+ * (`slack`, `smtp`, `jira`) advertises its actions from `SERVICE_TOOL_SPECS` — not from
+ * `discovered_tools`, which is a presentation cache the executor never consults. An empty
+ * column there says nothing about whether the connection works, so the broad rule marked
+ * three working connections `⚠ Not usable`. **The pins existed for exactly this and the
+ * finding is theirs, not mine.**
+ *
+ * ⚠ It is placed AFTER `disabled` and `revoked` on purpose: a disabled or revoked row also
+ * has nothing usable, and those two words say something more specific about WHY.
+ *
+ * ⚠ **AND IT DOES NOT OVERRIDE `◌ Not checked`, WHICH THE FIRST CUT DID.** Nine tests
+ * caught that overcorrection, and they were right: Phase 206.1's AR-03 says an EMPTY
+ * discovery is not evidence, because a row nobody has discovered looks identical to a row
+ * discovered and found barren. `discoveryHasRun` separates them — see
+ * `connectionRowVerdict.ts`. Both readings stop the row claiming `Ready`, which is the
+ * whole defect; neither invents a fact.
+ *
+ * ⚠ So Microsoft 365 — `oauth_byo`, `active`, zero actions, never checked — now reads
+ * `◌ Not checked` rather than `✓ Ready`. It reads `⚠ Not usable` the moment somebody
+ * presses Check and discovery still finds nothing.
  */
 export function connectionStateOf(connection: ConnectorConnection): ConnectionStateKind {
   if (!connection.is_enabled) return "disabled"
   if (connection.status === "revoked") return "revoked"
-  if (connection.auth_type === "oauth_byo" && connection.status === "active") return "ready"
+
+  if (connection.auth_type === "oauth_byo" && connection.status === "active") {
+    const verdict = connectionRowVerdict({
+      toolCount: connection.discovered_tools?.length ?? 0,
+      // Plan 02 supplies this from the per-application availability probe. Until then no
+      // application can be known-blocked, so this is 0 and `partly` is unreachable — by
+      // absence of evidence, never by an assumption that everything works.
+      blockedApplicationCount: 0,
+      // ⚠ `last_check_verdict` is the ONLY record that anything ever looked. `"ok"` with
+      // zero actions is a measurement; `"not_checked"` with zero actions is an absence.
+      discoveryHasRun: connection.last_check_verdict === "ok",
+    })
+    if (verdict === "unusable") return "unusable"
+    if (verdict === "partly") return "partly"
+    // `undiscovered` falls THROUGH to `not_checked` at the bottom — AR-03's word. What it
+    // must do is skip this arm's `ready`, and it does.
+    if (verdict === "ready") return "ready"
+  }
   if (connection.last_check_verdict === "failed") return "failed"
   if (connection.last_check_verdict === "ok") return "ready"
 

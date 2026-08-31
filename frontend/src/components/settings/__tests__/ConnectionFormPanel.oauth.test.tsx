@@ -45,11 +45,29 @@ describe("Phase 215 — BYO OAuth Frontend Components & Copy Derivations", () =>
     }
     expect(connectionStateOf(revokedConn)).toBe("revoked")
 
+    // ⚠ AMENDED BY PHASE 221 (D-221-12). This assertion used to read `ready` on a fixture
+    // carrying NO `discovered_tools` at all — which is exactly the defect the operator
+    // reported on the live Microsoft 365 row: `OAuth connected · ✓ Ready` while the
+    // connection advertised zero actions and could do nothing. The fixture modelled the
+    // bug, so the fixture is what changes.
     const activeConn: ConnectorConnection = {
       ...revokedConn,
       status: "active",
+      discovered_tools: [{ name: "search_files" }],
     }
     expect(connectionStateOf(activeConn)).toBe("ready")
+
+    // ...and the same row WITHOUT actions is not Ready. It reads `not_checked` rather than
+    // `unusable` because nothing has run discovery on it — Phase 206.1's AR-03: an empty
+    // discovery is not evidence.
+    const activeButEmpty: ConnectorConnection = { ...revokedConn, status: "active" }
+    expect(connectionStateOf(activeButEmpty)).toBe("not_checked")
+
+    // Discovery HAS run and still found nothing — now it is a measurement, and the word
+    // for it is `unusable`.
+    expect(
+      connectionStateOf({ ...activeButEmpty, last_check_verdict: "ok" } as ConnectorConnection),
+    ).toBe("unusable")
   })
 
   it("credentialReadingOf renders account email and revoked state", () => {

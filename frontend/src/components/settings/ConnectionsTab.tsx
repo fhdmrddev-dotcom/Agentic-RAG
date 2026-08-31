@@ -207,6 +207,12 @@ function useIsMobile(): boolean {
 /** The state chip's tone. Colour is REINFORCEMENT — the word beside it is the carrier. */
 const STATE_TONE: Record<ConnectionStateKind, string> = {
   ready: "text-success",
+  // Phase 221 (D-221-12) — both are "connected, and it will not do what you expect", so
+  // both take the warning tone. ⚠ Neither takes `destructive`: nothing has FAILED here,
+  // and spending the red on a row that is merely undiscovered devalues it on rows that
+  // genuinely broke. The word beside the chip is the carrier, as it is for every state.
+  partly: "text-warning",
+  unusable: "text-warning",
   not_checked: "text-warning",
   failed: "text-destructive",
   disabled: "text-muted-foreground",

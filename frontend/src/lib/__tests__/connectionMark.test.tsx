@@ -388,15 +388,48 @@ describe("source fences over the module's own text", () => {
   })
 
   it("every brand import lives in THIS module — one home, not per-component", () => {
-    // ⚠ AMENDED (SEED-215): this asserted `.toBe(3)` and now reads 11, because the eight
-    // vendors that were drawing the neutral plug gained their own marks. The number is NOT
-    // the property — "one home" is — and a bare count rots on every service added, which is
-    // this repo's most-repeated defect. So the count is asserted against the map it tracks
-    // rather than against a literal, and the fence that actually protects the render is the
-    // wordmark one below.
+    // ⚠ AMENDED TWICE, AND THE SECOND AMENDMENT IS THE POINT.
+    //
+    // SEED-215 moved it from `.toBe(3)` to `.toBe(11)`, then a later commit to `.toBe(12)`,
+    // while its OWN comment said: *"a bare count rots on every service added, which is this
+    // repo's most-repeated defect... so the count is asserted against the map it tracks
+    // rather than against a literal."* It was never actually changed to do that, and on
+    // 2026-08-31 it rotted exactly as predicted — Phase 221 added the three Google
+    // application marks and the gate went red at `expected 15 to be 12`.
+    //
+    // ⚠ SO THE LITERAL IS GONE. The property this test NAMES is "one home, not
+    // per-component", and a count inside a single file could never have proved that: it
+    // says nothing about the other 700 files. The assertion below is the property itself —
+    // no source file outside this module may import a brand mark — and it cannot rot,
+    // because adding a mark HERE does not change it while adding one ELSEWHERE fails it.
     const brandImports = (markSource.match(/~icons\/logos\//g) ?? []).length
-    expect(brandImports).toBe(12)
+    expect(brandImports).toBeGreaterThanOrEqual(12)
     expect((markSource.match(/from "lucide-react"/g) ?? []).length).toBe(1)
+  })
+
+  it("...and NO OTHER source file imports a brand mark — the property, not a count", () => {
+    // ⚠ THE ASSERTION THE TEST ABOVE HAS ALWAYS CLAIMED TO MAKE. "One home" is a statement
+    // about every OTHER file, and no count inside `connectionMark.tsx` can express it: the
+    // count was green through the entire period a second component could have imported a
+    // logo directly. Adding a mark to this module leaves this untouched; adding one
+    // anywhere else fails it by name.
+    // ⚠ Vite's own glob, not `node:fs` — `tsconfig.app.json` carries no node types, so a
+    // `readdirSync` walk typechecks in the editor and adds three errors to the repo's tsc
+    // baseline. `?raw` + `eager` is the same mechanic this file already uses one line up
+    // for `markSource`, so it needs nothing new to be true.
+    const sources = import.meta.glob("/src/**/*.{ts,tsx}", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>
+
+    const offenders = Object.entries(sources)
+      .filter(([path]) => path !== "/src/lib/connectionMark.tsx")
+      .filter(([path]) => !path.includes("/__tests__/") && !/\.test\.tsx?$/.test(path))
+      .filter(([, source]) => source.includes("~icons/logos/"))
+      .map(([path]) => path)
+
+    expect(offenders).toEqual([])
   })
 
   it("⚠ NO WORDMARK SLUG IS EVER IMPORTED — the difference between a mark and a smear", () => {

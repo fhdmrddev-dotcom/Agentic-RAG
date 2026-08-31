@@ -1575,6 +1575,12 @@ export function ConnectionFormPanel({
                   return next
                 })
               }}
+              // Phase 221 (D-221-05) — the middle rung. It writes into the SAME
+              // `tool_grants` object under an `app:` key, so the existing save path,
+              // its dirty-diff and `_sanitize_tool_grants` all carry it unchanged.
+              onChangeApplicationGrant={(application, posture) => {
+                setToolGrants((prev) => ({ ...prev, [`app:${application}`]: posture }))
+              }}
               readOnly={readOnly}
               grantsArePersisted={grantsArePersisted}
               connectionName={draft.name || draft.serviceId}

@@ -121,6 +121,19 @@ import LinearIcon from "~icons/logos/linear-icon"
 import SentryIcon from "~icons/logos/sentry-icon"
 import IntercomIcon from "~icons/logos/intercom-icon"
 import MiroIcon from "~icons/logos/miro-icon"
+// ── Phase 221 (D-221-08) — the six Google APPLICATIONS under one connection.
+// ⚠ THREE OF THE SIX EXIST AND THREE DO NOT, and that was MEASURED rather than assumed —
+// against the installed `@iconify-json/logos@1.2.13`, `@iconify-json/vscode-icons` and
+// `@lobehub/icons@5.10` on 2026-08-31:
+//   logos:google-drive     256x229  ratio 1.12  ✅
+//   logos:google-gmail     256x193  ratio 1.33  ✅
+//   logos:google-calendar  256x256  ratio 1.00  ✅
+//   Sheets · Docs · Contacts —  ABSENT from all three packs.
+// All three ratios are near-square, so this file's letterboxing trap (ratio >= ~2.7, which
+// squashes a wordmark to an unreadable strip in an h-4 box) does not apply to any of them.
+import GoogleDriveIcon from "~icons/logos/google-drive"
+import GoogleGmailIcon from "~icons/logos/google-gmail"
+import GoogleCalendarIcon from "~icons/logos/google-calendar"
 
 import { cn } from "@/lib/utils"
 
@@ -207,6 +220,26 @@ const SERVICE_MARKS: Record<string, ConnectionMarkEntry> = {
   // person sees NOTHING. The import fence structurally cannot catch it — only the
   // resolved-but-INVISIBLE assertion in the suite can.
   intercom: { key: "intercom", Mark: IntercomIcon, ink: "fill" },
+
+  // ── Phase 221 (D-221-08) — one Google connection, six applications ───────────────────
+  // The whole premise of the six-application split is that these read as SIX PRODUCTS; six
+  // copies of one Google glyph would undo it at a glance.
+  //
+  // ⚠ THE THREE WITHOUT A MARK FALL BACK TO THE GOOGLE GLYPH, NOT TO THE NEUTRAL PLUG, and
+  // not to a hand-drawn monogram. The plug is measurably WRONG here — it means "a service
+  // this map has never heard of", and Sheets is not that. And a monogram tile would need
+  // six new hand-authored components, which is exactly what the icon convention forbids:
+  // provider marks are SINGLE-SOURCE from the installed packs, everywhere. So the honest
+  // fallback is the parent brand: "a Google product with no distinct mark installed".
+  //
+  // ⚠ RE-OPEN TRIGGER: the day `logos:google-sheets` / `-docs` / `-contacts` appear in a
+  // pack upgrade, these three rows become real marks and nothing else changes.
+  "google-drive": { key: "google-drive", Mark: GoogleDriveIcon, ink: "self" },
+  "google-gmail": { key: "google-gmail", Mark: GoogleGmailIcon, ink: "self" },
+  "google-calendar": { key: "google-calendar", Mark: GoogleCalendarIcon, ink: "self" },
+  "google-sheets": { key: "google-sheets", Mark: GoogleIcon, ink: "self" },
+  "google-docs": { key: "google-docs", Mark: GoogleIcon, ink: "self" },
+  "google-contacts": { key: "google-contacts", Mark: GoogleIcon, ink: "self" },
 }
 
 /**

@@ -1703,7 +1703,11 @@ const BASELINE = {
   // a pin necessarily deletes a line — which this file's own ledger row names as the thing
   // that makes a `-0` deletion check wrong. ADDING a pin is not RAISING one; this edit is
   // additions only.
-  "connectionMark.test.tsx": 39,
+  // ⚠ RE-BASELINED 39 -> 75 in Phase 221. The old floor was 36 cases below the actual
+  // count, so this file could have LOST half its assertions and the gate would have said
+  // OK. The rise is not this phase's work — 221 adds exactly one case (the "one home"
+  // repo scan); it is 36 cases of drift the stale pin was hiding.
+  "connectionMark.test.tsx": 75,
   // ── 214-08 (STEP-04 / SC#4 / D-214-16) — the shared step-identity element's own suite, ──
   // ── pinned in the commit that creates it, because a `BASELINE` key naming a path that ──
   // ── does not yet exist makes this gate ERROR (exit 2) rather than fail. ──────────────
@@ -2804,6 +2808,19 @@ const BASELINE = {
   "apiBarrel.test.ts": 5,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
+  // ── Added in Phase 221 (221-01 / T7), every value read from THIS script's own printed
+  // ── `— N new` column in the same run that adopted them. Not booked ahead: an unpinned
+  // ── file is not lightly guarded, it is UNGUARDED — its count can fall to 1 and the gate
+  // ── still reports OK.
+  //
+  // ⚠ `ConnectionFormPanel.oauth.test.tsx` is a FIND, not a new file. It has shipped since
+  // Phase 215 and sat in NEITHER knob, so the gate never ran it and nothing guarded it —
+  // the sixth suite found in that state inside a week. TARGETS decides what RUNS and
+  // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one.
+  "ConnectionFormPanel.oauth.test.tsx": 8,
+  "toolGroups.test.ts": 21,
+  "ConnectionGrantsList.grouping.test.tsx": 16,
+  "connectionRowVerdict.test.ts": 14,
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
   // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
@@ -4093,6 +4110,18 @@ const TARGETS = [
   "src/lib/__tests__/apiBarrel.test.ts",
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "src/components/settings/__tests__/ConnectionGrantsList.test.tsx",
+  // ── Added in Phase 221 (221-01 / T7) — the six-application split ─────────────
+  // ⚠ FOUR lines, and the fourth is a FIND rather than a new file:
+  // `ConnectionFormPanel.oauth.test.tsx` has shipped since Phase 215 and was in
+  // NEITHER knob — the gate has never executed it and nothing guarded its count.
+  // That is the sixth suite found in this state inside a week (three chat suites on
+  // 2026-08-31, one of them RED for hours unseen), and the cause is structural: the
+  // `src/components/settings/` entries here are FILE-LEVEL by deliberate choice, so
+  // every new file under it is invisible until somebody types its name.
+  "src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx",
+  "src/components/settings/toolGroups.test.ts",
+  "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
+  "src/components/settings/connectionRowVerdict.test.ts",
   // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
   // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
   // ── whole script returned NOTHING before this line was written. `src/components/metadata`
