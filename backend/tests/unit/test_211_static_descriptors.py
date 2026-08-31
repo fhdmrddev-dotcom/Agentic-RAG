@@ -41,7 +41,20 @@ _CAPABILITIES: list[str] = sorted(EXTERNAL_ACTION_CAPABILITIES)
 #: The four keys ``descriptor_for`` emits. This IS a literal, deliberately: it is the shape
 #: contract with the sanitizer (D-211-05), and a derived version would compare the module
 #: against itself.
-_DESCRIPTOR_KEYS = {"name", "title", "description", "inputSchema"}
+#: ⚠ `annotations` JOINED THIS SET DELIBERATELY, AND THE FENCE IS WHAT FORCED THE RIGHT
+#: SHAPE. A first-party descriptor now carries `annotations.readOnlyHint`, so the grant
+#: list can say "ONLY READS" / "CHANGES SOMETHING OUTSIDE" about an action written in this
+#: tree instead of "this server does not say" — a sentence that was true of a remote
+#: server and never true of an adapter beside the code that performs it.
+#:
+#: The first cut emitted a TOP-LEVEL `readOnlyHint` and this fence caught it. That key is
+#: not one `mcp_client` emits (the specification puts the hint inside `annotations`), so it
+#: would have made these rows a shape no downstream reader was written against — which is
+#: exactly the indistinguishability D-211-05 claims. The set below widened; the CLAIM did
+#: not, because `annotations` is already in `_SANITIZER_EMITTABLE_KEYS`.
+#:
+#: ⚠ IT GRANTS NOTHING. No gate reads the hint; it changes one sentence on a grant row.
+_DESCRIPTOR_KEYS = {"name", "title", "description", "inputSchema", "annotations"}
 
 #: Every key the sanitizer emits or MAY emit after D-211-09 widens it. A descriptor key
 #: outside this set would be a key no discovered tool can carry, which is the one way a

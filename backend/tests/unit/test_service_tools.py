@@ -77,9 +77,36 @@ def test_a_descriptor_carries_the_four_sanitized_keys_and_no_plumbing():
     rendered to a person as if it were part of the tool's contract."""
     for service in ("slack", "jira"):
         for descriptor in extra_descriptors_for_service(service):
-            assert set(descriptor) == {"name", "title", "description", "inputSchema"}
+            assert set(descriptor) == {
+                "name", "title", "description", "inputSchema", "annotations",
+            }
             assert descriptor["title"] and descriptor["description"]
             assert descriptor["inputSchema"]["type"] == "object"
+            assert isinstance(descriptor["annotations"]["readOnlyHint"], bool)
+
+
+def test_a_read_is_marked_as_a_read_and_a_write_is_not():
+    """The grant list renders "ONLY READS" from `readOnlyHint === true` and
+    "does not say whether this action only reads" from its ABSENCE. Before this the
+    first-party rows all showed the second sentence, which was true of a remote server
+    and never true of an action authored in this tree.
+
+    ⚠ It widens nothing: no gate reads the hint, and every action still arrives ungranted.
+    """
+    by_name = {d["name"]: d for d in extra_descriptors_for_service("slack")}
+    assert by_name["list_channels"]["annotations"]["readOnlyHint"] is True
+    assert by_name["read_channel"]["annotations"]["readOnlyHint"] is True
+    assert by_name["post_message_to_channel"]["annotations"]["readOnlyHint"] is False
+
+    jira = {d["name"]: d for d in extra_descriptors_for_service("jira")}
+    assert jira["search_issues"]["annotations"]["readOnlyHint"] is True
+    assert jira["add_comment"]["annotations"]["readOnlyHint"] is False
+
+    # And the capability verbs, so the list is not honest in only half its rows. Every
+    # capability in the closed set SENDS something, so none of them only reads.
+    for capability in ("post_message", "create_ticket", "send_email"):
+        annotations = static_descriptors_for_capability(capability)[0]["annotations"]
+        assert annotations["readOnlyHint"] is False
 
 
 def test_every_spec_hangs_off_an_existing_capability_and_adds_no_verb():

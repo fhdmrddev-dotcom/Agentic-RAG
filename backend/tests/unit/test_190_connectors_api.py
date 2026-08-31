@@ -759,7 +759,15 @@ def test_a_new_capability_row_is_born_advertising_its_own_action(
     # Every descriptor carries the four keys a sanitized tool carries, and NOTHING else -
     # the execution fields (http method, api method, path) are ours and never leave
     # `service_tools.py`. A URL path on a grant list is a leak of our own plumbing.
-    assert all(set(t) == {"name", "title", "description", "inputSchema"} for t in tools), tools
+    assert all(
+        set(t) == {"name", "title", "description", "inputSchema", "annotations"}
+        for t in tools
+    ), tools
+    # `annotations.readOnlyHint` is how the grant list says "ONLY READS" instead of "this
+    # server does not say" — the second sentence was true of a remote server and never
+    # true of an action authored in this tree. It is inside `annotations` because that is
+    # the only shape the tool sanitizer can produce (D-211-05).
+    assert all(isinstance(t["annotations"]["readOnlyHint"], bool) for t in tools), tools
     # A descriptor ADVERTISES an action; it does not GRANT one. The executor's gate denies on
     # a missing grant key by design, and that asymmetry is the desirable direction.
     assert insert_row["tool_grants"] == {}, insert_row

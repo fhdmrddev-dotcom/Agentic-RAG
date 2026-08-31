@@ -356,6 +356,22 @@ def spec_for(service_id: str, tool_name: str) -> dict[str, Any] | None:
     return None
 
 
+#: ⚠ WE ARE THE SERVER FOR THESE ACTIONS, SO THE HINT IS FIRST-PARTY AND NOT A CLAIM
+#: TO DISTRUST. CLAUDE.md's caution — "`readOnlyHint` may be carried but MUST NOT be
+#: depended on ... a hint from an untrusted server may never WIDEN a permission" — is
+#: about a REMOTE server describing itself. These descriptors are authored in this tree
+#: beside the code that performs them, so the hint is as trustworthy as the call.
+#:
+#: ⚠ IT GOES INSIDE `annotations`, AND THE FIRST CUT PUT IT AT THE TOP LEVEL AND WAS
+#: WRONG. `test_211_static_descriptors` asserts that a first-party descriptor is
+#: INDISTINGUISHABLE from a sanitized discovered tool — same key set, and no key the
+#: sanitizer could never produce. `mcp_client` emits `annotations` (the spec puts the
+#: hint there) and never a bare `readOnlyHint`, so a top-level key made these rows a
+#: shape no reader was written against. The fence caught it; the fence was right.
+#:
+#: ⚠ AND IT WIDENS NOTHING. It changes one SENTENCE on the grant row — "ONLY READS"
+#: instead of "does not say whether this action only reads" — and no gate anywhere reads
+#: it. Every action still arrives ungranted, and a missing grant key still denies.
 def extra_descriptors_for_service(service_id: str) -> list[dict[str, Any]]:
     """The advertisement shape — the same four keys a sanitized tool carries, same order.
 
@@ -370,6 +386,7 @@ def extra_descriptors_for_service(service_id: str) -> list[dict[str, Any]]:
             "title": spec["title"],
             "description": spec["description"],
             "inputSchema": spec["inputSchema"],
+            "annotations": {"readOnlyHint": not spec["writes"]},
         }
         for spec in SERVICE_TOOL_SPECS.get((service_id or "").strip().lower(), [])
     ]

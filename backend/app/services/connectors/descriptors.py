@@ -167,6 +167,16 @@ def descriptor_for(capability: str) -> dict[str, Any]:
         "description": _DESCRIPTION_FOR_CAPABILITY[capability],
         # DERIVED from the adapter's own declaration — never retyped. See the docstring.
         "inputSchema": _plain_json(adapter.INPUT_SCHEMA),
+        # ⚠ FALSE FOR ALL THREE, AND IT IS A FACT RATHER THAN A DEFAULT. Every capability
+        # in the closed set SENDS something — an email, an issue, a message — so none of
+        # them only reads. Emitting it means the grant list says "CHANGES SOMETHING
+        # OUTSIDE" on these rows instead of "this server does not say", which was true of
+        # a remote server and never true of an adapter written in this tree.
+        # ⚠ INSIDE `annotations`, because D-211-05 says this object must be a shape the
+        # sanitizer could have produced — and the sanitizer emits `annotations`, never a
+        # bare hint. `test_211_static_descriptors` is the fence, and it caught the first
+        # cut of this line.
+        "annotations": {"readOnlyHint": False},
     }
 
 

@@ -59,6 +59,23 @@ export function ConnectionGrantsList({
     })
   }, [tools, search])
 
+/** The direction hint, read from BOTH places it can legally live.
+ *
+ * ⚠ THE `annotations` ARM WAS MISSING AND THAT MADE PHASE 209 HALF-DEAD. `mcp_client.py`
+ * forwards a server's `annotations` object verbatim *"so `readOnlyHint` reaches the
+ * frontend"* — and nothing here ever looked inside it, so a server that DID annotate its
+ * tools still rendered "this server does not say". The top-level field is read first
+ * because it is the flatter, more specific spelling; the specification puts the hint
+ * inside `annotations`, which is why the fallback is the one that fires in practice.
+ *
+ * ⚠ ABSENCE STILL MEANS UNKNOWN, AND UNKNOWN STILL MEANS TREAT AS DESTRUCTIVE. This
+ * resolves where to LOOK, never what to assume — `?? undefined` rather than `?? false`,
+ * because a hint nobody gave is not a hint that says no.
+ */
+function directionHint(tool: { readOnlyHint?: boolean; annotations?: { readOnlyHint?: boolean } }) {
+  return tool.readOnlyHint ?? tool.annotations?.readOnlyHint
+}
+
   /** Does ANY action on this connection have an unknown direction?
    *
    *  ⚠ Derived from `tools`, NOT from `filteredTools`: the sentence explains a property of
@@ -67,7 +84,7 @@ export function ConnectionGrantsList({
    *  narrows a 44-row list — the same "is it still true?" jitter the reserved edge lane
    *  exists to prevent one grain down. */
   const anyUnknownDirection = useMemo(
-    () => tools.some((tool) => tool.readOnlyHint == null),
+    () => tools.some((tool) => directionHint(tool) == null),
     [tools],
   )
 
@@ -191,10 +208,12 @@ export function ConnectionGrantsList({
               defaultPosture,
             )
 
-            // Direction calculation
-            const isRead = tool.readOnlyHint === true
-            const isChange = tool.readOnlyHint === false
-            const isUnknown = tool.readOnlyHint == null
+            // Direction calculation — one resolver, so the row and the summary sentence
+            // above it can never disagree about the same tool.
+            const hint = directionHint(tool)
+            const isRead = hint === true
+            const isChange = hint === false
+            const isUnknown = hint == null
 
             return (
               <div
