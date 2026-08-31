@@ -332,16 +332,39 @@ def _sanitize_tool_grants(tool_grants: dict) -> dict[str, str]:
 
     Raises ``ValueError`` — mapped to a 422 by both routers, per the WR-02 convention.
     """
+    from app.services.connectors.grants import APPLICATION_GRANT_PREFIX
+
     clean: dict[str, str] = {}
     for key, value in tool_grants.items():
+        name = str(key)
+        # ⚠ Phase 221 (D-221-05) — THE KEY SHAPE IS NOW CHECKED, AND IT WAS NOT BEFORE.
+        # Every key used to pass through on `str(key)`, so `app:drive` already survived
+        # this function untouched — which is why the application rung needs no migration.
+        # But the same silence accepted `foo:bar`, and a namespace nobody implements is a
+        # grant that reads as configured and resolves as nothing. Two shapes are legal: a
+        # bare tool name, and exactly one `app:` key. Anything else is refused for the
+        # identical reason a bad VALUE is refused above — refuse, never coerce, so the
+        # write goes RED at the seam instead of storing something the gate cannot read.
+        if ":" in name and not name.startswith(APPLICATION_GRANT_PREFIX):
+            raise ValueError(
+                f"tool grant key {name!r} uses an unknown namespace. Only a bare tool "
+                f"name or an {APPLICATION_GRANT_PREFIX!r}-prefixed application key is "
+                f"valid. Refused rather than stored: a namespace nothing resolves would "
+                f"read as configured and grant nothing."
+            )
+        if name.startswith(APPLICATION_GRANT_PREFIX) and not name[len(APPLICATION_GRANT_PREFIX):].strip():
+            raise ValueError(
+                f"tool grant key {name!r} names no application. Refused rather than "
+                f"stored: an empty application key can never match a tool."
+            )
         if not isinstance(value, str) or value not in _LEGAL_GRANT_VALUES:
             raise ValueError(
-                f"tool grant {str(key)!r} has the value {value!r} "
+                f"tool grant {name!r} has the value {value!r} "
                 f"({type(value).__name__}), which is not one of "
                 f"{sorted(_LEGAL_GRANT_VALUES)}. Refused rather than coerced: "
                 f"only 'allow', 'ask', or 'deny' are valid approval postures."
             )
-        clean[str(key)] = value
+        clean[name] = value
     return clean
 
 
