@@ -57,6 +57,39 @@ OAUTH_PROVIDERS: dict[OAuthProvider, dict[str, Any]] = {
             "https://www.googleapis.com/auth/documents.readonly",
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/contacts.readonly",
+            # ── WRITES · Phase 221 step 2 (2026-09-01, operator-chosen) ────────────────
+            # ⚠ THE "STOP: `.readonly`, never `.modify` or `.send`" ABOVE IS SUPERSEDED,
+            # NOT VIOLATED, AND ONLY FOR THE FOUR LINES BELOW. That instruction was the
+            # reads-first decision; the operator lifted it deliberately after the approval
+            # model shipped, and the standing rule it enforced still binds every scope not
+            # named here. It is kept above rather than deleted, because the reasoning —
+            # *a wider scope grants more than any code can use, which is the grant nobody
+            # can audit later* — is exactly why this list is as narrow as it is.
+            #
+            # ⚠ `gmail.send` IS DELIBERATELY ABSENT. `gmail.compose` creates a DRAFT and
+            # cannot deliver one. The operator chose drafts-only on a stated reason: SMTP
+            # already sends mail through a path that has been approval-gated since Phase
+            # 190, and a draft is the one shape of outbound mail a person still reads
+            # before it leaves. Adding `.send` later is a scope change and a re-consent —
+            # which is the correct cost for that decision, not an obstacle to it.
+            #
+            # ⚠ `drive.file`, NOT `drive`. The app sees and edits ONLY files IT created.
+            # Consequence the operator confirmed: `update_file` cannot touch a document
+            # they made themselves, and that refusal is the safety property, not a gap.
+            # `drive.file` is also neither sensitive nor restricted, unlike `drive`.
+            #
+            # ⚠ NO DELETE SCOPE IS BROADER THAN A WRITE ONE HERE, so "creates and updates
+            # only" is enforced by the TOOL SET rather than by the scopes: `calendar.events`
+            # can delete an event and `drive.file` can trash an app-created file. Nothing
+            # advertises those actions, and `_TOOL_REGISTRY` is the audit surface — the
+            # standing rule is that no outbound capability exists before its approval model
+            # does, and none exists for a delete.
+            "https://www.googleapis.com/auth/drive.file",
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/documents",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/contacts",
         ],
         "supports_pkce": True,
         "access_type": "offline",

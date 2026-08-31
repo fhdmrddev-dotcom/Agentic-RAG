@@ -2819,7 +2819,9 @@ const BASELINE = {
   // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one.
   "ConnectionFormPanel.oauth.test.tsx": 8,
   "toolGroups.test.ts": 21,
-  "ConnectionGrantsList.grouping.test.tsx": 16,
+  // Step 2 (2026-09-01): +3 — the two band cases for a mixed-direction application and
+  // the D-221-06 rendering case. Read from the gate's own printed column.
+  "ConnectionGrantsList.grouping.test.tsx": 18,
   "connectionRowVerdict.test.ts": 14,
   // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
   // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An

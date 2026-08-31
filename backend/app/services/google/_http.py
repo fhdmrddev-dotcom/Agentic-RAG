@@ -265,6 +265,62 @@ async def post_json(
     return jsonlib.loads(resp.body)
 
 
+async def write_json(
+    capability: str,
+    connection_id: str | UUID,
+    method: str,
+    url: str,
+    payload: Mapping[str, Any] | None = None,
+    params: Mapping[str, str] | None = None,
+    *,
+    what: str,
+    max_bytes: int = 512 * 1024,
+    timeout: float = 25.0,
+) -> Any:
+    """One WRITE — the only function in this module that changes anything at Google.
+
+    ⚠ **SEPARATE FROM `post_json` ON PURPOSE, AND THAT SEPARATION IS THE POINT.**
+    `post_json`'s docstring promises *"a POST here is still a read"* and tells the next
+    author not to reach for it to add a write. Widening it would have made that promise
+    false for its one existing caller (`calendar.find_free_time`) without editing a line of
+    that caller — the sentence would still be there, and it would be a lie. So writes get
+    their own door, and `post_json`'s guarantee stays true and greppable.
+
+    ⚠ **IT REFUSES A `*_read` CAPABILITY OUTRIGHT.** Every read key is bound to a
+    `.readonly` OAuth scope, so a write attempted under one would fail at Google anyway —
+    but it would fail as a confusing 403 about scopes rather than as our own bug. The
+    assertion turns a mis-wired spec into an immediate, named error at the seam, which is
+    the same refuse-never-degrade stance `_sanitize_tool_grants` takes one layer up.
+
+    ⚠ Accepts the 2xx family, not just 200. Google answers `201 Created` for a created
+    calendar event and a created Drive file; a `== 200` check — the shape both read helpers
+    above use correctly — would turn every successful create into a reported failure.
+    """
+    if capability.endswith("_read"):
+        raise GoogleReadError(
+            f"{what} was NOT sent: it declares the read-only capability {capability!r}. "
+            "A write must declare its own '*_write' key — this is a wiring error, not a "
+            "permission the person can grant."
+        )
+
+    token = await _token(connection_id)
+    resp = await send_pinned_http(
+        capability,
+        method.upper(),
+        url,
+        params=dict(params or {}),
+        json=dict(payload) if payload is not None else None,
+        headers={"authorization": f"Bearer {token}", "Accept": "application/json"},
+        timeout=timeout,
+        max_bytes=max_bytes,
+    )
+    if not (200 <= resp.status_code < 300):
+        _raise_for(resp.status_code, resp.body, what)
+    if not resp.body:
+        return {}
+    return jsonlib.loads(resp.body)
+
+
 def decode_b64url(data: str | None) -> bytes:
     """Google's base64url with the padding it omits. Empty on anything malformed.
 

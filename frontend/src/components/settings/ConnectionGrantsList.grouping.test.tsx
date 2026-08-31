@@ -135,9 +135,45 @@ describe("D-221-09 — one component, both shapes", () => {
     expect(screen.getByTestId("action-row-ask_question")).toBeInTheDocument()
   })
 
-  it("Google renders no bands today, because every application is reads-only", () => {
+  it("an application with only ONE direction gets no band — it would distinguish nothing", () => {
+    // ⚠ RENAMED IN STEP 2. This read "Google renders no bands today, because every
+    // application is reads-only" — true of the FIXTURE, and no longer true of the product:
+    // eleven writes shipped 2026-09-01, so every Google application now has both. The
+    // property being asserted was always about single-direction groups, and the fixture is
+    // what carries it.
     renderList(GOOGLE)
     expect(screen.queryByTestId("direction-band-read")).toBeNull()
+  })
+
+  it("⭐ an application with BOTH directions bands them, per application", () => {
+    // The sketch's Case A, now real: Drive has 2 reads + 2 writes, Docs has 1 + 2.
+    const withWrites = [
+      ...GOOGLE,
+      tool("create_file", { app: "drive", readOnly: false }),
+      tool("update_file", { app: "drive", readOnly: false }),
+      tool("draft_email", { app: "gmail", readOnly: false }),
+    ]
+    renderList(withWrites)
+    // ⚠ Bands are scoped to their application, so there are as many as there are
+    // mixed-direction groups — never one pair for the whole connection.
+    expect(screen.getAllByTestId("direction-band-read")).toHaveLength(2)
+    expect(screen.getAllByTestId("direction-band-write")).toHaveLength(2)
+    // Sheets/Docs/Calendar/Contacts are still reads-only in this fixture, so they get none.
+    expect(screen.getByTestId("application-header-sheets")).toBeInTheDocument()
+  })
+
+  it("⛔ a write is shown at Ask even when its application is set to Allow (D-221-06)", () => {
+    const withWrites = [
+      tool("search_files", { app: "drive", readOnly: true }),
+      tool("create_file", { app: "drive", readOnly: false }),
+    ]
+    renderList(withWrites, { toolGrants: { "app:drive": "allow" } })
+    expect(
+      within(screen.getByTestId("action-row-search_files")).getByRole("button", { name: "Allow" }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      within(screen.getByTestId("action-row-create_file")).getByRole("button", { name: "Ask first" }),
+    ).toHaveAttribute("aria-pressed", "true")
   })
 })
 

@@ -248,16 +248,32 @@ def test_the_gmail_key_is_WHOLLY_wired_into_the_binder():
     assert _TLS_SCHEMES["gmail_read"] == frozenset({"https"})
 
 
-def test_no_gmail_tool_writes_and_the_scope_is_readonly():
+def test_no_gmail_tool_sends_and_no_send_scope_is_granted():
+    """⚠ NARROWED BY PHASE 221 STEP 2 (operator, 2026-09-01) — DELIBERATELY, NOT QUIETLY.
+
+    This asserted `tool["writes"] is False` for EVERY Google tool and forbade
+    `gmail.compose`. Both were correct statements of the reads-first decision, and the
+    operator lifted that decision after the approval model shipped. A fence whose premise
+    has changed must be NARROWED to what is still true — deleting it is how the next
+    decision it was protecting gets lost silently.
+
+    ⛔ WHAT STILL HOLDS, and is what this now guards: **nothing sends mail.** `draft_email`
+    writes a draft and cannot deliver it, because the token carries `gmail.compose` and
+    never `gmail.send`. That is the operator's stated line — SMTP already sends through a
+    path approval-gated since Phase 190, and a draft is the one shape of outbound mail a
+    person still reads before it leaves.
+    """
     from app.services.connectors.service_tools import SERVICE_TOOL_SPECS
     from app.services.oauth_service import OAUTH_PROVIDERS
 
-    for tool in SERVICE_TOOL_SPECS["google"]:
-        assert tool["writes"] is False, f"{tool['name']} claims to write"
+    gmail_tools = [t for t in SERVICE_TOOL_SPECS["google"] if t.get("app") == "gmail"]
+    writes = [t["name"] for t in gmail_tools if t["writes"]]
+    assert writes == ["draft_email"], writes
 
     scopes = OAUTH_PROVIDERS["google"]["default_scopes"]
     assert "https://www.googleapis.com/auth/gmail.readonly" in scopes
-    # ⛔ A wider mail scope would grant more than any shipped code can use — the grant
-    # nobody can audit later.
-    for forbidden in ("gmail.send", "gmail.modify", "gmail.compose", "mail.google.com"):
+    assert "https://www.googleapis.com/auth/gmail.compose" in scopes
+    # ⛔ STILL FORBIDDEN. `compose` drafts; `send` delivers; `modify` and `mail.google.com`
+    # can do both and more. Only the first is granted.
+    for forbidden in ("gmail.send", "gmail.modify", "mail.google.com"):
         assert not any(forbidden in s for s in scopes), f"{forbidden} must not be granted"

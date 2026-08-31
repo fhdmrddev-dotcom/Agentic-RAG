@@ -272,6 +272,20 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     "docs_read": ("googleapis.com",),
     "calendar_read": ("googleapis.com",),
     "contacts_read": ("googleapis.com",),
+    # ── WRITES · Phase 221 step 2 (2026-09-01) ────────────────────────────────────────
+    # ⚠ SIX MORE KEYS ON ONE HOST, AND THE REASON IS THE SAME ONE STATED ABOVE, SHARPENED.
+    # These buy no HOST separation — everything Google is `googleapis.com`. What they buy
+    # is that a spec declares exactly ONE key, so `grep -c "drive_write"` over
+    # `SERVICE_TOOL_SPECS` answers *"which actions can change a Drive"* exactly, and a READ
+    # tool structurally cannot name a write key. Folding writes into `*_read` would have
+    # made that question unanswerable from the code, on the one axis where the answer
+    # matters most.
+    "drive_write": ("googleapis.com",),
+    "gmail_write": ("googleapis.com",),
+    "sheets_write": ("googleapis.com",),
+    "docs_write": ("googleapis.com",),
+    "calendar_write": ("googleapis.com",),
+    "contacts_write": ("googleapis.com",),
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -284,6 +298,12 @@ _HOST_MATCH: dict[str, str] = {
     "docs_read": _SUFFIX,
     "calendar_read": _SUFFIX,
     "contacts_read": _SUFFIX,
+    "drive_write": _SUFFIX,
+    "gmail_write": _SUFFIX,
+    "sheets_write": _SUFFIX,
+    "docs_write": _SUFFIX,
+    "calendar_write": _SUFFIX,
+    "contacts_write": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -298,6 +318,12 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "docs_read": frozenset({"https"}),
     "calendar_read": frozenset({"https"}),
     "contacts_read": frozenset({"https"}),
+    "drive_write": frozenset({"https"}),
+    "gmail_write": frozenset({"https"}),
+    "sheets_write": frozenset({"https"}),
+    "docs_write": frozenset({"https"}),
+    "calendar_write": frozenset({"https"}),
+    "contacts_write": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {

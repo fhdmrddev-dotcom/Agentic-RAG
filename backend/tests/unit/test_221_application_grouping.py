@@ -29,8 +29,14 @@ from app.services.connectors.service_tools import (
     extra_descriptors_for_service,
 )
 
-#: The six applications and their measured action counts (2026-08-31, live probe).
-EXPECTED_COUNTS = {"drive": 2, "gmail": 5, "sheets": 2, "docs": 1, "calendar": 4, "contacts": 1}
+#: The six applications and their READ counts (2026-08-31, live probe).
+READ_COUNTS = {"drive": 2, "gmail": 5, "sheets": 2, "docs": 1, "calendar": 4, "contacts": 1}
+
+#: ⚠ TOTALS AFTER STEP 2 (2026-09-01). Kept as a separate constant from `READ_COUNTS`
+#: rather than edited over it: several assertions below are about the READ surface
+#: specifically — the backfill heals a cache written when only reads existed — and a single
+#: constant serving both questions would have silently changed what those tests assert.
+EXPECTED_COUNTS = {"drive": 4, "gmail": 6, "sheets": 4, "docs": 3, "calendar": 6, "contacts": 3}
 
 #: The keys `extra_descriptors_for_service` exists to strip. Named here rather than
 #: recited inline, so widening the strip is one edit in the source and one here.
@@ -46,7 +52,7 @@ def _conn(grants: dict, default: str | None = "ask") -> dict:
 
 def test_every_google_descriptor_carries_an_app():
     descriptors = extra_descriptors_for_service("google")
-    assert len(descriptors) == 15
+    assert len(descriptors) == 26  # 15 reads + 11 writes
     assert all("app" in d for d in descriptors), [
         d["name"] for d in descriptors if "app" not in d
     ]
@@ -342,3 +348,158 @@ def test_every_enforcement_gate_resolves_the_application(module_path, symbol):
     assert symbol in src, f"{module_path} never resolves the application/direction pair"
     # ...and it must actually PASS them, not merely import them.
     assert "application=" in src and "is_write=" in src, module_path
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# 7 · WRITES (Phase 221 step 2, operator 2026-09-01)
+#
+# ⚠ Section 3 proved D-221-06 against a PLANTED write because no real one existed. Eleven
+# now do, so the same rule is re-proved against the SHIPPED specs — a rule that holds for a
+# fixture and not for production is not a rule.
+# ══════════════════════════════════════════════════════════════════════════════════════
+
+WRITE_COUNTS = {"drive": 2, "gmail": 1, "sheets": 2, "docs": 2, "calendar": 2, "contacts": 2}
+
+
+def _google(name: str) -> dict:
+    for spec in SERVICE_TOOL_SPECS["google"]:
+        if spec["name"] == name:
+            return spec
+    raise AssertionError(f"no google spec named {name!r}")
+
+
+def test_the_eleven_writes_exist_with_their_applications():
+    writes = [s for s in SERVICE_TOOL_SPECS["google"] if s["writes"]]
+    counts: dict[str, int] = {}
+    for s in writes:
+        counts[s["app"]] = counts.get(s["app"], 0) + 1
+    assert counts == WRITE_COUNTS
+    assert len(SERVICE_TOOL_SPECS["google"]) == 26  # 15 reads + 11 writes
+
+
+def test_every_write_declares_its_own_write_egress_key():
+    """⚠ A read tool must be structurally unable to name a write key, and vice versa."""
+    for spec in SERVICE_TOOL_SPECS["google"]:
+        key = spec["capability"]
+        assert key.endswith("_write" if spec["writes"] else "_read"), (spec["name"], key)
+        assert key.startswith(spec["app"]), (spec["name"], key)
+
+
+def test_the_write_keys_are_registered_in_all_three_egress_tables():
+    """A key the egress guard does not know refuses at send time, not at import."""
+    from app.security.egress import ALLOWED_HOST_SUFFIXES, _HOST_MATCH, _TLS_SCHEMES
+
+    for spec in SERVICE_TOOL_SPECS["google"]:
+        if not spec["writes"]:
+            continue
+        key = spec["capability"]
+        assert key in ALLOWED_HOST_SUFFIXES, key
+        assert key in _HOST_MATCH, key
+        assert _TLS_SCHEMES[key] == frozenset({"https"}), key
+
+
+def test_every_write_resolves_to_a_real_callable():
+    """Phase 190's lesson: three module paths were registered when one adapter existed."""
+    import importlib
+
+    from app.services.connectors.service_tools import _GOOGLE_READ_CALLS
+
+    for spec in SERVICE_TOOL_SPECS["google"]:
+        if not spec["writes"]:
+            continue
+        module_path, func_name = _GOOGLE_READ_CALLS[spec["capability"]][spec["name"]]
+        module = importlib.import_module(module_path)
+        assert callable(getattr(module, func_name, None)), spec["name"]
+
+
+@pytest.mark.parametrize("tool", sorted(s["name"] for s in SERVICE_TOOL_SPECS["google"] if s["writes"]))
+def test_no_shipped_write_is_armed_by_an_application_allow(tool):
+    """⭐ D-221-06 AGAINST THE REAL SPECS, every one of them.
+
+    Section 3 used a planted `create_file` because nothing real existed. This parametrises
+    over what actually ships, so a twelfth write added without thought is covered the day
+    it lands rather than the day somebody remembers to extend a fixture.
+    """
+    from app.services.connectors.service_tools import tool_facet
+
+    spec = _google(tool)
+    application, is_write = tool_facet("google", tool)
+    assert is_write is True, tool
+    assert application == spec["app"]
+
+    conn = _conn({application_grant_key(application): "allow"}, default="ask")
+    posture = resolve_effective_posture(conn, tool, application=application, is_write=is_write)
+    assert posture == "ask", f"{tool} was armed by an application-level allow"
+
+    # ...and an explicit per-action grant still works, so the cap withholds rather than blocks.
+    conn_explicit = _conn(
+        {application_grant_key(application): "allow", tool: "allow"}, default="ask"
+    )
+    assert (
+        resolve_effective_posture(
+            conn_explicit, tool, application=application, is_write=is_write
+        )
+        == "allow"
+    )
+
+
+def test_reads_in_the_same_application_are_unaffected():
+    """The cap is about DIRECTION, not about the application. Drive reads still inherit."""
+    conn = _conn({"app:drive": "allow"}, default="ask")
+    assert resolve_effective_posture(conn, "search_files", application="drive", is_write=False) == "allow"
+    assert resolve_effective_posture(conn, "create_file", application="drive", is_write=True) == "ask"
+
+
+# ── the two absences the operator chose, asserted rather than trusted ─────────────────
+
+
+def test_nothing_sends_mail_and_nothing_deletes():
+    """⛔ The operator chose drafts-only and creates-and-updates-only.
+
+    ⚠ Asserted over the SPEC NAMES, which is the surface an audit greps and the surface a
+    model is handed. A scope wide enough to delete is not the same as an action that does.
+    """
+    names = {s["name"] for s in SERVICE_TOOL_SPECS["google"]}
+    forbidden = {
+        "send_email", "send_message", "send_mail",
+        "delete_event", "delete_file", "trash_file", "delete_contact", "clear_values",
+    }
+    assert names & forbidden == set(), sorted(names & forbidden)
+    assert "draft_email" in names
+
+
+def test_the_send_scope_is_absent_and_drive_is_narrow():
+    from app.services.oauth_service import OAUTH_PROVIDERS
+
+    scopes = set(OAUTH_PROVIDERS["google"]["default_scopes"])
+    assert "https://www.googleapis.com/auth/gmail.send" not in scopes
+    assert "https://www.googleapis.com/auth/gmail.compose" in scopes
+    # ⚠ `drive.file` (app-created only), never the full `drive` scope.
+    assert "https://www.googleapis.com/auth/drive.file" in scopes
+    assert "https://www.googleapis.com/auth/drive" not in scopes
+
+
+def test_create_event_cannot_invite_anybody():
+    """⚠ Adding an attendee makes Google email a person who never used this product.
+
+    That is a different consent conversation, and an action worded "create an event" must
+    not smuggle it in. The absence is asserted on the SCHEMA the model is handed.
+    """
+    props = set(_google("create_event")["inputSchema"]["properties"])
+    assert "attendees" not in props and "guests" not in props
+
+
+def test_a_write_cannot_be_sent_under_a_read_capability():
+    """`write_json` refuses a `*_read` key outright — a wiring error, named at the seam."""
+    import asyncio
+
+    from app.services.google._http import GoogleReadError, write_json
+
+    async def go():
+        await write_json(
+            "drive_read", "c-1", "POST", "https://www.googleapis.com/drive/v3/files",
+            {}, what="create_file",
+        )
+
+    with pytest.raises(GoogleReadError, match="read-only capability"):
+        asyncio.run(go())

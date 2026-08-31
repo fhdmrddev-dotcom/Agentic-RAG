@@ -769,6 +769,368 @@ SERVICE_TOOL_SPECS: dict[str, list[dict[str, Any]]] = {
                 "additionalProperties": False,
             },
         },
+        # ══ WRITES · Phase 221 step 2 (operator, 2026-09-01) ═════════════════════════
+        # ⚠ EVERY ONE OF THESE DEFAULTS TO **ask**, AND AN APPLICATION-LEVEL `allow` CANNOT
+        # ARM ONE (D-221-06). That cap lives in `connectors/grants.py` and is reached at all
+        # three enforcement gates through `tool_facet`; it was built and tested BEFORE the
+        # first write existed, precisely so it could never be retrofitted onto a permission
+        # somebody already believed they had granted.
+        #
+        # ⚠ EACH DECLARES ITS OWN `*_write` EGRESS KEY. A read tool structurally cannot name
+        # one, so `grep -c "drive_write"` over this file answers *"what can change a Drive?"*
+        # exactly. Folding writes under `*_read` would have destroyed that answer on the one
+        # axis where it matters most.
+        #
+        # ⛔ NO SEND, NO DELETE. `draft_email` cannot deliver (the scope is `gmail.compose`,
+        # never `gmail.send`); nothing here trashes a file or deletes an event, though both
+        # scopes are wide enough to. "Creates and updates only" is enforced by THIS LIST.
+        #
+        # ⛔ DRIVE IS `drive.file` — app-created files only. `update_file` on a document the
+        # person made themselves is refused by Google, and that refusal is the property the
+        # operator chose rather than a gap.
+        {
+            "name": "create_file",
+            "title": "Create a Drive file",
+            "description": (
+                "Create a NEW text file in this Google account's Drive. Only files this app creates are ever visible to it - it cannot see or change anything else."
+            ),
+            "capability": "drive_write",
+            "app": "drive",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "name": {
+                                "type": "string",
+                                "description": "The file name."
+                },
+                "content": {
+                                "type": "string",
+                                "description": "The text to put in it. Optional."
+                },
+                "mime_type": {
+                                "type": "string",
+                                "description": "Defaults to text/plain."
+                }
+                },
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "update_file",
+            "title": "Rename a Drive file this app created",
+            "description": (
+                "Rename a file THIS APP created. A file the person made themselves is refused - the app can only touch its own files."
+            ),
+            "capability": "drive_write",
+            "app": "drive",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "file_id": {
+                                "type": "string",
+                                "description": "The Drive file id."
+                },
+                "name": {
+                                "type": "string",
+                                "description": "The new name."
+                }
+                },
+                "required": ["file_id", "name"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "draft_email",
+            "title": "Draft a Gmail message",
+            "description": (
+                "Save a DRAFT in this mailbox. It is NOT sent and this connection cannot send it - a person opens Gmail to review and send."
+            ),
+            "capability": "gmail_write",
+            "app": "gmail",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "to": {
+                                "type": "string",
+                                "description": "Recipient address."
+                },
+                "subject": {
+                                "type": "string",
+                                "description": "The subject line."
+                },
+                "body": {
+                                "type": "string",
+                                "description": "The plain-text body."
+                }
+                },
+                "required": ["to", "subject", "body"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "append_rows",
+            "title": "Add rows to a spreadsheet",
+            "description": (
+                "Append rows to the end of a sheet's data. Adds only - it never overwrites an existing row."
+            ),
+            "capability": "sheets_write",
+            "app": "sheets",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "spreadsheet_id": {
+                                "type": "string",
+                                "description": "The spreadsheet id."
+                },
+                "rows": {
+                                "type": "array",
+                                "description": "Rows to append, each an array of cell values.",
+                                "items": {
+                                                "type": "array",
+                                                "items": {
+                                                                "type": "string"
+                                                }
+                                }
+                },
+                "a1_range": {
+                                "type": "string",
+                                "description": "Where to append. Defaults to A1."
+                }
+                },
+                "required": ["spreadsheet_id", "rows"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "update_cells",
+            "title": "Overwrite spreadsheet cells",
+            "description": (
+                "Replace the contents of a named range. This DESTROYS what is currently in those cells, so the range is required."
+            ),
+            "capability": "sheets_write",
+            "app": "sheets",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "spreadsheet_id": {
+                                "type": "string",
+                                "description": "The spreadsheet id."
+                },
+                "a1_range": {
+                                "type": "string",
+                                "description": "The exact range to overwrite, e.g. Sheet1!A2:C10."
+                },
+                "rows": {
+                                "type": "array",
+                                "description": "The replacement rows.",
+                                "items": {
+                                                "type": "array",
+                                                "items": {
+                                                                "type": "string"
+                                                }
+                                }
+                }
+                },
+                "required": ["spreadsheet_id", "a1_range", "rows"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "create_doc",
+            "title": "Create a Google Doc",
+            "description": (
+                "Create a new Google Doc, optionally with a first block of text."
+            ),
+            "capability": "docs_write",
+            "app": "docs",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "title": {
+                                "type": "string",
+                                "description": "The document title."
+                },
+                "content": {
+                                "type": "string",
+                                "description": "Optional first text to insert."
+                }
+                },
+                "required": ["title"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "append_to_doc",
+            "title": "Add text to a Google Doc",
+            "description": (
+                "Add text to the END of a Google Doc. Adds only - it never replaces what is there."
+            ),
+            "capability": "docs_write",
+            "app": "docs",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "document_id": {
+                                "type": "string",
+                                "description": "The document id."
+                },
+                "content": {
+                                "type": "string",
+                                "description": "The text to add."
+                }
+                },
+                "required": ["document_id", "content"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "create_event",
+            "title": "Create a calendar event",
+            "description": (
+                "Create an event on this account's calendar. It invites nobody - this action cannot add attendees, so no one else is emailed."
+            ),
+            "capability": "calendar_write",
+            "app": "calendar",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "summary": {
+                                "type": "string",
+                                "description": "The event title."
+                },
+                "start": {
+                                "type": "string",
+                                "description": "Start: YYYY-MM-DD for all-day, or a full timestamp."
+                },
+                "end": {
+                                "type": "string",
+                                "description": "End, in the same shape as start."
+                },
+                "description": {
+                                "type": "string",
+                                "description": "Optional notes."
+                },
+                "calendar_id": {
+                                "type": "string",
+                                "description": "Defaults to the primary calendar."
+                }
+                },
+                "required": ["summary", "start", "end"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "update_event",
+            "title": "Change a calendar event",
+            "description": (
+                "Change an existing event. Only the fields supplied are touched; anything omitted is left exactly as it was."
+            ),
+            "capability": "calendar_write",
+            "app": "calendar",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "event_id": {
+                                "type": "string",
+                                "description": "The event id."
+                },
+                "summary": {
+                                "type": "string",
+                                "description": "New title."
+                },
+                "start": {
+                                "type": "string",
+                                "description": "New start."
+                },
+                "end": {
+                                "type": "string",
+                                "description": "New end."
+                },
+                "description": {
+                                "type": "string",
+                                "description": "New notes."
+                },
+                "calendar_id": {
+                                "type": "string",
+                                "description": "Defaults to the primary calendar."
+                }
+                },
+                "required": ["event_id"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "create_contact",
+            "title": "Create a contact",
+            "description": (
+                "Add a contact to this Google account's own contacts."
+            ),
+            "capability": "contacts_write",
+            "app": "contacts",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "name": {
+                                "type": "string",
+                                "description": "The person's name."
+                },
+                "email": {
+                                "type": "string",
+                                "description": "Optional email address."
+                },
+                "phone": {
+                                "type": "string",
+                                "description": "Optional phone number."
+                }
+                },
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "name": "update_contact",
+            "title": "Change a contact",
+            "description": (
+                "Change an existing contact. Only the fields supplied are written; a field nobody names is never cleared."
+            ),
+            "capability": "contacts_write",
+            "app": "contacts",
+            "writes": True,
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "resource_name": {
+                                "type": "string",
+                                "description": "The contact resource name, e.g. people/c123."
+                },
+                "name": {
+                                "type": "string",
+                                "description": "New name."
+                },
+                "email": {
+                                "type": "string",
+                                "description": "New email."
+                },
+                "phone": {
+                                "type": "string",
+                                "description": "New phone."
+                }
+                },
+                "required": ["resource_name"],
+                "additionalProperties": False,
+            },
+        },
     ],
     # ── SMTP ──────────────────────────────────────────────────────────────────────────
     # ⚠ DELIBERATELY EMPTY, AND THAT IS AN ANSWER RATHER THAN AN OMISSION. SMTP is a
@@ -1417,6 +1779,34 @@ _GOOGLE_READ_CALLS: dict[str, dict[str, tuple[str, str]]] = {
     "contacts_read": {
         "search_contacts": ("app.services.google.people", "search_contacts"),
     },
+    # ── WRITES (Phase 221 step 2) — ONE module, `google/writes.py`, on purpose ─────────
+    # Each read module opens with a line like "⛔ READS ONLY — `documents.readonly`",
+    # and those sentences are load-bearing. Putting a create beneath one would make it a
+    # lie in the one place a reader checks, so every write lives in a single file and
+    # "what can this product change at Google?" has one answer.
+    "drive_write": {
+        "create_file": ("app.services.google.writes", "create_file"),
+        "update_file": ("app.services.google.writes", "update_file"),
+    },
+    "gmail_write": {
+        "draft_email": ("app.services.google.writes", "draft_email"),
+    },
+    "sheets_write": {
+        "append_rows": ("app.services.google.writes", "append_rows"),
+        "update_cells": ("app.services.google.writes", "update_cells"),
+    },
+    "docs_write": {
+        "create_doc": ("app.services.google.writes", "create_doc"),
+        "append_to_doc": ("app.services.google.writes", "append_to_doc"),
+    },
+    "calendar_write": {
+        "create_event": ("app.services.google.writes", "create_event"),
+        "update_event": ("app.services.google.writes", "update_event"),
+    },
+    "contacts_write": {
+        "create_contact": ("app.services.google.writes", "create_contact"),
+        "update_contact": ("app.services.google.writes", "update_contact"),
+    },
 }
 
 #: The keyword each tool's arguments map onto, with its coercion. Absent keys are simply
@@ -1433,6 +1823,30 @@ _GOOGLE_READ_ARGS: dict[str, dict[str, str]] = {
     "get_event": {"event_id": "str", "calendar_id": "str"},
     "find_free_time": {"days_ahead": "int", "calendar_ids": "list"},
     "search_contacts": {"query": "str", "limit": "int"},
+    # ── WRITES (Phase 221 step 2) ──────────────────────────────────────────────────────
+    # ⚠ `rows` is a "rows" kind, NOT "list". `_google_read_kwargs`'s `list` arm flattens
+    # every element with `str(v)`, which would turn [["a","b"]] into ["['a', 'b']"] — one
+    # cell containing the Python repr of a row. A spreadsheet write is the first argument
+    # in this table that is a list OF lists, and the existing coercion cannot express it.
+    "create_file": {"name": "str", "content": "str", "mime_type": "str"},
+    "update_file": {"file_id": "str", "name": "str"},
+    "draft_email": {"to": "str", "subject": "str", "body": "str"},
+    "append_rows": {"spreadsheet_id": "str", "rows": "rows", "a1_range": "str"},
+    "update_cells": {"spreadsheet_id": "str", "a1_range": "str", "rows": "rows"},
+    "create_doc": {"title": "str", "content": "str"},
+    "append_to_doc": {"document_id": "str", "content": "str"},
+    "create_event": {
+        "summary": "str", "start": "str", "end": "str",
+        "description": "str", "calendar_id": "str",
+    },
+    "update_event": {
+        "event_id": "str", "summary": "str", "start": "str", "end": "str",
+        "description": "str", "calendar_id": "str",
+    },
+    "create_contact": {"name": "str", "email": "str", "phone": "str"},
+    "update_contact": {
+        "resource_name": "str", "name": "str", "email": "str", "phone": "str",
+    },
 }
 
 
@@ -1458,6 +1872,23 @@ def _google_read_kwargs(tool_name: str, args: Mapping[str, Any]) -> dict[str, An
                 ) from None
         elif kind == "list":
             out[key] = [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value)]
+        elif kind == "rows":
+            # ⚠ A LIST OF LISTS, and the `list` arm above cannot express it: `str(v)` over
+            # a row yields the Python repr `"['a', 'b']"` in ONE cell. A model supplies
+            # these, so a single row handed in flat is wrapped rather than refused.
+            if not isinstance(value, (list, tuple)):
+                raise ServiceToolError(
+                    f"{tool_name} expects {key} to be a list of rows, not {value!r}"
+                )
+            rows = list(value)
+            if rows and not isinstance(rows[0], (list, tuple)):
+                rows = [rows]
+            out[key] = [
+                [("" if cell is None else str(cell)) for cell in row]
+                if isinstance(row, (list, tuple))
+                else [str(row)]
+                for row in rows
+            ]
         else:
             out[key] = str(value)
     return out

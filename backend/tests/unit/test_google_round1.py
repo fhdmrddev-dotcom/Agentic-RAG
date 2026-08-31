@@ -335,15 +335,27 @@ async def test_search_contacts_projects_the_first_of_each_field(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════════════════
 # The wiring — 15 tools, one connection, five keys, no writes
 # ══════════════════════════════════════════════════════════════════════════════════════
-def test_every_google_tool_declares_a_wholly_wired_key_and_writes_nothing():
+def test_every_google_tool_declares_a_wholly_wired_key_that_matches_its_direction():
+    """⚠ NARROWED BY PHASE 221 STEP 2 — the `writes is False` half is superseded.
+
+    It asserted that NO Google tool writes, which was the reads-first decision and is no
+    longer true: eleven writes shipped 2026-09-01 by operator decision. What replaces it is
+    STRONGER than what it lost — the key must now AGREE WITH THE DIRECTION, so a write
+    declaring a `*_read` key (or the reverse) is red here rather than a 403 at Google.
+
+    The wholly-wired half is untouched: a key in one egress table and missing from another
+    is a KeyError at the socket — no answer, rather than a clear no.
+    """
     from app.security.egress import ALLOWED_HOST_SUFFIXES, _HOST_MATCH, _TLS_SCHEMES
     from app.services.connectors.service_tools import SERVICE_TOOL_SPECS
 
     tools = SERVICE_TOOL_SPECS["google"]
-    assert len(tools) == 15
+    assert len(tools) == 26, "15 reads + 11 writes"
     for tool in tools:
         key = tool["capability"]
-        assert tool["writes"] is False, f"{tool['name']} claims to write"
+        expected_suffix = "_write" if tool["writes"] else "_read"
+        assert key.endswith(expected_suffix), f"{tool['name']} declares {key}"
+        assert key.startswith(tool["app"]), f"{tool['name']} declares {key}"
         # A key in one table and missing from another is a KeyError at the socket —
         # no answer, rather than a clear no.
         assert ALLOWED_HOST_SUFFIXES.get(key), f"{key} has no allow-list"
@@ -381,12 +393,34 @@ def test_no_second_google_service_id_and_every_read_scope_is_readonly():
             "consent and one place to revoke"
         )
     scopes = OAUTH_PROVIDERS["google"]["default_scopes"]
+    # Every READ surface still carries its `.readonly` scope — unchanged by step 2.
     for surface in ("gmail", "spreadsheets", "documents", "calendar", "contacts", "drive"):
         assert any(f"/{surface}.readonly" in s for s in scopes), surface
-    # ⛔ Not one write scope was granted along the way.
-    for forbidden in ("gmail.send", "gmail.modify", "gmail.compose", "mail.google.com",
-                      "auth/spreadsheets\"", "calendar.events", "drive.file"):
+
+    # ⚠ NARROWED BY PHASE 221 STEP 2 — the blanket "not one write scope" is superseded.
+    # ⛔ The write scopes are now an EXACT SET rather than an absence, which is the stronger
+    # assertion: a seventh write scope appearing by accident is red here, where the old
+    # blanket ban would simply have been deleted wholesale to let the first six through.
+    granted_writes = {
+        s for s in scopes
+        if s.startswith("https://www.googleapis.com/auth/")
+        and not s.endswith(".readonly")
+        and s not in {"openid", "email", "profile"}
+    }
+    assert granted_writes == {
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/documents",
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/contacts",
+    }, sorted(granted_writes)
+
+    # ⛔ STILL FORBIDDEN, and each for its own reason: `send`/`modify`/`mail.google.com`
+    # deliver mail; the bare `drive` scope reaches files the app did not create.
+    for forbidden in ("gmail.send", "gmail.modify", "mail.google.com"):
         assert not any(forbidden in s for s in scopes), forbidden
+    assert "https://www.googleapis.com/auth/drive" not in scopes
 
 
 def test_every_declared_tool_resolves_to_a_real_transport():
