@@ -376,11 +376,11 @@ Plans:
 
 Plans:
 
-- [ ] 216-01-PLAN.md - dynamic chat tool generation from active connections, prompt injection isolation wrapper, and unit tests
-- [ ] 216-02-PLAN.md - tool approval pause, SSE approval events, and POST /threads/{id}/tool-approval resume route
-- [ ] 216-03-PLAN.md - single-file cloud storage browser (Google Drive) and user-initiated document import endpoint (ATTACH-01)
-- [ ] 216-04-PLAN.md - MessageInput '+' button, Connectors flyout menu with toggles, active connector chips bar, and starter prompt suggestions
-- [ ] 216-05-PLAN.md - branded tool call panel, ChatToolApprovalCard inline actions, ConnectedFilePickerModal, and E2E integration test suite
+- [x] 216-01-PLAN.md - dynamic chat tool generation from active connections, prompt injection isolation wrapper, and unit tests
+- [x] 216-02-PLAN.md - tool approval pause, SSE approval events, and POST /threads/{id}/tool-approval resume route
+- [x] 216-03-PLAN.md - single-file cloud storage browser (Google Drive) and user-initiated document import endpoint (ATTACH-01)
+- [x] 216-04-PLAN.md - MessageInput '+' button, Connectors flyout menu with toggles, active connector chips bar, and starter prompt suggestions
+- [x] 216-05-PLAN.md - branded tool call panel, ChatToolApprovalCard inline actions, ConnectedFilePickerModal, and E2E integration test suite
 
 **UI hint**: yes
 **Flags**: ⭐ **Gated behind Phase 213.** ⚠ **CAT-04 lives here, not in the catalog phase, and the reason is honesty**: a starter prompt is only truthful once the agent can act on it — chips shipped before the chat surface are suggestions that fail. **G-2 sketch owed** (service chip in the thread, starter prompts, the attach picker). **G-5 ×4, and two of them read *extraction due***: `ChatLayout.tsx` (40/21/815 — ⚠ fires at **21 phases** and has been **absent from the ledger for its entire life**), `MessageInput.tsx` (25/13/478), `ToolCallPanel.tsx` (47/19/995 — *extraction due*), `MessageItem.tsx` (57/29/856 — *extraction due*). Refactor recommendation owed first. ⚠ **The workspace panel is a CROSS-SURFACE shell mounted by `ChatLayout`** — a change here lands in chat first, so UAT on a workflow surface alone will miss it. **Threat model REQUIRED — and the named threat is PROMPT INJECTION**: every read lands untrusted external text in a model's context, and this tree has never faced that class because until 206.2 every connector was a write. ⚠ *No vendor in the competitor study documents a defence; treat it as unsolved, design for it rather than discovering it.* **SC#10 — the FULL 8-row native roster + OpenRouter**, plus multi-tool, parallel-thread and long-message rows; derive the roster from `MODEL_CAPABILITIES`, never re-type it; blocked rows recorded ⛔ with a reason. **ATTACH-01 is mode C and is deliberately human-initiated** — it dodges ACL mirroring, deletion propagation and sync loops by construction. ⚠ **The re-open trigger for `SEED-209/210/211/212` is "the first AUTOMATIC or BACKGROUND sync from a connected source"** — if any plan in this phase reaches for a poll, a watcher or a scheduled pull, **it has left this milestone** and the Connected Knowledge deferral applies.

@@ -43,6 +43,7 @@ vi.mock("@/hooks/useMessages", () => ({
 vi.mock("@/lib/api", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/api")>()
   return {
+    ...actual,
     ApiError: actual.ApiError,
     // ⚠ The id is spelled as a LITERAL here, not as `GLOBAL_DEFAULT`. `vi.mock` factories are
     // hoisted above every top-level binding in the file, so referencing the constant throws
@@ -69,6 +70,7 @@ vi.mock("@/lib/api", async (importActual) => {
       mode: "deep",
       active_workflow_run_id: null,
     }),
+    listConnectorConnections: vi.fn().mockResolvedValue([]),
   }
 })
 
