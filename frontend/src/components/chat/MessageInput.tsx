@@ -49,6 +49,8 @@ interface Props {
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
   onClearPrefill?: () => void
+  /** Take the person to the connections surface — see `ConnectorsFlyout`. */
+  onOpenConnections?: () => void
   workflowLocked?: boolean
 }
 
@@ -87,6 +89,7 @@ export function MessageInput({
   onAgentModeChange,
   prefillMessage,
   onClearPrefill,
+  onOpenConnections,
   workflowLocked = false,
 }: Props) {
   const [value, setValue] = useState("")
@@ -276,6 +279,7 @@ export function MessageInput({
                     activeConnectorIds={activeConnectorIds}
                     onToggleConnector={handleToggleConnector}
                     onClose={() => setPlusMenuOpen(false)}
+                    onOpenConnections={onOpenConnections}
                   />
                 </DropdownMenuContent>
               </DropdownMenu>

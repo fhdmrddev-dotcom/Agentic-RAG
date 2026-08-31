@@ -735,6 +735,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               prefillMessage={prefillMessage}
               onClearPrefill={() => onSetPrefillMessage(null)}
               onOpenDrawer={() => setDrawerOpen(true)}
+              // The composer's Connectors flyout needs a REAL navigator: this app has no
+              // router (SEED-185), so its three buttons set a URL hash nothing reads — and
+              // one called an undefined `navigate` and threw ReferenceError. It goes to the
+              // UNGOVERNED connections door, never to `settings`, which is operator-only.
+              onOpenConnections={() => onNavigate("connections")}
               // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />

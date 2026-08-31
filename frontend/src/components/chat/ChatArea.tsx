@@ -28,6 +28,8 @@ interface Props {
   prefillMessage?: string | null
   onClearPrefill?: () => void
   onOpenDrawer?: () => void
+  /** Take the person to the connections surface — see `ConnectorsFlyout`. */
+  onOpenConnections?: () => void
   // Phase 156 REFINEMENT (operator 2026-07-16): reopens the folded-away chat-history
   // column (sketch Variant A #reopenA — the ▷ handle in the chat top-bar). Provided by
   // ChatLayout ONLY while the history is collapsed; undefined otherwise, so the handle
@@ -35,7 +37,7 @@ interface Props {
   onReopenHistory?: () => void
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onReopenHistory }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onReopenHistory }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -335,6 +337,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // composer.
   const inputBar = (
     <MessageInput
+      onOpenConnections={onOpenConnections}
       onSend={handleSend}
       /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
          from this element. The composer's Stop is `StopControl` (written WITHOUT its

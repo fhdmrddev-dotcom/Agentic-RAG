@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from "react"
-import { ExternalLink, Loader2, Plug, Plus, Settings2 } from "lucide-react"
+import { Loader2, Plug, Plus, Settings2 } from "lucide-react"
 import { ConnectionMarkGlyph } from "@/lib/connectionMark"
 import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -16,12 +16,29 @@ interface ConnectorsFlyoutProps {
   activeConnectorIds: string[]
   onToggleConnector: (id: string) => void
   onClose?: () => void
+  /**
+   * Take the person to the connections surface.
+   *
+   * ⚠ THREE BUTTONS IN THIS COMPONENT CLAIMED TO DO THIS AND NONE OF THEM DID.
+   * "Manage" and "Add connector" set `window.location.hash = "#settings"`, which does
+   * nothing at all — this app has NO ROUTER (`SEED-185`), navigation is a
+   * `useState<ActiveView>` switch in App.tsx. The empty-state button was worse: it
+   * called a bare `navigate(...)` that is neither imported nor defined anywhere in the
+   * file, so clicking "Add your first connector" threw `ReferenceError`. `tsc` had it
+   * as TS2552 the whole time; vitest does not typecheck, so the count gate could not
+   * see it.
+   *
+   * Optional because the flyout must still render in isolation, and a dead click is
+   * better than a crash — but the caller in the product always supplies it.
+   */
+  onOpenConnections?: () => void
 }
 
 export function ConnectorsFlyout({
   activeConnectorIds,
   onToggleConnector,
   onClose,
+  onOpenConnections,
 }: ConnectorsFlyoutProps) {
   const [connections, setConnections] = useState<ConnectorConnection[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,7 +66,7 @@ export function ConnectorsFlyout({
 
   const handleOpenSettings = () => {
     onClose?.()
-    window.location.hash = "#settings"
+    onOpenConnections?.()
   }
 
   return (
@@ -82,10 +99,7 @@ export function ConnectorsFlyout({
             </p>
             <button
               type="button"
-              onClick={() => {
-                onClose?.()
-                navigate("/settings?tab=connections")
-              }}
+              onClick={handleOpenSettings}
               className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
             >
               <Plus className="h-3.5 w-3.5" />

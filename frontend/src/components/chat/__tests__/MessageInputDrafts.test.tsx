@@ -53,7 +53,14 @@ describe("099-08 per-thread composer drafts", () => {
     const { rerender, onSend } = renderComposer("thread-A")
     fireEvent.change(textarea(), { target: { value: "send me" } })
     fireEvent.keyDown(textarea(), { key: "Enter" })
-    expect(onSend).toHaveBeenCalledWith("send me")
+    // ⚠ THE SECOND ARGUMENT IS PHASE 216's, and it is `undefined` rather than absent:
+    // `onSend(trimmed, activeConnectorIds.length > 0 ? activeConnectorIds : undefined)`.
+    // `toHaveBeenCalledWith('x')` compares the whole argument LIST, so a call carrying a
+    // trailing `undefined` does not match a one-argument expectation — which is why these
+    // two cases have been red since that phase, over a change that has nothing to do with
+    // drafts. Asserted with the second argument named, so a future third one fails loudly
+    // rather than silently.
+    expect(onSend).toHaveBeenCalledWith("send me", undefined)
     expect(textarea().value).toBe("")
 
     // away and back — no resurrected draft
@@ -95,7 +102,7 @@ describe("099-08 per-thread composer drafts", () => {
     // Type + send → the box is cleared synchronously by handleSend.
     fireEvent.change(textarea(), { target: { value: "dropped message" } })
     fireEvent.keyDown(textarea(), { key: "Enter" })
-    expect(onSend).toHaveBeenCalledWith("dropped message")
+    expect(onSend).toHaveBeenCalledWith("dropped message", undefined)
     expect(textarea().value).toBe("")
 
     // The send-drop recovery restores the stashed draft through the prefill seam.
