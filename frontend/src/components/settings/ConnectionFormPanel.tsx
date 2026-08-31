@@ -465,6 +465,23 @@ export interface ConnectionFormPanelProps {
   /** §2g's victim count — the same caller-scoped FLOOR the table row renders
    *  (`connectionsCopy.usageCountsFrom`). It GRADES the disable guard; it never blocks. */
   usedBy?: number
+  /** Phase 221 — the parent's rows are STALE the moment a discovery succeeds.
+   *
+   *  ⚠ OPERATOR-REPORTED, 2026-08-31: *"I see Google Drive Google Contacts Google Gmail when
+   *  I refresh actions but once I navigate away it is all gone."* `discoverConnectorTools`
+   *  persists the refreshed list server-side and sets `probeResult` in memory — and NOTHING
+   *  ever told the tab. So the next open re-seeds from `connection.discovered_tools` out of
+   *  an array fetched BEFORE the discovery, and the panel silently shows the older shape.
+   *
+   *  ⚠ THE BUG PREDATES THE SIX-APPLICATION SPLIT; the split only made it VISIBLE. Until
+   *  Phase 221 the content of `discovered_tools` changed which rows appeared but never how
+   *  they were arranged, so a stale copy looked like a correct one. Grouping made the
+   *  staleness legible: without `app` the list degrades — correctly, per D-221-09 — to a
+   *  single unnamed application, which reads as "the categorisation disappeared".
+   *
+   *  Absent ⇒ the panel still works and the parent simply stays stale, which is the
+   *  behaviour every caller had before this prop existed. */
+  onDiscovered?: () => void
 }
 
 /** §2g's two sheets, and `null` for "no confirm open". Mirrors `ConnectionsTab`'s own
@@ -545,6 +562,7 @@ export function ConnectionFormPanel({
   onDelete,
   onSetEnabled,
   usedBy = 0,
+  onDiscovered,
 }: ConnectionFormPanelProps) {
   const isMobile = useIsMobile()
   const rootRef = useRef<HTMLElement | null>(null)
@@ -685,6 +703,15 @@ export function ConnectionFormPanel({
         }
         return next
       })
+      // ⚠ Tell the parent its rows are stale — see `onDiscovered`. Only on the SAVED-row
+      // arm: the two probe arms above contact a server for a row that does not exist yet,
+      // so there is nothing for the tab to re-read.
+      //
+      // ⚠ This cannot clobber what is on screen. The seeding effect early-returns on an
+      // unchanged `mode:id` key, so the refreshed `connection` prop arriving from the
+      // reload does NOT re-seed `probeResult` — the person keeps looking at exactly what
+      // they just discovered, and the NEXT open reads the fresh copy.
+      if (savedRow) onDiscovered?.()
     } catch (err) {
       // WARNING: the fallback said "Failed to discover tools from MCP server", and this handler
       // now serves three shapes - two of which contact no MCP server and one of which contacts

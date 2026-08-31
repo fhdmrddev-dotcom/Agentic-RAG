@@ -189,3 +189,83 @@ def test_the_value_refusal_is_unchanged():
     """Phase 213's refuse-never-coerce stance must survive the key check being added."""
     with pytest.raises(ValueError, match="not one of"):
         _sanitize_tool_grants({"delete_repository": True})
+
+
+# ── 5 · the cache heals at READ time (operator-reported, 2026-08-31) ──────────────────
+#
+# ⚠ *"I see Google Drive Google Contacts Google Gmail when I refresh actions but once I
+# navigate away it is all gone and I have to refresh action again."*
+#
+# `discovered_tools` is a CACHE, and every Google row written before this phase holds
+# fifteen descriptors with no `app`. The client groups on `app`, so a stale cache degrades
+# to a single unnamed application — correct behaviour (D-221-09) reading as a disappearance.
+
+
+def _stale(tools: list[dict]) -> list[dict]:
+    """The pre-221 shape: byte-identical minus the key that did not exist yet."""
+    return [{k: v for k, v in t.items() if k != "app"} for t in tools]
+
+
+def test_a_cache_written_before_the_key_existed_still_groups():
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    stale = _stale(extra_descriptors_for_service("google"))
+    assert not any("app" in t for t in stale), "the fixture must actually be stale"
+
+    healed = backfill_application_keys("google", stale)
+    counts: dict[str, int] = {}
+    for t in healed:
+        counts[t["app"]] = counts.get(t["app"], 0) + 1
+    assert counts == EXPECTED_COUNTS
+
+
+def test_the_backfill_adds_and_never_overwrites():
+    """A descriptor that already names an application is returned untouched."""
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    already = [{"name": "search_files", "app": "somewhere_else"}]
+    assert backfill_application_keys("google", already) == already
+
+
+def test_a_name_the_spec_table_does_not_know_is_left_alone():
+    """No guessing. An unknown tool keeps exactly the shape it arrived with."""
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    out = backfill_application_keys("google", [{"name": "not_a_real_tool"}])
+    assert out == [{"name": "not_a_real_tool"}]
+
+
+def test_a_service_with_no_applications_is_untouched():
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    tools = [{"name": "post_message"}, {"name": "read_channel"}]
+    assert backfill_application_keys("slack", tools) == tools
+    assert backfill_application_keys(None, tools) == tools
+    assert backfill_application_keys("google", []) == []
+    assert backfill_application_keys("google", None) == []
+
+
+def test_the_response_projection_heals_a_stale_row():
+    """⭐ END TO END: the row is stale, the API answer is not.
+
+    This is the assertion that would have caught the operator's report. It runs through
+    `_to_response` — the ONE place a row becomes output — rather than through the helper,
+    because a helper nobody calls heals nothing.
+    """
+    from app.services.connector_service import _to_response
+
+    row = {
+        "id": "c-1",
+        "org_id": "o-1",
+        "service_id": "google",
+        "name": "Google Workspace",
+        "auth_type": "oauth_byo",
+        "status": "active",
+        "is_enabled": True,
+        "discovered_tools": _stale(extra_descriptors_for_service("google")),
+    }
+    resp = _to_response(row)
+    counts: dict[str, int] = {}
+    for t in resp.discovered_tools:
+        counts[t["app"]] = counts.get(t["app"], 0) + 1
+    assert counts == EXPECTED_COUNTS

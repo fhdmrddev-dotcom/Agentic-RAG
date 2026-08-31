@@ -857,6 +857,58 @@ def extra_descriptors_for_service(service_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def backfill_application_keys(
+    service_id: str | None, tools: list[dict[str, Any]] | None
+) -> list[dict[str, Any]]:
+    """Stamp ``app`` onto CACHED descriptors written before that key existed.
+
+    ⚠ **OPERATOR-REPORTED, 2026-08-31, AND THIS IS THE ROOT CAUSE OF IT:** *"I see Google
+    Drive Google Contacts Google Gmail when I refresh actions but once I navigate away it is
+    all gone and I have to refresh action again."*
+
+    ``discovered_tools`` is a CACHE. Every Google row written before Phase 221 holds fifteen
+    descriptors with no ``app`` key, and nothing rewrites them until somebody presses
+    *Refresh actions*. The client groups on ``app``, so a stale cache degrades — correctly,
+    per D-221-09 — to a single unnamed application, which reads as *"the categorisation
+    disappeared"*.
+
+    ⚠ **THE FIX IS AT READ TIME RATHER THAN A BACKFILL MIGRATION, ON PURPOSE.** A migration
+    would repair the rows that exist today and do nothing for the next key added to a spec;
+    this is correct for every row forever, including one restored from an old backup. The
+    spec table is the source of truth for what a service advertises — the cache is a
+    convenience, and a convenience that disagrees with the source should lose.
+
+    ⚠ **IT ADDS, NEVER OVERWRITES.** A descriptor that already carries ``app`` is returned
+    untouched, so a future service whose cache is authoritative cannot be silently rewritten
+    from here. Matching is BY TOOL NAME against this service's own specs, so a name the spec
+    table does not know is left exactly as it was rather than guessed at.
+
+    ⚠ Nothing is WRITTEN back. The row heals on its next real discovery; until then every
+    read is correct anyway, which is the property that matters.
+    """
+    if not tools:
+        return tools or []
+    specs = SERVICE_TOOL_SPECS.get((service_id or "").strip().lower(), [])
+    if not specs:
+        return tools
+    app_by_name = {
+        spec["name"]: spec["app"] for spec in specs if spec.get("app") and spec.get("name")
+    }
+    if not app_by_name:
+        return tools
+
+    patched = False
+    out: list[dict[str, Any]] = []
+    for tool in tools:
+        if isinstance(tool, dict) and not tool.get("app"):
+            app = app_by_name.get(tool.get("name"))
+            if app:
+                tool = {**tool, "app": app}
+                patched = True
+        out.append(tool)
+    return out if patched else tools
+
+
 # ══════════════════════════════════════════════════════════════════════════════════════
 # 2 · EXECUTION
 # ══════════════════════════════════════════════════════════════════════════════════════

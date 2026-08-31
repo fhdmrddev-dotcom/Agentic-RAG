@@ -404,6 +404,15 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["tool_grants"] = {}
     if d.get("discovered_tools") is None:
         d["discovered_tools"] = []
+    # Phase 221 — heal a cache written before the `app` key existed. Function-local for the
+    # reason every other `service_tools` import here is: the adapter registry stays out of
+    # the cold import graph. See `backfill_application_keys` for why this is a read-time
+    # repair and not a migration.
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    d["discovered_tools"] = backfill_application_keys(
+        d.get("service_id"), d.get("discovered_tools")
+    )
     if d.get("config") is None:
         d["config"] = {}
     if d.get("default_approval_posture") is None:

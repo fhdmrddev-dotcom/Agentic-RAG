@@ -1495,6 +1495,7 @@ export function ConnectionsTab() {
             onCheck={handlePanelCheck}
             onDelete={handleDelete}
             onSetEnabled={handleSetEnabled}
+            onDiscovered={reload}
             usedBy={panelState.connection ? (usageCounts[panelState.connection.id] ?? 0) : 0}
           />
         ) : undefined
