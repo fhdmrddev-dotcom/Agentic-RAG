@@ -4317,8 +4317,29 @@ async def _handle_connector_chat_tool(
     if not user_id:
         return ToolResult(result=f"Cannot execute {action_tool_name}: no authenticated user in context.")
 
+    org_id = (ctx.current_user or {}).get("org_id")
+    if not org_id and getattr(ctx, "supabase", None):
+        try:
+            org_res = await aexec(
+                ctx.supabase.table("org_members")
+                .select("org_id")
+                .eq("user_id", str(user_id))
+                .order("created_at")
+                .limit(1)
+            )
+            if org_res and hasattr(org_res, "data") and isinstance(org_res.data, list) and len(org_res.data) > 0:
+                org_id = org_res.data[0].get("org_id")
+        except Exception:
+            pass
+
+    if not org_id:
+        org_id = str(user_id)
+
     # Look up connection matching service_id
-    conns = await list_connections(user_id=UUID(user_id))
+    try:
+        conns = await list_connections(org_id=str(org_id), supabase=ctx.supabase)
+    except Exception:
+        conns = []
     matched_conn = next(
         (c for c in conns if (c.service_id == service_id or (c.name and c.name.lower().replace(" ", "_") == service_id.lower()))),
         None,
