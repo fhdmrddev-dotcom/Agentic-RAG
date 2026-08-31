@@ -393,7 +393,8 @@ ROADMAP RELEASED (BUS-030 done). Phase 220 'A Drawing Becomes Quantities -- SPIK
 Phase 216 (Connections in Chat, and One File In by Hand — CHAT-05, CHAT-06, CHAT-07, CAT-04, ATTACH-01) is COMPLETED and FULLY VERIFIED. Summary for handover:
 1. ARCHITECTURE & SECURITY:
    - `chat_tools.py`: Dynamic function tool schema generation from active connection `discovered_tools`, namespacing (`service_id__tool_name`), and prompt injection defense wrapping (`wrap_untrusted_tool_result` with `<external_tool_result>` security notice envelope).
-   - `tool_dispatcher.py`: Connected tool execution handling, `deny` posture refusal, `ask` posture stream pause via Redis pub/sub channel `tool_approval:{thread_id}:{call_id}`, and `tool_approval_required` SSE event emission.
+   - `agent_loop.py`: Connector tools dynamic injection into `active_tools` with org-scoped discovery (`org_members` -> `list_connections`) and `## Connected Services & External Tools` system prompt section.
+   - `tool_dispatcher.py`: Connected tool execution handling for both MCP servers (`mcp_client.call_tool`) and capability adapters (`get_adapter`), `deny` posture refusal, `ask` posture stream pause via Redis pub/sub channel `tool_approval:{thread_id}:{call_id}`, and `tool_approval_required` SSE event emission.
    - `cloud_storage.py`: Google Drive single-file browser (`list_cloud_files`) and human-initiated binary download/export (`fetch_cloud_file`, `ATTACH-01`), strictly avoiding background sync loops (`SEED-209/210/211/212` preserved).
 2. FRONTEND SURFACES:
    - `ConnectorsFlyout.tsx`: Claude.ai style `+` menu flyout with switch toggles per connected service and direct Settings navigation.
@@ -406,7 +407,15 @@ Phase 216 (Connections in Chat, and One File In by Hand — CHAT-05, CHAT-06, CH
    - Backend unit & integration tests: 100% green (`backend/tests/unit/test_chat_connector_tools.py`, `backend/tests/unit/test_chat_tool_approval.py`, `backend/tests/unit/test_connector_file_import.py`, `backend/tests/integration/test_chat_connectors_e2e.py`).
    - Frontend unit tests: 100% green (`MessageInput.connectors.test.tsx`, `ToolApproval.test.tsx`, `ChatArea.model.test.tsx`).
    - Vitest count gate: OK 171/171 pinned files passing, 6,929 / 6,929 tests passed, 0 failing.
-4. MILESTONE STATUS: Phase 216 is COMPLETE.
+4. COMMITS ON DEVELOP:
+   - `7be087baa`: `feat(216): backend chat connector tools & prompt injection envelope`
+   - `54ddbfc8e`: `feat(216): tool approval stream pause & SSE approval endpoint`
+   - `a604171a9`: `feat(216): single-file cloud storage browser and import API (ATTACH-01)`
+   - `3c1b728d9`: `feat(216): frontend '+' menu, connectors flyout, active chips, approval card & file picker`
+   - `612c7bc3d`: `docs(216): complete Phase 216 summaries, E2E integration suite and state updates`
+   - `1fdeefa79`: `fix(chat): wire active connector tools and prompt instructions into agent loop`
+   - `c0a09c728`: `fix(connectors): resolve org_id from org_members for chat tool discovery and execution`
+5. MILESTONE STATUS: Phase 216 is COMPLETE and ready for reviewer post-phase verification.
 
 **Answer:**
 
