@@ -148,3 +148,54 @@ def test_token_encryption_roundtrip():
     enc = encrypt_token_value(token)
     dec = decrypt_token_value(enc)
     assert dec == token
+
+
+def test_the_install_wide_application_is_a_declared_setting():
+    """⚠ THESE SIX FIELDS DID NOT EXIST WHILE `resolve_client_credentials` READ THEM.
+
+    It reads through `getattr(settings, "google_oauth_client_id", "")`, and a `getattr` with a
+    default cannot tell *"configured as empty"* from *"there is no such setting"* — so the
+    branch always fell through to its raise, and that raise names the exact environment
+    variables nothing was reading:
+
+        "Please set GOOGLE_OAUTH_CLIENT_ID & GOOGLE_OAUTH_CLIENT_SECRET"
+
+    pydantic-settings maps env vars onto DECLARED fields only, so an operator who followed
+    that instruction to the letter changed nothing, and the per-connection *Advanced* form was
+    the only path that ever worked. Found by the operator asking why they had to fill it in
+    for an application they had already registered.
+
+    Asserted on the SETTINGS OBJECT rather than on behaviour, because the defect was the
+    field's absence and `getattr`'s default is what hid it.
+    """
+    from app.config import settings
+
+    for provider in ("google", "microsoft", "github"):
+        for half in ("client_id", "client_secret"):
+            name = f"{provider}_oauth_{half}"
+            assert hasattr(settings, name), (
+                f"{name} is not a declared setting, so the environment variable that names it "
+                "is silently ignored and resolve_client_credentials can never see it"
+            )
+
+
+def test_a_per_connection_application_still_overrides_the_install_wide_one(monkeypatch):
+    """Declaring the fields must not change the PRECEDENCE. A tenant bringing their own
+    application keeps overriding the install's, and that is the whole point of BYO OAuth."""
+    from app.config import settings
+    from app.services.oauth_service import resolve_client_credentials
+
+    monkeypatch.setattr(settings, "google_oauth_client_id", "install-wide-id", raising=False)
+    monkeypatch.setattr(settings, "google_oauth_client_secret", "install-wide-secret", raising=False)
+
+    assert resolve_client_credentials("google") == ("install-wide-id", "install-wide-secret")
+    assert resolve_client_credentials("google", "tenant-id", "tenant-secret") == (
+        "tenant-id",
+        "tenant-secret",
+    )
+    # ⚠ HALF a pair is not a pair: a client id with no secret must fall back rather than be
+    # sent to the provider on its own, which fails with a message about the wrong thing.
+    assert resolve_client_credentials("google", "tenant-id", None) == (
+        "install-wide-id",
+        "install-wide-secret",
+    )

@@ -1278,6 +1278,36 @@ class Settings(BaseSettings):
     #: is `redirect_uri_mismatch` rather than anything that names this setting.
     backend_public_url: str = "http://localhost:8000"
 
+    # ══════════════════════════════════════════════════════════════════════════════════
+    # THE INSTALL-WIDE OAUTH APPLICATION (one per provider)
+    # ══════════════════════════════════════════════════════════════════════════════════
+    #
+    # ⚠ THESE SIX FIELDS DID NOT EXIST, AND `oauth_service.resolve_client_credentials` HAS
+    # BEEN READING THEM SINCE PHASE 215. It reads them through
+    # `getattr(settings, "google_oauth_client_id", "")`, and a `getattr` with a default
+    # cannot tell "configured as empty" from "there is no such setting" — so the branch
+    # always fell through to its raise, and the sentence it raises names the exact
+    # environment variables that nothing was reading:
+    #
+    #     "OAuth credentials not configured for provider 'google'. Please set
+    #      GOOGLE_OAUTH_CLIENT_ID & GOOGLE_OAUTH_CLIENT_SECRET ..."
+    #
+    # pydantic-settings maps environment variables onto DECLARED fields only, so an
+    # operator who followed that instruction to the letter changed nothing at all. The
+    # only path that ever worked was the per-connection *Advanced* form — which is why the
+    # operator asked, correctly: *"why should I have to put the advanced OAuth credential"*
+    # for an application they had already registered.
+    #
+    # ⚠ THE PRECEDENCE IS NOT CHANGED BY DECLARING THEM. `resolve_client_credentials` still
+    # prefers the per-connection pair when BOTH halves are supplied, and falls back to
+    # these. A tenant bringing their own application keeps overriding the install's.
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    microsoft_oauth_client_id: str = ""
+    microsoft_oauth_client_secret: str = ""
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: str = ""
+
     # Phase 167 (INV-01, D-167-02) — env-switched invitation email delivery. The DEFAULT is
     # ``none``: the app just LOGS the invite link (offline/self-hosted safe — no email service
     # or API key required). Set ``EMAIL_PROVIDER=resend`` + ``RESEND_API_KEY`` +
