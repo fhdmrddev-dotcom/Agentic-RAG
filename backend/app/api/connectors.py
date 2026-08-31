@@ -116,9 +116,25 @@ No `supabase-py` call is made in this module. Every DB touch happens inside
 `run_in_threadpool(query.execute)` (D-v2.5-01).
 """
 
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from supabase import Client
+
+#: ⚠ THIS MODULE USED `logger` AT SIX SITES AND DEFINED IT AT NONE.
+#:
+#: `logger` was a plain undefined NAME, so every one of those lines raised `NameError` the
+#: moment it was reached — and because the raise happens after the response has begun, the
+#: browser gets no status and no CORS headers at all: `TypeError: Failed to fetch`, with
+#: NOTHING in the server log. Import-time checks cannot see it; only executing the line can.
+#:
+#: Measured 2026-08-31: `POST /connectors/oauth/authorize` with ANY non-null
+#: `connection_id` died this way, while the same call with `connection_id: null` returned a
+#: clean 422 — the branch that reads the stored client id is the one that logs. The other
+#: five sites are worse: two of them are the OAuth CALLBACK's error paths, so a provider
+#: that answered with an error, or a token exchange that failed, would have crashed the
+#: request instead of redirecting the person somewhere that says so.
 
 from app.dependencies import (
     get_active_org_id,
@@ -145,6 +161,8 @@ from app.security.egress import (
     EgressResponseTooLarge,
     EgressResponseUndecodable,
 )
+
+logger = logging.getLogger(__name__)
 from app.services import connector_service
 from app.services.connectors.jira_adapter import JiraUnreachable
 from app.services.connectors.protocol import AdapterError
