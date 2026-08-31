@@ -75,6 +75,17 @@ def _google_error_reason(body: bytes | str | None) -> str:
             reason = (entry or {}).get("reason") if isinstance(entry, dict) else None
             if isinstance(reason, str) and reason.isalnum() and reason not in parts:
                 parts.append(reason)
+        # ⚠ `details[]` TOO — the google.rpc.ErrorInfo shape. Drive still sends the legacy
+        # `errors[]` today, but the newer APIs send an EMPTY one and put everything here;
+        # measured 2026-08-31, Sheets and Docs both arrived as a bare `PERMISSION_DENIED`
+        # until this arm existed. Read both, so this helper does not quietly go blind the
+        # day Drive migrates. `services/google/_http.error_reason` is the same rule.
+        for detail in err.get("details") or []:
+            if not isinstance(detail, dict):
+                continue
+            reason = detail.get("reason")
+            if isinstance(reason, str) and reason.replace("_", "").isalnum() and reason not in parts:
+                parts.append(reason)
         return f" ({' / '.join(parts)})" if parts else ""
     except Exception:  # noqa: BLE001 — a best-effort read of a body we already distrust
         return ""
