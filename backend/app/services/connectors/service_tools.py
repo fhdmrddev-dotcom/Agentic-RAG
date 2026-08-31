@@ -818,7 +818,7 @@ SERVICE_TOOL_SPECS: dict[str, list[dict[str, Any]]] = {
             },
         },
         {
-            "name": "update_file",
+            "name": "rename_file",
             "title": "Rename a Drive file this app created",
             "description": (
                 "Rename a file THIS APP created. A file the person made themselves is refused - the app can only touch its own files."
@@ -1786,7 +1786,10 @@ _GOOGLE_READ_CALLS: dict[str, dict[str, tuple[str, str]]] = {
     # "what can this product change at Google?" has one answer.
     "drive_write": {
         "create_file": ("app.services.google.writes", "create_file"),
-        "update_file": ("app.services.google.writes", "update_file"),
+        # ⚠ `rename_file`, NOT `update_file`. The old identifier read as "replace the
+        # contents" to a model choosing a tool, while the function only ever changed the
+        # NAME. The description was honest; the identifier is what gets chosen.
+        "rename_file": ("app.services.google.writes", "rename_file"),
     },
     "gmail_write": {
         "draft_email": ("app.services.google.writes", "draft_email"),
@@ -1829,7 +1832,7 @@ _GOOGLE_READ_ARGS: dict[str, dict[str, str]] = {
     # cell containing the Python repr of a row. A spreadsheet write is the first argument
     # in this table that is a list OF lists, and the existing coercion cannot express it.
     "create_file": {"name": "str", "content": "str", "mime_type": "str"},
-    "update_file": {"file_id": "str", "name": "str"},
+    "rename_file": {"file_id": "str", "name": "str"},
     "draft_email": {"to": "str", "subject": "str", "body": "str"},
     "append_rows": {"spreadsheet_id": "str", "rows": "rows", "a1_range": "str"},
     "update_cells": {"spreadsheet_id": "str", "a1_range": "str", "rows": "rows"},

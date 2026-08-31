@@ -645,6 +645,23 @@ async def send_pinned_http(
     url: str,
     *,
     json: Any | None = None,
+    #: A RAW request body, for the one thing a JSON body cannot express: an upload.
+    #:
+    #: ⚠ ADDED 2026-09-01 FOR A MEASURED DEFECT, not for generality. `create_file` needed
+    #: to put bytes in a Drive file, `send_pinned_http` spoke only JSON, and the result was
+    #: a file created EMPTY that reported success — the exact failure its own docstring
+    #: warned about. The alternative was hand-assembling a `multipart/related` body in a
+    #: caller, which is more code in a worse place.
+    #:
+    #: ⚠ EVERY SECURITY PROPERTY OF THIS FUNCTION IS BODY-AGNOSTIC AND NONE OF THEM MOVES:
+    #: the destination is validated and pinned before a body is looked at, the SNI name is
+    #: restored the same way, redirects are still refused explicitly, and the RESPONSE cap
+    #: is unchanged. What a request carries has never been part of where it is allowed to
+    #: go, and this does not make it part of it.
+    #:
+    #: ⚠ MUTUALLY EXCLUSIVE WITH `json` — httpx would silently let one win. Refused here,
+    #: because a caller that passed both has a bug and deserves to be told at the seam.
+    content: bytes | None = None,
     headers: Mapping[str, str] | None = None,
     #: Query parameters, encoded by the transport rather than by the caller.
     #:
@@ -691,6 +708,12 @@ async def send_pinned_http(
     # the D-06 ordering fence installs recording stubs with `monkeypatch.setattr`, and making
     # it a coroutine or hiding it behind a wrapper name would make that ordering unobservable
     # — the exact shape RESEARCH §R10 rejected.
+    if json is not None and content is not None:
+        raise ValueError(
+            "send_pinned_http was given both 'json' and 'content'. Refused rather than "
+            "letting one silently win: a caller that passed both does not know which body "
+            "it is sending."
+        )
     pinned = await run_in_threadpool(
         validate_destination, capability, url, None,
         allowed_host=allowed_host, resolver=resolver,
@@ -726,6 +749,7 @@ async def send_pinned_http(
             method,
             target,
             json=json,
+            content=content,
             params=dict(params) if params else None,
             headers=outgoing,
             timeout=explicit_timeout,

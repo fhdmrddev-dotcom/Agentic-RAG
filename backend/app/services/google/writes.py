@@ -21,7 +21,7 @@ shape of outbound mail a person still reads before it leaves.
 are both wide enough to delete; nothing here advertises it. "Creates and updates only" is
 enforced by the TOOL SET, and `SERVICE_TOOL_SPECS` is the surface an audit greps.
 
-⛔ **Drive is `drive.file`** — the app sees and edits ONLY files it created. `update_file` on
+⛔ **Drive is `drive.file`** — the app sees and edits ONLY files it created. `rename_file` on
 a document the person made themselves is refused BY GOOGLE, and that refusal is the safety
 property the operator chose, not a gap to work around.
 
@@ -39,7 +39,7 @@ from email.message import EmailMessage
 from typing import Any
 from uuid import UUID
 
-from app.services.google._http import GoogleReadError, write_json
+from app.services.google._http import GoogleReadError, upload_media, write_json
 
 DRIVE = "drive_write"
 GMAIL = "gmail_write"
@@ -63,7 +63,7 @@ _MAX_BODY_CHARS = 100_000
 
 __all__ = [
     "create_file",
-    "update_file",
+    "rename_file",
     "draft_email",
     "append_rows",
     "update_cells",
@@ -124,12 +124,22 @@ async def create_file(
 async def _create_with_content(
     connection_id: str | UUID, name: str, mime: str, body: str
 ) -> dict[str, Any]:
-    """Metadata first, then the bytes.
+    """Metadata first, then the BYTES — and the second half is what was broken.
 
-    ⚠ TWO CALLS RATHER THAN ONE MULTIPART UPLOAD, and the reason is honesty about failure:
-    a multipart body assembled by hand is one boundary-string bug away from creating an
-    EMPTY file that reports success. Two plain JSON calls each fail loudly where they fail,
-    and the create's own id is what the second one addresses.
+    ⚠ **THIS FUNCTION SHIPPED WRITING NOTHING, AND ITS OWN DOCSTRING PREDICTED IT.** The
+    original text said a multipart body was rejected because it is *"one boundary-string bug
+    away from creating an EMPTY file that reports success"* — and then the media call was
+    made through `write_json`, which sends a JSON document. Drive's upload endpoint wants
+    the file's bytes AS the body, so the content was encoded into nothing: an empty file,
+    HTTP 200, and a note saying it had been created.
+
+    ⚠ **NOTHING CAUGHT IT AND NOTHING COULD HAVE.** Both calls returned 2xx, every unit test
+    was green, and the only observable is the file itself — which is why the fix ships with
+    a test that asserts the BYTES SENT rather than the call count.
+
+    ⚠ TWO CALLS, STILL. That part of the original reasoning was right and is kept: a
+    hand-assembled `multipart/related` body is a boundary-string bug waiting to happen, and
+    two requests each fail loudly where they fail.
     """
     created = await write_json(
         DRIVE,
@@ -141,40 +151,56 @@ async def _create_with_content(
         what="create_file",
     )
     file_id = str(created.get("id") or "")
+    wrote_content = False
     if body and file_id:
-        await write_json(
+        await upload_media(
             DRIVE,
             connection_id,
             "PATCH",
             f"{_DRIVE_UPLOAD}/{file_id}",
-            None,
-            params={"uploadType": "media"},
+            body.encode("utf-8"),
+            f"{mime}; charset=utf-8",
+            {"uploadType": "media"},
             what="create_file",
         )
+        wrote_content = True
     return {
         "id": file_id,
         "name": created.get("name"),
         "mime_type": created.get("mimeType"),
         "web_view_url": created.get("webViewLink"),
+        # ⚠ REPORTED, NOT ASSUMED. The empty-file defect was invisible partly because the
+        # note claimed a creation without saying whether anything was IN it.
+        "bytes_written": len(body.encode("utf-8")) if wrote_content else 0,
         "note": (
             "Created. Only files this app created are visible to it — it cannot see or "
             "edit anything else in the Drive."
+            if wrote_content
+            else "Created EMPTY — no content was supplied. Only files this app created "
+            "are visible to it."
         ),
     }
 
 
-async def update_file(
+async def rename_file(
     connection_id: str | UUID, file_id: str | None = None, name: str | None = None
 ) -> dict[str, Any]:
     """Rename a file THIS APP created.
+
+    ⚠ **RENAMED FROM `update_file` (2026-09-01) BECAUSE THE OLD NAME WAS A LIE TO A MODEL.**
+    It changes the file's NAME and nothing else — the description said so, but a model
+    picking a tool reads the NAME first, and `update_file` reads as *"replace the
+    contents."* A model asked to update a document would have chosen it, got a 200, and
+    changed the title while the content sat untouched. The description was honest and the
+    identifier was not; the identifier is what gets chosen.
 
     ⚠ A file the person created themselves is refused BY GOOGLE with a 404 under
     `drive.file`, and `_raise_for` already words a 404 as *"the id may be wrong, or this
     account may not have access to it."* That is accurate here and is the safety property,
     not a defect to route around.
     """
-    file_id = _require(file_id, "a file id", "update_file")
-    name = _require(name, "a new name", "update_file")
+    file_id = _require(file_id, "a file id", "rename_file")
+    name = _require(name, "a new name", "rename_file")
     updated = await write_json(
         DRIVE,
         connection_id,
@@ -182,7 +208,7 @@ async def update_file(
         f"{_DRIVE_API}/{file_id}",
         {"name": name},
         params={"fields": "id,name,webViewLink"},
-        what="update_file",
+        what="rename_file",
     )
     return {
         "id": updated.get("id"),

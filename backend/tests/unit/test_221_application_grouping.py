@@ -503,3 +503,118 @@ def test_a_write_cannot_be_sent_under_a_read_capability():
 
     with pytest.raises(GoogleReadError, match="read-only capability"):
         asyncio.run(go())
+
+
+# ── 8 · the two write defects, and the assertions that would have caught them ─────────
+
+
+def test_create_file_actually_sends_the_bytes():
+    """⭐ THE TEST THAT WAS MISSING. `create_file` shipped writing NOTHING.
+
+    The media call went through `write_json`, which sends a JSON document, while Drive's
+    upload endpoint wants the file's bytes AS the body. Both calls returned 2xx, every test
+    was green, and the only observable was the file itself.
+
+    ⚠ SO THIS ASSERTS THE BYTES, NOT THE CALL COUNT. A test that counted requests — the
+    obvious one to write — would have passed against the broken version.
+    """
+    import asyncio
+
+    from app.services.google import writes
+
+    sent: dict[str, object] = {}
+
+    async def fake_write_json(cap, conn, method, url, payload=None, params=None, **kw):
+        return {"id": "file-1", "name": "notes.txt", "mimeType": "text/plain"}
+
+    async def fake_upload_media(cap, conn, method, url, body, content_type, params=None, **kw):
+        sent["body"] = body
+        sent["content_type"] = content_type
+        sent["capability"] = cap
+        return {}
+
+    original_write, original_upload = writes.write_json, writes.upload_media
+    writes.write_json, writes.upload_media = fake_write_json, fake_upload_media
+    try:
+        result = asyncio.run(
+            writes.create_file("c-1", name="notes.txt", content="hello world")
+        )
+    finally:
+        writes.write_json, writes.upload_media = original_write, original_upload
+
+    assert sent["body"] == b"hello world", sent
+    assert sent["capability"] == "drive_write"
+    assert result["bytes_written"] == 11
+
+
+def test_create_file_with_no_content_says_so_rather_than_implying_content():
+    import asyncio
+
+    from app.services.google import writes
+
+    uploaded = []
+
+    async def fake_write_json(cap, conn, method, url, payload=None, params=None, **kw):
+        return {"id": "file-1", "name": "empty.txt"}
+
+    async def fake_upload_media(*a, **kw):
+        uploaded.append(a)
+        return {}
+
+    original_write, original_upload = writes.write_json, writes.upload_media
+    writes.write_json, writes.upload_media = fake_write_json, fake_upload_media
+    try:
+        result = asyncio.run(writes.create_file("c-1", name="empty.txt"))
+    finally:
+        writes.write_json, writes.upload_media = original_write, original_upload
+
+    assert uploaded == []
+    assert result["bytes_written"] == 0
+    assert "EMPTY" in result["note"]
+
+
+def test_the_drive_write_is_named_rename_not_update():
+    """⚠ A model picks a tool by NAME. `update_file` read as 'replace the contents'.
+
+    The function only ever changed the file's name, so a model asked to update a document
+    would have chosen it, received a 200, and changed the title while the content sat
+    untouched — a silent wrong answer with a success shape.
+    """
+    names = {s["name"] for s in SERVICE_TOOL_SPECS["google"]}
+    assert "rename_file" in names
+    assert "update_file" not in names
+
+    from app.services.connectors.service_tools import _GOOGLE_READ_CALLS, spec_for
+
+    assert "rename_file" in _GOOGLE_READ_CALLS["drive_write"]
+    assert "update_file" not in _GOOGLE_READ_CALLS["drive_write"]
+    assert spec_for("google", "rename_file")["title"].lower().startswith("rename")
+
+
+def test_an_upload_cannot_go_out_under_a_read_capability():
+    import asyncio
+
+    from app.services.google._http import GoogleReadError, upload_media
+
+    with pytest.raises(GoogleReadError, match="read-only capability"):
+        asyncio.run(
+            upload_media(
+                "drive_read", "c-1", "PATCH", "https://example.invalid",
+                b"x", "text/plain", what="create_file",
+            )
+        )
+
+
+def test_the_transport_refuses_a_request_carrying_two_bodies():
+    """`json` and `content` together: httpx would let one win silently."""
+    import asyncio
+
+    from app.security.egress import send_pinned_http
+
+    with pytest.raises(ValueError, match="both 'json' and 'content'"):
+        asyncio.run(
+            send_pinned_http(
+                "drive_write", "POST", "https://www.googleapis.com/x",
+                json={"a": 1}, content=b"bytes", timeout=1.0, max_bytes=1024,
+            )
+        )

@@ -321,6 +321,59 @@ async def write_json(
     return jsonlib.loads(resp.body)
 
 
+async def upload_media(
+    capability: str,
+    connection_id: str | UUID,
+    method: str,
+    url: str,
+    body: bytes,
+    content_type: str,
+    params: Mapping[str, str] | None = None,
+    *,
+    what: str,
+    timeout: float = 30.0,
+) -> Any:
+    """Send RAW BYTES — the one thing `write_json` cannot do, and the reason a file was empty.
+
+    ⚠ **THIS EXISTS BECAUSE `create_file` REPORTED SUCCESS AND WROTE NOTHING.** Drive's
+    upload endpoint takes the file's bytes as the request body; `write_json` sends a JSON
+    document, so the content parameter was accepted, encoded into nothing, and the person
+    got an empty file with a cheerful note. The failure was predicted verbatim in
+    `writes.py`'s own docstring and then committed anyway.
+
+    ⚠ Same refusal as `write_json`: a `*_read` capability cannot reach this. A read key is
+    bound to a `.readonly` scope, so an upload under one is a wiring error, and naming it
+    here beats a confusing 403 from Google.
+    """
+    if capability.endswith("_read"):
+        raise GoogleReadError(
+            f"{what} was NOT sent: it declares the read-only capability {capability!r}. "
+            "An upload must declare its own '*_write' key — this is a wiring error, not a "
+            "permission the person can grant."
+        )
+
+    token = await _token(connection_id)
+    resp = await send_pinned_http(
+        capability,
+        method.upper(),
+        url,
+        params=dict(params or {}),
+        content=body,
+        headers={
+            "authorization": f"Bearer {token}",
+            "Content-Type": content_type,
+            "Accept": "application/json",
+        },
+        timeout=timeout,
+        max_bytes=512 * 1024,
+    )
+    if not (200 <= resp.status_code < 300):
+        _raise_for(resp.status_code, resp.body, what)
+    if not resp.body:
+        return {}
+    return jsonlib.loads(resp.body)
+
+
 def decode_b64url(data: str | None) -> bytes:
     """Google's base64url with the padding it omits. Empty on anything malformed.
 
