@@ -50,6 +50,13 @@ OAUTH_PROVIDERS: dict[OAuthProvider, dict[str, Any]] = {
             # and cannot write; a wider scope here would grant more than any code can
             # use, which is precisely the grant nobody can audit later.
             "https://www.googleapis.com/auth/gmail.readonly",
+            # Round 1 (2026-08-31, operator: "all five"). SCOPES BATCH ON ONE CONSENT
+            # SCREEN, which is the whole reason these landed together: adding them one
+            # surface at a time would have cost one re-consent EACH. Reads only.
+            "https://www.googleapis.com/auth/spreadsheets.readonly",
+            "https://www.googleapis.com/auth/documents.readonly",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/contacts.readonly",
         ],
         "supports_pkce": True,
         "access_type": "offline",

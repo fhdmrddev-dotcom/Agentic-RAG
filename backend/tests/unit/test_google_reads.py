@@ -19,8 +19,10 @@ import json
 
 import pytest
 
-from app.services import gmail_read
-from app.services.gmail_read import GmailReadError, _error_reason, _header, _plain_text
+from app.services.google import gmail as gmail_read
+from app.services.google import _http
+from app.services.google._http import GoogleReadError as GmailReadError, error_reason as _error_reason
+from app.services.google.gmail import _header, _plain_text
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
@@ -46,8 +48,8 @@ async def test_an_insufficient_scope_403_tells_the_person_to_RECONNECT(monkeypat
     async def _fake_send(*_a, **_k):
         return _Resp(403, body)
 
-    monkeypatch.setattr(gmail_read, "send_pinned_http", _fake_send)
-    monkeypatch.setattr(gmail_read, "get_fresh_access_token", _token_ok)
+    monkeypatch.setattr(_http, "send_pinned_http", _fake_send)
+    monkeypatch.setattr(_http, "get_fresh_access_token", _token_ok)
 
     with pytest.raises(GmailReadError) as exc:
         await gmail_read.search_email("c-1", limit=3)
@@ -68,8 +70,8 @@ async def test_a_connection_with_no_token_says_so_rather_than_calling_out(monkey
     async def _must_not_send(*_a, **_k):
         raise AssertionError("no request may be sent without a token")
 
-    monkeypatch.setattr(gmail_read, "get_fresh_access_token", _no_token)
-    monkeypatch.setattr(gmail_read, "send_pinned_http", _must_not_send)
+    monkeypatch.setattr(_http, "get_fresh_access_token", _no_token)
+    monkeypatch.setattr(_http, "send_pinned_http", _must_not_send)
 
     with pytest.raises(GmailReadError, match="no valid OAuth token"):
         await gmail_read.read_email("c-1", "m-1")
@@ -84,8 +86,8 @@ async def test_read_email_needs_an_id_and_sends_nothing_without_one(monkeypatch)
     async def _must_not_send(*_a, **_k):
         raise AssertionError("no request may be sent without a message id")
 
-    monkeypatch.setattr(gmail_read, "send_pinned_http", _must_not_send)
-    monkeypatch.setattr(gmail_read, "get_fresh_access_token", _token_ok)
+    monkeypatch.setattr(_http, "send_pinned_http", _must_not_send)
+    monkeypatch.setattr(_http, "get_fresh_access_token", _token_ok)
     with pytest.raises(GmailReadError, match="needs a message id"):
         await gmail_read.read_email("c-1", "   ")
 
@@ -169,8 +171,8 @@ async def test_read_email_reports_an_html_only_body_as_a_NOTE_not_an_empty_strin
     async def _fake_send(*_a, **_k):
         return _Resp(200, json.dumps(msg).encode())
 
-    monkeypatch.setattr(gmail_read, "send_pinned_http", _fake_send)
-    monkeypatch.setattr(gmail_read, "get_fresh_access_token", _token_ok)
+    monkeypatch.setattr(_http, "send_pinned_http", _fake_send)
+    monkeypatch.setattr(_http, "get_fresh_access_token", _token_ok)
 
     out = await gmail_read.read_email("c-1", "m-1")
     assert out["subject"] == "Hello"
@@ -196,8 +198,8 @@ async def test_search_email_caps_the_limit_and_projects_the_four_headers(monkeyp
             ]},
         }).encode())
 
-    monkeypatch.setattr(gmail_read, "send_pinned_http", _fake_send)
-    monkeypatch.setattr(gmail_read, "get_fresh_access_token", _token_ok)
+    monkeypatch.setattr(_http, "send_pinned_http", _fake_send)
+    monkeypatch.setattr(_http, "get_fresh_access_token", _token_ok)
 
     out = await gmail_read.search_email("c-1", query="from:hr", limit=999)
     # 999 is clamped to 25 — the low cap is deliberate: each result costs a second call.

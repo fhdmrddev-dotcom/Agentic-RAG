@@ -264,6 +264,14 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # shared `google_read` would have destroyed the moment a second scope was added.
     # The OAuth scopes stay the real boundary; this is the one the code can check.
     "gmail_read": ("googleapis.com",),
+    # Round 1 (2026-08-31) - four more read-only Google surfaces on the SAME connection.
+    # All resolve to googleapis.com, so these keys buy no HOST separation; what they buy
+    # is that a spec DECLARES exactly one, so a Calendar tool cannot reach Gmail. That is
+    # the property an audit can grep. The OAuth scopes stay the real boundary.
+    "sheets_read": ("googleapis.com",),
+    "docs_read": ("googleapis.com",),
+    "calendar_read": ("googleapis.com",),
+    "contacts_read": ("googleapis.com",),
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -272,6 +280,10 @@ _HOST_MATCH: dict[str, str] = {
     "send_email": _CALLER,
     "drive_read": _SUFFIX,
     "gmail_read": _SUFFIX,
+    "sheets_read": _SUFFIX,
+    "docs_read": _SUFFIX,
+    "calendar_read": _SUFFIX,
+    "contacts_read": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -282,6 +294,10 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "send_email": frozenset({"smtps", "smtp+starttls"}),
     "drive_read": frozenset({"https"}),
     "gmail_read": frozenset({"https"}),
+    "sheets_read": frozenset({"https"}),
+    "docs_read": frozenset({"https"}),
+    "calendar_read": frozenset({"https"}),
+    "contacts_read": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {
