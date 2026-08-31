@@ -486,6 +486,25 @@ export interface ConnectorConnection {
   service_id: string
   name: string
   config: ConnectorConnectionConfig
+  /**
+   * Phase 215's OAuth facts, and they were MISSING here while the server sent all five.
+   *
+   * ⚠ `ConnectorConnectionResponse` (the Pydantic wall) has declared `auth_type`,
+   * `status`, `error_message`, `account_email` and `account_name` since Phase 215; this
+   * type declared none of them, so ~20 `tsc` errors sat across `connectionsCopy.ts`,
+   * `connectionFormCopy.ts`, `ConnectionFormPanel.tsx` and `ConnectorsFlyout.tsx` while the
+   * data flowed correctly at runtime. Vitest does not typecheck, so the count gate could
+   * never see them — the type had stopped guarding this surface entirely.
+   *
+   * ⚠ `custom_client_secret` IS DELIBERATELY NOT HERE, in either this type or `config`.
+   * The server does not return it: it lives encrypted in `oauth_client_secret_ciphertext`
+   * (migration 150), ungranted to `authenticated`, precisely so it cannot be read back.
+   */
+  auth_type?: "static_key" | "oauth_byo" | null
+  status?: "active" | "revoked" | "error" | null
+  error_message?: string | null
+  account_email?: string | null
+  account_name?: string | null
   is_enabled: boolean
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture

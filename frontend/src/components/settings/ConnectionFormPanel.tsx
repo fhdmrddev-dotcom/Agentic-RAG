@@ -829,6 +829,33 @@ export function ConnectionFormPanel({
    * resolver a RUN uses (plan 190-15 asserted the no-body property three ways: signature,
    * OpenAPI, and over the wire).
    */
+  /**
+   * Is this row authenticated by OAuth rather than by a stored credential?
+   *
+   * ⚠ THREE CONTROLS ON THIS PANEL WERE BUILT WHEN EVERY CONNECTION HAD A HOST AND A
+   * SECRET, AND THEY LIE ON AN OAUTH ROW. The operator met all three on a connection that
+   * was working:
+   *
+   *   · "Check credential" answered *"The check did not run ... nothing_to_check_yet"*.
+   *     An OAuth connection HAS no host to probe; the question worth asking of it is
+   *     "is the token live", which is a different check this panel does not implement.
+   *   · The 🔒 destination footer read *"sends to nothing yet — fill the fields above"*,
+   *     and there are no fields above: an OAuth row types no host and no port.
+   *   · The refusal banner then explained a failure that had not happened.
+   *
+   * The existing guard on the check button was `!connection.mcp_server_url` — written when
+   * there were TWO shapes and a remote server was the only one without a credential to
+   * probe. Phase 215 added a third. This is that guard, widened by name rather than by
+   * another negation, so the next shape is added HERE and not in four places.
+   *
+   * ⚠ ABSENCE, NEVER A DISABLED CONTROL. The sketch-069-A rule this repo follows
+   * everywhere: an affordance whose verb cannot run is worse than no affordance.
+   */
+  // ⚠ READ FROM THE DRAFT AND THE ROW, NOT FROM `capability` — that const is declared ~180
+  // lines BELOW this one, and naming it here is a temporal-dead-zone ReferenceError at
+  // render, not a compile error. `draft.capability` holds the same shape and is state.
+  const isOAuthRow = draft.capability === "oauth" || connection?.auth_type === "oauth_byo"
+
   async function handleCheck() {
     if (!connection || !onCheck || check.kind === "checking") return
     setCheck({ kind: "checking" })
@@ -1817,7 +1844,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 1 — in flight. Says, before it runs, that nothing leaves. ── */}
-        {check.kind === "checking" && (
+        {!isOAuthRow && check.kind === "checking" && (
           <NoticeBlock
             tone="neutral"
             glyph="⟳"
@@ -1830,7 +1857,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 2 — the one green moment, and its second clause is load-bearing. ── */}
-        {check.kind === "done" && check.result.ok && checkCapability && (
+        {!isOAuthRow && check.kind === "done" && check.result.ok && checkCapability && (
           <NoticeBlock
             tone="positive"
             glyph={CHECK_SUCCESS_GLYPH}
@@ -1855,7 +1882,7 @@ export function ConnectionFormPanel({
                nothing answered) is not a rejection (we reached it and IT said no). Each
                arrives in its own `bucket` on the wire and renders its own heading, its own
                glyph and its own next step. §14 names the two forbidden swaps directly. */}
-        {check.kind === "done" && !check.result.ok && (
+        {!isOAuthRow && check.kind === "done" && !check.result.ok && (
           <NoticeBlock
             tone="destructive"
             glyph={
@@ -1941,7 +1968,7 @@ export function ConnectionFormPanel({
         {/* ── The check that did not run. A PLATFORM condition, deliberately outside §4d's
                three: telling someone to "correct the host" about a switched-off connection
                sends them to fix something that is not broken. ── */}
-        {check.kind === "platform" && (
+        {!isOAuthRow && check.kind === "platform" && (
           <NoticeBlock
             tone="destructive"
             glyph={CHECK_NOT_RUN_GLYPH}
@@ -1955,6 +1982,12 @@ export function ConnectionFormPanel({
           </NoticeBlock>
         )}
 
+        {/* ⚠ NOT RENDERED FOR AN OAUTH ROW. The footer states where a step SENDS, read from
+            the host and port fields — and an OAuth connection has neither, so it fell to its
+            "nothing yet — fill the fields above" arm and pointed at fields that do not
+            exist. Its always-on contract (§3c) is about a row that HAS a destination to
+            state; silence is the honest answer where there is none. */}
+        {!isOAuthRow && (<>
         <div
           data-testid="connection-destination-footer"
           data-refused={footer.refusedReason ? "true" : "false"}
@@ -2011,6 +2044,7 @@ export function ConnectionFormPanel({
           </p>
         )}
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{FOOTER_SERVER_NOTE}</p>
+        </>)}
 
         {/* ── 190-18 · §2g — THE GRADED DESTRUCTIVE GUARDS, on the row the panel is editing.
                Present only when a write is genuinely possible: an org admin, a live
@@ -2028,6 +2062,7 @@ export function ConnectionFormPanel({
                 worded 409 as well; this guard is so the control is never OFFERED. */}
             {onCheck &&
               !connection.mcp_server_url &&
+              !isOAuthRow &&
               (connection.is_enabled ? (
                 <button
                   type="button"

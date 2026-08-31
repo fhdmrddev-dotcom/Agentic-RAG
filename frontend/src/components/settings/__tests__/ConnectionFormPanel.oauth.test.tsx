@@ -119,3 +119,102 @@ describe("Phase 215 — BYO OAuth Frontend Components & Copy Derivations", () =>
     expect(screen.getByText(/Reconnect with Google Workspace/i)).toBeInTheDocument()
   })
 })
+
+describe("an OAuth row does not wear capability-shaped controls", () => {
+  /**
+   * ⚠ ALL THREE OF THESE WERE ON SCREEN AT ONCE, ON A CONNECTION THAT WAS WORKING, and the
+   * operator reported them as "a lot of fake information that is not needed":
+   *
+   *   · "Check credential" answered "The check did not run ... nothing_to_check_yet".
+   *     An OAuth connection has NO HOST to probe; the question worth asking of it is
+   *     "is the token live", which is a different check this panel does not implement.
+   *   · The destination footer read "sends to nothing yet - fill the fields above",
+   *     pointing at fields that do not exist on an OAuth row.
+   *   · A refusal banner explained a failure that had not happened.
+   *
+   * The guard on the check button was `!connection.mcp_server_url` — correct when there
+   * were two shapes and a remote server was the only credential-less one. Phase 215 added
+   * a third and nothing widened.
+   */
+  const oauthConn: ConnectorConnection = {
+    id: "conn-oauth-1",
+    org_id: "org-1",
+    service_id: "google",
+    name: "Google Workspace",
+    config: { provider: "google" } as ConnectorConnection["config"],
+    auth_type: "oauth_byo",
+    status: "active",
+    account_email: "engineer@company.com",
+    is_enabled: true,
+    capability: null,
+    mcp_server_url: null,
+    discovered_tools: [],
+    tool_grants: {},
+  }
+
+  function renderOAuth() {
+    render(
+      <ConnectionFormPanel
+        open={true}
+        mode="edit"
+        connection={oauthConn}
+        onClose={() => {}}
+        canManage={true}
+        onCheck={vi.fn()}
+      />
+    )
+  }
+
+  // ⚠ THERE IS NO "offers no Check credential control" CASE HERE, AND ITS ABSENCE IS A
+  // FINDING RATHER THAN AN OVERSIGHT. It was written, and driven against the pre-fix panel
+  // to see it fail — and it PASSED, because this harness does not satisfy the button's
+  // other preconditions (a live platform among them), so the control was missing for a
+  // reason that had nothing to do with the guard. A test that cannot fail is worse than no
+  // test: it reports a property it never examined. The button guard is real — it is the
+  // `!isOAuthRow` term added beside `!connection.mcp_server_url` — but proving it needs a
+  // harness that can render the button at all, which is owed rather than faked here.
+
+  it("claims no destination", () => {
+    renderOAuth()
+    expect(screen.queryByTestId("connection-destination-footer")).toBeNull()
+    expect(screen.queryByText(/fill the fields above/i)).toBeNull()
+  })
+
+  it("still shows what an OAuth row IS", () => {
+    // The cleanup removes noise, not information. ⚠ This one passes on the OLD panel too —
+    // it is a NEGATIVE control against over-removal, not a fence for the change.
+    renderOAuth()
+    expect(screen.getByText(/engineer@company\.com/i)).toBeInTheDocument()
+    expect(screen.getByText(/OAuth 2\.0 Authorization/i)).toBeInTheDocument()
+  })
+
+  it("leaves a capability row untouched", () => {
+    // The guard is by SHAPE, not a blanket removal: a Slack row still has a host to probe
+    // and a destination to state, and both must survive.
+    render(
+      <ConnectionFormPanel
+        open={true}
+        mode="edit"
+        connection={{
+          ...oauthConn,
+          id: "conn-slack-1",
+          service_id: "slack",
+          name: "Slack",
+          auth_type: "static_key",
+          account_email: null,
+          capability: "post_message",
+          config: { default_channel: "#ops" } as ConnectorConnection["config"],
+        }}
+        onClose={() => {}}
+        canManage={true}
+        onCheck={vi.fn()}
+      />
+    )
+    // ⚠ THE FOOTER, NOT THE CHECK BUTTON, AND THE DIFFERENCE IS DELIBERATE. The button
+    // carries further preconditions this harness does not satisfy (a live platform among
+    // them), so asserting its presence here would be testing the harness rather than the
+    // shape guard. The footer depends on the guard alone, which is the property in
+    // question: it VANISHES for OAuth and SURVIVES for a capability row.
+    expect(screen.getByTestId("connection-destination-footer")).toBeInTheDocument()
+  })
+})
