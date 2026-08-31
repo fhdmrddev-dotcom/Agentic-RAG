@@ -38,6 +38,7 @@ from app.dependencies import (
     get_redis,
     get_user_pg_connection,
     get_user_supabase_client,
+    resolve_active_org_or_none,
 )
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
@@ -741,6 +742,35 @@ async def send_message(
     service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
+    # ── ⚠ THE ORG THIS TURN BELONGS TO, DECIDED HERE AND CARRIED, NOT GUESSED LATER ────
+    #
+    # Chat used to resolve its org by taking the caller's OLDEST `org_members` row, while
+    # every other surface in the app honoured the validated `X-Org-Id` the org switcher
+    # sets. For anyone in exactly one org those agree and nothing was visibly wrong. For
+    # anyone in two they disagree permanently, and MEASURED on this install the disagreement
+    # produced four separate faults that all looked like different bugs:
+    #   · connectors in the active org were invisible in chat, so grants "did nothing";
+    #   · "Always allow" refused for an account that IS an org-admin of the active org;
+    #   · the folder scope picker never rendered — the fallback org has no folders;
+    #   · and the knowledge base looked empty, because the documents are in the other one.
+    #
+    # ⚠ THE FIX IS NOT A BETTER GUESS. `X-Org-Id` is already sent by the client on every
+    # request and already re-validated against `org_members` server-side; chat simply was
+    # not reading it. `resolve_active_org_or_none` is `get_active_org_id`'s validation with
+    # a soft failure, because a chat message must not 400 for a person who belongs to two
+    # organisations.
+    #
+    # ⚠ IT IS STAMPED ONTO `current_user` BECAUSE THAT DICT ALREADY GOES EVERYWHERE this
+    # decision is needed — RunContext, ToolContext, and `resolve_connector_org`, whose
+    # "an org resolved upstream wins" branch was written for exactly this and had no
+    # supplier until now. A new parameter would have to be threaded through the producer,
+    # the loop and the dispatcher to reach the same three readers. A COPY is made rather
+    # than mutating in place: the dependency-cached dict belongs to the request, and the
+    # detached producer outlives it.
+    active_org_id = await resolve_active_org_or_none(request, current_user)
+    if active_org_id:
+        current_user = {**current_user, "org_id": active_org_id}
+
     thread_resp = await aexec(
         supabase.table("threads")
         .select("id, active_workflow_run_id")
