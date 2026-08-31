@@ -35,6 +35,21 @@ OAUTH_PROVIDERS: dict[OAuthProvider, dict[str, Any]] = {
             "email",
             "profile",
             "https://www.googleapis.com/auth/drive.readonly",
+            # WARNING: added 2026-08-31 - ONE CONNECTION, NOT TWO (BUS-037 section B).
+            # Gmail hangs off the SAME Google row and the SAME token; a second
+            # `connector_connections` row would have meant a second consent and two
+            # places to revoke.
+            #
+            # WARNING: an EXISTING connection does not widen itself. A token carries the
+            # scopes granted at consent time, so a row authorised before this line was
+            # added answers 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` on any mail read until
+            # it is reconnected once. `gmail_read._get` turns that into a sentence that
+            # says exactly that, rather than a bare HTTP 403.
+            #
+            # STOP: `.readonly`, never `.modify` or `.send`. The tools built on it read
+            # and cannot write; a wider scope here would grant more than any code can
+            # use, which is precisely the grant nobody can audit later.
+            "https://www.googleapis.com/auth/gmail.readonly",
         ],
         "supports_pkce": True,
         "access_type": "offline",

@@ -256,6 +256,14 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # SUFFIX-matched, so `www.googleapis.com` and `oauth2.googleapis.com` pass while
     # `evilgoogleapis.com` does not — the leading-dot rule `_host_is_allowed` documents.
     "drive_read": ("googleapis.com",),
+    # ⚠ THE SAME HOST AS `drive_read`, AND A SEPARATE KEY ON PURPOSE (2026-08-31).
+    # Gmail lives under googleapis.com too, so this entry buys no HOST separation. What
+    # it buys is that a SPEC declares exactly one key: a Drive tool cannot reach Gmail
+    # and a Gmail tool cannot reach Drive, because neither names the other's key. The
+    # separation is auditable in `SERVICE_TOOL_SPECS` — one grep per key — which a
+    # shared `google_read` would have destroyed the moment a second scope was added.
+    # The OAuth scopes stay the real boundary; this is the one the code can check.
+    "gmail_read": ("googleapis.com",),
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -263,6 +271,7 @@ _HOST_MATCH: dict[str, str] = {
     "create_ticket": _SUFFIX,
     "send_email": _CALLER,
     "drive_read": _SUFFIX,
+    "gmail_read": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -272,6 +281,7 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "create_ticket": frozenset({"https"}),
     "send_email": frozenset({"smtps", "smtp+starttls"}),
     "drive_read": frozenset({"https"}),
+    "gmail_read": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {
