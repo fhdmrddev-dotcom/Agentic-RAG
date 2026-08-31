@@ -26,8 +26,11 @@ import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvi
 import { VectorStoreCard } from "@/components/library/indexing/VectorStoreCard"
 import { EmbeddingModelCard } from "@/components/library/indexing/EmbeddingModelCard"
 import { FoldersIndexTable } from "@/components/library/indexing/FoldersIndexTable"
+import type { ActiveView } from "@/App"
 
-export function IndexingTab({ onNavigate }: { onNavigate?: (view: string) => void } = {}) {
+// ⚠ NARROWED 2026-08-31 — `(view: string)` was wider than the `(view: ActiveView)`
+// `LibraryPage` passes, so this mount was a live tsc error. See `EmbeddingModelCard`.
+export function IndexingTab({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const [summary, setSummary] = useState<IndexSummary | null>(null)
   const [unreachable, setUnreachable] = useState(false)
 

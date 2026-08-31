@@ -12,6 +12,7 @@
 import { useState } from "react"
 import type { IndexSummary } from "@/lib/api"
 import { kickReembed } from "@/lib/api"
+import type { ActiveView } from "@/App"
 
 const UNKNOWN = "Not known yet"
 
@@ -39,7 +40,11 @@ export function EmbeddingModelCard({
   /** `features.model_management === true` — gates the Change model button (VANISH). */
   canManage: boolean
   /** Routes to Settings' shipped model picker — never a second picker here. */
-  onNavigate?: (view: string) => void
+  /** ⚠ NARROWED 2026-08-31 — this was `(view: string) => void`, which is WIDER than
+   *  the `(view: ActiveView) => void` `LibraryPage` actually passes, so tsc refused the
+   *  assignment and the tab shipped with a live type error. `ActiveView` is the closed
+   *  set of routes; a `string` here could name a view that does not exist. */
+  onNavigate?: (view: ActiveView) => void
 }) {
   const [reindexing, setReindexing] = useState(false)
   const loading = summary === null
