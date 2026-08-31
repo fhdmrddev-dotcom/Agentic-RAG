@@ -6735,3 +6735,104 @@ It mirrors `_fetch_never_retrieved`'s SQL-level shape and caps its Python scan t
 **THE TWO CAUSE BLOCKS CANNOT BOTH RENDER, and it is structural rather than guarded.** `PublishRefusalList` claims the argument-gap entries out of `named_failures` — a gap that blocks a run **before it starts**; this claims the step-level failure of a golden run that **started and then stopped**.
 
 ⚠ **jsdom CANNOT PROVE WHAT THIS CARD IS FOR.** Every `getBoundingClientRect` is zero, so no test here can show that a person reading the result can name the failing step — the same blind spot the bug report names as the reason nothing caught the original, and the same one `BUG-260828-04` sits in. The suite proves the WIRING (the sentence arrives verbatim, the slug never does, the card is absent on every path that names no step); the READING is the operator's, in a browser.
+
+
+---
+
+### `frontend/src/components/settings/ConnectionGrantsList.tsx`
+
+**Triple at Phase 221's open (2026-08-31): `4 / 1 / 344` — G-5: no (1 phase).**
+
+⚠ **THE ROW WAS ABSENT FOR THIS FILE'S ENTIRE LIFE, and it is the file Phase 221 changes most.**
+That is the failure CLAUDE.md's completeness rule exists to prevent: a hot file missing from the scan
+list is permanently invisible to its own guardrail, at any count. Added at 221's open, BEFORE any
+feature code, rather than at its close.
+
+**It does not fire, and that is exactly why the seam had to be argued rather than triggered.** One
+phase old, 344 L — and a naive build of the six-application split roughly DOUBLES it, which is how
+every file in this ledger became hot. G-5 would have fired two phases too late.
+
+**Disposition: the seam is TAKEN BY CONSTRUCTION, inside 221 rather than deferred.** A later refactor
+phase would have had to undo a ~700-line component first. Four leaves are cut out at build time:
+`toolGroups.ts` (pure — grouping + the three-rung resolver, zero JSX) · `ApplicationGroup.tsx` ·
+`DirectionBand.tsx` · `ActionRow.tsx` (lifted verbatim from the existing `.map()` body). This file
+keeps the default-posture card, the search box and the composition, and owns **no row markup**.
+
+⚠ **THE ACCEPTANCE CRITERION IS A LINE COUNT, and it is falsifiable:** this file must measure
+**below 344 L** at 221's close. A summary reporting that it grew is reporting that this disposition
+was not honoured — not that the plan was bigger than expected.
+
+**The invariant it carries:** `DirectionBand.tsx` renders a label and a count and **nothing
+interactive**. The ROADMAP's rule is the reason — *"the run-time gate may key on direction; the
+grant-time gate must NOT"*, because a read is exactly where prompt injection enters. The reference
+design (Claude.ai's Rovo screen) puts a `Needs approval` control on its *Read-only tools · 22* group;
+copying that would set twenty-two grants in one click on the one axis the rule forbids.
+
+---
+
+### `frontend/src/lib/api/org.ts`
+
+**Triple at Phase 221's open (2026-08-31): `6 / 4 / 562` — ⚠ G-5 FIRES (4 phases).**
+
+⚠ **ABSENT FOR ITS ENTIRE LIFE, AND NOT COVERED BY `lib/api.ts`'s ROW — that row is the BARREL.**
+The Phase 207 split created twelve domain modules and gave rows to none of them; `knowledge.ts`,
+`threads.ts` and `workflows.ts` gained theirs at 214, and this one did not. It has been firing G-5
+unseen since.
+
+**What it holds:** the wire types a client is allowed to learn — `McpDiscoveredTool`,
+`ToolGrantPosture`, `ConnectorConnection`. Its own docblock records the standing danger: this type
+**must never declare a credential field**, because documentation naming a field the server never
+sends invites a component to render it.
+
+**Disposition: honoured by construction (221).** One optional `app` field on `McpDiscoveredTool`.
+⚠ It names a PRODUCT, never a route — see `service_tools.py`'s section for why that distinction is
+the whole of D-221-07.
+
+---
+
+### `backend/app/services/connectors/service_tools.py`
+
+**Triple at Phase 221's open (2026-08-31): `6 / 0 / 1456` — G-5: no (0 phases).**
+
+⚠ **ZERO PHASES AT 1456 LINES, and the zero is real rather than a counting error.** Every one of its
+six commits carries a DATED QUICK-TASK bucket (`260831`), which CLAUDE.md's recipe correctly
+subtracts. So G-5 structurally cannot fire on this file no matter how large it gets — a property
+worth recording, because the next reader will assume the `0` is a mistake and "fix" it.
+
+**What it holds:** `SERVICE_TOOL_SPECS` — the static advertisement + execution table for every
+capability-shaped service. Google alone is 15 specs across 6 egress keys.
+
+⚠ **THE STRIP AT `extra_descriptors_for_service` IS LOAD-BEARING AND 221 DOES NOT REVERSE IT.** Its
+docstring: *"The execution fields (`capability`, `http_method`, `path` / `api_method`, `writes`) are
+STRIPPED here rather than carried through. They are ours, they are not part of any tool contract."*
+The operator's brief for 221 assumed the grouping key already reached the browser; it does not, and
+un-stripping `capability` to make it would put URL paths in front of pickers and grant lists.
+
+**Disposition: honoured by construction (221).** A SEPARATE presentation-safe `app` key on each spec,
+emitted beside `title`. It carries no host, no path, no method — and a test asserts none of the five
+stripped keys appears on any emitted descriptor.
+
+---
+
+### `backend/app/services/connectors/grants.py`
+
+**Triple at Phase 221's open (2026-08-31): `1 / 1 / 92` — G-5: no (1 phase).**
+
+⚠ **ABSENT, AND IT IS THE GRANT-TIME GATE** — 92 lines deciding the posture of every connector call
+the product makes. Small is not the same as unimportant, and this ledger's scan list is the only
+thing that would have told anyone it was unwatched.
+
+**The invariant it carries: FAIL CLOSED AT EVERY ARM.** No connection, no tool name, an unrecognised
+value, an absent default — all return `deny`. Phase 213's own measurement is why: the previous
+`bool(v)` coercion turned a person's Deny into an Allow silently
+(`{"delete_repository": "deny"} → True`).
+
+**Disposition: honoured by construction (221).** One rung inserted between the two that exist —
+`action → app:<key> → connection default → deny` — keyed inside the existing `tool_grants` jsonb, so
+there is **no migration**.
+
+⚠ **AND ONE ASYMMETRY THAT IS NOT AN OVERSIGHT (D-221-06):** the application rung may resolve `ask`
+or `deny` for a write, but **never `allow`**. Only an explicit per-action grant can allow a write.
+Built and tested against a PLANTED write spec, because no Google write tool exists yet — the rule
+must exist before the first write does, not be retrofitted onto a shipped Allow that already
+cascades.

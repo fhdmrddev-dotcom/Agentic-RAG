@@ -630,6 +630,33 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 
 **Flags**: ⚠ **SPIKE — cap it.** One drawing, one rate sheet, end to end; a second file format is a new phase. ⭐ **The extraction half is ALREADY PROVEN** — `backend/scripts/probe_drawing_pdf.py` and `backend/scripts/probe_dxf_takeoff.py` are committed and produced a real priced subtotal (12,680.00 USD in counted items) from the operator's own DXF. **The deliverable is the MATCHING step**, which the probe showed is where this case is won or lost, and which is an LLM judgement task with the rate sheet in context — never a regex. **New dependency decision**: `ezdxf` (MIT) is currently pip-installed into `backend/venv` for evaluation ONLY; promoting it to `requirements.txt` and `docs/SANDBOX-PACKAGES.md` in the same commit is this phase's call. ⚠ **DWG is NOT DXF** — the operator's `.dwg` needed an external conversion (ODA File Converter / cloudconvert); this phase does **not** ship DWG support. **No migration expected**; storage is jsonb on the existing document row unless the spike proves otherwise. ⚠ **G-4 lived-experience UAT** — the operator is a domain expert here and the acceptance bar is theirs, not a wire format's.
 
+#### Phase 221: Six Applications, One Token
+
+**Goal**: Google Workspace stops being one undifferentiated list of fifteen actions and becomes **six applications** — Drive, Gmail, Sheets, Docs, Calendar, Contacts — under **one connection, one token, one place to revoke**. Inside each, reads and writes separate. And the panel stops being silent about what will not work: an application whose Cloud API is switched off says so, with the remedy, **before** somebody asks it to run.
+**Depends on**: **Phase 213** (per-tool grants — this adds a rung to that ladder, it does not rebuild it) and **Phase 215** (BYO OAuth — the Google row is `oauth_byo`). Both SHIPPED.
+**Requirements**: D-221-01..12 — approved from the sketch, recorded in `221-CONTEXT.md`. ⚠ **Deliberately outside this milestone's 32**: this is operator-directed work arising from live Google UAT on 2026-08-31, not a mapped REQ-ID.
+**Success Criteria** (what must be TRUE):
+
+  1. A person opens Google Workspace and sees **six applications**, each with its own action count and its own permission default; the connection, the token, the consent screen and the Revoke button are all still **singular** (D-221-01).
+  2. Inside an application, reads and writes are **separated into bands** — and ⛔ **the band carries no posture control.** The ROADMAP's own rule is the reason: *"the run-time gate may key on direction; the grant-time gate must NOT"*, because a read is exactly where prompt injection enters (D-221-03).
+  3. The permission ladder is **three rungs** — action → application → connection default — stored as an `app:<key>` entry inside the existing `tool_grants` jsonb. **No migration** (D-221-05).
+  4. ⛔ An application set to **Allow never arms a write.** Built and tested against a *planted* write tool, because no Google write exists yet — the rule must exist before the first write does (D-221-06).
+  5. An application that cannot run **says which of three things is wrong**, because their remedies are opposite: the Cloud API is off (a console visit; reconnecting is useless) · the scope was never granted (a re-consent; the console is useless) · it works. ⭐ **A working application says nothing at all** (D-221-04).
+  6. The same component renders a **single-product** connector: GitHub's 44 tools (27 read / 17 write, measured on the live row) become one application whose header collapses and whose bands rise to the top — `apps.length === 1`, not a second component (D-221-09).
+  7. A connector whose tools declare **no direction** gets **no bands at all** — one ungrouped list, never a guessed *"Only reads"* heading. `readOnlyHint` was measured absent in the wild (D-221-11).
+  8. The list row verdict is **derived**, so `Ready` stops being a lie: Microsoft 365 — connected, `✓ Ready`, **zero tools** — reads **Not usable**, and Google degrades to `Partly ready · N need attention` on its own (D-221-12).
+
+**How we'd know this failed** (G-6):
+
+  - `ConnectionGrantsList.tsx` **grew**. It is 344 lines and a naive build doubles it; this phase's whole G-5 answer is that it shrinks and hands every row to a child.
+  - A posture control appears on a direction band — the one thing SC#2 forbids, and the one thing the reference design (Claude.ai's Rovo screen) actually does.
+  - A healthy application renders an availability line. Twelve things that said nothing is precisely what the 2026-08-31 noise audit deleted.
+  - A transport failure renders as *"your API is switched off"*. A refusal naming the wrong cause is the defect family BUS-040 (d) already recorded.
+  - The grouping is achieved by un-stripping `capability` from the tool descriptor. That strip is deliberate and its reason is right; the fix is a **separate presentation-safe field**.
+  - Six connections appear where there was one.
+
+**Flags**: ⚠ **G-2 is SATISFIED, not overridden** — `.planning/sketches/221-six-applications-one-token/index.html` is the operator-approved mockup (rev 2, approved 2026-08-31), and it is the acceptance bar for layout, copy and the band's emptiness. ⚠ **G-5 fires on six files and the scan found worse than a fire:** `ConnectionFormPanel.tsx` and `connector_service.py` rows were **STALE**, and **four files have no ledger row at all** — including `ConnectionGrantsList.tsx`, the file this phase changes most. Rows + detail sections land in the phase's **first commit**. ⚠ **The G-5 seam is taken BY CONSTRUCTION** (`toolGroups.ts` · `ApplicationGroup.tsx` · `DirectionBand.tsx` · `ActionRow.tsx`), not deferred — a later refactor phase would have to undo a 700-line component first. ⚠ **No migration. No new route. No new icon dependency** — only **three** of the six product marks exist in the installed packs (Drive, Gmail, Calendar); Sheets, Docs and Contacts fall back to the monogram. ⚠ **The only network call added is operator-triggered** — it extends the existing Check action and never runs on render, on load, or on a schedule (SEED-209/210/211/212). ⚠ **G-4 UAT is OWED and BLOCKING at close**, and it cannot run until Google is connected in org `22f9c615` as `fhdmrd@gmail.com` — the currently signed-in account is only a `member` there and `require_org_manage` refuses it. ⚠ **Writes per application are STEP 2 and out of scope**; this phase ships the rule that governs them and no write.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
