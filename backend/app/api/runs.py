@@ -30,6 +30,7 @@ INSTANCE (AttributeError), NOT the module. This convention matches the
 Phase 061 import style at the top of threads.py.
 """
 import asyncio
+import time as _time
 import json
 import logging
 import time as time_mod
@@ -357,6 +358,13 @@ async def replay_tail_consumer(
 # Yields exactly one terminal SSE event then returns; EventSourceResponse
 # closes the response naturally on generator exhaustion.
 # ───────────────────────────────────────────────────────────────────────
+#: How long a stream request waits for a just-started run's buffer to appear before
+#: concluding the run is genuinely gone. Bounded so a truly dead producer cannot hold a
+#: connection open: the observed gap is well under 150 ms, and this is 20x that.
+_NASCENT_BUFFER_WAIT_SECONDS = 3.0
+_NASCENT_BUFFER_POLL_SECONDS = 0.05
+
+
 async def _synthetic_terminal_generator(runs_status: str, runs_error: Optional[str]):
     """Yield ONE synthetic terminal event for a TTL-expired run (D-062-06).
 
@@ -430,6 +438,59 @@ async def stream_run(
             content={"detail": "Streaming infrastructure unavailable"},
             headers={"Retry-After": "10"},
         )
+
+    # ── Step 2b: A RUN THAT HAS JUST STARTED IS NOT A TTL-EXPIRED ONE ────────────────
+    #
+    # ⚠ MEASURED IN A REAL BROWSER, 2026-08-31, AND DETERMINISTIC. Opening this stream
+    # 0 ms after `POST /threads/{id}/messages` returned answered
+    # `{"type":"error","error":"buffer_expired_while_streaming"}` and closed — on a run
+    # that was perfectly healthy and went on to complete. At a 150 ms delay the same
+    # sequence streamed normally. Four delays, one outcome each: 0 → dead, 150/400/1000 →
+    # fine.
+    #
+    # ⚠ `_synthetic_terminal_generator`'s own docstring called this case impossible —
+    # *"status='streaming' with redis.exists=0 shouldn't happen"* — which is why it was
+    # handled as a hard terminal rather than as a wait. It happens on every send: the
+    # producer is a DETACHED task, so `POST` returns the run id before that task has
+    # XADDed anything, and `run:{id}` does not exist until the first event. The client is
+    # simply faster than the producer.
+    #
+    # ⚠ AND IT WAS INVISIBLE TO EVERY DRIVE SCRIPT IN THIS REPO. They are Python clients
+    # on `http://localhost:8000`, where `localhost` resolves `::1` first and this backend
+    # binds IPv4 only — so urllib stalls ~2 s per connection and always LOSES the race by
+    # a mile. Chrome connects in ~40 ms and loses it the other way. A harness slower than
+    # the bug cannot see the bug.
+    #
+    # THE DISTINCTION THAT MAKES THE FIX SAFE: a TTL-expired run is by definition OLD, and
+    # an old run has a TERMINAL status — the producer's shielded finalizer writes one on
+    # every exit path. `streaming` (or any non-terminal status) plus a missing key means
+    # "not yet", never "gone". So we wait, briefly and boundedly, ONLY in that case;
+    # a genuinely expired run still gets its synthetic terminal with no delay at all.
+    if not buffer_exists and row.get("status") not in _RUN_STATUS_TO_TERMINAL_TYPE:
+        deadline = _time.monotonic() + _NASCENT_BUFFER_WAIT_SECONDS
+        while _time.monotonic() < deadline:
+            await asyncio.sleep(_NASCENT_BUFFER_POLL_SECONDS)
+            try:
+                buffer_exists = await asyncio.wait_for(
+                    redis.exists(f"run:{run_id}"), timeout=2.0
+                )
+            except (RedisError, asyncio.TimeoutError, OSError):
+                # Redis went away mid-wait. Fall through to the synthetic terminal rather
+                # than 503: the run row is real and the caller deserves a clean close.
+                logger.warning(
+                    "Redis probe failed while waiting for a nascent buffer on run %s",
+                    run_id, exc_info=True,
+                )
+                break
+            if buffer_exists:
+                break
+        if not buffer_exists:
+            # Not a race after all. Say so, because a producer that never wrote a single
+            # event is a real fault and the log is the only place it is visible.
+            logger.warning(
+                "run %s is %r but wrote no buffer within %.1fs — emitting a synthetic "
+                "terminal", run_id, row.get("status"), _NASCENT_BUFFER_WAIT_SECONDS,
+            )
 
     # Step 3a: live or already-terminal run — buffer present.
     # Both cases use the same consumer code path; the producer's terminal
