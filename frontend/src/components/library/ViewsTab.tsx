@@ -30,7 +30,8 @@ export interface ViewsTabProps {
   selectedViewId: string | null
   onSelectView: (view: SavedView) => void
   onEditView: (view: SavedView) => void
-  onRenameView: (view: SavedView) => void
+  /** ⚠ CORRECTED 2026-08-31 — see `ViewCard`. The sidebar's signature, end to end. */
+  onRenameView: (id: string, name: string) => Promise<void> | void
   onDeleted: (id: string) => void
   /** The corpus denominator for "N of M documents". Optional — the fence mounts this
    *  component standalone without it; LibraryPage supplies `listDocuments.length`. */

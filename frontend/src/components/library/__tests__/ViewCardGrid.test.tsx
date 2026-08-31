@@ -13,11 +13,13 @@ import type { SavedView } from "@/types"
 
 // ── Mock resolveView so the lazy count cache has something to resolve. ──
 const resolveView = vi.fn<() => Promise<{ total: number }>>()
+const deleteView = vi.fn<() => Promise<void>>()
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return {
     ...actual,
     resolveView: (id: string) => resolveView(id),
+    deleteView: (id: string) => deleteView(id),
   }
 })
 
@@ -69,6 +71,14 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  deleteView.mockResolvedValue(undefined)
+  // Radix's DropdownMenu listens for pointer events jsdom does not implement; without
+  // these four the trigger renders and the menu never opens, which reads exactly like
+  // the defect this suite exists to guard against.
+  if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+  if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+  if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
   resolveView.mockImplementation((id: string) => {
     const map: Record<string, number> = { "v-1": 8, "v-2": 34, "v-3": 0 }
     return Promise.resolve({ total: map[id] ?? 0 })
@@ -140,5 +150,90 @@ describe("ViewCardGrid — shared match-count cache", () => {
     expect(resolveView).toHaveBeenCalledWith("v-3")
     // Exactly three resolves — no double-fetch per view.
     expect(resolveView).toHaveBeenCalledTimes(3)
+  })
+})
+
+/**
+ * ⚠ THESE SIX CASES EXIST BECAUSE THE `⋯` SHIPPED WITH NO `onClick` (2026-08-31).
+ *
+ * `onEdit` / `onRename` / `onDelete` were accepted as props and read at NO site, while a
+ * comment beside the button claimed they were wired. Eight green cases in this very file
+ * could not see it, because not one of them opened the menu — the affordance was drawn,
+ * asserted to EXIST, and never DRIVEN. So each case below ends at the callback, which is
+ * the only thing an absent `onClick` cannot fake.
+ */
+async function openMenu(viewName: string) {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole("button", { name: `Options for ${viewName}` }))
+  return user
+}
+
+describe("ViewCardGrid — the ⋯ menu actually invokes its callbacks", () => {
+  it("'Edit filter' invokes onEditView with the view", async () => {
+    const onEditView = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onEditView={onEditView} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Edit filter"))
+    expect(onEditView).toHaveBeenCalledTimes(1)
+    expect(onEditView).toHaveBeenCalledWith(expect.objectContaining({ id: "v-1" }))
+  })
+
+  it("'Rename' opens an inline editor and Enter commits (id, name) — the SIDEBAR's shape", async () => {
+    const onRenameView = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onRenameView={onRenameView} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Rename"))
+    const input = await screen.findByTestId("view-card-rename-input")
+    await user.clear(input)
+    await user.type(input, "Renamed view{Enter}")
+    // ⭐ TWO ARGUMENTS, NOT A VIEW OBJECT. The prop used to be typed
+    // `(view: SavedView) => void` while `LibraryPage.handleRenameView` is `(id, name)`,
+    // so a wired menu would have called `updateView(view, { name: undefined })`.
+    await waitFor(() => expect(onRenameView).toHaveBeenCalledWith("v-1", "Renamed view"))
+  })
+
+  it("Escape cancels a rename without calling onRenameView", async () => {
+    const onRenameView = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onRenameView={onRenameView} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Rename"))
+    const input = await screen.findByTestId("view-card-rename-input")
+    await user.clear(input)
+    await user.type(input, "Discarded{Escape}")
+    expect(onRenameView).not.toHaveBeenCalled()
+  })
+
+  it("a blank rename is a cancel, never a rename to the empty string", async () => {
+    const onRenameView = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onRenameView={onRenameView} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Rename"))
+    const input = await screen.findByTestId("view-card-rename-input")
+    await user.clear(input)
+    await user.type(input, "   {Enter}")
+    expect(onRenameView).not.toHaveBeenCalled()
+  })
+
+  it("'Delete' confirms inline first — one click deletes nothing", async () => {
+    const onDelete = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onDelete={onDelete} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Delete"))
+    expect(await screen.findByTestId("view-card-delete-confirm")).toBeInTheDocument()
+    expect(deleteView).not.toHaveBeenCalled()
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it("confirming Delete calls deleteView BEFORE onDelete — the page handler calls no API", async () => {
+    const onDelete = vi.fn()
+    render(<ViewCardGrid {...defaultProps} onDelete={onDelete} />)
+    const user = await openMenu("Needs review")
+    await user.click(await screen.findByText("Delete"))
+    const confirm = await screen.findByTestId("view-card-delete-confirm")
+    await user.click(within(confirm).getByRole("button", { name: "Delete" }))
+    // ⭐ `LibraryPage.handleDeletedView` only drops the row from local state. A card that
+    // skipped `deleteView` would make the view vanish and return on the next reload.
+    await waitFor(() => expect(deleteView).toHaveBeenCalledWith("v-1"))
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("v-1"))
   })
 })

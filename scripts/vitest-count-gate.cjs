@@ -3022,7 +3022,7 @@ const BASELINE = {
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,
   "viewRulePhrase.test.ts": 4,
-  "ViewCardGrid.test.tsx": 8,
+  "ViewCardGrid.test.tsx": 14,
   "IndexFoldersTable.test.tsx": 6,
   "IndexingTab.gate.test.tsx": 6,
   "HealthTiles.test.tsx": 6,

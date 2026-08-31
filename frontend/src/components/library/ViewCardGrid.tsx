@@ -24,7 +24,10 @@ export interface ViewCardGridProps {
   corpusCount: number
   onSelectView: (view: SavedView) => void
   onEditView: (view: SavedView) => void
-  onRenameView: (view: SavedView) => void
+  /** ⚠ CORRECTED 2026-08-31 — this was `(view: SavedView) => void` while the value passed
+   *  is `LibraryPage.handleRenameView`, which is `(id, name)`. One signature for one
+   *  concern: the SIDEBAR's (`ViewsGroup`), because that is the one that works. */
+  onRenameView: (id: string, name: string) => Promise<void> | void
   onDelete: (id: string) => void
   /** "New view" — opens the SAME filter-bar flow LibraryPage already drives. */
   onNewView: () => void
