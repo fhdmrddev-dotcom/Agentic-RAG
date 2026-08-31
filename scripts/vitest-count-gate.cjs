@@ -212,7 +212,7 @@ const BASELINE = {
   "useComposerModel.test.ts": 17,
   "ChatArea.model.test.tsx": 2,
   "MessageInput.connectors.test.tsx": 5,
-  "ToolApproval.test.tsx": 8,
+  "ToolApproval.test.tsx": 15,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
