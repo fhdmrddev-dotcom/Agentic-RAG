@@ -212,6 +212,7 @@ const BASELINE = {
   "useComposerModel.test.ts": 17,
   "ChatArea.model.test.tsx": 2,
   "MessageInput.connectors.test.tsx": 5,
+  "ToolApproval.test.tsx": 8,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -4055,6 +4056,11 @@ const TARGETS = [
   // not execute would not have caught its return. TARGETS decides what runs, BASELINE
   // decides what is guarded, and this file was on the wrong side of both.
   "src/components/chat/__tests__/MessageInput.connectors.test.tsx",
+  // ⚠ ADOPTED 2026-08-31, for the same reason and on the same day: the approval card is
+  // the ONE surface where a person grants an external action, and its suite was in
+  // neither knob. The three-button card writes a real grant; a fence the gate does not
+  // execute would not notice that button losing its wiring.
+  "src/components/chat/__tests__/ToolApproval.test.tsx",
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT as its BASELINE pin above ─────────
   //
   // The ELEVENTH occurrence of the two-knob trap this script documents. `src/lib/` is reached

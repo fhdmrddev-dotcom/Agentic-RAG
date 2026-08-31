@@ -1418,6 +1418,11 @@ async def get_thread_workflow(
 async def handle_tool_approval(
     thread_id: UUID,
     payload: ToolApprovalDecisionRequest,
+    # ⚠ TAKEN AS A PLAIN ARG, NOT `Depends(get_active_org_id)`. As a dependency the org
+    # would be resolved on EVERY approval, so a person in no org could not click Allow on
+    # a run that never needed an org — a 403 on the ordinary path to serve the rare one.
+    # `always` resolves it lazily, inside its own branch.
+    request: Request,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
@@ -1433,14 +1438,99 @@ async def handle_tool_approval(
     if not (thread_resp and thread_resp.data):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
+    # ── "Always" is TWO acts, and the second one may legitimately fail ────────────────
+    #
+    # ⚠ THE ORDER IS DELIBERATE: the grant is written BEFORE the run is released. Released
+    # first, the loop can reach its NEXT `ask` on the same tool while the write is still in
+    # flight, and pause again on a setting the person has already changed — which reads as
+    # the button not working.
+    #
+    # ⚠ AND A FAILED WRITE MUST NOT STRAND THE RUN. Approving a call needs only that the
+    # thread is yours; changing a grant needs `org:manage`. A member who clicks Always is
+    # entitled to the first and not the second, so the call is released either way and the
+    # response says which half happened. Reporting "ok" for a setting that did not change
+    # would be the same class of lie as the `Executed …` string the dispatcher used to
+    # return for every failed send.
+    grant_persisted = False
+    grant_problem: str | None = None
+    if payload.decision == "always":
+        if not payload.connection_id or not payload.tool_name:
+            grant_problem = (
+                "this approval did not carry the connection and action it belongs to, so "
+                "the setting could not be changed"
+            )
+        else:
+            try:
+                from app.dependencies import _has_org_permission
+                from app.services import connector_service
+                from app.services.connectors.org_scope import resolve_connector_org
+
+                # ⚠ NOT `get_active_org_id` — MEASURED, NOT REASONED ABOUT. That dependency
+                # reads the `X-Org-Id` header and, when it is absent, 400s any caller with
+                # more than one membership. A chat turn carries no such header, so the
+                # FIRST live drive of this button failed for an account that is an
+                # org-admin — and reported "needs an organisation admin", which is the
+                # exact species of misdiagnosis this session has spent its time deleting.
+                #
+                # The right org is the one the chat turn is already scoped to: the same
+                # leaf that decided which connections could be OFFERED decides which org
+                # the grant belongs to. Anything else and the card could change a setting
+                # on a connection the conversation cannot even see.
+                scope = await resolve_connector_org(current_user, supabase)
+                if not scope.ok:
+                    grant_problem = (
+                        f"this action was allowed once, but the setting was not changed: "
+                        f"{scope.problem}"
+                    )
+                # ⚠ THE PERMISSION CHECK IS EXPLICIT, because this route does NOT carry
+                # `require_org_manage` — it cannot: approving a call needs only that the
+                # thread is yours, and hanging an org gate on the whole endpoint would 403
+                # every ordinary Allow. So the gate sits on the WRITE, using the same
+                # predicate the settings route uses, against the org resolved above.
+                elif not await _has_org_permission(
+                    request, current_user, str(scope.org_id), "org:manage"
+                ):
+                    grant_problem = (
+                        "this action was allowed once, but the setting was not changed — "
+                        "changing what a connection may do needs an organisation admin"
+                    )
+                else:
+                    await connector_service.grant_one_tool(
+                        str(payload.connection_id),
+                        org_id=str(scope.org_id),
+                        tool_name=payload.tool_name,
+                        posture="allow",
+                        supabase=supabase,
+                    )
+                    grant_persisted = True
+            except Exception as exc:  # noqa: BLE001 — a permission/RLS boundary
+                logger.warning(
+                    "tool approval: could not persist an always-allow grant for "
+                    "connection %s tool %s", payload.connection_id, payload.tool_name,
+                    exc_info=True,
+                )
+                grant_problem = (
+                    "this action was allowed once, but the setting was not changed "
+                    f"({exc.__class__.__name__})"
+                )
+
+    # `always` releases the run as an ordinary allow: the pubsub contract is the RUN's,
+    # and it has exactly two outcomes. Widening it would make every waiter learn a word
+    # that means the same thing to them.
     approval_channel = f"tool_approval:{thread_id}:{payload.call_id}"
     await redis.publish(
         approval_channel,
         json.dumps({
             "call_id": payload.call_id,
-            "decision": payload.decision,
+            "decision": "allow" if payload.decision == "always" else payload.decision,
             "user_id": current_user["id"],
         }),
     )
-    return {"status": "ok", "call_id": payload.call_id, "decision": payload.decision}
+    return {
+        "status": "ok",
+        "call_id": payload.call_id,
+        "decision": payload.decision,
+        "grant_persisted": grant_persisted,
+        "grant_problem": grant_problem,
+    }
 

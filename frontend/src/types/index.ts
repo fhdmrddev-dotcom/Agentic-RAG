@@ -221,6 +221,9 @@ export interface Message {
   /** Phase 216 (GRANT-03 / CHAT-07): tool approval request requiring human decision in chat. */
   toolApproval?: {
     callId: string
+    /** The connection the paused call belongs to — what "Always allow" changes. Optional:
+     *  a run paused before 2026-08-31 carries no such field. */
+    connectionId?: string
     serviceId: string
     serviceName: string
     toolName: string

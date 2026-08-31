@@ -1113,6 +1113,39 @@ async def update_connection_grants(
 
 
 
+async def grant_one_tool(
+    connection_id: str,
+    org_id: str,
+    tool_name: str,
+    posture: str,
+    supabase: Client | None = None,
+) -> ConnectorConnectionResponse:
+    """Set ONE tool's posture, leaving every other grant exactly as it was.
+
+    ⚠ `update_connection_grants` IS A WHOLE-COLUMN REPLACE (D-206.2-16), which is correct
+    for the settings panel — that form owns the entire map and submits all of it. It is
+    the WRONG primitive for "always allow this one action", the decision a person makes
+    from a chat approval card: a caller that read the map, added a key and wrote it back
+    would silently revert any grant changed in between, and a caller that sent only the
+    one key would wipe all the others.
+
+    So the read-merge-write lives HERE, once, on the server. Doing it in the browser would
+    put a lost-update race on a permission surface — the one place where losing a write
+    means a tool stays more permissive, or less, than the person believes.
+
+    Org-scoped by `_fetch_connection_row`, so a connection id from another org is a
+    `ConnectorNotFound` and never a write.
+    """
+    row = await _fetch_connection_row(str(connection_id), str(org_id))
+    if row is None:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+    merged = dict(row.get("tool_grants") or {})
+    merged[str(tool_name)] = str(posture)
+    return await update_connection_grants(
+        str(connection_id), org_id=str(org_id), tool_grants=merged, supabase=supabase
+    )
+
+
 async def record_check_verdict(
 
     connection_id: str,

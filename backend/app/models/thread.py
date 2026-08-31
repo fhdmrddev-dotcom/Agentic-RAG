@@ -439,6 +439,27 @@ class ThreadWorkflowState(BaseModel):
 
 
 class ToolApprovalDecisionRequest(BaseModel):
-    """Phase 216 (GRANT-03 / CHAT-07): Payload for human decision on a paused tool call."""
+    """Phase 216 (GRANT-03 / CHAT-07): Payload for human decision on a paused tool call.
+
+    ⚠ `always` IS A THIRD DECISION, NOT A FLAG ON `allow` — 2026-08-31. It means two
+    things at once: let this call through, AND stop asking about this action on this
+    connection. The settings panel has offered all three postures since Phase 213 and
+    `grantsVocabulary.ts` has carried the words (`ASK_ALWAYS`) just as long; the chat card
+    shipped with two buttons, so the only way to stop being asked was to leave the
+    conversation and go and find the connection.
+
+    ⚠ THE GRANT WRITE CAN FAIL WHILE THE APPROVAL SUCCEEDS, and the response says so
+    rather than picking one story. Changing a grant needs `org:manage`; approving a call
+    needs only that the thread is yours. A member who clicks Always gets the call through
+    — refusing that would strand a run over a permission they did not need — and is told
+    plainly that the setting was not changed.
+    """
     call_id: str
-    decision: Literal["allow", "reject"]
+    decision: Literal["allow", "reject", "always"]
+    #: Required for `always` only: WHICH connection the grant belongs to. It arrives from
+    #: the `tool_approval_required` event rather than being resolved from `service_id`,
+    #: because two connections can share a service. Org-scoped server-side, so an id from
+    #: another org is a 404 and never a write.
+    connection_id: UUID | None = None
+    #: Required for `always` only: the bare tool name (never the `service__tool` spelling).
+    tool_name: str | None = None

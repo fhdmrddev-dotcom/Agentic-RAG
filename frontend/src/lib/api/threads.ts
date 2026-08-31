@@ -359,6 +359,10 @@ export interface StreamCallbacks {
   /** Phase 216 (GRANT-03 / CHAT-07): tool_approval_required SSE event when a connector tool pauses on 'ask' posture. */
   onToolApprovalRequired?: (approval: {
     callId: string
+    /** ⚠ THE CONNECTION, NOT ONLY THE SERVICE. Two rows can share a `service_id`, so
+     *  "Always allow" must name the row it is changing rather than infer it. Optional on
+     *  the type because a run paused before 2026-08-31 has no such field on the wire. */
+    connectionId?: string
     serviceId: string
     serviceName: string
     toolName: string
@@ -539,16 +543,41 @@ export async function postMessage(
 }
 
 /** Phase 216 (GRANT-03 / CHAT-07): Submit human approval decision for paused tool call. */
+/**
+ * Submit a decision on a paused tool call.
+ *
+ * ⚠ `always` IS A THIRD DECISION, NOT `allow` PLUS A FLAG. It means "let this through AND
+ * stop asking about this action on this connection", and the server does both — writing
+ * the grant with a read-merge-write it owns, because doing that here would put a
+ * lost-update race on a permission surface.
+ *
+ * ⚠ THE GRANT CAN FAIL WHILE THE APPROVAL SUCCEEDS. Approving needs the thread to be
+ * yours; changing a grant needs `org:manage`. The response reports both halves separately
+ * and the caller must not collapse them — telling someone their setting changed when it
+ * did not is the failure mode this whole surface was built to remove.
+ */
 export async function submitToolApproval(
   threadId: string,
   callId: string,
-  decision: "allow" | "reject",
-): Promise<{ status: string; call_id: string; decision: string }> {
+  decision: "allow" | "reject" | "always",
+  options: { connectionId?: string; toolName?: string } = {},
+): Promise<{
+  status: string
+  call_id: string
+  decision: string
+  grant_persisted?: boolean
+  grant_problem?: string | null
+}> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/tool-approval`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ call_id: callId, decision }),
+    body: JSON.stringify({
+      call_id: callId,
+      decision,
+      ...(options.connectionId ? { connection_id: options.connectionId } : {}),
+      ...(options.toolName ? { tool_name: options.toolName } : {}),
+    }),
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
@@ -698,6 +727,7 @@ export async function subscribeToRun(
         else if (t === "tool_approval_required" && callbacks.onToolApprovalRequired)
           callbacks.onToolApprovalRequired({
             callId: (parsed.call_id ?? parsed.callId) as string,
+            connectionId: (parsed.connection_id ?? parsed.connectionId) as string | undefined,
             serviceId: (parsed.service_id ?? parsed.serviceId) as string,
             serviceName: (parsed.service_name ?? parsed.serviceName) as string,
             toolName: (parsed.tool_name ?? parsed.toolName) as string,

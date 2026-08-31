@@ -4404,6 +4404,14 @@ async def _handle_connector_chat_tool(
                 getattr(ctx, "run_id", None),
                 "tool_approval_required",
                 call_id=call_id,
+                # ⚠ THE CONNECTION ID, NOT ONLY THE SERVICE ID. Two rows can share a
+                # service — this install has two `slack` connections in different orgs —
+                # so a client that resolved "which connection is this" from `service_id`
+                # would sometimes write a grant onto the wrong one. It is also the only
+                # way the card's "Always allow" can name what it is changing: without it,
+                # that button could not exist, which is a reachability defect of exactly
+                # the shape this repo keeps finding.
+                connection_id=str(matched_conn.id),
                 service_id=service_id,
                 service_name=matched_conn.name,
                 tool_name=action_tool_name,
