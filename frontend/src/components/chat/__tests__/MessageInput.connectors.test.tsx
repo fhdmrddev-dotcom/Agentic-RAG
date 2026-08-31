@@ -113,3 +113,51 @@ describe("MessageInput Connectors & Plus Menu", () => {
     })
   })
 })
+
+/**
+ * ⚠ 2026-08-31 — THE COMPOSER'S OFF STATE MEANT "ALL", WHICH IS THE OPPOSITE.
+ *
+ * `onSend(trimmed, ids.length > 0 ? ids : undefined)` here, `...(ids && ids.length > 0)`
+ * in `api/threads.ts`, and an `else` arm in `agent_loop.py` that offered EVERY enabled
+ * connection when the field was absent. Three layers, each individually defensible,
+ * together meaning that selecting NOTHING asked for EVERYTHING — and the composer's
+ * initial state is an empty list, so it was true of every message ever sent from a fresh
+ * one. The operator caught it: a chat about local files searched Google Drive on a
+ * connection they had never switched on.
+ *
+ * These cases pin the FRONTEND half at the only place it is observable — the argument
+ * handed to `onSend`. The backend half is fenced separately
+ * (`test_chat_connector_scoping.py`), because that is the boundary that actually decides.
+ */
+describe("MessageInput — an empty connector selection means NONE, never all", () => {
+  it("sends an EMPTY ARRAY, not undefined, when nothing is selected", async () => {
+    const user = userEvent.setup()
+    const onSend = vi.fn()
+    render(<MessageInput onSend={onSend} disabled={false} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    const box = screen.getByPlaceholderText("Ask anything…")
+    await user.type(box, "what files do I have")
+    await user.click(screen.getByTestId("composer-send"))
+
+    // ⭐ THE LOAD-BEARING ASSERTION. `undefined` here reached a backend arm that read it
+    // as "every enabled connection"; `[]` is the person saying none, and says so.
+    expect(onSend).toHaveBeenCalledWith("what files do I have", [])
+    expect(onSend).not.toHaveBeenCalledWith("what files do I have", undefined)
+  })
+
+  it("still sends exactly the ids that are lit", async () => {
+    const user = userEvent.setup()
+    const onSend = vi.fn()
+    render(<MessageInput onSend={onSend} disabled={false} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId("composer-plus-btn"))
+    await user.click(await screen.findByTestId("connector-toggle-conn-1"))
+
+    const box = screen.getByPlaceholderText("Ask anything…")
+    await user.type(box, "post it")
+    await user.click(screen.getByTestId("composer-send"))
+    expect(onSend).toHaveBeenCalledWith("post it", ["conn-1"])
+  })
+})

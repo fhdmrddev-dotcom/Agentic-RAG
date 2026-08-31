@@ -511,7 +511,11 @@ export async function postMessage(
         ? { inputs: options.inputs }
         : {}),
       // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this message
-      ...(options.activeConnectorIds && options.activeConnectorIds.length > 0
+      // ⚠ AN EMPTY ARRAY IS SENT, NOT DROPPED. Omitting it used to reach a backend arm
+      // that read "absent" as EVERY enabled connection, so turning every chip off asked
+      // for all of them. The backend now treats absent and empty alike (none), and this
+      // line stops the wire lying about which one the person actually chose.
+      ...(options.activeConnectorIds
         ? { active_connector_ids: options.activeConnectorIds }
         : {}),
     }),

@@ -211,6 +211,7 @@ const BASELINE = {
   //     branch coverage lives in the hook suite and not here.
   "useComposerModel.test.ts": 17,
   "ChatArea.model.test.tsx": 2,
+  "MessageInput.connectors.test.tsx": 5,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -4048,6 +4049,12 @@ const TARGETS = [
   // Phase 196 the owner of their future rot in a gate that requires 0 failing forever.
   "src/hooks/__tests__/useComposerModel.test.ts",
   "src/components/chat/__tests__/ChatArea.model.test.tsx",
+  // ⚠ ADOPTED 2026-08-31 — it was in NEITHER knob, so the gate neither ran it nor guarded
+  // it, on the suite that now fences the composer's connector selection. That selection
+  // shipped a defect where an EMPTY choice meant EVERY connection; a fence the gate does
+  // not execute would not have caught its return. TARGETS decides what runs, BASELINE
+  // decides what is guarded, and this file was on the wrong side of both.
+  "src/components/chat/__tests__/MessageInput.connectors.test.tsx",
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT as its BASELINE pin above ─────────
   //
   // The ELEVENTH occurrence of the two-knob trap this script documents. `src/lib/` is reached

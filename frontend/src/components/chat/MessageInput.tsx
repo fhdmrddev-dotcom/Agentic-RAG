@@ -69,9 +69,24 @@ const PROVIDER_LABELS: Record<string, string> = {
 const NEW_CHAT_DRAFT_KEY = "__new__"
 const composerDraftsByThread = new Map<string, string>()
 
+/**
+ * ⭐ THE CONNECTOR SELECTION, REMEMBERED PER THREAD — the same shape as the draft map
+ * directly above, and for a related reason.
+ *
+ * ⚠ IT IS PART OF THE FIX, NOT A FEATURE RIDING ALONG WITH IT. Until 2026-08-31 an empty
+ * selection was sent as `undefined` and the backend read that as EVERY enabled
+ * connection, so a composer that had never been touched silently had every connector
+ * live. Closing that hole without this map would swap one wrong behaviour for an
+ * irritating one: every new message would start with nothing selected, and a person who
+ * had already said "yes, use Google here" would have to say it again on the next turn.
+ * Off now means off — and on stays on for the conversation you said it in.
+ */
+const activeConnectorsByThread = new Map<string, string[]>()
+
 /** Test-only: reset the module-scoped draft map between test cases. */
 export function _resetComposerDraftsForTest() {
   composerDraftsByThread.clear()
+  activeConnectorsByThread.clear()
 }
 
 export function MessageInput({
@@ -97,6 +112,7 @@ export function MessageInput({
 
   // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
   const [connections, setConnections] = useState<ConnectorConnection[]>([])
+  // ⛔ STARTS EMPTY, AND EMPTY NOW GENUINELY MEANS NONE. See `activeConnectorsByThread`.
   const [activeConnectorIds, setActiveConnectorIds] = useState<string[]>([])
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
@@ -129,6 +145,18 @@ export function MessageInput({
   // so the switch effect reads the LATEST text, not a stale closure.
   const draftKey = threadId ?? NEW_CHAT_DRAFT_KEY
   const prevDraftKeyRef = useRef(draftKey)
+  // Mirrors the live selection so the thread-switch effect can stash the OUTGOING thread's
+  // choice without taking `activeConnectorIds` as a dependency — which would re-run the
+  // switch effect on every chip toggle and immediately overwrite the incoming selection.
+  const activeConnectorIdsRef = useRef<string[]>([])
+
+  // The ref mirrors the state so the thread-switch effect can stash the OUTGOING
+  // selection; the map keeps the CURRENT thread's choice fresh, so a switch away and
+  // back returns exactly what was armed.
+  useEffect(() => {
+    activeConnectorIdsRef.current = activeConnectorIds
+    activeConnectorsByThread.set(draftKey, activeConnectorIds)
+  }, [activeConnectorIds, draftKey])
   const valueRef = useRef(value)
   valueRef.current = value
   useEffect(() => {
@@ -138,6 +166,10 @@ export function MessageInput({
     if (outgoing.trim()) composerDraftsByThread.set(prevKey, outgoing)
     else composerDraftsByThread.delete(prevKey)
     setValue(composerDraftsByThread.get(draftKey) ?? "")
+    // The connector selection belongs to the CONVERSATION, not to the composer instance:
+    // switching away and back must not quietly re-arm, or disarm, a set of services.
+    activeConnectorsByThread.set(prevKey, activeConnectorIdsRef.current)
+    setActiveConnectorIds(activeConnectorsByThread.get(draftKey) ?? [])
     prevDraftKeyRef.current = draftKey
   }, [draftKey])
 
@@ -164,7 +196,11 @@ export function MessageInput({
   const handleSend = () => {
     const trimmed = value.trim()
     if (!trimmed || disabled || workflowLocked) return
-    onSend(trimmed, activeConnectorIds.length > 0 ? activeConnectorIds : undefined)
+    // ⚠ ALWAYS THE ARRAY, NEVER `undefined`. `[] -> undefined` is exactly how "I turned
+    // everything off" became "use everything": the backend's absent-arm offered every
+    // enabled connection. Both ends now agree that absent and empty mean the same thing —
+    // none — and the wire says which one the person chose.
+    onSend(trimmed, activeConnectorIds)
     setValue("")
     // Per-thread drafts: a successful hand-off consumes the draft.
     composerDraftsByThread.delete(draftKey)

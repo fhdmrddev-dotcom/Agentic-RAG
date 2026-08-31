@@ -1511,13 +1511,32 @@ async def run_agent_loop(
             # so `build_chat_tools_for_connectors` — whose ONLY production call site is
             # here — never ran and chat never saw a connector tool. Every Phase 216 test
             # calls that helper directly, so 6929 green tests could not see it.
-            active_conns = []
-            if getattr(body, "active_connector_ids", None):
-                allowed_ids = {str(cid) for cid in body.active_connector_ids}
-                active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
-            else:
-                # Include all enabled connections with discovered tools or external capabilities
-                active_conns = [c for c in conns if c.is_enabled and (c.discovered_tools or c.capability)]
+            # ── ⚠ THE COMPOSER'S OFF STATE USED TO MEAN "ALL", WHICH IS THE OPPOSITE ──
+            # This block had an `else` arm that, when `active_connector_ids` was absent,
+            # offered EVERY enabled connection in the org. The composer sends the field
+            # only when at least one chip is lit (`MessageInput.tsx`, `api/threads.ts`),
+            # and its initial state is an empty list — so selecting NOTHING sent nothing,
+            # and nothing meant everything. Measured by the operator: a chat about local
+            # files silently searched Google Drive on a connection they had not switched
+            # on, and every message ever sent from a fresh composer had the full connector
+            # set live.
+            #
+            # ⚠ IT FAILED OPEN ON A GRANT SURFACE, WHICH IS THE ONE PLACE THAT MUST NOT.
+            # The posture gate still held (an `ask` tool still paused), so nothing ran
+            # unwatched — but "which services is this conversation even allowed to touch"
+            # is a decision the person makes, and it was being made for them, in the
+            # permissive direction, by a falsy check.
+            #
+            # ABSENT AND EMPTY BOTH MEAN NONE, and they mean it HERE, at the boundary,
+            # rather than by agreement with a client we do not control. A caller that
+            # wants connector tools names them.
+            allowed_ids = {str(cid) for cid in (getattr(body, "active_connector_ids", None) or [])}
+            active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
+            if not allowed_ids:
+                logger.debug(
+                    "chat run %s named no connector connections — offering built-in tools "
+                    "only (absent and empty both mean none)", run_id,
+                )
 
             if active_conns:
                 connector_tools = build_chat_tools_for_connectors(active_conns)
