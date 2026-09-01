@@ -226,3 +226,61 @@ def test_module_list_tools_accepts_the_exact_keywords_the_route_passes():
         )
     # binding with the route's exact call shape must not raise
     sig.bind(server_url="https://mcp.example.com/mcp", secret=None, timeout=15.0)
+
+
+# ── the refusal handler · found 2026-09-01 while building Phase 222 ───────────────────
+
+
+def test_egress_refused_carries_no_detail_attribute_so_the_handler_must_not_read_one():
+    """⚠ THIS PINS A REAL DEFECT THAT SHIPPED, and it is a STATIC pin on purpose.
+
+    `discover_tools_from_url` read `exc.detail` inside its `except EgressRefused` handler.
+    `EgressRefused.__init__` (`egress.py:190-210`) assigns `reason_code`, `host`,
+    `capability` and `ip` — and NOTHING else, deliberately: its own docstring says D-08 is
+    *"enforced by the signature, not by discipline"* so that no request body, response body
+    or resolved secret can be smuggled onto it.
+
+    So the handler raised `AttributeError` INSIDE the `except`, and FastAPI turned a clean
+    422 *"we would not go there"* into a 500. **The security message a person most needs to
+    see was the one that broke** — and only on the SSRF path, which is why nothing caught it.
+
+    Driven: constructing the exception and reading `.detail` raises. Asserted against the
+    real class rather than a mock, so adding a `detail` field later makes this test fail
+    loudly rather than letting the assumption drift back in.
+    """
+    exc = EgressRefused(reason_code="address_not_public", host="h.example.com", capability="mcp")
+    assert exc.reason_code == "address_not_public"
+    with pytest.raises(AttributeError):
+        _ = exc.detail
+
+
+def test_the_discover_tools_refusal_handler_reads_only_attributes_that_exist():
+    """A source fence over the handler, because the runtime path needs live DNS to reach.
+
+    Every attribute the `except EgressRefused` block reads must be one the class assigns.
+    """
+    import ast
+    import inspect
+
+    from app.api import connectors as conn_module
+
+    source = inspect.getsource(conn_module.discover_tools_from_url)
+    tree = ast.parse(source.lstrip())
+
+    assigned = {"reason_code", "host", "capability", "ip", "args"}
+    read: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ExceptHandler) and node.type is not None:
+            names = [node.type.id] if isinstance(node.type, ast.Name) else []
+            if "EgressRefused" not in names or not node.name:
+                continue
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Attribute) and isinstance(inner.value, ast.Name):
+                    if inner.value.id == node.name:
+                        read.add(inner.attr)
+
+    assert read, "the EgressRefused handler was not found — has the route been renamed?"
+    assert read <= assigned, (
+        f"the handler reads {sorted(read - assigned)} which EgressRefused never assigns; "
+        f"that raises AttributeError inside the except and turns a 422 into a 500"
+    )

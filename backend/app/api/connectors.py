@@ -998,7 +998,16 @@ async def discover_tools_from_url(
     except EgressRefused as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Connection refused by security policy: {exc.reason_code} ({exc.detail})",
+            # ⚠ `exc.detail` UNTIL 2026-09-01, AND IT DOES NOT EXIST. `EgressRefused.__init__`
+            # assigns reason_code/host/capability/ip and nothing else — by design, so that no
+            # body or secret can ride on it (its docstring: *"enforced by the signature, not
+            # by discipline"*). Reading it raised `AttributeError` INSIDE this handler, so
+            # every SSRF refusal on this route surfaced as a 500 instead of this 422. The
+            # security sentence a person most needs was the only one that broke, and only on
+            # the refusal path — which is why no test and no eye caught it. Found while
+            # building Phase 222's sibling route; fenced by
+            # `test_the_discover_tools_refusal_handler_reads_only_attributes_that_exist`.
+            detail=f"Connection refused by security policy: {exc.reason_code}",
         ) from exc
     except McpClientError as exc:
         raise HTTPException(
