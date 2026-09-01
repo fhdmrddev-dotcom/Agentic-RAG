@@ -694,15 +694,31 @@ export function ConnectionFormPanel({
           set({ name: suggested })
         }
       }
-      setToolGrants((prev) => {
-        const next = { ...prev }
-        for (const t of tools) {
-          if (next[t.name] === undefined) {
-            next[t.name] = true
-          }
-        }
-        return next
-      })
+      // ⚠ DISCOVERY SEEDS NO GRANT, AND THE ABSENCE IS THE POINT (BUG-260901-01).
+      //
+      // This block used to write `next[t.name] = true` for every newly-found tool. It was
+      // wrong twice over, and the louder failure hid the graver one:
+      //
+      //  1. THE WIRE. `PATCH /grants` declares `dict[str, ToolGrantPosture]` —
+      //     `Literal["allow","ask","deny"]` — so Pydantic refused the body at the framework
+      //     boundary with `literal_error`, and every Save after any discovery, on every
+      //     connection shape, rendered `PANEL_SAVE_FAILED`. ⚠ `_sanitize_tool_grants` was
+      //     hardened the SAME DAY this seeding landed (`4aa28090b`) to refuse rather than
+      //     coerce, precisely so a missed call site would go RED at the seam — and its
+      //     refusal names the offending value. The route's annotation rejects first, so the
+      //     sentence written for this exact moment never reached anyone.
+      //
+      //  2. ⚠ THE PERMISSION, WHICH IS WORSE. `toolGroups.ts:235` maps `true -> "allow"`.
+      //     An ABSENT key already inherits the connection default through the three-rung
+      //     ladder (`:225`, mirroring `grants.py::resolve_effective_posture`). So seeding
+      //     did not merely break the wire — it silently ESCALATED every newly-discovered
+      //     action to Allow on a connection whose default is Deny. Had the save ever
+      //     worked, probing a stranger's MCP server would have persisted allow-on-41-tools.
+      //     **The broken save is the only reason a fail-open never reached the database.**
+      //
+      // Absence is already how both ends of the ladder spell "inherits the default", so the
+      // correct seed is no seed. A person who wants a posture sets one, and that act is what
+      // makes the grants dirty — discovering an action is not granting it.
       // ⚠ Tell the parent its rows are stale — see `onDiscovered`. Only on the SAVED-row
       // arm: the two probe arms above contact a server for a row that does not exist yet,
       // so there is nothing for the tab to re-read.

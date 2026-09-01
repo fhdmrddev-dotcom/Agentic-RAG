@@ -3264,3 +3264,95 @@ describe("213-07 · a permission change is written BEFORE the parent reloads", (
     expect(screen.queryByTestId("connection-save-refusal")).toBeNull()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ BUG-260901-01 — DISCOVERY SEEDED A **BOOLEAN**, AND IT BROKE SAVE FOR EVERY CONNECTION
+//
+// OPERATOR, 2026-09-01, having just connected Notion over OAuth and pulled 41 tools:
+//   *"for all apps connected, when I try to save I see Couldn't save that — try again."*
+//
+// CAUSE, driven rather than reasoned. `handleDiscoverTools` seeded every newly-found tool
+// as `next[t.name] = true` — the LEGACY boolean spelling. `PATCH /grants` declares
+// `dict[str, ToolGrantPosture]` where the posture is `Literal["allow","ask","deny"]`, so
+// Pydantic refused the body at the FRAMEWORK boundary:
+//
+//     {"notion-search": true}  ->  literal_error | Input should be 'allow', 'ask' or 'deny'
+//
+// ⚠ AND THE GUARD THAT WAS BUILT FOR EXACTLY THIS NEVER GOT TO SPEAK. `_sanitize_tool_grants`
+// was hardened the same day the seeding landed (`4aa28090b`, 2026-08-27) to REFUSE rather
+// than coerce, precisely so a missed call site would go RED at the seam — and its refusal
+// names the offending value in plain words. The route's own annotation rejects first, so the
+// person got the generic "try again" and the sentence written for them was never rendered.
+//
+// ⚠ THE SECOND DEFECT IS THE ONE THAT MATTERS MORE, AND IT WAS INVISIBLE BEHIND THE FIRST.
+// `toolGroups.ts:235` maps `true -> "allow"`. An ABSENT key already inherits the connection
+// default through the three-rung ladder (`:225`, mirroring `grants.py`). So seeding did not
+// merely break the wire — it SILENTLY ESCALATED every newly-discovered action to Allow,
+// overriding a connection whose default is Deny. Had the save ever succeeded, discovering a
+// stranger's MCP server would have persisted allow-on-every-tool. **The broken save is what
+// stopped a fail-open from reaching the database.**
+//
+// THE FIX IS TO SEED NOTHING. Absence is already the correct expression of "inherits the
+// default", and it is the spelling both ends of the ladder agree on.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+describe("BUG-260901-01 · discovery must not seed a grant", () => {
+  it("⭐ a newly-discovered action INHERITS a Deny default — it is not seeded to Allow", async () => {
+    const user = userEvent.setup({ delay: null })
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "notion-search", description: "Search Notion", inputSchema: {} },
+    ])
+    renderPanel({
+      mode: "edit",
+      connection: makeMcpConnection({
+        default_approval_posture: "deny",
+        tool_grants: {},
+      } as Partial<ConnectorConnection>),
+    })
+
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    const row = screen.getByTestId("action-row-notion-search")
+    // ⚠ THE ASSERTION IS ON THE RESOLVED POSTURE, WHICH IS THE ONLY OBSERVABLE `toolGrants`
+    // HAS. Seeded `true` resolves to "allow" at `toolGroups.ts:235`; an absent key resolves
+    // to the connection default. Deny is chosen for the fixture precisely because it is the
+    // value the escalation would overwrite — a fixture defaulting to "allow" could not tell
+    // the two apart and would be green for the wrong reason.
+    expect(
+      within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_ALLOW }),
+    ).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("⭐ discovery ALONE is not a permission change, so Save writes no grants", async () => {
+    // The wire half of the same defect, pinned through the ordering mechanism the two tests
+    // above already rely on: `updateConnectorGrants` is the REAL function and jsdom has no
+    // `fetch`, so reaching it REJECTS and `onUpdate` is never called. Here nobody touched a
+    // posture, so the write must not be attempted at all — which means `onUpdate` DOES run.
+    // Under the seeding this was the reverse: discovery alone made the grants dirty and every
+    // save carried booleans, which is why it failed for every connection rather than for one.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "notion-search", description: "Search Notion", inputSchema: {} },
+    ])
+    renderPanel({
+      mode: "edit",
+      connection: makeMcpConnection({ default_approval_posture: "deny", tool_grants: {} } as Partial<ConnectorConnection>),
+      onUpdate,
+    })
+
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("connection-save-refusal")).toBeNull()
+  })
+})
