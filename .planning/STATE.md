@@ -38,6 +38,22 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+📌 **PHASE 221 CLOSED 2026-09-01. EVERYTHING NOT DONE IS CAPTURED IN ONE PLACE:**
+**`.planning/phases/221-six-applications-one-token/221-CARRY-FORWARD.md`** — six sections, every
+row with a re-open trigger. Read it before scoping the next connector work.
+
+⛔ **THE ONE THING THAT BLOCKS EVERYTHING: 510 COMMITS ARE NOT PUSHED.** `e5977a244` is in the
+range, is NOT yet on GitHub, and carries two LIVE keys in plaintext (`LLM_SWITCHING_GUIDE.md` —
+Zhipu/GLM and Moonshot/Kimi). BUS-040 called them "published"; that was the LOCAL commit. **The
+window to avoid real publication is still open and a push closes it.** Revoke, strip, or push
+knowingly — the operator's call, and it was put to them.
+
+New seeds from this close: **SEED-236** (Always-allow grants one action; the app rung caps
+writes — moving it would NOT fix the reported case), **SEED-237** (Microsoft yields zero tools;
+MCP still has no OAuth door though the PKCE machinery exists). Earlier in the session:
+**SEED-233** (`connector_tokens` RLS), **SEED-234** (the Sheets gap is discoverability),
+**SEED-235** (the second approval — FIXED and closed).
+
 ⚠ **SESSION 2026-09-01 (Claude, autonomous) — PHASE 221 PLAN 02 SHIPPED, AND THE ELEVEN GOOGLE
 WRITES ARE PROVEN 11/11.** Commits `a2cba2acf` · `10a61340d` · `d5d0e1495` · `4c2399380` on
 `develop`. Full detail: `.planning/phases/221-six-applications-one-token/221-02-SUMMARY.md`.
