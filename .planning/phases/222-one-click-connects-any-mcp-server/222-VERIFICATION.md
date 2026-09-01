@@ -84,3 +84,47 @@ signature — red in a full run, green in isolation — is pollution, never a de
 5. **`SEED-239`** — one malformed `config` still takes down every connection in the org.
 6. **`D-222-02`'s auto-probe-on-typing** stands as designed; §3 of `222-PREFLIGHT.md` records why
    blur-or-button would open fewer sockets to hosts a person is merely passing through.
+
+---
+
+## 6 · ⚠ SC#7 IS PARTLY UNMET, AND THE MEASUREMENT SAYS WHY
+
+ROADMAP SC#7 reads: *"⭐ **Notion and Atlassian Rovo connect** — both are OAuth-only … **They are
+the phase's proof; a unit test is not.**"*
+
+**Notion: MET.** OAuth end to end, RFC 7591 self-registration, no console, **41 tools**, and the
+token now renews.
+
+⛔ **Atlassian Rovo: NOT MET — and it is not a defect in this phase.** Probed live, both documented
+endpoints:
+
+| endpoint | `kind` | `resource_status` |
+|---|---|---|
+| `mcp.atlassian.com/v1/sse` | **`token`** | 401 |
+| `mcp.atlassian.com/v1/mcp` | **`token`** | 401 |
+
+> *"This server asks for a credential but does not advertise how to obtain one, so it needs a token
+> you create yourself."*
+
+**Rovo returns 401 and advertises no authorization server**, so RFC 9728 discovery has nothing to
+read. The premise in SC#7 — *"both are OAuth-only"* — is **false for Rovo as it is served today**.
+⭐ **The door handles it correctly**: it falls back to the paste-a-token arm with a sentence naming
+the cause, which is SC#5 working rather than SC#7 failing quietly. **No code change would connect
+Rovo by OAuth; the vendor would have to advertise it.**
+
+⭐ **Two other real OAuth servers were found unprompted, and they are better proof of the thesis
+than Rovo would have been** — because neither was designed for, and both work:
+
+| server | `kind` | `registration_required` |
+|---|---|---|
+| `mcp.linear.app/mcp` | `oauth` | `false` — self-registers |
+| `mcp.sentry.dev/mcp` | `oauth` | `false` — self-registers |
+
+**Four independent vendors (Notion, GitHub, Linear, Sentry) are reachable through one generic door
+with no vendor entry anywhere.** That is SC#2 — *authorization is DISCOVERED, not configured* —
+demonstrated more strongly than the criterion asked for, while SC#7's second named vendor turns out
+to be unreachable by OAuth for reasons outside this repository.
+
+**Recommended disposition (operator's call, not mine):** amend SC#7 to name a vendor that actually
+advertises discovery, and record Rovo as a `token`-door service. Re-opening the phase would not
+change the measurement.
