@@ -435,6 +435,7 @@ export {
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
+  ApplicationAvailabilityWire,
   ConnectorCheckResult,
   McpProbeRequest,
   McpProbeResponse,

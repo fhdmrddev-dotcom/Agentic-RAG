@@ -102,10 +102,13 @@ import {
   updateConnectorConnection,
 } from "@/lib/api"
 import type {
+  ApplicationAvailabilityWire,
+  ConnectorCheckResult,
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
 } from "@/lib/api"
+import { blockedApplicationCount } from "@/components/settings/applicationAvailability"
 import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
 import {
   CATALOG_SERVICES,
@@ -167,6 +170,7 @@ import {
   RECEIPT_ENABLED,
   connectionMatchesQuery,
   connectionStateOf,
+  CONNECTION_STATE_PARTLY_COUNTED,
   connectionsCountLabel,
   credentialReadingOf,
   deleteConfirmLabel,
@@ -255,6 +259,16 @@ export interface ConnectionsTabViewProps {
    *  Passed as a NODE rather than built here so this view stays presentational and the
    *  suite can drive list-plus-panel in one render. */
   panel?: React.ReactNode
+  /** Phase 221 plan 02 (D-221-12) — `connection_id` → applications KNOWN blocked, from the
+   *  last Check in this session.
+   *
+   *  ⚠ SESSION-SCOPED, AND THAT IS A DECISION RATHER THAN A GAP. Availability is a
+   *  MEASUREMENT made by the Check action; it is deliberately not stored on the row,
+   *  because this plan's fence forbids a migration. A connection nobody has checked is
+   *  absent from this map, and an absent entry reads as 0 — an unmeasured application is
+   *  not a blocked one, exactly as AR-03 requires for the tool count. Making it survive a
+   *  reload is a column and a migration, and should be decided on its own. */
+  blockedByConnection?: Record<string, number>
 }
 
 type DisplayItem =
@@ -275,6 +289,7 @@ export function ConnectionsTabView({
   onOpen,
   now,
   panel,
+  blockedByConnection,
 }: ConnectionsTabViewProps) {
   const [query, setQuery] = useState("")
   const [filterState, setFilterState] = useState<ConnectionFilterState>(null)
@@ -669,6 +684,7 @@ export function ConnectionsTabView({
                             onOpen={onOpen}
                             now={now}
                             dense={dense}
+                            blockedApplications={blockedByConnection?.[item.connection.id]}
                           />
                         ) : (
                           <CatalogServiceRow
@@ -699,6 +715,7 @@ export function ConnectionsTabView({
                             onOpen={onOpen}
                             now={now}
                             dense={dense}
+                            blockedApplications={blockedByConnection?.[item.connection.id]}
                           />
                         ) : (
                           <CatalogServiceRow
@@ -727,6 +744,7 @@ export function ConnectionsTabView({
                       onOpen={onOpen}
                       now={now}
                       dense={dense}
+                      blockedApplications={blockedByConnection?.[item.connection.id]}
                     />
                   ) : (
                     <CatalogServiceRow
@@ -972,6 +990,7 @@ function ConnectionRow({
   onOpen,
   now,
   dense = false,
+  blockedApplications,
 }: {
   connection: ConnectorConnection
   usedBy: number
@@ -982,13 +1001,17 @@ function ConnectionRow({
   onOpen?: (connection: ConnectorConnection) => void
   now?: number
   dense?: boolean
+  /** Phase 221 plan 02 (D-221-12) — applications KNOWN blocked by the last Check in this
+   *  session. `undefined` means nobody looked, which reads as 0 rather than as "none are
+   *  blocked" — an unmeasured application is not a working one. See `connectionStateOf`. */
+  blockedApplications?: number
 }) {
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [receipt, setReceipt] = useState<string | null>(null)
 
-  const state = connectionStateOf(connection)
+  const state = connectionStateOf(connection, blockedApplications)
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
   const isMcp = Boolean(connection.mcp_server_url)
@@ -1147,7 +1170,12 @@ function ConnectionRow({
               data-testid="connections-row-state"
               className={cn("inline-flex items-center text-[11px] font-medium", STATE_TONE[state])}
             >
-              {CONNECTION_STATE_WORDS[state]}
+              {/* Phase 221 plan 02 — `partly` carries its count; every other state is its
+                  bare word. The count comes from the SAME verdict that chose the state, so
+                  the two cannot disagree. */}
+              {state === "partly" && blockedApplications
+                ? CONNECTION_STATE_PARTLY_COUNTED(blockedApplications)
+                : CONNECTION_STATE_WORDS[state]}
             </span>
 
             <span className="inline-flex items-baseline gap-1">
@@ -1243,7 +1271,12 @@ function ConnectionRow({
                 )}
                 aria-hidden="true"
               />
-              {CONNECTION_STATE_WORDS[state]}
+              {/* Phase 221 plan 02 — `partly` carries its count; every other state is its
+                  bare word. The count comes from the SAME verdict that chose the state, so
+                  the two cannot disagree. */}
+              {state === "partly" && blockedApplications
+                ? CONNECTION_STATE_PARTLY_COUNTED(blockedApplications)
+                : CONNECTION_STATE_WORDS[state]}
             </span>
           </div>
 
@@ -1417,22 +1450,59 @@ export function ConnectionsTab() {
     [reload],
   )
 
+  /** Phase 221 plan 02 (D-221-12) — per-application verdicts from every Check run in this
+   *  session, keyed by connection id.
+   *
+   *  ⚠ BOTH check doors write here, and that is the point. The row menu's Check and the
+   *  panel's Check are two entry points to one endpoint; recording the result in only one
+   *  of them would make `⚠ Partly ready` appear or not depending on WHICH button a person
+   *  pressed — the kind of surface that teaches people the app is unreliable.
+   *
+   *  ⚠ It is REPLACED per connection, never merged. A later check supersedes an earlier
+   *  one completely: an application that has since been switched on must be able to
+   *  disappear from the list, and merging would make a stale `api_off` immortal. */
+  const [availabilityByConnection, setAvailabilityByConnection] = useState<
+    Record<string, ApplicationAvailabilityWire[]>
+  >({})
+
+  const recordAvailability = useCallback(
+    (connectionId: string, result: ConnectorCheckResult) => {
+      setAvailabilityByConnection((prev) => ({
+        ...prev,
+        [connectionId]: result.application_availability ?? [],
+      }))
+    },
+    [],
+  )
+
   const handleCheck = useCallback(
     async (connection: ConnectorConnection) => {
-      await checkConnectorConnection(connection.id)
+      const result = await checkConnectorConnection(connection.id)
+      recordAvailability(connection.id, result)
       reload()
     },
-    [reload],
+    [reload, recordAvailability],
   )
 
   const handlePanelCheck = useCallback(
     async (connection: ConnectorConnection) => {
       const result = await checkConnectorConnection(connection.id)
+      recordAvailability(connection.id, result)
       reload()
       return result
     },
-    [reload],
+    [reload, recordAvailability],
   )
+
+  /** ⚠ COUNTED WITH THE SAME LEAF THE PANEL USES. A second count written inline here would
+   *  be free to disagree with the line the person is reading two inches away. */
+  const blockedByConnection = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const [id, verdicts] of Object.entries(availabilityByConnection)) {
+      out[id] = blockedApplicationCount(verdicts)
+    }
+    return out
+  }, [availabilityByConnection])
 
   const [panelState, setPanelState] = useState<
     | { mode: "create"; connection: null; presetServiceId?: string | null }
@@ -1466,6 +1536,7 @@ export function ConnectionsTab() {
       catalogServices={CATALOG_SERVICES}
       readFailed={read.kind === "error"}
       usageCounts={usageCounts}
+      blockedByConnection={blockedByConnection}
       isOrgAdmin={isOrgAdmin}
       liveConnectorsOn={liveConnectorsOn}
       onDelete={handleDelete}

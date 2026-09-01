@@ -131,6 +131,19 @@ export const CONNECTION_STATE_UNUSABLE = "⚠ Not usable"
  * its siblings rather than bolted on later, so the union is complete in one place. */
 export const CONNECTION_STATE_PARTLY = "⚠ Partly ready"
 
+/** Phase 221 plan 02 — the same state, WITH the number of applications that need attention.
+ *
+ * ⚠ THE COUNT IS THE ACTIONABLE HALF. `⚠ Partly ready` alone tells someone that something is
+ * wrong and nothing about how much; `⚠ Partly ready · 3 need attention` tells them whether
+ * this is a five-second fix or an afternoon. Acceptance #6 of this plan names the sentence
+ * verbatim, and it names it WITH the number.
+ *
+ * ⚠ It is a FUNCTION, not a second constant, so the count cannot drift from the verdict that
+ * produced it — `CONNECTION_STATE_WORDS` keeps the bare word for the closed-union walk that
+ * asserts every kind has one. */
+export const CONNECTION_STATE_PARTLY_COUNTED = (n: number) =>
+  `${CONNECTION_STATE_PARTLY} · ${n} need${n === 1 ? "s" : ""} attention`
+
 /** The states this surface can render, as a closed union. */
 export type ConnectionStateKind =
   | "ready"
@@ -185,17 +198,30 @@ export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
  * `◌ Not checked` rather than `✓ Ready`. It reads `⚠ Not usable` the moment somebody
  * presses Check and discovery still finds nothing.
  */
-export function connectionStateOf(connection: ConnectorConnection): ConnectionStateKind {
+export function connectionStateOf(
+  connection: ConnectorConnection,
+  /** Phase 221 plan 02 (D-221-12) — how many of this connection's applications are KNOWN
+   *  blocked, from the last Check in this session.
+   *
+   *  ⚠ OPTIONAL, AND ITS ABSENCE MEANS "NOBODY LOOKED" RATHER THAN "NONE". Availability is
+   *  a MEASUREMENT: it is produced by the Check action and is not stored on the row (no
+   *  migration — D-221's fence). So on a fresh page load nothing is known and this is
+   *  `undefined`, which reads as 0 and leaves the row saying `Ready` exactly as before.
+   *  That is the AR-03 stance, not a gap: an unmeasured application is not a blocked one,
+   *  and inventing `Partly ready` from no evidence would be the same error as `Ready` from
+   *  no evidence, pointed the other way. */
+  blockedApplications?: number,
+): ConnectionStateKind {
   if (!connection.is_enabled) return "disabled"
   if (connection.status === "revoked") return "revoked"
 
   if (connection.auth_type === "oauth_byo" && connection.status === "active") {
     const verdict = connectionRowVerdict({
       toolCount: connection.discovered_tools?.length ?? 0,
-      // Plan 02 supplies this from the per-application availability probe. Until then no
-      // application can be known-blocked, so this is 0 and `partly` is unreachable — by
-      // absence of evidence, never by an assumption that everything works.
-      blockedApplicationCount: 0,
+      // Plan 02 supplies this from the per-application availability probe, via the Check
+      // action. `undefined` — nobody has checked in this session — still reads as 0, by
+      // absence of evidence and never by an assumption that everything works.
+      blockedApplicationCount: blockedApplications ?? 0,
       // ⚠ `last_check_verdict` is the ONLY record that anything ever looked. `"ok"` with
       // zero actions is a measurement; `"not_checked"` with zero actions is an absence.
       discoveryHasRun: connection.last_check_verdict === "ok",

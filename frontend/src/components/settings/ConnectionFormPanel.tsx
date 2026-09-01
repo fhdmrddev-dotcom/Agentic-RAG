@@ -1586,6 +1586,15 @@ export function ConnectionFormPanel({
           <div data-testid="connection-discovered-tools" className="mb-3.5">
             <ConnectionGrantsList
               tools={probeResult}
+              // Phase 221 plan 02 (D-221-04) — the per-application verdicts from the last
+              // Check, read straight off the check state machine.
+              //
+              // ⚠ NO SECOND PIECE OF STATE. `check` already holds the whole result; a
+              // parallel `availability` useState would be a second copy of one fact, free
+              // to be stale the moment somebody adds an early-return to `handleCheck`.
+              applicationAvailabilities={
+                check.kind === "done" ? check.result.application_availability : undefined
+              }
               toolGrants={toolGrants}
               defaultPosture={defaultPosture}
               onChangeDefaultPosture={setDefaultPosture}
@@ -2093,9 +2102,27 @@ export function ConnectionFormPanel({
                 which is precisely the drift `ConnectionsTab.tsx:1203-1206` claims passing the
                 handler unconditionally would prevent. It did not. The route now refuses with a
                 worded 409 as well; this guard is so the control is never OFFERED. */}
+            {/* ⚠ `!isOAuthRow` WAS HERE AND IS DELIBERATELY GONE (Phase 221 plan 02).
+                It was RIGHT when it was written: `POST /check` refused every OAuth row with
+                `409 nothing_to_check_yet`, and offering a control that can only fail is
+                worse than not offering it — the same reasoning as the `mcp_server_url`
+                guard beside it, which STAYS because that refusal is still true.
+
+                Plan 02 removed the refusal: an OAuth row is now checked by renewing its
+                token, and the check is what produces the per-application availability
+                verdicts. With this guard still in place the panel's Check never ran, so the
+                availability line could never render from here — a shipped feature with no
+                door, which is the failure class this surface keeps producing. Measured in a
+                real browser on 2026-09-01: six application groups on screen, zero ways to
+                ask whether any of them works.
+
+                ⚠ The five OTHER `!isOAuthRow` gates in this file are UNTOUCHED. They hide
+                §5c's host/port/identity result block, whose copy was authored for a
+                capability row reaching a named host; an OAuth row has no port and its
+                result is the availability lines themselves. Widening those is a copy
+                decision, not this plan's. */}
             {onCheck &&
               !connection.mcp_server_url &&
-              !isOAuthRow &&
               (connection.is_enabled ? (
                 <button
                   type="button"

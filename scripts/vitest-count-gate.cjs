@@ -2822,7 +2822,16 @@ const BASELINE = {
   // Step 2 (2026-09-01): +3 — the two band cases for a mixed-direction application and
   // the D-221-06 rendering case. Read from the gate's own printed column.
   "ConnectionGrantsList.grouping.test.tsx": 18,
-  "connectionRowVerdict.test.ts": 14,
+  // Plan 02 (2026-09-01): 14 -> 19. `partly` was UNREACHABLE BY CONSTRUCTION until this
+  // plan — `blockedApplicationCount` was the literal 0 — so these five cases had nothing
+  // to assert before it. Read from the gate's own printed column, not counted by hand.
+  "connectionRowVerdict.test.ts": 22,
+  // ── Added in Phase 221 plan 02, in the SAME COMMIT that creates the files ───────────
+  // ⚠ BOTH KNOBS, TOGETHER. Every suite found orphaned in the last week was orphaned
+  // because one knob was edited and the other was not; `src/components/settings/` entries
+  // in TARGETS are FILE-LEVEL, so a new file there is invisible until its name is typed.
+  "applicationAvailability.test.ts": 18,
+  "ApplicationGroup.availability.test.tsx": 10,
   "statusWord.honesty.test.ts": 5,
   // ⚠ FOUND UNPINNED 2026-09-01 while fixing the ask-card defect: the gate RUNS this
   // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
@@ -4130,6 +4139,9 @@ const TARGETS = [
   "src/components/settings/toolGroups.test.ts",
   "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
   "src/components/settings/connectionRowVerdict.test.ts",
+  // ── Added in Phase 221 plan 02 (the availability line) — BOTH knobs, same commit ────
+  "src/components/settings/applicationAvailability.test.ts",
+  "src/components/settings/ApplicationGroup.availability.test.tsx",
   // Added 2026-09-01 with the two honest-failure fixes the operator drove out.
   "src/components/chat/__tests__/statusWord.honesty.test.ts",
   // ⚠ FOUND IN NEITHER KNOB 2026-09-01 — the gate never RAN it and nothing guarded it,

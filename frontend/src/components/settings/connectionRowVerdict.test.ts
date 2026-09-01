@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest"
 import type { ConnectorConnection } from "@/lib/api"
 import { connectionRowVerdict } from "./connectionRowVerdict"
 import {
+  CONNECTION_STATE_PARTLY,
+  CONNECTION_STATE_PARTLY_COUNTED,
   CONNECTION_STATE_UNUSABLE,
   CONNECTION_STATE_WORDS,
   connectionStateOf,
@@ -139,6 +141,72 @@ describe("connectionStateOf — D-221-12 in the shipped resolver", () => {
         }),
       ),
     ).toBe("not_checked")
+  })
+
+  // ── Phase 221 plan 02 (D-221-12) — `partly` stops being unreachable ─────────────────
+  //
+  // ⚠ Until plan 02 the second argument did not exist and `blockedApplicationCount` was
+  // the literal 0, so `⚠ Partly ready` was unreachable BY CONSTRUCTION. These are the
+  // tests that would have had nothing to assert.
+
+  it("⭐ three blocked applications reads `partly`, and names three", () => {
+    const state = connectionStateOf(
+      connection({ service_id: "google", discovered_tools: [{ name: "search_files" }], last_check_verdict: "ok" }),
+      3,
+    )
+    expect(state).toBe("partly")
+    expect(CONNECTION_STATE_WORDS[state]).toBe(CONNECTION_STATE_PARTLY)
+  })
+
+  it("zero blocked applications reads `ready`, not `partly`", () => {
+    expect(
+      connectionStateOf(
+        connection({ service_id: "google", discovered_tools: [{ name: "search_files" }], last_check_verdict: "ok" }),
+        0,
+      ),
+    ).toBe("ready")
+  })
+
+  it("⚠ an ABSENT count reads `ready`, never `partly` — nobody looked", () => {
+    // Availability is a MEASUREMENT. On a fresh page load nothing has been checked, and
+    // inventing `Partly ready` from no evidence is the same error as `Ready` from no
+    // evidence, pointed the other way.
+    expect(
+      connectionStateOf(
+        connection({ service_id: "google", discovered_tools: [{ name: "search_files" }], last_check_verdict: "ok" }),
+      ),
+    ).toBe("ready")
+  })
+
+  it("⛔ a blocked count NEVER rescues a zero-action row from `unusable`", () => {
+    // The tool-count arm runs FIRST and must keep doing so: a connection with no actions
+    // at all is not "partly" anything.
+    expect(connectionStateOf(connection({ last_check_verdict: "ok" }), 2)).toBe("unusable")
+  })
+
+  it("⛔ a DISABLED row stays disabled whatever the availability says", () => {
+    expect(
+      connectionStateOf(
+        connection({ is_enabled: false, discovered_tools: [{ name: "x" }] }),
+        3,
+      ),
+    ).toBe("disabled")
+  })
+
+  it("⭐ the counted sentence is acceptance #6, verbatim", () => {
+    // ⚠ The COUNT is the actionable half — `Partly ready` alone says something is wrong and
+    // nothing about how much. Asserted by character identity so it cannot drift.
+    expect(CONNECTION_STATE_PARTLY_COUNTED(3)).toBe("⚠ Partly ready · 3 need attention")
+  })
+
+  it("one blocked application says `needs`, not `need`", () => {
+    expect(CONNECTION_STATE_PARTLY_COUNTED(1)).toBe("⚠ Partly ready · 1 needs attention")
+  })
+
+  it("the counted sentence always contains the bare word — one source, not two", () => {
+    for (const n of [1, 2, 6]) {
+      expect(CONNECTION_STATE_PARTLY_COUNTED(n)).toContain(CONNECTION_STATE_PARTLY)
+    }
   })
 
   it("every state kind has a word — the closed union stays covered", () => {

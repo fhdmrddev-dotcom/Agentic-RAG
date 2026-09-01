@@ -144,6 +144,7 @@ from app.dependencies import (
     require_visible,
 )
 from app.models.connector import (
+    ApplicationAvailability,
     ConnectorCheckResponse,
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
@@ -514,6 +515,111 @@ async def delete_connection(
         raise _NOT_FOUND  # absent or another org's — never the forbidden status
 
 
+# ── the OAuth arm of the credential check (Phase 221 plan 02) ────────────────────────────
+#: Which service ids have per-application availability. A service absent from this map has
+#: applications nobody can probe, and its check reports availability for none of them —
+#: which is an EMPTY list, never six cheerful `ready`s.
+_AVAILABILITY_PROBES_BY_SERVICE = frozenset({"google"})
+
+
+async def _check_oauth_connection(
+    *,
+    connection_id: str,
+    active_org: str,
+    service_id: str | None,
+    token_status: dict,
+    supabase: Client,
+) -> ConnectorCheckResponse:
+    """Check an OAuth connection, and say which of its applications will not work.
+
+    ── WHAT "CHECKING" MEANS FOR THIS SHAPE ────────────────────────────────────────────
+    Minting a fresh access token from the stored refresh token — the SAME call every tool
+    makes. That is the property a green light has to be evidence for: not that a row exists,
+    but that the credential a run will use still works. A check that proved anything less
+    would be the *"green check on a credential somebody retyped"* the route's own docstring
+    refuses.
+
+    ── ⚠ THE PROVIDER'S RAW WORDS DO NOT TRAVEL HERE, AND THAT IS A NARROWING ──────────
+    `provider_message` elsewhere on this route carries the vendor verbatim (071-A). This arm
+    deliberately does not: `OAuthError` embeds the token endpoint's raw body, and the token
+    endpoint is the one place a request body contains a refresh token. The revocation
+    sentence is our own constant, the generic one is fixed, and the detail stays in the log.
+    A verbatim rule written for a Slack error body should not be extended, unexamined, to a
+    credential exchange.
+
+    ── ⚠ AN UNAVAILABLE TOKEN IS `rejected`, NOT `unreachable` ─────────────────────────
+    We reached Google and Google declined to renew. That is the same bucket a wrong password
+    lands in, and the next step is the same one: reconnect. `unreachable` would point the
+    person at their network.
+    """
+    from app.services.oauth_refresh_service import (  # deferred: keeps the import graph flat
+        OAuthError,
+        OAuthRevokedError,
+        OAuthTokenUnavailable,
+        get_fresh_access_token,
+    )
+
+    identity = token_status.get("account_email") or token_status.get("account_name")
+    scopes = list(token_status.get("scopes") or [])
+
+    ok = False
+    bucket: str | None = None
+    provider_message = ""
+
+    try:
+        token = await get_fresh_access_token(connection_id)
+        ok = bool(token)
+        if not ok:
+            bucket = "rejected"
+            provider_message = "The provider did not return an access token."
+    except OAuthRevokedError:
+        bucket = "rejected"
+        provider_message = "This authorisation was revoked or has expired — reconnect it once."
+    except (OAuthTokenUnavailable, OAuthError) as exc:
+        logger.warning(
+            "OAuth check failed for connection %s: %s", connection_id, type(exc).__name__
+        )
+        bucket = "rejected"
+        provider_message = "The provider refused to renew this authorisation."
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "OAuth check could not reach the provider for %s: %s",
+            connection_id, type(exc).__name__,
+        )
+        bucket = "unreachable"
+        provider_message = "Could not reach the provider to renew this authorisation."
+
+    # ⚠ THE PROBE RUNS ONLY ON A GOOD TOKEN. Six 401s tell nobody anything about six
+    # applications — they restate the credential verdict six times in the wrong words. With
+    # no token the list is EMPTY, and an empty list means "nothing was measured".
+    availability: list[ApplicationAvailability] = []
+    if ok and (service_id or "").strip().lower() in _AVAILABILITY_PROBES_BY_SERVICE:
+        from app.services.google.availability import probe_google_applications
+
+        availability = [
+            ApplicationAvailability(**verdict)
+            for verdict in await probe_google_applications(connection_id, scopes)
+        ]
+
+    verdict = "ok" if ok else "failed"
+    settled = await connector_service.record_check_verdict(
+        connection_id, org_id=active_org, verdict=verdict, supabase=supabase
+    )
+
+    return ConnectorCheckResponse(
+        ok=ok,
+        verdict=verdict,
+        identity=identity,
+        host="googleapis.com" if (service_id or "") == "google" else "",
+        port=None,
+        checked_at=settled.last_checked_at,
+        bucket=bucket,
+        provider_message=provider_message,
+        reason_code=None,
+        application_availability=availability,
+    )
+
+
 # ── the credential check: a DEDICATED action, because it has a SIDE EFFECT ───────────────
 @router.post(
     "/connections/{connection_id}/check",
@@ -610,8 +716,94 @@ async def check_connection(
     # exists to prevent, reached by a row that is neither of the two shapes it knows about.
     # ⚠ Keyed on the ABSENCE OF A CAPABILITY, after the MCP arm has already returned, so the
     # two refusals stay separately falsifiable and neither absorbs the other's shape.
+    # ── Phase 221 plan 02 — THE THIRD SHAPE: an OAuth row, whose credential is a TOKEN ────
+    #
+    # ⚠ MEASURED 2026-09-01, AND IT IS WHY THIS ARM EXISTS. Every `oauth_byo` row in the
+    # database carries `capability = NULL` and `mcp_server_url = NULL`, so a Google
+    # connection with a live, refreshable token fell straight into the refusal below and
+    # answered **409 "no way to reach it yet, so there is no credential to check"** — about a
+    # connection that had just performed twenty-six tools. The refusal's own wording predates
+    # OAuth: `connector_service`'s resolver still calls this a row with "no secret until OAuth
+    # ships in Phase 215". OAuth shipped. The credential simply does not live in
+    # `secret_ciphertext` — it lives in `connector_tokens`.
+    #
+    # ⚠ KEYED ON THE PRESENCE OF A TOKEN ROW, NOT ON `auth_type`. `ResolvedConnection` does
+    # not carry `auth_type`, and more importantly the token row IS the credential: if one
+    # exists there is something to check, and if none does the refusal below is still exactly
+    # true. A genuinely service-only row (CONN-08 — named, never connected) is untouched.
     if not capability:
-        raise _CHECK_NOTHING_TO_CHECK
+        # ⚠ IT RAISES, IT DOES NOT ONLY RETURN `None` — and an existing test caught this
+        # arm getting that wrong. `get_oauth_token_status` performs its OWN org-scoped read
+        # of the connection and raises `ConnectorNotFound` when that read comes back empty,
+        # so an unguarded call turned `test_check_refuses_a_service_only_connection_by_name
+        # _never_by_raising` from a clean 409 into an unhandled 500. That test's name is the
+        # whole rule: this route refuses BY NAME, never by raising.
+        #
+        # ⚠ `ConnectorError` is the right WIDTH — the family this service raises to mean
+        # "I cannot give you this row". A bare `except Exception` would swallow real faults;
+        # anything narrower would let a sibling refusal through as a 500. Either way the
+        # honest answer is the same: no OAuth token is visible here, so there is genuinely
+        # nothing to check, which is exactly what the refusal below says.
+        #
+        # ⚠ THE SERVICE CLIENT, NOT THE USER'S — AND THIS IS A MEASURED NECESSITY, NOT A
+        # SHORTCUT. `connector_tokens` has RLS **ENABLED WITH ZERO POLICIES** (verified
+        # against the live schema 2026-09-01: `relrowsecurity = true`, `pg_policy` count
+        # `0`). RLS with no policy denies everything, so the column-level SELECT grants
+        # that `authenticated` holds on that table are decoration — a user-JWT read of it
+        # returns EMPTY, always, for every row. That is why this arm answered 409 about a
+        # connection holding a live token, and it is the same defect family migration 118
+        # produced on `connector_connections`: a grant that looks right and a read that
+        # cannot succeed.
+        #
+        # ⚠ IT WIDENS NOTHING, and each clause of that is checkable:
+        #   · the route is `require_org_manage` — org admins only, API-enforced;
+        #   · `resolve_connection` above has ALREADY proven this row belongs to `active_org`
+        #     and raised `_NOT_FOUND` otherwise;
+        #   · `get_oauth_token_status` re-applies `.eq("org_id", org_id)` ITSELF, so the org
+        #     gate is inside the call as well as before it; and
+        #   · the projection is non-secret metadata — `account_email`, `scopes`, `expires_at`.
+        #     No ciphertext column is named, and `extra='forbid'` on the response model means
+        #     none could travel if it were.
+        # `oauth_refresh_service.get_valid_oauth_token` reads the same table the same way,
+        # for the same reason, and says so in its own comment.
+        #
+        # ⚠ THE PROPER FIX IS AN RLS POLICY ON `connector_tokens`, AND IT IS NOT THIS PLAN'S
+        # TO MAKE — this plan's fence forbids a migration, and a policy on a credential table
+        # is an operator decision. Until it lands, `GET /connections/{id}/oauth/token` stays
+        # broken for EVERY user (it 404s on rows that exist); see the seed.
+        #
+        # ⚠ THE CATCH IS BROAD ON PURPOSE, AND A NARROWER ONE WAS TRIED AND MEASURED WRONG.
+        # The first cut caught only `ConnectorError`; the service client performs a REAL
+        # HTTP call to Supabase, so an unresolvable host raises `httpx.ConnectError` right
+        # through it and this route answered an unhandled **500** — on a control the shipped
+        # UI offers, which is precisely the failure `test_check_refuses_a_service_only
+        # _connection_by_name_never_by_raising` exists to prevent. That test caught it.
+        #
+        # ⚠ THE COST IS NAMED RATHER THAN HIDDEN: a transport failure here is
+        # INDISTINGUISHABLE from "this row has no token", and both answer 409. That is a
+        # real loss of resolution, and it is still the better trade — this route's contract
+        # is *refuse by NAME, never by raising*, and a 500 tells the reader nothing at all.
+        # The exception type is logged at WARNING so the cause is recoverable from the log,
+        # which is where an infra fault belongs rather than in a user-facing sentence.
+        try:
+            token_status = await connector_service.get_oauth_token_status(
+                str(connection_id), org_id=str(active_org)
+            )
+        except Exception as exc:  # noqa: BLE001 — see the note above
+            logger.warning(
+                "check: could not read OAuth token metadata for %s (%s) — refusing by name",
+                connection_id, type(exc).__name__,
+            )
+            token_status = None
+        if token_status is None:
+            raise _CHECK_NOTHING_TO_CHECK
+        return await _check_oauth_connection(
+            connection_id=str(connection_id),
+            active_org=str(active_org),
+            service_id=connection.service_id,
+            token_status=token_status,
+            supabase=supabase,
+        )
 
     host, port = _check_destination(capability, config)
 

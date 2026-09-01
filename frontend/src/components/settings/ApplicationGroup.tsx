@@ -45,8 +45,17 @@ export interface ApplicationGroupProps {
   onResetToolGrant: (toolName: string) => void
   onChangeApplicationGrant: (application: string, posture: ToolGrantPosture) => void
   /** Phase 221 plan 02 fills this. Deliberately a slot rather than a prop shape, so the
-   *  availability work cannot be half-rendered from here before it is built. */
+   *  availability work cannot be half-rendered from here before it is built.
+   *
+   *  ⚠ Rendered OUTSIDE the header button — see the note at the render site. */
   availabilitySlot?: React.ReactNode
+  /** Phase 221 plan 02 — this application cannot currently run.
+   *
+   *  ⚠ It DIMS the posture control; it never removes it. A person may legitimately set a
+   *  posture on an application they are about to unblock, and taking the control away
+   *  would make them fix Google first and come back — for a setting that has nothing to
+   *  do with Google. */
+  blocked?: boolean
 }
 
 const POSTURES: readonly ToolGrantPosture[] = ["allow", "ask", "deny"] as const
@@ -116,6 +125,7 @@ export function ApplicationGroup({
   onResetToolGrant,
   onChangeApplicationGrant,
   availabilitySlot,
+  blocked = false,
 }: ApplicationGroupProps) {
   const open = headless || expanded
 
@@ -196,18 +206,34 @@ export function ApplicationGroup({
                 {GRANTS_COPY.APPLICATION_COUNT(group.tools.length)}
               </span>
             </span>
-            {availabilitySlot}
           </span>
           {group.key && (
-            <PostureControl
-              label={GRANTS_COPY.APPLICATION_POSTURE_LABEL(group.label)}
-              value={applicationPosture}
-              disabled={readOnly || !grantsArePersisted}
-              onChange={(posture) => onChangeApplicationGrant(group.key!, posture)}
-            />
+            <span
+              data-testid={`application-posture-${group.key}`}
+              data-blocked={blocked ? "true" : "false"}
+              className={cn("flex-none", blocked && "opacity-60")}
+            >
+              <PostureControl
+                label={GRANTS_COPY.APPLICATION_POSTURE_LABEL(group.label)}
+                value={applicationPosture}
+                // ⚠ `blocked` is NOT in this expression. Dimmed, never disabled — see the
+                // prop's own note.
+                disabled={readOnly || !grantsArePersisted}
+                onChange={(posture) => onChangeApplicationGrant(group.key!, posture)}
+              />
+            </span>
           )}
         </button>
       )}
+
+      {/* ⚠ THE AVAILABILITY LINE SITS OUTSIDE THE HEADER BUTTON, AND THAT IS A CORRECTION
+          RATHER THAN A LAYOUT PREFERENCE. Plan 01 left the slot INSIDE the `<button>`; the
+          `api_off` remedy renders an `<a href>` to the Google Cloud console, and interactive
+          content nested inside a button is invalid HTML — the anchor is not reliably
+          focusable or clickable, and a click that does reach it also toggles the group. The
+          slot renders here for both shapes: below the header when there is one, and at the
+          top when `headless` drops it. */}
+      {availabilitySlot}
 
       {open &&
         (group.bands

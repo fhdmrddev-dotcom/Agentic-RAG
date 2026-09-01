@@ -927,3 +927,133 @@ def test_check_refuses_a_service_only_connection_by_name_never_by_raising(
     assert detail["reason_code"] != "check_not_available_for_mcp", detail
     # The row never had a server URL, so naming one would be a lie about its shape.
     assert "mcp_server_url" not in res.text.lower(), res.text
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 221 plan 02 · the FOURTH shape — an OAuth row, whose credential is a TOKEN
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def test_check_reaches_the_oauth_arm_instead_of_refusing_a_connected_google_row(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """⭐ MEASURED 2026-09-01: this route REFUSED a working Google connection.
+
+    Every `oauth_byo` row in the database carries `capability = NULL` and
+    `mcp_server_url = NULL`, so a Google connection with a live, refreshable token fell into
+    the service-only refusal above and answered **409 "no way to reach it yet, so there is
+    no credential to check"** — about a connection that had just performed twenty-six tools.
+    The refusal's wording predates OAuth; the credential simply lives in `connector_tokens`
+    rather than in `secret_ciphertext`.
+
+    ⚠ THE DISCRIMINATOR IS THE PRESENCE OF A TOKEN ROW, not `auth_type` — which
+    `ResolvedConnection` does not even carry. A genuinely service-only row (the test above)
+    must keep its 409, and it does; the two cases are separately falsifiable on purpose.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    async def _google_oauth_row(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "google",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _google_oauth_row)
+
+    async def _token_status(connection_id, org_id, supabase=None):
+        return {
+            "account_email": "someone@example.com",
+            "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+        }
+
+    monkeypatch.setattr(connector_service, "get_oauth_token_status", _token_status)
+
+    async def _fresh(_connection_id):
+        return "ya29.fake"
+
+    # ⚠ PATCH THE ALIAS, NOT THE FUNCTION IT ALIASES. `oauth_refresh_service` binds
+    # `get_fresh_access_token = get_valid_oauth_token` at module scope, so patching the
+    # latter leaves the alias pointing at the real implementation — the first cut did that
+    # and made a REAL network call, which the route then correctly reported as
+    # `unreachable`. A patch that misses is worse than no patch: the test still ran green
+    # on the 200 and would have measured nothing about the happy path.
+    monkeypatch.setattr(
+        "app.services.oauth_refresh_service.get_fresh_access_token", _fresh, raising=False
+    )
+
+    async def _probe(_connection_id, _scopes):
+        return [
+            {"app": "drive", "state": "ready", "console_url": None},
+            {"app": "sheets", "state": "api_off", "console_url": "https://console.cloud.google.com/x"},
+        ]
+
+    monkeypatch.setattr(
+        "app.services.google.availability.probe_google_applications", _probe, raising=False
+    )
+
+    async def _record(connection_id, org_id, verdict, supabase=None):
+        return SimpleNamespace(last_checked_at="2026-09-01T00:00:00Z")
+
+    monkeypatch.setattr(connector_service, "record_check_verdict", _record)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 200, f"an OAuth row must be CHECKED, not refused: {res.text}"
+    body = res.json()
+    assert body["ok"] is True, body
+    assert body["identity"] == "someone@example.com", body
+    # ⚠ The per-application verdicts TRAVEL. Without this the arm could return a bare green
+    # check and the availability line would have nothing to render.
+    apps = {v["app"]: v["state"] for v in body["application_availability"]}
+    assert apps == {"drive": "ready", "sheets": "api_off"}, body
+
+
+def test_an_oauth_token_lookup_that_raises_still_refuses_by_name(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """⚠ THE REGRESSION THE SUITE ABOVE CAUGHT, PINNED AS ITS OWN CASE.
+
+    `get_oauth_token_status` performs its OWN org-scoped read and RAISES
+    `ConnectorNotFound` when that read comes back empty — it does not merely return `None`.
+    The first cut of the OAuth arm called it unguarded, which turned this route's honest 409
+    into an unhandled 500 for every row whose token read failed.
+
+    The rule this route is built on is in the neighbouring test's own name: it refuses **by
+    name, never by raising**. That property is one `try` away from being lost again, so it
+    gets a test rather than a comment.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    async def _service_only(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "notion",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _service_only)
+
+    async def _raises(connection_id, org_id, supabase=None):
+        raise connector_service.ConnectorNotFound("no connection")
+
+    monkeypatch.setattr(connector_service, "get_oauth_token_status", _raises)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 409, (
+        f"a raising token lookup must still refuse by NAME, got {res.status_code}: {res.text}"
+    )
+    assert res.json()["detail"]["reason_code"] == "nothing_to_check_yet", res.text

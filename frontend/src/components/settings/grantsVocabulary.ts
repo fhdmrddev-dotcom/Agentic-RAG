@@ -77,3 +77,39 @@ export const GRANTS_COPY = {
     `${tool} has never been allowed on this connection.`,
   REFUSED_NEXT: "Set it to Allow or Ask first to let this run continue.",
 } as const
+
+/**
+ * Phase 221 plan 02 (D-221-04) — every word the availability line says.
+ *
+ * ⚠ THREE SENTENCES, AND THE FIRST TWO ARE DELIBERATELY NOT INTERCHANGEABLE. `api_off` is
+ * a Google Cloud console visit where reconnecting is useless; `scope_missing` is a
+ * re-consent where the console is useless. The sentences say so in as many words, because
+ * the measured failure of 2026-08-31 was a refusal that named the wrong one and sent the
+ * operator to re-consent scopes that were already correct.
+ *
+ * ⚠ EACH NAMES THE REMEDY, NEVER THE STATUS. There is no sentence here that could be
+ * shortened to "Sheets: error" without losing the only part worth rendering.
+ *
+ * ⚠ THERE IS NO `READY` STRING, ON PURPOSE. A working application says nothing at all, and
+ * a constant for the healthy case is an invitation to render one.
+ */
+export const AVAILABILITY_COPY = {
+  API_OFF: (app: string) =>
+    `The ${app} API is switched off in your Google Cloud project. Reconnecting will not help.`,
+  API_OFF_ACTION: "Turn it on",
+  /** ⚠ Google did not supply an activation URL, so we name the place instead of guessing
+   *  at a link. A wrong console link is worse than none — it looks authoritative. */
+  API_OFF_ACTION_NO_LINK: "Enable it in the Google Cloud console, then check again",
+
+  SCOPE_MISSING: (app: string) =>
+    `You did not grant permission for ${app}.`,
+  SCOPE_MISSING_ACTION: "Reconnect this connection to add it",
+
+  /** ⚠ NEVER says "switched off". Not knowing is not a fact about their configuration. */
+  UNKNOWN: (app: string) => `Could not check ${app} just now.`,
+  UNKNOWN_ACTION: "Try Check again",
+
+  /** The application posture control stays reachable on a blocked application — a person
+   *  may set a posture on something they are about to unblock. This is its title only. */
+  BLOCKED_POSTURE_HINT: "This application is not working yet, but you can still set it.",
+} as const

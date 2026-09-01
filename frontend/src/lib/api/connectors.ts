@@ -186,6 +186,18 @@ export async function deleteConnectorConnection(id: string): Promise<void> {
  *  of three is a compile error away from becoming a boolean. Do not widen it to a string. */
 export type ConnectorCheckBucket = "refused" | "unreachable" | "rejected"
 
+/** Phase 221 plan 02 — one application's availability, exactly as the server sends it.
+ *
+ *  ⚠ THE STATE IS THE SERVER'S DECISION AND IS NOT RE-DERIVED IN THE BROWSER. The backend
+ *  classifier shares its predicate with the refusal site so a panel and a refusal cannot
+ *  disagree; a second classifier here would undo that. `applicationAvailability()` turns
+ *  this into words and decides nothing about the state. */
+export interface ApplicationAvailabilityWire {
+  app: string
+  state: "ready" | "api_off" | "scope_missing" | "unknown"
+  console_url?: string | null
+}
+
 /** The result of one credential check (`POST /connectors/connections/{id}/check`).
  *
  *  ⚠ A CHECK RETURNS A VERDICT — never the credential, in either form. The enforcing gate is
@@ -212,6 +224,14 @@ export interface ConnectorCheckResult {
   provider_message: string
   /** The guard's own `egress.REFUSAL_REASONS` code on a `refused` bucket, else `null`. */
   reason_code: string | null
+  /** Phase 221 plan 02 — one verdict per application, for a connection that HAS
+   *  applications (Google today).
+   *
+   *  ⚠ AN EMPTY ARRAY MEANS "NOTHING WAS MEASURED", NEVER "everything is fine". Every
+   *  non-OAuth shape returns `[]`, and so does an OAuth row whose token could not be
+   *  renewed — six 401s would restate the credential verdict six times in the wrong
+   *  words. A reader that treats `[]` as six greens has invented a fact. */
+  application_availability?: ApplicationAvailabilityWire[]
 }
 
 /** `POST /connectors/connections/{id}/check` — org admins only, enforced SERVER-side (U-02).

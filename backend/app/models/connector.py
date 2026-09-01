@@ -330,6 +330,29 @@ class ConnectorConnectionUpdate(_StrictBase):
     error_message: str | None = None
 
 
+class ApplicationAvailability(_StrictBase):
+    """Phase 221 plan 02 (D-221-04) — whether ONE application inside a connection can run.
+
+    ⚠ FOUR STATES, AND THE FIRST TWO EXIST BECAUSE THEIR REMEDIES ARE OPPOSITE. `api_off`
+    is a Google Cloud console visit where reconnecting is useless; `scope_missing` is a
+    re-consent where the console is useless. Collapsing them into one "not working" badge
+    reproduces the defect this work was opened to close — a refusal that named the wrong
+    cause and sent the operator to re-consent scopes that were already correct.
+
+    ⚠ NO SENTENCE IS AUTHORED HERE. This carries a state word and, for `api_off` only, the
+    console URL Google itself supplied. The wording lives in the component layer as exported
+    identifiers (the rule `check_connection` already states), so it can be asserted by
+    character identity rather than drifting in two places.
+
+    ⚠ `console_url` IS PRESENT ON `api_off` AND NOWHERE ELSE. Handing someone a console link
+    for a scope problem sends them to the one place that cannot fix it.
+    """
+
+    app: str
+    state: Literal["ready", "api_off", "scope_missing", "unknown"]
+    console_url: str | None = None
+
+
 class ConnectorCheckResponse(_StrictBase):
     """The result of ONE credential check (Phase 190 plan 190-15 — UI-SPEC §5c)."""
 
@@ -342,6 +365,10 @@ class ConnectorCheckResponse(_StrictBase):
     bucket: Literal["refused", "unreachable", "rejected"] | None = None
     provider_message: str = ""
     reason_code: str | None = None
+    #: Phase 221 plan 02 — per-application verdicts, populated for an OAuth row that has
+    #: applications (Google today). EMPTY for every other shape, and an empty list means
+    #: "nothing was measured", never "everything is fine".
+    application_availability: list[ApplicationAvailability] = Field(default_factory=list)
 
 
 class ConnectorConnectionResponse(_StrictBase):

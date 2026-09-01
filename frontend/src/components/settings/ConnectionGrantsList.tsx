@@ -33,6 +33,9 @@
 import { useMemo, useState } from "react"
 import type { McpDiscoveredTool, ToolGrantPosture } from "@/lib/api"
 import { ApplicationGroup } from "./ApplicationGroup"
+import { applicationAvailability } from "./applicationAvailability"
+import type { ApplicationAvailabilityWire } from "./applicationAvailability"
+import { AvailabilityLine } from "./AvailabilityLine"
 import { GRANTS_COPY } from "./grantsVocabulary"
 import { directionHint, groupToolsByApplication } from "./toolGroups"
 import { cn } from "@/lib/utils"
@@ -49,6 +52,15 @@ export interface ConnectionGrantsListProps {
   readOnly?: boolean
   grantsArePersisted?: boolean
   connectionName?: string
+  /** Phase 221 plan 02 — per-application verdicts from the last Check in this session.
+   *
+   *  ⚠ SESSION-SCOPED BY DESIGN, AND THE LIMIT IS RECORDED RATHER THAN HIDDEN. Availability
+   *  is a MEASUREMENT produced by the Check action; it is not stored on the row, because
+   *  D-221's fence forbids a migration in this plan. So it is present after a person presses
+   *  Check and absent on a fresh load — which is honest: an unmeasured application is not a
+   *  working one and not a blocked one. If it should survive a reload, that is a column and
+   *  a migration, and it is a decision rather than an oversight. */
+  applicationAvailabilities?: readonly ApplicationAvailabilityWire[]
 }
 
 const POSTURES: readonly ToolGrantPosture[] = ["allow", "ask", "deny"] as const
@@ -76,6 +88,7 @@ export function ConnectionGrantsList({
   onChangeApplicationGrant,
   readOnly = false,
   grantsArePersisted = true,
+  applicationAvailabilities,
 }: ConnectionGrantsListProps) {
   const [search, setSearch] = useState("")
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -106,6 +119,19 @@ export function ConnectionGrantsList({
     () => tools.some((tool) => directionHint(tool) == null),
     [tools],
   )
+
+  /** Phase 221 plan 02 — the last Check's per-application verdicts, by app key.
+   *
+   *  ⚠ Derived from the FULL list and never from `filteredTools`. Availability is a fact
+   *  about Google, and that fact does not change because somebody typed in the search box —
+   *  the same reasoning `anyUnknownDirection` above is written for. */
+  const availabilityByApp = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof applicationAvailability>>()
+    for (const wire of applicationAvailabilities ?? []) {
+      map.set(wire.app, applicationAvailability(wire))
+    }
+    return map
+  }, [applicationAvailabilities])
 
   // D-221-09 — one application means no header and no chevron; the bands rise to the top.
   const headless = groups.length === 1 && groups[0].key === null
@@ -211,6 +237,17 @@ export function ConnectionGrantsList({
               onChangeApplicationGrant={(application, posture) =>
                 onChangeApplicationGrant?.(application, posture)
               }
+              availabilitySlot={
+                group.key ? (
+                  <AvailabilityLine availability={availabilityByApp.get(group.key)} />
+                ) : null
+              }
+              blocked={(() => {
+                const state = group.key ? availabilityByApp.get(group.key)?.state : undefined
+                // ⚠ `unknown` is NOT blocked. A probe that measured nothing must not dim a
+                // control — that would render our own failed request as their problem.
+                return state === "api_off" || state === "scope_missing"
+              })()}
             />
           ))}
         </div>
