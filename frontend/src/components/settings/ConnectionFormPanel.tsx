@@ -106,6 +106,7 @@ import type {
 } from "@/lib/api"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
 import { ConnectionGrantsList } from "@/components/settings/ConnectionGrantsList"
+import { McpAuthDoor } from "@/components/settings/McpAuthDoor"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   EMPTY_DRAFT,
@@ -136,9 +137,6 @@ import {
   FOOTER_GLYPH,
   FIELD_MCP_SECRET_LABEL,
   FIELD_MCP_SECRET_OPTIONAL_NOTE,
-  FIELD_MCP_URL_HELP,
-  FIELD_MCP_URL_LABEL,
-  FIELD_MCP_URL_PLACEHOLDER,
   FIELD_SECRET_LABEL_NEUTRAL,
   DISCOVER_FAILED_FALLBACK,
   REFRESH_ACTIONS_BUSY,
@@ -1516,38 +1514,24 @@ export function ConnectionFormPanel({
                editor, no transport picker, no timeout, no "test connection": each is a
                surface nobody threat-modelled (D-32 / T-190-17-SCOPE), and the `config` this
                form composes is `{ headers: {} }` precisely so it offers to fill nothing. ── */}
+        {/* ── PHASE 222 (D-222-01..08) · THE MCP AUTH DOOR — 5 States ── */}
         {capability === "mcp" && (
-          <>
-            <Field
-              label={FIELD_MCP_URL_LABEL}
-              help={FIELD_MCP_URL_HELP}
-              htmlFor={`${fieldId}-mcp-url`}
-            >
-              <div className="flex gap-2">
-                <TextControl
-                  id={`${fieldId}-mcp-url`}
-                  value={draft.mcpServerUrl}
-                  onChange={(mcpServerUrl) => setShapedBy({ mcpServerUrl })}
-                  placeholder={FIELD_MCP_URL_PLACEHOLDER}
-                  describedBy={`${fieldId}-mcp-url-help`}
-                  readOnly={readOnly}
-                  className="font-mono flex-1"
-                />
-                {!readOnly && (
-                  <button
-                    type="button"
-                    disabled={probing || !draft.mcpServerUrl.trim()}
-                    onClick={() => void handleDiscoverTools()}
-                    data-testid="connection-probe-mcp-btn"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-                  >
-                    {probing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
-                    {probing ? "Probing..." : "Discover tools"}
-                  </button>
-                )}
-              </div>
-            </Field>
-          </>
+          <div className="mb-4">
+            <McpAuthDoor
+              draft={draft}
+              onDraftChange={(patch) => setShapedBy(patch)}
+              mode={mode}
+              connection={connection}
+              canWrite={canWrite}
+              isOrgAdmin={isOrgAdmin}
+              liveConnectorsOn={liveConnectorsOn}
+              onCreate={onCreate}
+              onUpdate={onUpdate}
+              onDiscovered={onDiscovered}
+              onDiscoverTools={handleDiscoverTools}
+              probingTools={probing}
+            />
+          </div>
         )}
 
         {/* -- PHASE 212 (D-4b) -- THE CAPABILITY SHAPE'S REFRESH, FOUND BY THE OPERATOR.
