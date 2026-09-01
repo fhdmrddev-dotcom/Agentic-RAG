@@ -3,7 +3,8 @@ seed_id: SEED-238
 title: "MCP OAuth tokens NEVER refresh — `resolve_connection` reads the ciphertext straight out of storage; and the shipped refresh engine cannot be reused as-is, because its provider inference DEFAULTS TO GOOGLE and would POST Notion's refresh token to accounts.google.com"
 created: 2026-09-01
 planted_during: Phase 222 crypto half — diagnosing an operator-reported Notion 403 that turned out to be a stale uvicorn, and reading the token path properly while there
-status: planted
+status: fixed
+folded_into: 222
 surface: Agentic-RAG
 severity: high
 category: connectors / oauth / token-lifecycle / cross-vendor-credential-exposure
@@ -96,3 +97,21 @@ exchange. The refresh is the *same* request shape against the *same* endpoint wi
 ⚠ **And the provider ladder should raise rather than default.** A silent `else "google"` is what
 turns "this service is unknown to the refresh engine" into "send its secrets to Google". That
 one-line change is independently worth making whether or not MCP refresh is built.
+
+---
+
+## ✅ CLOSED 2026-09-02 (Phase 222)
+
+Both findings fixed and **driven against real Notion**, not asserted.
+
+- **Finding 1** — `mcp_token.ensure_fresh_mcp_token` renews inside a 5-minute skew window,
+  re-discovering the token endpoint (never reading a stored one) over the pinned fetch. Wired
+  into `resolve_connection` keyed on `mcp_server_url`, so non-MCP OAuth rows keep their existing
+  read and no credential gets two renewal engines. It **never raises** — a failed renewal degrades
+  to the stored token, which is the previous behaviour rather than a fail-open.
+- **Finding 2** — `resolve_refresh_provider` REFUSES an unknown service by name. The
+  `else "google"` default is gone.
+
+**Driven live:** the expiry was back-dated into the skew window, `ensure_fresh_mcp_token` renewed
+against Notion, the new token persisted, `expires_at` advanced to the server's own value, and
+**41 tools resolved afterwards**. 11 tests, driven RED first.
