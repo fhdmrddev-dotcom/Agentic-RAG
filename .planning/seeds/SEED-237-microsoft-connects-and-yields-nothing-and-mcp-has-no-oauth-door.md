@@ -3,7 +3,8 @@ seed_id: SEED-237
 title: "The other integrations: Microsoft 365 OAuth completes and yields ZERO tools, and the MCP door still authenticates with a token you paste — the PKCE machinery exists and the MCP client never calls it"
 created: 2026-09-01
 planted_during: Phase 221 close — the operator asked \"what about other OAuth integrations? we need OAuth and MCP where applicable\"
-status: planted
+status: in_progress
+folded_into: 222
 surface: Agentic-RAG
 severity: high
 category: connectors / oauth / mcp / breadth
