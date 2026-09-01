@@ -1142,12 +1142,47 @@ async def start_mcp_oauth(
     client_secret = await connector_service.read_oauth_client_secret(
         str(payload.connection_id), str(active_org)
     )
+    # ⚠ REGISTER RATHER THAN REFUSE — the gap a LIVE DRIVE found, that none of this phase's
+    # 47 tests could: every one of them supplies a client id, so the branch below was never
+    # the interesting one. Driven against the real `mcp.notion.com` on 2026-09-01, which
+    # advertises `registration_endpoint` and therefore needs NOTHING from a developer
+    # console. Refusing here would have demanded a credential from the one service whose
+    # whole appeal is that it does not need one — and Notion is the service this project has
+    # been unable to connect since Phase 212.
+    if not client_id and probe.registration_endpoint:
+        from app.services.mcp_oauth import register_client
+
+        registered = await register_client(
+            probe.registration_endpoint,
+            redirect_uri=f"{settings.backend_public_url.rstrip('/')}/connectors/mcp/oauth/callback",
+            client_name="Agentic RAG",
+        )
+        client_id = registered.client_id
+        client_secret = registered.client_secret
+        # ⚠ PERSISTED, because re-registering on every Connect would mint a NEW application
+        # at the vendor each time — litter in someone else's account, and a different
+        # `client_id` on the token than on the consent that authorised it.
+        #
+        # ⚠ REUSES THE SHIPPED WRITER RATHER THAN A NEW ONE. `store_oauth_client_credentials`
+        # already puts the id in `config` and the secret in its own ungranted column, sweeps
+        # any legacy plaintext `custom_client_secret` out of `config` on every write, and
+        # scopes the update by `org_id`. A second writer here would have had to re-earn all
+        # four of those, and the first draft of this block called two helpers that DO NOT
+        # EXIST — the Phase 212 D-2 defect, where a seam stub invented a parameter the real
+        # function lacked. Checked against the real signature instead of assumed.
+        await connector_service.store_oauth_client_credentials(
+            str(payload.connection_id),
+            str(active_org),
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
     if not client_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "This server needs an application to sign in with, and none is saved for "
-                "this connection yet."
+                "This server needs an application to sign in with, it does not offer to "
+                "create one, and none is saved for this connection yet."
             ),
         )
 

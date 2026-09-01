@@ -187,9 +187,35 @@ class PostMessageConfig(_StrictBase):
 
 
 class McpConfig(_StrictBase):
-    """Configuration facts for a remote MCP server connection."""
+    """Configuration facts for a remote MCP server connection.
+
+    ⚠ `custom_client_id` IS HERE BECAUSE OMITTING IT BROKE THE WHOLE CONNECTIONS PAGE, and
+    the failure is worth recording because it was nothing like its symptom.
+
+    Phase 222 lets an MCP server be connected by OAuth, and RFC 7591 dynamic registration
+    mints a `client_id` for it. Writing that through the shipped
+    `store_oauth_client_credentials` put an OAuth-shaped key into an MCP row's `config` —
+    and because every model here is `extra='forbid'`, the row then matched NO member of the
+    `ConnectorConfig` union. `_to_response` raised `ValidationError`, and since ONE row is
+    validated inside the list comprehension, **every connection in the org became
+    unreadable**: the page showed *"Could not load connections. Nothing is wrong with them —
+    this page could not read them"* and the API answered 503. Driven live 2026-09-01 against
+    the real Notion registration.
+
+    ⚠ THE COPY WAS RIGHT AND THAT IS WHY IT WAS CONFUSING. *"Nothing is wrong with them"* was
+    literally true — eight rows were fine and one key on a ninth stopped the projection.
+
+    ⚠ IT IS AN ID, NEVER A SECRET. `OAuthConnectionConfig` documents at length why
+    `custom_client_secret` was removed from `config` (migration 150 — it was readable by
+    every member of the org). The same rule binds here: a registered secret goes to
+    `oauth_client_secret_ciphertext`, and only the non-secret id lands in this model.
+    """
 
     headers: dict[str, str] = Field(default_factory=dict)
+
+    #: The OAuth application this connection signs in with — supplied by the operator, or
+    #: minted by the server itself under RFC 7591 dynamic client registration.
+    custom_client_id: str | None = None
 
 
 AuthType = Literal["static_key", "oauth_byo", "mcp"]

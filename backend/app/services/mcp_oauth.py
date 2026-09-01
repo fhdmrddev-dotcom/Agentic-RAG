@@ -79,6 +79,89 @@ class McpOAuthError(Exception):
 
 
 @dataclass
+class RegisteredClient:
+    """An OAuth client this server minted for us, RFC 7591."""
+
+    client_id: str
+    client_secret: str | None
+
+
+async def register_client(
+    registration_endpoint: str,
+    *,
+    redirect_uri: str,
+    client_name: str,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> RegisteredClient:
+    """RFC 7591 dynamic client registration — the step that makes a console visit unnecessary.
+
+    ⚠ THIS IS THE WHOLE POINT OF THE PHASE, IN ONE FUNCTION. Without it, connecting a service
+    means a person opening a developer console, creating an application, and copying two
+    strings — which is the step real users abandon. With it, a compliant server mints the
+    application itself and the person only ever sees a consent screen.
+
+    ⚠ MEASURED AGAINST NOTION 2026-09-01: `https://mcp.notion.com/register` is advertised in
+    its RFC 8414 metadata, so the service this project could not connect at ALL since Phase
+    212 needs *nothing* from its console.
+
+    ⚠ THE ENDPOINT IS A STRANGER'S URL, like every other hop here — it came out of metadata
+    served by a host nobody curated — so it goes through the same pinned fetch. It is also
+    the one request in this flow that is deliberately UNAUTHENTICATED: RFC 7591 §3.1 open
+    registration takes no credential, and we have none to send yet.
+
+    ⚠ NO `client_secret` IS *REQUIRED* BACK. A server may register us as a PUBLIC client,
+    which is legitimate and is exactly why PKCE is mandatory rather than optional here — the
+    verifier, not a secret, is what proves the exchange came from us.
+    """
+    payload = {
+        "client_name": client_name,
+        "redirect_uris": [redirect_uri],
+        "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"],
+        # `none` says we are a public client: no secret, PKCE carries the proof. A server
+        # that would rather issue a secret is free to, and the response is read either way.
+        "token_endpoint_auth_method": "none",
+    }
+
+    try:
+        status_code, _headers, body = await _PinnedFetch.request(
+            "POST",
+            registration_endpoint,
+            json_body=payload,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            transport=transport,
+        )
+    except httpx.RequestError as exc:
+        raise McpOAuthError(f"Could not reach this service to register: {exc}") from exc
+
+    if status_code >= 400:
+        # The body is NOT echoed — same rule as the token exchange: registration errors
+        # quote the request back, and the request contains our redirect URI and name.
+        logger.warning(
+            "mcp_oauth: registration refused by %s with HTTP %d",
+            httpx.URL(registration_endpoint).host, status_code,
+        )
+        raise McpOAuthError(
+            f"This service refused to register an application (HTTP {status_code})."
+        )
+
+    try:
+        data = json.loads(body.decode("utf-8", errors="replace"))
+    except ValueError as exc:
+        raise McpOAuthError("This service's registration reply could not be read.") from exc
+
+    client_id = data.get("client_id") if isinstance(data, dict) else None
+    if not isinstance(client_id, str) or not client_id:
+        raise McpOAuthError("This service registered an application without giving it an id.")
+
+    secret = data.get("client_secret")
+    return RegisteredClient(
+        client_id=client_id,
+        client_secret=secret if isinstance(secret, str) and secret else None,
+    )
+
+
+@dataclass
 class PendingAuthorization:
     """What the callback needs, held server-side for the length of one consent."""
 
