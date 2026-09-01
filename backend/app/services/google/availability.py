@@ -198,7 +198,15 @@ async def _probe_one(
             probe.url,
             params=dict(probe.params),
             headers={"authorization": f"Bearer {token}", "Accept": "application/json"},
-            timeout=8.0,
+            # ⚠ 20s, MATCHING `_http.get_json`, AND THE 8s FIRST CUT WAS MEASURED TOO
+            # TIGHT. Six probes run concurrently and each takes ~2s in isolation, which
+            # looked like ample headroom — but under the running server two of four live
+            # checks reported a DIFFERENT healthy application as `unknown` each time.
+            # A spurious "Could not check Sheets just now" on a working connection is
+            # exactly the noise this whole surface exists to remove, and it teaches people
+            # to ignore the line that matters. The probe is operator-triggered and bounded
+            # by one Check press, so a longer ceiling costs nothing anybody waits on twice.
+            timeout=20.0,
             max_bytes=64 * 1024,
         )
     except Exception as exc:  # noqa: BLE001
