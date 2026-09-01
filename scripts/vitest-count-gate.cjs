@@ -3085,6 +3085,10 @@ const BASELINE = {
   "FilterBar.test.tsx": 10,
   "DocumentStatusBadge.test.tsx": 19,
   "DocumentStatusBadge.a11y.test.tsx": 19,
+  // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
+  "connectors.mcp_auth.test.ts": 8,
+  "connectionFormCopy.mcp.test.ts": 6,
+  "McpAuthDoor.test.tsx": 9,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4305,6 +4309,10 @@ const TARGETS = [
   // as `new`). The `.a11y` sibling below is genuinely under `src/components/ingestion/__tests__/`.
   "src/__tests__/components/DocumentStatusBadge.test.tsx",
   "src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx",
+  // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
+  "src/lib/api/__tests__/connectors.mcp_auth.test.ts",
+  "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
+  "src/components/settings/McpAuthDoor.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

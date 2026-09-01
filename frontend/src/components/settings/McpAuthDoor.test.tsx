@@ -244,4 +244,101 @@ describe("Phase 222 — McpAuthDoor Component", () => {
       expect(mockPopup.location.href).toContain("accounts.notion.com/oauth/authorize")
     })
   })
+
+  it("handles blocked popup gracefully without minting handles or creating connections", async () => {
+    vi.mocked(api.probeMcpAuth).mockResolvedValueOnce({
+      kind: "oauth",
+      authorization_host: "accounts.notion.com",
+      registration_required: false,
+      code_challenge_methods: ["S256"],
+      detail: null,
+      resource_status: 401,
+    })
+
+    vi.spyOn(window, "open").mockReturnValue(null)
+    const onCreateMock = vi.fn()
+
+    render(
+      <McpAuthDoor
+        draft={{ ...EMPTY_DRAFT, mcpServerUrl: "https://mcp.notion.com/mcp", name: "Notion" }}
+        onDraftChange={vi.fn()}
+        mode="create"
+        canWrite={true}
+        isOrgAdmin={true}
+        liveConnectorsOn={true}
+        onCreate={onCreateMock}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mcp-oauth-connect-btn")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId("mcp-oauth-connect-btn"))
+
+    expect(onCreateMock).not.toHaveBeenCalled()
+    expect(api.createMcpOAuthAuthorizeUrl).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByTestId("mcp-oauth-error-alert")).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Popup was blocked by your browser/)).toBeInTheDocument()
+  })
+
+  it("preserves config and does not wipe custom_client_id in edit mode (BUS-053)", async () => {
+    vi.mocked(api.probeMcpAuth).mockResolvedValueOnce({
+      kind: "oauth",
+      authorization_host: "accounts.notion.com",
+      registration_required: false,
+      code_challenge_methods: ["S256"],
+      detail: null,
+      resource_status: 401,
+    })
+
+    vi.mocked(api.createMcpOAuthAuthorizeUrl).mockResolvedValueOnce({
+      authorize_url: "https://accounts.notion.com/oauth/authorize",
+      authorization_host: "accounts.notion.com",
+    })
+
+    const mockPopup = { location: { href: "" }, close: vi.fn() }
+    vi.spyOn(window, "open").mockReturnValue(mockPopup as unknown as Window)
+
+    const onUpdateMock = vi.fn().mockResolvedValue({})
+
+    render(
+      <McpAuthDoor
+        draft={{ ...EMPTY_DRAFT, mcpServerUrl: "https://mcp.notion.com/mcp", name: "Notion" }}
+        connection={{
+          id: "conn-notion-existing",
+          org_id: "org-1",
+          service_id: "notion",
+          name: "Notion",
+          capability: "mcp",
+          mcp_server_url: "https://mcp.notion.com/mcp",
+          config: { custom_client_id: "bD78Ksp3xBJew1kL" },
+          is_enabled: true,
+          created_at: "",
+          updated_at: "",
+        }}
+        onDraftChange={vi.fn()}
+        mode="edit"
+        canWrite={true}
+        isOrgAdmin={true}
+        liveConnectorsOn={true}
+        onUpdate={onUpdateMock}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mcp-oauth-connect-btn")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId("mcp-oauth-connect-btn"))
+
+    await waitFor(() => {
+      expect(onUpdateMock).toHaveBeenCalledWith("conn-notion-existing", {
+        name: "Notion",
+        mcp_server_url: "https://mcp.notion.com/mcp",
+      })
+    })
+  })
 })

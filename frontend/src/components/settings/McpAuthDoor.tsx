@@ -136,17 +136,26 @@ export function McpAuthDoor({
 
     // Synchronously open popup in the gesture handler to avoid browser popup blockers (BUS-049)
     const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null
+    if (!popup) {
+      setOauthError("Popup was blocked by your browser. Please allow popups for this site and try again.")
+      return
+    }
 
     try {
       setIsAuthorizing(true)
       let connId = connection?.id
 
       if (mode === "create" && !connId) {
+        const createConfig: Record<string, unknown> = {}
+        if (draft.authType === "custom_app" && draft.customClientId.trim()) {
+          createConfig.custom_client_id = draft.customClientId.trim()
+        }
         const createBody: ConnectorConnectionCreate = {
           service_id: draft.serviceId.trim() || "custom_mcp",
           name: draft.name.trim() || draft.serviceId.trim() || "MCP Connection",
           mcp_server_url: draft.mcpServerUrl.trim(),
-          config: {},
+          config: Object.keys(createConfig).length > 0 ? createConfig : undefined,
+          secret: draft.authType === "custom_app" && draft.customClientSecret.trim() ? draft.customClientSecret.trim() : undefined,
         }
         const created = await onCreate?.(createBody)
         if (created && typeof created === "object" && "id" in created) {
@@ -156,7 +165,15 @@ export function McpAuthDoor({
         const updateBody: ConnectorConnectionUpdate = {
           name: draft.name.trim(),
           mcp_server_url: draft.mcpServerUrl.trim(),
-          config: {},
+        }
+        if (draft.authType === "custom_app" && draft.customClientId.trim()) {
+          updateBody.config = {
+            ...(connection?.config ?? {}),
+            custom_client_id: draft.customClientId.trim(),
+          }
+        }
+        if (draft.authType === "custom_app" && draft.customClientSecret.trim()) {
+          updateBody.secret = draft.customClientSecret.trim()
         }
         await onUpdate?.(connId, updateBody)
       }
@@ -166,13 +183,9 @@ export function McpAuthDoor({
       }
 
       const res = await createMcpOAuthAuthorizeUrl(connId)
-      if (popup) {
-        popup.location.href = res.authorize_url
-      }
+      popup.location.href = res.authorize_url
     } catch (err: unknown) {
-      if (popup) {
-        popup.close()
-      }
+      popup.close()
       const msg = err instanceof Error ? err.message : "Failed to initiate OAuth authorization"
       setOauthError(msg)
     } finally {
