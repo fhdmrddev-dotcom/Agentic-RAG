@@ -36,6 +36,7 @@ import type {
   ConnectorCapability,
   ConnectorConnection,
   ConnectorConnectionConfig,
+  McpAuthKind,
 } from "@/lib/api"
 // ⚠ THE TREE'S ONE OWN-GUARD SPELLING, imported rather than re-declared. `SERVICE_TO_SHAPE`
 // is a plain object literal read with a free-text key that arrives from a person's keystrokes
@@ -1082,3 +1083,43 @@ export const REFRESH_ACTIONS_HELP =
  *  operators used to see. */
 export const DISCOVER_FAILED_FALLBACK =
   "Could not read this connection's actions. Nothing was changed."
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// PHASE 222 (D-222-01..07) — MCP AUTH DISCOVERY & ONE-CLICK OAUTH DOOR COPY
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+export const MCP_PROBING_STATUS = "Checking server authentication..."
+export const MCP_AUTH_OPEN_DESC = "No credentials required. This server allows direct connection."
+export const MCP_AUTH_OAUTH_DCR_DESC = (host: string) => `Authentication required. Sign in with ${host} to connect.`
+export const MCP_AUTH_OAUTH_BYO_DESC = (host: string) => `Authentication required. Supply your client credentials to sign in with ${host}.`
+export const MCP_AUTH_TOKEN_DESC = (detail?: string | null) => detail?.trim() || "This server requires an API token or personal access token."
+export const MCP_REFUSAL_POLICY_HEADING = "Connection refused by security policy"
+export const MCP_UNREACHABLE_HEADING = "Server did not respond"
+export const MCP_TOO_LARGE_HEADING = "Response too large"
+
+export function mcpAuthActionLabel(
+  kind: McpAuthKind,
+  registrationRequired?: boolean,
+  host?: string | null,
+): string {
+  if (kind === "open") return "Connect"
+  if (kind === "oauth") {
+    if (registrationRequired) return "Authorize & Connect"
+    return host ? `Sign in with ${host}` : "Sign in to Connect"
+  }
+  if (kind === "token") return "Save & Connect"
+  return "Connect"
+}
+
+export function mcpPolicyRefusalMessage(
+  reasonCode: string | null,
+  fallbackMessage?: string | null,
+): string {
+  if (reasonCode === "address_not_public") return "The target server address is not public or belongs to a restricted internal network."
+  if (reasonCode === "scheme_not_tls") return "Only secure HTTPS URLs are permitted for remote MCP servers."
+  if (reasonCode === "host_not_allowed") return "The requested host is not permitted by security egress policy."
+  if (reasonCode === "host_not_ascii") return "The host contains invalid non-ASCII characters."
+  if (reasonCode === "unresolvable") return "The server host address could not be resolved by DNS."
+  if (reasonCode === "redirected") return "The server attempted an unpermitted HTTP redirect."
+  return fallbackMessage || "Connection to this destination was refused by security egress policy."
+}

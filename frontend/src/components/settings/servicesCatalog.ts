@@ -74,7 +74,7 @@ export const POPULAR_SERVICES: CatalogServiceEntry[] = [
     shape: "mcp",
     isPopular: true,
     category: "productivity",
-    defaultHost: "api.notion.com",
+    defaultHost: "mcp.notion.com/mcp",
     starterPrompts: [
       "Search engineering runbooks and SOPs",
       "Append retrospective notes to project board",
