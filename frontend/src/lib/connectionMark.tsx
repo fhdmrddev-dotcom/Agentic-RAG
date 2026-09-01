@@ -134,8 +134,45 @@ import MiroIcon from "~icons/logos/miro-icon"
 import GoogleDriveIcon from "~icons/logos/google-drive"
 import GoogleGmailIcon from "~icons/logos/google-gmail"
 import GoogleCalendarIcon from "~icons/logos/google-calendar"
+// ⚠ THE RE-OPEN TRIGGER ABOVE FIRED, PARTLY — operator, 2026-09-01: *"the icons for sheets,
+// Docs and Contacts are not correct, it is using the general google logo while we have
+// official logos."* Re-measured rather than assumed, and the answer is TWO of the three:
+//   @iconify-json/logos@1.2.13   google-sheets / -docs / -contacts   ALL THREE ABSENT
+//   @iconify-json/vscode-icons   nothing google-shaped at all
+//   @lobehub/icons@5.10          only `Google` and `GoogleCloud`
+//   @iconify-json/simple-icons   googlesheets ✅  googledocs ✅  googlecontacts ❌
+// So Sheets and Docs now draw their OFFICIAL brand geometry, and Contacts still cannot.
+//
+// ⚠ SIMPLE ICONS ARE MONOCHROME BY DESIGN — one path, `currentColor`, no `ink: "self"`
+// possible without supplying the colour. The wrappers below set each brand's OWN hex, so
+// the mark is the official path in the official colour rather than a tinted guess. That is
+// not the multi-colour product tile Drive/Gmail/Calendar get, and at `h-4 w-4` it reads the
+// same; anyone who disagrees should replace the pack, not hand-draw a fourth mark.
+import GoogleSheetsGlyph from "~icons/simple-icons/googlesheets"
+import GoogleDocsGlyph from "~icons/simple-icons/googledocs"
 
 import { cn } from "@/lib/utils"
+
+/** Google's own brand hexes, as Simple Icons records them for these two marks. */
+const GOOGLE_SHEETS_HEX = "#34A853"
+const GOOGLE_DOCS_HEX = "#4285F4"
+
+/**
+ * A monochrome brand glyph, drawn in that brand's own colour.
+ *
+ * ⚠ It exists so these two can be registered `ink: "self"` alongside the full-colour
+ * `logos:` marks. A monochrome path registered `fill` would inherit the interface ink and
+ * render Sheets in the same grey as a plug — resolved but WRONG, which is a cousin of the
+ * resolved-but-INVISIBLE failure this file's ink contract was written for.
+ */
+function brandInk(Glyph: ConnectionMark, hex: string): ConnectionMark {
+  return function BrandInkMark(props) {
+    return <Glyph {...props} style={{ color: hex, ...(props.style ?? {}) }} />
+  }
+}
+
+const GoogleSheetsIcon = brandInk(GoogleSheetsGlyph, GOOGLE_SHEETS_HEX)
+const GoogleDocsIcon = brandInk(GoogleDocsGlyph, GOOGLE_DOCS_HEX)
 
 /**
  * An `unplugin-icons` bundled SVG component, or a `lucide-react` glyph.
@@ -237,8 +274,11 @@ const SERVICE_MARKS: Record<string, ConnectionMarkEntry> = {
   "google-drive": { key: "google-drive", Mark: GoogleDriveIcon, ink: "self" },
   "google-gmail": { key: "google-gmail", Mark: GoogleGmailIcon, ink: "self" },
   "google-calendar": { key: "google-calendar", Mark: GoogleCalendarIcon, ink: "self" },
-  "google-sheets": { key: "google-sheets", Mark: GoogleIcon, ink: "self" },
-  "google-docs": { key: "google-docs", Mark: GoogleIcon, ink: "self" },
+  "google-sheets": { key: "google-sheets", Mark: GoogleSheetsIcon, ink: "self" },
+  "google-docs": { key: "google-docs", Mark: GoogleDocsIcon, ink: "self" },
+  // ⚠ STILL THE GENERIC MARK, and it is the only one left. `googlecontacts` is absent from
+  // every installed pack including simple-icons; there is no official geometry to draw.
+  // RE-OPEN TRIGGER, narrowed to one: the day a pack ships a Google Contacts mark.
   "google-contacts": { key: "google-contacts", Mark: GoogleIcon, ink: "self" },
 }
 
