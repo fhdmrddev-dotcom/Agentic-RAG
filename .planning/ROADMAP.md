@@ -673,6 +673,7 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 | 218. ~~The Library Knows How It Is Used~~ | — | ⛔ **ABSORBED INTO 217.1** (operator, 2026-08-29) — all five criteria and LIB-05/06/07 moved. Row kept so dependencies and the coverage map still resolve | - |
 | 219. A Connected Source Feeds the Library | 0/? | Not started — depends on **215** + 216 | - |
 | 220. A Drawing Becomes Quantities — SPIKE | 0/? | Not started — depends on 217. Extraction half already proven by two committed probes (`SEED-226`) | - |
+| 222. One Click Connects Any MCP Server | 0/? | **NEXT — chosen by the operator 2026-09-01.** Give the MCP door a real front step: RFC 9728 discovery + OAuth 2.1/PKCE, reusing the machinery `oauth_service.py` already has and the MCP client has never called. `SEED-237` · `SEED-177` | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.

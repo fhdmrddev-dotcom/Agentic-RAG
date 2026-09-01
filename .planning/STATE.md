@@ -38,6 +38,15 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+▶ **NEXT PHASE, CHOSEN BY THE OPERATOR 2026-09-01: `222 — One Click Connects Any MCP Server`.**
+Give the MCP door a real front step. The MCP spec requires OAuth 2.1 + PKCE and RFC 9728
+Protected Resource Metadata discovery; **we already have PKCE (`oauth_service.py`) and the MCP
+client has never called it** — the two halves are built and have never been introduced. Today
+every MCP service needs a token minted by hand in someone else's console, which is the step real
+users abandon. Scope, cost anchors and the sequence that follows: **`SEED-237`** (and `SEED-177`,
+whose "OAuth per vendor is wrong" correction is the premise). ⚠ Start with `/gsd:discuss-phase 222`
+— and read `221-CARRY-FORWARD.md` first, section C4 especially.
+
 📌 **PHASE 221 CLOSED 2026-09-01. EVERYTHING NOT DONE IS CAPTURED IN ONE PLACE:**
 **`.planning/phases/221-six-applications-one-token/221-CARRY-FORWARD.md`** — six sections, every
 row with a re-open trigger. Read it before scoping the next connector work.
