@@ -143,6 +143,17 @@ class _PinnedFetch:
         url: str,
         *,
         json_body: dict[str, Any] | None = None,
+        #: ⚠ ADDED FOR THE TOKEN EXCHANGE, and it is not interchangeable with `json_body`.
+        #: RFC 6749 §4.1.3 requires the token request to be
+        #: `application/x-www-form-urlencoded`; a JSON body is refused by most authorization
+        #: servers and — worse — accepted-and-ignored by a few, which yields a 400 whose
+        #: message blames the grant rather than the encoding.
+        #:
+        #: ⚠ MUTUALLY EXCLUSIVE WITH `json_body`, refused rather than silently resolved:
+        #: httpx would let one quietly win, and a caller that passed both has a bug that
+        #: deserves to be told at the seam. `egress.send_pinned_http` takes the same
+        #: position on its own `json`/`content` pair, for the same reason.
+        form: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
         #: ⚠ A TEST SEAM WITH A PRODUCTION DEFAULT OF `None`, copied deliberately from
         #: `egress.send_pinned_http`, whose docstring gives the reason: *"a binder
@@ -154,6 +165,12 @@ class _PinnedFetch:
         #: restoration and the real cap, and fakes only the socket.
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> tuple[int, httpx.Headers, bytes]:
+        if json_body is not None and form is not None:
+            raise ValueError(
+                "_PinnedFetch.request takes json_body OR form, never both — httpx would let "
+                "one silently win and the caller would not learn which"
+            )
+
         # ── 1 · validate FIRST, off the event loop ────────────────────────────────────
         # D-v2.5-01: `validate_mcp_destination` reaches `socket.getaddrinfo`, a BLOCKING
         # libc call that `timeout=` does not bound. `mcp_client.py:225` threadpools the
@@ -185,6 +202,7 @@ class _PinnedFetch:
                 method,
                 target,
                 json=json_body,
+                data=form,
                 headers=send_headers,
                 # SNI is TLS-layer; the `Host:` header is sent AFTER the handshake and
                 # cannot stand in for it. Without this, pinning to an IP fails certificate
