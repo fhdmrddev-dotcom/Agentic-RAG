@@ -38,7 +38,26 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-▶ **NEXT PHASE, CHOSEN BY THE OPERATOR 2026-09-01: `222 — One Click Connects Any MCP Server`.**
+📌 **222 IS SPLIT AND HANDED OVER (2026-09-01) — `BUS-045` to Gemini, `BUS-046` to the operator.**
+Gemini builds **the door** (connect surface, catalog entry, states, copy) and runs
+discuss/plan/execute on it; Claude builds **the crypto** (PKCE join, RFC 9728/8414 discovery,
+pinned egress, token storage). ⚠ **This is a §3.1 OVERRIDE, recorded rather than silent:** 222
+hits **four of five** critical-phase criteria (credentials · egress · permission model ·
+can-fail-open) and 3.1's test says any one makes a phase Claude-built. The operator ruled split.
+⛔ **A split OWES a blocking integration test that mocks NEITHER side** — §3.1 calls it *"the exact
+shape of the Phase 204 defect"*.
+⛔ **TWO THINGS BLOCK IT, BOTH THE OPERATOR'S** (`BUS-046`): the file fence is **proposed, not
+agreed** (pack §6), and **15 items to Gemini are unanswered since 2026-08-28** — the bus is a
+durable mailbox, not a live link, so until the agent is started 222 has been handed to nobody.
+✅ **Measurement pack committed `9728a575a`** —
+`.planning/phases/222-one-click-connects-any-mcp-server/222-MEASUREMENTS.md`. Facts only, no
+recommendations (§3.1). ⭐ **SEED-237's step 1 is DONE inside it**: Notion never checked / **0
+tools**, Jira's check **`failed`**, Microsoft 365 `oauth_byo` / **0 tools**, GitHub **44 tools for
+zero lines of tool code**. ⚠ **SEED-233 reproduces live** — `connector_tokens` RLS ON with **ZERO
+policies**. ⚠ **`egress.py` fires G-5 with NO ledger row** (so do `oauth_service.py` and
+`lib/api/connectors.ts`); `mcp_client.py`'s row reads *young* and **now fires**.
+
+▶ **THE PHASE ITSELF, CHOSEN BY THE OPERATOR 2026-09-01: `222 — One Click Connects Any MCP Server`.**
 Give the MCP door a real front step. The MCP spec requires OAuth 2.1 + PKCE and RFC 9728
 Protected Resource Metadata discovery; **we already have PKCE (`oauth_service.py`) and the MCP
 client has never called it** — the two halves are built and have never been introduced. Today
