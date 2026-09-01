@@ -151,6 +151,8 @@ from app.models.connector import (
     ConnectorConnectionUpdate,
     McpDiscoverRequest,
     McpDiscoverResponse,
+    McpProbeAuthRequest,
+    McpProbeAuthResponse,
     OAuthAuthorizeRequest,
     OAuthAuthorizeResponse,
     OAuthProvider,
@@ -1003,6 +1005,65 @@ async def discover_tools_from_url(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"MCP server probe failed: {exc}",
         ) from exc
+
+
+@router.post(
+    "/mcp/probe-auth",
+    response_model=McpProbeAuthResponse,
+    # ⚠ PER ENDPOINT, NEVER ROUTER-LEVEL — the invariant `main.py:782` records. This opens a
+    # socket to an operator-supplied address, which is at least as write-shaped as the four
+    # connector writes that carry the same pair; outside the kill switch it would be the one
+    # egress path Phase 210's switch could not turn off.
+    dependencies=[Depends(require_visible("live_connectors")), Depends(require_org_manage)],
+    summary="Ask an MCP server how it wants to be authenticated, before anything is saved",
+)
+async def probe_mcp_server_auth(
+    payload: McpProbeAuthRequest,
+) -> McpProbeAuthResponse:
+    """Phase 222 (SEED-237) — which door does this server need?
+
+    The wire half of `services.mcp_auth_discovery`. Sends NO credential: the 401 it is
+    reading is the expected answer, and a probe carrying a token would be handing it to a
+    host nobody has yet decided to trust.
+    """
+    from app.services.mcp_auth_discovery import probe_mcp_auth
+
+    try:
+        probe = await probe_mcp_auth(payload.server_url)
+    except EgressRefused as exc:
+        # ⚠ A REFUSAL IS NOT A VERDICT ABOUT THE SERVER, and the two must not be flattened.
+        # `422` here means *"we would not go there"*; a 200 with `kind="token"` means *"it
+        # wants a credential"*. Collapsing them would tell somebody to find an API key for
+        # an address we refused to contact.
+        #
+        # ⚠ `exc.reason_code` AND NOT `exc.detail`. Measured 2026-09-01: `EgressRefused`
+        # defines `reason_code`/`host`/`capability`/`ip` and NO `detail`, so reading it
+        # raises `AttributeError` INSIDE the handler and converts a clean 422 into a 500.
+        # `discover_tools_from_url` above does exactly that at its own `except` and is
+        # reported rather than patched here — it is Phase 212's route, not this one's.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Connection refused by security policy: {exc.reason_code}",
+        ) from exc
+    except EgressResponseTooLarge as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="That address returned more data than a metadata document should contain.",
+        ) from exc
+
+    return McpProbeAuthResponse(
+        kind=probe.kind,
+        authorization_host=probe.authorization_host,
+        # ⚠ DERIVED HERE, so the endpoint URL itself never reaches the browser. `False` when
+        # the server supports RFC 7591 dynamic registration (the operator supplies nothing);
+        # `True` when they must bring a client id/secret to the shipped Phase 215 form.
+        registration_required=(
+            probe.kind == "oauth" and probe.registration_endpoint is None
+        ),
+        code_challenge_methods=probe.code_challenge_methods,
+        detail=probe.detail,
+        resource_status=probe.resource_status,
+    )
 
 
 # ── Phase 215 (OAUTH-01..03) · BYO OAuth Endpoints ──────────────────────────────

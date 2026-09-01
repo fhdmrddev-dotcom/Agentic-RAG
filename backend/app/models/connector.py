@@ -444,6 +444,60 @@ class McpDiscoverResponse(_StrictBase):
     count: int = 0
 
 
+# ── Phase 222 (SEED-237) · which door does this server need? ─────────────────────────
+class McpProbeAuthRequest(_StrictBase):
+    """Ask an MCP server how it wants to be authenticated, before anything is saved."""
+
+    server_url: NonEmpty
+
+
+class McpProbeAuthResponse(_StrictBase):
+    """⚠ THE WIRE CONTRACT THE CONNECT SURFACE READS (BUS-047).
+
+    Bound to `services.mcp_auth_discovery.McpAuthProbe`, and deliberately NARROWER than it.
+    Three of that dataclass's fields are withheld on purpose and their absence is the
+    contract, not an oversight:
+
+      · `authorization_endpoint` / `token_endpoint` — the BROWSER never calls these; the
+        backend does. Putting them on the wire invites a frontend to start the flow itself,
+        which would move the PKCE verifier out of the one place that can keep it secret.
+      · the raw metadata documents — attacker-influenced JSON from a host nobody curated.
+        Nothing renders it, so nothing should receive it.
+
+    If the door genuinely needs one of them, that is a design conversation, not a field to
+    add quietly.
+    """
+
+    #: ⚠ THE ONLY FIELD A CALLER SHOULD BRANCH ON.
+    #: `open`        — answered with no credential; collect NOTHING.
+    #: `oauth`       — refused AND advertised a reachable authorization server.
+    #: `token`       — refused, advertised nothing usable; the paste-a-token door, which is
+    #:                 the door that ships TODAY and must keep working.
+    #: `unreachable` — no answer. A FAILURE, never a form.
+    kind: Literal["open", "oauth", "token", "unreachable"]
+
+    #: A bare host (`accounts.notion.com`), never a URL — the door NAMES where a person is
+    #: going; it does not link there. The address was validated for a socket, not for
+    #: navigation, and those are different guarantees.
+    authorization_host: str | None = None
+
+    #: Whether the operator must supply a client id/secret. FALSE means the server supports
+    #: RFC 7591 dynamic registration and they supply nothing; TRUE means the shipped Phase
+    #: 215 BYO form collects it, rather than a second form being invented.
+    registration_required: bool = False
+
+    #: Usually `["S256"]`. ⚠ EMPTY IS NOT "unsupported" — RFC 8414 §2 permits an
+    #: authorization server to stay silent, so an empty list must not render a warning.
+    code_challenge_methods: list[str] = Field(default_factory=list)
+
+    #: A human sentence naming a CAUSE rather than restating a status code. Populated for
+    #: `token` and `unreachable`. Render verbatim; do not compose one from `resource_status`.
+    detail: str | None = None
+
+    #: What the server itself returned. Display and debugging only.
+    resource_status: int | None = None
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -467,5 +521,7 @@ __all__ = [
     "ConnectorCheckResponse",
     "McpDiscoverRequest",
     "McpDiscoverResponse",
+    "McpProbeAuthRequest",
+    "McpProbeAuthResponse",
 ]
 
