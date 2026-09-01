@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-08-30T22:10:00.000Z"
-last_activity: 2026-08-30
+last_updated: "2026-09-01T10:05:00.000Z"
+last_activity: 2026-09-01
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 75
-  completed_plans: 73
+  completed_plans: 74
   percent: 62
 ---
 
@@ -36,6 +36,40 @@ can be taught new behaviors (skills) that persist and can be shared.
 Phase numbering continues at **210**.
 
 ## Current Position
+
+⚠ **SESSION 2026-09-01 (Claude, autonomous) — PHASE 221 PLAN 02 SHIPPED, AND THE ELEVEN GOOGLE
+WRITES ARE PROVEN 11/11.** Commits `a2cba2acf` · `10a61340d` · `d5d0e1495` · `4c2399380` on
+`develop`. Full detail: `.planning/phases/221-six-applications-one-token/221-02-SUMMARY.md`.
+
+**Gates at close:** count gate **182/182 · total 7108 · pinned 6387 · failed 0** · tsc **66**
+(baseline 66) · backend **70 failed / 3366 passed** (70 IS the baseline, +46 mine) · CLAUDE.md
+size **106,048 · 70.7% · OK**.
+
+| # | What was found | Where |
+|---|---|---|
+| 1 | **The Check action REFUSED every Google connection** — `409 nothing_to_check_yet` about a row that had just run 26 tools. Every `oauth_byo` row has `capability = NULL`. Plan 02's stated premise ("extend the existing Check action") was false | `a2cba2acf` |
+| 2 | **`connector_tokens` has RLS ON and ZERO POLICIES** — every user-JWT read returns empty, so `GET /oauth/token` 404s on rows that exist. Worked around on the service client; the real fix is a migration | `SEED-233` |
+| 3 | **The feature had no door** — the panel gated its Check button on `!isOAuthRow`, correct until the route stopped refusing OAuth rows. Found by opening the panel in a real browser | `a2cba2acf` |
+| 4 | **`create_event` refused every naive local time** — "Thursday at 3pm" was a 400 on every calendar event. Two of three input shapes worked, which is what hid it | `10a61340d` |
+| 5 | **`create_file` ALREADY mints a native Google Sheet** — the recorded "no `create_spreadsheet`" gap is discoverability, not capability | `SEED-234` |
+| 6 | **A healthy application intermittently reported `unknown`** — the 8s probe cap was too tight under server load | `4c2399380` |
+
+**⛔ ONE UAT ROW IS OWED AND IS NOT CLAIMED AS PASSED.** `api_off` end-to-end from a genuinely
+disabled API needs an API switched OFF in Google Cloud project `877112366454` — the operator's
+console, not mine to change. One step: disable Sheets, press Check, confirm only Sheets reports
+`api_off` with a working link, re-enable, press Check, confirm the line disappears.
+
+⚠ **ARTEFACTS LEFT IN THE OPERATOR'S GOOGLE ACCOUNT, all named `AGENTIC-RAG UAT 221`:** one Doc,
+two Drive files, one Sheet, **one unsent Gmail draft**, **five calendar events** (2026-09-05,
+09-06, 09-08 ×2, 09-09) and one contact. Nothing sent, shared or deleted. Search the marker to bin.
+
+⚠ **`uvicorn --reload` HANGS on this backend.** WatchFiles logs *"Reloading..."* and no *"Started
+server process"* follows, so the pre-edit worker keeps serving. Every verification in this session
+used a hard restart. Three live checks looked like code failures before this was understood.
+
+⚠ **FIVE DUPLICATE SEED IDS**: `SEED-022`, `SEED-092`, `SEED-228`, `SEED-229`, `SEED-231` each name
+two different files. `status:` frontmatter IS the index, so one of each pair will be answered and
+the other will silently inherit the resolution.
 
 ⚠ **SESSION 2026-08-31 (session 2, Claude + operator driving together) — FIVE DEFECTS, EACH
 ONE BLOCKING THE NEXT, ALL FOUND BY THE OPERATOR PRESSING A BUTTON.** Full detail: `BUS-037`.
