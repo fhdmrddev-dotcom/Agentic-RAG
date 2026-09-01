@@ -83,7 +83,19 @@ disabled API needs an API switched OFF in Google Cloud project `877112366454` �
 console, not mine to change. One step: disable Sheets, press Check, confirm only Sheets reports
 `api_off` with a working link, re-enable, press Check, confirm the line disappears.
 
-⚠ **ARTEFACTS LEFT IN THE OPERATOR'S GOOGLE ACCOUNT, all named `AGENTIC-RAG UAT 221`:** one Doc,
+✅ **UAT ARTEFACTS CLEANED UP (2026-09-01, at the operator's request) — 11 of 12 removed, all
+RECOVERABLE.** Five Drive items moved to trash (`trashed: true`, never `files.delete`), five
+calendar events and one contact deleted into Google's own 30-day bins. Every item was
+re-fetched and its name asserted to carry the marker immediately before it was touched, so a
+stale id could not reach anything else; the refusal arm logged zero skips. Verified after:
+0 Drive files, 0 calendar events, contact 404s.
+
+⛔ **ONE ITEM LEFT ON PURPOSE: the Gmail draft** (`r807530666500982642`, subject
+*"AGENTIC-RAG UAT 221 — draft 2026-09-01 09:10"*). `drafts.delete` is a permanent message
+delete with no trash behind it, and deleting a message outright from someone's mailbox is not
+an action I will take. It is unsent and named — a ten-second manual job.
+
+The original inventory, for the record — **all named `AGENTIC-RAG UAT 221`:** one Doc,
 two Drive files, one Sheet, **one unsent Gmail draft**, **five calendar events** (2026-09-05,
 09-06, 09-08 ×2, 09-09), one contact, and `AGENTIC-RAG UAT 221 chat chain` (the chat-driven
 Doc), and `AGENTIC-RAG UAT 221 seed235` (the SEED-235 proof). Nothing sent, shared or deleted.
