@@ -641,6 +641,8 @@ async def resolve_connection(
     org_id: str,
     *,
     fetch_row: FetchRow | None = None,
+    #: The OAuth-token seam, same shape and same reason as `fetch_row`.
+    fetch_oauth_token: Callable[[str], Awaitable[str | None]] | None = None,
 ) -> ResolvedConnection:
     """Resolve a bound connection FOR THE RUN'S ORG and return its credential.
 
@@ -786,8 +788,25 @@ async def resolve_connection(
     # alone, and it is safe for one reason worth stating rather than assuming: we are past
     # `fetch(connection_id, org_id)`, so this connection is already proven to belong to the
     # caller's org. A token cannot be read for a connection the caller could not resolve.
+    # ⚠ THROUGH THE SAME INJECTABLE SEAM `fetch_row` USES, and the first cut did not — it
+    # called storage directly and broke SIX shipped tests with `getaddrinfo failed`, because
+    # this resolver is deliberately unit-testable WITHOUT a database. A new read that ignores
+    # the seam quietly makes every caller of the seam network-dependent.
+    #
+    # ⚠ AND IT IS TOLERANT, which is a degradation to the PREVIOUS behaviour rather than a
+    # fail-open: if the token table cannot be read, the connection still resolves on the
+    # credential it already had. Nothing is granted that was not granted before; the only
+    # thing lost is the upgrade from a stale secret to a live token, and that is logged.
+    fetch_token = fetch_oauth_token or read_oauth_access_token
     resolved_scheme = "auto"
-    oauth_token = await read_oauth_access_token(connection_id)
+    try:
+        oauth_token = await fetch_token(connection_id)
+    except Exception:
+        logger.warning(
+            "connector_service: could not read an OAuth token for connection %s; resolving "
+            "on the stored credential instead", connection_id, exc_info=True,
+        )
+        oauth_token = None
     if oauth_token:
         # Re-encrypt under the SAME cipher the lazy `.secret` property decrypts with, so the
         # object keeps its one invariant: the plaintext is never held on the dataclass.

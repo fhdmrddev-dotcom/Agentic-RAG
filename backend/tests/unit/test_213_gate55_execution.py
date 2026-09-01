@@ -273,11 +273,17 @@ async def test_gate55_mcp_allow_dispatches_tool_and_writes_sent_receipt():
 
         assert res["text"] == "Issue created: PROJ-456"
         assert "failure" not in res
+        # ⚠ `auth_scheme` JOINED THIS CALL AT PHASE 222 and the exact-args assertion is kept
+        # exact rather than loosened. A `stored token -> auto` pairing is the shipped
+        # behaviour for a pasted credential like this one; the OAuth path resolves `bearer`
+        # instead, and an assertion that stopped naming the argument would stop noticing
+        # which of the two a call site actually sends.
         mock_call.assert_called_once_with(
             "https://mcp.atlassian.com/v1",
             tool_name="jira_create_issue",
             arguments={"summary": "New Issue"},
             secret="test-token",
+            auth_scheme="auto",
         )
 
         # D-213-13 / D-213-14: MCP arm writes external_action_sent with tool_name
