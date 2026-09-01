@@ -797,7 +797,29 @@ async def resolve_connection(
     # fail-open: if the token table cannot be read, the connection still resolves on the
     # credential it already had. Nothing is granted that was not granted before; the only
     # thing lost is the upgrade from a stale secret to a live token, and that is logged.
-    fetch_token = fetch_oauth_token or read_oauth_access_token
+    #
+    # ⚠ AN MCP ROW RENEWS; EVERY OTHER SHAPE READS (SEED-238). `read_oauth_access_token`
+    # projects `access_token_ciphertext` and NOTHING ELSE — no `expires_at`, no refresh — so
+    # before this branch a consented MCP connection ran on the token minted at consent until
+    # it expired, and then failed with `401 invalid_token`: an expiry wearing a rejection's
+    # clothes, which sends a person to re-consent and mint another one that dies the same way.
+    #
+    # ⚠ KEYED ON `mcp_server_url`, THE SAME FACT THE CHECK ROUTE KEYS ON (`:716`), and never
+    # on `auth_type`. A non-MCP OAuth row keeps its existing read: those renew through
+    # `oauth_refresh_service` at their own Google-specific call sites, and routing them here
+    # would give one credential two renewal engines.
+    #
+    # ⚠ THE RENEWAL IS ONLY ATTEMPTED INSIDE THE SKEW WINDOW. This is the hot path — every
+    # tool call — and a check that re-discovered metadata each time would put two network
+    # round trips in front of every action a workflow takes.
+    if fetch_oauth_token is not None:
+        fetch_token = fetch_oauth_token
+    elif row.get("mcp_server_url"):
+        from app.services.mcp_token import ensure_fresh_mcp_token
+
+        fetch_token = ensure_fresh_mcp_token
+    else:
+        fetch_token = read_oauth_access_token
     resolved_scheme = "auto"
     try:
         oauth_token = await fetch_token(connection_id)

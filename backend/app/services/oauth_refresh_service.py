@@ -42,6 +42,35 @@ class OAuthTokenUnavailable(OAuthError):
     pass
 
 
+def resolve_refresh_provider(service_id: str) -> OAuthProvider:
+    """Which vendor's token endpoint renews this connection — or a REFUSAL.
+
+    ⚠ THIS USED TO END `else "google"`, AND THAT DEFAULT WAS A CREDENTIAL LEAK WAITING FOR A
+    CALLER (SEED-238). `service_id="notion"` resolved to `google`, so wiring MCP refresh
+    through `get_valid_oauth_token` would have POSTed to `accounts.google.com`: Notion's
+    refresh token, the client id Notion issued us under RFC 7591, and our Google client
+    secret — one request, three credentials, to a vendor with no part in any of them.
+
+    ⚠ IT WAS NOT REACHABLE AT HEAD, and the distinction is the point rather than an excuse:
+    every production caller was Google-specific and the Check route refuses MCP rows before
+    the OAuth arm. So it was invisible until somebody built the missing half — which is
+    precisely the shape of defect a default hides and a refusal reveals.
+
+    A `ValueError` NAMING the service is what makes the next miswiring loud at the seam
+    instead of silent at a stranger's token endpoint.
+    """
+    sid = (service_id or "").lower()
+    if "google" in sid or "gmail" in sid:
+        return "google"
+    if "microsoft" in sid or "onedrive" in sid:
+        return "microsoft"
+    raise ValueError(
+        f"No refresh provider is registered for service '{service_id}'. This engine renews "
+        "against a hardcoded vendor registry; a connection whose authorization server was "
+        "DISCOVERED (an MCP row) renews through `mcp_oauth.refresh_access_token` instead."
+    )
+
+
 async def refresh_oauth_token_at_provider(
     provider: OAuthProvider,
     refresh_token: str,
@@ -156,7 +185,13 @@ async def get_valid_oauth_token(
 
     # Resolve provider and credentials
     service_id = conn.get("service_id", "")
-    provider: OAuthProvider = "google" if "google" in service_id or "gmail" in service_id else ("microsoft" if "microsoft" in service_id or "onedrive" in service_id else "google")
+    # ⚠ RAISES on an unknown service rather than defaulting to Google — see
+    # `resolve_refresh_provider`. `OAuthError` is what this function's callers already
+    # handle; a bare `ValueError` would surface as a 500.
+    try:
+        provider: OAuthProvider = resolve_refresh_provider(service_id)
+    except ValueError as exc:
+        raise OAuthError(str(exc)) from exc
     config = conn.get("config") or {}
     custom_cid = config.get("custom_client_id")
     # ⚠ THE SECRET IS NO LONGER IN `config`, AND IT WAS NEVER ACTUALLY THERE. Phase 215

@@ -329,3 +329,83 @@ async def complete_authorization(
         raise McpOAuthError("The sign-in service did not return an access token.")
 
     return tokens, pending
+
+
+async def refresh_access_token(
+    *,
+    token_endpoint: str,
+    refresh_token: str,
+    client_id: str,
+    client_secret: str | None,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> dict[str, Any]:
+    """Renew an access token at a DISCOVERED token endpoint (SEED-238).
+
+    ⚠ THIS HALF DID NOT EXIST, AND ITS ABSENCE WAS SILENT. `resolve_connection` read
+    `access_token_ciphertext` and nothing else — no `expires_at`, no refresh — so a
+    consented MCP connection ran on the token minted at consent until it expired. The
+    failure then surfaces as `401 invalid_token`, which reads as *"your credential is bad"*
+    and sends somebody to re-consent, minting another eight-hour token that fails
+    identically. An expiry wearing a rejection's clothes is a loop, not an error.
+
+    ⚠ NOT `oauth_refresh_service`, AND THE REASON IS NOT STYLE. That engine renews against a
+    hardcoded three-vendor registry and its provider ladder used to end `else "google"`, so
+    an MCP row would have had Notion's refresh token, the RFC 7591 client id and our Google
+    client secret POSTed to `accounts.google.com`. That default is now a refusal
+    (`resolve_refresh_provider`); this function is where a discovered server renews.
+
+    ⚠ THE ENDPOINT IS A STRANGER'S URL, exactly as at exchange time, so it takes the same
+    pinned fetch — validated off the loop, connected to the pinned IP with SNI restored,
+    redirects refused, body bounded. The caller RE-DISCOVERS it rather than trusting a
+    stored copy, for the reason `/authorize` re-discovers: anything that can be stored can
+    be poisoned, and this request ends with our client secret leaving the building.
+    """
+    form = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": client_id,
+    }
+    # ⚠ ONLY WHEN THERE IS ONE. A public client registered under RFC 7591 has no secret, and
+    # sending an empty one makes some servers answer `invalid_client` — a credential fault
+    # reported about a credential that does not exist, which is the worst kind to debug.
+    if client_secret:
+        form["client_secret"] = client_secret
+
+    try:
+        status_code, _headers, body = await _PinnedFetch.request(
+            "POST",
+            token_endpoint,
+            form=form,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+            transport=transport,
+        )
+    except EgressRefused:
+        raise
+    except httpx.RequestError as exc:
+        raise McpOAuthError(f"Could not reach the sign-in service to renew: {exc}") from exc
+
+    if status_code >= 400:
+        # ⚠ THE PROVIDER'S BODY IS NOT ECHOED, the same rule `complete_authorization` keeps:
+        # a token endpoint routinely quotes the request back, which would put the refresh
+        # token — and on some servers the client secret — into our logs and onto a screen.
+        logger.warning(
+            "mcp_oauth: token refresh refused by %s with HTTP %d",
+            httpx.URL(token_endpoint).host,
+            status_code,
+        )
+        raise McpOAuthError(
+            f"The sign-in service refused to renew this connection (HTTP {status_code})."
+        )
+
+    try:
+        tokens = json.loads(body.decode("utf-8", errors="replace"))
+    except ValueError as exc:
+        raise McpOAuthError("The sign-in service returned a response we could not read.") from exc
+
+    if not isinstance(tokens, dict) or not tokens.get("access_token"):
+        raise McpOAuthError("The sign-in service did not return an access token.")
+
+    return tokens
