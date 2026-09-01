@@ -3089,6 +3089,7 @@ const BASELINE = {
   "connectors.mcp_auth.test.ts": 8,
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
+  "McpAuthDoor.byo.test.tsx": 3,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4313,6 +4314,7 @@ const TARGETS = [
   "src/lib/api/__tests__/connectors.mcp_auth.test.ts",
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
+  "src/components/settings/McpAuthDoor.byo.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

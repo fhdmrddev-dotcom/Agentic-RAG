@@ -413,6 +413,17 @@ export interface PostMessageConnectionConfig {
  *  with no secret was accepted). Keep this a declared shape here for the same reason. */
 export interface McpConnectionConfig {
   headers?: Record<string, string>
+  /** Phase 222 — the client id an MCP authorization server issued us, either under RFC 7591
+   *  dynamic registration or brought by the operator.
+   *
+   *  ⚠ AN ID, NEVER A SECRET. Migration 150's rule holds: the secret lives encrypted in
+   *  `oauth_client_secret_ciphertext`, out of a column every org member can SELECT.
+   *
+   *  ⚠ THIS MIRROR WAS MISSED WHEN THE SERVER MODEL GAINED THE FIELD (`29152a983`), and the
+   *  gap is what made `McpAuthDoor.test.tsx` unable to state a fixture the backend accepts.
+   *  A wire type that has drifted from its model does not fail — it just refuses to describe
+   *  reality. */
+  custom_client_id?: string | null
 }
 
 export type ConnectorConnectionConfig =

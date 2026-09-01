@@ -135,6 +135,10 @@ export function McpAuthDoor({
     setOauthError(null)
 
     // Synchronously open popup in the gesture handler to avoid browser popup blockers (BUS-049)
+    // The one fact both the render and this handler branch on: a server that does NOT
+    // advertise RFC 7591 dynamic registration needs the operator's own client credentials.
+    const byoCredentials = probeResult?.registration_required === true
+
     const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null
     if (!popup) {
       setOauthError("Popup was blocked by your browser. Please allow popups for this site and try again.")
@@ -147,7 +151,13 @@ export function McpAuthDoor({
 
       if (mode === "create" && !connId) {
         const createConfig: Record<string, unknown> = {}
-        if (draft.authType === "custom_app" && draft.customClientId.trim()) {
+      // ⚠ KEYED ON THE PROBE, NOT ON `authType` (BUG-260902-01). This read
+      // `draft.authType === "custom_app"`, and `ConnectionDraft.authType` is
+      // `"static_key" | "oauth_byo" | "mcp"` — there is no `"custom_app"`, so the condition
+      // was ALWAYS FALSE and neither the client id nor the secret was ever sent. The inputs
+      // render on `registration_required` and the button enables on it, so the handler keys
+      // on it too: one source for what the door shows and what the door sends.
+        if (byoCredentials && draft.customClientId?.trim()) {
           createConfig.custom_client_id = draft.customClientId.trim()
         }
         const createBody: ConnectorConnectionCreate = {
@@ -155,7 +165,10 @@ export function McpAuthDoor({
           name: draft.name.trim() || draft.serviceId.trim() || "MCP Connection",
           mcp_server_url: draft.mcpServerUrl.trim(),
           config: Object.keys(createConfig).length > 0 ? createConfig : undefined,
-          secret: draft.authType === "custom_app" && draft.customClientSecret.trim() ? draft.customClientSecret.trim() : undefined,
+          secret:
+            byoCredentials && draft.customClientSecret?.trim()
+              ? draft.customClientSecret.trim()
+              : undefined,
         }
         const created = await onCreate?.(createBody)
         if (created && typeof created === "object" && "id" in created) {
@@ -166,13 +179,13 @@ export function McpAuthDoor({
           name: draft.name.trim(),
           mcp_server_url: draft.mcpServerUrl.trim(),
         }
-        if (draft.authType === "custom_app" && draft.customClientId.trim()) {
+        if (byoCredentials && draft.customClientId?.trim()) {
           updateBody.config = {
             ...(connection?.config ?? {}),
             custom_client_id: draft.customClientId.trim(),
           }
         }
-        if (draft.authType === "custom_app" && draft.customClientSecret.trim()) {
+        if (byoCredentials && draft.customClientSecret?.trim()) {
           updateBody.secret = draft.customClientSecret.trim()
         }
         await onUpdate?.(connId, updateBody)

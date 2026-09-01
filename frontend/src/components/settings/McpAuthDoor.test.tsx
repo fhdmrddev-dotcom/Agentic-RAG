@@ -312,7 +312,11 @@ describe("Phase 222 — McpAuthDoor Component", () => {
           org_id: "org-1",
           service_id: "notion",
           name: "Notion",
-          capability: "mcp",
+          // ⚠ NULL, not "mcp". `ConnectorCapability` is the closed three-member set of
+          // FIRST-PARTY capabilities; an MCP row carries `capability = NULL` by
+          // construction (migration 126), which is exactly why `api/connectors.py:716`
+          // keys the MCP refusal on `mcp_server_url` and never on a capability value.
+          capability: null,
           mcp_server_url: "https://mcp.notion.com/mcp",
           config: { custom_client_id: "bD78Ksp3xBJew1kL" },
           is_enabled: true,
