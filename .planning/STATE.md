@@ -54,6 +54,21 @@ size **106,048 · 70.7% · OK**.
 | 5 | **`create_file` ALREADY mints a native Google Sheet** — the recorded "no `create_spreadsheet`" gap is discoverability, not capability | `SEED-234` |
 | 6 | **A healthy application intermittently reported `unknown`** — the 8s probe cap was too tight under server load | `4c2399380` |
 
+⭐ **THE OPEN DEAD-RUN INVESTIGATION IS PROBABLY SOLVED — see `SEED-235`.** Driving a two-write
+Google chain through chat reproduced it: the **second** `tool_approval_required` in one run
+never renders live. The card keeps the first decision's word (`append_to_doc · Approved`) with
+no buttons, the run parks in `runs:active`, and the log shows `POST /tool-approval 200` then
+only `/health`. The server is right — the run's Redis buffer ends exactly on
+`tool_approval_required` and it was waiting. **A page reload renders the card, and approving
+finished the run** (3 steps, both writes landed). That accounts for every part of the recorded
+symptom: `error = NULL` (nothing failed), an empty assistant message (the turn never completed)
+and "cancelled itself" (a run showing no question and never moving looks dead). This is
+D-v2.5-03 broken on the approval surface. **NOT fixed here** — a new defect on a surface with
+its own design bar (G-2/G-4), and it deserves its own scope.
+
+✅ **The chat write chain is PROVEN**: one turn chained `create_doc` → `append_to_doc`, each with
+its own approval pause and an honest payload preview, both committed to the real account.
+
 **⛔ ONE UAT ROW IS OWED AND IS NOT CLAIMED AS PASSED.** `api_off` end-to-end from a genuinely
 disabled API needs an API switched OFF in Google Cloud project `877112366454` — the operator's
 console, not mine to change. One step: disable Sheets, press Check, confirm only Sheets reports
@@ -61,7 +76,8 @@ console, not mine to change. One step: disable Sheets, press Check, confirm only
 
 ⚠ **ARTEFACTS LEFT IN THE OPERATOR'S GOOGLE ACCOUNT, all named `AGENTIC-RAG UAT 221`:** one Doc,
 two Drive files, one Sheet, **one unsent Gmail draft**, **five calendar events** (2026-09-05,
-09-06, 09-08 ×2, 09-09) and one contact. Nothing sent, shared or deleted. Search the marker to bin.
+09-06, 09-08 ×2, 09-09), one contact, and `AGENTIC-RAG UAT 221 chat chain` (the chat-driven
+Doc). Nothing sent, shared or deleted. Search the marker to bin them.
 
 ⚠ **`uvicorn --reload` HANGS on this backend.** WatchFiles logs *"Reloading..."* and no *"Started
 server process"* follows, so the pre-edit worker keeps serving. Every verification in this session
