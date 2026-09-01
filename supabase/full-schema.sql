@@ -929,7 +929,7 @@ CREATE TABLE public.connector_tokens (
 -- Name: TABLE connector_tokens; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.connector_tokens IS 'Phase 215 (OAUTH-01..03): Encrypted OAuth tokens and claim-based refresh leases for connector connections.';
+COMMENT ON TABLE public.connector_tokens IS 'Phase 215 (OAUTH-01..03): Encrypted OAuth tokens and claim-based refresh leases. Phase 222/SEED-233: RLS was enabled at 129 with NO policy, which is deny-all and made 129 §4''s column grants unreachable; connector_tokens_select scopes reads through the parent connection''s org. Writes stay on the service client by design — see §2.';
 
 
 --
@@ -5618,6 +5618,15 @@ CREATE POLICY connector_connections_update ON public.connector_connections FOR U
 --
 
 ALTER TABLE public.connector_tokens ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_tokens connector_tokens_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_tokens_select ON public.connector_tokens FOR SELECT TO authenticated USING ((connection_id IN ( SELECT c.id
+   FROM public.connector_connections c
+  WHERE (c.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
+
 
 --
 -- Name: departments; Type: ROW SECURITY; Schema: public; Owner: -

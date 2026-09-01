@@ -498,6 +498,31 @@ class McpProbeAuthResponse(_StrictBase):
     resource_status: int | None = None
 
 
+class McpOAuthStartRequest(_StrictBase):
+    """Begin OAuth against an MCP connection's own discovered authorization server.
+
+    ⚠ IT TAKES A CONNECTION ID AND NOTHING ELSE — deliberately, and this is the same rule
+    `McpProbeAuthResponse` states from the other side. The authorization and token endpoints
+    are RE-DISCOVERED server-side from the connection's stored `mcp_server_url` on every
+    call; they are never accepted from the caller. A client that could name the token
+    endpoint could point the exchange — with our client secret in it — anywhere it liked,
+    which is the whole reason those two fields are withheld from the probe response.
+    """
+
+    connection_id: NonEmpty
+
+
+class McpOAuthStartResponse(_StrictBase):
+    """Where to send the person. The only thing that crosses to the browser."""
+
+    #: The vendor's own consent screen. Its `state` is an opaque handle carrying nothing.
+    authorize_url: str
+
+    #: The host in that URL, so the door can name where somebody is about to go without
+    #: parsing the URL itself.
+    authorization_host: str | None = None
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -523,5 +548,7 @@ __all__ = [
     "McpDiscoverResponse",
     "McpProbeAuthRequest",
     "McpProbeAuthResponse",
+    "McpOAuthStartRequest",
+    "McpOAuthStartResponse",
 ]
 
