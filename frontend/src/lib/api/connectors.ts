@@ -485,4 +485,68 @@ export async function importCloudFile(
   return res.json()
 }
 
+export type McpAuthKind = "open" | "oauth" | "token" | "unreachable"
+
+export interface McpProbeAuthResponse {
+  kind: McpAuthKind
+  authorization_host?: string | null
+  registration_required?: boolean
+  code_challenge_methods?: string[]
+  detail?: string | null
+  resource_status?: number | null
+}
+
+export interface McpOAuthAuthorizeResponse {
+  authorize_url: string
+  authorization_host: string
+}
+
+/** Phase 222: Probe an MCP server's authentication requirements. */
+export async function probeMcpAuth(
+  serverUrl: string,
+): Promise<McpProbeAuthResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/mcp/probe-auth`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ server_url: serverUrl }),
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || `MCP auth probe failed with status ${res.status}`,
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<McpProbeAuthResponse>
+}
+
+/** Phase 222: Generate OAuth authorize URL for an MCP connection. */
+export async function createMcpOAuthAuthorizeUrl(
+  connectionId: string,
+): Promise<McpOAuthAuthorizeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/mcp/oauth/authorize`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ connection_id: connectionId }),
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || `Failed to initiate MCP OAuth authorization`,
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<McpOAuthAuthorizeResponse>
+}
+
 

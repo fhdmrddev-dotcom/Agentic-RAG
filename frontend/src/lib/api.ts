@@ -432,6 +432,8 @@ export {
   getConnectionOAuthToken,
   listCloudFiles,
   importCloudFile,
+  probeMcpAuth,
+  createMcpOAuthAuthorizeUrl,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
@@ -445,6 +447,9 @@ export type {
   OAuthTokenResponse,
   CloudFileItem,
   CloudFileListResponse,
+  McpAuthKind,
+  McpProbeAuthResponse,
+  McpOAuthAuthorizeResponse,
 } from "./api/connectors"
 
 export { submitToolApproval } from "./api/threads"
