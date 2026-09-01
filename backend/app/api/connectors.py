@@ -153,6 +153,8 @@ from app.models.connector import (
     McpDiscoverResponse,
     McpProbeAuthRequest,
     McpProbeAuthResponse,
+    McpOAuthStartRequest,
+    McpOAuthStartResponse,
     OAuthAuthorizeRequest,
     OAuthAuthorizeResponse,
     OAuthProvider,
@@ -166,6 +168,14 @@ from app.security.egress import (
 )
 
 logger = logging.getLogger(__name__)
+# ⚠ UNDEFINED IN THIS MODULE UNTIL 2026-09-01, WITH THREE CALL SITES. `aexec` was used by
+# `create_oauth_authorize_url` (Phase 215, the OAuth Connect path), `import_connection_file`
+# (Phase 216) and this phase's `start_mcp_oauth`, and imported by NONE of them — so each
+# raised `NameError` on reaching its line. Same class as the `logger` defect BUS-037 recorded
+# in THIS FILE: a name the module docstring even mentions (`:115`) and that nothing bound.
+# Fenced by `test_222_no_undefined_names.py`, which walks every module-level name rather
+# than waiting for the next one.
+from app.utils.db import aexec
 from app.services import connector_service
 from app.services.connectors.jira_adapter import JiraUnreachable
 from app.services.connectors.protocol import AdapterError
@@ -1073,6 +1083,158 @@ async def probe_mcp_server_auth(
         detail=probe.detail,
         resource_status=probe.resource_status,
     )
+
+
+@router.post(
+    "/mcp/oauth/authorize",
+    response_model=McpOAuthStartResponse,
+    dependencies=[Depends(require_visible("live_connectors")), Depends(require_org_manage)],
+    summary="Start OAuth against an MCP server's own discovered authorization server",
+)
+async def start_mcp_oauth(
+    payload: McpOAuthStartRequest,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> McpOAuthStartResponse:
+    """Phase 222 (SEED-237) — the click that replaces pasting a token from a console.
+
+    ⚠ THE ENDPOINTS ARE RE-DISCOVERED HERE, NOT ACCEPTED FROM THE CALLER. Anything the
+    browser could name, the browser could redirect — and this request ends with our client
+    secret being POSTed to whatever `token_endpoint` says.
+    """
+    from app.dependencies import get_redis
+    from app.services.mcp_auth_discovery import probe_mcp_auth
+    from app.services.mcp_oauth import begin_authorization
+    from app.config import settings
+
+    conn_res = await aexec(
+        supabase.table("connector_connections")
+        .select("id, mcp_server_url, config")
+        .eq("id", str(payload.connection_id))
+        .eq("org_id", str(active_org))
+        .limit(1)
+    )
+    if not conn_res.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
+
+    row = conn_res.data[0]
+    server_url = row.get("mcp_server_url")
+    if not server_url:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This connection has no server address to sign in to.",
+        )
+
+    probe = await probe_mcp_auth(server_url)
+    if probe.kind != "oauth" or not probe.authorization_endpoint or not probe.token_endpoint:
+        # ⚠ NAMES WHICH DOOR IT IS, rather than reporting a generic failure. The three
+        # non-oauth verdicts have different remedies and a person acts on the difference.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=probe.detail or "This server does not offer a sign-in we can use.",
+        )
+
+    cfg = row.get("config") or {}
+    client_id = cfg.get("custom_client_id")
+    # Read through the SERVICE role — the column is ungranted to `authenticated` (mig 150),
+    # which is the entire point of it being a column rather than a config key.
+    client_secret = await connector_service.read_oauth_client_secret(
+        str(payload.connection_id), str(active_org)
+    )
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This server needs an application to sign in with, and none is saved for "
+                "this connection yet."
+            ),
+        )
+
+    # ⚠ BYTE-IDENTICAL TO THE ONE THE CALLBACK REBUILDS. The provider compares the two and
+    # answers `redirect_uri_mismatch`, which names neither setting — Phase 215 recorded that
+    # exact trap, and `backend_public_url` exists because the frontend URL answered 200 with
+    # Vite's SPA fallback and silently dropped the code.
+    redirect_uri = f"{settings.backend_public_url.rstrip('/')}/connectors/mcp/oauth/callback"
+
+    authorize_url, _handle = await begin_authorization(
+        get_redis(),
+        authorization_endpoint=probe.authorization_endpoint,
+        token_endpoint=probe.token_endpoint,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        scopes=None,
+        server_url=server_url,
+        connection_id=str(payload.connection_id),
+        user_id=str(user.get("id") or user.get("sub") or ""),
+        org_id=str(active_org),
+    )
+    return McpOAuthStartResponse(
+        authorize_url=authorize_url,
+        authorization_host=probe.authorization_host,
+    )
+
+
+@router.get(
+    "/mcp/oauth/callback",
+    summary="Return leg of the MCP OAuth consent",
+)
+async def mcp_oauth_callback(
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
+    error_description: str = Query(None),
+) -> RedirectResponse:
+    """Phase 222 — the vendor sends the person back here.
+
+    ⚠ NO AUTH DEPENDENCY, AND THAT IS CORRECT RATHER THAN AN OMISSION: this is a browser
+    redirect arriving from a third party with no JWT. What replaces it is stronger than a
+    header — the org and user were bound into the pending record at authorize time, under
+    an authenticated `require_org_manage` request, and `state` is a single-use random handle
+    that resolves to that record. Nothing here trusts a value the caller supplied.
+    """
+    from app.dependencies import get_redis
+    from app.services.mcp_oauth import McpOAuthError, complete_authorization
+    from app.config import settings
+
+    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+
+    # ⚠ `error_description` IS LOGGED AND NEVER PUT IN THE REDIRECT. It is attacker-supplied
+    # text from an untrusted authorization server; reflecting it into a URL the browser then
+    # renders is how a refusal becomes an injection.
+    if error:
+        logger.warning("mcp oauth: consent returned %s (%s)", error, error_description)
+        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error={error}")
+
+    if not code or not state:
+        return RedirectResponse(
+            url=f"{frontend_url}/?connections=1&oauth_error=missing_code_or_state"
+        )
+
+    try:
+        tokens, pending = await complete_authorization(get_redis(), handle=state, code=code)
+    except (McpOAuthError, EgressRefused) as exc:
+        logger.warning("mcp oauth: could not complete the connection: %s", exc)
+        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=exchange_failed")
+
+    scope_str = tokens.get("scope", "")
+    await connector_service.save_oauth_tokens(
+        connection_id=pending.connection_id,
+        org_id=pending.org_id,
+        access_token=tokens["access_token"],
+        refresh_token=tokens.get("refresh_token"),
+        token_type=tokens.get("token_type", "Bearer"),
+        scopes=scope_str.split() if isinstance(scope_str, str) else [],
+        expires_in=tokens.get("expires_in", 3600),
+        # ⚠ NO PROFILE FETCH. The Phase 215 path calls `fetch_account_profile` against a
+        # known vendor's identity endpoint; there is no such endpoint here, and inventing
+        # one would mean sending the fresh token to a URL this server also chose. The
+        # account name stays unknown rather than guessed.
+        account_email=None,
+        account_name=None,
+    )
+    return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_connected=1")
 
 
 # ── Phase 215 (OAUTH-01..03) · BYO OAuth Endpoints ──────────────────────────────
