@@ -35,6 +35,7 @@ day add the twelfth write.
 from __future__ import annotations
 
 import base64
+import re
 from email.message import EmailMessage
 from typing import Any
 from uuid import UUID
@@ -407,6 +408,16 @@ async def create_event(
     end = _require(end, "an end time", "create_event")
     where = (calendar_id or "primary").strip() or "primary"
 
+    # ⚠ Resolved ONCE and shared by both fields — two lookups for one event would double
+    # the cost to answer a question whose answer cannot differ between start and end.
+    # Skipped entirely when both values already carry an offset, so the common
+    # already-pinned case adds no call at all.
+    tz = (
+        ""
+        if (_has_offset(start.strip()) and _has_offset(end.strip()))
+        else await _calendar_time_zone(connection_id, where)
+    )
+
     created = await write_json(
         CALENDAR,
         connection_id,
@@ -415,8 +426,8 @@ async def create_event(
         {
             "summary": summary,
             "description": _bounded(description, "description"),
-            "start": _time_field(start),
-            "end": _time_field(end),
+            "start": _time_field(start, tz),
+            "end": _time_field(end, tz),
         },
         what="create_event",
     )
@@ -448,10 +459,14 @@ async def update_event(
         patch["summary"] = summary
     if description is not None:
         patch["description"] = _bounded(description, "description")
+    # Same rule as `create_event`: a naive datetime needs the calendar's own zone, and one
+    # that already carries an offset must never be reinterpreted.
+    _needs_tz = (start and not _has_offset(start.strip())) or (end and not _has_offset(end.strip()))
+    tz = await _calendar_time_zone(connection_id, where) if _needs_tz else ""
     if start:
-        patch["start"] = _time_field(start)
+        patch["start"] = _time_field(start, tz)
     if end:
-        patch["end"] = _time_field(end)
+        patch["end"] = _time_field(end, tz)
     if not patch:
         raise GoogleReadError("update_event was given nothing to change.")
 
@@ -471,16 +486,63 @@ async def update_event(
     }
 
 
-def _time_field(value: str) -> dict[str, str]:
+#: A `dateTime` carries a UTC offset if it ends in `Z` or in `±HH:MM` / `±HHMM`.
+_OFFSET = re.compile(r"(?:Z|[+-]\d{2}:?\d{2})$")
+
+
+def _has_offset(text: str) -> bool:
+    return bool(_OFFSET.search(text))
+
+
+async def _calendar_time_zone(connection_id: str | UUID, where: str) -> str:
+    """The calendar's OWN time zone, as an IANA name. `""` when it cannot be read.
+
+    ⚠ ONE EXTRA GET, AND IT BUYS THE ONLY HONEST ANSWER. A naive `2026-09-04T15:00:00`
+    means *three in the afternoon where the person lives*, and the only place that fact
+    exists is the calendar itself. Guessing UTC would silently move every meeting by the
+    user's offset — a wrong answer that looks like a right one, which is worse than the
+    400 this replaces.
+
+    ⚠ It travels under `calendar_write`, the caller's OWN key, not under `calendar_read`.
+    The egress key selects an allow-list, not an HTTP verb, and borrowing the read key here
+    would let a write tool reach a surface its own key does not name.
+    """
+    try:
+        cal = await write_json(
+            CALENDAR, connection_id, "GET", f"{_CALENDAR_API}/{where}", None,
+            what="read the calendar's time zone",
+        )
+    except Exception:  # noqa: BLE001 — a diagnostic read; its failure is not the caller's
+        return ""
+    tz = cal.get("timeZone")
+    return tz if isinstance(tz, str) and tz else ""
+
+
+def _time_field(value: str, time_zone: str = "") -> dict[str, str]:
     """An all-day date or a timed instant, told apart by length.
 
     Google's two shapes are `{"date": "2026-09-01"}` and
     `{"dateTime": "2026-09-01T09:00:00Z"}`, and sending the wrong one is a 400. A bare
     `YYYY-MM-DD` is a date; anything longer is treated as an instant.
+
+    ── ⚠ MEASURED 2026-09-01: THIS SHIPPED BROKEN FOR THE COMMONEST INPUT THERE IS ───────
+    Google's rule is *"a time zone offset is required unless a time zone is explicitly
+    specified in timeZone"*. This function sent NEITHER, so a naive local datetime — which
+    is exactly what a model writes when a person says "Thursday at 3pm" — came back
+    `HTTP 400 (required)` every single time. Driven against the live API on the operator's
+    own calendar: naive **FAILED**, the same instant with a `Z` **succeeded**, and an
+    all-day `date` **succeeded**. Two of three arms worked, so nothing shallower than a
+    real call would have found it.
+
+    ⚠ An offset that IS present is left completely alone. `2026-09-04T15:00:00+02:00` means
+    what it says, and attaching a `timeZone` to it would invite Google to reinterpret an
+    instant the caller had already pinned.
     """
     text = value.strip()
     if len(text) == 10 and text.count("-") == 2:
         return {"date": text}
+    if time_zone and not _has_offset(text):
+        return {"dateTime": text, "timeZone": time_zone}
     return {"dateTime": text}
 
 
