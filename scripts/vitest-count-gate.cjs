@@ -1463,6 +1463,17 @@ const BASELINE = {
   // cases were observed RED; the fifth is the flag-ON positive control. This also
   // discharges the render-guard assertion `revertByteIdentical.test.tsx` deferred in 181.
   "ChatLayout.launch.test.tsx": 17,
+  // ⚠ ADOPTED 2026-09-01, pinned at the gate's OWN printed `new` column (13), never counted
+  // by hand — `221-CARRY-FORWARD.md` §E2 records the session where a hand-split pin was
+  // caught doing exactly that. TARGETS was added in the same commit; a suite in one knob
+  // and not the other either runs unguarded or is guarded without running.
+  //
+  // ⚠ RECORDED WHILE ADOPTING IT, AND DELIBERATELY NOT FIXED HERE: the neighbour above
+  // measures 35 and is pinned at 17. That pin is stale-LOW, so 18 of its tests could be
+  // deleted without the gate noticing — the gate only fails on a decrease BELOW the pin.
+  // Its test file is byte-unchanged by this commit (last touched 2026-08-30, 217.1-18), so
+  // re-baselining it here would bury someone else's drift inside a nav refactor.
+  "SettingsPage.test.tsx": 13,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -3598,6 +3609,15 @@ const TARGETS = [
   // count was still growing; PINNED at 12 by 188-12 from this script's printed `actual`
   // column across two agreeing runs.
   "src/components/layout/ChatLayout.launch.test.tsx",
+  // ⚠ ADOPTED 2026-09-01 — it was in NEITHER knob, and the change that found it is the
+  // kind the gate exists to watch: Connections moved out of Settings into its own page,
+  // which deleted a tab, retired a routing key and re-pointed the persisted-tab fallback.
+  // Four existing tests went RED and two new guards were driven RED against a planted
+  // empty `RETIRED_TABS` — and NONE of that was visible to the gate, because this suite
+  // has never been run by it. Same pattern BUS-040 recorded for three chat suites, one of
+  // which had been red for hours unseen.
+  // ⚠ No bareName collision: the sibling is `SettingsPage.a11y.test.tsx`, a distinct key.
+  "src/pages/SettingsPage.test.tsx",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured

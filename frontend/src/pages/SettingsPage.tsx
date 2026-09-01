@@ -41,15 +41,10 @@ import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 // the user picks a default WITHIN the operator/org-allowed set; the always-on 🔒 footer
 // surfaces the operator lock. Self-fetching (getModelDefault), so it needs no page state.
 import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
-// Phase 190-16 (CONN-02 / D-25 / sketch 155-C) — Settings → Connections, the sixth tab.
-// D-25 puts connections HERE and not in the Control Room: the operator sets the allowed-set
-// and the platform lock; the user (an org admin) sets the preference. Self-fetching, so it
-// needs no page state and contributes nothing to the tab-level Save.
-import { ConnectionsTab } from "@/components/settings/ConnectionsTab"
-import {
-  CONNECTIONS_SECTION_DESCRIPTION,
-  CONNECTIONS_SECTION_TITLE,
-} from "@/components/settings/connectionsCopy"
+// ⚠ Phase 190-16's Connections tab and its two imports left this file on 2026-09-01 —
+// see `pages/ConnectionsPage.tsx`. D-25's ruling is UNCHANGED and travelled with it:
+// connections belong to the user (an org admin), not to the Control Room, which is why
+// the new page is ungoverned. What changed is only which door opens it.
 // Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
 // Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
 // shared context, and routes bounded user-facing labels through the term-map (D-04).
@@ -519,23 +514,24 @@ function AuditLogSection() {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 /**
- * ⚠ THREE OF THIS PAGE'S SIX TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
+ * ⚠ THREE OF THIS PAGE'S FIVE TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
  * BY ABSENCE. `GET /settings`, `PUT /settings` and the re-embed routes all carry
  * `require_visible("model_management")` (`api/settings.py:331,341,560,589`), which
  * `api/features.py:21` classifies Operators-only. Rendering AI Model, Search or
  * Integrations to a member offers a control whose every call is a 403 — the
  * locked/badged placeholder Phase 148 (sketch 069-A) explicitly rejected in favour of the
- * VANISH. Connections, Memory and Audit Log fetch through their own endpoints and stay.
+ * VANISH. Memory and Audit Log fetch through their own endpoints and stay.
  *
  * ⚠ THE MAP FAILS TO `{}`, WHICH IS WHY THE TEST IS `=== true` AND NOT A TRUTHINESS CHECK:
  * a blip must hide a governed tab, never flash one. Same rule `visibleNavItems` follows.
  *
- * `initialTab` is the ungoverned Connections door's pin (`ChatLayout`). It wins over the
- * persisted choice on mount and is then forgotten — a member who clicks Memory stays on
- * Memory. It is NOT a lock, and it is NOT a permission: the gate below is what decides
- * what exists, and the API is what decides what works.
+ * ⚠ `initialTab` IS GONE, AND SO IS ITS ONLY CALLER. It existed so the ungoverned
+ * Connections rail entry could mount THIS page pinned to tab "5". That pin is what made
+ * `Settings` and `Connections` two rail entries onto one page — the whole tab strip
+ * rendered either way, so an operator saw the duplicate. Connections now has its own
+ * page (`pages/ConnectionsPage.tsx`) and this page has one door again.
  */
-export function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
+export function SettingsPage() {
   const featuresCtx = useEffectiveFeaturesOptional()
   const canManageModels = featuresCtx?.features.model_management === true
   const featuresLoading = featuresCtx?.loading ?? false
@@ -562,18 +558,29 @@ export function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
   const [savedIntegrations, setSavedIntegrations] = useState(false)
 
   // Tab persistence
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    if (initialTab) return initialTab
-    return localStorage.getItem("settings_active_tab") ?? "0"
-  })
+  const [activeTab, setActiveTab] = useState<string>(
+    () => localStorage.getItem("settings_active_tab") ?? "0",
+  )
 
   // ⚠ A PERSISTED CHOICE CAN NAME A TAB THIS CALLER NO LONGER HAS. `settings_active_tab`
   // outlives a permission change, so an ex-operator (or anyone whose map has not resolved
   // yet) would land on a `TabsContent` with no trigger — a blank panel under a strip that
-  // does not mark anything active. Land them on Connections instead: it is the one tab
-  // every caller can use, and it is this page's only ungoverned door.
+  // does not mark anything active. Land them on Memory instead: with Connections moved to
+  // its own page (2026-09-01), Memory is the first tab every caller can still use.
+  //
+  // ⚠ "5" IS IN THIS LIST BECAUSE THE TAB IT NAMED IS GONE, NOT BECAUSE IT IS GOVERNED.
+  // A user who last used Connections has "5" persisted in localStorage; without this it
+  // would select nothing and render the same blank panel this guard exists to prevent.
+  // It is unconditional for that reason — an operator with "5" persisted needs the
+  // redirect exactly as much as a member does, which is why the check below tests it
+  // outside the `!canManageModels` arm.
   const MODEL_TABS = ["0", "1", "2"]
-  const effectiveTab = !canManageModels && MODEL_TABS.includes(activeTab) ? "5" : activeTab
+  const RETIRED_TABS = ["5"]
+  const effectiveTab =
+    RETIRED_TABS.includes(activeTab) ||
+    (!canManageModels && MODEL_TABS.includes(activeTab))
+      ? "3"
+      : activeTab
 
   function handleTabChange(value: string) {
     setActiveTab(value)
@@ -997,16 +1004,14 @@ export function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
                 ROUTING key — is unchanged (D-02a / no contract break). */}
             {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="1">{retrievalTabLabel}</TabsTrigger>}
             {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="2">Integrations</TabsTrigger>}
-            {/* Phase 190-16 (CONN-02 / D-25 / UI-SPEC §2a, U-01) — Connections.
-                ROUTING KEY "5" is the next FREE key, deliberately: appending renumbers
-                nothing, so every user's persisted `settings_active_tab` keeps pointing at
-                the tab they left. It is rendered VISUALLY FOURTH because Connections is
-                what Integrations is *about*, while Memory and Audit Log are unrelated —
-                and visual order is independent of the routing key, so this costs nothing.
-                ⚠ THE REVERSIBLE HALF (U-01): if the operator later prefers this tab LAST,
-                move ONLY this line. The routing key stays "5" either way — do NOT
-                renumber, exactly as the retrieval relabel above records for value="1". */}
-            <TabsTrigger className={SETTINGS_TAB_CLASS} value="5">Connections</TabsTrigger>
+            {/* ⚠ CONNECTIONS IS NO LONGER A TAB HERE (2026-09-01). It moved to its own
+                top-level page — `pages/ConnectionsPage.tsx` — because the ungoverned
+                `Connections` rail entry and the `model_management`-gated `Settings` entry
+                were two doors onto THIS page, distinguishable only by which tab was
+                pre-selected. An operator saw both. The routing key "5" is RETIRED, not
+                reused: a persisted `settings_active_tab` of "5" now falls through to the
+                guard below rather than selecting a tab that no longer exists.
+                Phase 190-16's note on never renumbering still governs 0-4. */}
             <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>
             <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>
           </TabsList>
@@ -1530,14 +1535,6 @@ export function SettingsPage({ initialTab }: { initialTab?: string } = {}) {
               no query-param and no route — the "route" IS this numeric key, persisted to
               localStorage. Do not add a router, a search-param reader or a navigate call
               to this page to reach this tab. */}
-          <TabsContent value="5">
-            <SectionCard
-              title={CONNECTIONS_SECTION_TITLE}
-              description={CONNECTIONS_SECTION_DESCRIPTION}
-            >
-              <ConnectionsTab />
-            </SectionCard>
-          </TabsContent>
         </Tabs>
 
       </div>

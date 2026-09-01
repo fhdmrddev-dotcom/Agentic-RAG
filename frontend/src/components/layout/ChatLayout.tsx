@@ -7,6 +7,7 @@ import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePan
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { LibraryPage } from "@/pages/LibraryPage"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { ConnectionsPage } from "@/pages/ConnectionsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
@@ -768,12 +769,17 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               onReviewEvals={onReviewEvals}
             />
           ) : activeView === "connections" ? (
-            // The ungoverned Connections door (`nav-items.ts`). It mounts the SAME
-            // SettingsPage pinned to the Connections tab, rather than a second copy of
-            // the surface — one home per concern. `initialTab` is a pin, not a lock: a
-            // member can still reach Memory and Audit Log from the tab strip, and the
-            // model_management tabs are absent for them there (SettingsPage decides).
-            <SettingsPage initialTab="5" />
+            // The ungoverned Connections door (`nav-items.ts`) — its OWN page since
+            // 2026-09-01, no longer `<SettingsPage initialTab="5" />`.
+            //
+            // ⚠ THE PIN WAS THE BUG. Mounting SettingsPage here rendered the whole tab
+            // strip either way, so `Settings` and `Connections` were two rail entries
+            // onto ONE page differing only by which tab was pre-selected — invisible to a
+            // member (whose Settings entry vanishes) and a plain duplicate for an
+            // operator, who sees both. The comment this replaces said as much:
+            // *"`initialTab` is a pin, not a lock"*. One home per concern now means one
+            // home, not one page wearing two labels. See `ConnectionsPage.tsx`.
+            <ConnectionsPage />
           ) : activeView === "settings" ? (
             <SettingsPage />
           ) : activeView === "workflows" ? (
