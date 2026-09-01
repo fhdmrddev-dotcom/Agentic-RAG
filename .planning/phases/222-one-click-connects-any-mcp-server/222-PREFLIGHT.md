@@ -122,3 +122,50 @@ these. Worth an explicit operator override if the order is deliberate; recorded 
 
 ⚠ Growth is the gate WORKING. `7127` includes `+2` from `BUG-260901-01`'s tests; a plan reading a
 larger number has read the correct current one.
+
+---
+
+# Post-execution review — plans 222-01 … 222-04
+
+Added as Gemini executed, so findings reach it in-phase rather than in a gap round.
+
+## Fence: CLEAN
+
+`222-01` (`lib/api/connectors.ts` + types), `222-02` (`connectionFormCopy.ts`,
+`servicesCatalog.ts`), `222-03` (sketch), `222-04` (`McpAuthDoor.tsx`,
+`ConnectionFormPanel.tsx`). **No crypto file, no seam file, no migration touched.**
+
+⚠ `222-05` writes `backend/tests/integration/test_222_mcp_oauth_seam.py` — a backend path, and
+**correctly so**: §3.1's un-mocked join test cannot live on one side of the fence by definition.
+Recorded so it is not later mistaken for a crossing.
+
+## ⭐ The prediction I got wrong, recorded because being wrong is the finding
+
+`§4` above named the `window.open` gesture as *"the likeliest silent failure"* in the built door.
+**It is not.** `McpAuthDoor.tsx:138` opens `about:blank` **synchronously, before any `await`**,
+and assigns `href` afterwards — the one pattern that survives a popup blocker — citing `BUS-049`.
+A reviewer's prediction is a hypothesis, and this one was falsified by the code.
+
+## ⚠ BUG-260901-02 — `config: {}` DESTROYS the registered client id (`BUS-053`)
+
+`handleOAuthConnect`'s edit arm sends `config: {}`; `update_connection` **replaces** the column
+(`connector_service.py:1041`). Driven:
+
+```
+ConnectorConnectionUpdate(name=…, mcp_server_url=…, config={})
+  → written to the config column: {"headers": {}}
+  → custom_client_id survives: False
+```
+
+⚠ **Notion's live row holds `bD78Ksp3xBJew1kL` right now.** Wiping it sends `/authorize` down its
+re-registration arm (`api/connectors.py:1171`), whose own comment says why that must not happen:
+*"re-registering on every Connect would mint a NEW application … a different `client_id` on the
+token than on the consent that authorised it."* Every press would orphan a registration at the
+vendor. **Not fixed by me — Gemini's file, and it is mid-execution.**
+
+## ⚠ BUG-260901-03 — a blocked popup succeeds silently
+
+Every use of `popup` is guarded by `if (popup)`, so when the blocker returns `null` the flow still
+creates/updates the connection, calls `/authorize`, **mints a single-use pending handle**, and then
+does nothing: no window, no message, `isAuthorizing` back to false. The correct guard is a refusal
+**before** the async work, so nothing is created for a window that cannot open.
