@@ -238,7 +238,11 @@ def test_an_egress_refusal_is_a_422_naming_its_reason_code_and_not_a_500(
         headers=HEADERS,
     )
     assert res.status_code == 422
-    assert "address_not_public" in res.json()["detail"]
+    # ⚠ KEYED ON THE FIELD, NOT ON CONTAINMENT (BUS-052). The old spelling was
+    # `"address_not_public" in res.json()["detail"]`, which passed against a plain SENTENCE and
+    # would keep passing if the structure regressed to one — the door reads
+    # `detail.reason_code` and nothing else.
+    assert res.json()["detail"]["reason_code"] == "address_not_public"
     assert called is False, "a refused destination must never reach the transport"
 
 
@@ -257,7 +261,11 @@ def test_a_redirect_is_a_refusal_and_never_an_open_door(
     ))
     res = router_client.post("/connectors/mcp/probe-auth", json={"server_url": SERVER}, headers=HEADERS)
     assert res.status_code == 422
-    assert "redirected" in res.json()["detail"]
+    # ⚠ KEYED ON THE FIELD, NOT ON CONTAINMENT (BUS-052). The old spelling was
+    # `"redirected" in res.json()["detail"]`, which passed against a plain SENTENCE and
+    # would keep passing if the structure regressed to one — the door reads
+    # `detail.reason_code` and nothing else.
+    assert res.json()["detail"]["reason_code"] == "redirected"
     assert "open" not in res.text
 
 
@@ -293,3 +301,67 @@ def test_an_unknown_field_in_the_request_is_refused(authorized, router_client):
         headers=HEADERS,
     )
     assert res.status_code == 422
+
+
+# ── BUS-052 — the refusal must carry its reason_code STRUCTURALLY, not in prose ────────
+
+
+def test_an_egress_refusal_carries_reason_code_as_an_object_the_door_can_parse(
+    authorized, monkeypatch, router_client
+):
+    """⭐ BUS-052 — THE REVIEWER'S OWN CONTRACT ERROR, PINNED SO IT CANNOT RECUR.
+
+    `BUS-047` promised the door *"HTTP 400 carrying the refusal `reason_code` from
+    egress.py's CLOSED six-code set"*. Both halves were wrong about what shipped: the
+    status is 422 (correct, and kept — a refusal is not a 400-shaped bad request), and the
+    `detail` was a plain English SENTENCE.
+
+    ⚠ THE SENTENCE IS WHY THIS IS A JOIN DEFECT RATHER THAN A COSMETIC ONE.
+    `frontend/src/lib/api/connectors.ts:59` (`readConnectorReasonCode`) returns the code
+    ONLY when `detail` is an object; given a string it returns `null`, and
+    `readConnectorFailure:43` yields `{reasonCode: null}`. So the closed six-code set could
+    not reach the door AT ALL, and `222-CONTEXT.md`'s `D-222-06` — *"render an explicit
+    warning alert using the closed refusal reason"* — was unbuildable except by
+    string-matching English. Each side green, the join dead: the Phase 204 shape exactly,
+    which is the failure `AGENTS.md` §3.1 says a split phase owes a test against.
+
+    ⚠ THE STATUS IS DELIBERATELY UNCHANGED AT 422. `BUS-047`'s `400` was the error; the
+    shipped code was right. Correcting the message toward the promise, rather than the
+    promise toward the message, would have moved a status the sibling test already pins for
+    a semantic reason: 422 means *"we would not go there"*, a 200 with `kind="token"` means
+    *"it wants a credential"*.
+
+    ⚠ AND THE SHAPE IS THE ONE THIS FILE'S OWN MODULE ALREADY USES — `update_grants` and
+    `_CHECK_NOTHING_TO_CHECK` both answer `{"reason_code": …, "message": …}`. `probe-auth`
+    was the odd one out, which is the part no reviewer noticed because each route reads
+    correctly on its own.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("a refused destination must never reach the transport")
+
+    real_client_cls = httpx.AsyncClient
+
+    class _TransportInjected(real_client_cls):
+        def __init__(self, *a, **kw):
+            kw["transport"] = httpx.MockTransport(handler)
+            super().__init__(*a, **kw)
+
+    monkeypatch.setattr(disc.httpx, "AsyncClient", _TransportInjected)
+
+    res = router_client.post(
+        "/connectors/mcp/probe-auth",
+        json={"server_url": "https://127.0.0.1/mcp"},
+        headers=HEADERS,
+    )
+
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    # ⚠ THE `isinstance` IS THE ASSERTION, not decoration. A string body satisfies every
+    # `in`-based check below by accident — `"address_not_public" in "...address_not_public"`
+    # is True — so a test written without it passes against the exact defect it exists to
+    # catch. This is the same trap `SEED-190`'s `isinstance(raw, dict)` guard records.
+    assert isinstance(detail, dict), f"detail must be an object the door can parse, got {type(detail).__name__}"
+    assert detail["reason_code"] == "address_not_public"
+    # The sentence survives — it is what a person reads; the code is what the door branches on.
+    assert isinstance(detail.get("message"), str) and detail["message"].strip()

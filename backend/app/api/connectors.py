@@ -1060,9 +1060,27 @@ async def probe_mcp_server_auth(
         # raises `AttributeError` INSIDE the handler and converts a clean 422 into a 500.
         # `discover_tools_from_url` above does exactly that at its own `except` and is
         # reported rather than patched here — it is Phase 212's route, not this one's.
+        #
+        # ⚠ AN OBJECT, NOT A SENTENCE (BUS-052) — and this was MY contract error, corrected
+        # toward the promise rather than the promise toward it. `BUS-047` told the door it
+        # would receive the `reason_code` from the CLOSED six-code set; this raised a plain
+        # string, and `lib/api/connectors.ts:59` (`readConnectorReasonCode`) returns the code
+        # ONLY for an object — `null` for a string. So the enumeration could not reach the
+        # door AT ALL, and a door branching on it would have had to string-match English.
+        # Each side green, the join dead: the Phase 204 shape §3.1 warns a split phase about.
+        #
+        # ⚠ THE STATUS STAYS 422 — `BUS-047`'s `400` was the wrong half of that sentence. The
+        # sibling test pins 422 for a SEMANTIC reason: it means *"we would not go there"*,
+        # while a 200 with `kind="token"` means *"it wants a credential"*.
+        #
+        # The shape is the one this module already uses at `update_grants` and
+        # `_CHECK_NOTHING_TO_CHECK`; `probe-auth` was the only route spelling it differently.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Connection refused by security policy: {exc.reason_code}",
+            detail={
+                "reason_code": exc.reason_code,
+                "message": f"Connection refused by security policy: {exc.reason_code}",
+            },
         ) from exc
     except EgressResponseTooLarge as exc:
         raise HTTPException(
