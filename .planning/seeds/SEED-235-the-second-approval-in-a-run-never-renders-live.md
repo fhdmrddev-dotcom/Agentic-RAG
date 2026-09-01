@@ -3,7 +3,7 @@ seed_id: SEED-235
 title: "The SECOND approval pause in one chat run never renders live — the run parks in runs:active forever, with no error and no assistant message, and a page reload is the only way to see it"
 created: 2026-09-01
 planted_during: Phase 221 — driving a two-write Google chain through chat with real approvals
-status: planted
+status: closed
 surface: Agentic-RAG
 severity: high
 category: chat / approval-model / realtime-reconcile
@@ -21,6 +21,25 @@ trigger_when:
 ---
 
 # SEED-235 — the run was never dead; nobody could see the question
+
+> ✅ **CLOSED 2026-09-01, same day, fixed and proven live.** Root cause was NOT the SSE
+> transport: the event arrived. `ChatToolApprovalCard` held its decision in untagged local
+> state, and the message carries a SINGLE `toolApproval` slot — so the second
+> `tool_approval_required` replaced the first on the SAME mounted component and React kept
+> the first decision. The card rendered the new question as already answered and
+> `handleDecision` early-returned on the stale value. **Every piece of that state is now
+> tagged with the `callId` it belongs to.** Three tests driven RED against the shipped
+> defect, plus a COUNTERWEIGHT proving a settled card does not flicker back into a question
+> — that overcorrection was driven RED too and fails eight tests. **Live proof: one chat
+> turn, two approvals, NO RELOAD, both writes committed** — the Doc
+> `AGENTIC-RAG UAT 221 seed235` reads `second approval rendered`.
+>
+> ⚠ **THE DIAGNOSIS IN THIS SEED'S BODY BELOW IS KEPT AS WRITTEN AND IS PARTLY WRONG.** It
+> blamed a missing fetch reconcile (D-v2.5-03). That was the natural reading — a reload
+> fixed it — but the reload worked because it produced a FRESH MOUNT, not because it
+> re-fetched. The evidence was equally consistent with both, and only reading the component
+> separated them. Recorded rather than overwritten, because "a reload fixes it" pointing at
+> the wrong layer is the trap worth remembering.
 
 ## Reproduced end to end, 2026-09-01
 

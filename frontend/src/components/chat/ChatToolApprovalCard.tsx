@@ -106,12 +106,53 @@ export function ChatToolApprovalCard({
   approval,
   onDecision,
 }: ChatToolApprovalCardProps) {
-  const [submitting, setSubmitting] = useState(false)
-  const [decisionState, setDecisionState] = useState<ApprovalDecision | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  /** Set only when "Always" let the call through but could NOT change the setting. */
-  const [grantProblem, setGrantProblem] = useState<string | null>(null)
-  const [argsExpanded, setArgsExpanded] = useState(false)
+  /**
+   * ⛔ EVERY PIECE OF THIS CARD'S STATE IS TAGGED WITH THE CALL IT BELONGS TO, AND THAT IS
+   * A SAFETY PROPERTY RATHER THAN TIDINESS.
+   *
+   * ── SEED-235, reproduced 2026-09-01 ────────────────────────────────────────────────
+   * A run may pause TWICE. One chat turn chained `create_doc` then `append_to_doc`; the
+   * message carries a single `toolApproval` slot, so the second `tool_approval_required`
+   * REPLACED the first on the same mounted component. React kept the instance, and with
+   * it the first decision — so the second question rendered as `append_to_doc · Approved`
+   * with no controls, and `handleDecision` early-returned on the stale `decisionState`
+   * even if something had clicked.
+   *
+   * **The run did not die. Nobody could see the question.** It sat in `runs:active` with
+   * no error and no assistant message — indistinguishable from a dead run, which is how it
+   * was reported. The server was correct throughout: its buffer ended on
+   * `tool_approval_required`, waiting. A page reload (a fresh mount, hence fresh state)
+   * rendered the card, and approving finished the run.
+   *
+   * ── WHY THE STATE IS TAGGED HERE RATHER THAN KEYED AT THE MOUNT ────────────────────
+   * `key={approval.callId}` on the one mount site would also work, and is the idiomatic
+   * React answer. It is NOT what shipped, because it puts the guarantee in the CALLER: a
+   * second mount site added later reintroduces the defect silently, and no test on this
+   * component could see it. Tagged here, the property holds wherever this card is mounted
+   * and is asserted by the suite that lives beside it. One mechanism, one home.
+   *
+   * ⚠ IT KEYS ON `callId`, NOT ON PROP IDENTITY. Resetting on any prop change would make a
+   * SETTLED card flicker back into a question on an unrelated re-render — inviting a second
+   * decision on a call already decided, which is a worse bug than the one being fixed. The
+   * suite drives that counterweight explicitly.
+   */
+  const [settled, setSettled] = useState<{
+    callId: string
+    submitting: boolean
+    decision: ApprovalDecision | null
+    error: string | null
+    /** Set only when "Always" let the call through but could NOT change the setting. */
+    grantProblem: string | null
+  } | null>(null)
+  const [expandedFor, setExpandedFor] = useState<string | null>(null)
+
+  // ⚠ Read through the tag, ALWAYS. A direct read of `settled` is the defect.
+  const mine = settled?.callId === approval.callId ? settled : null
+  const submitting = mine?.submitting ?? false
+  const decisionState = mine?.decision ?? null
+  const error = mine?.error ?? null
+  const grantProblem = mine?.grantProblem ?? null
+  const argsExpanded = expandedFor === approval.callId
 
   // No connection id means no row to change — an older paused run, or an event from
   // before the field existed. The button is not rendered rather than rendered broken.
@@ -128,9 +169,8 @@ export function ChatToolApprovalCard({
 
   async function handleDecision(decision: ApprovalDecision) {
     if (submitting || decisionState) return
-    setSubmitting(true)
-    setError(null)
-    setGrantProblem(null)
+    const callId = approval.callId
+    setSettled({ callId, submitting: true, decision: null, error: null, grantProblem: null })
     try {
       const res = await submitToolApproval(threadId, approval.callId, decision, {
         connectionId: approval.connectionId,
@@ -139,15 +179,27 @@ export function ChatToolApprovalCard({
       // ⚠ THE TWO HALVES ARE READ SEPARATELY. `status: "ok"` means the run was released;
       // it says nothing about whether the grant was written, and collapsing them would
       // tell someone their setting changed when it did not.
-      if (decision === "always" && res.grant_persisted === false) {
-        setGrantProblem(res.grant_problem || GRANTS_COPY.ASK_ALWAYS_NOTE)
-      }
-      setDecisionState(decision)
+      // ⚠ ONE WRITE, carrying the tag. Two separate setters could interleave with a
+      // second approval arriving mid-flight and land half this decision on the next call.
+      setSettled({
+        callId,
+        submitting: false,
+        decision,
+        error: null,
+        grantProblem:
+          decision === "always" && res.grant_persisted === false
+            ? res.grant_problem || GRANTS_COPY.ASK_ALWAYS_NOTE
+            : null,
+      })
       onDecision?.(decision)
     } catch (err: any) {
-      setError(err.message || "Failed to submit decision")
-    } finally {
-      setSubmitting(false)
+      setSettled({
+        callId,
+        submitting: false,
+        decision: null,
+        error: err.message || "Failed to submit decision",
+        grantProblem: null,
+      })
     }
   }
 
@@ -237,7 +289,9 @@ export function ChatToolApprovalCard({
             <button
               type="button"
               data-testid="approval-args-toggle"
-              onClick={() => setArgsExpanded((open) => !open)}
+              onClick={() =>
+                setExpandedFor((open) => (open === approval.callId ? null : approval.callId))
+              }
               className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               {argsExpanded ? (

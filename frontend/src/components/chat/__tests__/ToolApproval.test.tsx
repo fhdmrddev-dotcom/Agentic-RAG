@@ -307,3 +307,100 @@ describe("ChatToolApprovalCard — quiet by default", () => {
     expect(card.textContent!.length).toBeLessThan(600)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SEED-235 — the SECOND approval in one run
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⛔ THIS IS THE LOAD-BEARING BLOCK IN THIS FILE. It is not a rendering nicety: when this
+// property is false a run PARKS FOREVER. The server asks a second question, the card keeps
+// the FIRST decision's word, no controls are offered, and `handleDecision` early-returns on
+// the stale `decisionState` even if something did click. The run sits in `runs:active` with
+// no error and no assistant message — indistinguishable from a dead run, which is exactly
+// how it was reported.
+//
+// REPRODUCED 2026-09-01: one chat turn chained `create_doc` then `append_to_doc`. The first
+// approval worked. The second rendered as `append_to_doc · Approved` with no buttons. The
+// run's Redis buffer ended on `tool_approval_required` — the server was waiting correctly.
+// A page reload (fresh mount, fresh state) rendered the card and approving finished the run.
+describe("ChatToolApprovalCard — a NEW call_id is a NEW question", () => {
+  const first = {
+    callId: "call_first",
+    connectionId: "conn-1",
+    serviceId: "google",
+    serviceName: "Google Workspace",
+    toolName: "create_doc",
+    args: { title: "Q3 report" },
+  }
+  const second = {
+    ...first,
+    callId: "call_second",
+    toolName: "append_to_doc",
+    args: { document_id: "1abc", content: "written through chat" },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(api.submitToolApproval).mockResolvedValue({
+      status: "ok",
+      call_id: "call_first",
+      decision: "allow",
+      grant_persisted: true,
+    } as any)
+  })
+
+  it("⭐ after deciding, a DIFFERENT call_id offers its buttons again", async () => {
+    const { rerender } = render(<ChatToolApprovalCard threadId="t-1" approval={first} />)
+
+    fireEvent.click(screen.getByTestId("approval-allow-btn"))
+    await waitFor(() => expect(screen.queryByTestId("approval-allow-btn")).toBeNull())
+
+    // The run continues and asks about the NEXT tool call.
+    rerender(<ChatToolApprovalCard threadId="t-1" approval={second} />)
+
+    expect(screen.getByTestId("approval-allow-btn")).toBeDefined()
+    expect(screen.getByTestId("approval-reject-btn")).toBeDefined()
+  })
+
+  it("⭐ the second question does not wear the first answer's word", async () => {
+    const { rerender } = render(<ChatToolApprovalCard threadId="t-1" approval={first} />)
+    fireEvent.click(screen.getByTestId("approval-allow-btn"))
+    await waitFor(() => expect(screen.getByTestId("tool-approval-card-call_first").textContent)
+      .toContain("Approved"))
+
+    rerender(<ChatToolApprovalCard threadId="t-1" approval={second} />)
+
+    const card = screen.getByTestId("tool-approval-card-call_second")
+    expect(card.textContent).not.toContain("Approved")
+    expect(card.textContent).toContain("append_to_doc")
+  })
+
+  it("⭐ the second question is ANSWERABLE — a stale decision must not gate the submit", async () => {
+    // ⚠ `handleDecision` early-returns on `submitting || decisionState`. A card that
+    // rendered its buttons but refused to act on them would pass the two tests above and
+    // still park the run, so the submit is driven rather than the DOM inspected.
+    const { rerender } = render(<ChatToolApprovalCard threadId="t-1" approval={first} />)
+    fireEvent.click(screen.getByTestId("approval-allow-btn"))
+    await waitFor(() => expect(api.submitToolApproval).toHaveBeenCalledTimes(1))
+
+    rerender(<ChatToolApprovalCard threadId="t-1" approval={second} />)
+    fireEvent.click(screen.getByTestId("approval-allow-btn"))
+
+    await waitFor(() => expect(api.submitToolApproval).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.submitToolApproval).mock.calls[1][1]).toBe("call_second")
+  })
+
+  it("the SAME call_id keeps its settled state — this must not reset on every render", async () => {
+    // ⚠ The counterweight. Resetting on any prop change would make a settled card flicker
+    // back into a question on an unrelated re-render, which is a worse bug than the one
+    // being fixed: it would invite a second decision on a call already decided.
+    const { rerender } = render(<ChatToolApprovalCard threadId="t-1" approval={first} />)
+    fireEvent.click(screen.getByTestId("approval-allow-btn"))
+    await waitFor(() => expect(screen.queryByTestId("approval-allow-btn")).toBeNull())
+
+    rerender(<ChatToolApprovalCard threadId="t-1" approval={{ ...first }} />)
+
+    expect(screen.queryByTestId("approval-allow-btn")).toBeNull()
+    expect(screen.getByTestId("tool-approval-card-call_first").textContent).toContain("Approved")
+  })
+})
