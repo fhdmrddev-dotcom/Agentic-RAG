@@ -56,8 +56,29 @@ class McpClient:
         self.timeout = timeout
 
     @staticmethod
-    def _build_auth_headers(secret: str | None) -> dict[str, str]:
-        """Format authentication header based on credential shape."""
+    def _build_auth_headers(secret: str | None, auth_scheme: str = "auto") -> dict[str, str]:
+        """Format the authorization header for a stored credential.
+
+        ⚠ `auth_scheme` EXISTS BECAUSE THE GUESS BELOW SILENTLY BROKE A VALID TOKEN, and the
+        failure is worth recording because it looked like a credential problem and was not.
+
+        The `":" in secret` arm treats any colon-bearing string as a `user:token` Basic pair —
+        right for a Jira `email:api_token`, and WRONG for an OAuth access token that merely
+        happens to contain a colon. Notion's does. Measured live 2026-09-01: a freshly minted,
+        entirely valid Notion OAuth token was base64'd into `Basic …`, and the server answered
+        `401 invalid_token`. Driving the SAME token with an explicit `Bearer` header returned
+        **HTTP 200**, so the credential was never the problem — the inference about it was.
+
+        ⚠ THE DIAGNOSIS IT INVITES IS THE EXPENSIVE PART. `invalid_token` reads as *"your
+        credential is wrong"*, which sends somebody to re-authorize, re-consent, or hunt for a
+        scope — and every one of those would have produced another token containing a colon
+        and failed identically. A heuristic that is wrong 5% of the time costs more than one
+        that is absent, because it answers confidently.
+
+        So a caller that KNOWS the scheme now says so. `auto` keeps the historical behaviour
+        byte-for-byte, because the pasted-credential path genuinely cannot know and its
+        existing rows depend on the guess.
+        """
         headers: dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
@@ -69,6 +90,19 @@ class McpClient:
         if not clean_secret:
             return headers
 
+        # An explicit scheme wins outright — no inspection of the value at all. This is the
+        # OAuth path (`token_type` came from the authorization server, so it is KNOWN).
+        if auth_scheme == "bearer":
+            headers["Authorization"] = f"Bearer {clean_secret}"
+            return headers
+        if auth_scheme == "basic":
+            encoded = base64.b64encode(clean_secret.encode("utf-8")).decode("ascii")
+            headers["Authorization"] = f"Basic {encoded}"
+            return headers
+
+        # `auto` — unchanged, and deliberately so: every shipped `static_key` row was stored
+        # against exactly these rules, so tightening them here would break connections that
+        # work today in order to fix a path that now declares itself instead.
         if clean_secret.lower().startswith("bearer "):
             headers["Authorization"] = clean_secret
         elif clean_secret.lower().startswith("basic "):
@@ -218,6 +252,7 @@ class McpClient:
         params: dict[str, Any] | None = None,
         secret: str | None = None,
         timeout: float | None = None,
+        auth_scheme: str = "auto",
     ) -> dict[str, Any]:
         """Validate destination against SSRF and execute a JSON-RPC 2.0 call."""
         # SSRF Guard (D-206-04 / T-206-01 / D-v2.5-01 / SEC-2)
@@ -229,7 +264,7 @@ class McpClient:
         target_url = str(parsed_target.copy_with(host=pinned.ip)) if pinned and getattr(pinned, "ip", None) else server_url
         server_hostname = getattr(pinned, "hostname", None) or parsed_target.host
 
-        headers = self._build_auth_headers(secret)
+        headers = self._build_auth_headers(secret, auth_scheme)
         if server_hostname:
             headers["Host"] = server_hostname
 
@@ -278,6 +313,7 @@ class McpClient:
         server_url: str,
         secret: str | None = None,
         timeout: float = DEFAULT_DISCOVERY_TIMEOUT,
+        auth_scheme: str = "auto",
     ) -> list[dict[str, Any]]:
         """Query remote MCP server for available tools via tools/list.
 
@@ -295,6 +331,7 @@ class McpClient:
             params={},
             secret=secret,
             timeout=timeout,
+            auth_scheme=auth_scheme,
         )
 
         raw_tools = result.get("tools") or []
@@ -363,6 +400,7 @@ class McpClient:
         arguments: dict[str, Any],
         secret: str | None = None,
         timeout: float = DEFAULT_MCP_TIMEOUT,
+        auth_scheme: str = "auto",
     ) -> dict[str, Any]:
         """Invoke a tool on the remote MCP server via tools/call.
 
@@ -379,6 +417,7 @@ class McpClient:
             params=params,
             secret=secret,
             timeout=timeout,
+            auth_scheme=auth_scheme,
         )
 
         # MCP spec returns content: list[TextContent | ImageContent | EmbeddedResource]
@@ -410,6 +449,7 @@ async def list_tools(
     server_url: str,
     secret: str | None = None,
     timeout: float = DEFAULT_DISCOVERY_TIMEOUT,
+    auth_scheme: str = "auto",
 ) -> list[dict[str, Any]]:
     """⚠ `timeout` is NOT optional decoration — `connectors.py:760` passes it by keyword.
 
@@ -423,7 +463,9 @@ async def list_tools(
     signature INVENTED the parameter the real function lacked. A mock that does not match the
     thing it replaces proves only that the caller is self-consistent.
     """
-    return await default_mcp_client.list_tools(server_url, secret=secret, timeout=timeout)
+    return await default_mcp_client.list_tools(
+        server_url, secret=secret, timeout=timeout, auth_scheme=auth_scheme
+    )
 
 
 async def call_tool(
@@ -431,5 +473,8 @@ async def call_tool(
     tool_name: str,
     arguments: dict[str, Any],
     secret: str | None = None,
+    auth_scheme: str = "auto",
 ) -> dict[str, Any]:
-    return await default_mcp_client.call_tool(server_url, tool_name, arguments, secret=secret)
+    return await default_mcp_client.call_tool(
+        server_url, tool_name, arguments, secret=secret, auth_scheme=auth_scheme
+    )

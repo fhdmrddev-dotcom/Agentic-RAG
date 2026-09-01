@@ -244,6 +244,21 @@ class ResolvedConnection:
     #: the verb to go on. Optional because rows created before migration 127 may carry
     #: none, and a missing service simply falls back to the capability descriptor alone.
     service_id: str | None = None
+    #: How the credential must be presented — `auto`, `bearer` or `basic`.
+    #:
+    #: ⚠ IT IS RESOLVED HERE RATHER THAN GUESSED AT THE TRANSPORT, and the reason is a
+    #: measured defect. `mcp_client._build_auth_headers` infers the scheme from the STRING:
+    #: anything containing a colon is treated as a `user:token` Basic pair, which is right
+    #: for a Jira `email:api_token` and wrong for an OAuth access token that merely happens
+    #: to contain one. Notion's does. Driven live 2026-09-01 — a valid, freshly minted token
+    #: was base64'd into `Basic` and the server answered `401 invalid_token`; the SAME token
+    #: with an explicit `Bearer` returned HTTP 200 and 41 tools.
+    #:
+    #: The resolver KNOWS which it is, because it knows where the credential came from. A
+    #: transport cannot know, and `invalid_token` is the worst possible thing to guess wrong
+    #: about — it reads as *"your credential is bad"* and sends somebody to re-consent, which
+    #: mints another colon-bearing token and fails identically.
+    auth_scheme: str = "auto"
     default_approval_posture: str = "ask"
     tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
@@ -596,6 +611,31 @@ async def read_oauth_client_secret(connection_id: str, org_id: str) -> str | Non
 # Fernet call to `ResolvedConnection.secret` instead. Both D-11 read gates stay EAGER, so
 # nothing about the fail-closed property moved.
 # ══════════════════════════════════════════════════════════════════════════════════════════
+async def read_oauth_access_token(connection_id: str) -> str | None:
+    """The live OAuth access token for a connection, or `None` if it has never consented.
+
+    ⚠ SERVICE CLIENT, DELIBERATELY. `connector_tokens.access_token_ciphertext` is ungranted
+    to `authenticated` (migration 129 §4) — that is the whole point of the column — so a
+    user-JWT read cannot name it. Migration 151 added the row-level policy that makes the
+    NON-secret columns readable; the ciphertext stays unreachable to a member either way.
+
+    Returns the PLAINTEXT token. Callers hand it straight to the transport and never log it.
+    """
+    from app.services.oauth_service import decrypt_token_value
+
+    res = await aexec(
+        _client(None)
+        .table("connector_tokens")
+        .select("access_token_ciphertext")
+        .eq("connection_id", str(connection_id))
+        .limit(1)
+    )
+    if not res.data:
+        return None
+    ciphertext = res.data[0].get("access_token_ciphertext")
+    return decrypt_token_value(ciphertext) if ciphertext else None
+
+
 async def resolve_connection(
     connection_id: str,
     org_id: str,
@@ -735,6 +775,27 @@ async def resolve_connection(
         "connector_service: resolved connection %s (capability=%s, config keys=%s)",
         connection_id, row.get("capability"), sorted(dict(row.get("config") or {})),
     )
+
+    # ⚠ A LIVE OAUTH TOKEN WINS OVER A STORED STATIC SECRET, and the ordering is the fix.
+    # A row that has completed consent may STILL carry the pasted credential somebody tried
+    # first — Notion's does, and that credential is precisely the one the server refuses with
+    # `403 restricted_resource`. Preferring the stored secret would mean a connection that
+    # just authorized successfully keeps failing with the error it authorized to escape.
+    #
+    # ⚠ SCOPED BY THE ROW WE ALREADY RESOLVED FOR THIS ORG. The lookup is by `connection_id`
+    # alone, and it is safe for one reason worth stating rather than assuming: we are past
+    # `fetch(connection_id, org_id)`, so this connection is already proven to belong to the
+    # caller's org. A token cannot be read for a connection the caller could not resolve.
+    resolved_scheme = "auto"
+    oauth_token = await read_oauth_access_token(connection_id)
+    if oauth_token:
+        # Re-encrypt under the SAME cipher the lazy `.secret` property decrypts with, so the
+        # object keeps its one invariant: the plaintext is never held on the dataclass.
+        from app.services.oauth_service import encrypt_token_value
+
+        raw = encrypt_token_value(oauth_token)
+        resolved_scheme = "bearer"
+
     return ResolvedConnection(
         connection_id=str(row["id"]),
         org_id=str(row["org_id"]),
@@ -744,6 +805,7 @@ async def resolve_connection(
         config=dict(row.get("config") or {}),
         secret_ciphertext=raw,
         mcp_server_url=row.get("mcp_server_url"),
+        auth_scheme=resolved_scheme,
         default_approval_posture=str(row.get("default_approval_posture") or "ask"),
         tool_grants=dict(row.get("tool_grants") or {}),
         discovered_tools=list(row.get("discovered_tools") or []),
@@ -1060,7 +1122,12 @@ async def discover_connection_tools(
 
     if resolved.mcp_server_url:
         from app.services import mcp_client
-        tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
+        tools = await mcp_client.list_tools(
+            resolved.mcp_server_url,
+            secret=resolved.secret,
+            # The resolver knows where this credential came from; the transport cannot.
+            auth_scheme=resolved.auth_scheme,
+        )
     elif resolved.capability:
         # ⚠ Function-local import, for the reason `create_connection` states: `descriptors.py`
         # reaches the adapter registry, and the source fence keeps that out of the cold import

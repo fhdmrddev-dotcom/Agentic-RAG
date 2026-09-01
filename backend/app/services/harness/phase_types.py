@@ -2812,6 +2812,8 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
                 tool_name=tool_name,
                 arguments=final_args,
                 secret=connection.secret,
+                # Resolved, not guessed — see ResolvedConnection.auth_scheme.
+                auth_scheme=connection.auth_scheme,
             )
         except Exception as exc:
             logger.warning("206: MCP tool %r execution failed: %s", tool_name, exc)

@@ -4498,6 +4498,8 @@ async def _handle_connector_chat_tool(
                 tool_name=action_tool_name,
                 arguments=args,
                 secret=resolved_conn.secret,
+                # Resolved, not guessed — see ResolvedConnection.auth_scheme.
+                auth_scheme=resolved_conn.auth_scheme,
             )
             # ⚠ `isError` IS THE SERVER SAYING NO, and reading only `text` treats its refusal
             # as its answer — the same shape as the "Executed …" lie one level up.
