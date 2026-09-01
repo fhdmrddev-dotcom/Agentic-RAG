@@ -94,3 +94,7 @@ scripts/pm-pack/out/
 
 # Local LiteLLM proxy config — holds real provider keys. Template: litellm-config.example.yaml
 litellm-config.yaml
+
+# Held two live provider keys in plaintext (committed at e5977a244, revoked 2026-09-01).
+# Never re-add: provider keys belong in .env / litellm-config.example.yaml placeholders.
+LLM_SWITCHING_GUIDE.md
