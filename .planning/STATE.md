@@ -33,12 +33,35 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 216 — Connections in Chat, and One File In by Hand (COMPLETED & VERIFIED)
+**Current focus:** Phase 222 — One Click Connects Any MCP Server (COMPLETE & DRIVEN 2026-09-02; one manual BYO connect OWED)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-📌 **222 IS SPLIT AND HANDED OVER (2026-09-01) — `BUS-045` to Gemini, `BUS-046` to the operator.**
+✅ **222 IS COMPLETE AND DRIVEN IN A BROWSER (2026-09-02).** Both halves shipped: Gemini's five
+door plans + Claude's crypto. ⭐ **Notion connects by OAuth with NO developer console** — RFC 7591
+self-registration — and returns **41 tools for zero lines of tool code**. **The un-mocked join
+§3.1 demanded was DRIVEN**, browser → route → live internet, and all four `kind` values were
+observed on real servers: DeepWiki `open`, Notion `oauth`/DCR, **GitHub `oauth`/BYO**, loopback
+`422` with a structured `reason_code`. ⭐ **Four independent vendors reach one generic door with no
+vendor entry anywhere** (Notion, GitHub, Linear, Sentry). Full record:
+`.planning/phases/222-one-click-connects-any-mcp-server/222-VERIFICATION.md`.
+
+⛔ **OWED, AND IT NEEDS A HUMAN: no BYO connect has ever completed end to end.** GitHub answers
+`registration_required: true`, so that arm is a path the operator will walk; it needs real GitHub
+OAuth credentials and was not clicked on a live row unattended. Pinned by test only.
+
+⚠ **SC#7 IS PARTLY UNMET AND IT IS NOT A DEFECT.** Atlassian Rovo answers `kind: "token"` at BOTH
+documented endpoints — it advertises no authorization server, so RFC 9728 has nothing to read and
+**no code change would connect it by OAuth**. The criterion's premise ("both are OAuth-only") is
+false for Rovo as served today. The door falls back correctly, which is SC#5 working.
+
+⚠ **THE REVIEWER TOOK TWO FENCE EXCEPTIONS**, both operator-approved in spirit by the BUS-051
+precedent and both recorded (`BUS-051`, `BUS-053`/`c0eaeef0f`): the grants boolean seed, and the
+dead BYO submit arm. ⭐ **`tsc` had named the second one three times** (`TS2367`, 81 vs a 66
+baseline) and nobody read it.
+
+📌 **HOW IT WAS SPLIT (2026-09-01) — `BUS-045` to Gemini, `BUS-046` to the operator.**
 Gemini builds **the door** (connect surface, catalog entry, states, copy) and runs
 discuss/plan/execute on it; Claude builds **the crypto** (PKCE join, RFC 9728/8414 discovery,
 pinned egress, token storage). ⚠ **This is a §3.1 OVERRIDE, recorded rather than silent:** 222
@@ -63,8 +86,7 @@ Protected Resource Metadata discovery; **we already have PKCE (`oauth_service.py
 client has never called it** — the two halves are built and have never been introduced. Today
 every MCP service needs a token minted by hand in someone else's console, which is the step real
 users abandon. Scope, cost anchors and the sequence that follows: **`SEED-237`** (and `SEED-177`,
-whose "OAuth per vendor is wrong" correction is the premise). ⚠ Start with `/gsd:discuss-phase 222`
-— and read `221-CARRY-FORWARD.md` first, section C4 especially.
+whose "OAuth per vendor is wrong" correction is the premise). ✅ **DONE** — see the verification above.
 
 📌 **PHASE 221 CLOSED 2026-09-01. EVERYTHING NOT DONE IS CAPTURED IN ONE PLACE:**
 **`.planning/phases/221-six-applications-one-token/221-CARRY-FORWARD.md`** — six sections, every
