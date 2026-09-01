@@ -10,6 +10,7 @@ progress:
   completed_phases: 8
   total_plans: 75
   completed_plans: 74
+  # + SEED-235 fixed out-of-phase (chat approval card)
   percent: 62
 ---
 
@@ -63,8 +64,16 @@ only `/health`. The server is right — the run's Redis buffer ends exactly on
 finished the run** (3 steps, both writes landed). That accounts for every part of the recorded
 symptom: `error = NULL` (nothing failed), an empty assistant message (the turn never completed)
 and "cancelled itself" (a run showing no question and never moving looks dead). This is
-D-v2.5-03 broken on the approval surface. **NOT fixed here** — a new defect on a surface with
-its own design bar (G-2/G-4), and it deserves its own scope.
+✅ **FIXED THE SAME DAY (`ff7ad28ad`), and the first diagnosis was WRONG.** It was NOT the SSE
+transport and NOT a missing fetch reconcile: the event always arrived. A message carries ONE
+`toolApproval` slot, so the second event replaced the first on the SAME mounted card; React kept
+the instance and its decision, so the new question rendered as already answered and
+`handleDecision` early-returned on the stale value. **The reload worked because it was a fresh
+MOUNT, not because it re-fetched** — the evidence fitted both readings and only reading the
+component separated them. Every piece of the card's state is now tagged with the `callId` it
+belongs to. Three tests RED against the defect, one COUNTERWEIGHT against the overcorrection
+(which fails eight tests when planted). **Live: one turn, two approvals, NO RELOAD, both writes
+committed** — `AGENTIC-RAG UAT 221 seed235` reads `second approval rendered`.
 
 ✅ **The chat write chain is PROVEN**: one turn chained `create_doc` → `append_to_doc`, each with
 its own approval pause and an honest payload preview, both committed to the real account.
@@ -77,7 +86,8 @@ console, not mine to change. One step: disable Sheets, press Check, confirm only
 ⚠ **ARTEFACTS LEFT IN THE OPERATOR'S GOOGLE ACCOUNT, all named `AGENTIC-RAG UAT 221`:** one Doc,
 two Drive files, one Sheet, **one unsent Gmail draft**, **five calendar events** (2026-09-05,
 09-06, 09-08 ×2, 09-09), one contact, and `AGENTIC-RAG UAT 221 chat chain` (the chat-driven
-Doc). Nothing sent, shared or deleted. Search the marker to bin them.
+Doc), and `AGENTIC-RAG UAT 221 seed235` (the SEED-235 proof). Nothing sent, shared or deleted.
+Search the marker to bin them.
 
 ⚠ **`uvicorn --reload` HANGS on this backend.** WatchFiles logs *"Reloading..."* and no *"Started
 server process"* follows, so the pre-edit worker keeps serving. Every verification in this session
