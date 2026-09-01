@@ -6836,3 +6836,140 @@ or `deny` for a write, but **never `allow`**. Only an explicit per-action grant 
 Built and tested against a PLANTED write spec, because no Google write tool exists yet — the rule
 must exist before the first write does, not be retrofitted onto a shipped Allow that already
 cascades.
+
+---
+
+## `backend/app/services/google/availability.py`
+
+**0 / 0 / 277 · young (Phase 221 plan 02).** The per-application probe: given a connection and
+its stored scopes, one verdict per Google application.
+
+**Why it exists.** On 2026-08-31 three of six Google applications were switched off in the
+Cloud project and the connection panel said nothing about any of them; the only way to find out
+was to run a tool in chat and read the refusal.
+
+**The binding invariants.**
+
+- **THREE STATES BECAUSE THEIR REMEDIES ARE OPPOSITE.** `api_off` is a console visit where
+  reconnecting is useless; `scope_missing` is a re-consent where the console is useless.
+  Collapsing them reproduces the measured defect where an operator was told to re-consent
+  scopes that were already correct.
+- **NO SECOND PARSER.** `error_reason` and `activation_url` are imported from `_http`, never
+  reimplemented, and the substring predicate is the SAME one `_http._raise_for` uses — so the
+  panel and the refusal cannot disagree about one connection on one afternoon.
+- **`error.message` never travels.** Nothing here reads, returns or logs it. Proven live on
+  2026-09-01 against a real Google 403: the body carried a `message` field and the response
+  carried none.
+- **The scope arm makes NO network call**, and an application whose scope is absent is not
+  probed at all — a round trip that can only confirm what arithmetic already knows.
+- **A 401 IS `unknown`, NOT `ready`** — a considered narrowing of the plan's "any other 4xx is
+  ready". A rejected token means the application was never reached, so nothing about it was
+  measured.
+- **Operator-triggered only.** It runs on the existing Check action. Never on render, never on
+  load, never on a schedule (SEED-209/210/211/212).
+
+**The named seam.** If a second vendor gains applications, `APPLICATION_PROBES` and
+`classify_probe_response` split: the table stays per-vendor, the classifier becomes the shared
+leaf. Nothing should move before that second vendor exists.
+
+**ONE TABLE, NOT TWO.** An earlier shape split scope/service into `service_tools.py` and kept
+the URL here. Two tables that must agree is this repository's most-repeated defect; the
+invariant it was meant to buy is bought instead by `test_every_google_application_has_a_probe`,
+which walks `SERVICE_TOOL_SPECS` and fails by name on any application missing a probe.
+
+---
+
+## `backend/app/services/google/writes.py`
+
+**2 / 1 / 625 · absent from BOTH for its entire life — row added at Phase 221 plan 02.**
+Every Google write: Drive, Gmail, Sheets, Docs, Calendar, Contacts.
+
+**`create_event` SHIPPED BROKEN FOR THE COMMONEST INPUT THERE IS, and every gate was green.**
+Google's rule is *"a time zone offset is required unless a time zone is explicitly specified in
+timeZone"*. `_time_field` sent NEITHER for a naive datetime, so `2026-09-04T15:00:00` — exactly
+what a model writes for "Thursday at 3pm" — returned `HTTP 400 (required)` every time.
+
+**What made it invisible: two of the three input shapes worked.** Driven live against the
+operator's own calendar on 2026-09-01 — naive **FAILED**, the same instant with `Z` **OK**,
+all-day `date` **OK**. A test author reaching for an ISO string would naturally pick a working
+shape and prove the feature fine.
+
+**The fix, and why it costs a network call.** A naive time means *three in the afternoon where
+the person lives*, and the only place that fact exists is the calendar itself, so
+`_calendar_time_zone` reads it. **Defaulting to UTC would have made every arm pass while
+silently moving the operator's meetings by their offset** — a wrong answer wearing a right
+answer's clothes, which is worse than the 400 it replaces. An instant that already carries an
+offset is left completely alone; attaching a `timeZone` to it would invite Google to
+reinterpret a moment the caller had already pinned.
+
+**The invariants.**
+
+- The all-day arm short-circuits FIRST. Reordering makes a bare date a `dateTime` with a bogus
+  zone — a shape Google rejects. The test that asserts the order was **rewritten after the
+  first version was driven RED and could not fail**: the anchor on the offset pattern turns out
+  not to be reachable by any realistic input, so asserting it was decoration.
+- The time-zone lookup travels under `calendar_write`, the caller's OWN key. The egress key
+  selects an allow-list, not an HTTP verb; borrowing `calendar_read` would let a write tool
+  reach a surface its own key does not name.
+- A failed lookup returns `""` and never raises into the caller: it exists to IMPROVE a payload,
+  not to gate one.
+- **NO ATTENDEES FIELD**, deliberately — an attendee makes Google email somebody who never used
+  this product, from an action worded *"create an event"*.
+
+**`create_file` CAN MINT A NATIVE GOOGLE SHEET** (`mime_type:
+application/vnd.google-apps.spreadsheet`), proven live. So the recorded "no `create_spreadsheet`"
+gap is a **discoverability** gap, not a capability one — nothing tells a model that `create_file`
+does it. See `SEED-230`.
+
+---
+
+## `frontend/src/components/settings/applicationAvailability.ts`
+
+**0 / 0 / 152 · young (Phase 221 plan 02).** One application's server verdict, turned into a
+REMEDY.
+
+- **IT CLASSIFIES NOTHING, and that is a deliberate narrowing of the plan.** The plan's sketched
+  signature took raw scopes and a probe body and decided the state in the browser. That would be
+  a SECOND classifier, recreating exactly the defect `availability.py` refuses to create. The
+  server decides WHICH state; this file decides WHAT IT SAYS — the same split `check_connection`
+  already states for every other verdict on this surface.
+- **The remedy names the action, not the status.** *"Sheets: error"* is not a sentence anybody
+  can act on.
+- **The console URL is origin-whitelisted here too**, and not because the backend forgot: this is
+  the layer where the value becomes a live `href` a person clicks.
+- **`unknown` does not count as blocked.** Counting it would put `Partly ready` on a healthy
+  connection because someone's wifi dropped.
+- An unrecognised state degrades to `unknown`, **never** to `ready` — an old client must not read
+  a new server's fifth state as "everything is fine".
+
+---
+
+## `frontend/src/components/settings/AvailabilityLine.tsx`
+
+**0 / 0 / 74 · young (Phase 221 plan 02).** One line saying what will not work, and what to do.
+
+- **A `ready` APPLICATION RENDERS `null` — absent, not an empty element.** Silence is the healthy
+  state; the 2026-08-31 noise audit deleted twelve items that each said nothing, and six lines
+  reading "fine" would put them straight back. The suite asserts the element is ABSENT.
+- The link renders **only** where a destination helps: `api_off` gets the console,
+  `scope_missing` gets none, because the console cannot grant a scope.
+- **`unknown` never says "switched off".**
+- **IT MOUNTS OUTSIDE THE HEADER BUTTON.** Plan 01 left the slot INSIDE a `<button>`; interactive
+  content nested in a button is invalid HTML, the anchor is not reliably clickable, and a click
+  that reaches it also toggles the group. A test asserts no anchor has a button ancestor.
+
+---
+
+## `frontend/src/components/settings/grantsVocabulary.ts`
+
+**3 / 2 / 115 · absent for its entire life — row added at Phase 221 plan 02.** Every word the
+grants surface and the availability line say.
+
+- **There is deliberately NO `READY` string.** A constant for the healthy case is an invitation
+  to render one, and a working application must say nothing at all.
+- The `api_off` and `scope_missing` sentences are **not interchangeable** and say so in as many
+  words, because the measured failure was a refusal that named the wrong one.
+- `API_OFF_ACTION_NO_LINK` exists because a wrong console link is worse than none — it looks
+  authoritative.
+
+**No seam proposed.** A vocabulary doing one thing many times is the right shape.
