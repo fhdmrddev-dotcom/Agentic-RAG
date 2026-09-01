@@ -3,7 +3,8 @@ seed_id: SEED-233
 title: "`connector_tokens` has RLS ENABLED and ZERO POLICIES, so every user-JWT read of it returns empty — the OAuth token endpoint 404s on rows that exist"
 created: 2026-09-01
 planted_during: Phase 221 plan 02 — while wiring the per-application availability probe onto the Check action
-status: planted
+status: fixed_local_only
+folded_into: 222
 surface: Agentic-RAG
 severity: high
 category: security / data-access / shipped-endpoint-broken
@@ -17,6 +18,7 @@ trigger_when:
   - Anyone touches `GET /connectors/connections/{id}/oauth/token`, which cannot succeed today
   - The next migration on the connectors schema — this is a policy, and it belongs with one
   - Any surface wants per-application availability to SURVIVE A RELOAD (see the note below)
+  - ⚠ THE CLOUD DATABASE STILL HAS THE DEFECT — migration 151 is LOCAL ONLY. Re-open the moment a cloud deploy is proposed, and note the failure is SILENT: a read against a policy-less table returns EMPTY rather than erroring
 ---
 
 # SEED-233 — a table nobody can read, and a grant that says otherwise
