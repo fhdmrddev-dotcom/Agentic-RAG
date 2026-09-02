@@ -200,6 +200,45 @@ body {
 .callout.ok { border-left-color: hsl(var(--success)); background: hsl(var(--success) / .07); }
 .callout b { color: hsl(var(--foreground)); font-weight: 600; }
 
+
+/* -- sources / references footer -------------------------------------- */
+.answer { font-size: .875rem; line-height: 1.65; color: hsl(var(--foreground) / .92); }
+.answer p { margin-bottom: .7rem; }
+.answer sup {
+  font: 600 .625rem/1 var(--mono); color: hsl(var(--primary));
+  background: hsl(var(--primary) / .14); border-radius: 4px;
+  padding: .1rem .22rem; margin-left: .12rem; vertical-align: super;
+}
+.ref-trigger-today {
+  display: flex; align-items: center; gap: .375rem; margin-top: .75rem;
+  font-size: .75rem; color: hsl(var(--muted-foreground));
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.ref-rows { margin-top: .5rem; display: flex; flex-direction: column; gap: .5rem; }
+.ref-row {
+  border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+  background: hsl(var(--card)); padding: .5rem .65rem; font-size: .75rem;
+}
+.ref-row .n { font: 600 .625rem/1 var(--mono); color: hsl(var(--primary)); margin-right: .4rem; }
+.ref-row .snip { color: hsl(var(--muted-foreground)); display: block; margin-top: .25rem; line-height: 1.5; }
+.ref-trigger-fix {
+  display: inline-flex; align-items: center; gap: .45rem; margin-top: .9rem;
+  font: 500 .75rem/1 var(--sans); cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / .55);
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px; padding: .34rem .7rem .34rem .55rem;
+  transition: all .16s ease;
+}
+.ref-trigger-fix:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary) / .5); background: hsl(var(--primary) / .08); }
+.ref-trigger-fix .chev { font: 600 .625rem/1 var(--mono); opacity: .7; }
+.ref-trigger-fix .cnt { font: 600 .6875rem/1 var(--mono); color: hsl(var(--foreground) / .8); }
+.hairline { height: 1px; background: hsl(var(--border) / .8); margin-top: .9rem; }
+.two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.mini-label { font: 500 .625rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-bottom: .6rem; }
+.mini-label.bad { color: hsl(var(--destructive)); }
+.mini-label.good { color: hsl(var(--success)); }
+
 .panel-view { display: none; }
 .panel-view.active { display: block; }
 </style>
@@ -218,6 +257,8 @@ body {
   <button class="tab" role="tab" aria-selected="false" data-view="a">A · A row on the rail</button>
   <button class="tab" role="tab" aria-selected="false" data-view="b">B · Panel-owned band</button>
   <button class="tab" role="tab" aria-selected="false" data-view="c">C · Bracketed sibling</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="d">D · Delete it ★</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="src">Sources fold</button>
   <span class="spacer"></span>
   <button class="ghost" onclick="toggleTheme()">◐ Theme</button>
 </div>
@@ -520,6 +561,177 @@ body {
   </div>
 </div>
 
+
+<!-- =============================== D ================================= -->
+<div class="stage panel-view" data-view="d">
+  <div class="column">
+    <div class="column-label">variant D &middot; the card is gone</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div class="runcard">
+          <div class="run-head">
+            <span class="dot"></span><span>Run &middot; 2 steps</span>
+            <span class="sep">&middot;</span><span>anthropic &middot; claude-sonnet-4-5</span>
+            <span class="right">&#9201; 18.3s</span>
+          </div>
+          <div class="rail">
+            <div class="step">
+              <div class="node">&#10003;</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">&#8981;</span>Search the knowledge base</span>
+                <span class="step-res">6 results</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">&#10003;</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">&#9654;</span>Run code</span>
+                <span class="step-res">chart.png</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="terminal fixed">
+          <span class="word">Stopped</span>
+          <span>Agent reached its time limit</span>
+          <span class="rule"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <b>The orphan does not need a home. It needs deleting.</b> Two steps, counted as two, and nothing
+      below the frame. The todos live in the panel, where they were already live &mdash; and where they
+      are still correct after a reload.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Why the premise for keeping it is false</h3>
+    <ul>
+      <li><code>SeamCard.tsx:3-8</code> justifies itself: <em>&ldquo;on thread reload the panel reconciles
+        to current state and does NOT replay history, so the transcript must be self-contained.&rdquo;</em></li>
+      <li><span class="good">Measured: the panel does not need to replay.</span>
+        <code>StreamsProvider.tsx:106</code> &mdash; <code>useDerivedPanel</code> is <em>&ldquo;a PURE read
+        over the viewing thread&rsquo;s persisted chat tool_calls&rdquo;</em>, and
+        <code>workspacePanel.ts:204</code> takes the latest <code>write_todos</code> snapshot from them.</li>
+      <li><b>Both surfaces read the same durable rows.</b> The card is a second render of one source, not a
+        backup for a source that disappears.</li>
+    </ul>
+    <h3>workspace_write is redundant too, by a stronger argument</h3>
+    <ul>
+      <li><code>FilesSection.tsx:158</code> uses <code>useWorkspaceFiles</code>, which
+        <span class="good">fetches from the server</span> (<code>getThreadWorkspaceFiles</code> via
+        <code>usePanelReconcile</code>) &mdash; not a derive from the transcript at all.</li>
+      <li>That is <em>more</em> durable than the chat row, so its seam card is the weaker copy of the two.</li>
+    </ul>
+    <h3>&#9888; ask_user must survive</h3>
+    <ul>
+      <li>Same component, different kind. <code>You answered X</code> is the <b>only</b> record that a human
+        made a decision &mdash; the panel shows a <em>pending</em> question, never an answered one.</li>
+      <li><code>SeamCard.tsx:6-8</code> says it <em>&ldquo;CLOSES the documented ask_user reload
+        gap&rdquo;</em>. <span class="bad">Deleting the whole component takes that with it.</span></li>
+    </ul>
+    <h3>The precedent</h3>
+    <ul>
+      <li><code>MessageItem.tsx:536</code> &mdash; <em>&ldquo;SEED-098 Change 2: the loose write_todos /
+        workspace_write pointers are GONE &mdash; todos live only in the right Workspace panel.&rdquo;</em>
+        The <b>live</b> pointers were already deleted for this exact reason. This finishes the job.</li>
+      <li>&#9888; Cost, stated plainly: the panel collapses to a 52px rail, so a reopened thread shows todos
+        only once it is open. A click, not a loss.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ========================== SOURCES FOLD =========================== -->
+<div class="stage panel-view" data-view="src">
+  <div class="column">
+    <div class="column-label">BUG-260902-07 &middot; today (left) vs proposed (right)</div>
+
+    <div class="two-up">
+      <div>
+        <div class="mini-label bad">today &mdash; open, trigger is prose</div>
+        <div class="answer">
+          <p>The Q3 rate sheet lists 14 line items, with the largest increase on
+            structural steel at 8.2%<sup>1</sup>. Labour rates were unchanged<sup>2</sup>.</p>
+        </div>
+        <button class="ref-trigger-today">&#9662; References &middot; 2 sources</button>
+        <div class="ref-rows">
+          <div class="ref-row">
+            <span class="n">1</span>sample_master_rate_sheet.xlsx
+            <span class="snip">&ldquo;Structural steel &mdash; Q3 unit rate 8.2% above Q2&hellip;&rdquo;</span>
+          </div>
+          <div class="ref-row">
+            <span class="n">2</span>labour_schedule_2026.pdf
+            <span class="snip">&ldquo;Base labour rates held at the 2026 agreement&hellip;&rdquo;</span>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:.8rem;">
+          <b>The footer is taller than the answer.</b> And the only way to close it is a 12px line of the
+          lowest-contrast text in the message, sitting directly under body copy.
+        </div>
+      </div>
+
+      <div>
+        <div class="mini-label good">proposed &mdash; folded, trigger is a control</div>
+        <div class="answer">
+          <p>The Q3 rate sheet lists 14 line items, with the largest increase on
+            structural steel at 8.2%<sup>1</sup>. Labour rates were unchanged<sup>2</sup>.</p>
+        </div>
+        <div class="hairline"></div>
+        <button class="ref-trigger-fix" onclick="toggleRefs(this)">
+          <span class="chev">&#9656;</span>References<span class="cnt">2</span>
+        </button>
+        <div class="ref-rows" id="refs-fix" hidden>
+          <div class="ref-row">
+            <span class="n">1</span>sample_master_rate_sheet.xlsx
+            <span class="snip">&ldquo;Structural steel &mdash; Q3 unit rate 8.2% above Q2&hellip;&rdquo;</span>
+          </div>
+          <div class="ref-row">
+            <span class="n">2</span>labour_schedule_2026.pdf
+            <span class="snip">&ldquo;Base labour rates held at the 2026 agreement&hellip;&rdquo;</span>
+          </div>
+        </div>
+        <div class="callout ok" style="margin-top:.8rem;">
+          <b>The answer is the message again.</b> A hairline separates chrome from prose; the control has a
+          surface, so it reads as pressable without shouting. <b>Press it</b> &mdash; it works.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Measured cause</h3>
+    <ul>
+      <li><code>MessageItem.tsx:619</code> passes
+        <code>defaultOpen={hasInRangeMarker(&hellip;)}</code>. A grounded answer normally has markers, so in
+        ordinary use <span class="bad">it is open every time</span>; the collapsed state is only ever seen
+        on the degraded path.</li>
+      <li><code>CitationList.tsx:32-44</code> &mdash; the trigger is
+        <code>text-xs text-muted-foreground</code> with a 12px chevron. No border, no surface, no weight, no
+        separation from the answer body.</li>
+    </ul>
+    <h3>&#9888; This reverses a shipped decision</h3>
+    <ul>
+      <li><code>CitationList.tsx:9-14</code> calls it the <em>&ldquo;canonical open-by-default contract
+        (D-06/D-07)&rdquo;</em> from Phase 153, whose sketch 075-A paired numbered markers with an open
+        footer so the two read as one object.</li>
+      <li>The operator&rsquo;s direction supersedes it. Recorded in <code>BUG-260902-07</code> so a later
+        phase does not &ldquo;restore&rdquo; the old behaviour believing it was an oversight.</li>
+    </ul>
+    <h3>Why the two halves ship together</h3>
+    <ul>
+      <li>While it is open by default the weak trigger is invisible &mdash; nobody hunts for a control they
+        never need. <span class="bad">Folding it makes that trigger the only way back in</span>, so half one
+        without half two takes a surface that is merely noisy and makes it feel broken.</li>
+      <li>The count stays visible while closed. A fold that hid <em>how many sources there are</em> would
+        trade one readability problem for a worse one.</li>
+    </ul>
+  </div>
+</div>
+
 <script>
 document.querySelectorAll('.tab[data-view]').forEach(function (btn) {
   btn.addEventListener('click', function () {
@@ -532,6 +744,12 @@ document.querySelectorAll('.tab[data-view]').forEach(function (btn) {
     });
   });
 });
+function toggleRefs(btn) {
+  var rows = document.getElementById('refs-fix');
+  var open = !rows.hidden;
+  rows.hidden = open;
+  btn.querySelector('.chev').innerHTML = open ? '&#9656;' : '&#9662;';
+}
 function toggleTheme() {
   var root = document.documentElement;
   root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
