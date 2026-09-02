@@ -20,9 +20,15 @@ import logging
 import os
 import shlex
 import time as time_mod
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Awaitable
 from uuid import UUID
+
+# Phase 224 Plan 02 (BUG-260902-04 / D-224-01):
+# Single authority for the connector tool approval timeout.
+# Consumed by both the asyncio.wait_for pause and the wire deadline/duration emit.
+_APPROVAL_TIMEOUT_SECONDS: float = 120.0
 
 from starlette.concurrency import run_in_threadpool
 
@@ -4440,6 +4446,9 @@ async def _handle_connector_chat_tool(
 
     if posture == "ask" and getattr(ctx, "redis", None) is not None:
         call_id = getattr(ctx, "tool_call_id", None) or f"call_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+        now_utc = datetime.now(timezone.utc)
+        deadline_utc = now_utc + timedelta(seconds=_APPROVAL_TIMEOUT_SECONDS)
+        expires_at_iso = deadline_utc.isoformat()
         if getattr(ctx, "emit", None) is not None:
             await ctx.emit(
                 ctx.redis,
@@ -4457,6 +4466,8 @@ async def _handle_connector_chat_tool(
                 service_name=matched_conn.name,
                 tool_name=action_tool_name,
                 args=args,
+                expires_at=expires_at_iso,
+                timeout_seconds=_APPROVAL_TIMEOUT_SECONDS,
             )
 
         approval_channel = f"tool_approval:{ctx.thread_id}:{call_id}"
@@ -4472,7 +4483,7 @@ async def _handle_connector_chat_tool(
                         except Exception:
                             return None
 
-            decision_payload = await asyncio.wait_for(_wait_for_decision(), timeout=120.0)
+            decision_payload = await asyncio.wait_for(_wait_for_decision(), timeout=_APPROVAL_TIMEOUT_SECONDS)
             if not decision_payload or decision_payload.get("decision") != "allow":
                 _record_connector_audit("user_rejected", "User rejected execution")
                 return ToolResult(
@@ -4482,7 +4493,7 @@ async def _handle_connector_chat_tool(
                     })
                 )
         except asyncio.TimeoutError:
-            _record_connector_audit("timeout", "Approval request timed out after 120s")
+            _record_connector_audit("timeout", f"Approval request timed out after {int(_APPROVAL_TIMEOUT_SECONDS)}s")
             return ToolResult(
                 result=json.dumps({
                     "status": "timeout",
