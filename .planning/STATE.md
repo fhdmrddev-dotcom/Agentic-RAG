@@ -33,20 +33,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Context gathered, ready for planning)
+**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Plan 01 complete, executing Plan 02)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — CONTEXT GATHERED (2026-09-02).**
-- Discuss-phase complete; decisions locked in `224-CONTEXT.md`.
-- Winner D: `SeamCard`'s `write_todos` and `workspace_write` arms deleted; `ask_user` preserved.
-- Shared `toolName` re-exported from `@/lib/toolNames.ts` for chat and workflows.
-- Status line moved inside `RunCard` frame; right-aligned step results; `<Square>` glyph dropped.
-- Pending approval card docked above `MessageInput` with ISO 8601 UTC wire deadline (`expires_at`) and fallback jump chip.
-- References folded by default (`defaultOpen={false}`); shared fold pill/badge across `CitationList.tsx` and `RunCard.tsx`.
-- Panel todo wrap layout restructured to prevent premature wrapping at 308px floor.
-- Next: `/gsd:plan-phase 224`.
+🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTING (2026-09-03).**
+- Plan 224-01 complete: Shared tool vocabulary (`@/lib/toolNames`) established; `SeamCard` pruned per Winner D (deleted `workspace_write` and `write_todos` arms, preserved `ask_user`); deleted 33 lines of dead parsing code from `MessageItem.tsx`.
+- Count gate verified OK (188/188, 0 failing) and tsc clean at baseline 66 errors.
+- Next: Plan 224-02 (Wire deadline with module constant `_APPROVAL_TIMEOUT_SECONDS` in `tool_dispatcher.py`).
 
 ✅ **PHASE 223: A Connection Leaves a Record — VERIFIED & CLOSED (2026-09-02).**
 Reviewed and cleared by Claude in BUS-062. All live DB assertions, G-6 privacy safeguards (`arg_keys`), `Map.has()` restore semantics, and dual-source permanent grant receipts (`chat_card` and `settings`) verified.
