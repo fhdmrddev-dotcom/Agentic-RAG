@@ -1,11 +1,12 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
+import { Bot, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { providerLogo } from "@/lib/providerLogo"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { outerBannerLabel, toolLabel } from "@/lib/toolMeta"
+import { FoldTrigger } from "./FoldTrigger"
 // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE ONE STEP-IDENTITY ELEMENT.
 //
 // ⚠ THE SHAPE THIS SURFACE HANDS IN IS DELIBERATELY EMPTY, AND THAT IS THE HONEST ANSWER
@@ -477,19 +478,23 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           {message.reasoningContent ? (
             <Collapsible open={thinkingOpen} onOpenChange={setThinkingOpen} className="mb-2">
               <CollapsibleTrigger asChild>
+                {/* Phase 224-05 (BUG-260902-07, second half): the SHARED FoldTrigger — the
+                    same element CitationList mounts. This trigger carried the identical
+                    buried-control defect (text-xs, muted/80, a bare 12px chevron, no
+                    surface) and is fixed ONCE for both rather than twice similarly.
+                    ⚠ NO `count`: reasoning has no countable unit and inventing one would be
+                    fabricated precision. ⚠ The DEFAULT is untouched — `useState(false)`
+                    above is correct and flipping it would be a regression dressed as
+                    consistency (224-PREFLIGHT §3.2). */}
                 <button
                   data-testid="thinking-trigger"
                   aria-expanded={thinkingOpen}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/80 hover:text-foreground transition-colors w-full text-left"
+                  className="px-3 py-1.5 text-left"
                 >
-                  {thinkingOpen ? (
-                    <ChevronDown className="w-3 h-3 shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3 shrink-0" />
-                  )}
-                  <span className="truncate">
-                    {isStreamingNow ? "Thinking..." : "Thinking"}
-                  </span>
+                  <FoldTrigger
+                    open={thinkingOpen}
+                    label={isStreamingNow ? "Thinking..." : "Thinking"}
+                  />
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">

@@ -239,24 +239,6 @@ function dedupParagraphs(text: string): string {
   return result.join('\n\n')
 }
 
-/**
- * Phase 153-05 (CITE-01 / D-06/D-07): does the settled content carry ≥1 valid
- * in-range inline marker? Drives the canonical `defaultOpen` on the References
- * footer — the footer opens by default only when markers exist, else it keeps
- * today's collapsed default (footer-only degradation). The backend already
- * strips non-members/out-of-range markers before persist (D-02), so any `[n]`
- * with n ∈ [1, count] in the persisted content is a real, keyed marker.
- */
-function hasInRangeMarker(content: string, count: number): boolean {
-  if (!count || !content) return false
-  const re = /\[(\d+)\]/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(content)) !== null) {
-    const n = parseInt(m[1], 10)
-    if (n >= 1 && n <= count) return true
-  }
-  return false
-}
 
 /**
  * Phase 194 Plan 07 (RUN-01 / BUG-260815-04 / D-18) — THE ADVANCING HARNESS BANNER.
@@ -582,7 +564,18 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 // Phase 153-05 (CITE-01 / D-06/D-07): open by default only when the
                 // settled answer actually carries valid in-range markers; else keep
                 // today's collapsed default (footer-only degradation).
-                defaultOpen={hasInRangeMarker(dedupParagraphs(message.content), message.citations.length)}
+                /* Phase 224-05 (BUG-260902-07, first half) — FOLDED, EVERY TIME.
+                   ⚠ This REVERSES Phase 153's D-06/D-07 open-by-default contract, and the
+                   reversal is deliberate rather than an oversight — see CitationList's own
+                   docblock, where the superseded rule is kept struck through so a later
+                   phase does not "restore" it. Measured 2026-09-02: the old expression
+                   asked whether the answer had an in-range marker, and a grounded answer
+                   normally DOES, so the footer was open on essentially every real answer
+                   and the collapsed state only ever appeared on the degraded path. The
+                   operator: "the sources should be by default folded ... this is very bad
+                   user experience." ⚠ `hasInRangeMarker` is NOT deleted — it still gates
+                   the AbsenceHint below, which is a different question. */
+                defaultOpen={false}
                 // Scope the row→marker flash to this message's marker host.
                 flashContainer={messageBody}
               />

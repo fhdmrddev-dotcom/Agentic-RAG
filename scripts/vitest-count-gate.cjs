@@ -120,6 +120,12 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  "Seam.test.tsx": 8,
+  "TodosSection.test.tsx": 12,
+  "CitationList.test.tsx": 11,
+  "RunCard.test.tsx": 29,
+  "RunCard.timer.test.tsx": 7,
+  "ChatArea.approval.test.tsx": 3,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -3504,6 +3510,18 @@ const TARGETS = [
   // to it. Half of those rows are ABSENCE assertions, which is the easiest kind of case to
   // delete unnoticed.
   "src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx",
+  // Phase 224-05 — THE CHAT/PANEL RUN SURFACE, ADOPTED. Measured 2026-09-03: the gate
+  // RAN none of these and GUARDED none of them, so 224-05's own acceptance criterion
+  // would have passed whether or not four of the phase's five plans worked. The Phase
+  // 214 shape again: TARGETS decides what RUNS, BASELINE what is GUARDED, and these sat
+  // outside BOTH. All six were green BEFORE adoption, so adoption cannot red the gate;
+  // every count was read from a real run AFTER the edits landed, never guessed.
+  "src/components/panel/__tests__/Seam.test.tsx",
+  "src/components/panel/__tests__/TodosSection.test.tsx",
+  "src/components/chat/__tests__/CitationList.test.tsx",
+  "src/components/chat/RunCard.test.tsx",
+  "src/components/chat/RunCard.timer.test.tsx",
+  "src/components/chat/__tests__/ChatArea.approval.test.tsx",
   // ⭐ Added in 214.1-02 — THE SECOND KNOB for this phase's headline artefact, and it was
   // MEASURED to be needed rather than added by habit: the pre-edit gate run printed no row
   // whatsoever for this file, because `src/pages` is reached by NAMED FILES ONLY and there
