@@ -120,3 +120,5 @@ class MessageResponse(BaseModel):
     provider: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
+    active_connector_ids: list[UUID] | None = None
