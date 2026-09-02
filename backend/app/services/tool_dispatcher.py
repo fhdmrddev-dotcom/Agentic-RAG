@@ -4334,6 +4334,10 @@ async def _handle_connector_chat_tool(
 
     user_id = (ctx.current_user or {}).get("id")
     if not user_id:
+        logger.warning(
+            "connector chat tool %s: no authenticated user in context (audit_log.user_id is NOT NULL)",
+            action_tool_name,
+        )
         return ToolResult(result=f"Cannot execute {action_tool_name}: no authenticated user in context.")
 
     # ── ⚠ THREE DIFFERENT FAULTS USED TO ARRIVE AS ONE INNOCENT SENTENCE ──────────────
@@ -4387,6 +4391,34 @@ async def _handle_connector_chat_tool(
         # now true when it is said, which it was not before.
         return ToolResult(result=f"Connector service '{service_id}' is not connected or not found.")
 
+    # Phase 223 (GRANT-05 / SC#1 / D-223-01..04): Audit all outbound connector tool execution attempts & outcomes.
+    def _record_connector_audit(outcome: str, failure_reason: str | None = None) -> None:
+        arg_keys = list(args.keys()) if isinstance(args, dict) else []
+        audit_meta = {
+            "connection_id": str(matched_conn.id),
+            "service_id": service_id,
+            "service_name": matched_conn.name,
+            "tool_name": action_tool_name,
+            "outcome": outcome,
+            "arg_keys": arg_keys,
+            "failure_reason": failure_reason,
+        }
+        actor_user_id = (ctx.current_user or {}).get("id")
+        if not actor_user_id:
+            logger.warning("Cannot audit connector call: user_id is missing (audit_log.user_id is NOT NULL)")
+            return
+        entry_coro = write_audit_entry(
+            user_id=actor_user_id,
+            action_type="connector.call",
+            metadata=audit_meta,
+            supabase=ctx.supabase,
+            org_id=str(org_id) if org_id else None,
+        )
+        if getattr(ctx, "spawn", None) is not None:
+            ctx.spawn(entry_coro)
+        else:
+            asyncio.create_task(entry_coro)
+
     # Phase 221 (D-221-05 / D-221-06) — the APPLICATION rung, resolved from the spec table.
     # ⚠ Without these two keywords the middle rung is a no-op and the write cap CANNOT FIRE:
     # `application` defaults to None, so `app:drive` is never consulted and an application
@@ -4398,6 +4430,7 @@ async def _handle_connector_chat_tool(
         matched_conn, action_tool_name, application=_application, is_write=_is_write
     )
     if posture == "deny":
+        _record_connector_audit("policy_denial", "Denied by tool posture policy")
         return ToolResult(
             result=json.dumps({
                 "error": "tool_refused",
@@ -4412,7 +4445,6 @@ async def _handle_connector_chat_tool(
                 ctx.redis,
                 getattr(ctx, "run_id", None),
                 "tool_approval_required",
-                call_id=call_id,
                 # ⚠ THE CONNECTION ID, NOT ONLY THE SERVICE ID. Two rows can share a
                 # service — this install has two `slack` connections in different orgs —
                 # so a client that resolved "which connection is this" from `service_id`
@@ -4442,17 +4474,19 @@ async def _handle_connector_chat_tool(
 
             decision_payload = await asyncio.wait_for(_wait_for_decision(), timeout=120.0)
             if not decision_payload or decision_payload.get("decision") != "allow":
+                _record_connector_audit("user_rejected", "User rejected execution")
                 return ToolResult(
                     result=json.dumps({
                         "status": "rejected",
-                        "message": f"User rejected execution of tool '{action_tool_name}' on {matched_conn.name}.",
+                        "message": f"User rejected execution of tool '{action_tool_name}' on {matched_conn.name}. Do not retry this action unless explicitly requested by the user.",
                     })
                 )
         except asyncio.TimeoutError:
+            _record_connector_audit("timeout", "Approval request timed out after 120s")
             return ToolResult(
                 result=json.dumps({
                     "status": "timeout",
-                    "message": f"Tool execution '{action_tool_name}' on {matched_conn.name} timed out waiting for approval.",
+                    "message": f"Tool execution '{action_tool_name}' on {matched_conn.name} timed out waiting for human approval in the chat. Nobody answered in time. Do not advise the user to check a workspace panel or re-authenticate; if the user still wants this action, ask them in this chat if they would like to try again.",
                 })
             )
         finally:
@@ -4580,6 +4614,7 @@ async def _handle_connector_chat_tool(
         failure = str(exc) or exc.__class__.__name__
 
     if failure is not None:
+        _record_connector_audit("execution_failure", failure)
         # Not wrapped: this sentence is OURS, not third-party text, and putting our own words
         # inside the untrusted-content envelope would teach the model to distrust them.
         return ToolResult(
@@ -4601,6 +4636,7 @@ async def _handle_connector_chat_tool(
         # line is now reachable ONLY when no failure was recorded.
         raw_output = json.dumps({"performed": action_tool_name, "detail": ""})
 
+    _record_connector_audit("success", None)
     wrapped = wrap_untrusted_tool_result(matched_conn.name, action_tool_name, raw_output)
     return ToolResult(result=wrapped)
 
