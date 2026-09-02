@@ -161,6 +161,7 @@ from app.models.connector import (
     OAuthTokenResponse,
     ToolGrantPosture,
 )
+from app.services.audit_service import write_audit_entry
 from app.security.egress import (
     EgressRefused,
     EgressResponseTooLarge,
@@ -961,12 +962,31 @@ async def update_grants(
     `update_connection` above.
     """
     try:
-        return await connector_service.update_connection_grants(
+        updated = await connector_service.update_connection_grants(
             str(connection_id),
             org_id=str(active_org),
             tool_grants=tool_grants,
             supabase=supabase,
         )
+        # Phase 223 (GRANT-05 / SC#1a / D-223-01 / D-223-05): Permanent grant receipt via Settings
+        try:
+            actor_user_id = user.get("id") or user.get("sub")
+            if actor_user_id:
+                await write_audit_entry(
+                    user_id=actor_user_id,
+                    action_type="connector.grant",
+                    metadata={
+                        "connection_id": str(connection_id),
+                        "source": "settings",
+                        "tool_count": len(tool_grants),
+                        "tool_grants": {k: str(v) for k, v in tool_grants.items()},
+                    },
+                    supabase=supabase,
+                    org_id=str(active_org),
+                )
+        except Exception:  # noqa: BLE001 - audit write failure must not mask update success
+            logger.warning("update_grants: failed to record connector.grant audit entry", exc_info=True)
+        return updated
     except connector_service.ConnectorNotFound:
         raise _NOT_FOUND
     except ValueError as exc:

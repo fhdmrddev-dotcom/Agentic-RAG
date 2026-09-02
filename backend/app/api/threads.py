@@ -1533,6 +1533,24 @@ async def handle_tool_approval(
                         supabase=supabase,
                     )
                     grant_persisted = True
+                    # Phase 223 (GRANT-05 / SC#1a / D-223-01 / D-223-05): Audit permanent grant via chat card Always allow
+                    try:
+                        actor_user_id = current_user.get("id") or current_user.get("sub")
+                        if actor_user_id:
+                            await write_audit_entry(
+                                user_id=actor_user_id,
+                                action_type="connector.grant",
+                                metadata={
+                                    "connection_id": str(payload.connection_id),
+                                    "tool_name": payload.tool_name,
+                                    "posture": "allow",
+                                    "source": "chat_card",
+                                },
+                                supabase=supabase,
+                                org_id=str(scope.org_id),
+                            )
+                    except Exception:  # noqa: BLE001 - audit write failure must not abort approval flow
+                        logger.warning("tool approval: failed to record connector.grant audit entry", exc_info=True)
             except Exception as exc:  # noqa: BLE001 — a permission/RLS boundary
                 logger.warning(
                     "tool approval: could not persist an always-allow grant for "
