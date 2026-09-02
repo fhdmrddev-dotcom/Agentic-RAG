@@ -152,6 +152,7 @@ it.*
 - [x] **Phase 222: One Click Connects Any MCP Server** — RFC 9728 discovery + OAuth 2.1/PKCE on the MCP door, reusing the PKCE machinery `oauth_service.py` already has and the MCP client has never called, so a service connects by logging in rather than by pasting a token minted by hand.
 - [x] **Phase 223: A Connection Leaves a Record** — an outbound connector call, and the permanent grant that permits it, appear in the audit ledger naming service/tool/actor/outcome; and a thread's armed connectors survive a reload (closes ⛔ `BUG-260902-05`, `BUG-260902-03`, the copy half of `BUG-260902-04`). ⚠ **`GRANT-05` is currently met for the EMPTY SET** — measured 2026-09-02
 - [ ] **Phase 224: What the Agent Is Doing Reads Like a Sentence** — the chat column names what a step did instead of `WRITE_TODOS`, the orphan card below the run is DELETED rather than rehomed, the approval card docks where you can reach it and shows its clock, and the References footer folds by default behind a control you can find (`SEED-240`, `BUG-260902-04` copy-adjacent halves, `BUG-260902-07`). ✅ **G-2 SATISFIED** — sketches 223 (winner **D · delete**) + 226 (winner **A · dock**), operator 2026-09-02. ⛔ `SEED-128` REMOVED from scope on the operator's own words (*"this is for the next milestones"*) and unfolded back to `planted`
+- [ ] **Phase 225: One Way to Hold a Secret Mid-Handshake** — the OAuth handshake keeps its secrets on the SERVER instead of in the URL bar. `generate_oauth_state` (`oauth_service.py:139`) packs the OAuth client secret (`sec_ovr`) and the PKCE verifier (`cv`) into the `state` parameter, base64-encodes and SIGNS it — signing proves it was not tampered with and does nothing to hide it — and `build_authorization_url` (`:265`) puts that into the authorize URL, so it reaches browser history, proxies and logs. ⛔ **The `cv` one defeats the purpose of PKCE**: an intercepted code and its verifier travel in the same URL. Ports the Google path onto the opaque-handle design `mcp_oauth.py` ALREADY SHIPS, so there is ONE state implementation rather than two (`BUS-048`, answered by the operator 2026-09-02). ⚠ **Security-bearing** · ⚠ **the cutover is the hard part** — `state` round-trips through a third party, so the callback must accept both formats during a transition window
 
 ### Phase Details
 
@@ -731,6 +732,45 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 
 **Flags**: ✅ **G-2 SATISFIED, not waived** (2026-09-02) — sketch **223** `the-step-inside-the-run` → winner **D · delete the seam card**, and sketch **226** `the-card-you-can-reach-and-its-clock` → winner **A · dock above the composer** with B's jump chip as a triggered fallback; a Stitch pass (project `10591382119939539231`) contributed the in-frame status line and the right-aligned result column. Sketches for the vocabulary and the todo row were DELIBERATELY NOT DRAWN — winner D deleted their subject matter. ⚠ **The post-sketch scope is in `224-PROPOSAL.md` under `SCOPE CHANGE 2026-09-02`; the list in this entry above it is the PRE-sketch scope and is superseded where they conflict.** ⚠ **A countdown CANNOT be built client-side** — `ToolApprovalRequest` carries no deadline and `120.0` lives only at `tool_dispatcher.py:4443`, so the deadline must go ON THE WIRE. ⚠ **Four G-5 hot files in the blast radius** — `MessageItem.tsx` (57/29/856) and `ToolCallPanel.tsx` (47/19/995) **both already read *extraction due***, plus `ChatArea.tsx` (63/30/571) and `WorkspacePanel.tsx` (16/10/646); re-derive the triples rather than quoting these. ⚠ **`WorkspacePanel` is a CROSS-SURFACE shell mounted by `ChatLayout` with NO mount in any workflow page** — redesigning it lands in CHAT first, so workflow-surface UAT alone will miss it. Full scoping: `.planning/phases/224-what-the-agent-is-doing-reads-like-a-sentence/224-PROPOSAL.md`.
 
+#### Phase 225: One Way to Hold a Secret Mid-Handshake
+
+**Goal**: The OAuth handshake keeps its secrets on the server instead of in the URL bar — one state
+implementation across both flows, not two.
+
+**Why**: ⭐ A security finding in shipped, LIVE code, reported rather than silently patched
+(`BUS-048`, answered by the operator 2026-09-02). `generate_oauth_state` (`oauth_service.py:139`)
+builds a payload carrying `cid_ovr` (client id), **`sec_ovr` (the OAuth client secret, verbatim)** and
+**`cv` (the PKCE code verifier)**, base64url-encodes it and HMAC-signs it. **Signing proves the blob
+was not TAMPERED WITH; it does nothing to HIDE it, and base64 is an encoding, not a cipher** — driven,
+not reasoned: the real function was called with a real secret and the output decoded.
+`build_authorization_url` (`:265`) places it in the authorize URL, so it travels to the authorization
+server, into browser history, and into any proxy or access log on the path. ⛔ **The `cv` one defeats
+the entire purpose of PKCE** — PKCE exists so an intercepted `code` cannot be redeemed without the
+verifier, and here they ride in the same URL.
+
+**Severity, both directions**: on the shipped Google path the AS is Google and the secret is the
+customer's own, so it is **not** a leak to a third party — the real exposure is history, logs and
+proxies. It would be far worse with a pasted MCP server, which is why Phase 222 deliberately did not
+reuse this design. `major`, not `blocking`; open since Phase 215 shipped.
+
+**Success criteria**: (1) no secret in any URL the browser sees — the `state` is an opaque handle and
+nothing more, proven by **decoding the real emitted state**, never by asserting a helper was called;
+(2) ⭐ **ONE state implementation, not two** — this is the actual point; (3) a consent already in
+progress survives the deploy; (4) the handle is single-use and expires; (5) the Google connection still
+works end to end, driven in a real browser.
+
+**Flags**: ⚠ **Security-bearing** — `AGENTS.md` §3.1 names "credentials", so who builds it is the
+operator's call. ⚠ **The cutover is the hard part and it is not code**: `state` round-trips through a
+third party, so a consent started before the deploy returns after it in the OLD format — the callback
+must accept both during a transition window, and `verify_oauth_state` cannot be deleted in the commit
+that stops producing its output. ⚠ **Third instance of the same family** — `CR-01` (Phase 190,
+column-level SELECT on `secret_ciphertext`) and the 2026-08-31 `custom_client_secret`-in-`config`
+finding (closed by migration 150) are the other two; **all three were invisible to every gate**.
+⚠ `backend/app/api/connectors.py` is a G-5 hot file whose row was already found stale once —
+re-derive. **No G-2**: nothing changes on screen, and that is the success condition. ⚠ **No migration**,
+so no cloud-parity gate — but the callback must understand the new format BEFORE anything emits it.
+Full scoping: `.planning/phases/225-one-way-to-hold-a-secret-mid-handshake/225-PROPOSAL.md`.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -752,6 +792,7 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 | 222. One Click Connects Any MCP Server | 5/5 door + crypto | ✅ **COMPLETE 2026-09-02, SPLIT across both agents (§3.1 override).** Notion connects by OAuth with **zero** developer-console work (RFC 7591 self-registration) and returns **41 tools for zero lines of tool code**. Join DRIVEN in a browser against four real servers — all four `kind` values observed live. ⛔ **A BYO connect has never completed end to end** — needs a human. ⚠ **SC#7 PARTLY UNMET:** Rovo answers `kind: token` at both endpoints (advertises no AS), so it cannot connect by OAuth — Linear + Sentry proven instead. `222-VERIFICATION.md` | 2026-09-02 |
 | 223. A Connection Leaves a Record | 0/? | **NEXT — operator handed to Gemini 2026-09-02.** ⛔ `GRANT-05` is met for the EMPTY SET: a live approved connector call appears in no ledger, and `update_grants` writes no receipt either. `223-PROPOSAL.md` | - |
 | 224. What the Agent Is Doing Reads Like a Sentence | 0/? | Scoped 2026-09-02. ✅ **G-2 satisfied** — sketches 223 (**D · delete**) + 226 (**A · dock**) decided by the operator. ⭐ Winner D rests on a measurement: the panel and the seam card read the SAME persisted `tool_calls`, so the card's stated reason for existing is false. New: `BUG-260902-07`. ⛔ `SEED-128` out of scope, unfolded to `planted`. Post-sketch scope: `224-PROPOSAL.md` §SCOPE CHANGE | - |
+| 225. One Way to Hold a Secret Mid-Handshake | 0/? | Proposed 2026-09-02 from `BUS-048`, answered by the operator the same day. ⛔ **Live-code security finding**: the OAuth `state` carries the client secret and the PKCE verifier in the clear — signed, not hidden. Ports the Google path onto the opaque-handle design `mcp_oauth.py` already ships. ⚠ The cutover is the hard part. `225-PROPOSAL.md` | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.
@@ -914,6 +955,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [ ] **Phase 180 (STRETCH): Agent-Loop Behavior Honesty** — honor step-by-step/todo-loop, Anthropic user-facing end summary, bounded tool iterations (LOOP-01..03)
 
 ### Phase Details
+
 
 #### Phase 174: Run-State & Lifecycle Honesty
 
