@@ -132,11 +132,42 @@ body {
   width: 1px; height: calc(100% + .35rem); min-height: 14px;
   background: hsl(var(--border));
 }
-.step-line { min-width: 0; font-size: .8125rem; line-height: 1.45; }
-.step-title { color: hsl(var(--foreground) / .92); }
+/* Stitch's second idea: the result gets its own right-aligned column, so the
+   actions scan down one edge and the outcomes down the other. Variant `today`
+   and variant `c` keep the old inline arrow — see the override below. */
+.step-line {
+  min-width: 0; font-size: .8125rem; line-height: 1.45;
+  display: grid; grid-template-columns: 1fr auto; gap: .9rem; align-items: baseline;
+}
+.step-title { color: hsl(var(--foreground) / .92); min-width: 0; }
 .step-title .mark { color: hsl(var(--muted-foreground)); margin-right: .3rem; }
-.step-res { color: hsl(var(--muted-foreground)); }
-.step-res::before { content: "→"; margin: 0 .35rem; opacity: .5; }
+.step-res {
+  color: hsl(var(--muted-foreground)); text-align: right;
+  font: 400 .75rem/1.4 var(--mono); white-space: nowrap;
+}
+/* the measured Today reference must not change, and variant C may not touch
+   RunCard internals — so both keep the shipped inline form. */
+[data-view="today"] .step-line, [data-view="c"] .step-line { display: block; }
+[data-view="today"] .step-res, [data-view="c"] .step-res {
+  text-align: left; font: inherit; white-space: normal;
+}
+[data-view="today"] .step-res::before, [data-view="c"] .step-res::before {
+  content: "\2192"; margin: 0 .35rem; opacity: .5;
+}
+
+/* Stitch's first idea: the status belongs to the run, so it lives in the run's
+   frame rather than hanging beneath it. */
+.run-status {
+  display: flex; align-items: center; gap: .5rem;
+  border-top: 1px solid hsl(var(--border) / .6);
+  padding: .5rem .85rem; font-size: .75rem; color: hsl(var(--warning));
+}
+.run-status .word {
+  font: 500 .625rem/1 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  padding: .2rem .4rem; border-radius: 4px;
+  background: hsl(var(--warning) / .14); border: 1px solid hsl(var(--warning) / .4);
+}
+.run-status .txt { color: hsl(var(--muted-foreground)); }
 .step .open {
   font: 500 .6875rem/1 var(--sans); color: hsl(var(--primary));
   background: none; border: 0; cursor: pointer; padding: 0; margin-left: .5rem;
@@ -381,13 +412,12 @@ body {
               </div>
             </div>
           </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
         </div>
 
-        <div class="terminal fixed">
-          <span class="word">Stopped</span>
-          <span>Agent reached its time limit</span>
-          <span class="rule"></span>
-        </div>
       </div>
     </div>
 
@@ -450,13 +480,12 @@ body {
             <span>Track its to-dos · 1 of 1 done</span>
             <button class="open" style="margin-left:auto;font:500 .6875rem/1 var(--sans);color:hsl(var(--primary));background:none;border:0;cursor:pointer;">open panel ↗</button>
           </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
         </div>
 
-        <div class="terminal fixed">
-          <span class="word">Stopped</span>
-          <span>Agent reached its time limit</span>
-          <span class="rule"></span>
-        </div>
       </div>
     </div>
 
@@ -557,6 +586,10 @@ body {
       <li>It is a <em>drawing</em> of containment rather than containment. The next panel-owned tool lands
         outside again, and the bracket has to be widened by hand.</li>
       <li>⚠ It leaves both <em>extraction due</em> ledger rows untouched, so the debt is deferred, not paid.</li>
+      <li>⭐ <span class="bad">And it can adopt NEITHER improvement the Stitch pass found.</span> Both the
+        status-inside-the-frame and the right-aligned result column live <em>inside</em> <code>RunCard</code>,
+        which this variant exists to leave alone. Compare its step rows and its dangling status line against
+        A, B or D &mdash; C is the only one still carrying the shipped inline form.</li>
     </ul>
   </div>
 </div>
@@ -591,13 +624,12 @@ body {
               </div>
             </div>
           </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
         </div>
 
-        <div class="terminal fixed">
-          <span class="word">Stopped</span>
-          <span>Agent reached its time limit</span>
-          <span class="rule"></span>
-        </div>
       </div>
     </div>
 
