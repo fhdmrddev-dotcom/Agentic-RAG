@@ -41,7 +41,6 @@
     "panel files fetch from server": "FilesSection.tsx:158 useWorkspaceFiles -> getThreadWorkspaceFiles"
   },
   "design_tokens": "frontend/src/index.css",
-  "recommended": "d",
   "stitch": {
     "project": "projects/10591382119939539231",
     "title": "Aether Chat Column - Phase 224 - quiet run, folded sources",
@@ -54,5 +53,7 @@
       "The References pill reads very quiet at this scale - close to the affordance problem BUG-260902-07 is fixing.",
       "Two generate calls timed out at the tool boundary; the second still completed server-side after ~2 min."
     ]
-  }
+  },
+  "winner": "d",
+  "winner_decided": "2026-09-02 (operator)"
 }

@@ -2414,3 +2414,60 @@ first shelled out to `grep -rl`, which failed on this box and returned an empty 
 vacuously, manufacturing the finding it was meant to verify**. It now walks the tree in JS behind two
 positive controls. Final: **124 assertions, 0 failing**, five driven RED against planted defects with
 the file restored md5-identical each time.
+
+### Phase 224 session — where a panel-owned step belongs (2026-09-02)
+
+Phase 224's structural question, drawn with the strings that ship today. The measured `Today` view is
+the sketch's spine: the run header counts **3 steps** while the rail enumerates **2**, the third being
+a card *outside* the frame; that card's title is the raw tool name uppercased by CSS; and the status
+sentence wears a `<Square>` that reads as an unticked box **because `☑` sits directly above it**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 223 | the-step-inside-the-run | A `write_todos` card is panel-owned, so it renders as a sibling beneath the run that counts it. Does it belong inside the run frame — and if so, as what? | **D · delete it** (operator, 2026-09-02) | phase-224, seed-240, seed-128, bug-260902-07, chat-surface, seam-card, acceptance-bar |
+
+⭐ **The composition fault is a guardrail's residue.** `MessageItem.tsx:841` says in writing: *"ADDITIVE
+ONLY — a new sibling renderer in MessageItem, never a touch of RunCard internals (G-5)."* The orphan
+below the run was placed there deliberately, to protect a hot file.
+
+⭐ **D is deletion, and the premise for keeping the card is measurably FALSE.** `SeamCard.tsx:3-8`
+justifies itself with *"the panel reconciles to current state and does NOT replay history, so the
+transcript must be self-contained."* But `StreamsProvider.tsx:106` says `useDerivedPanel` is *"a PURE
+read over the viewing thread's persisted chat `tool_calls`"* and `workspacePanel.ts:204` takes the
+latest `write_todos` snapshot from exactly those — **both surfaces read the same durable rows.** The
+card is a second render of one source, not a backup for a source that disappears.
+**`workspace_write` is redundant by a stronger argument still:** `FilesSection.tsx:158` *fetches from
+the server*. ⚠ **`ask_user` must survive the delete** — `You answered X` is the only record a human
+decided anything, and the panel shows a *pending* question, never an answered one.
+
+The operator was finishing a job this repo started: `MessageItem.tsx:536` deleted the **live** pointers
+at SEED-098 for the identical reason. Only the reload card survived, because nobody re-checked its
+premise.
+
+⭐ **A Stitch pass contributed two ideas the sketch missed, and then settled the field.** Project
+`10591382119939539231`; screenshot kept beside the sketch. It put the status line **inside** the run
+frame rather than beneath it, and gave each step's result its **own right-aligned column**. Folding
+both in revealed the decider: **variant C can adopt NEITHER**, because both live inside `RunCard`,
+which C exists to leave alone. *The variant that avoided the G-5 obligation is the one that cannot have
+the better design.* ⚠ Stitch's own palette drifted (olive checks, indigo nearly absent) and its
+References pill still has the affordance problem `BUG-260902-07` exists to fix — the recorded rule that
+**rules belong in `designMd`, not the prompts** was skipped here, and it showed exactly where it said it
+would.
+
+⚠ **Two `generate_screen_from_text` calls timed out at the tool boundary.** The first produced nothing
+across five polls over seven minutes; the second completed server-side ~2 min after timing out. **A
+timeout here means *unknown*, not *failed*.**
+
+**New bug filed from this session — `BUG-260902-07`.** The References footer opens by default whenever
+an answer carries inline markers (`MessageItem.tsx:619`), which for a grounded answer is *every time*,
+so the collapsed state is only ever seen on the degraded path; and its trigger (`CitationList.tsx:32-44`)
+is `text-xs text-muted-foreground` with a 12px chevron — no border, no surface, no separation from body
+copy. ⚠ **The two halves ship together or not at all:** while it is open by default the weak trigger is
+invisible, because nobody hunts for a control they never need. ⚠ This **reverses Phase 153's
+D-06/D-07 open-by-default contract** — recorded as a conscious reversal so a later phase does not
+"restore" it believing it was an oversight.
+
+Fenced per variant rather than per file: `a`/`b`/`d` carry the in-frame status, `c` keeps the external
+one, `today` is byte-identical to the measured original, the inline-arrow override covers exactly
+`today`+`c`, every `onclick` resolves to a defined function, every `getElementById` target exists, 16
+grounded source strings are present — with a negative control proving the fence can fail.
