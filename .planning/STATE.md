@@ -33,15 +33,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Plan 01 complete, executing Plan 02)
+**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Plan 02 complete, executing Plan 03)
 Phase numbering continues at **210**.
 
 ## Current Position
 
 🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTING (2026-09-03).**
 - Plan 224-01 complete: Shared tool vocabulary (`@/lib/toolNames`) established; `SeamCard` pruned per Winner D (deleted `workspace_write` and `write_todos` arms, preserved `ask_user`); deleted 33 lines of dead parsing code from `MessageItem.tsx`.
-- Count gate verified OK (188/188, 0 failing) and tsc clean at baseline 66 errors.
-- Next: Plan 224-02 (Wire deadline with module constant `_APPROVAL_TIMEOUT_SECONDS` in `tool_dispatcher.py`).
+- Plan 224-02 complete: Approval wire deadline unified under module constant `_APPROVAL_TIMEOUT_SECONDS = 120.0` in `tool_dispatcher.py`; emitted `expires_at` (ISO 8601 UTC) and `timeout_seconds` on `tool_approval_required`; test suite `test_224_approval_deadline.py` passing (2/2) and `test_223_dispatcher_audit.py` passing (6/6).
+- Next: Plan 224-03 (Docked approval card above `MessageInput` with live countdown anchored to `timeout_seconds`).
 
 ✅ **PHASE 223: A Connection Leaves a Record — VERIFIED & CLOSED (2026-09-02).**
 Reviewed and cleared by Claude in BUS-062. All live DB assertions, G-6 privacy safeguards (`arg_keys`), `Map.has()` restore semantics, and dual-source permanent grant receipts (`chat_card` and `settings`) verified.
