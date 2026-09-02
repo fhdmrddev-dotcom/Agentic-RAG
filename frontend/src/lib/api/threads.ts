@@ -50,6 +50,8 @@ type MessageResponseDTO = Message & {
   provider?: string | null
   started_at?: string | null
   completed_at?: string | null
+  // Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
+  active_connector_ids?: string[] | null
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -79,6 +81,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     provider,
     started_at,
     completed_at,
+    active_connector_ids,
     ...rest
   } = m
   const mapped: Message = {
@@ -92,6 +95,8 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     provider: provider ?? undefined,
     startedAt: started_at ?? undefined,
     completedAt: completed_at ?? undefined,
+    // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): preserve [] as [] and null/undefined as undefined
+    activeConnectorIds: active_connector_ids != null ? active_connector_ids : undefined,
   }
   if (confidence_level) {
     mapped.confidence = {

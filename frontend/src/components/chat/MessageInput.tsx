@@ -26,6 +26,7 @@ import { ConnectorsFlyout } from "./ConnectorsFlyout"
 import { ActiveConnectorChips } from "./ActiveConnectorChips"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
 import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
+import type { Message } from "@/types"
 
 interface Provider {
   id: string
@@ -38,6 +39,7 @@ interface Props {
   onSend: (content: string, activeConnectorIds?: string[]) => void
   disabled: boolean
   threadId?: string | null
+  messages?: Message[]
   providers?: Provider[]
   selectedProvider?: string
   onProviderChange?: (providerId: string) => void
@@ -93,6 +95,7 @@ export function MessageInput({
   onSend,
   disabled,
   threadId,
+  messages,
   providers = [],
   selectedProvider,
   onProviderChange,
@@ -112,10 +115,54 @@ export function MessageInput({
 
   // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
   const [connections, setConnections] = useState<ConnectorConnection[]>([])
-  // ⛔ STARTS EMPTY, AND EMPTY NOW GENUINELY MEANS NONE. See `activeConnectorsByThread`.
-  const [activeConnectorIds, setActiveConnectorIds] = useState<string[]>([])
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
+
+  // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07):
+  // Decision 2: key the restore on Map.has(), never on the value.
+  // activeConnectorsByThread.get(id) returns undefined for ABSENT and [] for EXPLICITLY CLEARED.
+  // A falsy or .length check treats them alike, so a reload re-arms connectors the person turned off.
+  // Rider 1: Seed from the last USER message (role === 'user' && activeConnectorIds !== undefined).
+  // Assistant messages carry no armed set.
+  const draftKey = threadId ?? NEW_CHAT_DRAFT_KEY
+  const prevDraftKeyRef = useRef(draftKey)
+  const activeConnectorIdsRef = useRef<string[]>([])
+
+  const [activeConnectorIds, setActiveConnectorIds] = useState<string[]>(() => {
+    if (activeConnectorsByThread.has(draftKey)) {
+      return activeConnectorsByThread.get(draftKey)!
+    }
+    if (messages && messages.length > 0) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.role === "user" && msg.activeConnectorIds !== undefined) {
+          activeConnectorsByThread.set(draftKey, msg.activeConnectorIds)
+          return msg.activeConnectorIds
+        }
+      }
+    }
+    return []
+  })
+
+  activeConnectorIdsRef.current = activeConnectorIds
+
+  // Hydrate from messages when unvisited in this session (e.g. async fetch of messages)
+  useEffect(() => {
+    if (activeConnectorsByThread.has(draftKey)) {
+      return
+    }
+    if (!messages || messages.length === 0) return
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.role === "user" && msg.activeConnectorIds !== undefined) {
+        activeConnectorsByThread.set(draftKey, msg.activeConnectorIds)
+        setActiveConnectorIds(msg.activeConnectorIds)
+        activeConnectorIdsRef.current = msg.activeConnectorIds
+        return
+      }
+    }
+  }, [draftKey, messages])
 
   useEffect(() => {
     let cancelled = false
@@ -130,35 +177,30 @@ export function MessageInput({
   }, [])
 
   const handleToggleConnector = useCallback((id: string) => {
-    setActiveConnectorIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    )
-  }, [])
+    setActiveConnectorIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      activeConnectorIdsRef.current = next
+      activeConnectorsByThread.set(draftKey, next)
+      return next
+    })
+  }, [draftKey])
 
   const handleRemoveConnector = useCallback((id: string) => {
-    setActiveConnectorIds((prev) => prev.filter((item) => item !== id))
-  }, [])
+    setActiveConnectorIds((prev) => {
+      const next = prev.filter((item) => item !== id)
+      activeConnectorIdsRef.current = next
+      activeConnectorsByThread.set(draftKey, next)
+      return next
+    })
+  }, [draftKey])
 
   // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
   // text and restore the incoming thread's stash (or empty). First mount is a
   // no-op (prevDraftKeyRef seeds to the current key). valueRef mirrors `value`
   // so the switch effect reads the LATEST text, not a stale closure.
-  const draftKey = threadId ?? NEW_CHAT_DRAFT_KEY
-  const prevDraftKeyRef = useRef(draftKey)
-  // Mirrors the live selection so the thread-switch effect can stash the OUTGOING thread's
-  // choice without taking `activeConnectorIds` as a dependency — which would re-run the
-  // switch effect on every chip toggle and immediately overwrite the incoming selection.
-  const activeConnectorIdsRef = useRef<string[]>([])
-
-  // The ref mirrors the state so the thread-switch effect can stash the OUTGOING
-  // selection; the map keeps the CURRENT thread's choice fresh, so a switch away and
-  // back returns exactly what was armed.
-  useEffect(() => {
-    activeConnectorIdsRef.current = activeConnectorIds
-    activeConnectorsByThread.set(draftKey, activeConnectorIds)
-  }, [activeConnectorIds, draftKey])
   const valueRef = useRef(value)
   valueRef.current = value
+
   useEffect(() => {
     const prevKey = prevDraftKeyRef.current
     if (prevKey === draftKey) return
@@ -166,12 +208,37 @@ export function MessageInput({
     if (outgoing.trim()) composerDraftsByThread.set(prevKey, outgoing)
     else composerDraftsByThread.delete(prevKey)
     setValue(composerDraftsByThread.get(draftKey) ?? "")
+
     // The connector selection belongs to the CONVERSATION, not to the composer instance:
     // switching away and back must not quietly re-arm, or disarm, a set of services.
     activeConnectorsByThread.set(prevKey, activeConnectorIdsRef.current)
-    setActiveConnectorIds(activeConnectorsByThread.get(draftKey) ?? [])
+
+    // ⚠ Decision 2: key the restore on Map.has(), never on the value.
+    if (activeConnectorsByThread.has(draftKey)) {
+      const restored = activeConnectorsByThread.get(draftKey)!
+      setActiveConnectorIds(restored)
+      activeConnectorIdsRef.current = restored
+    } else {
+      let seeded = false
+      if (messages && messages.length > 0) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i]
+          if (msg.role === "user" && msg.activeConnectorIds !== undefined) {
+            activeConnectorsByThread.set(draftKey, msg.activeConnectorIds)
+            setActiveConnectorIds(msg.activeConnectorIds)
+            activeConnectorIdsRef.current = msg.activeConnectorIds
+            seeded = true
+            break
+          }
+        }
+      }
+      if (!seeded) {
+        setActiveConnectorIds([])
+        activeConnectorIdsRef.current = []
+      }
+    }
     prevDraftKeyRef.current = draftKey
-  }, [draftKey])
+  }, [draftKey, messages])
 
   useEffect(() => {
     const el = textareaRef.current

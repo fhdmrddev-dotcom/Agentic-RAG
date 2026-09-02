@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { MessageInput } from "../MessageInput"
+import { MessageInput, _resetComposerDraftsForTest } from "../MessageInput"
 import * as api from "@/lib/api"
 
 vi.mock("@/lib/api", async () => {
@@ -40,6 +40,7 @@ describe("MessageInput Connectors & Plus Menu", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    _resetComposerDraftsForTest()
     if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
     if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
     if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
@@ -161,3 +162,78 @@ describe("MessageInput — an empty connector selection means NONE, never all", 
     expect(onSend).toHaveBeenCalledWith("post it", ["conn-1"])
   })
 })
+
+describe("MessageInput — Decision 2 armed connectors restoration", () => {
+  it("restores armed connectors from the last user message when unvisited in session", async () => {
+    const onSend = vi.fn()
+    const messages = [
+      { id: "1", role: "user", content: "first", activeConnectorIds: ["conn-1"] },
+      { id: "2", role: "assistant", content: "reply" },
+    ] as any
+
+    render(<MessageInput onSend={onSend} disabled={false} threadId="thread-1" messages={messages} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active-connector-chip-conn-1")).toBeDefined()
+    })
+  })
+
+  it("restores empty array when the last user message was explicitly cleared ([])", async () => {
+    const onSend = vi.fn()
+    const messages = [
+      { id: "1", role: "user", content: "first with connectors", activeConnectorIds: ["conn-1"] },
+      { id: "2", role: "assistant", content: "reply" },
+      { id: "3", role: "user", content: "second cleared", activeConnectorIds: [] },
+      { id: "4", role: "assistant", content: "reply 2" },
+    ] as any
+
+    render(<MessageInput onSend={onSend} disabled={false} threadId="thread-2" messages={messages} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    expect(screen.queryByTestId("active-connector-chip-conn-1")).toBeNull()
+  })
+
+  it("ignores trailing assistant messages without activeConnectorIds", async () => {
+    const onSend = vi.fn()
+    const messages = [
+      { id: "1", role: "user", content: "search drive", activeConnectorIds: ["conn-2"] },
+      { id: "2", role: "assistant", content: "found 3 files" },
+    ] as any
+
+    render(<MessageInput onSend={onSend} disabled={false} threadId="thread-3" messages={messages} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active-connector-chip-conn-2")).toBeDefined()
+    })
+  })
+
+  it("respects Map.has() when user explicitly disarms in session, never re-arming from messages", async () => {
+    const user = userEvent.setup()
+    const onSend = vi.fn()
+    const messages = [
+      { id: "1", role: "user", content: "initial", activeConnectorIds: ["conn-1"] },
+      { id: "2", role: "assistant", content: "reply" },
+    ] as any
+
+    const { rerender } = render(
+      <MessageInput onSend={onSend} disabled={false} threadId="thread-4" messages={messages} />,
+    )
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByTestId("active-connector-chip-conn-1")).toBeDefined())
+
+    // Explicitly remove connector in session
+    const removeBtn = screen.getByLabelText("Remove Slack Ops")
+    await user.click(removeBtn)
+    await waitFor(() => expect(screen.queryByTestId("active-connector-chip-conn-1")).toBeNull())
+
+    // Switch to another thread and switch back
+    rerender(<MessageInput onSend={onSend} disabled={false} threadId="thread-other" messages={[]} />)
+    rerender(<MessageInput onSend={onSend} disabled={false} threadId="thread-4" messages={messages} />)
+
+    // Must REMAIN disarmed (empty array in Map.has()) — SC#2 guard
+    expect(screen.queryByTestId("active-connector-chip-conn-1")).toBeNull()
+  })
+})
+

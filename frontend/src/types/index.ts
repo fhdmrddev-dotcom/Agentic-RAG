@@ -229,6 +229,9 @@ export interface Message {
     toolName: string
     args: Record<string, any>
   }
+  /** Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): active connector connection IDs armed when this message was sent.
+   *  Present on user messages. Distinguishes [] (explicitly cleared) from undefined (legacy / absent). */
+  activeConnectorIds?: string[]
 }
 
 export interface DocumentMetadata {

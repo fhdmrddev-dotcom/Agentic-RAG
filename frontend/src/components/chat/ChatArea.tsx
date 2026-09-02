@@ -357,6 +357,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
          `useMessages`' action surface"*. */
       disabled={isStreaming}
       threadId={thread?.id ?? null}
+      messages={messages}
       providers={providers}
       selectedProvider={selectedProvider}
       onProviderChange={handleProviderChange}

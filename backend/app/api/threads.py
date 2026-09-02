@@ -816,13 +816,19 @@ async def send_message(
     # INSERT) — is to call `.insert(row)` alone; PostgREST returns the inserted
     # row(s) under `.data` as a list (Prefer: return=representation is the
     # supabase-py default). Read the id from `.data[0]["id"]`.
+    _user_msg_row = {
+        "thread_id": thread_id,
+        "user_id": current_user["id"],
+        "role": "user",
+        "content": body.content,
+    }
+    # Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): Durably record armed connector IDs
+    # Distinction: None -> SQL NULL (absent / not supplied); [] -> '[]'::jsonb (explicitly cleared)
+    if body.active_connector_ids is not None:
+        _user_msg_row["active_connector_ids"] = [str(c) for c in body.active_connector_ids]
+
     _user_msg_resp = await aexec(
-        supabase.table("messages").insert({
-            "thread_id": thread_id,
-            "user_id": current_user["id"],
-            "role": "user",
-            "content": body.content,
-        })
+        supabase.table("messages").insert(_user_msg_row)
     )
     _user_msg_data = _user_msg_resp.data if _user_msg_resp is not None else None
     # Real-PostgREST path: list[dict]; some test mocks hand back a single dict.
