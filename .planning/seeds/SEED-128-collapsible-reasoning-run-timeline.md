@@ -1,6 +1,6 @@
 ---
 id: SEED-128
-status: dormant
+status: planted
 planted: 2026-07-22
 planted_during: v3.5 (UX Consolidation & Chat Polish — operator-raised during Phase 175 execution)
 trigger_when: Phase 174 (Run-State & Lifecycle Honesty) enters /gsd:sketch or /gsd:discuss-phase — this is the design input for how the live run reads; also relevant to Phase 178 (Chat UI/UX Polish)
@@ -36,3 +36,18 @@ Present at **`/gsd:sketch 174`** (Phase 174 is G-2 sketch-gated for exactly the 
 - Existing surfaces to extend, not replace: `frontend/src/components/chat/ToolCallPanel.tsx`, `MessageItem.tsx`, the harness `PhaseTimeline`/`PhaseCard`.
 - Reasoning content today: reasoning-first models keep thinking on (Phase 175 XPROV-01); check how reasoning deltas currently render before designing the fold.
 - Related: [[SEED-045]] (ui-ux-polish umbrella, the next UX track).
+
+## ⭐ RE-RAISED BY THE OPERATOR 2026-09-02, unprompted and six weeks later
+
+*"I reported before the thinking process, how it is doing now and how it should be… this is for
+the next milestones, just to pay attention to those details."*
+
+⚠ **This seed has been `dormant` since 2026-07-22 and the operator remembered it anyway.** That
+is the register working as a memory and failing as a queue: the trigger named Phase 178, Phase
+178 never ran, and nothing re-surfaced it. Status flipped `dormant` → `planted` so the
+`/gsd:new-milestone` sweep can actually see it.
+
+⭐ **Sketch it WITH `SEED-240`, not after it.** 240 is the same complaint one altitude down — the
+tool card in chat still renders `WRITE_TODOS`, a run frame that promises 3 steps enumerates none,
+and the panel is 308px while the chat is 700px of a 1536px screen. **Reasoning timeline and tool
+card are one surface**; two sketches would produce two vocabularies for it.
