@@ -23,12 +23,16 @@ Scope anchors (from `224-PROPOSAL.md §SCOPE CHANGE 2026-09-02` and `224-PREFLIG
 ## Implementation Decisions
 
 ### 1. Approval Card Docking & Wire Deadline
-- **D-224-01:** Wire deadline representation: The backend computes an ISO 8601 UTC timestamp (`expires_at: string`) at pause time and transmits it on `ToolApprovalRequest`. The frontend anchors its countdown against `Date.now()`, eliminating drift and client constant duplication.
+- **D-224-01:** Single source for approval timeout & clock skew immunity:
+  - Define `_APPROVAL_TIMEOUT_SECONDS = 120.0` as a single module-level constant in `backend/app/services/tool_dispatcher.py`. Both `asyncio.wait_for(..., timeout=_APPROVAL_TIMEOUT_SECONDS)` and `now_utc + timedelta(seconds=_APPROVAL_TIMEOUT_SECONDS)` consume this single constant.
+  - On the wire, `ctx.emit("tool_approval_required", ...)` transmits BOTH `expires_at` (ISO 8601 UTC timestamp) and `timeout_seconds: float = _APPROVAL_TIMEOUT_SECONDS`.
+  - The client prefers `timeoutSeconds` to anchor the countdown locally (`Date.now() + timeoutSeconds * 1000`), with fallback to `Date.parse(expiresAt)`. This makes the countdown completely immune to client-server clock skew while still preserving absolute timestamps for audit/replay.
+  - Tests import `_APPROVAL_TIMEOUT_SECONDS` and assert directly against it, not against an independent literal or float tolerance.
 - **D-224-02:** Docking & transition: While pending, the approval card docks directly above `MessageInput` in `ChatArea.tsx` (always visible in viewport). Once decided or timed out, the card immediately transitions into the message transcript as a historic record. If scrolled away, the jump chip serves as a triggered fallback.
 
 ### 2. SeamCard Cleanup & Tool Vocabulary
 - **D-224-03:** Shared tool vocabulary: Re-export `toolName` from `@/lib/toolNames.ts` (re-exporting from `components/workflows/toolNames.ts`) so both Chat and Workflows import human-readable action phrases ("Track its to-dos", "Write a file", etc.) without cross-domain boundary leakage.
-- **D-224-04:** SeamCard arm deletion: Remove `write_todos` and `workspace_write` arms from `SeamCard.tsx` and associated tests in `Seam.test.tsx`, preserving `ask_user`. Re-pin the vitest count gate in the same commit as the deletion, documenting the exact test count delta.
+- **D-224-04:** SeamCard arm deletion: Remove `write_todos` and `workspace_write` arms from `SeamCard.tsx` and associated tests in `Seam.test.tsx`, preserving `ask_user`. (Note: `Seam.test.tsx` was verified to not be in `TARGETS` or `BASELINE`, so there is no existing count-gate pin to decrease; adoption into the gate is handled in Plan 224-05).
 
 ### 3. RunCard Composition & Status Indicator
 - **D-224-05:** Status indicator styling: Drop the `<Square>` checkbox glyph entirely in `MessageItem.tsx`. Render "Agent reached time limit" and "Response stopped" as plain muted italic text without control-like glyphs.
@@ -40,6 +44,7 @@ Scope anchors (from `224-PROPOSAL.md §SCOPE CHANGE 2026-09-02` and `224-PREFLIG
   - Implement a shared fold trigger affordance (subtle bordered pill/badge: `border border-border/50 bg-muted/30 hover:bg-muted/60 rounded px-2 py-0.5 text-xs text-muted-foreground font-medium flex items-center gap-1.5`) used in both `CitationList.tsx` and `RunCard.tsx` (Thinking fold).
   - `RunCard.tsx` Thinking fold default remains `useState(false)` (do not alter its default state).
 - **D-224-08:** Todo row wrap layout: In `TodosSection.tsx`, let `todo.content` take full available width (`flex-1 min-w-0`), placing status text on a subtle secondary line beneath the content when long so sentences do not wrap prematurely at the 308px panel floor.
+- **D-224-09:** Count gate adoption for touched suites: In Plan 224-05, adopt the test suites touched and created in this phase (`Seam.test.tsx` at 8 tests, `TodosSection.test.tsx`, etc.) into `TARGETS` and `BASELINE` in `scripts/vitest-count-gate.cjs` (matching Phase 214 practice), ensuring these chat/panel surfaces are actively guarded against regression rather than remaining ungated.
 
 ### Claude's Discretion
 - Exact Tailwind utility classes for the docked approval card shadow and border styling in `ChatArea.tsx`.
