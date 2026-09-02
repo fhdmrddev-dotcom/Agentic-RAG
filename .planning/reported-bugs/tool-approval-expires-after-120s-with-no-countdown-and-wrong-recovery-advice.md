@@ -4,9 +4,9 @@ title: A tool approval expires after a hardcoded 120s with NO countdown anywhere
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/tool-dispatcher, frontend/chat, connectors, grants, run-honesty]
-folded_into: null
+folded_into: "223 (COPY HALF ONLY — the 120s duration and the below-the-fold card go to the chat-surface phase with SEED-240/SEED-128)"
 verified_closed_by: null
 related_seeds: [SEED-240]
 re_open_trigger: null

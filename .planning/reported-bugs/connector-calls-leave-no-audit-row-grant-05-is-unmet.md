@@ -4,9 +4,9 @@ title: An approved connector call to a third party leaves NO audit row — the o
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [backend/tool-dispatcher, connectors, grants, audit, governance]
-folded_into: null
+folded_into: "223"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

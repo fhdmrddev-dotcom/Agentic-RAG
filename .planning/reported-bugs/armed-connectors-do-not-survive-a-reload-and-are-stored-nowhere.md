@@ -4,9 +4,9 @@ title: A connector armed in a thread is stored NOWHERE — it lives in a module-
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat, backend/threads, connectors, persistence]
-folded_into: null
+folded_into: "223"
 verified_closed_by: null
 related_seeds: [SEED-240]
 re_open_trigger: null
