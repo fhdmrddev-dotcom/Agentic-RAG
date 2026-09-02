@@ -111,3 +111,81 @@ Also out: `BUG-260902-06` (per-worker cache — no shared surface), and everythi
   alone will miss it.
 - **`SEED-128` was flipped `dormant` → `planted` on 2026-09-02** so the `/gsd:new-milestone` sweep
   can see it. Its six dormant weeks are the argument for doing this now.
+
+---
+
+# ⚠ SCOPE CHANGE 2026-09-02 — after the G-2 sketch pass. The original scope above is preserved, never overwritten.
+
+Two sketches were drawn and decided, one bug was found, and one scope item was **removed on the
+operator's own words**. What follows supersedes the "What is in scope" list above where they conflict.
+
+## Decided by sketch
+
+| sketch | question | winner |
+|---|---|---|
+| **223** `the-step-inside-the-run` | Where does a panel-owned step belong? | **D · delete it** (operator, 2026-09-02) |
+| **226** `the-card-you-can-reach-and-its-clock` | Where does the approval card live, and how does it show its time? | **A · docked above the composer**, with **B's jump chip as a triggered fallback** |
+
+## ⛔ ③ THE REASONING TIMELINE IS OUT — and it was never the operator's ask for THIS phase
+
+`SEED-128` was marked `status: folded, folded_into: 224`, **while its own final entry records the
+operator saying, on 2026-09-02: *"this is for the next milestones, just to pay attention to those
+details."*** The fold contradicted the direction that re-raised it. The seed is flipped back to
+`planted` with a trigger naming the contradiction.
+
+⭐ **And most of the literal ask already ships**, which is why removing it costs nothing:
+`RunCard.tsx:477-500` has a collapsible **"Thinking"** block from Phase 076.2 D-01 — a real
+`Collapsible`, **folded by default** (`useState(false)`, `:90`), live during streaming, with an honest
+*"Agent is planning the next step"* placeholder when there is no reasoning yet. **What is missing is
+only the timeline FRAMING** — reasoning and tool steps as one foldable sequence rather than two
+collapsibles in one card. That is a re-composition, and it belongs to a milestone that scopes it.
+
+## ⭐ NEW — `BUG-260902-07`, and its affordance half is SHARED
+
+Found while sketching, reported by the operator: **the References footer opens by default and its fold
+control is buried in the prose.**
+
+- **Default state** — `MessageItem.tsx:619` passes `defaultOpen={hasInRangeMarker(…)}`, and a grounded
+  answer normally *has* markers, so it is open **every time**; the collapsed state is only ever seen on
+  the degraded path. ⚠ Folding it **reverses Phase 153's D-06/D-07 contract** — a conscious reversal,
+  recorded so nobody later "restores" it as an oversight.
+- **Affordance** — `CitationList.tsx:32-44` is `text-xs text-muted-foreground` + a 12px chevron: no
+  border, no surface, no separation from body copy.
+
+⭐ **The affordance defect reproduces verbatim on the reasoning block** (`RunCard.tsx:481-484`,
+`text-xs text-muted-foreground/80`), so **that half is ONE shared fix used twice**, not a one-off.
+⚠ **The default-state half does NOT generalise** — the Thinking block is already folded and correct;
+flipping it would be a regression dressed as consistency.
+
+## The scope that actually goes to `/gsd:discuss-phase`
+
+1. **Delete `SeamCard`'s `write_todos` and `workspace_write` arms.** ⚠ **`ask_user` survives** — it is
+   the only record a human decided anything, and the panel shows a *pending* question, never an
+   answered one. Measured basis: `useDerivedPanel` is *"a PURE read over the viewing thread's persisted
+   chat `tool_calls`"* (`StreamsProvider.tsx:106`) and `FilesSection` *fetches from the server*, so both
+   surfaces already hold what the cards duplicate.
+2. **Chat imports `TOOL_PHRASES`** (`toolNames.ts:114`) so no raw identifier reaches a person.
+3. **The status line moves inside the run frame**, and **each step's result takes a right-aligned
+   column** (both from the Stitch pass; both live inside `RunCard`).
+4. **Drop the `<Square>` glyph** on *"Agent reached time limit"* — it wears a checkbox costume because
+   `☑` sits directly above it.
+5. **Dock the approval card above the composer while pending**, and **put the deadline on the wire** —
+   `ToolApprovalRequest` carries no expiry and `120.0` lives only at `tool_dispatcher.py:4443`, so a
+   client-side countdown would duplicate a server constant and drift.
+6. **`BUG-260902-07`** — fold References by default; fix the buried trigger **once, for both
+   components**.
+7. **The panel's todo row at the 300px floor** (`ChatLayout.tsx:727` is `clamp(300px,30%,420px)`, and
+   the measured 308px means it is *at* that floor) — the badge currently dictates the wrap point.
+
+## Still out, unchanged
+
+`BUG-260902-01` (todos stranded `in_progress`) and `BUG-260902-06` (the per-worker cache). ⚠ The
+sketch still owes `-01` one thing: **what an abandoned todo looks like** — cheap to name now, expensive
+later. The backend write that produces it is not this phase's.
+
+## G-2 status
+
+**SATISFIED, not waived.** Two sketches drawn, both decided by the operator, with a Stitch pass folded
+in. Sketches for the vocabulary and the todo row were **deliberately not drawn**: winner D deleted
+their subject matter, and drawing them would have been ceremony.
+
