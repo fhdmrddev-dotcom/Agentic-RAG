@@ -403,4 +403,91 @@ describe("ChatToolApprovalCard — a NEW call_id is a NEW question", () => {
     expect(screen.queryByTestId("approval-allow-btn")).toBeNull()
     expect(screen.getByTestId("tool-approval-card-call_first").textContent).toContain("Approved")
   })
+
+  describe("countdown & wire deadline (Phase 224 Plan 03)", () => {
+    it("renders ticking countdown clock when timeoutSeconds is provided", () => {
+      render(
+        <ChatToolApprovalCard
+          threadId="t-1"
+          approval={{
+            ...first,
+            timeoutSeconds: 120,
+          }}
+        />,
+      )
+      const cd = screen.getByTestId("approval-countdown")
+      expect(cd).toBeInTheDocument()
+      expect(cd.textContent).toMatch(/remaining/)
+    })
+
+    it("renders ticking countdown clock when expiresAt is provided", () => {
+      const expiresAt = new Date(Date.now() + 45000).toISOString()
+      render(
+        <ChatToolApprovalCard
+          threadId="t-1"
+          approval={{
+            ...first,
+            expiresAt,
+          }}
+        />,
+      )
+      const cd = screen.getByTestId("approval-countdown")
+      expect(cd).toBeInTheDocument()
+      expect(cd.textContent).toMatch(/45s remaining|44s remaining/)
+    })
+
+    it("disables action buttons and shows timed out copy when deadline has passed", () => {
+      render(
+        <ChatToolApprovalCard
+          threadId="t-1"
+          approval={{
+            ...first,
+            connectionId: "conn-1",
+            timeoutSeconds: 0,
+          }}
+        />,
+      )
+      const cd = screen.getByTestId("approval-countdown")
+      expect(cd).toBeInTheDocument()
+      expect(cd.textContent).toContain("Approval timed out")
+
+      const allowBtn = screen.getByTestId("approval-allow-btn") as HTMLButtonElement
+      const rejectBtn = screen.getByTestId("approval-reject-btn") as HTMLButtonElement
+      const alwaysBtn = screen.getByTestId("approval-always-btn") as HTMLButtonElement
+
+      expect(allowBtn.disabled).toBe(true)
+      expect(rejectBtn.disabled).toBe(true)
+      expect(alwaysBtn.disabled).toBe(true)
+    })
+
+    it("gracefully renders standard card when expiresAt and timeoutSeconds are omitted", () => {
+      render(
+        <ChatToolApprovalCard
+          threadId="t-1"
+          approval={{
+            ...first,
+          }}
+        />,
+      )
+      expect(screen.queryByTestId("approval-countdown")).toBeNull()
+      expect(screen.getByText("Approval Required")).toBeInTheDocument()
+
+      const allowBtn = screen.getByTestId("approval-allow-btn") as HTMLButtonElement
+      expect(allowBtn.disabled).toBe(false)
+    })
+
+    it("renders initial settled state when approval carries a decision", () => {
+      render(
+        <ChatToolApprovalCard
+          threadId="t-1"
+          approval={{
+            ...first,
+            decision: "allow",
+          }}
+        />,
+      )
+      expect(screen.getByText("Approved")).toBeInTheDocument()
+      expect(screen.queryByTestId("approval-allow-btn")).toBeNull()
+    })
+  })
 })

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
+import { ChatToolApprovalCard, type ApprovalDecision } from "./ChatToolApprovalCard"
 import { useMessages } from "@/hooks/useMessages"
 import { useStreamsStore } from "@/stores/streamsStore"
 import {
@@ -330,6 +331,31 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     [resumeFromFailed],
   )
 
+  // Phase 224 Plan 03 (BUG-260902-04 / D-224-02):
+  // Dock pending approval card directly above MessageInput so it is always reachable in the viewport.
+  const [settledCallIds, setSettledCallIds] = useState<Set<string>>(() => new Set())
+
+  const pendingApproval = useMemo(() => {
+    if (!isStreaming) return null
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.toolApproval && !m.toolApproval.decision && !settledCallIds.has(m.toolApproval.callId)) {
+        return m.toolApproval
+      }
+    }
+    return null
+  }, [messages, isStreaming, settledCallIds])
+
+  const handleApprovalDecision = useCallback(
+    (decision: ApprovalDecision) => {
+      if (pendingApproval) {
+        pendingApproval.decision = decision
+        setSettledCallIds((prev) => new Set(prev).add(pendingApproval.callId))
+      }
+    },
+    [pendingApproval],
+  )
+
   // Plan 075.4-01 D-075.4-A1: thread-scoped composer enablement; closes
   // BUG-260523-01 at the `disabled` prop below. `isStreaming` here is the
   // value of useStreamingForThread(thread?.id ?? null) (declared at the top
@@ -589,6 +615,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         onResume={onResume}
         threadId={thread?.id ?? null}
       />
+      {pendingApproval && (
+        <div
+          data-testid="docked-tool-approval"
+          className="mx-4 mb-2 p-1 rounded-xl border border-amber-500/40 bg-card/95 backdrop-blur shadow-lg z-10 animate-fadeSlideUp"
+        >
+          <ChatToolApprovalCard
+            threadId={thread?.id ?? ""}
+            approval={pendingApproval}
+            onDecision={handleApprovalDecision}
+          />
+        </div>
+      )}
       {inputBar}
     </div>
   )

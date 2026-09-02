@@ -485,8 +485,8 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />
         )}
-        {/* Phase 216 (GRANT-03 / CHAT-07): inline tool approval decision card */}
-        {message.toolApproval && (
+        {/* Phase 216 / Phase 224: inline tool approval decision card (settled transcript receipt or when not streaming) */}
+        {message.toolApproval && (message.toolApproval.decision || !isStreaming) && (
           <ChatToolApprovalCard
             threadId={message.thread_id}
             approval={message.toolApproval}

@@ -44,10 +44,10 @@
  * owns), because doing it here would put a lost-update race on a permission surface.
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Check, ShieldAlert, X, Loader2, ChevronDown, ChevronRight,
-  Infinity as InfinityIcon,
+  Infinity as InfinityIcon, Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConnectionMarkGlyph } from "@/lib/connectionMark"
@@ -65,6 +65,9 @@ export interface ToolApprovalRequest {
   serviceName: string
   toolName: string
   args: Record<string, any>
+  expiresAt?: string
+  timeoutSeconds?: number
+  decision?: ApprovalDecision
 }
 
 export type ApprovalDecision = "allow" | "reject" | "always"
@@ -143,7 +146,50 @@ export function ChatToolApprovalCard({
     error: string | null
     /** Set only when "Always" let the call through but could NOT change the setting. */
     grantProblem: string | null
-  } | null>(null)
+  } | null>(() => {
+    if (approval.decision) {
+      return {
+        callId: approval.callId,
+        submitting: false,
+        decision: approval.decision,
+        error: null,
+        grantProblem: null,
+      }
+    }
+    return null
+  })
+
+  // Synchronize if approval.decision updates on an existing instance
+  useEffect(() => {
+    if (approval.decision && (!settled || settled.decision !== approval.decision)) {
+      setSettled({
+        callId: approval.callId,
+        submitting: false,
+        decision: approval.decision,
+        error: null,
+        grantProblem: null,
+      })
+    }
+  }, [approval.callId, approval.decision])
+
+  // Countdown anchored locally to timeoutSeconds (receipt time + duration)
+  // or expiresAt, eliminating client-server clock skew.
+  const [targetEpochMs] = useState<number | null>(() => {
+    if (approval.timeoutSeconds != null) {
+      return Date.now() + approval.timeoutSeconds * 1000
+    }
+    if (approval.expiresAt) {
+      const parsed = Date.parse(approval.expiresAt)
+      return isNaN(parsed) ? null : parsed
+    }
+    return null
+  })
+
+  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(() => {
+    if (targetEpochMs == null) return null
+    return Math.max(0, Math.round((targetEpochMs - Date.now()) / 1000))
+  })
+
   const [expandedFor, setExpandedFor] = useState<string | null>(null)
 
   // ⚠ Read through the tag, ALWAYS. A direct read of `settled` is the defect.
@@ -153,6 +199,20 @@ export function ChatToolApprovalCard({
   const error = mine?.error ?? null
   const grantProblem = mine?.grantProblem ?? null
   const argsExpanded = expandedFor === approval.callId
+
+  useEffect(() => {
+    if (targetEpochMs == null || decisionState) return
+    const interval = setInterval(() => {
+      const rem = Math.max(0, Math.round((targetEpochMs - Date.now()) / 1000))
+      setSecondsRemaining(rem)
+      if (rem === 0) {
+        clearInterval(interval)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [targetEpochMs, decisionState])
+
+  const isTimedOut = secondsRemaining === 0
 
   // No connection id means no row to change — an older paused run, or an event from
   // before the field existed. The button is not rendered rather than rendered broken.
@@ -263,10 +323,32 @@ export function ChatToolApprovalCard({
             Rejected
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-            <ShieldAlert className="h-3 w-3" />
-            Approval Required
-          </span>
+          <div className="flex items-center gap-2">
+            {secondsRemaining != null && (
+              <span
+                data-testid="approval-countdown"
+                className={cn(
+                  "inline-flex items-center gap-1 font-mono text-[11px] tabular-nums px-2 py-0.5 rounded-full border font-semibold transition-colors",
+                  secondsRemaining === 0
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : secondsRemaining <= 15
+                      ? "border-destructive/40 bg-destructive/15 text-destructive animate-pulse"
+                      : "border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                )}
+              >
+                <Clock className="h-3 w-3" />
+                {secondsRemaining <= 0
+                  ? "Approval timed out"
+                  : secondsRemaining > 60
+                    ? `${Math.floor(secondsRemaining / 60)}m ${secondsRemaining % 60}s remaining`
+                    : `${secondsRemaining}s remaining`}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+              <ShieldAlert className="h-3 w-3" />
+              Approval Required
+            </span>
+          </div>
         )}
       </div>
 
@@ -332,7 +414,7 @@ export function ChatToolApprovalCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={submitting}
+            disabled={submitting || isTimedOut}
             onClick={() => handleDecision("reject")}
             data-testid="approval-reject-btn"
             className="h-7 px-3 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-border"
@@ -341,7 +423,7 @@ export function ChatToolApprovalCard({
           </Button>
           <Button
             size="sm"
-            disabled={submitting}
+            disabled={submitting || isTimedOut}
             onClick={() => handleDecision("allow")}
             data-testid="approval-allow-btn"
             className="h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
@@ -355,7 +437,7 @@ export function ChatToolApprovalCard({
             <Button
               size="sm"
               variant="outline"
-              disabled={submitting}
+              disabled={submitting || isTimedOut}
               onClick={() => handleDecision("always")}
               data-testid="approval-always-btn"
               title={`${GRANTS_COPY.ASK_ALWAYS(approval.toolName)} — ${GRANTS_COPY.ASK_ALWAYS_NOTE}`}

@@ -372,6 +372,8 @@ export interface StreamCallbacks {
     serviceName: string
     toolName: string
     args: Record<string, any>
+    expiresAt?: string
+    timeoutSeconds?: number
   }) => void
   // ──────────────────────────────────────────────────────────────────────────
   // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle SSE
@@ -737,6 +739,8 @@ export async function subscribeToRun(
             serviceName: (parsed.service_name ?? parsed.serviceName) as string,
             toolName: (parsed.tool_name ?? parsed.toolName) as string,
             args: (parsed.args ?? {}) as Record<string, any>,
+            expiresAt: (parsed.expires_at ?? parsed.expiresAt) as string | undefined,
+            timeoutSeconds: (parsed.timeout_seconds ?? parsed.timeoutSeconds) as number | undefined,
           })
         // Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice.
         // Informational branch (mirrors skill_activated) — carries NO `return`, so the
