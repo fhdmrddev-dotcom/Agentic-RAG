@@ -56,9 +56,10 @@
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Retain neutral string | Keep `"timed out waiting for approval"` without guidance | |
-| Provide actionable recovery instructions | Explicitly inform the model that approval timed out in chat, the connection is healthy, and advise it not to hallucinate panels or re-auth | ✓ |
+| Provide actionable recovery instructions | State what is known: nobody answered in time (saying nothing either way about connection health), and instruct the model not to hallucinate workspace panels or re-authorization | ✓ |
 
-**User's choice:** Provide truthful recovery text in `tool_dispatcher.py` to eliminate hallucinations.
+**User's choice:** Provide truthful recovery text in `tool_dispatcher.py` stating what is known (nobody answered in time) without asserting unverified connection health claims, eliminating recovery hallucinations.
+**Notes:** The timeout path knows only that no human answered within 120s; it has not probed the connection. Saying it is healthy would trade an invented recovery for an invented reassurance.
 
 ---
 
