@@ -277,3 +277,57 @@ green"* has written a criterion that can fail for reasons no plan controls. 221-
 deterministic evidence is the per-file figures and the explicitly-run in-scope suites —
 settings 367/367, `tsc` 66 = baseline, backend `70 failed / 3287 passed` with 70 the untouched
 baseline.
+
+---
+
+## ⚠ SIGHTING 2026-09-02 (Phase 223 reviewer check) — THE SET IS **SEVEN**, AND THE FAILING TESTS SHARE A *KIND*
+
+Two full gate runs on the **same tree**, minutes apart, no sibling agent, `GSD_VITEST_MAX_WORKERS=2`,
+run from the repo root. **Filenames were captured from the gate's own persisted JSON BEFORE either
+re-run**, per this seed's procedure.
+
+| run | failed | file | the failing tests |
+|---|---|---|---|
+| 1 | **4** | `frontend/src/components/workflows/library/ForkNameDialog.test.tsx` | reset-on-open · trimmed-empty check · Cancel creates nothing · **aXe structural** |
+| 2 | **2** | `frontend/src/components/workflows/WorkflowCanvas.test.tsx` | **aXe** on a rendered canvas · **aXe** on the empty state |
+
+**Different file on each run.** Both **byte-unchanged** since the phase base (`git diff --numstat`
+returns empty for the component and its suite). Phase 223's entire frontend diff is five files —
+`ChatArea.tsx`, `MessageInput.tsx`, `MessageInput.connectors.test.tsx`, `lib/api/threads.ts`,
+`types/index.ts` — and **neither flaky file is among them**. `ForkNameDialog.test.tsx` then passed
+**25/25 in isolation**.
+
+⚠ **Say "provably unmodified", never "fine".** One green isolation run is not proof of innocence, and
+this seed's own history is that a suite cleared on one sample went red later.
+
+**The flaky set is now SEVEN:** `WorkflowsPage.test.tsx` · `WorkflowCard.test.tsx` ·
+`WorkflowBuilderPage.session.test.tsx` · `WorkflowRunPage.test.tsx` ·
+`WorkflowBuilderPage.canvas.test.tsx` · **`library/ForkNameDialog.test.tsx`** ·
+**`WorkflowCanvas.test.tsx`**.
+
+### ⭐ THE NEW FINDING IS NOT THE TWO FILES — IT IS THAT THE FAILING TESTS SHARE A KIND
+
+Across **both** runs, **every** failure was either an **`axe` accessibility assertion** or a
+**dialog-render assertion**. Three of the six were literally named *"no aXe violations"*.
+
+That is a sharper hypothesis than *"these files are flaky"*, and it is falsifiable: **`axe` runs are
+the slowest, most CPU-bound work in the whole suite** — a full accessibility tree walk over a rendered
+DOM — so under worker contention they are the tests most likely to cross a timeout boundary first.
+It predicts that the *identity* of the flaky file is close to irrelevant, and that what actually
+predicts a red run is **how many `axe` assertions a run happens to schedule concurrently**.
+
+⚠ **This does NOT resurrect the cap hypothesis this seed refuted.** The cap was `2` on both runs and
+both went red; §CORRECTION (b) stands. What is proposed is a *different* mechanism for the same
+refractory symptom, and it is stated as a hypothesis rather than a finding **because it has not been
+driven** — nobody has yet run the gate with the `axe` assertions excluded to see whether red
+disappears. That experiment is the cheapest next step and it has not been done.
+
+### Consequence for a reviewer, restated
+
+A red count gate is **not** evidence against the phase under review until the failing filenames have
+been checked against that phase's real diff. Here the check took one `git diff --numstat` and cleared
+223 outright. **The gate's deterministic half — per-file figures, the explicitly-run in-scope suites,
+`tsc`, and the backend baseline — is what actually carried the verdict:** `tsc` **66** = baseline,
+backend **70 failed** = baseline exactly, 13 in-scope unit tests green, and the live audit suite
+**5 passed / 0 skipped**.
+
