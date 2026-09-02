@@ -11,6 +11,7 @@ priority: medium
 relates_to:
   - SEED-128 (Claude.ai-style collapsible run/reasoning timeline) — the operator's OTHER standing observation, still `dormant` since 2026-07-22, and the natural companion to this one
   - BUG-260902-01 (a todo abandoned mid-run stays `in_progress` forever) — found in the SAME screenshot; that one is a data defect, this one is presentation
+  - ⛔ BUG-260902-02 (~99px of every line silently clipped with the panel open) — found while driving chat scenarios an hour later, and it is BLOCKING. ⚠ This seed is the POLISH; that bug is the surface being unreadable. Do not fold them
   - Phase 209 ("A step says what it actually does") and Phase 214 (`StepIdentity`) — the vocabulary this card predates and never adopted
   - SEED-098 (chat tool-card deduplication / unified essence line)
   - SEED-045 (UI/UX polish pass)
@@ -36,8 +37,17 @@ Four columns share the width, and two of them are chrome:
 | **chat** | **~700 px** |
 | workspace panel | **308 px** |
 
-⚠ **No horizontal overflow** — `scrollWidth === innerWidth`, so nothing is technically broken.
-**The complaint is not overflow, it is proportion**: the surface that carries the conversation
+⚠ **CORRECTED 2026-09-02, SAME DAY — THE ORIGINAL CLAIM IS KEPT BELOW BECAUSE BEING WRONG IS THE
+FINDING.** This seed originally read *"no horizontal overflow, nothing is technically broken, the
+complaint is proportion"*. **That was measured on a message with no wide content.** An hour later,
+driving a response containing a fenced code block, `BUG-260902-02` measured **99 px of every line
+silently clipped** with the panel open — no scrollbar, no ellipsis. ⚠ **My detector said "0
+overflow" because I scanned each element against its own PARENT, and nothing overflows its
+parent; the whole column overflows the VIEWPORT.** A clean result from the wrong question reads
+exactly like a clean result.
+
+~~No horizontal overflow — `scrollWidth === innerWidth`, so nothing is technically broken.~~
+**The proportion complaint stands on its own**: the surface that carries the conversation
 gets 45% of a 1536px screen, and 1536 is a *common laptop width*, not a narrow one.
 
 ⚠ **The panel's 308 px is where it shows.** A todo label is allotted **186 px** before the
@@ -70,7 +80,7 @@ From the same screenshot, top to bottom:
 
 ## What this is NOT
 
-- Not overflow, not a broken layout, not a responsive bug. Everything fits.
+- ⚠ ~~Not overflow, not a broken layout. Everything fits.~~ **FALSE — see the correction above and `BUG-260902-02`.** These are the PRESENTATION faults; the clipping is a separate, blocking defect.
 - Not `BUG-260902-01`. That one is a wrong *value* in the database; this is wrong *presentation*
   of correct values. **They were found in one screenshot and must not be folded into one fix.**
 
