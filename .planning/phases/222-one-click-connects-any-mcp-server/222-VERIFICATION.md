@@ -79,8 +79,16 @@ signature — red in a full run, green in isolation — is pollution, never a de
    base64'd in the authorize URL. Reported, deliberately unfixed, needs its own scoped phase.
 3. **Cloud parity** — migration 151 is LOCAL only, and a read against a policy-less table returns
    **empty rather than erroring**, which is the silent half of the defect it fixes.
-4. **Two live provider keys** in `e5977a244` are still unrevoked, and ~520 commits sit unpushed
-   because of them.
+4. ✅ **RESOLVED 2026-09-02** — the two provider keys were **revoked by the operator** and
+   replacements verified live (Moonshot `api.moonshot.ai` HTTP 200; Zhipu authenticates but the
+   account answers `429 1113 — insufficient balance`, which is billing, not auth). ⚠ **The
+   "~520 commits unpushed because of them" claim was WRONG and is corrected rather than deleted:**
+   `e5977a244` was ALREADY on `origin/develop`, so that window had closed long before. Only 24
+   commits were unpushed, and they are pushed. ⚠ **Deleting the guide had NOT stopped the keys
+   propagating** — both were still readable at HEAD in `.agent-bus/OPEN.md` and
+   `221-CARRY-FORWARD.md`, because *the messages reporting the leak quoted the values*. Redacted at
+   `9bfc96902`. **A secret quoted in an incident note is still a secret.** Two more copies survive
+   locally in the stale `.claude/worktrees/revbase` worktree (gitignored, never pushed).
 5. **`SEED-239`** — one malformed `config` still takes down every connection in the org.
 6. **`D-222-02`'s auto-probe-on-typing** stands as designed; §3 of `222-PREFLIGHT.md` records why
    blur-or-button would open fewer sockets to hosts a person is merely passing through.
