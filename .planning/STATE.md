@@ -33,16 +33,20 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 223 — A Connection Leaves a Record (Context gathered 2026-09-02; ready for planning)
+**Current focus:** Phase 223 — A Connection Leaves a Record (5 plans ready for execution)
 Phase numbering continues at **210**.
 
 ## Current Position
 
 ▶ **PHASE 223: A Connection Leaves a Record — IN PROGRESS (2026-09-02).** Operator handed phase to Gemini;
-reviewer preflight completed (BUS-056 / BUS-057 / 223-PREFLIGHT.md). Discuss-phase complete: decisions locked
-in `223-CONTEXT.md` (D-223-01..10) including D-223-01/02 (`connector.call` & `connector.grant` audit action types,
-migration 152), D-223-03 (arg_keys only, privacy safe), D-223-06 (messages.active_connector_ids jsonb), and
-D-223-07 (Map.has() restore keyed on last USER message with explicit [] vs NULL distinction). Next: `/gsd:plan-phase 223`.
+reviewer preflight completed (BUS-056 / BUS-057 / 223-PREFLIGHT.md) and verified clean pass in BUS-059. Discuss-phase
+and plan-phase complete: 5 plans authored, committed, and structurally verified (`gsd-tools verify plan-structure` 0 errors):
+- `223-01-PLAN.md` (Wave 1): Schema lockstep (migration 152, VALID_ACTION_TYPES, _ALL_21 boot guard, MessageResponse).
+- `223-02-PLAN.md` (Wave 2): tool_dispatcher.py outbound audit (5 evaluated outcomes, arg_keys privacy, truthful timeout copy).
+- `223-03-PLAN.md` (Wave 2): Permanent grant receipts (Always allow on chat card + Settings panel grants).
+- `223-04-PLAN.md` (Wave 2): Armed connectors persistence (threads.py insert, Message mapper, MessageInput.tsx Map.has() restore).
+- `223-05-PLAN.md` (Wave 3): Live DB integration verification against :54322 (SC#4/SC#5 proof that writes land).
+Next: `/gsd:execute-phase 223`.
 
 ✅ **222 IS COMPLETE AND DRIVEN IN A BROWSER (2026-09-02).** Both halves shipped: Gemini's five
 door plans + Claude's crypto. ⭐ **Notion connects by OAuth with NO developer console** — RFC 7591
