@@ -4,10 +4,10 @@ title: With the workspace panel open, ~99px of EVERY line of generated text is s
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [frontend/chat, frontend/panel, frontend/layout, markdown-rendering]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "fixed 2026-09-02, verified in a real browser — see the closing section"
 related_seeds: [SEED-240, SEED-128]
 re_open_trigger: null
 reproduces_on:
@@ -96,3 +96,49 @@ removing it blindly is how the next layout defect gets introduced.
 ⚠ **`SEED-240` records the presentation faults found in the same session** (a raw `WRITE_TODOS`
 card, a step orphaned outside its run frame, a 308 px panel crowding its own badges). **This bug
 is not those**, and folding them together would bury a blocking defect inside a polish pass.
+
+---
+
+## ✅ FIXED AND VERIFIED IN A BROWSER, 2026-09-02
+
+**Cause: Radix's own injected viewport child**, not our markup.
+`ScrollAreaPrimitive.Viewport` wraps its children in a div carrying
+`display: table; min-width: 100%`. **A table shrink-wraps to its content**, so one wide child
+made that wrapper wider than the viewport instead of forcing the child to wrap — and the
+viewport's `overflow-x: hidden` then discarded the excess.
+
+**Fix:** `[&>div]:!block` on the Viewport (`components/ui/scroll-area.tsx`).
+
+⚠ **Safe here for a reason that was CHECKED, not assumed.** Radix uses `display: table` only to
+measure content width for a **horizontal** scrollbar. `grep 'orientation="horizontal"'` across
+`frontend/src` returns **nothing**, and `<ScrollArea` has exactly **two** call sites
+(`MessageList.tsx`, `ReadDocumentBody.tsx`), both vertical. The measurement is unconsumed. **If a
+horizontal scrollbar is ever added, that line is the first thing to revisit** — the comment in the
+source says so too.
+
+### Measured in the browser, panel open, same message
+
+| | before | after |
+|---|---|---|
+| Radix child `display` | `table` | **`block`** |
+| viewport | 718 px | 718 px |
+| message column | **865 px** | **718 px** |
+| clipped | **99 px** | **0** |
+
+⭐ **And the long code line is now REACHABLE rather than gone**: the `<pre>` reports
+`clientWidth 625 / scrollWidth 771` with `overflow-x: auto` — it scrolls. The markdown table fits
+at 626 px with nothing lost. **The fix converts "silently discarded" into "wrapped where it can
+be, scrollable where it cannot."**
+
+### Gates
+
+`tsc` **66** (baseline) · chat + ui suites **288/288** · count gate **OK 188/188 · 7155 · 0
+failing** · 2 tests added and pinned.
+
+⚠ **One flake, triaged rather than waved through.** The first gate run reported 1 failing test.
+⚠ **I re-ran before capturing the name — the exact mistake CLAUDE.md records** — and recovered it
+from the gate's persisted JSON instead: `src/pages/WorkflowBuilderPage.canvas.test.tsx`, **one of
+SEED-171's five named cap-independent flaky suites**. Per the documented triage it is
+**byte-unchanged by this diff**, and neither `WorkflowBuilderPage.tsx` nor `WorkflowCanvas.tsx`
+imports `ScrollArea` at all, so this change cannot reach it. **Provably unmodified — not
+"fine"**; one green sample of a flaky suite proves nothing.
