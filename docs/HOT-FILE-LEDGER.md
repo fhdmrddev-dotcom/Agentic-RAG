@@ -6,6 +6,61 @@ This file holds each row's **narrative** — the measured reasons, the correctio
 their originals, the RED-driven plants, the invariants each file now carries, and the named seam
 the next refactor should take.
 
+## ⚠ BATCH RE-DERIVATION 2026-09-02 — THIRTEEN OF FOURTEEN ROWS MEASURED STALE, AND ONE WAS WRONG IN THE DANGEROUS DIRECTION
+
+Fourteen rows re-derived in one pass with `CLAUDE.md`'s own recipe (6-digit dated quick-task buckets
+excluded from the phase count). **Thirteen were stale. One was `WorkspacePanel.tsx`, and it was exactly
+right.** Superseded figures are recorded beside the new ones, never over them.
+
+| file | row said | **measured 2026-09-02** | drift |
+|---|---|---|---|
+| `chat/MessageItem.tsx` | 57 / 29 / 856 | **58 / 29 / 863** | +1 commit |
+| `chat/ToolCallPanel.tsx` | 47 / 19 / 995 | **50 / 19 / 1019** | +3 commits, +24 L |
+| `chat/ChatArea.tsx` | 63 / 30 / 571 | **67 / 32 / 595** | **+2 phases** |
+| `chat/RunCard.tsx` | 22 / 10 / 661 | **24 / 10 / 688** | +27 L |
+| `chat/MessageInput.tsx` | 25 / 13 / 478 | **29 / 14 / 643** | **+1 phase, +165 L** |
+| `layout/ChatLayout.tsx` | 41 / 22 / 911 | **46 / 24 / 921** | **+2 phases** |
+| `services/tool_dispatcher.py` | 72 / 29 / 4624 | **77 / 32 / 4679** | **+3 phases, +55 L** |
+| `api/connectors.py` | 17 / 7 / 1338 | **24 / 10 / 1643** | **+3 phases, +305 L** |
+| `api/threads.py` | 238 / 78 / 1408 | **243 / 80 / 1590** | **+2 phases, +182 L** |
+| `services/connector_service.py` | 16 / 5 / 1461 | **21 / 7 / 1601** | **+2 phases, +140 L** |
+| `models/message.py` | 15 / 8 / 120 | **17 / 10 / 124** | **+2 phases** |
+| ⛔ `lib/api/threads.ts` | 3 / 2 / 1600 | **7 / 3 / 1683** | **+1 phase — CROSSES THE G-5 THRESHOLD** |
+| `types/index.ts` | 71 / 57 / 1209 | **78 / 60 / 1331** | **+3 phases, +122 L** |
+| ✅ `panel/WorkspacePanel.tsx` | 16 / 10 / 646 | **16 / 10 / 646** | none — the one accurate row |
+
+### ⛔ `frontend/src/lib/api/threads.ts` was PRESENT AND WRONG, which is worse than absent
+
+Its G-5 cell read **`no (2 phases)`** and it measures **3**. `CLAUDE.md` states the failure mode
+exactly: *"A row that is present and WRONG answers the auditor with `satisfied` and stops the audit,
+which is worse than an absent row."* This is that, caught in the wild. The cell is now
+**`⚠ FIRES — EXACTLY AT THRESHOLD`**.
+
+⚠ **It is also a file the 207 split created with no row of its own** — `lib/api.ts`'s row is the
+**barrel**, not these modules, and that distinction is already recorded in three sibling rows. The
+next phase to modify it owes it a named seam.
+
+### ⭐ ONE ROW ROTTED DURING THE SESSION THAT MEASURED IT
+
+`tool_dispatcher.py` was measured **76 / 31 / 4643** earlier the same day, while writing the Phase 223
+pre-flight, and **77 / 32 / 4679** a few hours later — Phase 223's own commits landed in between.
+**The ledger's standing thesis is that a figure written at a phase's close goes stale on the next
+commit that touches the file; here it went stale inside a single working session.** Recorded because
+it is a demonstration, not an anecdote: **re-derive at the moment of use, never quote a table.**
+
+### Why this sweep happened at all
+
+The Phase 224 pre-flight quoted four of these rows to Gemini with the caveat *"re-derive rather than
+quoting these"* — and then the sweep found the caveat was load-bearing on **every one of them**.
+⚠ **A caveat is not a fix.** The rows are corrected here so discuss-phase reads the right numbers
+instead of correcting them, and so the four hot files in 224's blast radius
+(`MessageItem` · `ToolCallPanel` · `ChatArea` · `WorkspacePanel`) plus the two the ROADMAP omits
+(`RunCard.tsx`, `ChatLayout.tsx`) are all current at hand-off.
+
+⚠ **No disposition cell was changed by this sweep** — only triples, plus the one G-5 verdict that the
+new phase count forced. **Re-measuring a file is not the same as re-judging it**, and conflating the
+two is how a sweep silently discharges obligations nobody discharged.
+
 ## How to use it
 
 - **`CLAUDE.md` is the guardrail.** The discuss-phase audit scans PLAN.md `files_modified`
