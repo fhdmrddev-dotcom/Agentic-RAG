@@ -1,0 +1,20 @@
+{
+  "sketch_id": "223-the-step-inside-the-run",
+  "phase": 224,
+  "title": "The Step Inside The Run — where a panel-owned card belongs",
+  "question": "A write_todos card is panel-owned, so it renders as a sibling beneath the run that counts it. Does it belong inside the run frame, and if so as what?",
+  "views": [
+    { "id": "today", "description": "The measured shipping state: header says 3 steps, rail shows 2, WRITE_TODOS below the frame, Square glyph reading as an unticked box" },
+    { "id": "a", "description": "The card becomes step 3 on RunCard's rail. One grammar, count true by construction. Requires the RunCard extraction." },
+    { "id": "b", "description": "Inside the frame but in its own panel-owned band. Keeps panel=now / chat=happened. Two grammars in one card." },
+    { "id": "c", "description": "RunCard untouched; a continuation bracket groups run and siblings. No G-5 obligation; count still disagrees." }
+  ],
+  "real_strings": {
+    "WRITE_TODOS": "SeamCard.tsx:43 headLabel returns raw kind, :51 applies uppercase",
+    "count-only payload": "SeamCard.tsx:83 receives counts only; raw payload forbidden by T-087-13",
+    "Agent reached time limit": "MessageItem.tsx:799, lucide Square at 12px",
+    "sibling placement": "MessageItem.tsx:841 — ADDITIVE ONLY, never a touch of RunCard internals (G-5)",
+    "Track its to-dos": "toolNames.ts:114 TOOL_PHRASES, unimported by chat"
+  },
+  "design_tokens": "frontend/src/index.css"
+}
