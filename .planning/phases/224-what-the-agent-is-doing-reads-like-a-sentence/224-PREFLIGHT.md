@@ -159,10 +159,29 @@ gate's persisted JSON BEFORE re-running anything**, check them against `git diff
 **aXe** or dialog-render assertion — the slowest work in the suite — so the file identity may matter
 less than how many `axe` assertions land concurrently. **Untested; it is a hypothesis, not a finding.**
 
-⚠ **A count-gate DECREASE is EXPECTED this phase and is not a regression** — deleting two `SeamCard`
+⚠ ~~**A count-gate DECREASE is EXPECTED this phase and is not a regression** — deleting two `SeamCard`
 arms will delete their tests. `Seam.test.tsx` covers them. **The gate fails on a per-file decrease, so
 the BASELINE pins must be updated in the same commit as the deletion**, and the summary must say which
-file went down and by how much. A silent decrease and a deliberate one look identical to the gate.
+file went down and by how much. A silent decrease and a deliberate one look identical to the gate.~~
+
+⛔ **CORRECTED 2026-09-02, AFTER GEMINI HAD ALREADY PLANNED AROUND IT. The original is struck through
+above rather than deleted, because being wrong in a pre-flight is the thing this document exists to
+prevent.** Measured from the gate's own persisted JSON report — not from the `TARGETS` source, my first
+read of which was incomplete and nearly produced a second wrong finding:
+
+| suite | runs? | pinned? |
+|---|---|---|
+| `chat/__tests__/ToolApproval.test.tsx` (224-03) | ✅ RUNS | ✅ PINNED |
+| `chat/__tests__/MessageInput.connectors.test.tsx` | ✅ RUNS | ✅ PINNED |
+| **`panel/__tests__/Seam.test.tsx` (224-01)** | ⛔ **NOT RUN** | ⛔ **NOT PINNED** |
+| **`panel/__tests__/TodosSection.test.tsx` (224-05)** | ⛔ **NOT RUN** | — |
+| **`CitationList` / `RunCard` (224-04, 224-05)** | ⛔ **NO SUITE EXISTS** | — |
+
+**So there is NO decrease and NO pin to update.** And the sharper consequence: 224-05's acceptance
+criterion *"the count gate reports OK 188/188, 0 failing"* **passes whether or not four of the five
+plans work.** Only 224-03 is genuinely guarded. ⚠ This is the Phase 214 shape — **TARGETS decides what
+RUNS, BASELINE decides what is GUARDED** — with four surfaces outside both. The cheap remedy is to add
+the touched suites to TARGETS and BASELINE within the phase, as 214 did at its close.
 
 ---
 
