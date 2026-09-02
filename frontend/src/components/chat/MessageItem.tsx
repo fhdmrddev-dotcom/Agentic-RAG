@@ -49,12 +49,12 @@ import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
 import type { ToolCall } from "@/types"
 
 /**
- * Phase 087-05: the three panel-owned tools (write_todos / workspace_write /
- * ask_user) render via the seam, not as raw chat tool rows. Map a ToolCall name
- * to its SeamKind, or null when it is not panel-owned.
+ * Phase 087-05 / Phase 224 (Winner D): ask_user renders via the seam as an
+ * answered Q&A card in reloaded history. write_todos and workspace_write arms
+ * were pruned (the right-hand Workspace panel is the canonical view).
  */
 function seamKindFor(name: string): SeamKind | null {
-  if (name === "write_todos" || name === "workspace_write" || name === "ask_user") {
+  if (name === "ask_user") {
     return name
   }
   return null
@@ -163,48 +163,14 @@ function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
 }
 
 /**
- * Build the reload-mode SeamCard payload from a resolved panel-owned ToolCall
- * (D3). Renders ONLY summarized known fields — never the raw payload. Values are
- * best-effort: args are a Record<string,string> (Phase 086 wire), result is the
- * agent's answer for ask_user.
+ * Build the reload-mode SeamCard payload from a resolved ask_user ToolCall (D3).
+ * Renders question + resolved answer.
  */
 function seamCardPayloadFor(tc: ToolCall): SeamCardPayload {
-  switch (tc.name) {
-    case "ask_user":
-      return { question: tc.args.prompt, answer: tc.result ?? undefined }
-    case "workspace_write": {
-      const v = tc.args.version
-      return {
-        path: tc.args.path ?? tc.args.file_path,
-        version: v != null ? Number(v) : undefined,
-      }
-    }
-    case "write_todos": {
-      // 087-08 fix: write_todos args carry a `todos` array ({id, content, status});
-      // there is no total/done field, so the prior tc.args.total/.done read undefined
-      // and the SeamCard always showed "☑ 0 todos". Derive the counts from the list
-      // (array, or JSON string per wire drift). status enum: pending|in_progress|completed.
-      const raw = (tc.args as Record<string, unknown>).todos
-      let todos: Array<{ status?: string }> = []
-      if (Array.isArray(raw)) {
-        todos = raw as Array<{ status?: string }>
-      } else if (typeof raw === "string") {
-        try {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed)) todos = parsed
-        } catch {
-          /* leave empty — never throw in a render-path mapper */
-        }
-      }
-      const doneCount = todos.filter((t) => t?.status === "completed").length
-      return {
-        todoTotal: todos.length,
-        todoDone: doneCount > 0 ? doneCount : undefined,
-      }
-    }
-    default:
-      return {}
+  if (tc.name === "ask_user") {
+    return { question: tc.args.prompt, answer: tc.result ?? undefined }
   }
+  return {}
 }
 
 interface Props {

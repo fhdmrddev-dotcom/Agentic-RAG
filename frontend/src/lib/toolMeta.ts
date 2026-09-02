@@ -1,4 +1,5 @@
 import type { Phase, ToolCall } from "@/types"
+import { toolName } from "@/lib/toolNames"
 
 /**
  * Shared tool metadata helpers — used by ToolCallPanel and MessageItem.
@@ -25,7 +26,7 @@ export function toolLabel(name: string): string {
     const formattedAct = act.replace(/_/g, " ")
     return `${formattedSvc} · ${formattedAct}`
   }
-  return name
+  return toolName(name)
 }
 
 export function toolSummary(name: string, args: Record<string, unknown>): string | null {
