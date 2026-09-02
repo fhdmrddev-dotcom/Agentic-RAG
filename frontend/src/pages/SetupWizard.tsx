@@ -210,7 +210,7 @@ export function SetupWizard({ onExitToApp }: SetupWizardProps = {}) {
     setMaxReached((m) => Math.max(m, next))
   }
 
-  const goToApp = onExitToApp ?? (() => window.location.assign("/"))
+  const goToApp = onExitToApp ?? (() => window.location.assign("/app"))
 
   // ── Finalized: the ONLY surface after finalize is the lock-out (SC#2 / D-14). ──
   if (finalized) {
