@@ -73,8 +73,9 @@ not degraded, not partial. Absent.
 - The armed-connector restore **re-arms something a person turned off**.
 - A new `action_type` is added and **not registered**, so the write fails silently and every gate
   stays green. ⭐ **This is the most likely way this phase ships broken.**
-- The work grows to cover workflow-run connector calls, the `Always allow` grant receipt, or the
-  operator audit UI. **Those are named in "not in scope" below for exactly that reason.**
+- The work grows to cover workflow-run connector calls or the operator audit UI. **Those are
+  named in "not in scope" below for exactly that reason.** ⚠ The `Always allow` receipt was
+  moved INTO scope on measurement — see below — so it is no longer an example of scope creep.
 
 ## Not in scope, deliberately
 
