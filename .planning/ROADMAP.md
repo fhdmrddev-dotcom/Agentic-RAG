@@ -154,6 +154,7 @@ it.*
 - [x] **Phase 223: A Connection Leaves a Record** — an outbound connector call, and the permanent grant that permits it, appear in the audit ledger naming service/tool/actor/outcome; and a thread's armed connectors survive a reload (closes ⛔ `BUG-260902-05`, `BUG-260902-03`, the copy half of `BUG-260902-04`). ⚠ **`GRANT-05` is currently met for the EMPTY SET** — measured 2026-09-02
 - [ ] **Phase 224: What the Agent Is Doing Reads Like a Sentence** — the chat column names what a step did instead of `WRITE_TODOS`, the orphan card below the run is DELETED rather than rehomed, the approval card docks where you can reach it and shows its clock, and the References footer folds by default behind a control you can find (`SEED-240`, `BUG-260902-04` copy-adjacent halves, `BUG-260902-07`). ✅ **G-2 SATISFIED** — sketches 223 (winner **D · delete**) + 226 (winner **A · dock**), operator 2026-09-02. ⛔ `SEED-128` REMOVED from scope on the operator's own words (*"this is for the next milestones"*) and unfolded back to `planted`
 - [ ] **Phase 225: One Way to Hold a Secret Mid-Handshake** — the OAuth handshake keeps its secrets on the SERVER instead of in the URL bar. `generate_oauth_state` (`oauth_service.py:139`) packs the OAuth client secret (`sec_ovr`) and the PKCE verifier (`cv`) into the `state` parameter, base64-encodes and SIGNS it — signing proves it was not tampered with and does nothing to hide it — and `build_authorization_url` (`:265`) puts that into the authorize URL, so it reaches browser history, proxies and logs. ⛔ **The `cv` one defeats the purpose of PKCE**: an intercepted code and its verifier travel in the same URL. Ports the Google path onto the opaque-handle design `mcp_oauth.py` ALREADY SHIPS, so there is ONE state implementation rather than two (`BUS-048`, answered by the operator 2026-09-02). ⚠ **Security-bearing** · ⚠ **the cutover is the hard part** — `state` round-trips through a third party, so the callback must accept both formats during a transition window
+- [ ] **Phase 227: The Run Frame Has One Owner** — a REFACTOR phase, no new capability: one visual object (the run frame) is rendered by `MessageItem.tsx` (61/30/829, *extraction due*), `RunCard.tsx` (24/10/688) and `ToolCallPanel.tsx` (50/19/1019, *extraction due*), and **none of them owns it** — so every change to the frame becomes a negotiation between three hot files. ⭐ **The guardrail produced the defect it was protecting against**: `MessageItem.tsx:841` said *"ADDITIVE ONLY … never a touch of RunCard internals (G-5)"*, so a phase bolted a card onto the OUTSIDE of the frame — and **that card is exactly what Phase 224 deletes**. ⚠ **56 ledger rows read *honoured by construction***, which is how a refactor obligation becomes permanent. ⚠ **Success = NOTHING changes on screen**; the bar is a before/after browser drive of every frame state, not a green suite
 
 ### Phase Details
 
@@ -789,6 +790,52 @@ Full scoping: `.planning/phases/225-one-way-to-hold-a-secret-mid-handshake/225-P
 
 **Flags**: ✅ **G-2 SATISFIED** — Claude Design canvas *Agentic RAG Landing* (https://claude.ai/code/artifact/d33a1829-8e5c-498a-8f65-dcbda8cbc448), source in `.planning/design/landing-canvas/`. ⚠ Separate Vite entry, not an app route (D-226-01). ⚠ Verify how `ChatLayout` treats the bare root before choosing the rewrite (D-226-02). No migration. Full brief: `.planning/phases/226-the-public-landing-page/226-PROPOSAL.md`.
 
+
+#### Phase 227: The Run Frame Has One Owner
+
+**Goal**: One component owns the run frame — header, rail, steps, terminal status, footer. A REFACTOR
+phase: it ships no new capability, and **the success condition is that nothing changes on screen**.
+
+**Why**: ⭐ Phase 224 hit this wall TWICE in one plan and stopped both times rather than widen scope.
+Two small visual changes — move the status line inside the frame, right-align each step's result —
+could not be made inside the plan's declared `files_modified`, because one visual object is rendered by
+three files: `MessageItem.tsx` (**61 / 30 / 829**, *extraction due*) owns the terminal status line,
+`RunCard.tsx` (**24 / 10 / 688**) owns the frame, `ToolCallPanel.tsx` (**50 / 19 / 1019**, *extraction
+due*) owns the step rows. **No file owns the frame.** Any phase touching this surface hits the same
+wall.
+
+⭐ **THE GUARDRAIL PRODUCED THE DEFECT IT WAS PROTECTING AGAINST, and it is written in the source
+rather than inferred.** `MessageItem.tsx:841`: *"ADDITIVE ONLY — a new sibling renderer in MessageItem,
+never a touch of RunCard internals (G-5)."* G-5 told a phase to avoid a hot file; the phase complied by
+bolting a card onto the OUTSIDE of the run frame — **and that bolt-on card is the exact defect Phase
+224 exists to delete.** Not anyone's mistake: the mechanism working as designed.
+
+⚠ **AND THE LEDGER CANNOT SEE THE DIFFERENCE.** `grep -c "honoured by construction" CLAUDE.md` → **56**.
+Each row is individually reasonable; together they are how a refactor obligation becomes permanent —
+every phase dodges the file, so the file never improves, so the next phase must dodge it too.
+**"Honoured by construction" is booked as a discharge and is actually a deferral.** G-5's own rule
+(*"≥ 3 prior phases on the same hot file → insert a dedicated refactor phase BEFORE the next feature
+phase"*) has been firing on this surface for dozens of phases and has never been taken. **This phase is
+that rule being obeyed.**
+
+**Success criteria**: (1) one component owns the frame and `MessageItem` renders *a run* rather than
+pieces of one; (2) ⭐ **nothing changes on screen** across every state — streaming, settled, failed,
+timed-out, cancelled, paused-on-approval, no-tools, sub-agent; (3) the two changes 224 could not make
+become one-file edits **without being made here**; (4) both files leave *extraction due* by having lost
+the responsibility, not by a row being re-worded; (5) the covering suites are in `TARGETS`/`BASELINE`
+**before** the refactor starts.
+
+**Flags**: ⚠ **G-2 applies in an unusual direction** — nothing to sketch, but the acceptance bar is
+VISUAL and cannot be met in jsdom; it is a before/after browser drive and it needs the operator.
+⚠ **The failure mode with precedent**: Phase 217 *"shipped green against a contract with 200 assertions
+about vocabulary and ZERO about composition"* and had to be followed by 217.1 — **a refactor with no
+visual contract is a rewrite with extra steps.** ⚠ Four G-5 hot files, all firing; re-derive the
+triples. ⚠ **Whoever built 224 must not review this** — the two share their entire blast radius.
+⚠ **The right-aligned column has an unresolved conflict with the operator's 2026-08-31 noise audit**
+(`ToolCallPanel.tsx:420-430`) and is deliberately NOT built here. **No migration, no wire change, no new
+dependency** — if any appears, the phase has grown a feature. Full scoping:
+`.planning/phases/227-the-run-frame-has-one-owner/227-PROPOSAL.md`.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -812,6 +859,7 @@ Full scoping: `.planning/phases/225-one-way-to-hold-a-secret-mid-handshake/225-P
 | 224. What the Agent Is Doing Reads Like a Sentence | 0/? | Scoped 2026-09-02. ✅ **G-2 satisfied** — sketches 223 (**D · delete**) + 226 (**A · dock**) decided by the operator. ⭐ Winner D rests on a measurement: the panel and the seam card read the SAME persisted `tool_calls`, so the card's stated reason for existing is false. New: `BUG-260902-07`. ⛔ `SEED-128` out of scope, unfolded to `planted`. Post-sketch scope: `224-PROPOSAL.md` §SCOPE CHANGE | - |
 | 225. One Way to Hold a Secret Mid-Handshake | 0/? | Proposed 2026-09-02 from `BUS-048`, answered by the operator the same day. ⛔ **Live-code security finding**: the OAuth `state` carries the client secret and the PKCE verifier in the clear — signed, not hidden. Ports the Google path onto the opaque-handle design `mcp_oauth.py` already ships. ⚠ The cutover is the hard part. `225-PROPOSAL.md` | - |
 | 226. The Public Landing Page | 0/? | Proposed 2026-09-03 after a two-day design session; queued behind 224 / 225. ✅ G-2 satisfied by the design canvas. Folds `SEED-241`. Gemini builds, Claude pre-flights (`226-PREFLIGHT.md`). `226-PROPOSAL.md` | - |
+| 227. The Run Frame Has One Owner | 0/? | Proposed 2026-09-03 from Phase 224's execution — a REFACTOR, no new capability. One visual object rendered by three files, none owning it. ⭐ The G-5 guardrail produced the defect it protected against (`MessageItem.tsx:841`), and **56 ledger rows read *honoured by construction***. ⚠ Success = nothing changes on screen; the bar is a browser drive. `227-PROPOSAL.md` | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.
