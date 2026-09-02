@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Play, Ban } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, User, Play, Ban } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -440,7 +440,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // echo (stickyLabelRef / computedLabel / stickyBottomLabel) is GONE — the
   // RunCard header strip already carries the live verb + timer, so the loose
   // duplicate below the run card was pure noise. Terminal-state copy
-  // (timed_out / stopped) still renders from the Square block below; the
+  // (timed_out / stopped) still renders from the terminal block below; the
   // no-tools-yet thinking indicator renders from its own branch (both untouched).
   const isMessageStreaming = message.runStatus === "streaming"
 
@@ -718,8 +718,10 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           // DeepSeek early cancel whose only output was stripped DSML markup). The
           // renderer previously drew an avatar-only empty bubble that reads as
           // "something broke". Render an honest "cancelled — no output yet"
-          // affordance instead (mirrors the stopped-indicator styling: Square icon
-          // + muted italic). Reached only in the falsy-content branch, so a
+          // affordance instead (mirrors the stopped-indicator styling: muted
+          // italic — Phase 224 dropped the Square glyph from BOTH sites, SC#3:
+          // a status sentence must not wear a control's costume, and this one sat
+          // directly under SeamCard's `☑`). Reached only in the falsy-content branch, so a
           // cancelled run WITH content renders its content normally + the
           // persistent "Response stopped" indicator below. Pure render-derive from
           // the persisted runStatus — no shared-path fork (D-03/G-5 safe).
@@ -727,14 +729,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             className="flex items-center gap-1.5 text-sm text-muted-foreground"
             data-testid="cancelled-no-output"
           >
-            <Square className="w-3 h-3" />
             <span className="italic">cancelled — no output yet</span>
           </div>
         ) : null}
         {/* SEED-098 Change 2: the `hasAnyTools` bottom italic echo
             (`Preparing code…/Synthesizing answer…` + dots) is GONE — the RunCard
             header strip (RunStatusStrip) already carries the live verb + timer,
-            so this was a duplicate. Terminal-state copy renders from the Square
+            so this was a duplicate. Terminal-state copy renders from the terminal
             block below; the no-tools thinking indicator stays in its own arm. */}
         {/* Phase 066 D-066-10: stopped/timed-out indicator — shown after content
             when the run ended without completing. Banner copy mirrors the
@@ -760,7 +761,6 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           (message.runStatus === "cancelled" && !!message.content)) &&
           !isStreaming && (
           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-            <Square className="w-3 h-3" />
             <span className="italic">
               {message.runStatus === "timed_out" ? "Agent reached time limit" : "Response stopped"}
             </span>
