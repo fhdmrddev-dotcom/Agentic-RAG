@@ -175,7 +175,16 @@ read of which was incomplete and nearly produced a second wrong finding:
 | `chat/__tests__/MessageInput.connectors.test.tsx` | ✅ RUNS | ✅ PINNED |
 | **`panel/__tests__/Seam.test.tsx` (224-01)** | ⛔ **NOT RUN** | ⛔ **NOT PINNED** |
 | **`panel/__tests__/TodosSection.test.tsx` (224-05)** | ⛔ **NOT RUN** | — |
-| **`CitationList` / `RunCard` (224-04, 224-05)** | ⛔ **NO SUITE EXISTS** | — |
+| **`chat/__tests__/CitationList.test.tsx` (224-05)** | ⛔ **NOT RUN** | — |
+| **`chat/RunCard.test.tsx` + `RunCard.timer.test.tsx` (224-04)** | ⛔ **NOT RUN** | — |
+
+⚠ **SECOND CORRECTION, 2026-09-03 — the table above originally read `NO SUITE EXISTS` for
+`CitationList` and `RunCard`, and that was FALSE.** The probe measured what the gate RUNS and the
+conclusion over-generalised it into what EXISTS. Driven: those four suites are real and were run
+together — **4 files, 59 tests, all passing.** ⭐ **`not run by the gate` is not `absent`**, and
+conflating them is the same class of error as a ledger row that reads `satisfied` while being stale.
+The remedy is therefore larger and cheaper than first stated: there are five green suites available to
+adopt, not one.
 
 **So there is NO decrease and NO pin to update.** And the sharper consequence: 224-05's acceptance
 criterion *"the count gate reports OK 188/188, 0 failing"* **passes whether or not four of the five
