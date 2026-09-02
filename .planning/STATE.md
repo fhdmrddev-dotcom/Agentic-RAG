@@ -36,6 +36,8 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Plan 02 complete, executing Plan 03)
 Phase numbering continues at **210**.
 
+**Queued (2026-09-03):** Phase **226 — The Public Landing Page** is proposed and registered (`226-PROPOSAL.md`, folds `SEED-241`, G-2 satisfied by the design canvas). Operator: build after 224 / 225 close — Gemini executes, Claude pre-flights. Bus item `BUS-068`.
+
 ## Current Position
 
 🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTING (2026-09-03).**

@@ -134,6 +134,7 @@ it.*
 | 218 | ~~The Library Knows How It Is Used~~ | ⛔ **ABSORBED INTO PHASE 217.1** (operator, 2026-08-29) — the Health tab, the `Library Health` + `Governance` nav retirement, the `governance_health` gate move, the `ChatLayout.tsx:879` fallback replacement and all five success criteria moved verbatim to 217.1 | ~~LIB-05, LIB-06, LIB-07~~ → **217.1** | — | ⛔ **Not planned, not deleted.** The row is kept so the 32-requirement coverage map, `219`/`220`'s dependency lines and every doc citing *Phase 218* still resolve. **Its five criteria are 217.1's SC#6-10** |
 | 219 | A Connected Source Feeds the Library | A person connects a cloud drive once, sees what it would bring in **before** it does, and the Library keeps reading it on a schedule | LIB-08, LIB-09, LIB-10 | 4 | ⭐ **Depends on 215 (OAuth) and 216 (ATTACH-01 — the manual precursor this generalises)**. **Changes the CLAUDE.md manual-upload-only rule in the same commit** (`SEED-142`). ⚠ **threat model MANDATORY** — inbound untrusted content + a new credential scope. Migration in **140-149** |
 | 220 | A Drawing Becomes Quantities — SPIKE | A CAD drawing is read for what it actually contains — counted items, measured dimensions, the engineer's own specifications — and priced against a reference rate sheet, with every uncertain match escalated rather than guessed | TAKEOFF-01..04 (**SEED-226**, outside the 32) | 5 | ⚠ **SPIKE — one drawing, one rate sheet, end to end.** DXF FIRST (`ezdxf`, MIT); OCR + full-page vision stay deferred in SEED-226. ⭐ **The DELIVERABLE is the MATCHING step, not the extraction** — extraction is already proven by `probe_dxf_takeoff.py`. **Depends on 217** (the Library is where a takeoff surfaces). New dependency decision: `ezdxf` into `requirements.txt` + `docs/SANDBOX-PACKAGES.md` same commit. **No migration expected** |
+| 226 | The Public Landing Page | A public B2B marketing page at the product root that shows the whole product and is rendered from facts derived from code, so it cannot drift from what ships — *Book a demo* primary, *Sign in* a quiet link to the app | `SEED-241` (outside the 32; operator-directed 2026-09-03) | ? | ✅ **G-2 SATISFIED** — approved design is the Claude Design canvas *Agentic RAG Landing*, source in `.planning/design/landing-canvas/`. Separate Vite entry, zero app bundle. Ships `check-landing-drift.cjs` in the same phase. **Build after 224 / 225.** `226-PROPOSAL.md` |
 
 ### Phase Checklist
 
@@ -771,6 +772,23 @@ re-derive. **No G-2**: nothing changes on screen, and that is the success condit
 so no cloud-parity gate — but the callback must understand the new format BEFORE anything emits it.
 Full scoping: `.planning/phases/225-one-way-to-hold-a-secret-mid-handshake/225-PROPOSAL.md`.
 
+#### Phase 226: The Public Landing Page
+
+**Goal**: A public B2B landing page at the product's root that shows the whole product — every rail surface, the file formats, the business cases, two category-level comparisons, the model roster and the connector catalog — **rendered from facts derived from code** so it cannot drift from what ships. *Book a demo* is the primary action; *Sign in* is a quiet link to the app.
+**Depends on**: nothing in v3.9 — but **build after 224 / 225 close** (operator). Design already approved.
+**Requirements**: `SEED-241` (folded — the living-page mechanism). ⚠ **Outside this milestone's 32** — operator-directed 2026-09-03.
+**Success Criteria** (what must be TRUE):
+
+  1. `landing.html` renders with the app's auth provider and API client **absent from the bundle** — a negative import fence proves it.
+  2. Section-for-section parity with the canvas: hero · facts · how it works · 12 features · Tour (8 tabs, 8 scenes) · Files · 6 illustrated business cases · quotes · Studio + gauntlet · 2 comparisons · Models ring · Works with (15 logos) · Security · CTA.
+  3. Every number comes from `src/landing/facts.ts`; `scripts/check-landing-drift.cjs` is green on HEAD **and was driven RED** against a planted source change.
+  4. `VITE_DEMO_URL` / `VITE_APP_URL` wired; the deploy-artifact parity check passes in the same commit.
+  5. G-4 lived-experience UAT in Chrome: eight scenes play on hover, every link/CTA resolves, phone width has no horizontal scroll.
+
+**How we'd know this failed** (G-6): the landing chunk imports `@/lib/api`, a provider, or `@supabase/*`; a literal count appears in landing JSX; the guard is green but never fired; a logged-in bookmark to `/` dead-ends on marketing (D-226-02 unverified); scenes shipped as PNGs.
+
+**Flags**: ✅ **G-2 SATISFIED** — Claude Design canvas *Agentic RAG Landing* (https://claude.ai/code/artifact/d33a1829-8e5c-498a-8f65-dcbda8cbc448), source in `.planning/design/landing-canvas/`. ⚠ Separate Vite entry, not an app route (D-226-01). ⚠ Verify how `ChatLayout` treats the bare root before choosing the rewrite (D-226-02). No migration. Full brief: `.planning/phases/226-the-public-landing-page/226-PROPOSAL.md`.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -793,6 +811,7 @@ Full scoping: `.planning/phases/225-one-way-to-hold-a-secret-mid-handshake/225-P
 | 223. A Connection Leaves a Record | 0/? | **NEXT — operator handed to Gemini 2026-09-02.** ⛔ `GRANT-05` is met for the EMPTY SET: a live approved connector call appears in no ledger, and `update_grants` writes no receipt either. `223-PROPOSAL.md` | - |
 | 224. What the Agent Is Doing Reads Like a Sentence | 0/? | Scoped 2026-09-02. ✅ **G-2 satisfied** — sketches 223 (**D · delete**) + 226 (**A · dock**) decided by the operator. ⭐ Winner D rests on a measurement: the panel and the seam card read the SAME persisted `tool_calls`, so the card's stated reason for existing is false. New: `BUG-260902-07`. ⛔ `SEED-128` out of scope, unfolded to `planted`. Post-sketch scope: `224-PROPOSAL.md` §SCOPE CHANGE | - |
 | 225. One Way to Hold a Secret Mid-Handshake | 0/? | Proposed 2026-09-02 from `BUS-048`, answered by the operator the same day. ⛔ **Live-code security finding**: the OAuth `state` carries the client secret and the PKCE verifier in the clear — signed, not hidden. Ports the Google path onto the opaque-handle design `mcp_oauth.py` already ships. ⚠ The cutover is the hard part. `225-PROPOSAL.md` | - |
+| 226. The Public Landing Page | 0/? | Proposed 2026-09-03 after a two-day design session; queued behind 224 / 225. ✅ G-2 satisfied by the design canvas. Folds `SEED-241`. Gemini builds, Claude pre-flights (`226-PREFLIGHT.md`). `226-PROPOSAL.md` | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.
