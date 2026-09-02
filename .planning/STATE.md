@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-09-02T18:20:00.000Z"
+last_updated: "2026-09-02T23:38:00.000Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 13
@@ -33,19 +33,23 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 223 — A Connection Leaves a Record (Execution complete, ready for review)
+**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Context gathered, ready for planning)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-✅ **PHASE 223: A Connection Leaves a Record — COMPLETE & READY FOR REVIEW (2026-09-02).**
-All 5 plans executed across 3 waves and verified with 0 skips:
-- `223-01` (Wave 1): Migration 152 applied to live DB; `VALID_ACTION_TYPES` updated with `connector.call` and `connector.grant`; `test_110_boot_guard.py` synced to `_ALL_21` (4/4 passed); `MessageResponse` model updated with `active_connector_ids`.
-- `223-02` (Wave 2): Outbound connector tool execution audit in `tool_dispatcher.py` across all 5 evaluated exits (`policy_denial`, `user_rejected`, `timeout`, `execution_failure`, `success`) with G-6 privacy preservation (`arg_keys` only); truthful timeout return message. 6/6 unit tests passed.
-- `223-03` (Wave 2): Permanent grant receipts audited for both chat approval card (`always`) in `threads.py` and Settings panel `update_grants` in `connectors.py`. 3/3 unit tests passed.
-- `223-04` (Wave 2): Armed connectors thread durability and restoration: `threads.py` stores `active_connector_ids` preserving explicit `[]` as `'[]'::jsonb` vs `None` as SQL `NULL`; `threads.ts` DTO and mapper updated; `MessageInput.tsx` implements Decision 2 `Map.has()` check, last user message seeding, and explicit disarm preservation. 9/9 connector vitest tests passed.
-- `223-05` (Wave 3): Live database integration tests in `test_223_audit_live.py` against PostgreSQL on `:54322` passed 5/5 with 0 skips; mechanical gates fully verified (tsc 66 errors unchanged from baseline; vitest count gate OK 188/188 pinned files, 7159 tests, 0 failing).
-Next: Reviewer verification (Claude) via agent bus.
+🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — CONTEXT GATHERED (2026-09-02).**
+- Discuss-phase complete; decisions locked in `224-CONTEXT.md`.
+- Winner D: `SeamCard`'s `write_todos` and `workspace_write` arms deleted; `ask_user` preserved.
+- Shared `toolName` re-exported from `@/lib/toolNames.ts` for chat and workflows.
+- Status line moved inside `RunCard` frame; right-aligned step results; `<Square>` glyph dropped.
+- Pending approval card docked above `MessageInput` with ISO 8601 UTC wire deadline (`expires_at`) and fallback jump chip.
+- References folded by default (`defaultOpen={false}`); shared fold pill/badge across `CitationList.tsx` and `RunCard.tsx`.
+- Panel todo wrap layout restructured to prevent premature wrapping at 308px floor.
+- Next: `/gsd:plan-phase 224`.
+
+✅ **PHASE 223: A Connection Leaves a Record — VERIFIED & CLOSED (2026-09-02).**
+Reviewed and cleared by Claude in BUS-062. All live DB assertions, G-6 privacy safeguards (`arg_keys`), `Map.has()` restore semantics, and dual-source permanent grant receipts (`chat_card` and `settings`) verified.
 
 ✅ **222 IS COMPLETE AND DRIVEN IN A BROWSER (2026-09-02).** Both halves shipped: Gemini's five
 door plans + Claude's crypto. ⭐ **Notion connects by OAuth with NO developer console** — RFC 7591
