@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-09-02T17:15:00.000Z"
+last_updated: "2026-09-02T18:20:00.000Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 13
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 75
-  completed_plans: 74
+  completed_plans: 79
   # + SEED-235 fixed out-of-phase (chat approval card)
-  percent: 62
+  percent: 69
 ---
 
 # Project State
@@ -33,20 +33,19 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 223 — A Connection Leaves a Record (5 plans ready for execution)
+**Current focus:** Phase 223 — A Connection Leaves a Record (Execution complete, ready for review)
 Phase numbering continues at **210**.
 
 ## Current Position
 
-▶ **PHASE 223: A Connection Leaves a Record — IN PROGRESS (2026-09-02).** Operator handed phase to Gemini;
-reviewer preflight completed (BUS-056 / BUS-057 / 223-PREFLIGHT.md) and verified clean pass in BUS-059. Discuss-phase
-and plan-phase complete: 5 plans authored, committed, and structurally verified (`gsd-tools verify plan-structure` 0 errors):
-- `223-01-PLAN.md` (Wave 1): Schema lockstep (migration 152, VALID_ACTION_TYPES, _ALL_21 boot guard, MessageResponse).
-- `223-02-PLAN.md` (Wave 2): tool_dispatcher.py outbound audit (5 evaluated outcomes, arg_keys privacy, truthful timeout copy).
-- `223-03-PLAN.md` (Wave 2): Permanent grant receipts (Always allow on chat card + Settings panel grants).
-- `223-04-PLAN.md` (Wave 2): Armed connectors persistence (threads.py insert, Message mapper, MessageInput.tsx Map.has() restore).
-- `223-05-PLAN.md` (Wave 3): Live DB integration verification against :54322 (SC#4/SC#5 proof that writes land).
-Next: `/gsd:execute-phase 223`.
+✅ **PHASE 223: A Connection Leaves a Record — COMPLETE & READY FOR REVIEW (2026-09-02).**
+All 5 plans executed across 3 waves and verified with 0 skips:
+- `223-01` (Wave 1): Migration 152 applied to live DB; `VALID_ACTION_TYPES` updated with `connector.call` and `connector.grant`; `test_110_boot_guard.py` synced to `_ALL_21` (4/4 passed); `MessageResponse` model updated with `active_connector_ids`.
+- `223-02` (Wave 2): Outbound connector tool execution audit in `tool_dispatcher.py` across all 5 evaluated exits (`policy_denial`, `user_rejected`, `timeout`, `execution_failure`, `success`) with G-6 privacy preservation (`arg_keys` only); truthful timeout return message. 6/6 unit tests passed.
+- `223-03` (Wave 2): Permanent grant receipts audited for both chat approval card (`always`) in `threads.py` and Settings panel `update_grants` in `connectors.py`. 3/3 unit tests passed.
+- `223-04` (Wave 2): Armed connectors thread durability and restoration: `threads.py` stores `active_connector_ids` preserving explicit `[]` as `'[]'::jsonb` vs `None` as SQL `NULL`; `threads.ts` DTO and mapper updated; `MessageInput.tsx` implements Decision 2 `Map.has()` check, last user message seeding, and explicit disarm preservation. 9/9 connector vitest tests passed.
+- `223-05` (Wave 3): Live database integration tests in `test_223_audit_live.py` against PostgreSQL on `:54322` passed 5/5 with 0 skips; mechanical gates fully verified (tsc 66 errors unchanged from baseline; vitest count gate OK 188/188 pinned files, 7159 tests, 0 failing).
+Next: Reviewer verification (Claude) via agent bus.
 
 ✅ **222 IS COMPLETE AND DRIVEN IN A BROWSER (2026-09-02).** Both halves shipped: Gemini's five
 door plans + Claude's crypto. ⭐ **Notion connects by OAuth with NO developer console** — RFC 7591
