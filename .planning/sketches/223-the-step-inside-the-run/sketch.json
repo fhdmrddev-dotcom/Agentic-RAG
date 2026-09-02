@@ -41,5 +41,18 @@
     "panel files fetch from server": "FilesSection.tsx:158 useWorkspaceFiles -> getThreadWorkspaceFiles"
   },
   "design_tokens": "frontend/src/index.css",
-  "recommended": "d"
+  "recommended": "d",
+  "stitch": {
+    "project": "projects/10591382119939539231",
+    "title": "Aether Chat Column - Phase 224 - quiet run, folded sources",
+    "screen": "projects/10591382119939539231/screens/a4599de5d737426da390912cfe18a062",
+    "screenshot": "stitch-take.png",
+    "notes": [
+      "Stitch put the STOPPED status line INSIDE the run card; the sketch put it beneath. Nobody drew that variant.",
+      "Stitch right-aligned each step result into its own column (6 results / chart.png) instead of an inline arrow.",
+      "Palette drifted: checks and run dot came out olive-green, indigo accent barely present.",
+      "The References pill reads very quiet at this scale - close to the affordance problem BUG-260902-07 is fixing.",
+      "Two generate calls timed out at the tool boundary; the second still completed server-side after ~2 min."
+    ]
+  }
 }
