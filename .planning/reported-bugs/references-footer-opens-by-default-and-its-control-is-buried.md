@@ -5,10 +5,10 @@ reported: 2026-09-02
 surface: Agentic-RAG
 severity: minor
 status: open
-affected_areas: [frontend/chat, citations, readability]
+affected_areas: [frontend/chat, citations, reasoning, readability]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-240]
+related_seeds: [SEED-240, SEED-128]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -94,3 +94,28 @@ together or not at all.
 Chat-surface readability, same component family and the same "the chat column reads cluttered"
 complaint as `SEED-240`. Belongs with **Phase 224**, behind its G-2 sketch — the second half is a
 visual-affordance question and must be drawn, not specified in prose.
+
+---
+
+## ⭐ MEASURED 2026-09-02 — THE SECOND HALF IS NOT ONE COMPONENT, IT IS TWO
+
+The buried-trigger complaint reproduces **identically** on the reasoning block:
+
+| component | trigger styling |
+|---|---|
+| `CitationList.tsx:32-44` | `text-xs text-muted-foreground` + 12px chevron |
+| `RunCard.tsx:481-484` (the "Thinking" fold, Phase 076.2 D-01) | `text-xs text-muted-foreground/80` + 12px chevron |
+
+Same size, same token, same absent border, same absent surface — and the reasoning one is **dimmer
+still** (`/80`). Both sit directly beneath content at higher contrast, so both read as trailing prose
+rather than as controls.
+
+⭐ **So the affordance half of this bug is a SHARED fix across two components, not a one-off.** Whatever
+shape the fold control takes, it should be one thing used twice — the `connectionMark` / `TOOL_PHRASES`
+lesson: a second copy is how two surfaces drift.
+
+⚠ **Only the AFFORDANCE generalises. The default-state half does NOT.** The References footer opens by
+default and must be folded (`MessageItem.tsx:619`); the Thinking block is **already** `useState(false)`
+and is correct as-is. **Do not "fix" the thinking default — it is not broken**, and flipping it would
+be a regression dressed as consistency.
+
