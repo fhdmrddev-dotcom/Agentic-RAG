@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-09-01T10:05:00.000Z"
-last_activity: 2026-09-01
+last_updated: "2026-09-02T17:15:00.000Z"
+last_activity: 2026-09-02
 progress:
   total_phases: 13
   completed_phases: 8
@@ -33,10 +33,16 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 222 — One Click Connects Any MCP Server (COMPLETE & DRIVEN 2026-09-02; one manual BYO connect OWED)
+**Current focus:** Phase 223 — A Connection Leaves a Record (Context gathered 2026-09-02; ready for planning)
 Phase numbering continues at **210**.
 
 ## Current Position
+
+▶ **PHASE 223: A Connection Leaves a Record — IN PROGRESS (2026-09-02).** Operator handed phase to Gemini;
+reviewer preflight completed (BUS-056 / BUS-057 / 223-PREFLIGHT.md). Discuss-phase complete: decisions locked
+in `223-CONTEXT.md` (D-223-01..10) including D-223-01/02 (`connector.call` & `connector.grant` audit action types,
+migration 152), D-223-03 (arg_keys only, privacy safe), D-223-06 (messages.active_connector_ids jsonb), and
+D-223-07 (Map.has() restore keyed on last USER message with explicit [] vs NULL distinction). Next: `/gsd:plan-phase 223`.
 
 ✅ **222 IS COMPLETE AND DRIVEN IN A BROWSER (2026-09-02).** Both halves shipped: Gemini's five
 door plans + Claude's crypto. ⭐ **Notion connects by OAuth with NO developer console** — RFC 7591
