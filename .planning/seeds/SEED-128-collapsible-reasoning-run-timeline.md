@@ -1,6 +1,7 @@
 ---
 id: SEED-128
-status: planted
+status: folded
+folded_into: 224
 planted: 2026-07-22
 planted_during: v3.5 (UX Consolidation & Chat Polish — operator-raised during Phase 175 execution)
 trigger_when: Phase 174 (Run-State & Lifecycle Honesty) enters /gsd:sketch or /gsd:discuss-phase — this is the design input for how the live run reads; also relevant to Phase 178 (Chat UI/UX Polish)

@@ -3,7 +3,8 @@ seed_id: SEED-240
 title: "With chat AND the workspace panel open, the chat column is 700px of four — and what it renders there is a raw `WRITE_TODOS`, a status sentence wearing a checkbox, and a tool card orphaned outside the run frame it belongs to"
 created: 2026-09-02
 planted_during: Operator-directed layout observation, 2026-09-02 — *"observe the layout, how the chat tools are not fitting exactly if we open the chat and the workspace altogether"*
-status: planted
+status: folded
+folded_into: 224
 surface: Agentic-RAG
 severity: medium
 category: chat-surface / panel / step-identity / layout

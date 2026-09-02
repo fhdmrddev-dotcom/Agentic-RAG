@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: major
 status: folded
 affected_areas: [backend/tool-dispatcher, frontend/chat, connectors, grants, run-honesty]
-folded_into: "223 (COPY HALF ONLY — the 120s duration and the below-the-fold card go to the chat-surface phase with SEED-240/SEED-128)"
+folded_into: "223 (copy half) + 224 (duration + visibility). SPLIT DELIBERATELY: the copy is a factual correction, the clock and the below-the-fold card are design (COPY HALF ONLY — the 120s duration and the below-the-fold card go to the chat-surface phase with SEED-240/SEED-128)"
 verified_closed_by: null
 related_seeds: [SEED-240]
 re_open_trigger: null

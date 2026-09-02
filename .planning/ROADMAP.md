@@ -151,6 +151,7 @@ it.*
 - [x] **Phase 221: Six Applications, One Token** — Google Workspace becomes six applications — Drive, Gmail, Sheets, Docs, Calendar, Contacts — under one connection, one token and one Revoke button, with a three-rung permission ladder and an availability line that names which of three things is wrong. Eleven writes proven live.
 - [x] **Phase 222: One Click Connects Any MCP Server** — RFC 9728 discovery + OAuth 2.1/PKCE on the MCP door, reusing the PKCE machinery `oauth_service.py` already has and the MCP client has never called, so a service connects by logging in rather than by pasting a token minted by hand.
 - [ ] **Phase 223: A Connection Leaves a Record** — an outbound connector call, and the permanent grant that permits it, appear in the audit ledger naming service/tool/actor/outcome; and a thread's armed connectors survive a reload (closes ⛔ `BUG-260902-05`, `BUG-260902-03`, the copy half of `BUG-260902-04`). ⚠ **`GRANT-05` is currently met for the EMPTY SET** — measured 2026-09-02
+- [ ] **Phase 224: What the Agent Is Doing Reads Like a Sentence** — the chat column names what a step did instead of `WRITE_TODOS`, a run's steps render inside the run that counts them, the approval card is reachable and shows its clock, and the reasoning timeline `SEED-128` asked for six weeks ago exists (`SEED-240`, `SEED-128`, the duration+visibility halves of `BUG-260902-04`). ⚠ **G-2 FIRES — sketch first**
 
 ### Phase Details
 
@@ -708,6 +709,28 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 
 **Flags**: ⚠ **§3.1-adjacent** — it touches *credentials* and *permission model*, though it grants no new access and opens no egress; it records what already happens. **Operator ruled 2026-09-02 that Gemini builds it, Claude reviews** — recorded rather than assumed. ⚠ **`tool_dispatcher.py` is a G-5 hot file** (72 / 29 / 4,624) whose ledger row was already found stale once — re-derive at discuss-phase. ⚠ **A migration is LIKELY**: `audit_log` has a `metadata` jsonb so the ledger side needs none, but `public.messages` has only `tool_calls` and `source_refs` and neither honestly means "armed connectors". Full scoping, including a recorded near-miss where an unscoped `information_schema` query read `realtime.messages` as if it were `public.messages`: `.planning/phases/223-a-connection-leaves-a-record/223-PROPOSAL.md`.
 
+#### Phase 224: What the Agent Is Doing Reads Like a Sentence
+
+**Goal**: While the agent works and after it stops, the chat column says **what it did in words a person would use** — instead of a raw `WRITE_TODOS`, a step orphaned outside the run that counts it, and an approval card that expires below the fold. ⭐ **The operator raised the same complaint twice, six weeks apart, at two altitudes** — `SEED-128` (2026-07-22, the reasoning timeline, then `dormant` for six weeks because its trigger named a Phase 178 that never ran) and `SEED-240` (2026-09-02, the tool card and the proportions). **They are one question — *what does the agent's own activity look like?* — and sketching them apart would produce two vocabularies for one surface.**
+**Depends on**: **Phase 209** (*"A step says what it actually does"*) and **Phase 214** (`StepIdentity`) — ⚠ **the vocabulary this card PREDATES and never adopted.** Both SHIPPED.
+**Requirements**: `SEED-240` · `SEED-128` · `BUG-260902-04` (duration + visibility halves; the copy half is Phase 223's). ⚠ **Outside this milestone's 32** — operator-directed from the 2026-09-02 UAT drive.
+**Success Criteria** (what must be TRUE):
+
+  1. **No raw identifier reaches a person** — a tool card names its action the way `StepIdentity` already does elsewhere. `WRITE_TODOS` and its siblings do not appear.
+  2. **A run's steps render INSIDE the run.** A card belonging to `Run · N steps` is one of those N, not a sibling beneath it. ⭐ **This is the composition criterion and it is the one most likely to be skipped.**
+  3. A status sentence does not wear a control's costume — no checkbox glyph on *"Agent reached time limit"*.
+  4. **The approval card is reachable when it arrives, and says how long it has.** ⚠ The failure is not that 120 s is short; it is that the person cannot see the clock while the card sits below the fold.
+  5. The reasoning timeline answers `SEED-128` — collapsible, honest about the silence gap (`SEED-030`).
+
+**How we'd know this failed** (G-6):
+
+  - ⭐ **The sketch is drawn and the build diverges from it.** Phase 217 *"shipped green against a contract with 200 assertions about vocabulary and ZERO about composition"* and had to be rebuilt as 217.1. **Composition is the whole point here**; a words-only contract would pass a build with the card still outside the run frame.
+  - The vocabulary is fixed but the layout is not — `WRITE_TODOS` becomes a good sentence still rendered in the wrong place.
+  - A countdown is added and the card still lands below the fold, so the clock is visible only after scrolling to it.
+  - It absorbs `BUG-260902-01` (todos stranded `in_progress` on 25 threads). ⚠ **That is a DATA defect and stays out — but the sketch owes it one thing:** its fix needs a state that does not exist (*abandoned*), because `completed` is a lie and `pending` erases that work was attempted. **Drawing that state is cheap now and expensive later; writing it is not this phase's.**
+
+**Flags**: ⚠ **G-2 FIRES and must not be waived** — `/gsd:sketch` before planning, and note the order failure to avoid: Phase 222's CONTEXT locked presentation decisions BEFORE the sketch meant to judge them. ⚠ **Four G-5 hot files in the blast radius** — `MessageItem.tsx` (57/29/856) and `ToolCallPanel.tsx` (47/19/995) **both already read *extraction due***, plus `ChatArea.tsx` (63/30/571) and `WorkspacePanel.tsx` (16/10/646); re-derive the triples rather than quoting these. ⚠ **`WorkspacePanel` is a CROSS-SURFACE shell mounted by `ChatLayout` with NO mount in any workflow page** — redesigning it lands in CHAT first, so workflow-surface UAT alone will miss it. Full scoping: `.planning/phases/224-what-the-agent-is-doing-reads-like-a-sentence/224-PROPOSAL.md`.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -728,6 +751,7 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 | 221. Six Applications, One Token | 2/2 | ✅ **CLOSED** — six Google applications under one token, and **11 of 11 writes proven live** against a real account. Three defects the plan's premise missed: the Check action **refused every OAuth row** (`409` about a row that had just run 26 tools), `connector_tokens` has **RLS on with ZERO policies** (`SEED-233`), and `create_event` **refused every naive local time**. ⛔ **OWED**: the `api_off` UAT row needs an API switched off in Cloud project `877112366454` — operator's console. Everything not done: `221-CARRY-FORWARD.md` | 2026-09-01 |
 | 222. One Click Connects Any MCP Server | 5/5 door + crypto | ✅ **COMPLETE 2026-09-02, SPLIT across both agents (§3.1 override).** Notion connects by OAuth with **zero** developer-console work (RFC 7591 self-registration) and returns **41 tools for zero lines of tool code**. Join DRIVEN in a browser against four real servers — all four `kind` values observed live. ⛔ **A BYO connect has never completed end to end** — needs a human. ⚠ **SC#7 PARTLY UNMET:** Rovo answers `kind: token` at both endpoints (advertises no AS), so it cannot connect by OAuth — Linear + Sentry proven instead. `222-VERIFICATION.md` | 2026-09-02 |
 | 223. A Connection Leaves a Record | 0/? | **NEXT — operator handed to Gemini 2026-09-02.** ⛔ `GRANT-05` is met for the EMPTY SET: a live approved connector call appears in no ledger, and `update_grants` writes no receipt either. `223-PROPOSAL.md` | - |
+| 224. What the Agent Is Doing Reads Like a Sentence | 0/? | Proposed 2026-09-02 — the operator's complaint raised TWICE six weeks apart (`SEED-128` dormant since 2026-07-22, `SEED-240` today). ⚠ **G-2 fires: sketch first.** `224-PROPOSAL.md` | - |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.
