@@ -3,7 +3,7 @@
   "phase": 224,
   "title": "The Card You Can Reach - and its clock",
   "question": "The approval gate expires after 120s with no countdown and renders inline, so it can arrive below the fold while the clock runs. Where should it live, and how does it show its time?",
-  "winner": null,
+  "winner": "a",
   "views": [
     {
       "id": "today",
@@ -35,5 +35,12 @@
     "BUG-260902-04",
     "SEED-240",
     "SEED-128"
-  ]
+  ],
+  "winner_decided": "2026-09-02 (operator)",
+  "fallback": {
+    "variant": "b",
+    "why": "B's jump chip keeps the card in the transcript, so it needs no reload seam at all.",
+    "re_open_trigger": "Fires if a docked approval's decision CANNOT be rendered back into the transcript from persisted state at the quality SeamCard already achieves for ask_user - i.e. if the resolved card would leave a hole on reload, or would need machinery beyond a new SeamKind. Decide this at plan-phase, before the dock is built, not after."
+  },
+  "note_from_sketch_223": "A's reload seam is CHEAPER than it looked. Sketch 223's winner D deletes SeamCard's write_todos and workspace_write arms but KEEPS ask_user, because it is the only record a human decided anything. An approval decision is the same category, so the docked card resolves through the pattern that survives - a new SeamKind, not new machinery."
 }

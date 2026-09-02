@@ -2471,3 +2471,39 @@ Fenced per variant rather than per file: `a`/`b`/`d` carry the in-frame status, 
 one, `today` is byte-identical to the measured original, the inline-arrow override covers exactly
 `today`+`c`, every `onclick` resolves to a defined function, every `getElementById` target exists, 16
 grounded source strings are present — with a negative control proving the fence can fail.
+
+| 226 | the-card-you-can-reach-and-its-clock | The approval gate expires after 120s with no countdown and renders inline, so it can arrive below the fold while the clock runs. Where should it live, and how does it show its time? | **A · docked above the composer** (operator, 2026-09-02), with **B's jump chip as the recorded fallback** | phase-224, bug-260902-04, seed-240, approval, safety-gate, acceptance-bar |
+
+⭐ **The clock in the sketch is the real one.** Its fence asserts `DURATION = 120` matches
+`tool_dispatcher.py:4443`, so the mockup cannot drift from the server constant it is arguing about.
+Each viewport has a real fold — the `Today` view reproduces the defect by making you scroll past the
+composer to find a card whose invisible clock is already running.
+
+⭐ **The measured constraint that binds every variant: a countdown CANNOT be built client-side.**
+`ToolApprovalRequest` carries `callId` · `connectionId` · `serviceId` · `serviceName` · `toolName` ·
+`args` and **no deadline**, and `120.0` exists only in the dispatcher. Inventing it in the client
+duplicates a server constant that will drift. **The deadline has to go on the wire** whichever variant
+ships — that is the honest net-new.
+
+⭐ **The app already had a home for "the agent needs you" and this card ignored it.**
+`panel/PendingAskCard.tsx` hosts a pending `ask_user` under a section headed exactly *"Needs you"*.
+That is variant C's whole argument — consistency rather than invention. **It lost on a safety
+ground:** the panel collapses to a 52px rail, so an approval arriving while it is closed puts the
+decision behind a click *with the clock running* — strictly worse than today unless arrival
+force-opens the panel. A safety gate may not be made harder to reach.
+
+**Why A won, and what it owes.** While a decision is pending it is **state, not content**, so it
+leaves the scrollback for the one region always on screen — the calm-loud interrupt of
+`panel-shell.md`, made structural rather than loud. Its cost is a reload seam: the transcript loses
+the moment unless the decision resolves back into it.
+
+⭐ **And that cost is smaller than it looked, because sketch 223 settled it in the same session.**
+223's winner D deletes `SeamCard`'s `write_todos` and `workspace_write` arms **but keeps `ask_user`**,
+on the grounds that it is the only record a human decided anything. **An approval decision is the same
+category** — so a docked card resolves through the pattern that survives: a new `SeamKind`, not new
+machinery.
+
+⚠ **The fallback carries a real trigger, not a vague one.** B is chosen if a docked approval's
+decision cannot be rendered back into the transcript at the quality `SeamCard` already reaches for
+`ask_user` — a hole on reload, or machinery beyond a new `SeamKind`. **Decide it at plan-phase, before
+the dock is built.**
