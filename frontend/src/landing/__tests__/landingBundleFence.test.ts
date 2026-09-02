@@ -1,6 +1,23 @@
-import { describe, it, expect } from "vitest"
-import fs from "fs"
-import path from "path"
+import { describe, it, expect, vi } from "vitest"
+
+const nodeFs = await vi.importActual<{
+  readFileSync(path: string, encoding: string): string
+  existsSync(path: string): boolean
+  statSync(path: string): { isFile(): boolean }
+}>("node:fs")
+
+const nodePath = await vi.importActual<{
+  resolve(...paths: string[]): string
+  dirname(path: string): string
+}>("node:path")
+
+const SRC_DIR = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/landing/__tests__/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`cannot locate src dir in: ${here}`)
+  return `${here.slice(0, at)}/src`
+})()
 
 const FORBIDDEN_SUBSTRINGS = [
   "src/lib/api",
@@ -22,19 +39,19 @@ function resolveModulePath(currentFile: string, importPath: string): string | nu
 
   let resolved = ""
   if (importPath.startsWith("@/")) {
-    resolved = path.resolve(__dirname, "../../", importPath.slice(2))
+    resolved = nodePath.resolve(SRC_DIR, importPath.slice(2))
   } else {
-    resolved = path.resolve(path.dirname(currentFile), importPath)
+    resolved = nodePath.resolve(nodePath.dirname(currentFile), importPath)
   }
 
   const extensions = [".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts", "/index.jsx", "/index.js"]
-  if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+  if (nodeFs.existsSync(resolved) && nodeFs.statSync(resolved).isFile()) {
     return resolved
   }
 
   for (const ext of extensions) {
     const candidate = resolved + ext
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+    if (nodeFs.existsSync(candidate) && nodeFs.statSync(candidate).isFile()) {
       return candidate
     }
   }
@@ -55,8 +72,8 @@ function crawlImports(entryFile: string): { visitedFiles: Set<string>; allImport
     if (visitedFiles.has(current)) continue
     visitedFiles.add(current)
 
-    if (!fs.existsSync(current)) continue
-    const content = fs.readFileSync(current, "utf-8")
+    if (!nodeFs.existsSync(current)) continue
+    const content = nodeFs.readFileSync(current, "utf-8")
 
     let match: RegExpExecArray | null
     while ((match = importRegex.exec(content)) !== null) {
@@ -75,10 +92,10 @@ function crawlImports(entryFile: string): { visitedFiles: Set<string>; allImport
 }
 
 describe("Landing Bundle Fence (SC#1 / D-226-01 / F-3)", () => {
-  const landingEntry = path.resolve(__dirname, "../main.tsx")
+  const landingEntry = `${SRC_DIR}/landing/main.tsx`
 
   it("crawls the transitive dependency graph from src/landing/main.tsx with zero forbidden leaks", () => {
-    expect(fs.existsSync(landingEntry)).toBe(true)
+    expect(nodeFs.existsSync(landingEntry)).toBe(true)
 
     const { visitedFiles, allImports } = crawlImports(landingEntry)
 
@@ -112,7 +129,7 @@ describe("Landing Bundle Fence (SC#1 / D-226-01 / F-3)", () => {
   })
 
   it("landing main.tsx mounts without any auth context or stream provider", () => {
-    const content = fs.readFileSync(landingEntry, "utf-8")
+    const content = nodeFs.readFileSync(landingEntry, "utf-8")
     expect(content).not.toMatch(/<AuthProvider/i)
     expect(content).not.toMatch(/<StreamsProvider/i)
     expect(content).not.toMatch(/<OrgProvider/i)

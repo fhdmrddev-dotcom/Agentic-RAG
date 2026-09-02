@@ -1,6 +1,4 @@
-import { describe, it, expect } from "vitest"
-import fs from "fs"
-import path from "path"
+import { describe, it, expect, vi } from "vitest"
 import {
   MODEL_PROVIDERS,
   LOCAL_RUNTIMES,
@@ -15,6 +13,32 @@ import {
   VERBATIM_QUOTES,
   HERO_FACTS,
 } from "../facts"
+
+const nodeFs = await vi.importActual<{
+  readFileSync(path: string, encoding: string): string
+  existsSync(path: string): boolean
+  readdirSync(path: string): string[]
+}>("node:fs")
+
+const nodePath = await vi.importActual<{
+  join(...paths: string[]): string
+}>("node:path")
+
+const LANDING_DIR = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/landing/__tests__/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`cannot locate landing dir in: ${here}`)
+  return `${here.slice(0, at)}/src/landing`
+})()
+
+const REPO_ROOT = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/frontend/src/landing/__tests__/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`cannot locate repo root in: ${here}`)
+  return here.slice(0, at)
+})()
 
 describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
   it("exports authoritative counts measured at HEAD", () => {
@@ -47,12 +71,10 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
   })
 
   it("all verbatim quotes exist verbatim in their respective source files", () => {
-    const repoRoot = path.resolve(__dirname, "../../../../")
-
     for (const q of VERBATIM_QUOTES) {
-      const fullPath = path.join(repoRoot, q.source)
-      expect(fs.existsSync(fullPath), `Source file ${q.source} must exist`).toBe(true)
-      const content = fs.readFileSync(fullPath, "utf-8")
+      const fullPath = nodePath.join(REPO_ROOT, q.source)
+      expect(nodeFs.existsSync(fullPath), `Source file ${q.source} must exist`).toBe(true)
+      const content = nodeFs.readFileSync(fullPath, "utf-8")
       expect(
         content.includes(q.quote),
         `Quote "${q.quote}" must exist verbatim in ${q.source}`
@@ -61,7 +83,6 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
   })
 
   it("JSX text-node fence: no hardcoded product claim numbers in landing JSX copy", () => {
-    const landingDir = path.resolve(__dirname, "..")
     const subdirs = ["components", "scenes"]
     const trackedClaimNumerals = new Set(["8", "10", "11", "13", "29"])
 
@@ -69,13 +90,13 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     const textNodeRegex = />([^<]+)</g
 
     for (const subdir of subdirs) {
-      const dirPath = path.join(landingDir, subdir)
-      if (!fs.existsSync(dirPath)) continue
+      const dirPath = nodePath.join(LANDING_DIR, subdir)
+      if (!nodeFs.existsSync(dirPath)) continue
 
-      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".tsx") && !f.includes(".test."))
+      const files = nodeFs.readdirSync(dirPath).filter((f: string) => f.endsWith(".tsx") && !f.includes(".test."))
       for (const file of files) {
-        const fullPath = path.join(dirPath, file)
-        const content = fs.readFileSync(fullPath, "utf-8")
+        const fullPath = nodePath.join(dirPath, file)
+        const content = nodeFs.readFileSync(fullPath, "utf-8")
 
         let match: RegExpExecArray | null
         while ((match = textNodeRegex.exec(content)) !== null) {
