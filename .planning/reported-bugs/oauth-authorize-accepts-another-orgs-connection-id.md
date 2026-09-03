@@ -4,12 +4,12 @@ title: "`POST /connectors/oauth/authorize` accepts a connection_id from another 
 reported: 2026-09-03
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/connectors/oauth, security/authorization, backend/app/api/connectors.py]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "quick task 260904 — both gates driven RED first (tests/unit/test_oauth_cross_org_authorize.py)"
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "the legacy HMAC branch is deleted at the 24-h sunset — the callback gate skips its check when pending_org_id is None, and that arm goes with it"
 reproduces_on:
   branch: develop
   commit: 7b2534fd4
@@ -58,3 +58,25 @@ a screenshot, a log). Confidence it is exploitable given the id: 8/10.
   `verify_oauth_state` and the `"." in state` branch at the 24-h mark closes it for good.
 - `take_pending_state` uses `GET` then `DEL`; Redis ≥ 6.2 `GETDEL` would make single-use atomic under a
   concurrent double-callback. Theoretical; the provider rejects the second `code` redemption.
+
+## Fixed — 2026-09-04 (G-3 quick task)
+
+Both gates, in `backend/app/api/connectors.py`, driven RED against the unfixed routes before
+either was written (`backend/tests/unit/test_oauth_cross_org_authorize.py`, 6 tests: two fences
+and four controls; the two fences failed first, the four controls passed throughout).
+
+1. **`create_oauth_authorize_url`** now requires the named connection to exist under
+   `active_org` before any state is parked → **404 "Connection not found"**. Unconditional: the
+   pre-existing org-scoped read ran only when a credential was missing, so the inline-credential
+   path — the exploit's own shape — skipped it entirely. Same shape as the MCP route at `:1149`.
+2. **`oauth_callback`** captures `pending.org_id` and refuses to write when the service-role row
+   disagrees, redirecting with `oauth_error=invalid_or_expired_state` and logging
+   `[oauth-cross-org-refused]`. Not redundant with gate 1: this route carries no JWT, the row is
+   read through the service role, and the pending record is its only authority.
+
+The legacy HMAC path carries no org, so the callback check is skipped when `pending_org_id is
+None`; it sunsets with that branch at the announced 24-h mark.
+
+⚠ One existing test changed: `test_sc5_mocks_neither_side_integration_test` named a connection
+that no org owns, so gate 1 correctly 404'd it. It now supplies the owned row through
+`get_user_supabase_client` — the only addition; the handshake it drives stays unmocked.

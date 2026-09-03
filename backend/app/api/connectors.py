@@ -1336,6 +1336,31 @@ async def create_oauth_authorize_url(
     cid = payload.custom_client_id
     csec = payload.custom_client_secret
 
+    # ⚠ BUG-260903-02 — THE OWNERSHIP GATE, AND IT IS UNCONDITIONAL ON PURPOSE. Until this
+    # existed, `payload.connection_id` was taken on trust: the only org-scoped read in this
+    # route was the OPTIONAL stored-config lookup below, whose miss is non-fatal and which
+    # does not even run when the caller supplies both credentials inline. So a caller in
+    # org X could name a connection belonging to org Y, complete consent with their own
+    # account, and the callback would write THEIR tokens onto the victim's connector.
+    # Pre-existing since Phase 215; found by the security review of the Phase 225 diff.
+    #
+    # This is the shape the MCP authorize route above already used (`.eq("org_id", …)` →
+    # 404) — the provider pair is being brought to the same standard, not given a new rule.
+    # 404 rather than 403: a connection the caller's org does not own is one they must not
+    # learn the existence of.
+    if payload.connection_id:
+        owned = await aexec(
+            supabase.table("connector_connections")
+            .select("id")
+            .eq("id", str(payload.connection_id))
+            .eq("org_id", str(active_org))
+            .limit(1)
+        )
+        if not owned.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
+            )
+
     # ⚠ THE READ-BACK USED TO BE THE ONLY HALF OF THIS THAT EXISTED, AND NOTHING EVER
     # WROTE WHAT IT READ. The operator entered a Google client id and secret, pressed
     # Connect, and was asked for them again — because `configFromDraft` never persisted
@@ -1449,6 +1474,9 @@ async def oauth_callback(
     client_secret = None
     provider = None
     connection_id = None
+    # BUG-260903-02 — the org bound at authorize time, under an authenticated request. It
+    # stays `None` on the legacy HMAC path below, which carried no org and sunsets with it.
+    pending_org_id: str | None = None
 
     try:
         pending = await take_pending_state(get_redis(), state, expected_flow="provider")
@@ -1457,6 +1485,7 @@ async def oauth_callback(
         code_verifier = pending.code_verifier
         client_id = pending.client_id
         client_secret = pending.client_secret
+        pending_org_id = pending.org_id
     except OAuthStateError:
         # In-flight legacy fallback path (SC#3):
         # Transition fallback: delete after the first prod deploy has been live 24 h
@@ -1515,6 +1544,26 @@ async def oauth_callback(
             conn_res = srv_client.table("connector_connections").select("org_id").eq("id", str(connection_id)).execute()
             if conn_res.data:
                 org_id = conn_res.data[0]["org_id"]
+                # ⚠ BUG-260903-02 — THE SECOND HALF, AND IT IS NOT REDUNDANT WITH THE
+                # AUTHORIZE GATE. This route has no JWT at all: it is a browser redirect
+                # from a third party, and its entire authority is the pending record. The
+                # row above is read through the SERVICE ROLE, so RLS cannot speak here —
+                # the only thing that can is the org bound at authorize time. If they
+                # disagree, refuse rather than write: a mismatch means the row is not the
+                # one this handshake was started for.
+                #
+                # `pending_org_id is None` is the in-flight legacy HMAC state, which never
+                # carried an org; it is accepted for the announced 24 h and this check
+                # sunsets with that branch.
+                if pending_org_id is not None and str(org_id) != str(pending_org_id):
+                    logger.error(
+                        "[oauth-cross-org-refused] connection %s belongs to a different org "
+                        "than the pending authorization; no tokens written",
+                        connection_id,
+                    )
+                    return RedirectResponse(
+                        url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state"
+                    )
                 await connector_service.save_oauth_tokens(
                     connection_id=connection_id,
                     org_id=org_id,

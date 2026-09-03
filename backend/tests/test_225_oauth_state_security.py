@@ -20,7 +20,12 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_active_org_id, get_current_user, require_org_manage
+from app.dependencies import (
+    get_active_org_id,
+    get_current_user,
+    get_user_supabase_client,
+    require_org_manage,
+)
 from app.main import app
 from app.services import mcp_oauth, oauth_service, oauth_state
 from app.services.oauth_service import (
@@ -239,6 +244,15 @@ async def test_sc5_mocks_neither_side_integration_test(client: TestClient):
     app.dependency_overrides[require_org_manage] = lambda: True
     app.dependency_overrides[get_current_user] = lambda: {"id": "user-sc5", "email": "engineer@company.com"}
     app.dependency_overrides[get_active_org_id] = lambda: "00000000-0000-0000-0000-000000000001"
+
+    # BUG-260903-02: `/oauth/authorize` now requires the named connection to belong to the
+    # active org before it will park any state. This override supplies that owned row — it
+    # is the only thing added to this test, and the handshake it drives stays unmocked.
+    owned = MagicMock()
+    owned.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[{"id": "conn-sc5-live"}]
+    )
+    app.dependency_overrides[get_user_supabase_client] = lambda: owned
 
     with patch("app.dependencies.get_redis", return_value=shared_redis), \
          patch("app.dependencies.is_operator", new_callable=AsyncMock, return_value=True), \
