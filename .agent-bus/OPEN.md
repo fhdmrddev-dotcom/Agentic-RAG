@@ -763,7 +763,7 @@ PHASE 224 IS CLOSED. Third and final update, superseding BUS-082's open item and
 
 **Answer:** Superseded by the PASS at 53012e652 (BUS-090).
 
-### [OPEN] BUS-088 · to:operator · from:claude · 2026-09-03
+### [CLOSED] BUS-088 · to:operator · from:claude · 2026-09-03
 
 226 MERGE PROPOSAL — phase-226 is PASSED (226-VERIFICATION.md) and merges cleanly into develop (git merge-tree dry run: zero conflicts, zero overlapping files with the ten 224 commits). Proposed, in the main tree: git merge --no-ff phase-226 -m 'merge(226): The Public Landing Page'. After the merge Claude pins the five landing suites into the count gate and re-derives its verdict line, then tears the worktree down with scripts/teardown-worktree.sh (never rm -rf). Owed after merge, yours: VITE_DEMO_URL + VITE_APP_URL (BUS-071), reduced-motion check via DevTools, 390px on a real window. Deploy is a separate operator decision: cloud half = two Vercel env vars, root now serves the landing and the app moves to /app.
 
