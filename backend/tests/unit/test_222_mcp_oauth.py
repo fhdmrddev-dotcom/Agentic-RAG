@@ -185,7 +185,7 @@ async def test_the_pending_record_is_written_with_one_command_and_a_ttl():
     await _begin(redis)
     assert len(redis.setex_calls) == 1
     key, ttl = redis.setex_calls[0]
-    assert key.startswith("mcp_oauth:pending:")
+    assert key.startswith("oauth:pending:")
     assert ttl == mcp_oauth.PENDING_TTL_SECONDS
     # The key carries no user or connection identity — the handle resolves it, nothing else.
     assert "user-1" not in key and "conn-1" not in key

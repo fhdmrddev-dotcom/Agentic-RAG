@@ -1181,3 +1181,33 @@ def mock_submitted_supabase():
     tbl.execute.return_value = MagicMock(data=[])
     sb.table.return_value = tbl
     return sb
+
+
+class FakeRedis:
+    """Shared FakeRedis for exercising OAuth pending state without live Redis.
+
+    `setex` calls and deletions are recorded so their use can be pinned in tests.
+    """
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.setex_calls: list[tuple[str, int]] = []
+        self.deleted: list[str] = []
+
+    async def setex(self, key: str, ttl: int, value: str) -> None:
+        self.setex_calls.append((key, ttl))
+        self.store[key] = value
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def delete(self, key: str) -> None:
+        self.deleted.append(key)
+        self.store.pop(key, None)
+
+
+@pytest.fixture
+def fake_redis() -> FakeRedis:
+    """Fixture providing a fresh FakeRedis instance for testing."""
+    return FakeRedis()
+

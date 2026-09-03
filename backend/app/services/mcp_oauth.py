@@ -5,35 +5,17 @@ state and refresh since Phase 215, and `mcp_client.py` has authenticated with a 
 somebody pasted from a vendor console. The two were both built and were never introduced.
 `mcp_auth_discovery` answered *which door*; this opens it.
 
-── WHY THIS DOES NOT REUSE `oauth_service.generate_oauth_state` (BUS-048) ───────────────
+── CONVERGED OPAQUE STATE STORAGE VIA `oauth_state.py` (BUS-048 / Phase 225) ───
 
 ⚠ **THE SHIPPED STATE PARAMETER CARRIES SECRETS IN THE CLEAR, AND FOR THIS FLOW THAT WOULD
-BE FATAL RATHER THAN MERELY WRONG.** `generate_oauth_state` base64-encodes its payload and
-HMAC-**signs** it. Signing proves the blob was not TAMPERED WITH; it does nothing to HIDE
-it, and base64 is an encoding, not a cipher. Driven 2026-09-01 against the real function:
-the decoded payload contains `cid_ovr` (the OAuth client id), `sec_ovr` (**the client
-secret, verbatim**) and `cv` (**the PKCE code_verifier**). That blob is then placed in the
-authorize URL as `?state=…`.
+BE FATAL RATHER THAN MERELY WRONG.** `generate_oauth_state` base64-encoded its payload and
+HMAC-signed it, leaking client secrets and PKCE verifiers in URLs.
 
-Two consequences, and the second is the one that decides this module's design:
-
-  1. **It defeats the purpose of PKCE.** PKCE exists so an intercepted authorization `code`
-     cannot be redeemed without the verifier. If the verifier rides in the SAME URL as the
-     code, whoever sees one sees both.
-  2. **Here the authorization server is a URL A STRANGER PASTED.** On the Phase 215 path the
-     AS is Google and the secret is the customer's own — bad, but not a leak to an outsider.
-     In this flow, reusing that design would hand a hostile MCP server our client secret and
-     the verifier by construction, on the first request, with no attack required.
-
-**So the state here is an OPAQUE RANDOM HANDLE and nothing else.** The verifier, the client
-credentials and the discovered endpoints stay server-side in Redis, keyed by that handle.
-Nothing sensitive enters a URL. That is the correct shape whoever the AS is; it is
-mandatory when the AS is untrusted.
-
-⚠ Phase 215's flow is NOT patched from here. It is live and works; changing its state
-encoding mid-flight would break consent already in progress. `BUS-048` proposes converging
-the two afterwards, because **two state implementations is how the safe path and the unsafe
-path drift apart.**
+Phase 222 designed the opaque random handle pattern for discovered MCP servers.
+Phase 225 converged BOTH flows (Google/BYO OAuth and MCP OAuth) onto a single, unified
+implementation in `app.services.oauth_state`. The verifier, client credentials, and
+endpoints stay server-side in Redis, keyed by an opaque handle (`oauth:pending:{handle}`).
+Nothing sensitive enters a URL bar. Both flows now consume that single state engine.
 
 ── THE OTHER PROPERTY, AND IT IS EASY TO MISS ───────────────────────────────────────────
 
@@ -59,23 +41,26 @@ import httpx
 from app.security.egress import EgressRefused
 from app.services.mcp_auth_discovery import _PinnedFetch
 from app.services.oauth_service import generate_pkce_pair
+from app.services.oauth_state import (
+    PENDING_TTL_SECONDS,
+    OAuthStateError,
+    PendingOAuthState,
+    save_pending_state,
+    take_pending_state,
+)
 
 logger = logging.getLogger(__name__)
 
-#: ⚠ SHORT ON PURPOSE. This window is how long a stolen handle is worth anything, and a
-#: person who has been sent to a sign-in page either comes back within minutes or has
-#: abandoned it. 10 minutes matches `generate_oauth_state`'s own default TTL, so the two
-#: flows expire alike even though they store different things.
-PENDING_TTL_SECONDS = 600
-
-#: `mcp_oauth:pending:{handle}`. No user id and no connection id in the key — the handle is
-#: the only thing that resolves it, so an attacker who can enumerate keys learns nothing
-#: about who is connecting to what.
-_PENDING_KEY = "mcp_oauth:pending:{handle}"
+#: `oauth:pending:{handle}`. Unified Redis key prefix across all OAuth flows.
+_PENDING_KEY = "oauth:pending:{handle}"
 
 
 class McpOAuthError(Exception):
     """The authorization could not be completed. Carries a sentence a person can act on."""
+
+
+#: PendingAuthorization is an alias of the unified PendingOAuthState (Phase 225 convergence)
+PendingAuthorization = PendingOAuthState
 
 
 @dataclass
@@ -161,21 +146,6 @@ async def register_client(
     )
 
 
-@dataclass
-class PendingAuthorization:
-    """What the callback needs, held server-side for the length of one consent."""
-
-    code_verifier: str
-    client_id: str
-    client_secret: str | None
-    token_endpoint: str
-    redirect_uri: str
-    connection_id: str | None
-    user_id: str
-    org_id: str
-    server_url: str
-
-
 async def begin_authorization(
     redis: Any,
     *,
@@ -196,7 +166,6 @@ async def begin_authorization(
     handle — 32 bytes of `secrets.token_urlsafe`, carrying no information at all.
     """
     verifier, challenge = generate_pkce_pair()
-    handle = secrets.token_urlsafe(32)
 
     pending = PendingAuthorization(
         code_verifier=verifier,
@@ -208,16 +177,10 @@ async def begin_authorization(
         user_id=user_id,
         org_id=org_id,
         server_url=server_url,
+        flow="mcp",
     )
 
-    # ⚠ `setex`, NOT `set` + `expire`. Two commands leave a window in which a crash between
-    # them parks a credential-bearing record in Redis with NO expiry, forever. One command
-    # cannot half-succeed.
-    await redis.setex(
-        _PENDING_KEY.format(handle=handle),
-        PENDING_TTL_SECONDS,
-        json.dumps(pending.__dict__),
-    )
+    handle = await save_pending_state(redis, pending, ttl_seconds=PENDING_TTL_SECONDS)
 
     params = {
         "client_id": client_id,
@@ -247,17 +210,10 @@ async def _take_pending(redis: Any, handle: str) -> PendingAuthorization:
     exchange also burns the handle, which is the safe direction: the person retries the
     whole consent rather than the attacker retrying the redemption.
     """
-    key = _PENDING_KEY.format(handle=handle)
-    raw = await redis.get(key)
-    await redis.delete(key)
-
-    if not raw:
-        raise McpOAuthError(
-            "This sign-in link has already been used or has expired. Start the connection again."
-        )
-
-    payload = json.loads(raw if isinstance(raw, str) else raw.decode("utf-8"))
-    return PendingAuthorization(**payload)
+    try:
+        return await take_pending_state(redis, handle, expected_flow="mcp")
+    except OAuthStateError as exc:
+        raise McpOAuthError(str(exc)) from exc
 
 
 async def complete_authorization(
