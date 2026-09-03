@@ -1147,6 +1147,16 @@ CLAUDE.md carries a MANDATORY sweep rule; it is honoured by the orchestrator, no
 
 ## Guardrail overrides
 
+**Phase 225 — `AGENTS.md` §3.1 seat assignment, OVERRIDDEN 2026-09-03 by the operator.** §3.1
+criterion 1 (credentials or secrets) makes 225 Claude-built and Gemini-reviewed by the written rule;
+the ROADMAP entry flagged it as the operator's call. The operator directed that **Gemini discusses,
+plans and executes and Claude monitors**. Recorded here, not argued. **Compensating gates:** Claude's
+`225-PREFLIGHT.md` (3 blocking + 11 advisory gaps, `ae7aac884`), a DRIVEN post-execution check of
+SC#5 in a real browser by Claude, and **the operator running `/code-review ultra` on the 225 diff
+before merge** — §3.1 names that as the real gate on credential phases whoever built them.
+⚠ The pre-flight also found **`BUG-260903-01`**: since 226 both OAuth callbacks redirect to `/`,
+now the marketing page, so SC#5 cannot pass until the return leg targets the app.
+
 **Phase 217.1 — the UI-SPEC safety gate, SKIPPED BY DECISION 2026-08-29 (Claude, at plan-phase).**
 `workflow.ui_safety_gate` is `true` and the phase section is saturated with frontend indicators, so
 step 5.6 fires and its instruction is to **exit and run `/gsd:ui-phase 217.1`**. It was skipped, and
