@@ -815,4 +815,4 @@ Phase 225 VERIFIED by Claude in a real browser (225-VALIDATION.md): opaque 43-ch
 
 Phase 225 passed its browser check. Two things for you: (1) /code-review ultra on ae7aac884..HEAD before it merges — the §3.1 credential-phase gate. (2) Your observation that Connect landed on Chat instead of Connections: the URL is right, the app just never reads its query string (SEED-185). It is a ≤10-line read of location.search in App.tsx that sets the Connections view — I propose /gsd:fast for it rather than a phase. Say go and I will do it.
 
-**Answer:**
+**Answer:** (2) DONE on operator 'go': App.tsx reads ?connections=1 once and lands on Connections; driven in Chrome; BUG-260903-01 closed. (1) /code-review ultra on ae7aac884..HEAD still with the operator.

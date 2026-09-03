@@ -4,10 +4,10 @@ title: Both OAuth callbacks redirect to `/`, which Phase 226 turned into the mar
 reported: 2026-09-03
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/connectors/oauth, backend/connectors/mcp-oauth, frontend/landing, frontend/navigation]
 folded_into: "225"
-verified_closed_by: null
+verified_closed_by: "225 + quick 260903 (App.tsx query-string read)"
 related_seeds: [SEED-185]
 re_open_trigger: null
 reproduces_on:
@@ -48,6 +48,8 @@ vendor each time. Phase 225 SC#5 (*"the Google connection still works end to end
 browser"*) cannot pass while this stands, which is why it is filed now rather than at 225's close.
 
 ## Routing
+
+**CLOSED 2026-09-03 (quick task, operator 'go').** `App.tsx` now reads `?connections=1` once in the `useState<ActiveView>` initializer, lands on Connections and drops the query via `replaceState`. Driven in Chrome: `/app?connections=1&oauth_connected=1&id=…` → `h1 = Connections`, URL `/app`. `tsc` 66 = baseline.
 
 **2026-09-03, verified in a real browser:** the redirect half is CLOSED by 225 (`ec3d75a9d`) — the operator landed on `/app?connections=1&oauth_connected=1&id=…`. The query-string-reader half is still open: the app opened Chat, not Connections. Status stays `folded` until that half ships (SEED-185 or a `/gsd:fast`).
 
