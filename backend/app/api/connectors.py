@@ -1278,18 +1278,18 @@ async def mcp_oauth_callback(
     # renders is how a refusal becomes an injection.
     if error:
         logger.warning("mcp oauth: consent returned %s (%s)", error, error_description)
-        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error={error}")
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error={error}")
 
     if not code or not state:
         return RedirectResponse(
-            url=f"{frontend_url}/?connections=1&oauth_error=missing_code_or_state"
+            url=f"{frontend_url}/app?connections=1&oauth_error=missing_code_or_state"
         )
 
     try:
         tokens, pending = await complete_authorization(get_redis(), handle=state, code=code)
     except (McpOAuthError, EgressRefused) as exc:
         logger.warning("mcp oauth: could not complete the connection: %s", exc)
-        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=exchange_failed")
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=exchange_failed")
 
     scope_str = tokens.get("scope", "")
     await connector_service.save_oauth_tokens(
@@ -1307,7 +1307,7 @@ async def mcp_oauth_callback(
         account_email=None,
         account_name=None,
     )
-    return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_connected=1")
+    return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_connected=1")
 
 
 # ── Phase 215 (OAUTH-01..03) · BYO OAuth Endpoints ──────────────────────────────
@@ -1388,12 +1388,16 @@ async def create_oauth_authorize_url(
                 payload.connection_id, exc_info=True,
             )
 
+    from app.dependencies import get_redis
+
     try:
-        auth_url, state = build_authorization_url(
+        auth_url, state = await build_authorization_url(
             provider=payload.provider,
             connection_id=payload.connection_id,
             user_id=user["id"],
+            org_id=str(active_org),
             redirect_uri=redirect_uri,
+            redis=get_redis(),
             custom_client_id=cid,
             custom_client_secret=csec,
             custom_scopes=payload.custom_scopes,
@@ -1401,6 +1405,13 @@ async def create_oauth_authorize_url(
         return OAuthAuthorizeResponse(authorization_url=auth_url, state=state)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except Exception as exc:
+        # A-3: fail-closed 503 if Redis / state store is unavailable
+        logger.error("oauth authorize: failed to park authorization state: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication state store is currently unavailable. Please try again.",
+        ) from exc
 
 
 @router.get(
@@ -1414,6 +1425,8 @@ async def oauth_callback(
     error_description: str = Query(None),
 ) -> RedirectResponse:
     """Phase 215 (OAUTH-02) — Verify signed state, exchange code for tokens, encrypt, and redirect to settings."""
+    from app.dependencies import get_redis
+    from app.services.oauth_state import OAuthStateError, take_pending_state
     from app.services.oauth_service import (
         exchange_code_for_tokens,
         fetch_account_profile,
@@ -1426,29 +1439,51 @@ async def oauth_callback(
 
     if error:
         logger.warning("OAuth authorization returned error: %s (%s)", error, error_description)
-        # ⚠ `/settings/connections` WAS NOT A ROUTE EITHER — this app navigates by
-        # `useState<ActiveView>` and has no router (SEED-185), so every landing below used
-        # to drop the person on the SPA fallback with their result in a URL nothing reads.
-        # The app root plus a query the shell can act on is the honest target.
-        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error={error}")
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error={error}")
 
     if not code or not state:
-        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=missing_code_or_state")
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=missing_code_or_state")
+
+    code_verifier = None
+    client_id = None
+    client_secret = None
+    provider = None
+    connection_id = None
 
     try:
-        state_data = verify_oauth_state(state)
-        provider = state_data["prv"]
-        connection_id = state_data["cid"]
-        code_verifier = state_data["cv"]
-        custom_client_id = state_data.get("cid_ovr")
-        custom_client_secret = state_data.get("sec_ovr")
+        pending = await take_pending_state(get_redis(), state, expected_flow="provider")
+        provider = pending.provider
+        connection_id = pending.connection_id
+        code_verifier = pending.code_verifier
+        client_id = pending.client_id
+        client_secret = pending.client_secret
+    except OAuthStateError:
+        # In-flight legacy fallback path (SC#3):
+        # Transition fallback: delete after the first prod deploy has been live 24 h
+        if "." in state:
+            try:
+                state_data = verify_oauth_state(state)
+                logger.warning("[legacy-oauth-state-accepted] Verified in-flight signed OAuth state during deploy cutover")
+                provider = state_data["prv"]
+                connection_id = state_data["cid"]
+                code_verifier = state_data["cv"]
+                custom_client_id = state_data.get("cid_ovr")
+                custom_client_secret = state_data.get("sec_ovr")
+                client_id, client_secret = resolve_client_credentials(
+                    provider=provider,
+                    custom_client_id=custom_client_id,
+                    custom_client_secret=custom_client_secret,
+                )
+            except ValueError as exc:
+                # A-4: log length, not content
+                logger.warning("oauth callback: legacy state verification failed (len=%d): %s", len(state), exc)
+                return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
+        else:
+            # A-4: log length, not content
+            logger.warning("oauth callback: invalid or expired opaque handle (len=%d)", len(state))
+            return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
 
-        client_id, client_secret = resolve_client_credentials(
-            provider=provider,
-            custom_client_id=custom_client_id,
-            custom_client_secret=custom_client_secret,
-        )
-
+    try:
         # ⚠ MUST BE BYTE-IDENTICAL TO THE ONE SENT ON AUTHORIZE. The provider compares them
         # and answers `redirect_uri_mismatch`, which names neither setting.
         redirect_uri = f"{settings.backend_public_url.rstrip('/')}/connectors/oauth/callback"
@@ -1493,14 +1528,14 @@ async def oauth_callback(
                     supabase=srv_client,
                 )
 
-        target_url = f"{frontend_url}/?connections=1&oauth_connected=1"
+        target_url = f"{frontend_url}/app?connections=1&oauth_connected=1"
         if connection_id:
             target_url += f"&id={connection_id}"
         return RedirectResponse(url=target_url)
 
     except Exception as exc:
         logger.exception("OAuth callback processing failed: %s", exc)
-        return RedirectResponse(url=f"{frontend_url}/?connections=1&oauth_error=token_exchange_failed")
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=token_exchange_failed")
 
 
 @router.get(

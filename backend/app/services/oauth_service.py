@@ -17,10 +17,16 @@ from typing import Any
 from urllib.parse import urlencode
 
 import httpx
+import warnings
 
 from app.config import settings
 from app.models.connector import OAuthProvider
 from app.security.secret_cipher import decrypt_secret, encrypt_secret, get_cipher, is_encrypted
+from app.services.oauth_state import (
+    PENDING_TTL_SECONDS,
+    PendingOAuthState,
+    save_pending_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +151,17 @@ def generate_oauth_state(
     custom_client_secret: str | None = None,
     ttl_seconds: int = 600,
 ) -> str:
-    """Create a tamper-proof HMAC-signed state payload containing PKCE verifier."""
+    """Create a tamper-proof HMAC-signed state payload containing PKCE verifier.
+
+    .. deprecated:: Phase 225
+       Replaced by opaque random handles via `oauth_state.save_pending_state`.
+       Retained only for backward-compatibility tests during cutover.
+    """
+    warnings.warn(
+        "generate_oauth_state is deprecated since Phase 225; use oauth_state.save_pending_state instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     payload = {
         "cid": connection_id,
         "uid": user_id,
@@ -163,8 +179,9 @@ def generate_oauth_state(
 
 
 def verify_oauth_state(state: str) -> dict[str, Any]:
-    """Verify and unpack HMAC-signed state token.
+    """Verify and unpack legacy HMAC-signed state token.
 
+    # Transition fallback: delete after the first prod deploy has been live 24 h
     Raises:
         ValueError if state is invalid, tampered, or expired.
     """
@@ -222,30 +239,38 @@ def resolve_client_credentials(
     return client_id.strip(), client_secret.strip()
 
 
-def build_authorization_url(
+async def build_authorization_url(
     provider: OAuthProvider,
     connection_id: str | None,
     user_id: str,
     redirect_uri: str,
+    redis: Any,
+    org_id: str = "",
     custom_client_id: str | None = None,
     custom_client_secret: str | None = None,
     custom_scopes: list[str] | None = None,
 ) -> tuple[str, str]:
-    """Construct authorization URL for given provider with PKCE and state."""
+    """Construct authorization URL for given provider with PKCE and opaque state handle (SC#1)."""
     prov_meta = OAUTH_PROVIDERS.get(provider)
     if not prov_meta:
         raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     client_id, client_secret = resolve_client_credentials(provider, custom_client_id, custom_client_secret)
     verifier, challenge = generate_pkce_pair()
-    state = generate_oauth_state(
+
+    pending = PendingOAuthState(
+        code_verifier=verifier,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
         connection_id=connection_id,
         user_id=user_id,
+        org_id=org_id,
+        flow="provider",
         provider=provider,
-        code_verifier=verifier,
-        custom_client_id=custom_client_id,
-        custom_client_secret=custom_client_secret,
+        token_endpoint=prov_meta.get("token_url"),
     )
+    state = await save_pending_state(redis, pending, ttl_seconds=PENDING_TTL_SECONDS)
 
     scopes = custom_scopes or prov_meta["default_scopes"]
     scope_str = " ".join(scopes)

@@ -12,11 +12,11 @@ from app.models.connector import (
 from app.services.oauth_service import (
     generate_pkce_pair,
     build_authorization_url,
-    verify_oauth_state,
     exchange_code_for_tokens,
     fetch_account_profile,
     encrypt_token_value,
 )
+from app.services.oauth_state import take_pending_state
 from app.services.oauth_refresh_service import (
     get_valid_oauth_token,
     refresh_oauth_token_at_provider,
@@ -29,7 +29,7 @@ from app.services.connector_service import (
 
 
 @pytest.mark.asyncio
-async def test_oauth_full_authorization_and_token_storage_lifecycle():
+async def test_oauth_full_authorization_and_token_storage_lifecycle(fake_redis):
     """Simulates full OAuth authorization, PKCE validation, token exchange, and encrypted storage."""
     connection_id = "conn-int-101"
     user_id = "user-int-101"
@@ -38,22 +38,26 @@ async def test_oauth_full_authorization_and_token_storage_lifecycle():
 
     # Step 1: Authorization URL generation
     with patch("app.services.oauth_service.resolve_client_credentials", return_value=("mock-client-id", "mock-client-secret")):
-        auth_url, state_token = build_authorization_url(
+        auth_url, state_token = await build_authorization_url(
             provider="google",
             connection_id=connection_id,
             user_id=user_id,
+            org_id=org_id,
             redirect_uri=redirect_uri,
+            redis=fake_redis,
         )
 
     assert "https://accounts.google.com/o/oauth2/v2/auth" in auth_url
     assert "code_challenge=" in auth_url
     assert "code_challenge_method=S256" in auth_url
+    assert len(state_token) == 43
+    assert "." not in state_token
 
-    # Step 2: Callback state verification
-    state_payload = verify_oauth_state(state_token)
-    assert state_payload["cid"] == connection_id
-    assert state_payload["uid"] == user_id
-    assert len(state_payload["cv"]) > 10
+    # Step 2: Callback state verification via server-side pending state retrieval
+    pending_state = await take_pending_state(fake_redis, state_token, expected_flow="provider")
+    assert pending_state.connection_id == connection_id
+    assert pending_state.user_id == user_id
+    assert len(pending_state.code_verifier) > 10
 
     # Step 3: Token exchange & user profile retrieval
     mock_token_response = {
@@ -82,7 +86,7 @@ async def test_oauth_full_authorization_and_token_storage_lifecycle():
         tokens = await exchange_code_for_tokens(
             provider="google",
             code="mock-auth-code-789",
-            code_verifier=state_payload["cv"],
+            code_verifier=pending_state.code_verifier,
             redirect_uri=redirect_uri,
             client_id="mock-client-id",
             client_secret="mock-client-secret",

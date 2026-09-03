@@ -63,13 +63,16 @@ def test_oauth_state_tampering_rejected():
         verify_oauth_state(f"{payload_b64}.tampered_sig_12345")
 
 
-def test_build_authorization_url_google():
-    """Constructs valid Google OAuth authorization URL with PKCE."""
-    url, state = build_authorization_url(
+@pytest.mark.asyncio
+async def test_build_authorization_url_google(fake_redis):
+    """Constructs valid Google OAuth authorization URL with PKCE and opaque state handle (SC#1)."""
+    url, state = await build_authorization_url(
         provider="google",
         connection_id="conn-g-1",
         user_id="user-1",
+        org_id="org-1",
         redirect_uri="http://localhost:5173/api/connectors/oauth/callback",
+        redis=fake_redis,
         custom_client_id="google-client-id.apps.googleusercontent.com",
         custom_client_secret="google-client-secret",
     )
@@ -78,21 +81,33 @@ def test_build_authorization_url_google():
     assert "code_challenge=" in url
     assert "code_challenge_method=S256" in url
     assert "response_type=code" in url
+    assert len(state) == 43
+    assert "." not in state
+    assert f"state={state}" in url
+    assert f"oauth:pending:{state}" in fake_redis.store
 
 
-def test_build_authorization_url_microsoft():
-    """Constructs valid Microsoft OAuth authorization URL with PKCE."""
-    url, state = build_authorization_url(
+@pytest.mark.asyncio
+async def test_build_authorization_url_microsoft(fake_redis):
+    """Constructs valid Microsoft OAuth authorization URL with PKCE and opaque state handle (SC#1)."""
+    url, state = await build_authorization_url(
         provider="microsoft",
         connection_id="conn-ms-1",
         user_id="user-1",
+        org_id="org-1",
         redirect_uri="http://localhost:5173/api/connectors/oauth/callback",
+        redis=fake_redis,
         custom_client_id="ms-app-guid-123",
         custom_client_secret="ms-secret",
     )
     assert "https://login.microsoftonline.com/common/oauth2/v2.0/authorize" in url
     assert "client_id=ms-app-guid-123" in url
     assert "code_challenge=" in url
+    assert len(state) == 43
+    assert "." not in state
+    assert f"state={state}" in url
+    assert f"oauth:pending:{state}" in fake_redis.store
+
 
 
 @pytest.mark.asyncio

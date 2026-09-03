@@ -21,7 +21,7 @@ right.** Superseded figures are recorded beside the new ones, never over them.
 | `chat/MessageInput.tsx` | 25 / 13 / 478 | **29 / 14 / 643** | **+1 phase, +165 L** |
 | `layout/ChatLayout.tsx` | 41 / 22 / 911 | **46 / 24 / 921** | **+2 phases** |
 | `services/tool_dispatcher.py` | 72 / 29 / 4624 | **77 / 32 / 4679** | **+3 phases, +55 L** |
-| `api/connectors.py` | 17 / 7 / 1338 | **24 / 10 / 1643** | **+3 phases, +305 L** |
+| `api/connectors.py` | 24 / 10 / 1643 | **25 / 11 / 1678** | **+1 phase, +35 L** |
 | `api/threads.py` | 238 / 78 / 1408 | **243 / 80 / 1590** | **+2 phases, +182 L** |
 | `services/connector_service.py` | 16 / 5 / 1461 | **21 / 7 / 1601** | **+2 phases, +140 L** |
 | `models/message.py` | 15 / 8 / 120 | **17 / 10 / 124** | **+2 phases** |
@@ -6265,6 +6265,12 @@ Phases touched: 211, 212.
 Phases touched: 190, 211, 212.
 
 **Disposition: honoured by construction (212).** Added `POST /api/connectors/discover-tools` pre-save probe endpoint gated with `require_visible("live_connectors")` and `require_org_manage`.
+
+**Re-derived 2026-09-03 (Phase 225):** `25 commits / 11 phases / 1678 L` · **G-5 FIRES**.
+Phases touched: 190, 206, 211, 212, 215, 221, 222, 225, etc.
+
+**Disposition: honoured by construction (225):** dual-mode state resolution inside the two functions it already owns (`create_oauth_authorize_url` and `oauth_callback`), plus redirect target path migration to `/app` (B-1). No new endpoints added.
+
 
 ---
 
