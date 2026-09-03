@@ -58,6 +58,11 @@ export function toolSummary(tc: ToolCall) {
   return getToolSummary(tc.name, tc.args)
 }
 
+// Phase 075.8 Task 2 (sketch 002 D5): map ToolCall.status → StatusPill ToolStatus.
+// "failed" is not directly observable on ToolCall.status (failed execute_code
+// surfaces through ExecuteCodeBody's exitCode path; non-execute_code tools
+// surface errors via parsed.error). Treat anything terminal-but-not-done as
+// done — failures show up via ToolResultBlock's destructive italic line.
 export function pillStatus(s: ToolCall["status"]): ToolStatus {
   if (s === "preparing") return "preparing"
   if (s === "running") return "running"
@@ -65,8 +70,30 @@ export function pillStatus(s: ToolCall["status"]): ToolStatus {
   return "done"
 }
 
-// ---- Essence line (Phase 095 Plan 06, sketch 014 — GAP-095-03 essence) ----
+// Phase 075.8 Task 2 (sketch 002 D5): TimeBadge was dropped — the StatusPill
+// now carries the `· {duration}` suffix on done/failed/interrupted variants,
+// making the standalone Clock+duration span redundant. ExecuteCodeBody
+// underwent the same swap.
 
+// ---- Essence line (Phase 095 Plan 06, sketch 014 — GAP-095-03 essence) ----
+//   {icon} {tool} → {result} {pill} {chev}
+// The resting text is the RESULT (summarizeToolCall), NOT the args summary —
+// "finished essence recedes" so the result uses text-muted-foreground. The
+// whole row is the click target that expands this card's full body. Replaces
+// the prior two-row resting state (head row with args-in-quotes + a SEPARATE
+// ToolResultBlock result row) with a single essence line. Used for every
+// non-execute_code finished tool; execute_code reuses it for its done resting
+// line so a done code card shows ONE result-bearing line, not args + a
+// separate result row.
+// SEED-098 Change 1: the essence line is now the resting shape for ACTIVE
+// (running/preparing) tools too, not just finished ones — so an active tool
+// rests as the SAME calm one-line shape (no auto-expanded heavy body, no
+// show→collapse flicker), with its live body one click behind the chevron.
+//   • running   → `Running {tool}` (primary) + optional ` "{summary}"`; right
+//     pill = the Variant B merged live chip (verb · live duration in ONE chip).
+//   • preparing → `Preparing {tool}…` + preparingDescription suffix; right pill
+//     = `preparing` (or `preparing · X.X KB` when argsBytesStreamed > 0).
+//   • done/interrupted → UNCHANGED: `{tool} → {result}` + done pill w/ duration.
 export function ToolEssenceLine({
   tc,
   onExpand,
@@ -83,6 +110,8 @@ export function ToolEssenceLine({
     <button
       type="button"
       onClick={onExpand}
+      // Finished essence keeps the historical testid; the active essence is
+      // reachable via its inner StatusPill (data-testid="status-pill").
       data-testid={isActive ? undefined : "tool-result-summary"}
       aria-label="Expand this step"
       className="w-full flex items-center gap-2.5 text-left group"
@@ -132,8 +161,21 @@ export function ToolEssenceLine({
           }
         />
       ) : isRunning ? (
+        // The Variant B merged live chip — verb + live ticking duration in ONE
+        // chip; no separate ElapsedTimer span on the active essence row.
         <StatusPill status="running" liveStartedAt={tc.startedAt ?? undefined} />
       ) : (
+        /* ── ⚠ NOISE AUDIT 2026-08-31 (operator, item A6) ────────────────────────
+              A green `DONE` on every row of a run whose own header already says
+              `✓ done` is a column of identical stickers. Measured: a two-step run showed
+              `DONE` twice under one `✓ done`, and the pills were the only colour on the
+              list — so the eye went to the least informative thing on it.
+
+              ⚠ SUCCESS IS THE DEFAULT AND DEFAULTS ARE NOT WORTH SAYING; A FAILURE IS NOT.
+              `failed` and `interrupted` keep their pill, loudly, because those are the
+              rows a person is scanning FOR and the run header cannot say WHICH step it
+              was. The duration goes with the pill on a plain success — it is already in
+              the run's own elapsed, and a per-step timing belongs to the expanded body. */
         pillStatus(tc.status) !== "done" && (
           <StatusPill
             status={pillStatus(tc.status)}

@@ -1628,6 +1628,8 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `21 / 9 / 608` → `22 / 10 / 661`.** 214-11 mounted `StepIdentity`; the card takes props from the same wire as every other surface (T-214-11-04). Phase buckets gain `214`.
 
+**⚠ RE-DERIVED AT PHASE 227's CLOSE (2026-09-04, plan `227-03`) — recorded BESIDE the previous value, never over it: `24 / 10 / 688` → `26 / 12 / 728`.** Gained `RunTerminalStatus` (SC#1 / SC#3 single-owner terminal status row). Phase buckets gain `224` and `227`.
+
 ## `frontend/src/components/chat/MessageInput.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `25 commits / 13 phases / 478 L` · **G-5 FIRES** (13 phases vs threshold 3) — honoured by construction (194.1).

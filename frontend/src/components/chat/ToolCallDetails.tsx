@@ -49,7 +49,10 @@ export function ToolArgsBlock({ tc }: { tc: ToolCall }) {
 }
 
 // ---- Result rendering ----
-
+// Result block (all tools). Phase 095 Plan 06: a finished tool reaches this
+// branch only when it is EXPANDED (its key is in expandedSteps; the resting
+// essence line is ToolEssenceLine). Open the result body directly so there
+// is no redundant nested `→ summary` essence row.
 export function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -126,8 +129,9 @@ export function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; def
   )
 }
 
-// ---- Sub-agent block ----
-
+// ---- Sub-agent block (live or restored) ----
+// Phase 095 Plan 03 Task 1 (D-05 root fix): the sub-agent lives ONLY on its owning
+// tool_call (stamped by StreamsProvider onSubAgentStart).
 export function SubAgentBlock({ agent }: { agent: SubAgentState }) {
   const [open, setOpen] = useState(true)
   return (

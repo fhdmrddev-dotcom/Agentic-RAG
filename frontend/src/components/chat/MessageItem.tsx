@@ -1,8 +1,7 @@
-import { memo, useLayoutEffect, useRef, useState } from "react"
+import { memo, useState } from "react"
 import { Sparkles, Loader2, RotateCcw, User, Play, Ban } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 // Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
 // workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
 // thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered

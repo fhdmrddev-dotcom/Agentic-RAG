@@ -101,16 +101,33 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   // Interleave skill activations with tool calls by timestamp
   const displayItems = buildDisplayItems(deduplicatedToolCalls, activatedSkills)
   const toolStepNumber = buildToolStepNumberMap(deduplicatedToolCalls)
+  // 075.6 Plan 02 / SPEC Req #4: default-expand-for-active-preparing rule.
+  // The LAST tool in displayItems whose status === "preparing" is the
+  // ACTIVE preparing tool (per Boundary Keeper Round 1: "expanded for active
+  // preparing tool, collapsed for past preparing tools"). Past preparing
+  // tools (rare — would require multiple back-to-back preparing entries for
+  // the same agent loop iteration) render collapsed by default.
   const lastPreparingIndex = findLastPreparingIndex(displayItems)
 
-  // Per-tool-id expanded state for the <ToolArgsLivePanel> chevron toggle
+  // 075.6 Plan 02 / SPEC Req #4: per-tool-id expanded state for the
+  // <ToolArgsLivePanel> chevron toggle. Default value follows the default-
+  // for-active rule (i === lastPreparingIndex). useState inside the map
+  // callback is NOT React-safe; lift to a component-scope Record keyed by
+  // tc.id so each panel instance has its own user-toggle state.
   const [panelExpanded, setPanelExpanded] = useState<Record<string, boolean>>({})
   const togglePanel = (id: string, defaultExpanded: boolean) =>
     setPanelExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }))
 
   const activeIndex = findActiveIndex(displayItems)
 
-  // Per-step expanded Set keyed on stable stepKeyOf identity
+  // Per-step expanded Set keyed on the SAME `stepKeyOf` identity the rail snum
+  // + dedup use. Membership means "this step is expanded to its full body";
+  // absence means "folded to its one-line essence card" (ToolEssenceLine).
+  // Clicking one essence card expands ONLY that card (D-01 click-to-expand);
+  // the others stay folded. The identity scheme survives the
+  // preparing->running->done id mutation (075.9) and a reload (state is
+  // reconstructed from `toolCalls` each render). State stays component-local
+  // and provider-agnostic — no StreamsProvider/api.ts/backend change.
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set())
   const expandStep = (key: string) => setExpandedSteps((prev) => new Set(prev).add(key))
   const collapseStep = (key: string) =>
@@ -134,6 +151,8 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
         }
 
         // D-067-03: get the previous tool item's iteration for boundary detection.
+        // Skill rows don't partition iterations; walk back past consecutive skills
+        // to find the most recent tool kind. undefined if no prior tool.
         let prevToolIteration: number | undefined = undefined
         if (item.kind === "tool") {
           for (let j = i - 1; j >= 0; j--) {
@@ -147,16 +166,28 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
         const tc = item.tc
         const summary = toolSummary(tc)
         const agentState: SubAgentState | undefined = tc.sub_agent
+        // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
+        // Applied to the per-tool wrapper when the tool is running or preparing.
         const isToolActive = tc.status === "running" || tc.status === "preparing"
 
+        // BUG-260823-02: a STABLE key, not the list index. With `key={i}`
+        // React re-identified rows whenever the list changed shape, and a
+        // remounted element restarts its CSS animation from `opacity: 0` —
+        // so the whole history re-played its entrance on every reconcile.
         const stepKey = stepKeyOf(tc, i)
         const snum = toolStepNumber.get(stepKey) ?? 0
         const node = nodeStateOf(tc)
         const isLastTool = snum === deduplicatedToolCalls.length
 
+        // Phase 095 Plan 06: an EARLIER finished step (i < activeIndex)
+        // that the user expanded out of its essence row. It renders its
+        // full body here and gets a per-row re-collapse control so it can
+        // fold back to its essence independently.
         const isExpandedEarlierStep =
           activeIndex !== -1 && i < activeIndex && expandedSteps.has(stepKey)
 
+        // Phase 095 Plan 06 (GAP-095-03 essence) / SEED-098 Change 1:
+        // The essence line is the resting shape for active and finished tools.
         const isFinished = tc.status === "done" || tc.status === "interrupted"
         const isActive = tc.status === "running" || tc.status === "preparing"
         const isCollapsedToEssence = (isFinished || isActive) && !expandedSteps.has(stepKey)
@@ -213,6 +244,8 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                   )}
                 </>
               ) : tc.name === "execute_code" ? (
+                // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL execute_code statuses
+                // (preparing/running/done) for seamless streaming handoff.
                 <TOOL_BODIES.execute_code tc={tc} />
               ) : (
                 <>
@@ -296,7 +329,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     </div>
                   )}
 
-                  {/* Live args panel */}
+                  {/* 075.6 Plan 02 / SPEC Req #4: live code panel during preparing */}
                   {tc.status === "preparing" && tc.argsCodeText && tc.argsCodeText.length > 0 && tc.argsBytesStreamed != null && (() => {
                     const panelKey = tc.clientKey ?? tc.id ?? `idx-${i}`
                     const isExecuteCode = tc.name === "execute_code"
@@ -317,7 +350,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     )
                   })()}
 
-                  {/* Live Shiki editor inset for execute_code preparing */}
+                  {/* Phase 075.9 T4: live Shiki editor inset for execute_code preparing */}
                   {tc.status === "preparing" && tc.name === "execute_code" && tc.argsCodeText && tc.argsCodeText.length > 0 && (
                     <ExecuteCodeEditorInset tc={tc} />
                   )}
@@ -336,7 +369,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
               )}
             </StepRow>
 
-            {/* Bottom progress shimmer on active tools */}
+            {/* Phase 075.8 Task 3 (sketch 002 D6): bottom progress shimmer on active tools */}
             {isToolActive && (
               <div
                 className="tool-progress-bar absolute bottom-0 left-0 right-0"
@@ -349,3 +382,4 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
     </div>
   )
 }
+
