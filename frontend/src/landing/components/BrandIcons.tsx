@@ -1,3 +1,22 @@
+/**
+ * Brand icons for the public landing page — Phase 226.
+ *
+ * ⚠ TWO SOURCES, BOTH SINGLE-SOURCE, NEITHER REDRAWN (D-226-08 / the icon convention):
+ *
+ *   - MODEL PROVIDER marks come from `@lobehub/icons`, the same package every app surface
+ *     renders provider logos from.
+ *   - SERVICE / CONNECTOR marks come from `@/lib/connectionMark`, the ONE module in the repo
+ *     allowed to import the iconify logo pack directly. Its own suite asserts that NO OTHER source file
+ *     imports a brand mark ("one home, not per-component"), and this file used to be the one
+ *     offender — found by the count gate at the 226 merge, not by the phase's review, because
+ *     pre-flight F-6 kept the phase off the gate while 224-05 edited it.
+ *
+ * `connectionMark()` is total (never null) and imports only lucide + `@/lib/utils`, so the
+ * landing's own fence (no `@/lib/api`, `@/lib/supabase`, providers, auth, layout) still holds.
+ * The landing renders marks at pixel sizes, so this file applies the entry's `ink` inline
+ * instead of the app's Tailwind size classes.
+ */
+import type { CSSProperties } from "react"
 import OpenAI from "@lobehub/icons/es/OpenAI/components/Mono"
 import Anthropic from "@lobehub/icons/es/Anthropic/components/Mono"
 import GeminiColor from "@lobehub/icons/es/Gemini/components/Color"
@@ -8,29 +27,15 @@ import MinimaxColor from "@lobehub/icons/es/Minimax/components/Color"
 import OpenRouter from "@lobehub/icons/es/OpenRouter/components/Mono"
 import Ollama from "@lobehub/icons/es/Ollama/components/Mono"
 import LmStudio from "@lobehub/icons/es/LmStudio/components/Mono"
-
-import GoogleDriveIcon from "~icons/logos/google-drive"
-import GoogleGmailIcon from "~icons/logos/google-gmail"
-import GoogleCalendarIcon from "~icons/logos/google-calendar"
-import GoogleSheetsGlyph from "~icons/simple-icons/googlesheets"
-import GoogleDocsGlyph from "~icons/simple-icons/googledocs"
-import SlackIcon from "~icons/logos/slack-icon"
-import JiraIcon from "~icons/logos/jira"
-import GithubIcon from "~icons/logos/github-icon"
-import NotionIcon from "~icons/logos/notion-icon"
-import MicrosoftIcon from "~icons/logos/microsoft-icon"
-import FigmaIcon from "~icons/logos/figma"
-import LinearIcon from "~icons/logos/linear-icon"
-import SentryIcon from "~icons/logos/sentry-icon"
-import IntercomIcon from "~icons/logos/intercom-icon"
-import MiroIcon from "~icons/logos/miro-icon"
-import McpIcon from "~icons/logos/model-context-protocol-icon"
+import { connectionMark } from "@/lib/connectionMark"
 
 export interface IconProps {
   size?: number | string
   className?: string
-  style?: Record<string, any>
+  style?: CSSProperties
 }
+
+// ── Model providers (`@lobehub/icons`) ───────────────────────────────────────────────
 
 export function OpenAIIcon({ size = 16, className, style }: IconProps) {
   return <OpenAI size={size} className={className} style={style} />
@@ -40,7 +45,8 @@ export function AnthropicIcon({ size = 16, className, style }: IconProps) {
   return <Anthropic size={size} className={className} style={style} />
 }
 
-export function GoogleIcon({ size = 16, className, style }: IconProps) {
+/** The Google MODEL provider (Gemini). The Google SERVICE mark is `GoogleIcon` below. */
+export function GeminiIcon({ size = 16, className, style }: IconProps) {
   return <GeminiColor size={size} className={className} style={style} />
 }
 
@@ -72,105 +78,79 @@ export function LmStudioIcon({ size = 16, className, style }: IconProps) {
   return <LmStudio size={size} className={className} style={style} />
 }
 
-// Connection marks
-export function GmailIcon({ size = 16, className, style }: IconProps) {
-  return <GoogleGmailIcon width={size} height={size} className={className} style={style} />
-}
+// ── Services / connectors (`@/lib/connectionMark` — the one home) ────────────────────
 
-export function CalendarIcon({ size = 16, className, style }: IconProps) {
-  return <GoogleCalendarIcon width={size} height={size} className={className} style={style} />
-}
+const MUTED = "hsl(220 16% 65%)"
 
-export function DriveIcon({ size = 16, className, style }: IconProps) {
-  return <GoogleDriveIcon width={size} height={size} className={className} style={style} />
-}
-
-export function SheetsIcon({ size = 16, className, style }: IconProps) {
+/** Render a service mark at a pixel size, honouring the map's ink token inline. */
+function ServiceMark({ id, size = 16, className, style }: IconProps & { id: string }) {
+  const { Mark, ink } = connectionMark({ service_id: id })
+  const inkStyle: CSSProperties =
+    ink === "fill" ? { fill: "currentColor", color: MUTED } : ink === "stroke" ? { color: MUTED } : {}
   return (
-    <GoogleSheetsGlyph
-      width={size}
-      height={size}
-      className={className}
-      style={{ color: "#34A853", ...style }}
-    />
+    <Mark aria-hidden="true" width={size} height={size} className={className} style={{ ...inkStyle, ...style }} />
   )
 }
 
-export function DocsIcon({ size = 16, className, style }: IconProps) {
-  return (
-    <GoogleDocsGlyph
-      width={size}
-      height={size}
-      className={className}
-      style={{ color: "#4285F4", ...style }}
-    />
-  )
+/** Google Workspace — the Google "G", not the Gemini model mark. */
+export function GoogleIcon(p: IconProps) {
+  return <ServiceMark id="google" {...p} />
+}
+export function GmailIcon(p: IconProps) {
+  return <ServiceMark id="google-gmail" {...p} />
+}
+export function CalendarIcon(p: IconProps) {
+  return <ServiceMark id="google-calendar" {...p} />
+}
+export function DriveIcon(p: IconProps) {
+  return <ServiceMark id="google-drive" {...p} />
+}
+export function SheetsIcon(p: IconProps) {
+  return <ServiceMark id="google-sheets" {...p} />
+}
+export function DocsIcon(p: IconProps) {
+  return <ServiceMark id="google-docs" {...p} />
+}
+export function SlackBrandIcon(p: IconProps) {
+  return <ServiceMark id="slack" {...p} />
+}
+export function JiraBrandIcon(p: IconProps) {
+  return <ServiceMark id="jira" {...p} />
+}
+export function GithubBrandIcon(p: IconProps) {
+  return <ServiceMark id="github" {...p} />
+}
+export function NotionBrandIcon(p: IconProps) {
+  return <ServiceMark id="notion" {...p} />
+}
+export function MicrosoftBrandIcon(p: IconProps) {
+  return <ServiceMark id="microsoft" {...p} />
+}
+export function FigmaBrandIcon(p: IconProps) {
+  return <ServiceMark id="figma" {...p} />
+}
+export function LinearBrandIcon(p: IconProps) {
+  return <ServiceMark id="linear" {...p} />
+}
+export function SentryBrandIcon(p: IconProps) {
+  return <ServiceMark id="sentry" {...p} />
+}
+export function IntercomBrandIcon(p: IconProps) {
+  return <ServiceMark id="intercom" {...p} />
+}
+export function MiroBrandIcon(p: IconProps) {
+  return <ServiceMark id="miro" {...p} />
+}
+export function McpBrandIcon(p: IconProps) {
+  return <ServiceMark id="custom_mcp" {...p} />
+}
+export function SmtpBrandIcon(p: IconProps) {
+  return <ServiceMark id="smtp" {...p} />
 }
 
-export function SlackBrandIcon({ size = 16, className, style }: IconProps) {
-  return <SlackIcon width={size} height={size} className={className} style={style} />
-}
+// ── Lookups by fact id ────────────────────────────────────────────────────────────────
 
-export function JiraBrandIcon({ size = 16, className, style }: IconProps) {
-  return <JiraIcon width={size} height={size} className={className} style={style} />
-}
-
-export function GithubBrandIcon({ size = 16, className, style }: IconProps) {
-  return <GithubIcon width={size} height={size} className={className} style={style} />
-}
-
-export function NotionBrandIcon({ size = 16, className, style }: IconProps) {
-  return <NotionIcon width={size} height={size} className={className} style={style} />
-}
-
-export function MicrosoftBrandIcon({ size = 16, className, style }: IconProps) {
-  return <MicrosoftIcon width={size} height={size} className={className} style={style} />
-}
-
-export function FigmaBrandIcon({ size = 16, className, style }: IconProps) {
-  return <FigmaIcon width={size} height={size} className={className} style={style} />
-}
-
-export function LinearBrandIcon({ size = 16, className, style }: IconProps) {
-  return <LinearIcon width={size} height={size} className={className} style={style} />
-}
-
-export function SentryBrandIcon({ size = 16, className, style }: IconProps) {
-  return <SentryIcon width={size} height={size} className={className} style={style} />
-}
-
-export function IntercomBrandIcon({ size = 16, className, style }: IconProps) {
-  return <IntercomIcon width={size} height={size} className={className} style={style} />
-}
-
-export function MiroBrandIcon({ size = 16, className, style }: IconProps) {
-  return <MiroIcon width={size} height={size} className={className} style={style} />
-}
-
-export function McpBrandIcon({ size = 16, className, style }: IconProps) {
-  return <McpIcon width={size} height={size} className={className} style={style} />
-}
-
-export function SmtpBrandIcon({ size = 16, className, style }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      style={style}
-    >
-      <rect width="20" height="16" x="2" y="4" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </svg>
-  )
-}
-
+/** Provider ids as `facts.ts` `MODEL_PROVIDERS` / `LOCAL_RUNTIMES` carry them. */
 export function getModelIcon(id: string, props: IconProps = { size: 18 }) {
   switch (id) {
     case "anthropic":
@@ -178,7 +158,7 @@ export function getModelIcon(id: string, props: IconProps = { size: 18 }) {
     case "openai":
       return <OpenAIIcon {...props} />
     case "google":
-      return <GoogleIcon {...props} />
+      return <GeminiIcon {...props} />
     case "deepseek":
       return <DeepSeekIcon {...props} />
     case "zhipu":
@@ -198,35 +178,11 @@ export function getModelIcon(id: string, props: IconProps = { size: 18 }) {
   }
 }
 
+/**
+ * Service ids as `facts.ts` `CONNECTOR_CATALOG` carries them. Total by construction:
+ * `connectionMark()` answers an unknown id with the map's own NAMED neutral (a plug), never
+ * another vendor's mark — so this needs no default arm of its own.
+ */
 export function getServiceIcon(id: string, props: IconProps = { size: 22 }) {
-  switch (id) {
-    case "google":
-      return <GoogleIcon {...props} />
-    case "slack":
-      return <SlackBrandIcon {...props} />
-    case "jira":
-      return <JiraBrandIcon {...props} />
-    case "github":
-      return <GithubBrandIcon {...props} />
-    case "notion":
-      return <NotionBrandIcon {...props} />
-    case "microsoft":
-      return <MicrosoftBrandIcon {...props} />
-    case "figma":
-      return <FigmaBrandIcon {...props} />
-    case "linear":
-      return <LinearBrandIcon {...props} />
-    case "sentry":
-      return <SentryBrandIcon {...props} />
-    case "intercom":
-      return <IntercomBrandIcon {...props} />
-    case "miro":
-      return <MiroBrandIcon {...props} />
-    case "mcp":
-      return <McpBrandIcon {...props} />
-    case "smtp":
-      return <SmtpBrandIcon {...props} />
-    default:
-      return <McpBrandIcon {...props} />
-  }
+  return <ServiceMark id={id} {...props} />
 }
