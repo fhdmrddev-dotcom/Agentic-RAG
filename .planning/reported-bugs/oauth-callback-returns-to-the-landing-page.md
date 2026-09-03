@@ -49,6 +49,8 @@ browser"*) cannot pass while this stands, which is why it is filed now rather th
 
 ## Routing
 
+**2026-09-03, verified in a real browser:** the redirect half is CLOSED by 225 (`ec3d75a9d`) — the operator landed on `/app?connections=1&oauth_connected=1&id=…`. The query-string-reader half is still open: the app opened Chat, not Connections. Status stays `folded` until that half ships (SEED-185 or a `/gsd:fast`).
+
 **Operator, 2026-09-03: folded into Phase 225.** Plan 02 takes BOTH callbacks' redirects
 (`oauth_callback` and `mcp_oauth_callback`) to the app path. The query-string-reader half stays
 with `SEED-185`.
