@@ -102,12 +102,31 @@ scope questions. **Trigger: 227's execution.** After it, both are one-file edits
 ⚠ **That is unchanged by the finding above being resolved.** Clearing my own work's suspected
 regression is measurement, not review — the reviewer still has to check the parts I built.
 
-## Still owed — and it cannot be closed from a terminal
+## The visual bar — DRIVEN 2026-09-03, and what it could and could not reach
 
-⛔ **The acceptance bar for this phase is VISUAL and jsdom cannot judge it.** Owed browser checks:
+⛔ The acceptance bar is VISUAL and jsdom cannot judge it, so it was driven in a real browser against
+the live app (`localhost:5173` + backend `:8000`). ⭐ **Measured by COMPUTED STYLE, not by eye** — a
+screenshot would have shown a pill; `getComputedStyle` proves it is one.
 
-1. The approval card is **reachable on arrival** at a laptop viewport, and shows a deadline it was
-   **told** rather than one it invented.
-2. References is **folded**, and its trigger is findable — on **both** components.
-3. The panel todo label wraps by the sentence at the 300 px floor.
-4. Nothing regressed on the run card after the glyph removal.
+| check | result |
+|---|---|
+| **No regression** — five chat/panel components changed | ✅ app mounts, `#root` populated, composer present, **no vite error overlay**, **no console errors or exceptions** |
+| **`BUG-260902-07` half 1 — References folds by default** | ✅ `aria-expanded="false"` on a settled message with **5 sources** — precisely the case that used to open every time |
+| **`BUG-260902-07` half 2 — the trigger reads as a control** | ✅ `border-width: 0.8px` · `border-radius: 9999px` · `background: rgba(238,239,242,0.5)` · `font-weight: 500`. It has a border, a shape, a surface and weight; before, it had none of the four |
+| **The copy survived the affordance fix** | ✅ renders `References · 5 sources` verbatim — the count is visible while CLOSED |
+| **The fold actually works** | ✅ click → `aria-expanded="true"` and the panel's text grows; click again → back to `"false"` |
+
+### ⚠ Three checks the drive could NOT reach, stated rather than implied
+
+1. **The terminal-status glyph removal.** No thread in the sample carried a `timed_out` / `stopped` /
+   `cancelled` run, so no status line rendered and **the `<Square>` removal is verified only by source
+   and by suite, never on screen.**
+2. **The docked approval card above the fold.** Reproducing it needs a live connector call paused on
+   `ask` — real credentials and a real third-party round trip. **Not reachable from a terminal.**
+3. **The panel todo wrap at the 300 px floor.** Needs a thread with a long todo and the panel open at
+   a laptop width.
+
+⭐ **These are OWED, not passed.** The phase closes with them recorded as a decision — `CLAUDE.md`
+allows exactly that (*"closing a phase with owed manual UAT rows is legitimate ... but state it as a
+DECISION, never as a claim that everything ran"*). **Run #2 first** — it is the safety gate, and it is
+the only one where being wrong has a cost beyond appearance.

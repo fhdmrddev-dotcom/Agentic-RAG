@@ -40,10 +40,44 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
-🟡 **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTING (2026-09-03).**
-- Plan 224-01 complete: Shared tool vocabulary (`@/lib/toolNames`) established; `SeamCard` pruned per Winner D (deleted `workspace_write` and `write_todos` arms, preserved `ask_user`); deleted 33 lines of dead parsing code from `MessageItem.tsx`.
-- Plan 224-02 complete: Approval wire deadline unified under module constant `_APPROVAL_TIMEOUT_SECONDS = 120.0` in `tool_dispatcher.py`; emitted `expires_at` (ISO 8601 UTC) and `timeout_seconds` on `tool_approval_required`; test suite `test_224_approval_deadline.py` passing (2/2) and `test_223_dispatcher_audit.py` passing (6/6).
-- Next: Plan 224-03 (Docked approval card above `MessageInput` with live countdown anchored to `timeout_seconds`).
+✅ **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTED & CLOSED (2026-09-03).**
+All five plans shipped. `224-01`–`224-03` by Gemini, **`224-04`/`224-05` by Claude** — so under
+`AGENTS.md` §3.1 **the review belongs to Gemini** (BUS-082 / BUS-084).
+
+- **Winner D**: `SeamCard`'s `write_todos` + `workspace_write` arms DELETED; **`ask_user` survives**.
+  Premise for keeping them was measurably false — panel and card read the same persisted `tool_calls`.
+- **Winner A**: the approval card DOCKS above the composer, and **the deadline rides the wire** —
+  one `_APPROVAL_TIMEOUT_SECONDS` feeds the `wait_for`, the `expires_at`, the emit and the audit
+  string, with `timeout_seconds` emitted so client clock skew cannot apply.
+- `BUG-260902-07` BOTH halves via **one shared `FoldTrigger`**; the Thinking default untouched.
+- Vocabulary moved to `@/lib/toolNames`; the panel todo wraps by the sentence; the `<Square>` glyph
+  is gone; **six chat/panel suites adopted into the gate** (they were run by nothing and guarded by
+  nothing, so 224-05's own criterion could not have failed).
+
+**Gates**: `tsc` **66** = baseline · count gate **OK 194/194, pinned 6502, total 7234, failed 0**
+(+70 = exactly the six adopted suites) · backend **71 vs a 70 reading** — ⭐ **PROVEN not this phase**
+by reverting 224's only backend file and getting the identical 71.
+
+⭐ **Visual bar DRIVEN in a real browser**, measured by computed style rather than by eye: References
+`aria-expanded="false"` on a 5-source message, trigger now `border 0.8px` / `radius 9999px` / surface /
+`weight 500`, copy verbatim, fold opens and re-closes, **no console errors**.
+
+⚠ **THREE CHECKS ARE OWED, NOT PASSED** — recorded as a decision, never as a claim everything ran:
+the terminal-glyph removal (no stopped/timed-out run in the sample), the docked approval card (needs a
+live connector pause), and the 300 px todo wrap. **Run the approval card first** — it is the safety
+gate, and the only one where being wrong costs more than appearance.
+
+⚠ **Two must_haves DEFERRED to Phase 227 with a trigger**, not dropped: the right-aligned result
+column and the status line moving inside the frame. Both need a file outside the plan's blast radius,
+and the column conflicts with the operator's own 2026-08-31 noise audit.
+
+⚠ **Left open on purpose**: `test_chat_tool_approval.py::…_emits_event_and_pauses` fails on
+`KeyError: 'call_id'` — a REAL pre-existing disagreement between test and code, not 224's, and not
+resolved by 224 passing. It belongs to whoever next touches that emit.
+
+**NEXT: Phase 227 (`The Run Frame Has One Owner`)** — proposed from this phase's execution and the
+reason the two deferrals exist. Also queued: **225** (OAuth state, `BUS-048`), **226** (landing page,
+other session).
 
 ✅ **PHASE 223: A Connection Leaves a Record — VERIFIED & CLOSED (2026-09-02).**
 Reviewed and cleared by Claude in BUS-062. All live DB assertions, G-6 privacy safeguards (`arg_keys`), `Map.has()` restore semantics, and dual-source permanent grant receipts (`chat_card` and `settings`) verified.
