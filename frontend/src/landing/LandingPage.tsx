@@ -20,7 +20,7 @@ import {
 
 export function LandingPage() {
   return (
-    <div className="page-root" style={{ minHeight: "100%", background: "hsl(216 45% 4%)", position: "relative", overflowX: "clip" }}>
+    <div className="page-root" style={{ minHeight: "100%", background: "hsl(216 45% 4%)", position: "relative" }}>
       <Navigation />
       <main>
         <HeroSection />

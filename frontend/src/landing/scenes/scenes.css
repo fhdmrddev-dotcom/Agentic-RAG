@@ -164,11 +164,17 @@
   opacity: .35;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crow:last-child { border-bottom: 0; }
 .crow .needs { margin-left: auto; }
-.crow .dim { margin-left: 4px; }
+.crow .dim {
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .lines { display: flex; flex-direction: column; gap: 5px; }
 .lines i { display: block; height: 4px; border-radius: 2px; background: hsl(220 16% 65% / .4); }
@@ -463,6 +469,7 @@
 @media (max-width: 720px) {
   .scene { height: 470px; }
   .c-run, .x-gate, .t-card, .t-prog, .r-switch { width: 220px !important; }
+  .c-run { right: 16px !important; overflow: hidden !important; }
   .w-type { font-size: 11px; }
   .k-evals, .k-vers { display: none; }
   .l-folder { right: 16px !important; }

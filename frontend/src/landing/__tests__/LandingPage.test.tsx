@@ -158,4 +158,26 @@ describe("LandingPage Assembly & Interactivity", () => {
     const howItWorksCards = container.querySelectorAll("#how-it-works .card")
     expect(howItWorksCards.length).toBe(3)
   })
+
+  it("responsive overflow invariant: cmp-scroll wrappers have no inline overflow style and page-root has no root clip", () => {
+    const { container } = render(<LandingPage />)
+
+    // Expand the 30-row matrix so both cmp-scroll wrappers are mounted
+    const toggleBtn = screen.getByRole("button", { name: /view full 30-point matrix/i })
+    fireEvent.click(toggleBtn)
+
+    // Blocker 16: Ensure neither cmp-scroll wrapper has inline overflow: hidden
+    const cmpScrollElements = container.querySelectorAll(".cmp-scroll")
+    expect(cmpScrollElements.length).toBe(2)
+    for (const el of cmpScrollElements) {
+      const inlineStyle = el.getAttribute("style") || ""
+      expect(inlineStyle).not.toContain("overflow")
+    }
+
+    // Advisory 17: Ensure page-root does not rely on overflow-x: clip
+    const pageRoot = container.querySelector(".page-root")
+    expect(pageRoot).toBeDefined()
+    const pageRootStyle = pageRoot?.getAttribute("style") || ""
+    expect(pageRootStyle).not.toContain("clip")
+  })
 })
