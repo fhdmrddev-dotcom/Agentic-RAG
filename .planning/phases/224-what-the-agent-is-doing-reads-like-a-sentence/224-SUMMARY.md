@@ -24,12 +24,12 @@ by Gemini; **`224-04` and `224-05` built by Claude**, which changes who may revi
 |---|---|---|
 | `tsc -p tsconfig.app.json` | 66 | **66** ✅ |
 | count gate | 188/188 · pinned 6432 | **OK · 194/194 · pinned 6502 · total 7234 · failed 0** ✅ |
-| backend unit | 70 failed | ⚠ **71 failed** — see below |
+| backend unit | 70 failed | **71 failed** — ✅ **not this phase**, proven by reverting 224's only backend file and getting the identical 71 (below) |
 
 ⭐ **The adoption arithmetic is exact and was checked rather than assumed:** pinned 6432 → 6502 is
 **+70**, and 8+12+11+29+7+3 = 70.
 
-## ⚠ ONE OPEN FINDING — the backend is +1 over baseline and I did not resolve it
+## ✅ RESOLVED — the backend +1 is NOT this phase, and it was settled by a controlled comparison
 
 **Measured, twice, stable:** `71 failed / 3476 passed`. The 223-close baseline was `70 failed / 3477
 passed`. **The totals are identical (3547), so exactly ONE test flipped pass → fail.**
@@ -40,11 +40,28 @@ What is established:
 - ⚠ **That specific failure is provably NOT this phase's doing** — `git show e01990d55:…` and the
   current file both show the approval emit has **never** passed `call_id` as a kwarg.
 
-What is **not** established: which test actually flipped. **The most likely cause is `224-02` adding
-`expires_at` and `timeout_seconds` to that same emit** — a test asserting the exact kwarg set would
-flip on that. ⚠ **I am recording this rather than clearing it.** An honest open item is worth more than
-a clearance I cannot support, and the controlled comparison (run the suite at `e01990d55`, diff the
-failure lists) is the first thing the reviewer should do.
+⭐ **DRIVEN, NOT REASONED — the controlled comparison was run rather than handed over.** Phase 224's
+ENTIRE backend footprint is two files (`git diff --name-only e01990d55 HEAD -- backend/`):
+`tool_dispatcher.py` and the new `tests/test_224_approval_deadline.py`, the latter outside
+`tests/unit`. So reverting **one file** isolates the phase completely:
+
+```
+git checkout e01990d55 -- backend/app/services/tool_dispatcher.py
+pytest tests/unit   →   71 failed, 3476 passed          ← pre-224 dispatcher
+git checkout HEAD   -- backend/app/services/tool_dispatcher.py
+pytest tests/unit   →   71 failed, 3476 passed          ← with 224
+```
+
+**Identical. Phase 224 did not cause it.** The `70` was measured earlier in the session, during the
+223 check; something between that reading and `e01990d55` moved it, and it is **not this phase**.
+⚠ My own hypothesis — that `224-02`'s two new emit kwargs flipped a test asserting the exact kwarg
+set — **was WRONG, and is recorded as wrong rather than deleted.** The reverted-file run disproves it.
+
+⚠ **The `call_id` KeyError is a REAL pre-existing failure and should not be lost in this clearance.**
+`test_chat_tool_approval.py::test_tool_approval_ask_emits_event_and_pauses` asserts on a kwarg the
+approval emit has never sent, before or after 224. It is failing for a genuine reason — the test and
+the code disagree — and it belongs to whoever next touches that emit. It is NOT this phase's to fix,
+and it is NOT resolved by this phase passing.
 
 ## Deferred, with a trigger — NOT dropped
 
@@ -81,6 +98,9 @@ scope questions. **Trigger: 227's execution.** After it, both are one-file edits
 
 `AGENTS.md` §3.1 — whoever reviews must not have shaped the build. **Claude drew the sketches AND built
 `224-04`/`224-05`, so Claude cannot review this phase.** It goes to **Gemini**.
+
+⚠ **That is unchanged by the finding above being resolved.** Clearing my own work's suspected
+regression is measurement, not review — the reviewer still has to check the parts I built.
 
 ## Still owed — and it cannot be closed from a terminal
 
