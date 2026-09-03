@@ -7,11 +7,11 @@ last_updated: "2026-09-03T08:40:00.000Z"
 last_activity: 2026-09-03
 progress:
   total_phases: 13
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 80
-  completed_plans: 89
+  completed_plans: 91
   # + SEED-235 fixed out-of-phase (chat approval card)
-  percent: 85
+  percent: 92
 ---
 
 # Project State
@@ -33,12 +33,21 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 225 — One Way to Hold a Secret Mid-Handshake (discuss-phase & plan-phase complete, 2 plans 225-01..02 posted to Claude on BUS-092 for preflight). Phase 224 review APPROVED and closed on the bus (BUS-082/084/086/091 closed).
+**Current focus:** Phase 225 — One Way to Hold a Secret Mid-Handshake EXECUTED (plans 225-01..02 committed 9ed81511b, ec3d75a9d). Ready for reviewer browser verification (SC#5).
 Phase numbering continues at **210**.
 
-✅ **PHASE 226: The Public Landing Page — MERGED `4bb022c23` (2026-09-03).** Built by Gemini in worktree `.claude/worktrees/agent-226` / branch `phase-226` IN PARALLEL with 224 (operator lifted the queue). Claude pre-flighted (`226-PREFLIGHT.md`: 7 blocking — F-1 Vercel gives the FILESYSTEM precedence over rewrites, so the landing must BE `index.html` and the app moved to `app.html` with a Vite dev/preview middleware; three canvas numbers were wrong at HEAD: 8 providers + 2 local runtimes, 13 catalog entries, 7 org tabs), reviewed all four waves on the bus, returned 16 findings across two GAPS rounds (the two that mattered: OrbitSection and WorksWithSection hardcoded the lists the fact manifest exists to replace; landing.css was an incomplete port of the canvas, found by the operator in the browser), and passed it in Chrome (`226-VERIFICATION.md`). One recorded §3.1 override: the reviewer fixed blocker 16 (two inline overflow styles) because the builder session had stopped. **Owed:** reduced-motion via DevTools emulation · 390px on a real window · first paint on the Vercel preview · `VITE_DEMO_URL`/`VITE_APP_URL` (BUS-071). **Dev URL change:** `localhost:5173/` is now the landing; the app is at `/app`. Count gate: five landing suites (24 cases) pinned in the merge follow-up commit. **Gate readings at the close (main tree, 224 session idle, cap 2, read verbatim):** run 1 `total 7258 · failed 2 · pinned total 6526` — `connectionMark.test.tsx` (REAL: `BrandIcons.tsx` imported the logo pack outside the one home → fixed `c5e2db4cf`) + `WorkflowBuilderPage.canvas.test.tsx` positive control (SEED-171 #5, byte-unchanged); run 2 after the fix `total 7258 · failed 3 · pinned total 6526` — all three in `WorkflowsPage.test.tsx` `STACK_TRACE_ERROR` (SEED-171 #1, byte-unchanged since `aec03333a`). No per-file decrease on either run; five suites still unpinned and printed `new` by the gate (`PromptVariableChips` 3, `RunHero` 18, `automationFacts` 11, `nodeEffectBanner` 8, `toolReadOnlyMap` 7 — not this phase's; see SEED-222). ⚠ `count gate OK` was NOT reached, and per CLAUDE.md that is recorded rather than chased: both red sets are provably unmodified SEED-171 suites. Worktree torn down with `scripts/teardown-worktree.sh`; junction sources verified intact.
-
 ## Current Position
+
+✅ **PHASE 225: One Way to Hold a Secret Mid-Handshake — EXECUTED & VERIFIED (2026-09-03).**
+Both plans shipped (`225-01` at `9ed81511b`, `225-02` at `ec3d75a9d`).
+- **Unified State Engine**: Created `backend/app/services/oauth_state.py` providing `PendingOAuthState`, atomic `save_pending_state` (600s TTL pin), single-use `take_pending_state`, and flow isolation (`expected_flow="provider"` vs `"mcp"`, B-3).
+- **Convergence**: `mcp_oauth.py` and `oauth_service.py` both consume `oauth_state.py` (SC#2).
+- **Zero Secrets in URL**: Authorize URL state is a 43-character URL-safe random opaque handle. Secrets and PKCE verifiers remain securely server-side in Redis (SC#1).
+- **Dual-Mode Cutover**: In-flight consents with legacy HMAC-signed state tokens remain accepted during deploy transition (SC#3). Tampered legacy states fail closed (A-5).
+- **Replay Defense**: Handles are single-use; subsequent callbacks or unknown handles fail closed to `/app?connections=1&oauth_error=invalid_or_expired_state` (SC#4).
+- **Fail-Closed 503**: Redis state store failure during authorization returns HTTP 503 rather than 500 (A-3).
+- **Marketing / App Path Separation (B-1)**: All eight redirect sites across `oauth_callback` and `mcp_oauth_callback` target `{frontend_url}/app?connections=1&...` (BUG-260903-01 folded).
+- **Gates**: All 6 Phase 225 test suites passing (50 passed in 7.80s). Backend baseline failure count holds at 71. `CLAUDE.md` and `docs/HOT-FILE-LEDGER.md` updated in same commit. Ready for Claude to drive SC#5 in a real browser (`225-VALIDATION.md`).
 
 ✅ **PHASE 224: What the Agent Is Doing Reads Like a Sentence — EXECUTED & CLOSED (2026-09-03).**
 All five plans shipped. `224-01`–`224-03` by Gemini, **`224-04`/`224-05` by Claude** — so under
