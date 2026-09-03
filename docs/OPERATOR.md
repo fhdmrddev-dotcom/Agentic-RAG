@@ -129,6 +129,10 @@ Then edit `./.env` and fill in:
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick
   it up.
+- **`VITE_DEMO_URL` & `VITE_APP_URL`** (Phase 226) — public landing page CTA destinations.
+  `VITE_DEMO_URL` points to your demo scheduling link (e.g. Google Calendar appointment page);
+  if empty, the "Book a demo" CTA defaults to `#start`. `VITE_APP_URL` is the base URL of the
+  application SPA (e.g. `https://app.example.com`); if empty, "Sign in" targets `/app`.
 
 The full annotated variable surface is
 [`../deploy/onebox.env.example`](../deploy/onebox.env.example) (layered on

@@ -3,8 +3,9 @@ seed_id: SEED-241
 title: "The landing page is a LIVING artefact — its claims must be derived from code and re-checked when the product moves, and it must route B2B visitors to a demo, not a sign-up"
 created: 2026-09-03
 planted_during: Operator-directed landing-page design session, 2026-09-02/03 — *"this is a live landing page so you should find some way to trigger something to update it when we introduce a new feature"* and *"this application is business to business … it should show a demo instead of sign in but we should have it linked to the application somewhere"*
-status: folded
-folded_into: 226
+status: shipped
+shipped_in: 226
+shipped_date: 2026-09-03
 surface: Agentic-RAG
 severity: medium
 category: marketing-surface / routing / drift-guard

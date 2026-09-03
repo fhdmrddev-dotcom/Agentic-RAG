@@ -1,0 +1,56 @@
+# CI backstop for landing page factual accuracy (Phase 226 / SEED-241).
+#
+# The public landing page derives its claims (providers, file formats, tool counts,
+# gauntlet checks, verbatim quotes) directly from source code.
+#
+# The primary guard is the local PostToolUse hook .claude/hooks/landing-drift-guard.js,
+# which fires immediately whenever an agent touches backend or frontend files.
+# This CI workflow acts as the final gate to prevent any drift from landing on shared branches.
+
+name: landing-drift
+
+on:
+  push:
+    branches: [master, main, develop, production, "release/**", "phase-**"]
+    paths:
+      - "frontend/src/landing/**"
+      - "frontend/src/components/ingestion/acceptedFormats.ts"
+      - "frontend/src/components/workflows/PublishGauntlet.tsx"
+      - "frontend/src/components/workflows/stepIdentityVocabulary.ts"
+      - "frontend/src/components/workflows/doorVocabulary.ts"
+      - "frontend/src/components/settings/servicesCatalog.ts"
+      - "frontend/src/pages/LibraryPage.tsx"
+      - "frontend/src/pages/SettingsPage.tsx"
+      - "frontend/src/components/org/OrgAdminShell.tsx"
+      - "frontend/src/components/admin/ControlRoomPage.tsx"
+      - "backend/app/config.py"
+      - "backend/app/services/tool_dispatcher.py"
+      - "backend/app/api/documents.py"
+      - "scripts/check-landing-drift.cjs"
+      - ".github/workflows/landing-drift.yml"
+  pull_request:
+    paths:
+      - "frontend/src/landing/**"
+      - "frontend/src/components/ingestion/acceptedFormats.ts"
+      - "frontend/src/components/workflows/PublishGauntlet.tsx"
+      - "frontend/src/components/workflows/stepIdentityVocabulary.ts"
+      - "frontend/src/components/workflows/doorVocabulary.ts"
+      - "frontend/src/components/settings/servicesCatalog.ts"
+      - "frontend/src/pages/LibraryPage.tsx"
+      - "frontend/src/pages/SettingsPage.tsx"
+      - "frontend/src/components/org/OrgAdminShell.tsx"
+      - "frontend/src/components/admin/ControlRoomPage.tsx"
+      - "backend/app/config.py"
+      - "backend/app/services/tool_dispatcher.py"
+      - "backend/app/api/documents.py"
+      - "scripts/check-landing-drift.cjs"
+      - ".github/workflows/landing-drift.yml"
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check landing facts against application code
+        run: node scripts/check-landing-drift.cjs

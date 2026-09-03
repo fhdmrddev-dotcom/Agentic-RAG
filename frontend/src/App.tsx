@@ -227,7 +227,7 @@ function App() {
     return <SetupWizard />
   }
   if (atSetupPath && setupStatus.finalized) {
-    return <FinalizedLockout onGoToApp={() => window.location.assign("/")} />
+    return <FinalizedLockout onGoToApp={() => window.location.assign("/app")} />
   }
 
   // Phase 167 (INV-01 / INV-02 / D-167-01): the pre-auth /invite accept-invite branch,
