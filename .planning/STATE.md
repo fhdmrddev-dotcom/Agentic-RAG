@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-09-02T23:38:00.000Z"
-last_activity: 2026-09-02
+last_updated: "2026-09-03T08:40:00.000Z"
+last_activity: 2026-09-03
 progress:
   total_phases: 13
-  completed_phases: 9
-  total_plans: 75
-  completed_plans: 79
+  completed_phases: 11
+  total_plans: 80
+  completed_plans: 89
   # + SEED-235 fixed out-of-phase (chat approval card)
-  percent: 69
+  percent: 85
 ---
 
 # Project State
@@ -33,10 +33,10 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 224 — What the Agent Is Doing Reads Like a Sentence (Plan 02 complete, executing Plan 03)
+**Current focus:** Phases 224 and 226 both CLOSED 2026-09-03 (224 on develop, 226 merged `4bb022c23`). Next: Phase 225 — One Way to Hold a Secret Mid-Handshake (proposed, `225-PROPOSAL.md`); Gemini owes the 224 review (BUS-082/084/086).
 Phase numbering continues at **210**.
 
-**Queued (2026-09-03):** Phase **226 — The Public Landing Page** is proposed and registered (`226-PROPOSAL.md`, folds `SEED-241`, G-2 satisfied by the design canvas). ~~Operator: build after 224 / 225 close~~ **UNQUEUED 2026-09-03 (operator): 226 builds NOW in parallel with 224, in worktree `.claude/worktrees/agent-226` / branch `phase-226` — Gemini plans + executes, Claude pre-flights and monitors 224. Merge only after 224 closes.** Bus items `BUS-068`, `BUS-069`.
+✅ **PHASE 226: The Public Landing Page — MERGED `4bb022c23` (2026-09-03).** Built by Gemini in worktree `.claude/worktrees/agent-226` / branch `phase-226` IN PARALLEL with 224 (operator lifted the queue). Claude pre-flighted (`226-PREFLIGHT.md`: 7 blocking — F-1 Vercel gives the FILESYSTEM precedence over rewrites, so the landing must BE `index.html` and the app moved to `app.html` with a Vite dev/preview middleware; three canvas numbers were wrong at HEAD: 8 providers + 2 local runtimes, 13 catalog entries, 7 org tabs), reviewed all four waves on the bus, returned 16 findings across two GAPS rounds (the two that mattered: OrbitSection and WorksWithSection hardcoded the lists the fact manifest exists to replace; landing.css was an incomplete port of the canvas, found by the operator in the browser), and passed it in Chrome (`226-VERIFICATION.md`). One recorded §3.1 override: the reviewer fixed blocker 16 (two inline overflow styles) because the builder session had stopped. **Owed:** reduced-motion via DevTools emulation · 390px on a real window · first paint on the Vercel preview · `VITE_DEMO_URL`/`VITE_APP_URL` (BUS-071). **Dev URL change:** `localhost:5173/` is now the landing; the app is at `/app`. Count gate: five landing suites (24 cases) pinned in the merge follow-up commit. Worktree torn down with `scripts/teardown-worktree.sh`; junction sources verified intact.
 
 ## Current Position
 

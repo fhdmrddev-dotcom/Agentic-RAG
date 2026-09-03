@@ -217,6 +217,12 @@ const BASELINE = {
   //     branch coverage lives in the hook suite and not here.
   "useComposerModel.test.ts": 17,
   "ChatArea.model.test.tsx": 2,
+  // Phase 226 — src/landing (pinned at the merge commit; pre-flight F-6 kept the phase off this file while 224-05 edited it)
+  "landingBundleFence.test.ts": 2,
+  "facts.test.ts": 5,
+  "cssClasses.test.ts": 1,
+  "scenes.test.tsx": 9,
+  "LandingPage.test.tsx": 7,
   "MessageInput.connectors.test.tsx": 5,
   // SEED-235 (2026-09-01): 15 -> 19. Four cases for the SECOND approval in one run —
   // three for the defect (a stale decision rendered the next question as already answered
@@ -3468,6 +3474,8 @@ const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
+  // Phase 226 (merge commit) — the public landing page: fence, facts, CSS-class lint, scenes, page.
+  "src/landing",
   "src/components/workflows",
   "src/pages/WorkflowBuilderPage.test.tsx",
   "src/pages/WorkflowBuilderPage.canvas.test.tsx",
