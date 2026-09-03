@@ -8,7 +8,6 @@ html, body {
   color: hsl(226 60% 97%);
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 * { box-sizing: border-box; }
@@ -558,6 +557,213 @@ a:hover {
   gap: 6px;
 }
 
+/* ── Ported Canvas Styles (Main.dc.html lines 93, 302-324) ── */
+
+/* Facts count numeral font feature */
+.count {
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+
+/* Hero stage relative container */
+.hero-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background glows */
+.glow {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+/* Product tour tab bar and category grid */
+.tabbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.catgrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.catgrid span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 8px;
+  background: hsl(220 30% 7%);
+  border: 1px solid hsl(220 20% 16% / 0.7);
+  font-size: 10px;
+  color: hsl(226 60% 97%);
+  text-align: center;
+}
+
+/* WorksWith grid and tiles */
+.appgrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.apptile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid hsl(220 20% 16%);
+  background: hsl(220 30% 7%);
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.apptile:hover {
+  transform: translateY(-3px);
+  border-color: hsl(239 100% 82% / 0.4);
+}
+
+.apptile .apphead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.apptile .appwell {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: hsl(216 45% 4%);
+  border: 1px solid hsl(220 20% 16%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.apptile p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: hsl(220 16% 65%);
+}
+
+/* Use cases: illustrated workflow strips */
+.ucviz {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at 50% 120%, hsl(239 84% 67% / 0.18), transparent 60%), hsl(216 45% 4%);
+  border: 1px solid hsl(220 20% 16%);
+  min-height: 84px;
+}
+
+.ucn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid hsl(220 20% 16%);
+  background: hsl(220 30% 7%);
+  flex-shrink: 0;
+}
+
+.ucn .ext {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.ucn .lbl {
+  font-size: 9px;
+  color: hsl(220 16% 65%);
+  white-space: nowrap;
+}
+
+.ucn.agent {
+  background: linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%));
+  border: 0;
+  box-shadow: 0 0 24px hsl(239 84% 67% / 0.45);
+}
+
+.ucn.pause {
+  border-color: hsl(38 92% 60% / 0.6);
+  background: hsl(38 92% 60% / 0.08);
+}
+
+.ucviz.tight {
+  gap: 5px;
+  padding: 12px;
+}
+
+.ucviz.tight .ucn {
+  width: 46px;
+  height: 46px;
+}
+
+.ucviz.tight .ucarr {
+  min-width: 10px;
+}
+
+.ucstack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ucstack .ucn {
+  width: 44px;
+  height: 34px;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.ucviz.tight .ucstack .ucn {
+  width: 40px;
+  height: 30px;
+}
+
+.ucarr {
+  color: hsl(239 100% 82% / 0.7);
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  min-width: 14px;
+}
+
+.ucarr i {
+  display: block;
+  height: 2px;
+  flex: 1 1 0;
+  background: linear-gradient(90deg, hsl(239 100% 82% / 0.2), hsl(239 100% 82% / 0.8));
+}
+
+.ucarr b {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 6px solid hsl(239 100% 82% / 0.8);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
 /* ── Reduced Motion Overrides ── */
 @media (prefers-reduced-motion: reduce) {
   .tilt { transform: none !important; transition: none; }
@@ -594,4 +800,6 @@ a:hover {
   .tab { height: 36px; padding: 0 12px; font-size: 13px; }
   .pipstrip { flex-wrap: wrap; gap: 10px; }
   .wire { display: none; }
+  .appgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

@@ -102,12 +102,13 @@ const dropzoneLabels = dropzoneLabelsMatch
   : []
 
 const documentsPy = readFileOrDie("backend/app/api/documents.py")
-const serverOverrideExts = []
-if (documentsPy.includes('".msg"') || documentsPy.includes("'.msg'")) serverOverrideExts.push("MSG")
-if (documentsPy.includes('".eml"') || documentsPy.includes("'.eml'")) serverOverrideExts.push("EML")
-if (documentsPy.includes('".dxf"') || documentsPy.includes("'.dxf'")) serverOverrideExts.push("DXF")
+const extMimeMatch = documentsPy.match(/_EXT_MIME_OVERRIDES:\s*dict\[str,\s*str\]\s*=\s*\{([\s\S]*?)\}/)
+const overrideExts = extMimeMatch
+  ? Array.from(extMimeMatch[1].matchAll(/"\.([a-z0-9]+)"/gi)).map((m) => m[1].toUpperCase())
+  : []
+const serverOnlyExts = ["MSG", "EML", "DXF"].filter((ext) => overrideExts.includes(ext))
 
-const expectedIngestFormats = [...dropzoneLabels, ...serverOverrideExts]
+const expectedIngestFormats = [...dropzoneLabels, ...serverOnlyExts]
 
 const factsIngestMatch = factsSource.match(/export const INGEST_FORMATS:[^=]+=\s*Object\.freeze\(\[([\s\S]*?)\]\)/)
 const factsIngestFormats = factsIngestMatch
@@ -182,21 +183,61 @@ if (JSON.stringify(factsCatalogIds) !== JSON.stringify(uniqueCatalogIds)) {
 }
 
 // ── 7. Check Surface Tabs ─────────────────────────────────────────────────────
-const libraryPageTsx = readFileOrDie("frontend/src/pages/LibraryPage.tsx")
-const libraryTabsMatches = Array.from(libraryPageTsx.matchAll(/<TabsTrigger\s+value="([^"]+)"\s*>([^<]+)<\/TabsTrigger>/g)).map(m => m[2].trim())
-const expectedLibraryTabs = ["Documents", "Views", "Ingestion", "Indexing", "Health"]
-if (JSON.stringify(libraryTabsMatches) !== JSON.stringify(expectedLibraryTabs)) {
-  recordMismatch("SURFACE_TABS.library (LibraryPage.tsx)", expectedLibraryTabs, libraryTabsMatches)
+const surfaceTabsMatch = factsSource.match(/export const SURFACE_TABS\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\)/)
+function extractTabsForKey(key) {
+  if (!surfaceTabsMatch) return []
+  const m = surfaceTabsMatch[1].match(new RegExp(`${key}:\\s*\\[([\\s\\S]*?)\\]`))
+  if (!m) return []
+  return Array.from(m[1].matchAll(/"([^"]+)"/g)).map((t) => t[1])
 }
 
+const factsLibraryTabs = extractTabsForKey("library")
+const factsSettingsTabs = extractTabsForKey("settings")
+const factsControlRoomTabs = extractTabsForKey("controlRoom")
+const factsOrgAdminTabs = extractTabsForKey("orgAdmin")
+
+// 7a. Library tabs (LibraryPage.tsx)
+const libraryPageTsx = readFileOrDie("frontend/src/pages/LibraryPage.tsx")
+const libraryTabsMatches = Array.from(libraryPageTsx.matchAll(/<TabsTrigger\s+value="([^"]+)"\s*>([^<]+)<\/TabsTrigger>/g)).map(m => m[2].trim())
+if (JSON.stringify(factsLibraryTabs) !== JSON.stringify(libraryTabsMatches)) {
+  recordMismatch("SURFACE_TABS.library (LibraryPage.tsx)", libraryTabsMatches, factsLibraryTabs)
+}
+
+// 7b. Org Admin tabs (OrgAdminShell.tsx)
 const orgAdminShellTsx = readFileOrDie("frontend/src/components/org/OrgAdminShell.tsx")
 const orgTabsMatch = orgAdminShellTsx.match(/const TABS:\s*readonly\s*TabDef\[\]\s*=\s*\[([\s\S]*?)\n\]/)
 const extractedOrgTabs = orgTabsMatch
   ? Array.from(orgTabsMatch[1].matchAll(/label:\s*"([^"]+)"/g)).map(m => m[1])
   : []
-const expectedOrgTabs = ["Members", "Audit", "Settings", "Invitations & Roles", "SSO", "Subscription", "Retention"]
-if (JSON.stringify(extractedOrgTabs) !== JSON.stringify(expectedOrgTabs)) {
-  recordMismatch("SURFACE_TABS.orgAdmin (OrgAdminShell.tsx)", expectedOrgTabs, extractedOrgTabs)
+if (JSON.stringify(factsOrgAdminTabs) !== JSON.stringify(extractedOrgTabs)) {
+  recordMismatch("SURFACE_TABS.orgAdmin (OrgAdminShell.tsx)", extractedOrgTabs, factsOrgAdminTabs)
+}
+
+// 7c. Settings tabs (SettingsPage.tsx)
+const settingsPageTsx = readFileOrDie("frontend/src/pages/SettingsPage.tsx")
+const settingsTabsBlock = settingsPageTsx.match(/<TabsList[^>]*>([\s\S]*?)<\/TabsList>/)
+const extractedSettingsTabs = []
+if (settingsTabsBlock) {
+  for (const m of settingsTabsBlock[1].matchAll(/<TabsTrigger[^>]*>([\s\S]*?)<\/TabsTrigger>/g)) {
+    let label = m[1].trim()
+    if (label.includes("retrievalTabLabel")) {
+      label = "Search & Retrieval" // Admin view dynamic label matching facts.ts
+    }
+    extractedSettingsTabs.push(label)
+  }
+}
+if (JSON.stringify(factsSettingsTabs) !== JSON.stringify(extractedSettingsTabs)) {
+  recordMismatch("SURFACE_TABS.settings (SettingsPage.tsx)", extractedSettingsTabs, factsSettingsTabs)
+}
+
+// 7d. Control Room tabs (ControlRoomPage.tsx)
+const controlRoomTsx = readFileOrDie("frontend/src/components/admin/ControlRoomPage.tsx")
+const crTabsMatch = controlRoomTsx.match(/const TABS:\s*readonly\s*TabDef\[\]\s*=\s*\[([\s\S]*?)\n\]/)
+const extractedCRTabs = crTabsMatch
+  ? Array.from(crTabsMatch[1].matchAll(/label:\s*"([^"]+)"/g)).map(m => m[1])
+  : []
+if (JSON.stringify(factsControlRoomTabs) !== JSON.stringify(extractedCRTabs)) {
+  recordMismatch("SURFACE_TABS.controlRoom (ControlRoomPage.tsx)", extractedCRTabs, factsControlRoomTabs)
 }
 
 // ── 8. Check Verbatim Quotes ──────────────────────────────────────────────────

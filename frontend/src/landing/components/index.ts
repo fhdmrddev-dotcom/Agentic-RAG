@@ -1,6 +1,7 @@
 export * from "./BrandIcons"
 export * from "./Navigation"
 export * from "./HeroSection"
+export * from "./HowItWorksSection"
 export * from "./FeaturesSection"
 export * from "./TourSection"
 export * from "./WorkflowSpotlight"

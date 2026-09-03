@@ -1,5 +1,6 @@
 export function LandingFooter() {
   const currentYear = new Date().getFullYear()
+  const appUrl = (import.meta as any).env?.VITE_APP_URL || "/app"
 
   return (
     <footer
@@ -38,7 +39,7 @@ export function LandingFooter() {
           <a href="#security" style={{ color: "hsl(220 16% 65%)" }}>
             Security
           </a>
-          <a href="/app" style={{ color: "hsl(220 16% 65%)" }}>
+          <a href={appUrl} style={{ color: "hsl(220 16% 65%)" }}>
             Sign in
           </a>
         </div>

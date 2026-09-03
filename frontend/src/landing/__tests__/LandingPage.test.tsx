@@ -137,4 +137,25 @@ describe("LandingPage Assembly & Interactivity", () => {
     expect(screen.getByText("Construction & engineering")).toBeDefined()
     expect(screen.getByText("Legal & compliance")).toBeDefined()
   })
+
+  it("structural assertions: Orbit orbs, WorksWith tiles, and Features card counts match catalog facts", async () => {
+    const { container } = render(<LandingPage />)
+    const { MODEL_PROVIDERS, LOCAL_RUNTIMES, CONNECTOR_CATALOG } = await import("../facts")
+
+    // 1. Orbit orbs count matches MODEL_PROVIDERS + LOCAL_RUNTIMES (10 orbs)
+    const orbs = container.querySelectorAll(".orbit .orb")
+    expect(orbs.length).toBe(MODEL_PROVIDERS.length + LOCAL_RUNTIMES.length)
+
+    // 2. WorksWith tiles count matches CONNECTOR_CATALOG (13 tiles)
+    const appTiles = container.querySelectorAll(".appgrid .apptile")
+    expect(appTiles.length).toBe(CONNECTOR_CATALOG.length)
+
+    // 3. Features capability tiles count matches 12 cards
+    const featCards = container.querySelectorAll("#features .card")
+    expect(featCards.length).toBe(12)
+
+    // 4. How it works section renders 3 steps
+    const howItWorksCards = container.querySelectorAll("#how-it-works .card")
+    expect(howItWorksCards.length).toBe(3)
+  })
 })

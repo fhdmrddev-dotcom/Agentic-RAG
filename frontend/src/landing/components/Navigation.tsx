@@ -24,7 +24,7 @@ export function Navigation() {
         }}
       >
         <a
-          href="#"
+          href="/"
           style={{
             display: "flex",
             alignItems: "center",

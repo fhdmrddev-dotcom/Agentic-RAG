@@ -150,3 +150,83 @@ export function MiroBrandIcon({ size = 16, className, style }: IconProps) {
 export function McpBrandIcon({ size = 16, className, style }: IconProps) {
   return <McpIcon width={size} height={size} className={className} style={style} />
 }
+
+export function SmtpBrandIcon({ size = 16, className, style }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={style}
+    >
+      <rect width="20" height="16" x="2" y="4" rx="2" />
+      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  )
+}
+
+export function getModelIcon(id: string, props: IconProps = { size: 18 }) {
+  switch (id) {
+    case "anthropic":
+      return <AnthropicIcon {...props} />
+    case "openai":
+      return <OpenAIIcon {...props} />
+    case "google":
+      return <GoogleIcon {...props} />
+    case "deepseek":
+      return <DeepSeekIcon {...props} />
+    case "zhipu":
+      return <ZhipuIcon {...props} />
+    case "minimax":
+      return <MinimaxIcon {...props} />
+    case "moonshot":
+      return <MoonshotIcon {...props} />
+    case "openrouter":
+      return <OpenRouterIcon {...props} />
+    case "ollama":
+      return <OllamaIcon {...props} />
+    case "lmstudio":
+      return <LmStudioIcon {...props} />
+    default:
+      return <OpenAIIcon {...props} />
+  }
+}
+
+export function getServiceIcon(id: string, props: IconProps = { size: 22 }) {
+  switch (id) {
+    case "google":
+      return <GoogleIcon {...props} />
+    case "slack":
+      return <SlackBrandIcon {...props} />
+    case "jira":
+      return <JiraBrandIcon {...props} />
+    case "github":
+      return <GithubBrandIcon {...props} />
+    case "notion":
+      return <NotionBrandIcon {...props} />
+    case "microsoft":
+      return <MicrosoftBrandIcon {...props} />
+    case "figma":
+      return <FigmaBrandIcon {...props} />
+    case "linear":
+      return <LinearBrandIcon {...props} />
+    case "sentry":
+      return <SentryBrandIcon {...props} />
+    case "intercom":
+      return <IntercomBrandIcon {...props} />
+    case "miro":
+      return <MiroBrandIcon {...props} />
+    case "mcp":
+      return <McpBrandIcon {...props} />
+    case "smtp":
+      return <SmtpBrandIcon {...props} />
+    default:
+      return <McpBrandIcon {...props} />
+  }
+}

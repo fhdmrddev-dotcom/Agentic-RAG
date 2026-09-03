@@ -1,100 +1,52 @@
-import {
-  GoogleIcon,
-  GmailIcon,
-  CalendarIcon,
-  DriveIcon,
-  SlackBrandIcon,
-  GithubBrandIcon,
-  NotionBrandIcon,
-  MicrosoftBrandIcon,
-  JiraBrandIcon,
-  FigmaBrandIcon,
-  LinearBrandIcon,
-  SentryBrandIcon,
-  IntercomBrandIcon,
-  MiroBrandIcon,
-  McpBrandIcon,
-} from "./BrandIcons"
+import { CONNECTOR_CATALOG } from "../facts"
+import { getServiceIcon } from "./BrandIcons"
+
+const SERVICE_DESCRIPTIONS: Record<string, { name?: string; desc: string }> = {
+  google: {
+    name: "Google Workspace",
+    desc: "Gmail drafts · Calendar · Drive · Docs · Sheets · Contacts",
+  },
+  slack: {
+    desc: "Post summaries and exceptions to a channel",
+  },
+  jira: {
+    desc: "One issue per finding, citation in the body",
+  },
+  github: {
+    desc: "Issues and repositories as sources and targets",
+  },
+  notion: {
+    desc: "Pages and databases",
+  },
+  microsoft: {
+    desc: "Teams, Outlook, SharePoint files",
+  },
+  figma: {
+    desc: "Design files as context",
+  },
+  linear: {
+    desc: "Issues and cycles",
+  },
+  sentry: {
+    desc: "Errors and releases",
+  },
+  intercom: {
+    desc: "Conversations and customers",
+  },
+  miro: {
+    desc: "Boards",
+  },
+  mcp: {
+    name: "Any MCP server",
+    desc: "Custom tools, reachability checked before publish",
+  },
+  smtp: {
+    name: "SMTP Email",
+    desc: "Reliable transactional delivery with TLS",
+  },
+}
 
 export function WorksWithSection() {
-  const apps = [
-    {
-      name: "Google Workspace",
-      desc: "Gmail drafts · Calendar · Drive · Docs · Sheets · Contacts",
-      icon: <GoogleIcon size={22} />,
-    },
-    {
-      name: "Gmail",
-      desc: "Draft replies; nothing sends without you",
-      icon: <GmailIcon size={22} />,
-    },
-    {
-      name: "Google Calendar",
-      desc: "Find free time, create and update events",
-      icon: <CalendarIcon size={22} />,
-    },
-    {
-      name: "Google Drive",
-      desc: "Read files into the KB, create and rename",
-      icon: <DriveIcon size={22} />,
-    },
-    {
-      name: "Slack",
-      desc: "Post summaries and exceptions to a channel",
-      icon: <SlackBrandIcon size={22} />,
-    },
-    {
-      name: "GitHub",
-      desc: "Issues and repositories as sources and targets",
-      icon: <GithubBrandIcon size={22} />,
-    },
-    {
-      name: "Notion",
-      desc: "Pages and databases",
-      icon: <NotionBrandIcon size={22} />,
-    },
-    {
-      name: "Microsoft 365",
-      desc: "Teams, Outlook, SharePoint files",
-      icon: <MicrosoftBrandIcon size={22} />,
-    },
-    {
-      name: "Jira",
-      desc: "One issue per finding, citation in the body",
-      icon: <JiraBrandIcon size={22} />,
-    },
-    {
-      name: "Figma",
-      desc: "Design files as context",
-      icon: <FigmaBrandIcon size={22} />,
-    },
-    {
-      name: "Linear",
-      desc: "Issues and cycles",
-      icon: <LinearBrandIcon size={22} />,
-    },
-    {
-      name: "Sentry",
-      desc: "Errors and releases",
-      icon: <SentryBrandIcon size={22} />,
-    },
-    {
-      name: "Intercom",
-      desc: "Conversations and customers",
-      icon: <IntercomBrandIcon size={22} />,
-    },
-    {
-      name: "Miro",
-      desc: "Boards",
-      icon: <MiroBrandIcon size={22} />,
-    },
-    {
-      name: "Any MCP server",
-      desc: "Custom tools, reachability checked before publish",
-      icon: <McpBrandIcon size={22} />,
-    },
-  ]
-
   return (
     <section id="workswith" style={{ padding: "0 0 112px", position: "relative", zIndex: 1 }}>
       <div className="wrap">
@@ -119,15 +71,20 @@ export function WorksWithSection() {
         </div>
 
         <div className="appgrid">
-          {apps.map((app) => (
-            <div key={app.name} className="apptile">
-              <div className="apphead">
-                <span className="appwell">{app.icon}</span>
-                <span>{app.name}</span>
+          {CONNECTOR_CATALOG.map((service) => {
+            const meta = SERVICE_DESCRIPTIONS[service.id] || { desc: "Integrated service capability" }
+            const displayName = meta.name || service.name
+
+            return (
+              <div key={service.id} className="apptile">
+                <div className="apphead">
+                  <span className="appwell">{getServiceIcon(service.id, { size: 22 })}</span>
+                  <span>{displayName}</span>
+                </div>
+                <p>{meta.desc}</p>
               </div>
-              <p>{app.desc}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </section>

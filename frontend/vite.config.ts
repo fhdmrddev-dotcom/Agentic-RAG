@@ -12,6 +12,7 @@ function appRoutingPlugin(): Plugin {
       pathname !== "/" &&
       !pathname.includes(".") &&
       !pathname.startsWith("/@") &&
+      !pathname.startsWith("/__") &&
       !pathname.startsWith("/src") &&
       !pathname.startsWith("/node_modules")
     ) {

@@ -22,6 +22,7 @@ const nodeFs = await vi.importActual<{
 
 const nodePath = await vi.importActual<{
   join(...paths: string[]): string
+  resolve(...paths: string[]): string
 }>("node:path")
 
 const LANDING_DIR = (() => {
@@ -82,39 +83,51 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     }
   })
 
-  it("JSX text-node fence: no hardcoded product claim numbers in landing JSX copy", () => {
+  it("literal fence: no hardcoded product claim numbers in landing JSX copy, index.html, or app.html", () => {
     const subdirs = ["components", "scenes"]
     const trackedClaimNumerals = new Set(["8", "10", "11", "13", "29"])
 
     // Match text nodes between > and <
     const textNodeRegex = />([^<]+)</g
 
+    const scanFile = (filePath: string, fileName: string) => {
+      const content = nodeFs.readFileSync(filePath, "utf-8")
+      let match: RegExpExecArray | null
+      while ((match = textNodeRegex.exec(content)) !== null) {
+        const text = match[1].trim()
+        if (!text || text.startsWith("{/*") || text.startsWith("{")) continue
+
+        // Tokenize words
+        const words = text.split(/\s+/)
+        for (const word of words) {
+          const clean = word.trim()
+          // Match only tokens that are entirely digits to avoid false-positives on 'v1.0' or '$10k'
+          if (/^\d+$/.test(clean) && trackedClaimNumerals.has(clean)) {
+            expect.fail(
+              `Found hardcoded claim number "${clean}" in ${fileName}: "${text}". Import from facts.ts instead.`
+            )
+          }
+        }
+      }
+    }
+
+    // 1. Scan components and scenes
     for (const subdir of subdirs) {
       const dirPath = nodePath.join(LANDING_DIR, subdir)
       if (!nodeFs.existsSync(dirPath)) continue
 
       const files = nodeFs.readdirSync(dirPath).filter((f: string) => f.endsWith(".tsx") && !f.includes(".test."))
       for (const file of files) {
-        const fullPath = nodePath.join(dirPath, file)
-        const content = nodeFs.readFileSync(fullPath, "utf-8")
+        scanFile(nodePath.join(dirPath, file), file)
+      }
+    }
 
-        let match: RegExpExecArray | null
-        while ((match = textNodeRegex.exec(content)) !== null) {
-          const text = match[1].trim()
-          if (!text || text.startsWith("{/*") || text.startsWith("{")) continue
-
-          // Tokenize words
-          const words = text.split(/\s+/)
-          for (const word of words) {
-            const clean = word.replace(/[^0-9]/g, "")
-            if (trackedClaimNumerals.has(clean)) {
-              // Fail if a claim number is written directly as text instead of imported from facts
-              expect.fail(
-                `Found hardcoded claim number "${clean}" in ${file}: "${text}". Import from facts.ts instead.`
-              )
-            }
-          }
-        }
+    // 2. Scan index.html and app.html
+    const frontendDir = nodePath.resolve(LANDING_DIR, "..", "..")
+    for (const htmlFile of ["index.html", "app.html"]) {
+      const htmlPath = nodePath.join(frontendDir, htmlFile)
+      if (nodeFs.existsSync(htmlPath)) {
+        scanFile(htmlPath, htmlFile)
       }
     }
   })

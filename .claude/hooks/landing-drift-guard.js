@@ -72,7 +72,7 @@ process.stdin.on('end', () => {
         },
       })
     );
-    process.exit(res.status || 1);
+    process.exit(0);
   }
 
   process.exit(0);

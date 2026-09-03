@@ -3,6 +3,7 @@ import "./scenes/scenes.css"
 import {
   Navigation,
   HeroSection,
+  HowItWorksSection,
   FeaturesSection,
   TourSection,
   WorkflowSpotlight,
@@ -19,10 +20,11 @@ import {
 
 export function LandingPage() {
   return (
-    <div className="page-root" style={{ minHeight: "100%", background: "hsl(216 45% 4%)", position: "relative" }}>
+    <div className="page-root" style={{ minHeight: "100%", background: "hsl(216 45% 4%)", position: "relative", overflowX: "clip" }}>
       <Navigation />
       <main>
         <HeroSection />
+        <HowItWorksSection />
         <FeaturesSection />
         <TourSection />
         <WorkflowSpotlight />

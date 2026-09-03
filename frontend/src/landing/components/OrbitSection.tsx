@@ -1,16 +1,11 @@
-import {
-  AnthropicIcon,
-  OpenAIIcon,
-  GoogleIcon,
-  DeepSeekIcon,
-  ZhipuIcon,
-  MinimaxIcon,
-  MoonshotIcon,
-  OpenRouterIcon,
-  LmStudioIcon,
-} from "./BrandIcons"
+import { MODEL_PROVIDERS, LOCAL_RUNTIMES } from "../facts"
+import { getModelIcon } from "./BrandIcons"
 
 export function OrbitSection() {
+  const allModels = [...MODEL_PROVIDERS, ...LOCAL_RUNTIMES]
+  const totalOrbs = allModels.length
+  const angleStep = 360 / totalOrbs
+
   return (
     <section id="models" style={{ padding: "0 0 96px", position: "relative", zIndex: 1 }}>
       <div
@@ -49,44 +44,24 @@ export function OrbitSection() {
           model when data must not leave the network.
         </p>
 
-        <div className="orbit-wrap" style={{ width: "100%" }}>
+        <div className="orbit-wrap" style={{ width: "100%", overflow: "hidden" }}>
           <div className="orbit">
-            <div className="orb" style={{ transform: "rotateY(0deg) translateZ(300px)" }}>
-              <AnthropicIcon size={18} />
-              <span>Anthropic</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(40deg) translateZ(300px)" }}>
-              <OpenAIIcon size={18} />
-              <span>OpenAI</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(80deg) translateZ(300px)" }}>
-              <GoogleIcon size={18} />
-              <span>Google</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(120deg) translateZ(300px)" }}>
-              <DeepSeekIcon size={18} />
-              <span>DeepSeek</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(160deg) translateZ(300px)" }}>
-              <ZhipuIcon size={18} />
-              <span>Zhipu GLM</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(200deg) translateZ(300px)" }}>
-              <MinimaxIcon size={18} />
-              <span>MiniMax</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(240deg) translateZ(300px)" }}>
-              <MoonshotIcon size={18} />
-              <span>Moonshot</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(280deg) translateZ(300px)" }}>
-              <OpenRouterIcon size={18} />
-              <span>OpenRouter</span>
-            </div>
-            <div className="orb" style={{ transform: "rotateY(320deg) translateZ(300px)" }}>
-              <LmStudioIcon size={18} />
-              <span>Local · LM Studio</span>
-            </div>
+            {allModels.map((model, idx) => {
+              const rotation = Math.round(idx * angleStep)
+              const isLocal = model.id === "ollama" || model.id === "lmstudio"
+              const label = isLocal ? `Local · ${model.name}` : model.name
+
+              return (
+                <div
+                  key={model.id}
+                  className="orb"
+                  style={{ transform: `rotateY(${rotation}deg) translateZ(300px)` }}
+                >
+                  {getModelIcon(model.id, { size: 18 })}
+                  <span>{label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
