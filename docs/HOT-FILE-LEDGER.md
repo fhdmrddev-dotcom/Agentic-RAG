@@ -144,6 +144,12 @@ a guard, and this repo has measured that twice.
 
 **Re-derived 2026-08-17 (extraction):** `47 commits / 19 phases / 995 L` · quick-task buckets excluded: `260322`, `260328`, `260630` · **G-5 FIRES** (19 phases vs threshold 3) — extraction due — ⚠ row read `satisfied (075.7)` for ~19 phases.
 
+**⚠ UPDATED 2026-09-04 (Phase 227 Wave 2 / 227-02) — THE G-5 OBLIGATION WAS DISCHARGED: `51 commits / 23 phases / 351 L`.**
+Decomposed monolithic ToolCallPanel (1019 lines → 351 lines, a 65% reduction, shedding 668 lines):
+- Extracted `ToolCallDetails.tsx` (~188 L): parameter display, result dispatch across all tool bodies, subagent markdown.
+- Extracted `StepRow.tsx` (~158 L): 2-column timeline rail spine, status node, essence card presentation. Prepares SC#3 right-aligned result column as a localized 1-file edit.
+- Extracted `toolStepDerivation.ts` (~60 L, B-3): pure step computation and derivation map generation.
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **47 commits / 19 phases / 995 L**.
@@ -152,11 +158,11 @@ a guard, and this repo has measured that twice.
 
 ### Phases touched (verbatim)
 
-067 / 067.5 / 075 / 075.4 / 075.6 / 075.7 (6+)
+067 / 067.5 / 075 / 075.4 / 075.6 / 075.7 (6+) / 227 (G-5 discharge)
 
 ### G-5 status (verbatim)
 
-satisfied (075.7 — 2026-05-24)
+satisfied (075.7 — 2026-05-24) · **DISCHARGED (Phase 227 / 2026-09-04)**
 
 ---
 
@@ -170,6 +176,12 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 **Re-derived 2026-08-17 (extraction):** `57 commits / 29 phases / 856 L` · quick-task buckets excluded: `260328`, `260405`, `260630` · **G-5 FIRES** (29 phases vs threshold 3) — extraction due — ⚠ row read `satisfied (075.7)` for ~29 phases.
 
+**⚠ UPDATED 2026-09-04 (Phase 227 Wave 3 / 227-03) — THE G-5 OBLIGATION WAS DISCHARGED: `62 commits / 33 phases / 702 L`.**
+Decomposed non-message presentation responsibilities (823 lines → 702 lines, shedding 121 lines):
+- Extracted `messageText.ts` (~54 L): two-pass paragraph and sentence-level deduplication (`dedupParagraphs`).
+- Extracted `UserMessageBubble.tsx` (~65 L): user message presentation, 7-line clamp, gradient fade.
+- Delegated terminal run status to `RunTerminalStatus` in `RunCard.tsx` (SC#1 / SC#3 preparation).
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **57 commits / 29 phases / 856 L**.
@@ -178,11 +190,11 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 ### Phases touched (verbatim)
 
-075 / 075.1 / 075.4 / 075.6 / 075.7 (5+)
+075 / 075.1 / 075.4 / 075.6 / 075.7 (5+) / 227 (G-5 discharge)
 
 ### G-5 status (verbatim)
 
-satisfied (075.7 — 2026-05-24)
+satisfied (075.7 — 2026-05-24) · **DISCHARGED (Phase 227 / 2026-09-04)**
 
 ---
 

@@ -691,3 +691,38 @@ function statusWord(s: Message["runStatus"], runError?: string): string {
   if (s === "cancelled") return "cancelled"
   return "done"
 }
+
+// ── Phase 227 Plan 03 (SC#1 / SC#3) — RunTerminalStatus ───────────────────────
+// Encapsulates terminal status derivation ("Agent reached time limit" / "Response stopped")
+// and copy conditions. Exported for MessageItem delegation.
+//
+// SC#3 preparation: Moving this terminal status line INSIDE the RunCard frame in a future
+// phase (e.g., at the bottom of the expanded body or below the Next-up footer) is a
+// localized 1-file edit inside RunCard.tsx.
+export function RunTerminalStatus({
+  message,
+  isStreaming,
+  className,
+}: {
+  message: Message
+  isStreaming?: boolean
+  className?: string
+}) {
+  if (isStreaming) return null
+  const showTerminal =
+    message.stopped ||
+    message.runStatus === "timed_out" ||
+    (message.runStatus === "cancelled" && !!message.content)
+  if (!showTerminal) return null
+
+  const copy =
+    message.runStatus === "timed_out"
+      ? "Agent reached time limit"
+      : "Response stopped"
+
+  return (
+    <div className={cn("flex items-center gap-1.5 mt-1 text-xs text-muted-foreground", className)}>
+      <span className="italic">{copy}</span>
+    </div>
+  )
+}

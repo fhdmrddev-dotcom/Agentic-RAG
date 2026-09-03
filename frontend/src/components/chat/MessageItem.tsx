@@ -16,7 +16,9 @@ import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
 import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
-import { RunCard } from "./RunCard"
+import { RunCard, RunTerminalStatus } from "./RunCard"
+import { UserBubble } from "./UserMessageBubble"
+import { dedupParagraphs } from "./messageText"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ChatToolApprovalCard } from "./ChatToolApprovalCard"
@@ -69,70 +71,7 @@ function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
   )
 }
 
-/**
- * Phase 128 Plan 02 — CTC-04 user-prompt clamp (sketch 050-A / D-03).
- *
- * A long USER prompt (a pasted ≥5KB spec) renders at full height today and
- * shoves the live run off-screen. This collapses it to a `-webkit-line-clamp:7`
- * preview with a fade matched to the violet END of the bubble's 135°
- * `gradient-primary` (`index.css:199` → `hsl(258 90% 66%)`, NOT the page bg) and
- * an inline "Read more" / "Show less" chip. SHORT prompts render byte-identically
- * to today — the clamp classes are gated on `!expanded`, and the fade + chip on
- * `overflowing`, which only trips when the clamped <p> actually overflows.
- *
- * Factored as a LOCAL subcomponent (mirrors FinalOutputsPanel) so its
- * useRef/useLayoutEffect/useState do NOT perturb MessageItem's hook order
- * (MessageItem has hooks before the `if (isUser)` early return).
- *
- * `content` renders as React text children (auto-escaped) — never
- * dangerouslySetInnerHTML (T-128-02-01 / V5 output-encoding). The overflow
- * measure is a pure ref-guarded DOM read (scrollHeight/clientHeight) that cannot
- * throw on user content (T-128-02-02); jsdom reports 0/0 (no layout) so the
- * effect no-ops in tests, which assert structure + the fade class instead.
- */
-function UserBubble({ content }: { content: string }) {
-  const pRef = useRef<HTMLParagraphElement>(null)
-  const [overflowing, setOverflowing] = useState(false)
-  const [expanded, setExpanded] = useState(false)
 
-  // useLayoutEffect (NOT useEffect) so the measure runs pre-paint — avoids the
-  // one-frame full-height flash before the clamp applies (RESEARCH Pitfall 5).
-  useLayoutEffect(() => {
-    const el = pRef.current
-    if (el) setOverflowing(el.scrollHeight > el.clientHeight + 1)
-  }, [content])
-
-  return (
-    <div className="relative">
-      <p
-        ref={pRef}
-        className={cn(
-          "whitespace-pre-wrap break-words",
-          !expanded && "[display:-webkit-box] [-webkit-line-clamp:7] [-webkit-box-orient:vertical] overflow-hidden",
-        )}
-      >
-        {content}
-      </p>
-      {/* Fade dissolves into the bubble violet (the 135° gradient's END,
-          index.css:199), NOT the page bg — D-03. Only while clamped + overflowing. */}
-      {overflowing && !expanded && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[hsl(258_90%_66%)] to-transparent"
-        />
-      )}
-      {overflowing && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-1 text-xs text-white/80 underline"
-        >
-          {expanded ? "Show less" : "Read more"}
-        </button>
-      )}
-    </div>
-  )
-}
 
 /**
  * Phase 095.1 Plan 05 (D-095.1-06) — the FLAT "Generated files" list.
@@ -186,58 +125,7 @@ interface Props {
   isLastAssistant?: boolean
 }
 
-/**
- * Phase 076.1 D-07: Render-time dedup for consecutive identical text blocks.
- * Two-pass approach:
- *   1. Split by \n\n and collapse consecutive duplicate paragraphs (handles
- *      models that emit paragraph breaks between repeats).
- *   2. Detect repeated sentence-sized chunks within a single block (handles
- *      models like Anthropic/DeepSeek that concatenate repeats without breaks).
- * Preserves raw data in StreamsProvider unchanged — display-only.
- */
-function dedupParagraphs(text: string): string {
-  if (!text) return text
 
-  // Pass 1: paragraph-level dedup (split by \n\n)
-  const paragraphs = text.split('\n\n')
-  const deduped: string[] = []
-  let prev = ''
-  for (const p of paragraphs) {
-    const trimmed = p.trim()
-    if (trimmed === prev && trimmed.length > 20) continue
-    deduped.push(p)
-    prev = trimmed
-  }
-
-  // Pass 2: within each paragraph, detect repeated sentence-sized chunks.
-  // If a block contains the same sentence (>30 chars) repeated 2+ times
-  // consecutively, collapse to single occurrence.
-  const result = deduped.map(block => {
-    if (block.length < 80) return block
-    // Only flatten-dedup single-line run-on repeats (models that concatenate
-    // the same sentence without a break). A block with real line breaks — e.g.
-    // the agent's interim narration — is preserved verbatim so markdown keeps
-    // its newlines (breaks:true renders them); Pass 1 already handled
-    // paragraph-level repeats. Without this guard the sentence rejoin below
-    // collapsed every intra-paragraph newline into a single space (the
-    // reported run-on-blob narration).
-    if (block.includes('\n')) return block
-    // Split on sentence boundaries (period/exclamation/question + space + capital)
-    const sentences = block.split(/(?<=[.!?])\s+(?=[A-Z])/)
-    if (sentences.length < 2) return block
-    const seen: string[] = []
-    for (const s of sentences) {
-      const trimmed = s.trim()
-      if (trimmed.length > 30 && seen.length > 0 && seen[seen.length - 1] === trimmed) {
-        continue
-      }
-      seen.push(trimmed)
-    }
-    return seen.join(' ')
-  })
-
-  return result.join('\n\n')
-}
 
 
 /**
@@ -749,16 +637,8 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             `!!message.content` so an EMPTY early-cancel row is handled instead by
             the "cancelled — no output yet" affordance in the content region (no
             double indicator). Render-derive only — no shared-path fork (D-03/G-5). */}
-        {(message.stopped ||
-          message.runStatus === "timed_out" ||
-          (message.runStatus === "cancelled" && !!message.content)) &&
-          !isStreaming && (
-          <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-            <span className="italic">
-              {message.runStatus === "timed_out" ? "Agent reached time limit" : "Response stopped"}
-            </span>
-          </div>
-        )}
+        {/* Phase 227 SC#1 / SC#3: RunTerminalStatus delegated to RunCard */}
+        <RunTerminalStatus message={message} isStreaming={isStreaming} />
         {/* Active tool indicator — shown below content when a tool is running alongside text */}
         {isStreaming && hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
