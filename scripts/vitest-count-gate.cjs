@@ -3103,6 +3103,23 @@ const BASELINE = {
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
   "scrollAreaViewportWidth.test.tsx": 2,
+  // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
+  "MessageItem.cancelledRun.test.tsx": 8,
+  "MessageItem.blockedNotice.test.tsx": 4,
+  "MessageItem.harnessBanner.test.tsx": 11,
+  "ChatAreaBanner.test.tsx": 7,
+  "ChatAreaMode.test.tsx": 5,
+  "RunCard.characterization.test.tsx": 8,
+  "MessageItem.test.tsx": 24,
+  "MessageItem.clamp.test.tsx": 5,
+  "MessageItem.fallbackNotice.test.tsx": 3,
+  "MessageItem.memo.test.tsx": 3,
+  "MessageItem.sticky.test.tsx": 4,
+  "RunCard.logo.test.tsx": 6,
+  "ToolCallPanel.test.tsx": 16,
+  "MessageList.test.tsx": 30,
+  "MessageList.dedup.test.tsx": 7,
+  "MessageList.runline.baseline.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4343,6 +4360,23 @@ const TARGETS = [
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
+  // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
+  "src/components/chat/__tests__/MessageItem.cancelledRun.test.tsx",
+  "src/components/chat/__tests__/MessageItem.blockedNotice.test.tsx",
+  "src/components/chat/__tests__/MessageItem.harnessBanner.test.tsx",
+  "src/components/chat/__tests__/ChatAreaBanner.test.tsx",
+  "src/components/chat/__tests__/ChatAreaMode.test.tsx",
+  "src/components/chat/__tests__/RunCard.characterization.test.tsx",
+  "src/__tests__/components/MessageItem.test.tsx",
+  "src/__tests__/components/MessageItem.clamp.test.tsx",
+  "src/__tests__/components/MessageItem.fallbackNotice.test.tsx",
+  "src/__tests__/components/MessageItem.memo.test.tsx",
+  "src/__tests__/components/MessageItem.sticky.test.tsx",
+  "src/__tests__/components/RunCard.logo.test.tsx",
+  "src/__tests__/components/ToolCallPanel.test.tsx",
+  "src/__tests__/components/chat/MessageList.test.tsx",
+  "src/__tests__/components/chat/MessageList.dedup.test.tsx",
+  "src/__tests__/components/chat/MessageList.runline.baseline.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

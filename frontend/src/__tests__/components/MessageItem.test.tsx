@@ -103,7 +103,7 @@ describe("MessageItem – streaming state", () => {
         isStreaming={true}
       />,
     )
-    expect(screen.getByText(/thinking/i)).toBeInTheDocument()
+    expect(screen.getByText("Setting up agent…")).toBeInTheDocument()
   })
 
   it("shows cursor when streaming with non-empty content", () => {
