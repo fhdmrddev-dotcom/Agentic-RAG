@@ -386,6 +386,10 @@ a:hover {
 }
 
 /* ── Comparison 2 (30-row matrix) ── */
+.cmp-scroll {
+  overflow: hidden;
+}
+
 .cmp2 {
   width: 100%;
   border-collapse: separate;
@@ -791,8 +795,8 @@ a:hover {
   .h2 { font-size: 30px !important; }
   .cta-row { flex-direction: column; align-items: stretch; }
   .cta-row .btn { width: 100%; }
-  .cmp-scroll { overflow-x: auto; }
-  .cmp { min-width: 640px; }
+  .cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cmp, .cmp2 { min-width: 640px; }
   .orbit-wrap { height: 240px; }
   .tourpanel { padding: 16px; }
   .tourgrid { grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 24px; }

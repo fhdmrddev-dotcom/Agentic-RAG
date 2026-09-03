@@ -34,7 +34,7 @@ export function CompareSection() {
         </div>
 
         {/* 8-Row Category Comparison */}
-        <div className="card cmp-scroll" style={{ overflow: "hidden" }}>
+        <div className="card cmp-scroll">
           <table className="cmp">
             <thead>
               <tr>
@@ -87,7 +87,7 @@ export function CompareSection() {
               </div>
             </div>
 
-            <div className="card cmp-scroll" style={{ overflow: "hidden" }}>
+            <div className="card cmp-scroll">
               <table className="cmp2">
                 <thead>
                   <tr>
