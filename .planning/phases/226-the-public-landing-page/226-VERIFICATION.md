@@ -1,7 +1,7 @@
 # Phase 226 — VERIFICATION
 
-**Reviewer:** Claude · **Builder:** Gemini · **Verified at:** `d5836169e` on `phase-226` (base `aec03333a`, develop) · **Date:** 2026-09-03
-**Verdict:** ✅ **PASS — with three owed rows and one recorded §3.1 override.** Bus: `BUS-074` → `BUS-087`.
+**Reviewer:** Claude · **Builder:** Gemini · **Verified at:** `53012e652` on `phase-226` (re-verified after the builder's post-PASS commit) (base `aec03333a`, develop) · **Date:** 2026-09-03
+**Verdict:** ✅ **PASS — with three owed rows and one recorded §3.1 override.** Bus: `BUS-074` → `BUS-091`.
 
 ## Declared conflicts, up front
 
@@ -25,7 +25,8 @@
 | Wave 4 (docs, CI, RED drive, bundle) | BUS-079 | `23d52eae3` | **GAPS** — 14 items (BUS-080) + item 15 operator-observed CSS port gap (BUS-081) |
 | Gaps fixed | BUS-083 | `6d34bc99d` | all 15 verified in code + guard driven; Chrome UAT → 1 blocker + 1 advisory (BUS-085) |
 | Blocker 16 | BUS-085 | `d5836169e` | fixed by reviewer (override above); verified at 390 px |
-| **PASS** | BUS-087 | `d5836169e` | |
+| Builder's own blocker-16 + advisory-17 commit (arrived after PASS) | BUS-089 | `53012e652` | re-verified: root clip removed, protruders contained at source (`.float` hidden ≤720 px, `.dim` clipped in its scene), 390 px `scrollWidth === clientWidth` still holds, 24/24 |
+| **PASS** | BUS-087 → re-issued BUS-091 | `53012e652` | |
 
 ## Success criteria (proposal §Success)
 
@@ -67,7 +68,7 @@ measurement, and it is the reason D-226-02 was reshaped in the pre-flight.
 1. **Reduced-motion** (SC#5) — drive with DevTools *Emulate CSS prefers-reduced-motion* on `/`: no scene loops, each
    shows its end state. ~3 minutes, operator or reviewer.
 2. **390 px on a real narrow window** (SC#7c) — repeat the iframe result; confirm `.tabbar` scrolls rather than clips.
-3. **Count-gate pins** — five new suites (`landingBundleFence`, `cssClasses`, `facts`, `scenes`, `LandingPage`; 23 cases)
+3. **Count-gate pins** — five new suites (`landingBundleFence`, `cssClasses`, `facts`, `scenes`, `LandingPage`; 24 cases)
    are NOT in `scripts/vitest-count-gate.cjs` (pre-flight F-6 kept 226 off that file while 224-05 edited it). Claude adds
    `"src/landing"` to TARGETS and the BASELINE entries **in the merge commit**, then re-derives the gate's verdict line.
 4. **First paint** (SC#6) — not instrumented; measure on the Vercel preview when the operator deploys.
@@ -78,8 +79,9 @@ measurement, and it is the reason D-226-02 was reshaped in the pre-flight.
 - The "renderer frozen" alarms during UAT were the MCP tab being **background** (`document.visibilityState === "hidden"`):
   Chrome pauses `requestAnimationFrame` there, so rAF-based probes and screenshots hung. Not a page defect; the page
   reported 0 console errors and 23 running animations when probed with timers instead of frames.
-- `.page-root` computes `overflow-x: clip` (advisory 17). It hides two hero elements that protrude by ~20 px at 390 px
-  (`.float.f2`, a `.dim` span). Accepted as-is; recorded so nobody reads the clean `scrollWidth` as proof those elements fit.
+- Advisory 17 (`.page-root overflow-x: clip`) was **resolved, not accepted**, in `53012e652`: the root clip is removed and the
+  two protruders are contained where they live. A test now asserts neither `.cmp-scroll` carries an inline overflow and the
+  root carries no clip.
 - After this phase `localhost:5173/` is the landing and the app is at `/app` — README updated (gap 14); every developer
   habit changes.
 
