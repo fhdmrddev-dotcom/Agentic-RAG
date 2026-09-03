@@ -4,9 +4,9 @@ title: Both OAuth callbacks redirect to `/`, which Phase 226 turned into the mar
 reported: 2026-09-03
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/connectors/oauth, backend/connectors/mcp-oauth, frontend/landing, frontend/navigation]
-folded_into: null
+folded_into: "225"
 verified_closed_by: null
 related_seeds: [SEED-185]
 re_open_trigger: null
@@ -47,7 +47,13 @@ a marketing page reads as a failure, and the person will retry — minting a sec
 vendor each time. Phase 225 SC#5 (*"the Google connection still works end to end, driven in a real
 browser"*) cannot pass while this stands, which is why it is filed now rather than at 225's close.
 
-## Suggested routing
+## Routing
+
+**Operator, 2026-09-03: folded into Phase 225.** Plan 02 takes BOTH callbacks' redirects
+(`oauth_callback` and `mcp_oauth_callback`) to the app path. The query-string-reader half stays
+with `SEED-185`.
+
+### Original suggestion
 
 - The `oauth_callback` half is inside Phase 225 plan 02's blast radius (`225-PREFLIGHT.md` B-1).
 - The `mcp_oauth_callback` half is three lines in the same file, outside 225's `files_modified`.

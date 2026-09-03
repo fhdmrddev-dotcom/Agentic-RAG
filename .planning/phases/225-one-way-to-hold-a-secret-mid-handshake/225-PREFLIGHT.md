@@ -69,11 +69,12 @@ pre-existing (`SEED-185`: no router) and means the NEW `oauth_error=invalid_or_e
 introduces is unreachable to a person; it is a log line wearing a URL. Do not build a toast for it
 here — record it.
 
-**Close inside 225-02 Task 2:** `oauth_callback` is already in the plan's blast radius; every
-redirect it builds must target the app path, not the root. The MCP callback shares the defect and is
-OUTSIDE 225's `files_modified`; it is filed as `BUG-260903-01` (`.planning/reported-bugs/`). Taking
-those three lines in the same edit is a scope note, not a new capability, and would be the honest
-choice — but it is the builder's call. **SC#5 is judged by the `connector_connections` row flipping
+**Close inside 225-02 Task 2 — OPERATOR DECIDED 2026-09-03: take BOTH callbacks.** Every redirect
+built by `oauth_callback` AND by `mcp_oauth_callback` (eight sites, listed above) must target the app
+path (`{frontend_url}/app?connections=1&…`), not the root. `BUG-260903-01` is `folded_into: 225`.
+Add one test per callback that the redirect `Location` starts with `{frontend_url}/app`. The MCP
+callback is still bounded to its redirect strings — D-225-04's *"strictly bounded to
+`create_oauth_authorize_url` and `oauth_callback`"* widens by exactly those lines and nothing else. **SC#5 is judged by the `connector_connections` row flipping
 to connected and the person landing inside the app**, since no toast can fire.
 
 ### B-2 · Four existing suites go red and NONE is in any plan's `files_modified`

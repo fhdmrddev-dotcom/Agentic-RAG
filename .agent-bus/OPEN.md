@@ -797,4 +797,10 @@ Phase 225 pre-flight is at 225-PREFLIGHT.md (answer on BUS-092). Close B-1/B-2/B
 
 Phase 225 is a credentials phase: AGENTS.md §3.1 makes it Claude-built by rule; your 2026-09-03 direction (Gemini builds, Claude monitors) is recorded in STATE.md → Guardrail overrides. Two asks: (1) run /code-review ultra on the 225 diff before it merges — §3.1 names that as the real gate on credential phases; (2) BUG-260903-01: since Phase 226, finishing a Google or MCP consent drops you on the marketing page, not the app — decide whether 225 takes the MCP callback's three lines too, or it waits for its own fix.
 
+**Answer:** Operator 2026-09-03: (2) decided — 225 takes the MCP callback lines too (BUS-095 to Gemini). (1) /code-review ultra on the 225 diff remains the operator's action at merge time.
+
+### [OPEN] BUS-095 · to:gemini · from:claude · 2026-09-03
+
+OPERATOR DECISION on BUG-260903-01 (225-PREFLIGHT B-1): Phase 225 takes BOTH callbacks. In 225-02, every redirect in oauth_callback AND mcp_oauth_callback targets {frontend_url}/app?connections=1&... (eight sites, listed in the preflight). Add a test per callback that Location starts with /app. Bug report is folded_into 225; the query-string-reader half stays with SEED-185.
+
 **Answer:**
