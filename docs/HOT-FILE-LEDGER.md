@@ -2435,9 +2435,19 @@ quick-task buckets (`260328`, `260405`) present and subtracted (the recipe's own
 HARD** (30 phases vs threshold 3) — ⚠ **absent from this ledger for its ENTIRE LIFE**, among the hottest
 files in the repository. Row added by 217.1-08, the first plan to structurally edit it this phase.
 
+**Re-derived 2026-09-05 (Phase 229 close): `75 commits / 32 phases / 2408 L`** (`-127 L`) · **G-5 DISCHARGED (Phase 229)** via extraction of `mint_document_row()` and `splice_document()` into `backend/app/services/ingest_splice.py`.
+
 **What 217.1-08 did:** added `"embedded_at": datetime.now(timezone.utc).isoformat()` to the main-ingest
 chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_service.py:423` and `:896`,
 `reembed_service.py:187` are the other three). No routing, handler or response-model change.
+
+**What Phase 229 did:**
+- Extracted canonical document minting, folder-scoped deduplication, and user-scoped versioning into `backend/app/services/ingest_splice.py` (`mint_document_row`, `async_mint_document_row`).
+- Extracted background file ingestion dispatch into `splice_document()`.
+- Refactored `upload_document` (`POST /documents/upload`) and `_upload_pipeline` to delegate to `ingest_splice.py`, preserving exact HTTP 200/201 observable behavior.
+- Spliced `import_connection_file` (`POST /connectors/connections/{id}/files/{file_id}/import`), resolving `PGRST204` `storage_path` column defect and establishing Library parity with `/upload`.
+- Spliced email attachment cascade in `ingest_document()`, replacing brittle inline inserts with `mint_document_row(..., on_conflict="link")`, isolating per-attachment exceptions, and recording parent `metadata['attachments']` manifest.
+- Audited all four `document_chunks` write sites (documents.py text chunks, multimodal_service.py:435 table chunks, multimodal_service.py:913 image chunks, documents.py:2534 authoritative recount).
 
 **What binds this file:**
 
@@ -2451,11 +2461,9 @@ chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_se
    `:1308` legitimately nulls it on reingest. Do not "fix" this.
 3. **The chunk INSERT is one of FOUR `document_chunks` write sites** — a future change to the chunk-row
    shape must touch all four or the sites silently diverge (this is exactly the D-217.1-35 correction:
-   a two-site plan leaves table/image chunks NULL forever).
+   a two-site plan leaves table/image chunks NULL forever). All four write sites are now verified.
 
-**No seam is named yet** in the source material; state *"none proposed — owed to a future refactor phase"*
-rather than inventing one under 217.1-08's own budget. The 11-route surface and the `_upload_pipeline`
-are the obvious candidates for that future phase.
+**Seam status:** Named seam taken in Phase 229 (`backend/app/services/ingest_splice.py`). Handler is reduced by 127 lines and delegates row minting and async background pipeline execution.
 
 ---
 
