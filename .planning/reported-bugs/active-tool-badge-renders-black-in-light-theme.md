@@ -60,7 +60,7 @@ is the standing WCAG AA seed for this app).
 
 ## Cleared of Phase 227 — 2026-09-04
 
-The before/after drive () compared the normalized rendered DOM of the active
-rail node and the step rows between  (pre-227) and . **They are byte-identical.**
+The before/after drive (`227-VALIDATION.md`) compared the normalized rendered DOM of the active
+rail node and the step rows between `7334f8d84` (pre-227) and `57274c7e0`. **They are byte-identical.**
 Whatever produces the black mark is present in the pre-227 build too, so the refactor neither caused
 nor hid it. Diagnose it on its own, on the three candidates listed above.
