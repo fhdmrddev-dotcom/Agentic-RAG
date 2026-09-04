@@ -38,9 +38,10 @@ continues at **228**.
 ## Current Position
 
 Phase: 229 — The One Ingest Splice
-Plan: 229-01..04 authored (Wave 1: core splice, Wave 2: upload + connectors, Wave 3: email cascade, Wave 4: G-5 discharge & gate validation)
-Status: 📋 **PLANNED** — plan set (229-01..04), cross-plan seam audit (229-SEAM-AUDIT.md), and validation matrix (229-VALIDATION.md) locked; ready for pre-flight and execution
-Last activity: 2026-09-05 — Phase 229 planned (4 plans authored, seam audit complete, bus update ready for Claude pre-flight).
+Plan: 229-01..04 locked & pre-flighted (G-1..G-7 resolved); ready for execution
+Status: 📋 **PLANNED** — pre-flight verdict EXECUTE received (229-PREFLIGHT.md / BUS-107); all 7 gaps (blocking G-1 & G-2) resolved and committed; ready for execution
+Last activity: 2026-09-05 — Phase 229 pre-flight cleared (verdict EXECUTE; blocking G-1 and G-2 closed in plans; BUS-107 answered).
+
 
 
 
