@@ -37,7 +37,8 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 229 — The One Ingest Splice
+Phase: 230 — The Durable Ingestion Queue (STARTED 2026-09-05, briefed to Gemini on BUS-109) · 229 complete
+Prior: 229 — The One Ingest Splice
 Plan: 229-01..04 executed & verified; 229-VERIFICATION.md ready for review
 Status: ✅ **COMPLETE — REVIEWER-VERIFIED 2026-09-05, PASS, no corrections owed** (was: ready for reviewer verification) — all 4 plans executed, G-5 hot file documents.py discharged with same-commit ledger sync, all 4 test suites passing (26/26), backend unit baseline passed (70 <= 71), tsc 66 errors match baseline, deploy drift 0.
 Last activity: 2026-09-05 — Phase 229 executed (Gemini) and independently verified by DRIVING (Claude). See below.
@@ -115,6 +116,23 @@ column and the recursive `folder_is_org_shared()` function are **two definitions
 resolving that too — adding a department dimension on top of an unresolved org-shared predicate would
 compound it.
 
+
+
+### Phase 230 — preconditions VERIFIED before briefing (2026-09-05, Claude)
+
+Measured so the plan set does not re-derive them:
+
+- **Migration `153` is FREE** — highest existing is `152_audit_log_connector_action_types…`. Gaps at
+  130-139 / 142-149 must NEVER be backfilled.
+- **The claim pattern to copy EXISTS and is running** — `backend/app/db/schedules.py:307` uses
+  `FOR UPDATE SKIP LOCKED` in an explicit transaction (documented at `:271`). Copy the shape for a second
+  table with a different claim key. **No broker, no new process.**
+- **`backend/app/services/circuit_breaker.py` EXISTS** — `CircuitBreaker` (`:86`),
+  `CircuitBreakerTrippedError` (`:63`). `QUEUE-05` trips this; do not write a second breaker.
+- ⛔ **`embed_texts` really does send everything in ONE request** — `openai_service.py:2129` passes
+  `input=texts` with no chunking at all. `SEED-197` confirmed by reading. That is `QUEUE-04`'s subject.
+- ✅ **Clean baseline for restart-survival testing:** **77 completed** documents and **ZERO** in
+  `pending` / `processing` / `extracting` / `failed`. **Any stuck row after this phase is genuinely its own.**
 
 ### ✅ Phase 229 VERIFIED (2026-09-05, Claude — DRIVEN, not read)
 
