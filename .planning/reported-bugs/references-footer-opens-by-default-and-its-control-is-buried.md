@@ -4,10 +4,10 @@ title: The References footer opens by default and its fold control is buried in 
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [frontend/chat, citations, reasoning, readability]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "v3.9 close audit 2026-09-04 — both halves verified against shipped code"
 related_seeds: [SEED-240, SEED-128]
 re_open_trigger: null
 reproduces_on:
@@ -119,3 +119,16 @@ default and must be folded (`MessageItem.tsx:619`); the Thinking block is **alre
 and is correct as-is. **Do not "fix" the thinking default — it is not broken**, and flipping it would
 be a regression dressed as consistency.
 
+## Closed — v3.9 close audit, 2026-09-04
+
+Verified against shipped code rather than against a phase summary:
+
+- **Opens by default:** `frontend/src/components/chat/CitationList.tsx:32` — the prop defaults to
+  `defaultOpen = false`, and `:33` seeds the state from it. The footer is folded on arrival.
+- **Control is buried:** `:54` mounts the SHARED `FoldTrigger` with the label
+  `References · N sources` — the same element Phase 224 introduced so the affordance reads as a
+  control rather than as prose.
+
+Both halves shipped in **Phase 224**; the report simply stayed `open` afterwards. ⚠ That is the
+`status:`-frontmatter-IS-the-index failure this project already records: a fixed bug that still
+reads `open` will be re-proposed at every touchpoint forever.

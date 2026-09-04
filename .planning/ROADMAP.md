@@ -601,6 +601,31 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 
 #### Phase 219: A Connected Source Feeds the Library
 
+> ⛔ **DEFERRED TO THE CONNECTED KNOWLEDGE MILESTONE — operator decision, 2026-09-04, taken at the
+> v3.9 close audit (`v3.9-MILESTONE-AUDIT.md` GAP 1). The phase text below is KEPT VERBATIM so the
+> next milestone inherits it rather than re-deriving it.**
+>
+> ⭐ **This is a sequencing decision this milestone's own rule forced, not a descope.** SC#1 below
+> — *"watched on a schedule"* — is an AUTOMATIC background sync, which is word for word the binding
+> re-open trigger v3.9 recorded for `SEED-209/210/211/212`:
+>
+> > *"RE-OPEN TRIGGER: the first AUTOMATIC or BACKGROUND sync from a connected source. Shipping
+> > auto-ingest without them is **not a gap, it is a security defect**."*
+>
+> `SEED-210` measures that synced documents flatten source ACLs and that source deletions never
+> propagate; `SEED-211` is the M-Files metadata-permissions fork. So building 219 to close v3.9
+> would have shipped precisely the defect the trigger exists to prevent — the phase and its four
+> seeds move TOGETHER or not at all.
+>
+> ⚠ **LIB-08 / LIB-09 / LIB-10 are still absent from `REQUIREMENTS.md`** (the same gap `STATE.md`
+> records for LIB-05..07). Add them when the Connected Knowledge milestone is defined: a requirement
+> that exists only in a roadmap heading is invisible to every coverage check.
+>
+> ⭐ **Phase 216's ATTACH-01 stays shipped and is deliberately unaffected** — a human picking ONE
+> file dodges every one of those problems: no ACL mirroring, no deletion propagation, no sync loop.
+> That is why `SEED-213` was kept in v3.9 while its four siblings were deferred.
+
+
 **Goal**: The knowledge base stops depending on somebody remembering to upload. A person connects a cloud drive **once**, sees exactly what it would bring in **before** it brings anything, and the Library keeps reading it on a schedule.
 **Depends on**: ⭐ **Phase 215 (HARD — OAuth)** and **Phase 216** (ATTACH-01 ships the deliberate one-file pull this generalises into a standing sync).
 **Requirements**: LIB-08, LIB-09, LIB-10
@@ -856,15 +881,15 @@ dependency** — if any appears, the phase has grown a feature. Full scoping:
 | 217. The Library — One Home for Documents | 12/12 | ✅ Complete — 5/5 SC verified, 16 UAT rows owed. ⚠ **Shipped green against a contract asserting only TEXT** — the sketch's composition was never planned (`217-SKETCH-DRIFT-AUDIT.md`) → **217.1** | 2026-08-29 |
 | 217.1. The Library, Exactly As Sketched | 18/18 | ✅ Complete — 18 plans; all 4 UAT observations and the visual enhancements resolved. ⛔ **Absorbs Phase 218.** ⭐ **SC#1 was the GATE ITSELF** — `drive.cjs` gained composition assertions (217 shipped green against a contract with 200 assertions about vocabulary and **zero** about composition), driven RED first | 2026-08-30 |
 | 218. ~~The Library Knows How It Is Used~~ | — | ⛔ **ABSORBED INTO 217.1** (operator, 2026-08-29) — all five criteria and LIB-05/06/07 moved. Row kept so dependencies and the coverage map still resolve | - |
-| 219. A Connected Source Feeds the Library | 0/? | Not started — ⭐ **215 and 216 are both SHIPPED, so this is now unblocked.** ⚠ Changes CLAUDE.md's *"ingestion is manual file upload only"* rule in the same commit | - |
+| 219. ~~A Connected Source Feeds the Library~~ | — | ⛔ **DEFERRED to the CONNECTED KNOWLEDGE milestone** (operator, 2026-09-04, at the v3.9 close audit). ⭐ **Not a descope — a sequencing decision the milestone's own rule forced:** SC#1 (*"watched on a schedule"*) IS v3.9's binding re-open trigger for `SEED-209/210/211/212`, and the scope section states that shipping auto-ingest without them *"is not a gap, it is a security defect"* (`SEED-210` measures that synced documents flatten source ACLs and that source deletions never propagate). LIB-08/09/10 travel WITH the four seeds. ⚠ They are still absent from `REQUIREMENTS.md` — add them there when that milestone is defined, or the coverage check cannot see them | - |
 | 220. A Drawing Becomes Quantities — SPIKE | 4/4 | ✅ Complete & verified — the drawing-to-quantities business case answered end to end on one real DXF and one real rate sheet. `ezdxf` evaluated; the matching step is where the case is won or lost (`SEED-226`) | 2026-08-30 |
 | 221. Six Applications, One Token | 2/2 | ✅ **CLOSED** — six Google applications under one token, and **11 of 11 writes proven live** against a real account. Three defects the plan's premise missed: the Check action **refused every OAuth row** (`409` about a row that had just run 26 tools), `connector_tokens` has **RLS on with ZERO policies** (`SEED-233`), and `create_event` **refused every naive local time**. ⛔ **OWED**: the `api_off` UAT row needs an API switched off in Cloud project `877112366454` — operator's console. Everything not done: `221-CARRY-FORWARD.md` | 2026-09-01 |
 | 222. One Click Connects Any MCP Server | 5/5 door + crypto | ✅ **COMPLETE 2026-09-02, SPLIT across both agents (§3.1 override).** Notion connects by OAuth with **zero** developer-console work (RFC 7591 self-registration) and returns **41 tools for zero lines of tool code**. Join DRIVEN in a browser against four real servers — all four `kind` values observed live. ⛔ **A BYO connect has never completed end to end** — needs a human. ⚠ **SC#7 PARTLY UNMET:** Rovo answers `kind: token` at both endpoints (advertises no AS), so it cannot connect by OAuth — Linear + Sentry proven instead. `222-VERIFICATION.md` | 2026-09-02 |
-| 223. A Connection Leaves a Record | 0/? | **NEXT — operator handed to Gemini 2026-09-02.** ⛔ `GRANT-05` is met for the EMPTY SET: a live approved connector call appears in no ledger, and `update_grants` writes no receipt either. `223-PROPOSAL.md` | - |
+| 223. A Connection Leaves a Record | 5/5 | ✅ **VERIFIED & CLOSED (2026-09-02)** — reviewed and cleared by Claude in `BUS-062`. Live DB assertions, the G-6 `arg_keys` privacy safeguard, `Map.has()` restore semantics, and dual-source permanent-grant receipts (`chat_card` and `settings`) all verified | 2026-09-02 |
 | 224. What the Agent Is Doing Reads Like a Sentence | 5/5 | ✅ **EXECUTED 2026-09-03.** Winner D deleted the orphan card (ask_user survives); vocabulary shared via `lib/toolNames`; approval card DOCKED with the deadline ON THE WIRE (one `_APPROVAL_TIMEOUT_SECONDS`, `timeout_seconds` emitted so client skew cannot apply); Square glyph gone; `BUG-260902-07` both halves via ONE shared `FoldTrigger`. Gates: tsc 66 ✅ · count gate **OK 194/194, pinned 6502, failed 0** (+70 = the six adopted suites, exact) · ✅ backend **71 vs 70 — PROVEN not this phase**: reverting 224's only backend file gives the identical 71. ⚠ Two must_haves DEFERRED to **227** with a trigger. ✅ **Visual bar DRIVEN in a browser** (fold verified by computed style: aria-expanded=false, border 0.8px, radius 9999px, surface, weight 500; no console errors) — ⚠ **three checks OWED**: the terminal-glyph removal, the docked approval card, the 300px todo wrap. ⚠ Claude built 224-04/05 so **Gemini reviews**. `224-SUMMARY.md` | - |
-| 225. One Way to Hold a Secret Mid-Handshake | 0/2 | **PLANNED** — discuss-phase & plan-phase complete; 2 plans (225-01..02) across 2 waves. Ports Google/BYO OAuth onto shared `oauth_state.py` opaque Redis handle; dual-mode callback cutover. Plan set posted on BUS-092 to Claude for preflight. `225-PROPOSAL.md` | - |
+| 225. One Way to Hold a Secret Mid-Handshake | 2/2 | ✅ **EXECUTED (Gemini) & DRIVEN IN A REAL BROWSER (Claude, 2026-09-03).** Opaque `secrets.token_urlsafe(32)` handle, Redis `setex` 600 s, get-then-delete single use, per-flow `Literal` enforcement. Live Google OAuth driven end to end; `connector_tokens.updated_at` stamped. ⚠ **OWED**: `/code-review ultra review-base-225`, skipped by decision (credits) — re-open trigger is credits before the v3.9 production push. ⭐ The scoped security review found `BUG-260903-02` (pre-existing cross-org authorize), fixed 2026-09-04 | 2026-09-03 |
 | 226. The Public Landing Page | 5/5 | ✅ **MERGED `4bb022c23` 2026-09-03** — built by Gemini in worktree `phase-226` in parallel with 224 (operator unqueued it); Claude pre-flighted (F-1: Vercel filesystem precedence → landing IS `index.html`, app → `app.html`), reviewed 4 waves, 16 findings closed, Chrome UAT passed; `226-VERIFICATION.md`. Owed: reduced-motion emulation, real 390px window, first paint, `VITE_DEMO_URL`/`VITE_APP_URL` (BUS-071). Originally proposed 2026-09-03; queued behind 224 / 225 until the operator lifted it. ✅ G-2 satisfied by the design canvas. Folds `SEED-241`. Gemini builds, Claude pre-flights (`226-PREFLIGHT.md`). `226-PROPOSAL.md` | - |
-| 227. The Run Frame Has One Owner | 0/? | Proposed 2026-09-03 from Phase 224's execution — a REFACTOR, no new capability. One visual object rendered by three files, none owning it. ⭐ The G-5 guardrail produced the defect it protected against (`MessageItem.tsx:841`), and **56 ledger rows read *honoured by construction***. ⚠ Success = nothing changes on screen; the bar is a browser drive. `227-PROPOSAL.md` | - |
+| 227. The Run Frame Has One Owner | 3/3 | ✅ **EXECUTED (Gemini) & SC#2 DRIVEN IN A REAL BROWSER (Claude + operator, 2026-09-04)** — `227-VALIDATION.md`. All EIGHT run states compared as normalized rendered DOM against a pre-227 worktree: identical on every one. `ToolCallPanel` 1019 → 351 L, `MessageItem` 822 → 702 L, both G-5 discharges EARNED. ⭐ The characterization suite landed in Wave 1, before the refactor | 2026-09-04 |
 
 **Coverage:** **32 / 32 requirements mapped, each to exactly one phase.** No orphans, no duplicates.
 ⚠ **Re-owned 2026-08-29: LIB-01..07 all belong to Phase 217.1.** LIB-01..04 are re-opened there at sketch fidelity (217 shipped them against a text-only contract); LIB-05 / LIB-06 / LIB-07 moved from the **absorbed** Phase 218. The count is unchanged — each requirement still maps to exactly one phase; only the owning phase moved.

@@ -38,6 +38,31 @@ Phase numbering continues at **210**.
 
 ## Current Position
 
+⭐ **OPERATOR DECISION 2026-09-04 — PHASE 219 DEFERRED TO THE CONNECTED KNOWLEDGE MILESTONE, and
+v3.9 IS READY TO CLOSE.** Taken at the close audit (`.planning/v3.9-MILESTONE-AUDIT.md`, now
+`gaps_resolved`).
+
+**Why 219 could not simply be finished:** its SC#1 — *"watched on a schedule"* — is an AUTOMATIC
+background sync, which is word for word v3.9's own binding re-open trigger for
+`SEED-209/210/211/212`. v3.9's scope section states that shipping auto-ingest without them *"is not
+a gap, it is a security defect"* (`SEED-210` measures that synced documents flatten source ACLs and
+that source deletions never propagate). **So the phase and its four seeds move together.** The
+trigger did NOT fire — it was kept from firing by moving the feature. `LIB-08/09/10` travel with
+them, and ⚠ they are still absent from `REQUIREMENTS.md`, which must be fixed when that milestone
+is defined. Phase 216's ATTACH-01 (a human picking ONE file) stays shipped and is unaffected — no
+ACL mirroring, no deletion propagation, no sync loop, which is why `SEED-213` stayed in v3.9.
+
+**Also applied at the close audit:** the ROADMAP progress table was stale by four rows (223, 225 and
+227 all read not-started or planned while closed) and is corrected — the close ARCHIVES that table,
+so it would have been wrong exactly when it became permanent. `BUG-260902-07` was verified fixed
+against shipped code and closed. ⚠ **Owed and stated rather than absorbed:** 210's four undriven
+SC, 211's UAT + schema regen, 214's eight-row cross-provider roster and eight G-4 drives, 217's 16
+UAT rows, and `/code-review ultra review-base-225`.
+
+**NEXT: `/gsd:complete-milestone 3.9`** — the audit gate its step 0 requires now exists and passes.
+
+
+
 ✅ **PHASE 227: The Run Frame Has One Owner — EXECUTED (Gemini), VERIFIED & DRIVEN IN REAL BROWSER (Claude + Operator, 2026-09-04) — `227-VALIDATION.md`.**
 ⭐ SC#2 DISCHARGED: driven across all eight run states in a real browser comparing normalized rendered DOM against pre-227 worktree (commit `74b8385e1`). All states byte-identical.
 All three plans shipped (`227-01` at `26cb7397e`, `227-02` at `a743aeef4`, `227-03` at `585d451dd`, closure fixes at `157bb58e8`):

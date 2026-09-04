@@ -102,3 +102,20 @@ The app already thinks in metadata for *where a document belongs*. Whether it sh
 metadata for *who may see it* is a genuine architectural fork with a strong case on both sides. It is
 cheap to adopt before auto-ingest and expensive afterwards, which is the only reason it is being
 raised now rather than when it becomes obvious.
+
+## ⭐ SEQUENCED INTO THE CONNECTED KNOWLEDGE MILESTONE — operator, 2026-09-04
+
+Taken at the v3.9 close audit (`.planning/v3.9-MILESTONE-AUDIT.md`, GAP 1). **Phase 219
+(*A Connected Source Feeds the Library*, LIB-08/09/10) was DEFERRED out of v3.9 and travels with
+this seed and its three siblings — `SEED-209`, `SEED-210`, `SEED-211`, `SEED-212` — into the same
+milestone.**
+
+Why the two cannot be separated: Phase 219's SC#1 is *"watched on a schedule"*, an AUTOMATIC
+background sync, which is word for word v3.9's binding re-open trigger for these seeds. v3.9's own
+scope section states that shipping auto-ingest without them *"is not a gap, it is a security
+defect"*. So the trigger has NOT fired — it was kept from firing by moving the feature, not by
+ignoring it.
+
+⚠ **This seed therefore stays `planted` on purpose.** It is not dormant and it is not answered:
+it is now a PREREQUISITE of a named future phase, and whoever plans that milestone must sequence
+these four ahead of 219 rather than beside it.
