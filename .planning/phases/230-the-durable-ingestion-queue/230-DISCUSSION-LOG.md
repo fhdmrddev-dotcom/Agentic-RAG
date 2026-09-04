@@ -5,7 +5,7 @@
 
 **Date:** 2026-09-05
 **Phase:** 230-the-durable-ingestion-queue
-**Areas discussed:** G-2 Sketch Gate for Paused Ingestion & Named Refusal, Resume Granularity, Embedding Batching & Token Ceiling, Ingestion Concurrency & Polling Configuration, Recall Harness for Phase 241
+**Areas discussed:** G-2 Sketch Gate for Paused Ingestion & Named Refusal, Resume Granularity, Embedding Batching & Token Ceiling, Ingestion Concurrency & Polling Configuration, Recall Harness for Phase 241, Sub-Tab Placement for Paused Batches
 
 ---
 
@@ -17,7 +17,7 @@
 | In-place spec in Phase 230 | Proceed directly with an in-place spec using Aether Deep Midnight tokens without a separate Claude sketch session. | |
 
 **User's choice:** Hand off to Claude for `/gsd:sketch` (via agent bus).
-**Notes:** G-2 is honoured by delegating the visual surface sketch to Claude, opening BUS-110.
+**Notes:** G-2 was honoured via BUS-110. Claude delivered Sketch 227 (`.planning/sketches/227-the-paused-queue-and-its-refusal/`). Operator approved **Variant B (The Batch Lane)** on BUS-111.
 
 ---
 
@@ -57,12 +57,24 @@
 
 ---
 
-## 5. Recall Harness for Phase 241 Baseline
+## 5. Recall Harness for Phase 241 Baseline (G-3)
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| `tests/eval/test_retrieval_recall_baseline.py` + `scripts/measure-recall.py` (Recommended) | Dedicated script and test measuring Hit@K / MRR over the 77 baseline documents. | ✓ |
+| `backend/tests/eval/test_retrieval_recall_baseline.py` + `scripts/measure-recall.py` (Recommended) | Dedicated script and test measuring Hit@K / MRR over the 77 baseline documents, located under `backend/tests/` to be collected by pytest. | ✓ |
 | `backend/app/services/eval/recall_harness.py` | Integrated backend service module. | |
 
-**User's choice:** `tests/eval/test_retrieval_recall_baseline.py` + `scripts/measure-recall.py`.
-**Notes:** Establishes the baseline recall required for Phase 241 without premature coupling to runtime services.
+**User's choice:** `backend/tests/eval/test_retrieval_recall_baseline.py` + `scripts/measure-recall.py`.
+**Notes:** Pre-flight G-3 adopted: test moved under `backend/tests/eval/` to satisfy `backend/pytest.ini` `testpaths = tests`.
+
+---
+
+## 6. Sub-Tab Placement for Paused Batches (BUS-111 Open Decision)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Under `In progress` sub-tab (Recommended) | Mount the batch lane and refusal banner inside IngestionTab's "In progress" sub-tab above the in-flight rows. The batch has not failed, is automatically retrying, and requires zero user action. | ✓ |
+| Under `Needs attention` sub-tab | Display in "Needs attention" alongside failed documents. | |
+
+**Decision:** Under `In progress`.
+**Rationale:** "Needs attention" implies the user must take an action to unwedge the file. A rate-limited or transiently paused queue auto-resumes once the cooldown expires, and the refusal copy explicitly concludes "nothing for you to do."
