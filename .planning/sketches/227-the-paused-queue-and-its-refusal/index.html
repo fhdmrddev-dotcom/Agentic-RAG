@@ -196,7 +196,7 @@ button.go{background:linear-gradient(180deg,hsl(239 84% 67%),hsl(239 84% 60%));b
             <span class="pill live" id="a-pill">● Working</span>
           </div>
           <div class="units" id="a-units"><div class="fill" id="a-fill" style="width:0%"></div><div class="comet"></div></div>
-          <div class="ucount"><span id="a-count">0 of 340 files</span><span id="a-eta">estimating…</span></div>
+          <div class="ucount"><span id="a-count">0 of 340 files</span><span id="a-eta" class="dim">counting files, not guessing time</span></div>
         </div>
       </div>
       <div id="a-refusal"></div>
@@ -338,7 +338,7 @@ button.go{background:linear-gradient(180deg,hsl(239 84% 67%),hsl(239 84% 60%));b
     document.getElementById('a-glyph').textContent='✓';
     document.getElementById('a-units').className='units done';
     document.getElementById('a-sub').textContent='All 340 files added · 1 pause, recovered automatically';
-    document.getElementById('a-eta').textContent='done';
+    document.getElementById('a-eta').textContent='all files accounted for';
     setPill(document.getElementById('a-pill'),'ok','✓ Added');
     setPill(document.getElementById('b-pill'),'ok','✓ Added');
     setPill(document.getElementById('c-pill'),'ok','✓ Added');
@@ -350,7 +350,6 @@ button.go{background:linear-gradient(180deg,hsl(239 84% 67%),hsl(239 84% 60%));b
       done+=4;
       if(state==='running' && done>=218 && done<226){done=218;clearInterval(timer);paint();toPaused();return;}
       if(done>=TOTAL){done=TOTAL;clearInterval(timer);paint();finish();return;}
-      document.getElementById('a-eta').textContent='about '+Math.max(1,Math.round((TOTAL-done)/26))+' min left';
       paint();
     },90);
   }
@@ -375,7 +374,7 @@ button.go{background:linear-gradient(180deg,hsl(239 84% 67%),hsl(239 84% 60%));b
     document.getElementById('a-glyph').textContent='◍';
     document.getElementById('a-units').className='units';
     document.getElementById('a-sub').textContent='Embedding with OpenAI · text-embedding-3-small';
-    document.getElementById('a-eta').textContent='estimating…';
+    document.getElementById('a-eta').textContent='counting files, not guessing time';
     setPill(document.getElementById('a-pill'),'live','● Working');
     setPill(document.getElementById('b-pill'),'live','● Working');
     setPill(document.getElementById('c-pill'),'live','● Working');

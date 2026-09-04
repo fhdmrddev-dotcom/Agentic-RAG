@@ -1,7 +1,7 @@
 # Sketch 227 — The paused queue and its refusal
 
 **Phase:** 230 (The Durable Ingestion Queue) · **Requirement:** `QUEUE-05` / SC#3
-**Date:** 2026-09-05 · **Status:** awaiting operator decision · **Winner:** _not yet locked_
+**Date:** 2026-09-05 · **Status:** ✅ LOCKED · **Winner: B — the batch lane** (operator, 2026-09-05)
 **Closes:** `BUG-260815-05` (a 429 surfacing as *"your documents returned nothing"*)
 
 Open `index.html` (served over http — `file://` is blocked in the driven browser) and press
@@ -24,8 +24,53 @@ as an in-sketch toggle** so we can feel exactly what the motion buys. Every vari
 | | Variant | The idea | Cost |
 |---|---|---|---|
 | **A** | **The provider orb** | The provider is a physical object: a 3D-lit sphere that breathes while embedding, **holds its breath** (amber, slower, slightly contracted) when rate-limited, and settles green when done. The refusal grows out of it. | One more thing on screen; the orb must never imply a percentage it doesn't know. |
-| **B** | **The batch lane** | Every ~10 files is a bar. You watch the wave move and see **exactly where it stopped** — the held amber column is the file the provider refused. | Reads as a chart; at 3,000 files the bars stop being individually meaningful. |
+| **B** ⭐ **WINNER** | **The batch lane** | Every ~10 files is a bar. You watch the wave move and see **exactly where it stopped** — the held amber column is the file the provider refused. | Reads as a chart; at 3,000 files the bars stop being individually meaningful. |
 | **C** | **The quiet strip** | The calm anchor: one line while working, and the refusal is the only thing that ever raises its voice. | Honest but, at rest, it is a spinner with a number — the thing the operator called static. |
+
+## ⭐ LOCKED: variant B, with two corrections and one open decision
+
+**Operator picked B (the batch lane), 2026-09-05**, after asking the right question — *does this
+contradict what we already built for the Library and document ingestion?* It does not, but the audit
+that answered it produced two binding corrections.
+
+### ✅ It has a home that ALREADY EXISTS — this is not a new surface
+
+**Library → Ingestion tab → `In progress` sub-tab.** Measured at `LibraryPage.tsx:690-694` and
+`IngestionTab.tsx:128-131`, the shipped structure is:
+
+| Tab / sub-tab | Holds today |
+|---|---|
+| Ingestion › **Add files** | the `DocumentUpload` hero dropzone |
+| Ingestion › **In progress** | docs at `pending` / `processing`, showing `ingestion_step` (`:109`) |
+| Ingestion › **Needs attention** | docs at `failed` (`:118`) |
+| Ingestion › **History** | `completed` + `failed` (`:116`) |
+| **Indexing** (separate tab) | embedding model + `ReembedStatusCard` — ⛔ **not this phase's concern** |
+
+B's lane goes **above the rows already in `In progress`**. It re-visualises a list that exists; it
+does not add a surface. The refusal banner sits at the top of that sub-tab.
+
+### ⛔ CORRECTION 1 — the ETA is CUT (it violated a shipped decision)
+
+The first draft of this sketch showed *"about 7 min left."* That contradicts **D-217-19**, written into
+`DocumentUpload.tsx`:
+
+> *"⛔ NO PERCENTAGE AND NO ETA — MEASURED, not preferred: `uploadDocument` is a plain `fetch` with
+> `FormData` and there is no `onUploadProgress` … so bytes-sent is not observable and any percentage
+> would be invented."*
+
+**Removed from the sketch.** ⭐ **But the distinction that survives is the load-bearing part:**
+
+- **Upload** = bytes over the wire → **not observable** → no percentage, no ETA. D-217-19 stands untouched.
+- **The ingestion QUEUE** = discrete `ingestion_jobs` rows, each `pending`/`processing`/`completed`
+  → **countable**. *"218 of 340 files"* is a real count of real rows, not an extrapolation.
+
+So a determinate bar over **files** is honest; a **time estimate** is not. Same rule, correctly scoped.
+
+### ❓ OPEN DECISION — does a paused batch show in `In progress` or `Needs attention`?
+
+Genuinely undecided and it must not be picked silently by the plan. The work is **not failed** (it
+resumes itself), so **`In progress`** is the reviewer's recommendation — *"Needs attention"* implies you
+must act, and the refusal's own closing line is **"nothing for you to do."** Decide at `230-05`.
 
 ## Honesty rules the surface is built on
 
