@@ -621,6 +621,18 @@ rest is serialized by real dependencies: gate → defects → Ingestion shape �
 > records for LIB-05..07). Add them when the Connected Knowledge milestone is defined: a requirement
 > that exists only in a roadmap heading is invisible to every coverage check.
 >
+> ⭐ **OPERATOR REFINEMENT, 2026-09-04 (recorded at the close intake so the next milestone inherits
+> it):** the ingestion door has TWO modes and they have different risk profiles.
+>
+> 1. **Manual pick — ALREADY SHIPPED.** *"I can search the file, open the connector, search the
+> file"*: Phase 216's ATTACH-01 is exactly this, and it is live. A human choosing one file needs
+> none of `SEED-209..212`.
+> 2. **Rule-based folder watch — THIS PHASE.** *"based on a trigger and a specific folder that will
+> be ingested according to some rules"*: this is SC#1 + SC#2 below, and it is the half that fires
+> the security trigger. The RULES part (which folder, which types, what to do with an update) is
+> also where `SEED-243`'s classification-rules surface meets this phase — the two should be
+> designed together rather than growing two rule engines.
+>
 > ⭐ **Phase 216's ATTACH-01 stays shipped and is deliberately unaffected** — a human picking ONE
 > file dodges every one of those problems: no ACL mirroring, no deletion propagation, no sync loop.
 > That is why `SEED-213` was kept in v3.9 while its four siblings were deferred.

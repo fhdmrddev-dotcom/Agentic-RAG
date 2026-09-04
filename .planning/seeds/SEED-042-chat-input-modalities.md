@@ -67,3 +67,36 @@ Present during `/gsd:new-milestone` when the milestone scope matches:
 - **Hard line vs SEED-037:** SEED-037 is panel-side *viewing/downloading* of files the agent generated. SEED-042 is *user → agent* upload of files the user supplies. Same panel neighborhood, opposite data flow.
 - The CLAUDE.md "manual file upload only — no connectors" rule is about *automated/connector ingestion pipelines*; a manual chat-attach is still manual, but it does expand the input surface beyond the KB, so treat it as an explicit milestone decision (capture in DECISIONS.md when planned).
 - First cut for STT can be fully client-side (browser Web Speech API) — zero backend cost — before considering a provider STT call. Mention at surface time so it isn't over-scoped.
+
+
+## ⭐ REFINED BY THE OPERATOR AT THE v3.9 CLOSE INTAKE — 2026-09-04
+
+Verbatim: *"we have this upload template button in the workspace, I don't know what this does, but I
+think that we should add something to add a file to a chat that is stored somewhere — maybe in the
+workspace, you decide best location — but also it will be injected into that specific thread. And we
+can manage the context somehow."*
+
+**This is THIS seed, and it is still unbuilt.** Three things the refinement adds:
+
+1. **The file has a HOME, not just a lifetime.** The original seed framed the attach as *ephemeral*
+   (a file that does not land in the knowledge base). The operator wants it *stored* — the workspace
+   panel is the natural candidate, since that is already where a thread's files live — while still
+   not becoming a Library document. So the axis is **scope (thread) vs indexing (KB)**, not
+   permanence.
+2. **"Injected into that specific thread"** — the file participates in the thread's context by
+   construction, without a retrieval hop. That is a context-window decision, not a storage one.
+3. **"Manage the context somehow"** — the honest half. A thread-scoped file competes with history
+   and retrieved chunks for the same window, so this needs a stated rule (pin / drop / summarise)
+   and a visible one, or it silently degrades long threads.
+
+## ⚠ The "Upload template" button is a DIFFERENT thing, and the confusion is itself a finding
+
+Measured at HEAD: `frontend/src/components/panel/TemplateUpload.tsx:73` and
+`frontend/src/components/workflows/library/RunModal.tsx:513`. It uploads a **template document to be
+FILLED** — the Phase 101 trusted-path `docxtpl` render flow (a .docx/.xlsx with placeholders the run
+populates). It is not a general "attach a file to this chat" affordance.
+
+⭐ **That the operator — who commissioned that feature — could not tell what the button does is the
+strongest evidence in this seed.** Two different file doors sit in the same panel: one that fills a
+template, one that does not exist yet. Whoever builds the attach must name both so the pair reads as
+a choice rather than a puzzle.
