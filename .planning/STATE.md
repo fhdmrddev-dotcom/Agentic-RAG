@@ -215,8 +215,17 @@ Backend suites: **255 passed, 0 failed** across oauth / connector / mcp / invite
 
 ⚠ **The guard covers the RESOLVER, not its call sites.** A fifth site reading `settings.frontend_url`
 raw is invisible to it — that is `BUG-260904-04`'s re-open trigger.
-⚠ **Notion is still UNCONFIRMED.** This bug guaranteed a broken-looking Notion connect, but whether the
-exchange ALSO fails earlier (RFC 7591 dynamic registration) is **undriven**. Retry Notion first.
+✅ **NOTION CONNECTED AFTER THE HOTFIX** — `mcp.notion.com · OAuth connected · ✓ Ready`, Popular strip
+*"1 connection / Manage"*. ⭐ **This is the strongest confirmation available, not just one more green
+row:** Notion is the **RFC 7591 dynamic-registration** service, so it exercises
+`/connectors/mcp/oauth/callback` — the branch curl could only prove in its *error* arm. **This project
+had been unable to connect Notion since Phase 212** (403 `restricted_resource`), through 215's OAuth and
+222's four-server drive. Three services now hold live credentials on cloud: Google Workspace, Slack,
+Notion (plus Gmail-test SMTP).
+
+⚠ **Still undriven, for every service: a first outbound CALL on cloud.** The connections exist, hold
+credentials and report Ready — that is all they prove. This milestone twice shipped a phase whose
+feature was absent while every gate was green, so **"connected" is not "works"**.
 
 
 ## Deferred Items
