@@ -85,6 +85,15 @@ def test_owning_modules_publish_their_canonical_code_sets():
             "no_terminal",
             "orphan_phase",
             "unsatisfiable_skip",
+            # Phase 214 (STEP-03 / D-214-09) — the five ARGUMENT-GAP codes. They are minted by
+            # `args.unsatisfiable_arguments` and emitted as `LintError(gap.kind, ...)`, so the
+            # literal-only emit-site scanner below cannot see them; the drift detector covers
+            # them through `ARGUMENT_GAP_CODES` instead. Both routes, one union.
+            "no_source",
+            "ask_undeclared",
+            "upstream_unreachable",
+            "shape_unknown",
+            "unrenderable",
         }
     )
     assert grounding.GROUNDING_VERDICT_CODES == frozenset(
@@ -203,8 +212,24 @@ def test_every_known_code_classifies_exactly_as_the_pinned_table():
         # ... and an empty draft does not change the answer — there is no phase to accuse,
         # so the code cannot even be emitted, but the classifier must still be total.
         ("unbound_retrieval", True, "incomplete"),
+        # Phase 214 (STEP-03) — the five ARGUMENT-GAP codes are BREAKS, never "still building".
+        # The author has already bound an action and the workflow cannot perform it; the soft
+        # grey would say "keep going" and then hard-block the publish, which is the WR-05
+        # posture inverted. Written as literals here for the same reason every other row is:
+        # each is a product decision, and deriving them would only assert self-agreement.
+        ("no_source", False, "error"),
+        ("ask_undeclared", False, "error"),
+        ("upstream_unreachable", False, "error"),
+        ("shape_unknown", False, "error"),
+        ("unrenderable", False, "error"),
+        # ... and an empty draft does not soften them either: with no phases there is no step
+        # to accuse, so the code cannot be emitted — but the classifier must still be total.
+        ("no_source", True, "error"),
     ]
-    assert len(table) == 13, "11 codes + the second no_terminal and unbound_retrieval conditions"
+    assert len(table) == 19, (
+        "11 codes + the second no_terminal and unbound_retrieval conditions, + Phase 214's "
+        "five argument-gap codes and the second no_source condition"
+    )
 
     for code, phases_empty, expected in table:
         assert workflows._severity(code, phases_empty=phases_empty) == expected, (
@@ -238,7 +263,61 @@ def test_lint_codes_match_the_reachability_emit_sites():
         "the LintError emit-site scanner matched NOTHING — the scanner is broken (or the "
         "emit sites were reshaped), so this drift detector would pass vacuously"
     )
-    assert scanned == set(reachability.LINT_CODES), (
+
+    # ⚠ MEASURED 2026-08-28 (Phase 214, plan 214-05) — THIS SCANNER HAS A STRUCTURAL BLIND
+    # SPOT, AND IT WAS FOUND BY THE CHANGE THAT WALKED INTO IT RATHER THAN BY A REVIEW.
+    #
+    # `_LINT_EMIT_RE` requires the code to be a STRING LITERAL in the `LintError(` call. It
+    # therefore cannot see a code minted from an EXPRESSION. STEP-03's five argument-gap
+    # codes are emitted as `LintError(gap.kind, ...)` — the kind comes from
+    # `args.unsatisfiable_arguments`, deliberately, because re-typing the five literals here
+    # would be the second copy D-214-00 exists to prevent. Verbatim, on the commit that added
+    # those emit sites and BEFORE this block existed:
+    #
+    #     literal LintError emit sites scanned:
+    #       ['bad_index', 'input_unsatisfied', 'no_terminal', 'orphan_phase',
+    #        'unsatisfiable_skip']
+    #
+    # — five, while `lint_workflow` could really emit ten. The detector was GREEN. PATTERNS.md
+    # calls this pairing "MECHANICAL, RED-DRIVEN"; it was neither, for that class of code.
+    #
+    # THE FIX IS NOT TO WEAKEN THE EQUALITY, IT IS TO MAKE THE SET OF EMIT ROUTES TOTAL. There
+    # are exactly two: literal call sites (scanned above) and the closed vocabulary the
+    # argument predicate mints (`ARGUMENT_GAP_CODES`). Their union must equal `LINT_CODES`
+    # EXACTLY — so a sixth code added by EITHER route, and published in neither, still fails
+    # here. Both halves are asserted non-empty so neither can absorb the other vacuously.
+    minted = set(reachability.ARGUMENT_GAP_CODES)
+    assert minted, (
+        "reachability.ARGUMENT_GAP_CODES is EMPTY — the non-literal emit route would then be "
+        "invisible again and the union below would collapse back to the literal scan"
+    )
+    assert scanned.isdisjoint(minted), (
+        "an argument-gap code is ALSO emitted from a literal call site — one of the two "
+        f"routes must own it: {sorted(scanned & minted)}"
+    )
+    assert (scanned | minted) == set(reachability.LINT_CODES), (
+        "DRIFT: a lint_workflow code was added or removed without updating "
+        f"reachability.LINT_CODES. Symmetric difference: "
+        f"{sorted((scanned | minted).symmetric_difference(set(reachability.LINT_CODES)))}. "
+        "The two emit ROUTES are literal `LintError(\"code\", ...)` call sites and the closed "
+        "`ARGUMENT_GAP_CODES` vocabulary minted from `args.unsatisfiable_arguments`; their "
+        "union is what `lint_workflow` can really emit."
+    )
+
+    # ⭐ AND THE MINTED HALF IS NOT A LITERAL LIST EITHER — it must equal the PREDICATE's own
+    # `ArgumentGapKind` members, so `reachability` cannot quietly publish a kind the predicate
+    # does not produce (nor miss one it does). This is the one place the two languages of the
+    # same fact are compared inside the backend.
+    from typing import get_args
+
+    from app.services.connectors.args import ArgumentGapKind
+
+    assert minted == set(get_args(ArgumentGapKind)), (
+        "reachability.ARGUMENT_GAP_CODES has drifted from args.ArgumentGapKind: "
+        f"{sorted(minted.symmetric_difference(set(get_args(ArgumentGapKind))))}"
+    )
+
+    assert scanned <= set(reachability.LINT_CODES), (
         "DRIFT: a lint_workflow code was added or removed without updating "
         f"reachability.LINT_CODES. Symmetric difference: "
         f"{sorted(scanned.symmetric_difference(set(reachability.LINT_CODES)))}. "
@@ -378,6 +457,15 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
         "unregistered_tool",
         "unregistered_skill",
         "grounding_unavailable",
+        # Phase 214 (STEP-03) — the five argument-gap codes join this DERIVED set by
+        # construction: widening `LINT_CODES` without touching `_INCOMPLETE_CODES` drops them
+        # here, which is the required classification. Listed so the taxonomy decision is
+        # written out by hand rather than inferred from a subtraction.
+        "no_source",
+        "ask_undeclared",
+        "upstream_unreachable",
+        "shape_unknown",
+        "unrenderable",
     }
 
 

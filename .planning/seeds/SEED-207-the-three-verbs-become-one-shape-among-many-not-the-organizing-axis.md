@@ -2,8 +2,9 @@
 seed_id: SEED-207
 title: "The three fixed actions (send_email / create_ticket / post_message) must stop being the ORGANIZING AXIS — every connection should present its own available tools instead. ⚠ But they must NOT be deleted: they are the only external path that works with no MCP server."
 created: 2026-08-26
-planted_during: conversation with the operator, 2026-08-26, while Gemini executed Phase 209
-status: planted
+status: answered
+answered_by: "Phase 211"
+answered_on: "2026-08-27"
 priority: high
 surface: Agentic-RAG
 relates_to:

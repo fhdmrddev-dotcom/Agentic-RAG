@@ -19,13 +19,14 @@ import logging
 from typing import Any
 
 import httpx
-
-from app.security.egress import validate_mcp_destination
+from starlette.concurrency import run_in_threadpool
+from app.security.egress import validate_mcp_destination, PinnedDestination, EgressRefused
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MCP_TIMEOUT = 30.0
 DEFAULT_DISCOVERY_TIMEOUT = 15.0
+MAX_MCP_BODY_BYTES = 2 * 1024 * 1024  # 2MB response limit
 
 #: Sent in the ``initialize`` handshake. A server may negotiate DOWN from this; it is a
 #: statement of what we speak, not a demand.
@@ -55,8 +56,29 @@ class McpClient:
         self.timeout = timeout
 
     @staticmethod
-    def _build_auth_headers(secret: str | None) -> dict[str, str]:
-        """Format authentication header based on credential shape."""
+    def _build_auth_headers(secret: str | None, auth_scheme: str = "auto") -> dict[str, str]:
+        """Format the authorization header for a stored credential.
+
+        ⚠ `auth_scheme` EXISTS BECAUSE THE GUESS BELOW SILENTLY BROKE A VALID TOKEN, and the
+        failure is worth recording because it looked like a credential problem and was not.
+
+        The `":" in secret` arm treats any colon-bearing string as a `user:token` Basic pair —
+        right for a Jira `email:api_token`, and WRONG for an OAuth access token that merely
+        happens to contain a colon. Notion's does. Measured live 2026-09-01: a freshly minted,
+        entirely valid Notion OAuth token was base64'd into `Basic …`, and the server answered
+        `401 invalid_token`. Driving the SAME token with an explicit `Bearer` header returned
+        **HTTP 200**, so the credential was never the problem — the inference about it was.
+
+        ⚠ THE DIAGNOSIS IT INVITES IS THE EXPENSIVE PART. `invalid_token` reads as *"your
+        credential is wrong"*, which sends somebody to re-authorize, re-consent, or hunt for a
+        scope — and every one of those would have produced another token containing a colon
+        and failed identically. A heuristic that is wrong 5% of the time costs more than one
+        that is absent, because it answers confidently.
+
+        So a caller that KNOWS the scheme now says so. `auto` keeps the historical behaviour
+        byte-for-byte, because the pasted-credential path genuinely cannot know and its
+        existing rows depend on the guess.
+        """
         headers: dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
@@ -68,6 +90,19 @@ class McpClient:
         if not clean_secret:
             return headers
 
+        # An explicit scheme wins outright — no inspection of the value at all. This is the
+        # OAuth path (`token_type` came from the authorization server, so it is KNOWN).
+        if auth_scheme == "bearer":
+            headers["Authorization"] = f"Bearer {clean_secret}"
+            return headers
+        if auth_scheme == "basic":
+            encoded = base64.b64encode(clean_secret.encode("utf-8")).decode("ascii")
+            headers["Authorization"] = f"Basic {encoded}"
+            return headers
+
+        # `auto` — unchanged, and deliberately so: every shipped `static_key` row was stored
+        # against exactly these rules, so tightening them here would break connections that
+        # work today in order to fix a path that now declares itself instead.
         if clean_secret.lower().startswith("bearer "):
             headers["Authorization"] = clean_secret
         elif clean_secret.lower().startswith("basic "):
@@ -82,33 +117,12 @@ class McpClient:
         return headers
 
     @staticmethod
-    def _parse_body(response: httpx.Response) -> dict[str, Any] | None:
-        """Decode a JSON-RPC body from EITHER transport the MCP spec defines.
-
-        WARNING - THIS IS THE FIX FOR THE ONE DEFECT A GREEN UNIT SUITE COULD NOT SEE. The
-        first version called ``response.json()`` and nothing else, which works against a
-        fixture and fails against a real server: MCP's *Streamable HTTP* transport answers a
-        POST with ``Content-Type: text/event-stream`` and frames the JSON-RPC body inside SSE
-        ``data:`` lines. Measured 2026-08-25 against the public ``https://mcp.deepwiki.com/mcp``,
-        the server replied correctly and the client raised
-        ``McpProtocolError: Invalid JSON response ... event: message / data: {...}``.
-
-        The irony is load-bearing, and is why this belongs in the client rather than in a
-        caller: ``_build_auth_headers`` ALREADY sends ``Accept: application/json,
-        text/event-stream``, so the client was advertising a transport it could not read.
-        Atlassian's and GitHub's official servers - the two this phase exists to reach - both
-        use it, so every target was unreachable while twelve unit tests passed.
-
-        Returns ``None`` for a body-less acknowledgement (a notification answered ``202``),
-        which is a legitimate response and not an error.
-        """
-        content_type = (response.headers.get("content-type") or "").lower()
-        text = response.text
+    def _parse_body_from_bytes(headers: httpx.Headers, body_bytes: bytes) -> dict[str, Any] | None:
+        """Decode a JSON-RPC body from bytes and response headers."""
+        content_type = (headers.get("content-type") or "").lower()
+        text = body_bytes.decode("utf-8", errors="replace")
 
         if "text/event-stream" in content_type:
-            # An SSE stream may carry several frames; the JSON-RPC reply is the first `data:`
-            # payload that parses as an object. `event:` / `id:` / comment lines are skipped
-            # rather than concatenated blindly.
             for line in text.splitlines():
                 if not line.startswith("data:"):
                     continue
@@ -136,21 +150,53 @@ class McpClient:
             ) from exc
         return parsed if isinstance(parsed, dict) else {"value": parsed}
 
+    @classmethod
+    def _parse_body(cls, response: httpx.Response) -> dict[str, Any] | None:
+        """Decode a JSON-RPC body from EITHER transport the MCP spec defines."""
+        return cls._parse_body_from_bytes(response.headers, response.content)
+
     async def _post(
         self,
         client: httpx.AsyncClient,
         server_url: str,
         headers: dict[str, str],
         payload: dict[str, Any],
+        server_hostname: str | None = None,
     ) -> dict[str, Any] | None:
-        """One POST, with transport errors and HTTP status handled in one place."""
+        """One POST, with transport errors, bounded decoding, and HTTP status handled in one place."""
+        # ⚠ SNI IS TLS-LAYER AND THE `Host:` HEADER IS NOT A SUBSTITUTE FOR IT. `_send_jsonrpc`
+        # rewrites the URL to the pinned IP literal (the DNS-rebinding TOCTOU fix), which points
+        # certificate HOSTNAME verification at an address no certificate carries. `Host:` is sent
+        # AFTER the handshake and cannot help — the TLS `ClientHello` has already gone out.
+        # `egress.py:53,660-663` states the same rule for the sibling path and measures the
+        # httpcore extension as present in this venv (httpx 0.28.1).
+        # Driven 2026-08-27 against `https://mcp.deepwiki.com/mcp`, pinned to its real IP:
+        #   without this line -> ConnectError [SSL: CERTIFICATE_VERIFY_FAILED] IP address mismatch
+        #   with it           -> HTTP 200 and the real tools/list result
+        # `server_hostname` was already threaded here from `_send_jsonrpc` and then went UNUSED,
+        # so the plumbing existed and only the last step was missing.
         try:
-            response = await client.post(server_url, json=payload, headers=headers)
+            response = await client.post(
+                server_url,
+                json=payload,
+                headers=headers,
+                extensions={"sni_hostname": server_hostname} if server_hostname else {},
+            )
         except httpx.RequestError as exc:
             logger.warning("mcp_client: request to %r failed: %s", server_url, exc)
             raise McpClientError(
                 f"Failed to communicate with MCP server at {server_url}: {exc}"
             ) from exc
+
+        if 300 <= response.status_code < 400:
+            raise McpClientError(
+                f"MCP server at {server_url} returned redirect {response.status_code} (redirects forbidden by egress security policy)"
+            )
+
+        if len(response.content) > MAX_MCP_BODY_BYTES:
+            raise McpClientError(
+                f"Response from MCP server at {server_url} exceeded byte cap ({MAX_MCP_BODY_BYTES} bytes)"
+            )
 
         if response.status_code >= 400:
             logger.warning(
@@ -161,8 +207,6 @@ class McpClient:
                 f"MCP server responded with HTTP {response.status_code}: {response.text[:200]}"
             )
 
-        # The session id is issued on the `initialize` response and MUST be echoed on every
-        # later request of that session. Captured here so no caller has to know it exists.
         session_id = response.headers.get("mcp-session-id")
         if session_id:
             headers["Mcp-Session-Id"] = session_id
@@ -174,15 +218,9 @@ class McpClient:
         client: httpx.AsyncClient,
         server_url: str,
         headers: dict[str, str],
+        server_hostname: str | None = None,
     ) -> None:
-        """Run the ``initialize`` -> ``notifications/initialized`` exchange the spec requires.
-
-        A server is entitled to refuse every other method until this has run, which is why it
-        is not optional. It is deliberately TOLERANT of a server that does not implement it
-        (some minimal servers answer `tools/list` cold): a failure here is logged and the real
-        call is still attempted, so a stricter handshake can never make a previously-working
-        server unreachable.
-        """
+        """Run the ``initialize`` -> ``notifications/initialized`` exchange the spec requires."""
         try:
             await self._post(client, server_url, headers, {
                 "jsonrpc": "2.0",
@@ -193,7 +231,7 @@ class McpClient:
                     "capabilities": {},
                     "clientInfo": {"name": MCP_CLIENT_NAME, "version": MCP_CLIENT_VERSION},
                 },
-            })
+            }, server_hostname=server_hostname)
         except McpClientError as exc:
             logger.info("mcp_client: initialize refused by %r (%s) - continuing", server_url, exc)
             return
@@ -203,7 +241,7 @@ class McpClient:
                 "jsonrpc": "2.0",
                 "method": "notifications/initialized",
                 "params": {},
-            })
+            }, server_hostname=server_hostname)
         except McpClientError as exc:
             logger.info("mcp_client: initialized notification refused by %r (%s)", server_url, exc)
 
@@ -214,12 +252,22 @@ class McpClient:
         params: dict[str, Any] | None = None,
         secret: str | None = None,
         timeout: float | None = None,
+        auth_scheme: str = "auto",
     ) -> dict[str, Any]:
         """Validate destination against SSRF and execute a JSON-RPC 2.0 call."""
-        # SSRF Guard (D-206-04 / T-206-01)
-        validate_mcp_destination(server_url)
+        # SSRF Guard (D-206-04 / T-206-01 / D-v2.5-01 / SEC-2)
+        # 1. Validation runs off the asyncio event loop via threadpool
+        pinned: PinnedDestination | None = await run_in_threadpool(validate_mcp_destination, server_url)
 
-        headers = self._build_auth_headers(secret)
+        # 2. TOCTOU DNS-rebinding fix: rewrite URL host to pinned IP literal
+        parsed_target = httpx.URL(server_url)
+        target_url = str(parsed_target.copy_with(host=pinned.ip)) if pinned and getattr(pinned, "ip", None) else server_url
+        server_hostname = getattr(pinned, "hostname", None) or parsed_target.host
+
+        headers = self._build_auth_headers(secret, auth_scheme)
+        if server_hostname:
+            headers["Host"] = server_hostname
+
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -228,11 +276,17 @@ class McpClient:
         }
 
         call_timeout = timeout or self.timeout
-        # ONE client for the whole exchange: the handshake, the session id it returns and the
-        # real call have to share a connection and a header dict, or the session is meaningless.
-        async with httpx.AsyncClient(timeout=call_timeout, follow_redirects=True) as client:
-            await self._handshake(client, server_url, headers)
-            body = await self._post(client, server_url, headers, payload)
+        # ONE client for the whole exchange: handshake, session id, and call share transport.
+        # trust_env=False is a SECURITY property (SEC-2 / D-07) preventing proxy bypass.
+        # follow_redirects=False flatly prevents redirect-chasing SSRF.
+        async with httpx.AsyncClient(
+            timeout=call_timeout,
+            follow_redirects=False,
+            verify=True,
+            trust_env=False,
+        ) as client:
+            await self._handshake(client, target_url, headers, server_hostname=server_hostname)
+            body = await self._post(client, target_url, headers, payload, server_hostname=server_hostname)
 
         if body is None:
             raise McpProtocolError(None, "MCP server returned an empty body for a request")
@@ -259,11 +313,17 @@ class McpClient:
         server_url: str,
         secret: str | None = None,
         timeout: float = DEFAULT_DISCOVERY_TIMEOUT,
+        auth_scheme: str = "auto",
     ) -> list[dict[str, Any]]:
         """Query remote MCP server for available tools via tools/list.
 
         Returns a list of tool specifications:
           [{"name": "...", "description": "...", "inputSchema": {...}}, ...]
+
+        Three further keys are forwarded ONLY when the server sent a usable value, so their
+        absence stays meaningful: ``title`` (a stripped, non-empty string), ``outputSchema``
+        (an object) and ``annotations`` (an object). The emitted key set is an ALLOW-LIST —
+        see the comment above the dict literal below before adding to it.
         """
         result = await self._send_jsonrpc(
             server_url,
@@ -271,6 +331,7 @@ class McpClient:
             params={},
             secret=secret,
             timeout=timeout,
+            auth_scheme=auth_scheme,
         )
 
         raw_tools = result.get("tools") or []
@@ -289,10 +350,38 @@ class McpClient:
             if not isinstance(input_schema, dict):
                 input_schema = {"type": "object", "properties": {}}
 
+            # Phase 211 (D-211-09) — `title`, coerced with the same discipline `name` and
+            # `description` already receive rather than read bare off the item. An absent,
+            # blank or non-string title contributes NO KEY AT ALL: absence is meaningful
+            # here exactly as it is for `annotations`, and a fabricated `""` would claim the
+            # server named this tool when it said nothing, costing the reader its fallback
+            # to `name`.
+            raw_title = item.get("title")
+            title = str(raw_title).strip() if isinstance(raw_title, str) else ""
+
+            # Phase 211 (D-211-09) — `outputSchema`. Forwarded only when the server sent an
+            # object, and NEVER coerced to a default the way `inputSchema` is: the
+            # specification makes `inputSchema` mandatory and `outputSchema` optional, so an
+            # absent output schema is a fact about the server ("this tool makes no
+            # structural promise about its result") and inventing `{"type": "object"}` would
+            # make a promise on its behalf.
+            raw_output_schema = item.get("outputSchema")
+
+            # ⚠ WIDEN THE LIST, NEVER REMOVE IT (D-211-09). This object stays an explicit
+            # per-key dict literal, built key by key. It must not become a spread of `item`
+            # minus a set of unwanted names, and it must not become a comprehension over the
+            # server's keys: a list of what we refuse cannot be made fail-closed (the
+            # measured v3.6 finding), and the entire value of this function is that a key
+            # nobody named here cannot reach the `discovered_tools` jsonb column — and from
+            # there a client that will index into whatever it finds.
             sanitized_tools.append({
                 "name": name,
                 "description": description,
                 "inputSchema": input_schema,
+                **({"title": title} if title else {}),
+                **({
+                    "outputSchema": raw_output_schema
+                } if isinstance(raw_output_schema, dict) else {}),
                 # Phase 209 (SC#2 · D-209-02) — forward annotations so `readOnlyHint`
                 # reaches the frontend. The MCP spec places `readOnlyHint` inside the
                 # `annotations` object on a tool entry; dropping it here is what made the
@@ -311,6 +400,7 @@ class McpClient:
         arguments: dict[str, Any],
         secret: str | None = None,
         timeout: float = DEFAULT_MCP_TIMEOUT,
+        auth_scheme: str = "auto",
     ) -> dict[str, Any]:
         """Invoke a tool on the remote MCP server via tools/call.
 
@@ -327,6 +417,7 @@ class McpClient:
             params=params,
             secret=secret,
             timeout=timeout,
+            auth_scheme=auth_scheme,
         )
 
         # MCP spec returns content: list[TextContent | ImageContent | EmbeddedResource]
@@ -354,8 +445,27 @@ class McpClient:
 default_mcp_client = McpClient()
 
 
-async def list_tools(server_url: str, secret: str | None = None) -> list[dict[str, Any]]:
-    return await default_mcp_client.list_tools(server_url, secret=secret)
+async def list_tools(
+    server_url: str,
+    secret: str | None = None,
+    timeout: float = DEFAULT_DISCOVERY_TIMEOUT,
+    auth_scheme: str = "auto",
+) -> list[dict[str, Any]]:
+    """⚠ `timeout` is NOT optional decoration — `connectors.py:760` passes it by keyword.
+
+    It was missing here until 2026-08-27 and `POST /connectors/discover-tools` raised
+    `TypeError: list_tools() got an unexpected keyword argument 'timeout'` on EVERY call, so
+    that route had never once succeeded. `McpClient.list_tools` accepted `timeout` the whole
+    time; only this module-level wrapper dropped it.
+
+    ⚠ `test_212_discover_seam.py:88` did not catch it because it monkeypatches this function
+    away with `mock_list_tools(server_url, secret=None, timeout=None)` — a stub whose
+    signature INVENTED the parameter the real function lacked. A mock that does not match the
+    thing it replaces proves only that the caller is self-consistent.
+    """
+    return await default_mcp_client.list_tools(
+        server_url, secret=secret, timeout=timeout, auth_scheme=auth_scheme
+    )
 
 
 async def call_tool(
@@ -363,5 +473,8 @@ async def call_tool(
     tool_name: str,
     arguments: dict[str, Any],
     secret: str | None = None,
+    auth_scheme: str = "auto",
 ) -> dict[str, Any]:
-    return await default_mcp_client.call_tool(server_url, tool_name, arguments, secret=secret)
+    return await default_mcp_client.call_tool(
+        server_url, tool_name, arguments, secret=secret, auth_scheme=auth_scheme
+    )

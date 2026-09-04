@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 215 — publish refuses by name</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 46px; }
+
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 6px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brandline {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim);
+    margin-right: 10px; letter-spacing: .04em;
+  }
+  .variant-tab {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .variant-tab.active {
+    background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary);
+  }
+  .variant { display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .variant.active { display: block; }
+
+  .sheet { padding: 22px 26px 70px; max-width: 1180px; margin: 0 auto; }
+  .sheet > h2 { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 600; margin: 0 0 4px; }
+  .lede { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; max-width: 78ch; }
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin: 14px 0 0; max-width: 84ch; line-height: 1.6; }
+  .note b { color: var(--color-text-muted); font-weight: 600; }
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-muted);
+    border: 1px solid var(--color-border); border-radius: 4px; padding: 0 4px; color: var(--color-text-muted);
+  }
+
+  /* ── the refusal card ───────────────────────────────────────────────────────── */
+  .refusal {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-bg-elev1); overflow: hidden; box-shadow: var(--shadow-lg);
+    max-width: 720px;
+  }
+  .refusal-head {
+    padding: 16px 20px 14px; border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .refusal-title {
+    font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--color-text-dim); margin-bottom: 8px;
+  }
+  .refusal-count { font-size: var(--text-md); font-weight: 600; font-family: var(--font-headline); }
+  .refusal-rest { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 3px; }
+
+  .rlist { padding: 4px 0; }
+  .ritem {
+    display: flex; gap: 12px; align-items: flex-start; padding: 13px 20px;
+    border-top: 1px solid var(--color-border-soft);
+  }
+  .ritem:first-child { border-top: 0; }
+  .ritem .rmark {
+    flex: none; width: 20px; height: 20px; border-radius: var(--radius-full);
+    display: grid; place-items: center; font-size: 11px; margin-top: 1px;
+    background: var(--color-warning-dim); color: var(--color-warning);
+  }
+  .ritem .rbody { flex: 1; min-width: 0; }
+  /* ⭐ THE HEADLINE IS THE WHOLE REFUSAL. There is no second sentence. */
+  .rhead { font-size: var(--text-sm); line-height: 1.5; }
+  .rhead .qs { color: var(--color-text); font-weight: 600; }
+  .rhead .arg { font-family: var(--font-mono); font-size: 12px; }
+  .rgo {
+    font: inherit; font-size: 11px; margin-top: 7px; cursor: pointer;
+    background: transparent; border: 1px solid var(--color-primary); color: var(--color-primary);
+    border-radius: var(--radius-full); padding: 3px 11px;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .rgo:hover { background: var(--color-primary-dim); }
+  .rgo + .rgo { margin-left: 6px; }
+  /* ⚠ ON THE CANVAS THE WAY OUT IS THE NAME ITSELF — the author is already on the surface
+     that holds the step, so a separate "go to the step" would point at where they are. The
+     control is still a control: same role, same affordance, merged into the noun. */
+  .rgo-quiet {
+    border: 0; border-bottom: 1px dashed var(--color-primary); border-radius: 0;
+    padding: 0; margin: 0; font: inherit; color: inherit;
+  }
+  .rgo-quiet:hover { background: transparent; color: var(--color-primary); }
+
+  .refusal-foot {
+    padding: 11px 20px; border-top: 1px solid var(--color-border); background: var(--color-bg);
+    font-size: 10.5px; color: var(--color-text-dim); line-height: 1.5;
+  }
+
+  /* ── the shipped gauntlet spine ─────────────────────────────────────────────── */
+  .gauntlet { display: flex; flex-direction: column; gap: 0; }
+  .grow {
+    display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 10px;
+    align-items: center; padding: 7px 20px; font-size: 11.5px;
+  }
+  .grow .gpip {
+    width: 13px; height: 13px; border-radius: var(--radius-full); justify-self: center;
+    border: 1px solid var(--color-border); background: var(--color-muted);
+  }
+  .grow[data-state="passed"] .gpip { background: var(--color-success); border-color: var(--color-success); }
+  .grow[data-state="blocked"] .gpip {
+    background: var(--color-warning); border-color: var(--color-warning);
+    box-shadow: 0 0 0 3px var(--color-warning-dim);
+  }
+  .grow[data-state="not-reached"] .gpip { background: transparent; opacity: .45; }
+  .grow[data-state="not-reached"] { color: var(--color-text-dim); }
+  .grow .gname { font-weight: 500; }
+  .grow .gwhat { font-size: 10.5px; color: var(--color-text-dim); }
+  .grow .gstate { font-size: 10px; color: var(--color-text-dim); }
+  .grow[data-state="blocked"] .gstate { color: var(--color-warning); }
+  .grow[data-state="passed"] .gstate { color: var(--color-text-muted); }
+
+  /* ── canvas + inline refusal (variant B) ───────────────────────────────────── */
+  .builder {
+    display: grid; grid-template-columns: minmax(0,1fr) 400px; border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden; height: 560px; box-shadow: var(--shadow-lg);
+  }
+  .canvas {
+    position: relative; padding: 26px; overflow: hidden; background:
+      radial-gradient(circle at 1px 1px, hsl(220 20% 18%) 1px, transparent 0) 0 0/22px 22px, var(--color-bg);
+  }
+  .node {
+    width: 250px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); padding: 9px 11px; margin-bottom: 10px;
+    display: flex; gap: 9px; align-items: flex-start; position: relative;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .node.blocked {
+    border-color: var(--color-warning); box-shadow: 0 0 0 3px var(--color-warning-dim);
+  }
+  .node .well {
+    width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
+    background: var(--color-muted); display: grid; place-items: center;
+  }
+  .node .nname { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .node .nsub { font-size: 10.5px; color: var(--color-text-muted); margin-top: 1px; }
+  /* ⚠ THE CORNER MARK IS CLAIMED BY GOVERNANCE (D-185). A refusal mark goes on the EDGE,
+     never top-right — the seal's home is spoken for and two marks there is one too many. */
+  .node .nblock {
+    position: absolute; left: -1px; top: 8px; bottom: 8px; width: 2px;
+    background: var(--color-warning); border-radius: 2px;
+  }
+  .edge { width: 2px; height: 16px; background: var(--color-border); margin: 0 0 10px 24px; }
+
+  .panel {
+    border-left: 1px solid var(--color-border); background: var(--color-bg-elev1);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-head {
+    padding: 11px 13px; border-bottom: 1px solid var(--color-border);
+    font-size: 12.5px; font-weight: 600;
+  }
+  .panel-body { overflow-y: auto; padding: 14px 13px 30px; }
+
+  /* ── §3 the cuts ───────────────────────────────────────────────────────────── */
+  .cutgrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; max-width: 1000px; }
+  .cutcard {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg-elev1); padding: 14px 16px;
+  }
+  .cutcard.bad { border-color: hsl(0 40% 30%); }
+  .cutcard.good { border-color: hsl(142 30% 28%); }
+  .cutcard .tag {
+    font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .cutcard.bad .tag { color: hsl(0 60% 62%); }
+  .cutcard.good .tag { color: var(--color-success); }
+  .cutcard .demo {
+    font-size: var(--text-sm); line-height: 1.55; padding: 10px 12px;
+    background: var(--color-surface); border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+  }
+  .cutcard .demo .filler { color: hsl(0 55% 60%); text-decoration: line-through; }
+  .cutcard .demo .stagechip {
+    display: inline-block; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+    background: var(--color-muted); border-radius: var(--radius-full); padding: 1px 8px;
+    color: hsl(0 55% 60%); text-decoration: line-through;
+  }
+  .cutcard .why2 { font-size: 10.5px; color: var(--color-text-dim); margin-top: 10px; line-height: 1.55; }
+
+  #sketch-tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 7px 10px;
+    border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center;
+  }
+  #sketch-tools:hover { opacity: 1; }
+  #sketch-tools select, #sketch-tools button {
+    font: inherit; font-size: 11px; background: #1b1b1b; color: #fff;
+    border: 1px solid #444; border-radius: 5px; padding: 2px 6px; cursor: pointer;
+  }
+  .toast {
+    position: fixed; bottom: 60px; right: 14px; z-index: 9999;
+    background: var(--color-surface-hi); border: 1px solid var(--color-primary);
+    color: var(--color-text); font-size: 11.5px; padding: 8px 12px; border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(6px);
+    transition: all var(--dur-base) var(--ease-out); pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brandline">SKETCH 215 · publish refuses by name</span>
+  <button class="variant-tab active" data-v="a">A · the considered review</button>
+  <button class="variant-tab" data-v="b">B · refused on the canvas</button>
+  <button class="variant-tab" data-v="cuts">§3 what a refusal must not say</button>
+  <button class="variant-tab" data-v="kinds">§4 all five refusals</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     VARIANT A — Stitch's `06`, with the filler line and the stage chip CUT.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-a" class="variant active">
+<div class="sheet">
+  <h2 data-anno>A · The considered review — every step checked, the offenders named</h2>
+  <p class="lede" data-anno>
+    Stitch's <span class="kbd">06</span> was the strong drawing and its headline was nearly
+    shippable. Two things are cut: the corporate second line, and the stage-name chip. What is
+    left is <b>one sentence per offending step</b> and <b>one way out</b>.
+  </p>
+
+  <div class="refusal">
+    <div class="refusal-head">
+      <div class="refusal-title">Not published</div>
+      <div class="refusal-count">2 steps cannot run as written.</div>
+      <div class="refusal-rest">The other 4 are ready.</div>
+    </div>
+
+    <div class="rlist">
+      <div class="ritem" data-kind="no-source">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">Nothing supplies “<span class="arg">to</span>” in “<span class="qs">Email the weekly summary</span>”.</div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+      <div class="ritem" data-kind="ask-undeclared">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">“<span class="qs">File the escalation</span>” asks for “<span class="arg">summary</span>” when it runs, but nothing asks for it.</div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⚠ THE STAGE ROWS STAY, AND THEY STAY *BELOW* THE CAUSE. The shipped gauntlet is
+         honest and D-214-13 does not touch it. What BUG-260815-06 objects to is a stage
+         name standing IN PLACE OF a cause — not a spine saying where the run stopped. -->
+    <div class="gauntlet">
+      <div class="grow" data-state="passed">
+        <span class="gpip"></span>
+        <span><span class="gname">Goal</span> <span class="gwhat">· exactly one business requirement</span></span>
+        <span class="gstate">Checked</span>
+      </div>
+      <div class="grow" data-state="blocked">
+        <span class="gpip"></span>
+        <span><span class="gname">Structure</span> <span class="gwhat">· Reachable · terminal · inputs satisfied · no orphans</span></span>
+        <span class="gstate">Stopped here</span>
+      </div>
+      <div class="grow" data-state="not-reached">
+        <span class="gpip"></span>
+        <span><span class="gname">Grounding</span> <span class="gwhat">· folders, tools and skills resolve</span></span>
+        <span class="gstate">Not reached</span>
+      </div>
+      <div class="grow" data-state="not-reached">
+        <span class="gpip"></span>
+        <span><span class="gname">Golden run</span> <span class="gwhat">· a real harness run against the project KB</span></span>
+        <span class="gstate">Not reached</span>
+      </div>
+    </div>
+
+    <div class="refusal-foot">
+      Published workflows keep running — this check applies the next time one is published.
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    <b>Why the gate sits at</b> <span class="kbd">Structure</span>. D-214-10 puts it in the
+    pre-golden-run lint, which short-circuits before anything runs
+    (<span class="kbd">publish_service.py:175</span>) — so a refusal costs no model call and no
+    wall-clock. <span class="kbd">reachability.py:67</span> already does this shape of check
+    against <span class="kbd">_KNOWN_RUN_INPUT_KEYS</span>; ⚠ <b>that allowlist is exactly why
+    nothing sees the defect today</b> — an adapter's <span class="kbd">INPUT_SCHEMA</span>
+    requirements are not <span class="kbd">input_keys</span>.
+  </p>
+  <p class="note" data-anno>
+    <b>Why the count and the reassurance are both said.</b> <b>The wall did a full job</b> —
+    stopping at the first problem teaches an author to publish repeatedly to discover the rest.
+    And “the other 4 are ready” is a <em>fact</em> the check knows, not a consolation.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     VARIANT B — the refusal anchored to the node that caused it.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-b" class="variant">
+<div class="sheet">
+  <h2 data-anno>B · Refused on the canvas — the sentence sits beside the step</h2>
+  <p class="lede" data-anno>
+    Same words, different home. <span class="kbd">Go to the step</span> disappears because you are
+    already there. ⚠ <b>The trade is scale:</b> two offenders read fine; the fourteenth is
+    off-screen and the author has no count.
+  </p>
+
+  <div class="builder">
+    <div class="canvas">
+      <div class="node">
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(239 100% 82%)" stroke-width="2" stroke-linecap="round"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+        </div>
+        <div><div class="nname">Draft the summary</div><div class="nsub">Write with the model</div></div>
+      </div>
+      <div class="edge"></div>
+      <div class="node blocked">
+        <span class="nblock"></span>
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        </div>
+        <div>
+          <div class="nname">Email the weekly summary</div>
+          <div class="nsub">Send an email · Aether Mail</div>
+        </div>
+      </div>
+      <div class="edge"></div>
+      <div class="node blocked">
+        <span class="nblock"></span>
+        <div class="well">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(220 16% 65%)" stroke-width="2" stroke-linecap="round"><path d="M12 2 2 7v10l10 5 10-5V7z"/></svg>
+        </div>
+        <div>
+          <div class="nname">File the escalation</div>
+          <div class="nsub">Create an issue · Aether Jira</div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head" data-anno>Not published</div>
+      <div class="panel-body">
+        <div class="refusal-count" style="font-size:var(--text-sm)">2 steps cannot run as written.</div>
+        <div class="refusal-rest" style="font-size:11.5px">The other 4 are ready.</div>
+
+        <div class="rlist" style="margin-top:12px">
+          <div class="ritem" data-kind="no-source" style="padding-left:0;padding-right:0">
+            <span class="rmark">!</span>
+            <div class="rbody">
+              <div class="rhead" style="font-size:12px">Nothing supplies “<span class="arg">to</span>” in “<button class="rgo rgo-quiet"><span class="qs">Email the weekly summary</span></button>”.</div>
+            </div>
+          </div>
+          <div class="ritem" data-kind="ask-undeclared" style="padding-left:0;padding-right:0">
+            <span class="rmark">!</span>
+            <div class="rbody">
+              <div class="rhead" style="font-size:12px">“<button class="rgo rgo-quiet"><span class="qs">File the escalation</span></button>” asks for “<span class="arg">summary</span>” when it runs, but nothing asks for it.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="refusal-foot" style="margin-top:14px;border:0;padding:0;background:none">
+          Published workflows keep running — this check applies the next time one is published.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div style="margin-top:22px;max-width:720px">
+    <div class="refusal">
+      <div class="refusal-head">
+        <div class="refusal-title">Not published</div>
+        <div class="refusal-count">One step cannot run as written.</div>
+        <div class="refusal-rest">The other 5 are ready.</div>
+      </div>
+      <div class="rlist">
+        <div class="ritem" data-kind="no-source">
+          <span class="rmark">!</span>
+          <div class="rbody">
+            <div class="rhead">Nothing supplies “<span class="arg">to</span>” in “<span class="qs">Email the weekly summary</span>”.</div>
+            <button class="rgo">Go to the step</button>
+          </div>
+        </div>
+      </div>
+      <div class="refusal-foot">
+        Published workflows keep running — this check applies the next time one is published.
+      </div>
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    <b>The singular is its own sentence</b>, above — <span class="kbd">One step cannot run as
+    written.</span> A count that reads <em>“1 steps”</em> is the kind of seam a person notices and
+    a test never does.
+  </p>
+
+  <p class="note" data-anno>
+    ⚠ <b>The blocked mark is on the LEFT EDGE, not the top-right corner.</b> D-185 claimed the
+    card's corner for the governance seal — *"top-right of the card is claimed; governance spends
+    no colour and no third badge"* — so a refusal mark there would be a second thing in a slot
+    already spoken for. The edge is free, and an edge lane is reserved on every node so nothing
+    shifts when one becomes blocked.
+  </p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §3 — the four cuts, each beside what replaced it.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-cuts" class="variant">
+<div class="sheet">
+  <h2 data-anno>§3 · What a refusal must not say — Stitch's four, cut</h2>
+  <p class="lede" data-anno>
+    Every one of these was in the stitch pass. They are kept here <b>struck through beside their
+    replacement</b> rather than deleted, so the change is auditable — the 213 pattern.
+  </p>
+
+  <div class="cutgrid">
+
+    <div class="cutcard bad">
+      <div class="tag" data-anno>cut · the filler second line</div>
+      <div class="demo">
+        Nothing supplies “to” in “Email the weekly summary”.<br>
+        <span class="filler">Publication blocked. Please resolve the outstanding configuration requirement to proceed.</span>
+      </div>
+      <p class="why2" data-anno>
+        It says nothing the headline did not, in worse words — and it is the one place the pass
+        failed its own <em>text is noise, cut it</em> rule. ⚠ <b>The headline plus one control is
+        the whole refusal.</b>
+      </p>
+    </div>
+
+    <div class="cutcard good">
+      <div class="tag" data-anno>kept</div>
+      <div class="demo">
+        Nothing supplies “<span style="font-family:var(--font-mono);font-size:12px">to</span>” in “<b>Email the weekly summary</b>”.
+        <div><button class="rgo">Go to the step</button></div>
+      </div>
+      <p class="why2" data-anno>
+        The step in the author's own words, the argument by the name they saw on the form, and one
+        way out. D-214-09's contract in one line.
+      </p>
+    </div>
+
+    <div class="cutcard bad">
+      <div class="tag" data-anno>cut · the stage name as the cause</div>
+      <div class="demo">
+        <span class="stagechip">Quality review report</span><br>
+        <span class="filler">Configuration Error</span>
+      </div>
+      <p class="why2" data-anno>
+        ⚠ <span class="kbd">BUG-260815-06</span>'s whole complaint is refusals that name a
+        <b>stage</b> instead of a <b>cause</b>. D-214-13 folds it <em>at this new refusal's edge
+        only</em>, which means this refusal has to be right from birth — there is no later repair
+        planned for it.
+      </p>
+    </div>
+
+    <div class="cutcard good">
+      <div class="tag" data-anno>kept — but on its own row, below the cause</div>
+      <div class="demo" style="padding:0">
+        <div class="grow" data-state="blocked" style="padding:8px 12px">
+          <span class="gpip"></span>
+          <span><span class="gname">Structure</span> <span class="gwhat">· inputs satisfied</span></span>
+          <span class="gstate">Stopped here</span>
+        </div>
+      </div>
+      <p class="why2" data-anno>
+        The gauntlet's ten rows are shipped and honest
+        (<span class="kbd">PublishGauntlet.tsx:169-180</span>). A spine saying <em>where</em> the
+        run stopped is a different act from a stage name standing <em>in place of</em> the reason.
+      </p>
+    </div>
+
+    <div class="cutcard bad">
+      <div class="tag" data-anno>cut · internal ids on the canvas</div>
+      <div class="demo">
+        <span class="filler">ID: b_9834</span> &nbsp; <span class="filler">ID: c_4416</span>
+      </div>
+      <p class="why2" data-anno>
+        A direct violation of <em>never print the mechanism</em>, and the sort of thing that ships
+        if nobody names it. Stitch's <span class="kbd">05</span> put these on the nodes.
+      </p>
+    </div>
+
+    <div class="cutcard bad">
+      <div class="tag" data-anno>cut · the alarm</div>
+      <div class="demo">
+        <span class="filler">⚠ Configuration Error</span>
+      </div>
+      <p class="why2" data-anno>
+        <b>A refusal is competence, not an alarm.</b> ⚠ And the colour choice is structural, not
+        taste: <span class="kbd">--color-danger</span> is reserved for genuinely irreversible acts.
+        Spending it on <em>“this step is not finished yet”</em> — an ordinary, safe, expected state
+        — is what stops red meaning anything. This surface spends <b>warning</b> and nothing else.
+      </p>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     §4 — all five refusals, because each arm is proved on its own terms.
+     ══════════════════════════════════════════════════════════════════════════════ -->
+<section id="variant-kinds" class="variant">
+<div class="sheet">
+  <h2 data-anno>§4 · All five refusals — one per way an argument can be unproved</h2>
+  <p class="lede" data-anno>
+    ⚠ <b>Five, not one.</b> D-214-09 proves each source arm <em>on its own terms</em>, so each
+    failure is a different fact about the world and a person needs to be told which. A single
+    <em>“this step is invalid”</em> headline would be the stage-naming failure in a new costume.
+  </p>
+
+  <div class="refusal">
+    <div class="refusal-head">
+      <div class="refusal-title">Not published</div>
+      <div class="refusal-count">5 steps cannot run as written.</div>
+      <div class="refusal-rest">The other 1 are ready.</div>
+    </div>
+    <div class="rlist">
+
+      <div class="ritem" data-kind="no-source">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">Nothing supplies “<span class="arg">to</span>” in “<span class="qs">Email the weekly summary</span>”.</div>
+          <div class="why2" data-anno>No arm chosen, or <span class="kbd">Set here</span> chosen and left empty.</div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+
+      <div class="ritem" data-kind="ask-undeclared">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">“<span class="qs">File the escalation</span>” asks for “<span class="arg">summary</span>” when it runs, but nothing asks for it.</div>
+          <div class="why2" data-anno>
+            ⭐ <b>This is <span class="kbd">BUG-260826-01</span> itself</b> — a declared intention no
+            launcher can honour. <span class="kbd">Ask at launch</span> is chosen but the key is
+            absent from <span class="kbd">WorkflowDefinition.inputs[]</span>, so no form renders a
+            field for it. <b>The gate exists because that exact shape shipped once already.</b>
+          </div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+
+      <div class="ritem" data-kind="upstream-unreachable">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">“<span class="qs">Post the digest</span>” takes “<span class="arg">text</span>” from “<span class="qs">Score the sentiment</span>”, which does not run before it.</div>
+          <div class="why2" data-anno>
+            The same predicate <span class="kbd">reachability.py::_check_input_contracts</span>
+            already computes — a named phase that exists but is not upstream.
+          </div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+
+      <div class="ritem" data-kind="shape-unknown">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">We do not know what “<span class="qs">Open the pull request</span>” needs.</div>
+          <div class="why2" data-anno>
+            D-214-07. ⚠ <b>“Unknown” and “satisfied” must not look the same</b>, so this refuses
+            too — and the way out is the second control, because re-discovery is genuinely the fix
+            here rather than an edit.
+          </div>
+          <button class="rgo">Go to the step</button><button class="rgo">Refresh actions</button>
+        </div>
+      </div>
+
+      <div class="ritem" data-kind="unrenderable">
+        <span class="rmark">!</span>
+        <div class="rbody">
+          <div class="rhead">“<span class="arg">files</span>” in “<span class="qs">Commit the changelog</span>” is a list of items — nothing here can fill it in.</div>
+          <div class="why2" data-anno>
+            D-214-06. The action is real and reachable; this form structurally cannot supply that
+            argument, and it is required. ⚠ <b>The refusal is where that ends</b> — not a JSON box.
+          </div>
+          <button class="rgo">Go to the step</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="refusal-foot">
+      Published workflows keep running — this check applies the next time one is published.
+    </div>
+  </div>
+
+  <p class="note" data-anno>
+    <b>And what the golden run adds, once Structure passes</b> (D-214-11): it resolves what each
+    step <em>would</em> have sent and runs the adapter's own schema validation over that object —
+    catching an argument whose source is structurally fine but whose <em>resolved value</em> is
+    empty or the wrong type. ⭐ <b>D-16's no-send line is untouched, and the surface says so
+    rather than leaving an author to wonder:</b>
+  </p>
+  <div class="grow" data-state="passed" style="max-width:720px;border:1px solid var(--color-border);border-radius:var(--radius-md);margin-top:8px">
+    <span class="gpip"></span>
+    <span><span class="gname">Golden run</span> <span class="gwhat">· Checked what each step would send. Nothing was sent.</span></span>
+    <span class="gstate">Checked</span>
+  </div>
+</div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div id="sketch-tools">
+  <select id="theme-switcher" title="theme">
+    <option value="default">Deep Midnight</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+</div>
+
+<script src="./COPY.js"></script>
+<script>
+document.querySelectorAll(".variant-tab").forEach(function (t) {
+  t.addEventListener("click", function () {
+    document.querySelectorAll(".variant").forEach(function (v) { v.classList.remove("active") })
+    document.querySelectorAll(".variant-tab").forEach(function (x) { x.classList.remove("active") })
+    document.getElementById("variant-" + t.dataset.v).classList.add("active")
+    t.classList.add("active")
+    window.scrollTo(0, 0)
+  })
+})
+
+/* Every way out is live — it lands you on the step, with the argument already in view. */
+var toast = document.getElementById("toast")
+var timer = null
+document.addEventListener("click", function (e) {
+  var b = e.target.closest(".rgo")
+  if (!b) return
+  var item = b.closest(".ritem")
+  var step = item ? (item.querySelector(".qs") || {}).textContent : "the step"
+  toast.textContent = b.textContent === COPY.REFUSE_NEXT_REDISCOVER
+    ? "Re-reading what that connection can do…"
+    : "→ " + step + " — the argument is in view"
+  toast.classList.add("show")
+  clearTimeout(timer)
+  timer = setTimeout(function () { toast.classList.remove("show") }, 2200)
+})
+
+document.getElementById("theme-switcher").addEventListener("change", function () {
+  document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css"
+})
+</script>
+</body>
+</html>

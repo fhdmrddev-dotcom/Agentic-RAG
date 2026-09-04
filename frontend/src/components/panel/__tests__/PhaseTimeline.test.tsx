@@ -1018,3 +1018,105 @@ describe("panel/PhaseTimeline 200-07 — the durable per-step readings", () => {
     expect("const ms = new Date(b) - new Date(a)").toMatch(DATE_MATH)
   })
 })
+
+/**
+ * Phase 214-11 Task 2 (STEP-04 / D-214-16 · `SEED-206`) — THE TIMELINE IS THE SECOND SURFACE,
+ * AND IT IS ASSERTED AT RUNTIME RATHER THAN ASSUMED.
+ *
+ * `PhaseTimeline` deliberately does not import `StepIdentity`: it mounts `PhaseCard`, which
+ * does, so the identity arrives here as a consequence of the one component existing. ⚠ That is
+ * exactly the claim a plan is tempted to take on trust — *"the child renders it"* — and the
+ * plan's own instruction is **verify it renders, do not assume the child does**. A grep over
+ * `PhaseTimeline.tsx` would be satisfied by the docblock that explains the decision, which is
+ * the 187-24 trap; only a mounted tree can answer this.
+ */
+describe("panel/PhaseTimeline 214-11 — the step identity reaches the timeline", () => {
+  it("an external_action row renders the shared element, through PhaseCard", () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      {
+        slug: "notify",
+        phaseIndex: 1,
+        phaseType: "external_action",
+        status: "done",
+        subAgents: [],
+        pendingAsk: null,
+        capability: "post_message",
+        toolName: "post_message",
+        serviceName: "Acme Slack (production)",
+      },
+    ])
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const ids = container.querySelectorAll("[data-step-identity]")
+    // EXACTLY ONE — the `llm_single` row above is the negative control that lives in the same
+    // render, so "it appears" cannot be satisfied by an element painted on every row.
+    expect(ids).toHaveLength(1)
+    expect(ids[0].getAttribute("data-size")).toBe("row")
+    expect(container.querySelector("[data-step-identity-action]")?.textContent).toBe(
+      "Posts a message",
+    )
+    expect(container.querySelector("[data-step-identity-service]")?.textContent).toBe(
+      "Acme Slack (production)",
+    )
+  })
+
+  it("no wire id reaches the timeline's markup", () => {
+    // Sketch 216 invariant #4, asserted on THIS surface rather than inherited from the card's
+    // own suite — `SEED-206`'s warning is that a partial answer leaves the seed live.
+    // ⚠ The needles are assembled at runtime so this file's source does not contain them.
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      {
+        slug: "notify",
+        phaseIndex: 0,
+        phaseType: "external_action",
+        status: "done",
+        subAgents: [],
+        pendingAsk: null,
+        capability: "post_message",
+        toolName: "post_message",
+        serviceName: "Acme Slack (production)",
+      },
+    ])
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+    const markup = container.innerHTML
+    for (const parts of [
+      ["post", "message"],
+      ["send", "email"],
+      ["create", "ticket"],
+      ["external", "action"],
+      ["ask", "question"],
+    ]) {
+      expect(markup).not.toContain(parts.join("_"))
+    }
+    // POSITIVE CONTROL — the sweep is worthless over an empty tree.
+    expect(markup).toContain("Posts a message")
+  })
+
+  it("the timeline resolves NOTHING for itself — the row's own wire answers", () => {
+    // D-214-14 / T-214-11-04. A surface that reached for the connection list would give a
+    // different answer than the wire, and the panel and the run page would disagree about the
+    // same step at the same moment. `null` here is a legitimate reading, not a lookup miss.
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      {
+        slug: "notify",
+        phaseIndex: 0,
+        phaseType: "external_action",
+        status: "done",
+        subAgents: [],
+        pendingAsk: null,
+        capability: "post_message",
+        toolName: "post_message",
+        serviceName: null,
+      },
+    ])
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+    const id = container.querySelector("[data-step-identity]")
+    expect(id?.getAttribute("data-service-resolved")).toBe("false")
+    expect(container.querySelector("[data-step-identity-separator]")).toBeNull()
+    expect(id?.textContent).toBe("Posts a message")
+  })
+})

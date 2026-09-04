@@ -4,12 +4,12 @@ title: The publish gauntlet's structural-gate refusal says only "the golden run 
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: open  # NARROWED 2026-08-29 — 4 of 5 requirements shipped; only #4 remains
 affected_areas: [workflows/publish-gauntlet, frontend/workflows, observability, admin/control-room]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-165]
-re_open_trigger: "Considered at /gsd:discuss-phase 197 (2026-08-18) and DELIBERATELY NOT FOLDED — it shares SEED-163's root but is repair on the PUBLISH surface, while 197's SC#1 asks for the author to be ASKED, not better refused. Status stays `open` and `folded_into` stays null on purpose. Re-open at: the next phase touching the publish gauntlet's refusal copy, OR a second report of an author stuck on an unexplained refusal. See .planning/phases/197-guided-authoring/197-CONTEXT.md <deferred>."
+re_open_trigger: "⚠ FIRED A SECOND TIME AND DECLINED A SECOND TIME — at /gsd:discuss-phase 214 (2026-08-28). Phase 214 DOES touch the gauntlet's refusal copy (STEP-03 adds a new refusal naming the step and the missing argument), so this trigger fired exactly as written. It was declined on the same reasoning as 197 and recorded as D-214-13: 214's OWN refusal is written correctly from birth, so the phase adds nothing to this pile, and repairing the other five stages' copy is repair on files 214 does not otherwise touch — a capability inside a phase already carrying a threat model. `status` stays `open` and `folded_into` stays null ON PURPOSE, for the second time. ⚠ TWO DECLINES IS THE SIGNAL, NOT THE ABSENCE OF ONE: the next phase that fires this trigger should weigh that this bug has now been read, understood and passed over twice, and either fold it or state why it never will be. See .planning/phases/214-a-step-names-its-service-and-its-action/214-CONTEXT.md D-214-13. ── ORIGINAL TRIGGER, PRESERVED VERBATIM ── Considered at /gsd:discuss-phase 197 (2026-08-18) and DELIBERATELY NOT FOLDED — it shares SEED-163's root but is repair on the PUBLISH surface, while 197's SC#1 asks for the author to be ASKED, not better refused. Status stays `open` and `folded_into` stays null on purpose. Re-open at: the next phase touching the publish gauntlet's refusal copy, OR a second report of an author stuck on an unexplained refusal. See .planning/phases/197-guided-authoring/197-CONTEXT.md <deferred>."
 reproduces_on:
   branch: develop
   commit: 2986541f
@@ -102,3 +102,36 @@ Nothing joins them, so the wire carries the coarser of the two facts.
   inherits
 - `SEED-165` — the observability family
 - Phase 192 CR-01 — the precedent that the gauntlet must not overclaim (still binding)
+
+
+---
+
+# ⚠ FOUR OF FIVE SHIPPED 2026-08-29 — this bug is NARROWED, not closed
+
+`BUG-260828-09` (the operator hit this a third time, on four publish attempts in one sitting)
+delivered this report's requirements **1, 2, 3 and 5**. The scope that remains is **#4 alone**.
+
+| # | requirement | state |
+|---|---|---|
+| 1 | name the failing phase and its reason, sourced from `workflow_phases` / `harness_audit` | ✅ `PublishVerdict.blocked_step`, joined server-side |
+| 2 | use the canvas label, not the slug | ✅ resolved through `phaseVocabulary.nodeTitle`, whose floor is that the slug never appears; the server sends `step_name: null` rather than backfilling it |
+| 3 | keep the honesty property | ✅ no cause table on the client; the sentence is the server's own, verbatim |
+| 4 | **build the run view, or stop advertising it** | ⛔ **STILL OPEN** — *"(view coming soon)"* was read verbatim in the browser on 2026-08-29 beside golden run `22bbf8bb` |
+| 5 | distinguish "the run failed" from "the judge refused" | ✅ shipped at Phase 186; unchanged and still correct |
+
+⭐ **THE THIRD DECLINE WOULD HAVE BEEN THE WRONG CALL.** This report was read and passed over
+twice (Phase 197, then Phase 214 as `D-214-13`), and its own re-open trigger says *"TWO DECLINES
+IS THE SIGNAL."* It fired a third time as a live operator incident, and the fix took one
+afternoon. Recorded because the deferral reasoning was sound each time and the outcome was still
+wrong — a trigger that has fired twice is evidence about the trigger, not about the phase.
+
+## What #4 actually needs
+
+The run view **exists** (`WorkflowRunPage`), and the link is gated behind the canvas feature flag
+(`openRunSurface` is passed only when `canvasEnabled`). So the honest options are to route the
+link when the flag is on, or to drop the phrase. ⚠ *"coming soon"* is on this project's own
+never-say list — it promises a schedule that no roadmap phase owns, which is exactly what
+`SEED-164` was planted to retire one file over.
+
+**Re-open trigger for the remainder:** the next phase touching `PublishGauntlet.tsx`'s `RunLink`
+or the canvas feature gate.

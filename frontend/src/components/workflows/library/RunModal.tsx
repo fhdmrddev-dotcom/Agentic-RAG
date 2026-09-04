@@ -57,7 +57,10 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Upload, Check, X, ChevronDown, Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { entryInputFields, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+import { launchInputFields, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+// 214-12 (STEP-02): the ONE declared-input field renderer, shared with the chat launch form.
+// The two-arm label rule and the launchInputFields-not-entryInputFields warning live with it.
+import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
 import { RUN_TEMPLATE_LABEL } from "./libraryVocabulary"
 import { useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import type { PublishedWorkflow } from "@/lib/api"
@@ -85,16 +88,37 @@ export function RunModal({
   onCancel: () => void
   /** 152 (WFIN-01/02): launch carries the two run inputs — a staged template `File`
    *  and a per-run folder override `folderId` (null = stay on the workflow default,
-   *  D-06). May reject (e.g. a template 422) → the modal renders the message inline. */
-  onRun: (extras: { templateFile: File | null; folderId: string | null }) => void | Promise<void>
+   *  D-06). May reject (e.g. a template 422) → the modal renders the message inline.
+   *
+   *  Phase 214-09 (STEP-02 / D-214-04) adds a THIRD: `inputs`, the values collected for
+   *  the definition's declared entry inputs, keyed by their declared key.
+   *
+   *  ⚠ `inputs` IS ALWAYS PRESENT — `{}` when the definition declares none. An absent key
+   *  and an empty object are different facts, and a caller must not have to tell them apart
+   *  by `undefined`. That is also what makes the "every invocation carries it" assertion in
+   *  `RunModal.test.tsx` a real fence rather than a coincidence of the fixtures. */
+  onRun: (extras: {
+    templateFile: File | null
+    folderId: string | null
+    inputs: Record<string, string>
+  }) => void | Promise<void>
 }) {
   const def = wf.definition as DefShape | undefined
   // 200-WIRE: the entry inputs WITH their authored labels. `entryInputFields` is the same
   // resolver `entryInputKeys` is now derived from, so the key list and its order are
   // unchanged — see the hint line below for why the unlabelled arm stays character-identical.
-  const inputFields = entryInputFields(def)
-  const keys = inputFields.map((f) => f.key)
-  const anyAuthoredLabel = inputFields.some((f) => !!f.label)
+  //
+  // ⚠ 214-09 REPLACED `entryInputFields` HERE WITH `launchInputFields`, AND THE THREE LOCALS
+  // THE HINT LINE NEEDED (`inputFields` / `keys` / `anyAuthoredLabel`) ARE GONE WITH IT.
+  // `tsconfig.app.json` sets `noUnusedLocals`, so they could not be kept as documentation.
+  // `launchInputFields` IS `entryInputFields` minus the reserved run-scaffolding keys — same
+  // resolver, same precedence, same two-arm label rule — so the ORDER and the LABELS below
+  // are the hint line's, unchanged. See the docblock further down for what changed and why.
+  const launchFields = launchInputFields(def)
+  // The collected values, keyed by the DECLARED key. Never seeded from anything: a field a
+  // person did not fill is an empty string, and an empty string is a real answer here (the
+  // executor's own schema validation is the arbiter — this launcher validates nothing).
+  const [inputValues, setInputValues] = useState<Record<string, string>>({})
   // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
   //
   // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
@@ -218,8 +242,14 @@ export function RunModal({
     // "Workflow default" (not "All documents") on a bound workflow. Narrowing works.
     const normalized = selectedFolderId || null
     const folderId = normalized && normalized !== authorDefaultFolderId ? normalized : null
+    // 214-09 (STEP-02 / D-214-04): the declared-input values, projected onto the DECLARED
+    // keys and nothing else. Built from `launchFields` rather than handed `inputValues`
+    // straight, so a key that stopped being declared between two renders cannot ride along,
+    // and so the dict is `{}` — never `undefined` — when the definition declares none.
+    const inputs: Record<string, string> = {}
+    for (const f of launchFields) inputs[f.key] = inputValues[f.key] ?? ""
     try {
-      await onRun({ templateFile, folderId })
+      await onRun({ templateFile, folderId, inputs })
     } catch (e) {
       // Surface the server's validate_upload message VERBATIM (never a friendlier lie).
       setLaunchError(e instanceof Error ? e.message : "Run failed")
@@ -552,33 +582,61 @@ export function RunModal({
               author actually wrote. The unlabelled arm below is CHARACTER-IDENTICAL to what
               shipped, which is what keeps `RunModal.test.tsx`'s six whole-`innerHTML`
               captures green without re-capturing them. */}
+          {/* ── 214-09 (STEP-02 / D-214-04) — THE HINT LINE IS GONE, AND WHAT IT REFUSED IS
+              NOW BUILT. The original stands ABOVE, verbatim, because a refusal whose
+              CONDITION later came true is evidence about how this surface was reasoned
+              about — the same rule the block above applies to its own predecessor.
+
+              ── THE REFUSAL, AS SHIPPED (`:557-558`, deleted by this plan) ──
+              > Declared input_keys → a HINT line only (never fake structured fields).
+              > a `<p>` under the testid `run-hint`, reading "This workflow expects: …"
+              (Its comment delimiters are dropped in the quote for the obvious reason, and the
+              testid is named rather than SPELLED as an attribute — a `grep -c` fence on that
+              attribute would otherwise count this paragraph and read the node as still shipping.
+              Every word of the refusal sentence itself is verbatim.)
+
+              Its reason was CONDITIONAL and its condition is now met. The condition was
+              that **nothing guaranteed the value would be used**: a text box whose contents
+              reached no adapter argument is a control that lies about what it does, and one
+              hint line is more honest than six fields that go nowhere.
+
+              **D-214-04 supplies the guarantee.** `MessageCreate.inputs` carries the dict
+              (`214-16`), both kickoff merge sites spread it into `create_workflow_run.inputs`
+              and into the live `ctx.inputs` mirror, and `_external_action_inputs`
+              (`phase_types.py:1861`) is what an `ask`-sourced argument resolves out of by key
+              (`214-01`). So the value is used, by name, and the refusal has run out.
+
+              ⛔ WHERE THIS FILE'S CHAIN STOPS, STATED PLAINLY AND NOT CLAIMED AWAY. At THIS
+              commit the values reach `onRun` → `WorkflowsPage`'s consumer → `onLaunch`'s
+              third argument, and no further: `doRun` (`ChatLayout.tsx:711`) gains its
+              `inputs` parameter in plan `214-12`. `postMessage`'s `inputs` option and the
+              server merge already exist (`214-16`), so ONE hop is owed, and it is owed —
+              not broken. Nothing here asserts that a run receives these values.
+
+              ⚠ THE POINTER, 214-12. The FIELD MARKUP AND ITS TWO-ARM RULE HAVE MOVED to
+              `@/components/workflows/LaunchInputFields`. Plan `214-09` named that seam and
+              deliberately left it — *an extraction with one consumer is not an extraction* —
+              and named THIS plan as its re-open trigger; chat became the second consumer, so
+              the extraction was taken. The two-arm rule, the *"absence renders the KEY"*
+              sentence and the *"must be `launchInputFields`, never `entryInputFields`"*
+              warning all travelled WITH the code, because a rule separated from what it
+              governs is a rule nobody applies. Read them there, not here.
+
+              ⚠ NO REQUIRED-NESS IS VALIDATED HERE, deliberately. The publish gate (`214-05`)
+              already refuses a workflow whose `ask` key is undeclared; a launcher that
+              blocked on an empty optional field would refuse a run the system can perform.
+              An empty field sends an empty string and the executor's schema is the arbiter.
+
+              ⚠ IT SITS WITH THE FIELDS, NOT IN THE INFO GROUP BELOW. That group is what the
+              dialog SAYS about the run; this is what it ASKS. Putting a text box among the
+              ⓘ lines would break the one composition rule this body has. THAT placement is
+              this file's decision and stays here; only the markup left. */}
+          <LaunchInputFields
+            fields={launchFields}
+            values={inputValues}
+            onChange={(key, value) => setInputValues((prev) => ({ ...prev, [key]: value }))}
+          />
           <div className="flex flex-col gap-2">
-            {/* Declared input_keys → a HINT line only (never fake structured fields). */}
-            <p data-testid="run-hint" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
-              <Info className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
-              {anyAuthoredLabel ? (
-                <span>
-                  This workflow expects:{" "}
-                  {inputFields.map((f, i) => (
-                    <span key={`${f.key}-${i}`}>
-                      {i > 0 && ", "}
-                      {/* An AUTHORED label is prose a human wrote → body face. A key with no
-                          label keeps the mono face it has always had. Two arms, never three:
-                          absence renders the key, never a fabricated friendly name. */}
-                      {f.label ? (
-                        <span className="text-foreground">{f.label}</span>
-                      ) : (
-                        <span className="font-mono text-foreground">{f.key}</span>
-                      )}
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <span>
-                  This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
-                </span>
-              )}
-            </p>
             {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
                 going to. 188-09 retargeted `doRun` to the run surface, and the modal still
                 said "Run opens a new chat thread and streams there" right above the button.

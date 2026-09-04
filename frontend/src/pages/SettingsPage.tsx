@@ -5,6 +5,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
+
+/**
+ * The Settings tab trigger, spelled ONCE.
+ *
+ * Seven labels share it so they cannot drift from each other — the same reason every string
+ * on the Connections surface lives in a copy module rather than inline. `text-[13px]` is the
+ * type scale the panels and cards on this page already use (`ConnectionsTab`'s rows, the
+ * Popular cards); the primitive's default `text-sm` is 14px and was the visible mismatch.
+ *
+ * `data-[state=active]:bg-accent` overrides the primitive's `bg-background` — see the note on
+ * `TabsList` for why the default reads as a hole rather than a selection on a card.
+ */
+const SETTINGS_TAB_CLASS =
+  "flex-1 text-[13px] data-[state=active]:bg-accent data-[state=active]:text-foreground"
 import { getSettings, updateSettings, getReembedProgress, getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
@@ -26,15 +41,10 @@ import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 // the user picks a default WITHIN the operator/org-allowed set; the always-on 🔒 footer
 // surfaces the operator lock. Self-fetching (getModelDefault), so it needs no page state.
 import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
-// Phase 190-16 (CONN-02 / D-25 / sketch 155-C) — Settings → Connections, the sixth tab.
-// D-25 puts connections HERE and not in the Control Room: the operator sets the allowed-set
-// and the platform lock; the user (an org admin) sets the preference. Self-fetching, so it
-// needs no page state and contributes nothing to the tab-level Save.
-import { ConnectionsTab } from "@/components/settings/ConnectionsTab"
-import {
-  CONNECTIONS_SECTION_DESCRIPTION,
-  CONNECTIONS_SECTION_TITLE,
-} from "@/components/settings/connectionsCopy"
+// ⚠ Phase 190-16's Connections tab and its two imports left this file on 2026-09-01 —
+// see `pages/ConnectionsPage.tsx`. D-25's ruling is UNCHANGED and travelled with it:
+// connections belong to the user (an org admin), not to the Control Room, which is why
+// the new page is ungoverned. What changed is only which door opens it.
 // Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
 // Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
 // shared context, and routes bounded user-facing labels through the term-map (D-04).
@@ -503,7 +513,28 @@ function AuditLogSection() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+/**
+ * ⚠ THREE OF THIS PAGE'S FIVE TABS ARE OPERATOR-ONLY AT THE API, AND THE PAGE MUST SAY SO
+ * BY ABSENCE. `GET /settings`, `PUT /settings` and the re-embed routes all carry
+ * `require_visible("model_management")` (`api/settings.py:331,341,560,589`), which
+ * `api/features.py:21` classifies Operators-only. Rendering AI Model, Search or
+ * Integrations to a member offers a control whose every call is a 403 — the
+ * locked/badged placeholder Phase 148 (sketch 069-A) explicitly rejected in favour of the
+ * VANISH. Memory and Audit Log fetch through their own endpoints and stay.
+ *
+ * ⚠ THE MAP FAILS TO `{}`, WHICH IS WHY THE TEST IS `=== true` AND NOT A TRUTHINESS CHECK:
+ * a blip must hide a governed tab, never flash one. Same rule `visibleNavItems` follows.
+ *
+ * ⚠ `initialTab` IS GONE, AND SO IS ITS ONLY CALLER. It existed so the ungoverned
+ * Connections rail entry could mount THIS page pinned to tab "5". That pin is what made
+ * `Settings` and `Connections` two rail entries onto one page — the whole tab strip
+ * rendered either way, so an operator saw the duplicate. Connections now has its own
+ * page (`pages/ConnectionsPage.tsx`) and this page has one door again.
+ */
 export function SettingsPage() {
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canManageModels = featuresCtx?.features.model_management === true
+  const featuresLoading = featuresCtx?.loading ?? false
   const [s, setS] = useState<FullAppSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -527,9 +558,29 @@ export function SettingsPage() {
   const [savedIntegrations, setSavedIntegrations] = useState(false)
 
   // Tab persistence
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    return localStorage.getItem("settings_active_tab") ?? "0"
-  })
+  const [activeTab, setActiveTab] = useState<string>(
+    () => localStorage.getItem("settings_active_tab") ?? "0",
+  )
+
+  // ⚠ A PERSISTED CHOICE CAN NAME A TAB THIS CALLER NO LONGER HAS. `settings_active_tab`
+  // outlives a permission change, so an ex-operator (or anyone whose map has not resolved
+  // yet) would land on a `TabsContent` with no trigger — a blank panel under a strip that
+  // does not mark anything active. Land them on Memory instead: with Connections moved to
+  // its own page (2026-09-01), Memory is the first tab every caller can still use.
+  //
+  // ⚠ "5" IS IN THIS LIST BECAUSE THE TAB IT NAMED IS GONE, NOT BECAUSE IT IS GOVERNED.
+  // A user who last used Connections has "5" persisted in localStorage; without this it
+  // would select nothing and render the same blank panel this guard exists to prevent.
+  // It is unconditional for that reason — an operator with "5" persisted needs the
+  // redirect exactly as much as a member does, which is why the check below tests it
+  // outside the `!canManageModels` arm.
+  const MODEL_TABS = ["0", "1", "2"]
+  const RETIRED_TABS = ["5"]
+  const effectiveTab =
+    RETIRED_TABS.includes(activeTab) ||
+    (!canManageModels && MODEL_TABS.includes(activeTab))
+      ? "3"
+      : activeTab
 
   function handleTabChange(value: string) {
     setActiveTab(value)
@@ -573,6 +624,8 @@ export function SettingsPage() {
   const [rerankApiKey, setRerankApiKey] = useState("")
 
   // Retrieval
+  // SEED-227 — mirrors migration 044's default so a cold load matches the server.
+  const [maxVisionCalls, setMaxVisionCalls] = useState(100)
   const [retrievalTopK, setRetrievalTopK] = useState(5)
   const [retrievalThreshold, setRetrievalThreshold] = useState(0.3)
   const [hybridEnabled, setHybridEnabled] = useState(true)
@@ -644,6 +697,7 @@ export function SettingsPage() {
     setRerankModel(data.rerank_model)
     setRerankTopN(data.rerank_top_n)
     setRerankApiKey(data.rerank_has_api_key ? KEY_PLACEHOLDER : "")
+    setMaxVisionCalls(data.multimodal_max_vision_calls)
     setRetrievalTopK(data.retrieval_top_k)
     setRetrievalThreshold(data.retrieval_match_threshold)
     setHybridEnabled(data.hybrid_search_enabled)
@@ -671,12 +725,26 @@ export function SettingsPage() {
     setDeprecatedModels(new Set(data.deprecated_models ?? []))
   }
 
+  // ⚠ `GET /settings` IS ITSELF `model_management`-GATED, so this fetch is a 403 for a
+  // member — and `if (error && !s)` below turns any fetch failure into a FULL-PAGE error,
+  // which would make the ungoverned Connections door land on a red sentence. Skip the
+  // call entirely rather than calling and swallowing: a request we know will be refused
+  // is not diagnostics, it is noise in the audit log.
+  //
+  // ⚠ WAIT FOR THE MAP FIRST. It fails CLOSED to `{}`, so during `loading` an operator
+  // reads as a member; firing then would skip the fetch and never retry. The effect
+  // depends on both flags and runs again the moment the map resolves.
   useEffect(() => {
+    if (featuresLoading) return
+    if (!canManageModels) {
+      setLoading(false)
+      return
+    }
     getSettings()
       .then(hydrate)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [canManageModels, featuresLoading])
 
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
@@ -747,6 +815,7 @@ export function SettingsPage() {
       rerank_api_key: rerankApiKey || KEY_PLACEHOLDER,
       rerank_model: rerankModel,
       rerank_top_n: rerankTopN,
+      multimodal_max_vision_calls: maxVisionCalls,
       retrieval_top_k: retrievalTopK,
       retrieval_match_threshold: retrievalThreshold,
       hybrid_search_enabled: hybridEnabled,
@@ -812,7 +881,9 @@ export function SettingsPage() {
     )
   }
 
-  if (error && !s) {
+  // `canManageModels` is load-bearing: for a member `s` is legitimately null (the fetch
+  // above never ran), and without this guard the absence would render as a failure.
+  if (error && !s && canManageModels) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-destructive">{error}</p>
@@ -858,7 +929,25 @@ export function SettingsPage() {
           if (body) await commitSearchSave(body)
         }}
       />
-      <div className="max-w-3xl w-full mx-auto space-y-8">
+      {/* ── The page measure ────────────────────────────────────────────────────────────
+          ⚠ OPERATOR-DRIVEN, 2026-08-28: *"why did we make it narrow… we have to maintain
+          consistency in all the pages"*. Measured first, and the honest answer is that
+          THERE WAS NO CONVENTION TO BREAK — the app carries four widths across six pages:
+          Settings and Governance at `max-w-3xl` (768px), Knowledge Health at `max-w-6xl`
+          (1152px), and Skills / Ingestion / Skill Studio unconstrained.
+
+          `3xl` was not wrong in principle — a narrow measure is what keeps form labels and
+          help text readable. It was wrong for the CONNECTIONS tab, which carries a
+          five-column table (Connection · Sends to · Used by · Credential · State) inside a
+          width meant for a single-column form.
+
+          ⚠ `6xl` RATHER THAN UNCONSTRAINED, and rather than a new number: it is a width the
+          app ALREADY uses, so this adopts a precedent instead of inventing a fourth measure
+          for the same problem. Dropping the constraint entirely would give the table room
+          at the cost of running the AI Model and Memory forms edge-to-edge on a wide
+          monitor — paragraphs at full screen width are the readability problem a measure
+          exists to prevent, and those tabs have no table to justify paying it. */}
+      <div className="max-w-6xl w-full mx-auto space-y-8">
 
         {/* Header — no global Save button */}
         <div className="flex items-start justify-between">
@@ -880,26 +969,51 @@ export function SettingsPage() {
           <p className="text-sm text-destructive bg-destructive/10 px-4 py-2.5 rounded-lg">{error}</p>
         )}
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="0">AI Model</TabsTrigger>
+        <Tabs value={effectiveTab} onValueChange={handleTabChange} className="w-full">
+          {/* ── The tab strip wears the same container as the cards below it ────────────
+              ⚠ OPERATOR-DRIVEN, 2026-08-28: *"can you make tab labels as same with the page
+              itself or the card of the connection itself container"*. The strip sat on a
+              bare `bg-muted` pill while every panel under it is a bordered `bg-card` — two
+              visual systems on one page.
+
+              ⚠ STYLED HERE, NOT IN `components/ui/tabs.tsx`. That primitive is shared by
+              EIGHT surfaces (Skill Studio, the Control Room, …); restyling it to match this
+              page would silently redress all of them. The card treatment is a fact about
+              THIS page, so it is applied where that fact is true.
+
+              ⚠ THE ACTIVE STATE IS INVERTED ON PURPOSE. The primitive marks active with
+              `bg-background`, and in Deep Midnight `--background` is 4% against `--card` 7%
+              — on a card container that reads as a HOLE punched in the surface. `--accent`
+              (14%) sits above the card, so the selected tab reads as RAISED, which is what
+              selection should look like. Measured off the tokens, not guessed.
+
+              ⚠ AND `flex w-full` OVERRIDES THE PRIMITIVE'S `inline-flex`, which is the half
+              the first pass missed: an `inline-flex` list HUGS ITS CONTENT, so the strip
+              ended after "Audit Log" while the panel beneath it ran the full width — the
+              two cards were the same colour and border and still visibly different objects.
+              ⚠ AND THE TRIGGERS STRETCH — `flex-1` on each, no `justify-*` on the list. The
+              first cut left them left-aligned, which matched the panel's edge but left a
+              gap of empty card after "Audit Log": the strip was full-width while its
+              CONTENT was not, which reads as an unfinished row rather than a deliberate
+              one. Equal shares fill the row end to end and keep every label the same
+              target size, so no tab is easier to hit than its neighbour. */}
+          <TabsList className="mb-6 flex h-auto w-full gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="0">AI Model</TabsTrigger>}
             {/* D-04: display-only relabel via the term-map (Search by default, the
                 shipped "Search & Retrieval" under the reveal). value="1" — the tab
                 ROUTING key — is unchanged (D-02a / no contract break). */}
-            <TabsTrigger value="1">{retrievalTabLabel}</TabsTrigger>
-            <TabsTrigger value="2">Integrations</TabsTrigger>
-            {/* Phase 190-16 (CONN-02 / D-25 / UI-SPEC §2a, U-01) — Connections.
-                ROUTING KEY "5" is the next FREE key, deliberately: appending renumbers
-                nothing, so every user's persisted `settings_active_tab` keeps pointing at
-                the tab they left. It is rendered VISUALLY FOURTH because Connections is
-                what Integrations is *about*, while Memory and Audit Log are unrelated —
-                and visual order is independent of the routing key, so this costs nothing.
-                ⚠ THE REVERSIBLE HALF (U-01): if the operator later prefers this tab LAST,
-                move ONLY this line. The routing key stays "5" either way — do NOT
-                renumber, exactly as the retrieval relabel above records for value="1". */}
-            <TabsTrigger value="5">Connections</TabsTrigger>
-            <TabsTrigger value="3">Memory</TabsTrigger>
-            <TabsTrigger value="4">Audit Log</TabsTrigger>
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="1">{retrievalTabLabel}</TabsTrigger>}
+            {canManageModels && <TabsTrigger className={SETTINGS_TAB_CLASS} value="2">Integrations</TabsTrigger>}
+            {/* ⚠ CONNECTIONS IS NO LONGER A TAB HERE (2026-09-01). It moved to its own
+                top-level page — `pages/ConnectionsPage.tsx` — because the ungoverned
+                `Connections` rail entry and the `model_management`-gated `Settings` entry
+                were two doors onto THIS page, distinguishable only by which tab was
+                pre-selected. An operator saw both. The routing key "5" is RETIRED, not
+                reused: a persisted `settings_active_tab` of "5" now falls through to the
+                guard below rather than selecting a tab that no longer exists.
+                Phase 190-16's note on never renumbering still governs 0-4. */}
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>
+            <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>
           </TabsList>
 
           {/* Tab 0: AI Model */}
@@ -1294,6 +1408,17 @@ export function SettingsPage() {
                 )}
               </SectionCard>
 
+              {/* Images SectionCard — SEED-227. The description carries the CONSEQUENCE,
+                  because a bare number is what this setting already was in the database. */}
+              <SectionCard
+                title="Images in documents"
+                description="How many images are read per document. Anything past this limit is not read, and the document says so on its detail panel."
+              >
+                <FieldRow label="Images read per document">
+                  <NumberInput value={maxVisionCalls} onChange={setMaxVisionCalls} min={1} max={1000} />
+                </FieldRow>
+              </SectionCard>
+
               {/* Retrieval SectionCard */}
               <SectionCard title="Retrieval" description="Controls how document chunks are retrieved and ranked.">
                 <FieldRow label="Top-K chunks">
@@ -1410,14 +1535,6 @@ export function SettingsPage() {
               no query-param and no route — the "route" IS this numeric key, persisted to
               localStorage. Do not add a router, a search-param reader or a navigate call
               to this page to reach this tab. */}
-          <TabsContent value="5">
-            <SectionCard
-              title={CONNECTIONS_SECTION_TITLE}
-              description={CONNECTIONS_SECTION_DESCRIPTION}
-            >
-              <ConnectionsTab />
-            </SectionCard>
-          </TabsContent>
         </Tabs>
 
       </div>

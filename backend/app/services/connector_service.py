@@ -133,10 +133,11 @@ assert "secret_ciphertext" not in _RESPONSE_KEYS and "secret" not in _RESPONSE_K
 #   POST …&select=<the list below>    -> 403 "new row violates row-level security policy"
 #                                        (i.e. it got PAST the privilege check to the row gate)
 #
-# DERIVED from the response model, never retyped: a column added to the table tomorrow cannot
-# enter a projection unless somebody adds a field to `ConnectorConnectionResponse`, in a diff
-# a reviewer reads. That is the same single source of truth `_to_response` already uses.
-_SELECTABLE_COLUMNS: str = ",".join(_RESPONSE_KEYS)
+# DERIVED from the response model, excluding virtual/joined fields that live on other tables
+# (e.g. `account_email` and `account_name` which live in `connector_tokens` table):
+_NON_TABLE_RESPONSE_KEYS: frozenset[str] = frozenset({"account_email", "account_name"})
+_TABLE_SELECTABLE_KEYS: tuple[str, ...] = tuple(k for k in _RESPONSE_KEYS if k not in _NON_TABLE_RESPONSE_KEYS)
+_SELECTABLE_COLUMNS: str = ",".join(_TABLE_SELECTABLE_KEYS)
 
 
 # ── refusals ─────────────────────────────────────────────────────────────────────────────
@@ -190,6 +191,22 @@ class ConnectorSecretUnreadable(ConnectorError):
     """
 
 
+class ConnectorNothingToDiscover(ConnectorError):
+    """Phase 211 (T-211-13d) — a SERVICE-ONLY row has no action list to refresh, yet.
+
+    ⚠ WHY THIS IS ITS OWN CLASS RATHER THAN THE GENERIC `ConnectorError`. The route's blanket
+    `except Exception -> 502` renders a generic refusal as *"MCP tool discovery failed:
+    connection X is not configured with an mcp_server_url"* — **a remote-gateway error naming
+    a shape the row never had**, about a server that was never contacted. A person reading it
+    goes looking for an outage that does not exist.
+
+    ⚠ IT IS AN ERROR-MESSAGE CONTRACT, NOT A DEAD END TO BE DESIGNED AWAY. Nothing in Phase 211
+    gives a service-only row a way to populate tools; OAuth (Phase 215) does. That is exactly
+    why the refusal has to be WORDED: the honest sentence is *"not yet"*, and a 502 says
+    *"something is broken"*.
+    """
+
+
 # ── the resolved credential ──────────────────────────────────────────────────────────────
 @dataclass(frozen=True, repr=False)
 class ResolvedConnection:
@@ -221,7 +238,29 @@ class ResolvedConnection:
     # a native send with a missing credential — see the resolver's own block.
     secret_ciphertext: str | None
     mcp_server_url: str | None = None
-    tool_grants: dict[str, bool] = field(default_factory=dict)
+    #: The service this row IS (migration 127). Carried so a caller that resolved a
+    #: connection can ask what it advertises without a second read — the descriptor list
+    #: is per-SERVICE now, not per-capability, and `discover_connection_tools` had only
+    #: the verb to go on. Optional because rows created before migration 127 may carry
+    #: none, and a missing service simply falls back to the capability descriptor alone.
+    service_id: str | None = None
+    #: How the credential must be presented — `auto`, `bearer` or `basic`.
+    #:
+    #: ⚠ IT IS RESOLVED HERE RATHER THAN GUESSED AT THE TRANSPORT, and the reason is a
+    #: measured defect. `mcp_client._build_auth_headers` infers the scheme from the STRING:
+    #: anything containing a colon is treated as a `user:token` Basic pair, which is right
+    #: for a Jira `email:api_token` and wrong for an OAuth access token that merely happens
+    #: to contain one. Notion's does. Driven live 2026-09-01 — a valid, freshly minted token
+    #: was base64'd into `Basic` and the server answered `401 invalid_token`; the SAME token
+    #: with an explicit `Bearer` returned HTTP 200 and 41 tools.
+    #:
+    #: The resolver KNOWS which it is, because it knows where the credential came from. A
+    #: transport cannot know, and `invalid_token` is the worst possible thing to guess wrong
+    #: about — it reads as *"your credential is bad"* and sends somebody to re-consent, which
+    #: mints another colon-bearing token and fails identically.
+    auth_scheme: str = "auto"
+    default_approval_posture: str = "ask"
+    tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
 
     @property
@@ -268,6 +307,82 @@ class ResolvedConnection:
 
 
 # ── plumbing ─────────────────────────────────────────────────────────────────────────────
+#: The legal grant values, as data. **Phase 213 (D-213-05) widens this to the posture map**
+#: ``{"allow", "ask", "deny"}``; when it does, this set and `_sanitize_tool_grants`'s
+#: annotation are the two things that change, and every caller is already routed through
+#: them. Declared here rather than inline so the widening is ONE edit with no second
+#: spelling to fall out of agreement with it.
+_LEGAL_GRANT_VALUES: frozenset[str] = frozenset({"allow", "ask", "deny"})
+
+
+def _sanitize_tool_grants(tool_grants: dict) -> dict[str, str]:
+    """THE one grant-value sanitizer. **Both** write paths go through it.
+
+    ── WHAT THIS DEFENDS, WHICH IS NOT WHAT IT LOOKS LIKE ────────────────────────────────
+    F-1 introduced a `bool(v)` coercion here for a real reason, and the reason survives:
+    **the two ends of a grant disagree about what "granted" means.** ``phase_types.py``
+    GATE 6 requires ``grants.get(tool_name) is True``, while the client's ``isToolGranted``
+    (``McpToolPicker.tsx``) accepts any truthy value — so a stored ``1`` or ``"yes"`` would
+    read GRANTED in the UI and DENIED at run time. The property that fixes it is
+    **"only a value the gate can read ever reaches the column"**, and that property is
+    unchanged here.
+
+    ⚠ WHAT CHANGED IS THE DISPOSITION OF A VALUE WE CANNOT EXPRESS — refuse, never coerce.
+    ``bool("deny")`` is ``True``. Coercion is safe only while every legal value is already
+    boolean-shaped; the moment a THIRD state exists it becomes a **fail-OPEN**, and the
+    measured shape of that failure is::
+
+        {"delete_repository": "deny", "search_code": "ask"}
+            →  {"delete_repository": True, "search_code": True}      # driven 2026-08-27
+
+    i.e. a **Deny a person set is stored as an Allow**, silently, with nothing anywhere
+    reporting it. That is why this refuses rather than coerces: when Phase 213 widens the
+    value type and forgets a call site, the write goes RED **at the seam** instead of
+    writing `True`. This is the Phase 204 defect class — ``inputs`` vs ``metadata``, the
+    read failed open, and 106 tests were green.
+
+    ⚠ THE REFUSAL PRECEDES THE WRITE, and that is load-bearing rather than tidy: the grants
+    write is a whole-column REPLACE (D-206.2-16), so a sanitizer that raised *after*
+    building the payload would already have wiped every other grant on the connection.
+
+    Raises ``ValueError`` — mapped to a 422 by both routers, per the WR-02 convention.
+    """
+    from app.services.connectors.grants import APPLICATION_GRANT_PREFIX
+
+    clean: dict[str, str] = {}
+    for key, value in tool_grants.items():
+        name = str(key)
+        # ⚠ Phase 221 (D-221-05) — THE KEY SHAPE IS NOW CHECKED, AND IT WAS NOT BEFORE.
+        # Every key used to pass through on `str(key)`, so `app:drive` already survived
+        # this function untouched — which is why the application rung needs no migration.
+        # But the same silence accepted `foo:bar`, and a namespace nobody implements is a
+        # grant that reads as configured and resolves as nothing. Two shapes are legal: a
+        # bare tool name, and exactly one `app:` key. Anything else is refused for the
+        # identical reason a bad VALUE is refused above — refuse, never coerce, so the
+        # write goes RED at the seam instead of storing something the gate cannot read.
+        if ":" in name and not name.startswith(APPLICATION_GRANT_PREFIX):
+            raise ValueError(
+                f"tool grant key {name!r} uses an unknown namespace. Only a bare tool "
+                f"name or an {APPLICATION_GRANT_PREFIX!r}-prefixed application key is "
+                f"valid. Refused rather than stored: a namespace nothing resolves would "
+                f"read as configured and grant nothing."
+            )
+        if name.startswith(APPLICATION_GRANT_PREFIX) and not name[len(APPLICATION_GRANT_PREFIX):].strip():
+            raise ValueError(
+                f"tool grant key {name!r} names no application. Refused rather than "
+                f"stored: an empty application key can never match a tool."
+            )
+        if not isinstance(value, str) or value not in _LEGAL_GRANT_VALUES:
+            raise ValueError(
+                f"tool grant {name!r} has the value {value!r} "
+                f"({type(value).__name__}), which is not one of "
+                f"{sorted(_LEGAL_GRANT_VALUES)}. Refused rather than coerced: "
+                f"only 'allow', 'ask', or 'deny' are valid approval postures."
+            )
+        clean[name] = value
+    return clean
+
+
 def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
 
@@ -296,12 +411,33 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
     is dropped here AND would be rejected by `extra='forbid'` if it somehow got through.
     """
     d = {key: row.get(key) for key in _RESPONSE_KEYS}
+    if d.get("auth_type") is None:
+        d["auth_type"] = "mcp" if row.get("mcp_server_url") else "static_key"
+    if d.get("status") is None:
+        d["status"] = "active"
     if d.get("tool_grants") is None:
         d["tool_grants"] = {}
     if d.get("discovered_tools") is None:
         d["discovered_tools"] = []
+    # Phase 221 — heal a cache written before the `app` key existed. Function-local for the
+    # reason every other `service_tools` import here is: the adapter registry stays out of
+    # the cold import graph. See `backfill_application_keys` for why this is a read-time
+    # repair and not a migration.
+    from app.services.connectors.service_tools import backfill_application_keys
+
+    d["discovered_tools"] = backfill_application_keys(
+        d.get("service_id"), d.get("discovered_tools")
+    )
     if d.get("config") is None:
         d["config"] = {}
+    if d.get("default_approval_posture") is None:
+        d["default_approval_posture"] = "ask"
+    cfg = d.get("config")
+    if isinstance(cfg, dict):
+        if not d.get("account_email") and cfg.get("account_email"):
+            d["account_email"] = cfg.get("account_email")
+        if not d.get("account_name") and cfg.get("account_name"):
+            d["account_name"] = cfg.get("account_name")
     return ConnectorConnectionResponse.model_validate(d)
 
 
@@ -330,6 +466,101 @@ async def _fetch_connection_row(connection_id: str, org_id: str) -> dict | None:
     )
     return (result.data or [None])[0]
 
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# THE BYO-OAUTH APPLICATION SECRET (migration 150)
+# ══════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ IT HAS ITS OWN COLUMN BECAUSE IT USED TO LIVE IN `config`, WHICH EVERY ORG MEMBER CAN
+# READ. Measured 2026-08-31 on the live database:
+# `has_column_privilege('authenticated', 'public.connector_connections', 'config',
+# 'SELECT')` is TRUE, while the same call for `secret_ciphertext` is FALSE. Phase 215
+# declared `custom_client_secret` as a field of the OAuth config model, so a customer's
+# application secret was returned by the ordinary connections list.
+#
+# Both functions run on the SERVICE-ROLE client and take `org_id` with no default, for the
+# reason `resolve_connection` states at length: an optional org scope is the id-only query
+# wearing a disguise.
+
+
+async def store_oauth_client_credentials(
+    connection_id: str,
+    org_id: str,
+    *,
+    client_id: str | None,
+    client_secret: str | None,
+) -> None:
+    """Persist a customer-registered OAuth application, so Connect works a second time.
+
+    ⚠ A BLANK VALUE NEVER OVERWRITES A STORED ONE. The form cannot show a secret back (it
+    is not readable), so every reopen submits an empty field — and treating that as "clear
+    it" would destroy the credential the moment somebody opened the panel to look.
+
+    The id is a plain `config` fact; the secret is encrypted into its own ungranted column.
+    """
+    updates: dict[str, object] = {}
+
+    if client_id and client_id.strip():
+        row = await _fetch_connection_row(connection_id, org_id)
+        if row is None:
+            raise ConnectorNotFound(f"no connection {connection_id}")
+        config = dict(row.get("config") or {})
+        config["custom_client_id"] = client_id.strip()
+        # ⚠ SWEPT ON EVERY WRITE, not only by the migration. A row that still carries the
+        # old plaintext key gets it removed the next time anybody touches this connection,
+        # so the exposure closes without waiting for a deploy of the migration everywhere.
+        config.pop("custom_client_secret", None)
+        updates["config"] = config
+
+    if client_secret and client_secret.strip():
+        from app.services.oauth_service import encrypt_token_value
+
+        updates["oauth_client_secret_ciphertext"] = encrypt_token_value(client_secret.strip())
+
+    if not updates:
+        return
+
+    await aexec(
+        _client(None)
+        .table(_TABLE)
+        .update(updates)
+        .eq("id", connection_id)
+        .eq("org_id", org_id)  # D-14 — the scope. Removing this term is the leak.
+    )
+    logger.info(
+        "connector_service: stored OAuth application credentials for connection %s "
+        "(client_id=%s, secret=%s)",
+        connection_id, bool(client_id), bool(client_secret),
+    )
+
+
+async def read_oauth_client_secret(connection_id: str, org_id: str) -> str | None:
+    """The plaintext application secret, or ``None`` when this connection has none.
+
+    ⚠ `None` IS A REAL ANSWER AND MUST NOT BE MADE INTO AN ERROR. A connection using the
+    install-wide credentials from the environment legitimately has no stored application,
+    and `resolve_client_credentials` falls back to those — so raising here would break the
+    non-BYO path that has always worked.
+    """
+    row = await _fetch_connection_row(connection_id, org_id)
+    if row is None:
+        return None
+    ciphertext = row.get("oauth_client_secret_ciphertext")
+    if not isinstance(ciphertext, str) or not ciphertext:
+        return None
+
+    from app.services.oauth_service import decrypt_token_value
+
+    try:
+        return decrypt_token_value(ciphertext)
+    except Exception:
+        # A credential no configured key can read is ABSENT, not empty. Returning "" would
+        # be sent to the provider as a secret and refused with a confusing message.
+        logger.error(
+            "connector_service: connection %s has an OAuth application secret that no "
+            "configured key can decrypt (fail closed)", connection_id,
+        )
+        return None
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
 # THE RESOLVER (D-14) — ⭐ the headline security gate of Phase 190
@@ -380,11 +611,38 @@ async def _fetch_connection_row(connection_id: str, org_id: str) -> dict | None:
 # Fernet call to `ResolvedConnection.secret` instead. Both D-11 read gates stay EAGER, so
 # nothing about the fail-closed property moved.
 # ══════════════════════════════════════════════════════════════════════════════════════════
+async def read_oauth_access_token(connection_id: str) -> str | None:
+    """The live OAuth access token for a connection, or `None` if it has never consented.
+
+    ⚠ SERVICE CLIENT, DELIBERATELY. `connector_tokens.access_token_ciphertext` is ungranted
+    to `authenticated` (migration 129 §4) — that is the whole point of the column — so a
+    user-JWT read cannot name it. Migration 151 added the row-level policy that makes the
+    NON-secret columns readable; the ciphertext stays unreachable to a member either way.
+
+    Returns the PLAINTEXT token. Callers hand it straight to the transport and never log it.
+    """
+    from app.services.oauth_service import decrypt_token_value
+
+    res = await aexec(
+        _client(None)
+        .table("connector_tokens")
+        .select("access_token_ciphertext")
+        .eq("connection_id", str(connection_id))
+        .limit(1)
+    )
+    if not res.data:
+        return None
+    ciphertext = res.data[0].get("access_token_ciphertext")
+    return decrypt_token_value(ciphertext) if ciphertext else None
+
+
 async def resolve_connection(
     connection_id: str,
     org_id: str,
     *,
     fetch_row: FetchRow | None = None,
+    #: The OAuth-token seam, same shape and same reason as `fetch_row`.
+    fetch_oauth_token: Callable[[str], Awaitable[str | None]] | None = None,
 ) -> ResolvedConnection:
     """Resolve a bound connection FOR THE RUN'S ORG and return its credential.
 
@@ -443,27 +701,45 @@ async def resolve_connection(
         # omit it. Two places describing one row, disagreeing — the shape this repo keeps
         # finding.
         #
-        # ⚠ THE RELAXATION IS SCOPED TO THE MCP SHAPE AND NOWHERE ELSE. A capability
-        # connection with no secret is still `ConnectorNotFound`, unchanged, because that is
-        # still true of it.
-        if not row.get("mcp_server_url"):
+        # ⚠ THE RELAXATION IS SCOPED TO THE TWO CREDENTIAL-LESS SHAPES AND NOWHERE ELSE. A
+        # CAPABILITY connection with no secret is still `ConnectorNotFound`, unchanged,
+        # because that is still true of it: an SMTP host, a Jira instance and a Slack
+        # workspace each REQUIRE a credential, so a row without one is absent for the purpose
+        # of sending.
+        #
+        # ⚠ PHASE 211 ADDS THE SECOND CREDENTIAL-LESS SHAPE, for the same reason and with the
+        # same evidence. A SERVICE-ONLY row (CONN-08 — no capability, no `mcp_server_url`, and
+        # no secret until OAuth ships in Phase 215) also has no credential, and refusing it
+        # HERE produced the identical defect the MCP note above records: **404 "no connection"
+        # about a row sitting in the table**, which then makes both `/check` and `/discover`
+        # answer with a sentence that is not true. The named refusals those two routes owe
+        # (T-211-13 / T-211-13d) can only be worded if the row resolves at all.
+        #
+        # ⚠ IT OPENS NO SEND PATH. `_exec_external_action` branches on `mcp_tool_name` and
+        # then on `capability`; a service-only row has NEITHER, so nothing in the executor can
+        # select it. Org scoping (both gates above) and `is_enabled` are unchanged, and there
+        # is no credential on such a row to disclose.
+        if row.get("capability"):
             logger.info(
                 "connector_service: connection %s has no stored secret_ciphertext", connection_id
             )
             raise ConnectorNotFound(f"no connection {connection_id}")
 
         logger.info(
-            "connector_service: resolved MCP connection %s with NO credential — the remote "
-            "server is unauthenticated (no Authorization header will be sent)", connection_id,
+            "connector_service: resolved connection %s with NO credential (mcp_server_url=%s) "
+            "— either an unauthenticated remote server, or a service-only row that has no way "
+            "to be reached yet", connection_id, bool(row.get("mcp_server_url")),
         )
         return ResolvedConnection(
             connection_id=str(row["id"]),
             org_id=str(row["org_id"]),
             capability=row.get("capability"),
+            service_id=row.get("service_id"),
             name=str(row.get("name") or ""),
             config=dict(row.get("config") or {}),
             secret_ciphertext=None,
             mcp_server_url=row.get("mcp_server_url"),
+            default_approval_posture=str(row.get("default_approval_posture") or "ask"),
             tool_grants=dict(row.get("tool_grants") or {}),
             discovered_tools=list(row.get("discovered_tools") or []),
         )
@@ -501,14 +777,77 @@ async def resolve_connection(
         "connector_service: resolved connection %s (capability=%s, config keys=%s)",
         connection_id, row.get("capability"), sorted(dict(row.get("config") or {})),
     )
+
+    # ⚠ A LIVE OAUTH TOKEN WINS OVER A STORED STATIC SECRET, and the ordering is the fix.
+    # A row that has completed consent may STILL carry the pasted credential somebody tried
+    # first — Notion's does, and that credential is precisely the one the server refuses with
+    # `403 restricted_resource`. Preferring the stored secret would mean a connection that
+    # just authorized successfully keeps failing with the error it authorized to escape.
+    #
+    # ⚠ SCOPED BY THE ROW WE ALREADY RESOLVED FOR THIS ORG. The lookup is by `connection_id`
+    # alone, and it is safe for one reason worth stating rather than assuming: we are past
+    # `fetch(connection_id, org_id)`, so this connection is already proven to belong to the
+    # caller's org. A token cannot be read for a connection the caller could not resolve.
+    # ⚠ THROUGH THE SAME INJECTABLE SEAM `fetch_row` USES, and the first cut did not — it
+    # called storage directly and broke SIX shipped tests with `getaddrinfo failed`, because
+    # this resolver is deliberately unit-testable WITHOUT a database. A new read that ignores
+    # the seam quietly makes every caller of the seam network-dependent.
+    #
+    # ⚠ AND IT IS TOLERANT, which is a degradation to the PREVIOUS behaviour rather than a
+    # fail-open: if the token table cannot be read, the connection still resolves on the
+    # credential it already had. Nothing is granted that was not granted before; the only
+    # thing lost is the upgrade from a stale secret to a live token, and that is logged.
+    #
+    # ⚠ AN MCP ROW RENEWS; EVERY OTHER SHAPE READS (SEED-238). `read_oauth_access_token`
+    # projects `access_token_ciphertext` and NOTHING ELSE — no `expires_at`, no refresh — so
+    # before this branch a consented MCP connection ran on the token minted at consent until
+    # it expired, and then failed with `401 invalid_token`: an expiry wearing a rejection's
+    # clothes, which sends a person to re-consent and mint another one that dies the same way.
+    #
+    # ⚠ KEYED ON `mcp_server_url`, THE SAME FACT THE CHECK ROUTE KEYS ON (`:716`), and never
+    # on `auth_type`. A non-MCP OAuth row keeps its existing read: those renew through
+    # `oauth_refresh_service` at their own Google-specific call sites, and routing them here
+    # would give one credential two renewal engines.
+    #
+    # ⚠ THE RENEWAL IS ONLY ATTEMPTED INSIDE THE SKEW WINDOW. This is the hot path — every
+    # tool call — and a check that re-discovered metadata each time would put two network
+    # round trips in front of every action a workflow takes.
+    if fetch_oauth_token is not None:
+        fetch_token = fetch_oauth_token
+    elif row.get("mcp_server_url"):
+        from app.services.mcp_token import ensure_fresh_mcp_token
+
+        fetch_token = ensure_fresh_mcp_token
+    else:
+        fetch_token = read_oauth_access_token
+    resolved_scheme = "auto"
+    try:
+        oauth_token = await fetch_token(connection_id)
+    except Exception:
+        logger.warning(
+            "connector_service: could not read an OAuth token for connection %s; resolving "
+            "on the stored credential instead", connection_id, exc_info=True,
+        )
+        oauth_token = None
+    if oauth_token:
+        # Re-encrypt under the SAME cipher the lazy `.secret` property decrypts with, so the
+        # object keeps its one invariant: the plaintext is never held on the dataclass.
+        from app.services.oauth_service import encrypt_token_value
+
+        raw = encrypt_token_value(oauth_token)
+        resolved_scheme = "bearer"
+
     return ResolvedConnection(
         connection_id=str(row["id"]),
         org_id=str(row["org_id"]),
         capability=row.get("capability"),
+        service_id=row.get("service_id"),
         name=str(row.get("name") or ""),
         config=dict(row.get("config") or {}),
         secret_ciphertext=raw,
         mcp_server_url=row.get("mcp_server_url"),
+        auth_scheme=resolved_scheme,
+        default_approval_posture=str(row.get("default_approval_posture") or "ask"),
         tool_grants=dict(row.get("tool_grants") or {}),
         discovered_tools=list(row.get("discovered_tools") or []),
     )
@@ -551,17 +890,54 @@ async def create_connection(
 
     config_data = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else (payload.config or {})
 
+    # Phase 211 — the static action descriptor, WRITTEN AT CREATE TIME.
+    #
+    # ⭐ This is what makes SC#2's *"a connection presents as a service with a named action"*
+    # true for a NEW capability row. It is a WRITE, never a read-time projection: read-time
+    # branching is what D-211-03 rejected, because it makes the same row look like a service
+    # in one surface and like a verb in the next, and every new reader has to re-implement the
+    # branch. Existing rows get theirs from migration 127 §2b.
+    #
+    # ⚠ Imported INSIDE the function, not at module scope. `descriptors.py` reaches the
+    # adapter registry, and the registry is what `test_190_connector_source_fence.py` keeps out
+    # of the cold import graph until a send actually happens — a module-scope import here is
+    # the one edge that could drag the vendor adapters in.
+    if payload.capability:
+        from app.services.connectors.descriptors import static_descriptors_for_capability
+
+        descriptors = static_descriptors_for_capability(payload.capability, payload.service_id)
+    else:
+        # A service-only row genuinely HAS no action until OAuth (Phase 215) gives it one.
+        # An empty list is the honest answer; a placeholder action would be a lie a picker
+        # would happily render.
+        descriptors = []
+
     row = {
         "org_id": str(org_id),  # HARD-SET — never from the body (D-14)
         "created_by": str(created_by),  # HARD-SET — never from the body
         "capability": payload.capability,
+        # ⚠ A COLUMN ABSENT FROM THIS DICT IS NEVER WRITTEN, whatever the model declares —
+        # this literal is point 5 of the Phase 211 column lockstep. `.strip()` is belt and
+        # braces: `ServiceId`'s AfterValidator has already normalised it, and it stays here so
+        # a future non-API caller constructing the payload by hand cannot store `' slack'`
+        # beside `'slack'` as two different services.
+        "service_id": payload.service_id.strip(),
         "name": payload.name,
         "config": config_data,
         "secret_ciphertext": ciphertext,
         "is_enabled": True,
         "last_check_verdict": "not_checked",
         "mcp_server_url": payload.mcp_server_url,
-        "tool_grants": payload.tool_grants,
+        "default_approval_posture": getattr(payload, "default_approval_posture", "ask") or "ask",
+        "tool_grants": _sanitize_tool_grants(payload.tool_grants) if payload.tool_grants else {},
+        # ⚠ `tool_grants` above is UNTOUCHED by the descriptor. A descriptor ADVERTISES an
+        # action; it does not GRANT one. The executor's gate reads `tool_grants` alone and a
+        # missing key DENIES — that asymmetry is the desirable direction and must not be
+        # closed by accident here.
+        "discovered_tools": descriptors,
+        "auth_type": getattr(payload, "auth_type", "static_key") or "static_key",
+        "status": getattr(payload, "status", "active") or "active",
+        "error_message": getattr(payload, "error_message", None),
     }
     result = await aexec(_project(_client(supabase).table(_TABLE).insert(row)))
     created = (result.data or [None])[0]
@@ -692,11 +1068,20 @@ async def update_connection(
     if "mcp_server_url" in submitted and payload.mcp_server_url is not None:
         changes["mcp_server_url"] = payload.mcp_server_url
 
-    if "tool_grants" in submitted and payload.tool_grants is not None:
-        changes["tool_grants"] = {str(k): bool(v) for k, v in payload.tool_grants.items()}
+    if "default_approval_posture" in submitted and payload.default_approval_posture is not None:
+        changes["default_approval_posture"] = payload.default_approval_posture
 
-    if "discovered_tools" in submitted and payload.discovered_tools is not None:
-        changes["discovered_tools"] = payload.discovered_tools
+    if "tool_grants" in submitted and payload.tool_grants is not None:
+        changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)
+
+    if "auth_type" in submitted and payload.auth_type is not None:
+        changes["auth_type"] = payload.auth_type
+
+    if "status" in submitted and payload.status is not None:
+        changes["status"] = payload.status
+
+    if "error_message" in submitted and payload.error_message is not None:
+        changes["error_message"] = payload.error_message
 
     if "secret" in submitted and payload.secret is not None:
         cipher = get_cipher()
@@ -734,18 +1119,78 @@ async def update_connection(
     return _to_response(updated)
 
 
+def _service_advertises_actions(service_id: str | None) -> bool:
+    """Does this SERVICE have an action list of its own, independent of any capability?
+
+    Kept as a named predicate rather than an inline truth test so the discover ladder reads
+    as three routes to the same answer — a remote server, a capability adapter, a service —
+    rather than two routes and an exception.
+
+    ⚠ The import is function-local for the reason `descriptors.py` states: nothing that
+    merely asks WHAT a connection advertises should drag a vendor module into the graph.
+    """
+    if not service_id:
+        return False
+    from app.services.connectors.service_tools import extra_descriptors_for_service
+
+    return bool(extra_descriptors_for_service(service_id))
+
+
 async def discover_connection_tools(
     connection_id: str,
     org_id: str,
     supabase: Client | None = None,
 ) -> list[dict]:
-    """Phase 206 (D-206-05) — Discover tools from a remote MCP server and cache them on the row."""
-    resolved = await resolve_connection(connection_id, org_id=org_id)
-    if not resolved.mcp_server_url:
-        raise ConnectorError(f"connection {connection_id} is not configured with an mcp_server_url")
+    """Refresh a connection's action list and cache it on the row — WHATEVER ITS SHAPE.
 
-    from app.services import mcp_client
-    tools = await mcp_client.list_tools(resolved.mcp_server_url, secret=resolved.secret)
+    Phase 206 (D-206-05) shipped this for the remote-MCP shape only. Phase 211 gives it a
+    second arm, so ONE refresh path serves both reachable shapes and a stale copy self-heals in
+    one click from the same control.
+
+    ── The three shapes, and why each arm is here ──────────────────────────────────────────
+      * **MCP** — ask the server, unchanged. A network call, and the only arm that can fail
+        with a genuine bad gateway.
+      * **CAPABILITY** — write the adapter's own static descriptor. **NO NETWORK CALL HAPPENS
+        AT ALL**, which is exactly why the route must not report a failure here as a 502.
+        This is also what makes a row written before an adapter's `INPUT_SCHEMA` changed
+        refreshable: migration 127 §2b's copy is a snapshot, and this is how it is retaken.
+      * **SERVICE-ONLY** — `ConnectorNothingToDiscover`, worded. See that class.
+
+    ⚠ `tool_grants` IS NEVER TOUCHED BY ANY ARM. A descriptor advertises an action; it does not
+    grant one, and the executor's gate denies on a missing grant key by design.
+    """
+    resolved = await resolve_connection(connection_id, org_id=org_id)
+
+    if resolved.mcp_server_url:
+        from app.services import mcp_client
+        tools = await mcp_client.list_tools(
+            resolved.mcp_server_url,
+            secret=resolved.secret,
+            # The resolver knows where this credential came from; the transport cannot.
+            auth_scheme=resolved.auth_scheme,
+        )
+    elif resolved.capability:
+        # ⚠ Function-local import, for the reason `create_connection` states: `descriptors.py`
+        # reaches the adapter registry, and the source fence keeps that out of the cold import
+        # graph until a send happens.
+        from app.services.connectors.descriptors import static_descriptors_for_capability
+
+        tools = static_descriptors_for_capability(resolved.capability, resolved.service_id)
+    elif _service_advertises_actions(getattr(resolved, "service_id", None)):
+        # ⚠ THE OAUTH ARM, AND ITS ABSENCE IS WHAT THE OPERATOR MET. A `oauth_byo` row has
+        # NO `capability` and NO `mcp_server_url`, so both branches above missed and the
+        # refusal below fired: *"This connection names a service but no way to reach it
+        # yet."* That sentence was written for CONN-08 — a row naming a service with no
+        # credential — and it stopped being true the moment Phase 215 gave the row a token.
+        # The row IS reachable; it is reachable by a third route the ladder did not know.
+        from app.services.connectors.service_tools import extra_descriptors_for_service
+
+        tools = extra_descriptors_for_service(resolved.service_id)
+    else:
+        raise ConnectorNothingToDiscover(
+            "this connection names a service but no way to reach it yet, so there is nothing "
+            "to refresh"
+        )
 
     client = _client(supabase)
     # ⚠ `_project` IS NOT OPTIONAL ON A WRITE THAT RUNS ON THE USER-JWT CLIENT, and this call
@@ -778,13 +1223,15 @@ async def discover_connection_tools(
 async def update_connection_grants(
     connection_id: str,
     org_id: str,
-    tool_grants: dict[str, bool],
+    tool_grants: dict[str, str],
     supabase: Client | None = None,
 ) -> ConnectorConnectionResponse:
-    """Phase 206 (F-1 / D-206-06) — Update per-tool boolean grants on an MCP connection."""
+    """Phase 213 (GRANT-01) — Update per-tool approval posture grants on a connection."""
     client = _client(supabase)
-    # F-1: strictly enforce boolean map { [tool_name]: boolean }
-    sanitized_grants = {str(k): bool(v) for k, v in tool_grants.items()}
+    # F-1: strictly enforce the legal grant map { [tool_name]: <legal value> }. ⚠ This runs
+    # BEFORE the update is built — the write is a whole-column REPLACE (D-206.2-16), so a
+    # refusal that arrived afterwards would already have wiped every other grant.
+    sanitized_grants = _sanitize_tool_grants(tool_grants)
     result = await aexec(
         _project(
             client.table(_TABLE)
@@ -804,6 +1251,39 @@ async def update_connection_grants(
 
 
 
+
+
+async def grant_one_tool(
+    connection_id: str,
+    org_id: str,
+    tool_name: str,
+    posture: str,
+    supabase: Client | None = None,
+) -> ConnectorConnectionResponse:
+    """Set ONE tool's posture, leaving every other grant exactly as it was.
+
+    ⚠ `update_connection_grants` IS A WHOLE-COLUMN REPLACE (D-206.2-16), which is correct
+    for the settings panel — that form owns the entire map and submits all of it. It is
+    the WRONG primitive for "always allow this one action", the decision a person makes
+    from a chat approval card: a caller that read the map, added a key and wrote it back
+    would silently revert any grant changed in between, and a caller that sent only the
+    one key would wipe all the others.
+
+    So the read-merge-write lives HERE, once, on the server. Doing it in the browser would
+    put a lost-update race on a permission surface — the one place where losing a write
+    means a tool stays more permissive, or less, than the person believes.
+
+    Org-scoped by `_fetch_connection_row`, so a connection id from another org is a
+    `ConnectorNotFound` and never a write.
+    """
+    row = await _fetch_connection_row(str(connection_id), str(org_id))
+    if row is None:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+    merged = dict(row.get("tool_grants") or {})
+    merged[str(tool_name)] = str(posture)
+    return await update_connection_grants(
+        str(connection_id), org_id=str(org_id), tool_grants=merged, supabase=supabase
+    )
 
 
 async def record_check_verdict(
@@ -1019,38 +1499,103 @@ async def delete_connection(
     return removed
 
 
+async def save_oauth_tokens(
+    connection_id: str,
+    org_id: str,
+    access_token: str,
+    refresh_token: str | None,
+    token_type: str,
+    scopes: list[str],
+    expires_in: int,
+    account_email: str | None,
+    account_name: str | None,
+    supabase: Client | None = None,
+) -> None:
+    """Phase 215 (OAUTH-01, OAUTH-02) — Encrypt and store OAuth tokens in connector_tokens."""
+    from datetime import datetime, timedelta, timezone
+    from app.services.oauth_service import encrypt_token_value
 
+    client = _client(supabase)
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    enc_access = encrypt_token_value(access_token)
+    enc_refresh = encrypt_token_value(refresh_token) if refresh_token else None
+
+    # 1. Upsert connector_tokens
+    token_row = {
+        "connection_id": str(connection_id),
+        "account_email": account_email,
+        "account_name": account_name,
+        "access_token_ciphertext": enc_access,
+        "refresh_token_ciphertext": enc_refresh,
+        "token_type": token_type or "Bearer",
+        "scopes": scopes or [],
+        "expires_at": expires_at,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await aexec(
+        client.table("connector_tokens")
+        .upsert(token_row, on_conflict="connection_id")
+    )
+
+    # 2. Update connection status and account email
+    await aexec(
+        client.table(_TABLE)
+        .update({
+            "auth_type": "oauth_byo",
+            "status": "active",
+            "error_message": None,
+        })
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))
+    )
+    logger.info("connector_service: saved encrypted OAuth tokens for connection %s (%s)", connection_id, account_email)
+
+
+async def get_oauth_token_status(
+    connection_id: str,
+    org_id: str,
+    supabase: Client | None = None,
+) -> dict[str, Any] | None:
+    """Fetch public non-secret token metadata for a connection."""
+    client = _client(supabase)
+    # Ensure connection exists and belongs to org
+    conn_res = await aexec(
+        client.table(_TABLE)
+        .select("id, status, auth_type")
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))
+    )
+    if not conn_res.data:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+
+    res = await aexec(
+        client.table("connector_tokens")
+        .select("id, connection_id, account_email, account_name, token_type, scopes, expires_at, created_at, updated_at")
+        .eq("connection_id", str(connection_id))
+    )
+    if not res.data:
+        return None
+    row = res.data[0]
+    row["status"] = conn_res.data[0].get("status", "active")
+    return row
 
 
 __all__ = [
-
     "ConnectorError",
-
     "ConnectorNotFound",
-
     "ConnectorDisabled",
-
     "ConnectorCipherUnavailable",
-
     "ConnectorSecretNotEncrypted",
-
     "ConnectorSecretUnreadable",
-
     "ResolvedConnection",
-
     "resolve_connection",
-
     "create_connection",
-
     "list_connections",
-
     "get_connection",
-
     "update_connection",
-
     "delete_connection",
-
     "record_check_verdict",
-
+    "save_oauth_tokens",
+    "get_oauth_token_status",
 ]
 

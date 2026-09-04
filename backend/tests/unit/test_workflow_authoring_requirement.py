@@ -1290,11 +1290,23 @@ ADVERTISED_BUT_NOT_ASKED: dict[str, str] = {
         "provenance claim is a thing the SERVER decides, never a thing the model asserts "
         "about itself; cf. the stamp this file already fences in both directions"
     ),
-    "inputs": (
-        "the launch-form spec, authored on the visual canvas rather than at birth "
-        "(`models/harness.py:532`) — a generated draft that invented launch inputs would "
-        "hand the author a form nobody asked for"
-    ),
+    # ⚠ `inputs` WAS AN ENTRY HERE AND WAS REMOVED BY PHASE 214.1-02, WHICH IS THIS
+    # ALLOWLIST'S TWO-DIRECTIONAL CONTRACT WORKING RATHER THAN BEING SILENCED. The row is
+    # recorded here rather than deleted without trace, because its REASON was refuted by
+    # measurement and that is the finding:
+    #
+    #   "the launch-form spec, authored on the visual canvas rather than at birth
+    #    (`models/harness.py:532`) — a generated draft that invented launch inputs would
+    #    hand the author a form nobody asked for"
+    #
+    # ⇒ REFUTED ON BOTH HALVES. (a) `BUG-260828-02` measured that a draft which declares
+    # NOTHING is refused at publish with `ask_undeclared` and could not be repaired,
+    # because no authoring surface could declare an input at all — so "authored on the
+    # visual canvas" was not true of any canvas that existed. (b) SC#4 requires an
+    # AI-drafted workflow to be publishable WITHOUT HAND-REPAIR, and the prompt clause plus
+    # `_declare_asked_arguments` deliver that together. ⛔ Nothing is INVENTED: the
+    # derivation writes only keys the model's own `arg_sources` already said would be asked
+    # for at launch, so the form is exactly the one the draft asked for.
     "assets": (
         "template/reference refs, PRODUCED by the author-time binding door and consumed "
         "by `template_asset_service.resolve_template_source` (`models/harness.py:533`) — "
@@ -1322,8 +1334,13 @@ ADVERTISED_BUT_NOT_ASKED: dict[str, str] = {
         "then ignores it — worse than stateless, because the author would believe it "
         "remembered. The toggle and the prompt must move together, and the canvas is the "
         "one place an author does both (the toggle in the builder header, the insert chips "
-        "in the phase form). Same shape as `inputs` above: authored on the visual canvas "
-        "rather than at birth. ⚠ RE-OPEN TRIGGER: if the authoring prompt is ever taught "
+        "in the phase form). ⚠ THIS ROW USED TO SAY 'same shape as `inputs` above', AND "
+        "214.1-02 MADE THAT COMPARISON FALSE — `inputs` LEFT this allowlist because its "
+        "value is DERIVABLE from the emitted definition alone (the model's own `arg_sources` "
+        "name the keys), whereas `is_stateful` is not: nothing in an emitted definition "
+        "tells the server whether the phase prompts were written to consume last week's "
+        "output. So the two rows part company here, and this one stays for a reason that "
+        "is now its OWN rather than borrowed. ⚠ RE-OPEN TRIGGER: if the authoring prompt is ever taught "
         "to WRITE `{{prior_run.output}}` into the phase prompts it generates, then asking "
         "for this flag becomes coherent and it should move out of this allowlist in the "
         "same commit."

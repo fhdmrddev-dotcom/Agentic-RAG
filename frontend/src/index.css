@@ -97,6 +97,17 @@
        reuses that value.
          --accent-violet-text : 258 80% 40% (#4514b8) → 8.52:1 on light --panel-surface (text) */
     --accent-violet-text: 258 80% 40%;
+    /* Phase 217-06 (D-217-20 / D-217-21) — the ACTIVE TAB surface, theme-paired.
+       ⚠ A NEW TOKEN, NOT A SWAP. No existing token is lighter than --muted in BOTH themes:
+       --card fails dark (7% < 11%), --accent fails light (92% < 94%), and --background fails
+       dark (4% < 11%) — which IS the shipped inversion this token exists to fix.
+       Light: L 100% vs --muted 94% → +6, so the active tab reads as a raised chip.
+       ⚠ Text contrast MEASURED, not assumed (assumption A6): --foreground
+       (222 47% 11% = #171f30) on #ffffff → 17.87:1, clearing the ≥4.5:1 normal-text floor.
+       Read by components/ui/tabs.tsx as `data-[state=active]:bg-tab-active`, mapped in
+       tailwind.config.js beside the panel-* family, guarded by
+       components/ui/__tests__/tabsContrast.test.ts. */
+    --tab-active: 0 0% 100%;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -182,6 +193,17 @@
        is the lightened value the UI-SPEC prescribes for the "Attempt N" label.
          --accent-violet-text : 258 95% 84% (#c5b0fd) → 9.83:1 on dark --panel-surface (text) */
     --accent-violet-text: 258 95% 84%;
+    /* Phase 217-06 (D-217-20 / D-217-21) — the ACTIVE TAB surface (Deep Midnight).
+       ⭐ THIS IS THE HALF THAT WAS BROKEN. `data-[state=active]:bg-background` painted the
+       selected tab at L 4% inside a track at L 11% — SEVEN POINTS DARKER, a hole rather than
+       a raised chip — and its only other cue was a 5%-opacity shadow, invisible at 4% L.
+       Dark: L 16% vs --muted 11% → +5, the same SIGN as light; the bar no longer inverts.
+       ⚠ Text contrast MEASURED, not assumed (assumption A6): --foreground
+       (226 60% 97% = #f2f4fd) on #1f2533 → 14.06:1, clearing the ≥4.5:1 normal-text floor.
+       ⛔ --background / --muted / --card / --accent / --border are deliberately UNTOUCHED:
+       sketch 218's fences A4 and A4b measure --muted against --background and must stay
+       TRUE — they are the RECORDED FINDING, not a target. */
+    --tab-active: 220 25% 16%;
   }
 }
 

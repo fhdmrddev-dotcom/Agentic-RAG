@@ -50,6 +50,8 @@ type MessageResponseDTO = Message & {
   provider?: string | null
   started_at?: string | null
   completed_at?: string | null
+  // Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
+  active_connector_ids?: string[] | null
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -79,6 +81,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     provider,
     started_at,
     completed_at,
+    active_connector_ids,
     ...rest
   } = m
   const mapped: Message = {
@@ -92,6 +95,8 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     provider: provider ?? undefined,
     startedAt: started_at ?? undefined,
     completedAt: completed_at ?? undefined,
+    // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): preserve [] as [] and null/undefined as undefined
+    activeConnectorIds: active_connector_ids != null ? active_connector_ids : undefined,
   }
   if (confidence_level) {
     mapped.confidence = {
@@ -355,7 +360,21 @@ export interface StreamCallbacks {
   onTaskStart?: (subRunId: string, description: string, tools: string[], maxSteps: number) => void
   /** sub_agent_done TASK variant (has sub_run_id) — distinct from the legacy
    *  analyze_document onSubAgentDone no-arg path. */
-  onTaskDone?: (subRunId: string, status: string, summary: string) => void
+  onTaskDone?: (subRunId: string, status: string, summary?: string) => void
+  /** Phase 216 (GRANT-03 / CHAT-07): tool_approval_required SSE event when a connector tool pauses on 'ask' posture. */
+  onToolApprovalRequired?: (approval: {
+    callId: string
+    /** ⚠ THE CONNECTION, NOT ONLY THE SERVICE. Two rows can share a `service_id`, so
+     *  "Always allow" must name the row it is changing rather than infer it. Optional on
+     *  the type because a run paused before 2026-08-31 has no such field on the wire. */
+    connectionId?: string
+    serviceId: string
+    serviceName: string
+    toolName: string
+    args: Record<string, any>
+    expiresAt?: string
+    timeoutSeconds?: number
+  }) => void
   // ──────────────────────────────────────────────────────────────────────────
   // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle SSE
   // callbacks. The 6 new event types (phase_started / phase_completed /
@@ -465,6 +484,18 @@ export async function postMessage(
      *  modal picks a folder that differs from the workflow default — absence is the
      *  byte-identical D-06 path (no override → the author default / whole-KB). */
     folderId?: string | null
+    /** Phase 214 (STEP-02 / D-214-04) — the declared input values collected by a
+     *  launcher (RunModal, the chat launch form, Test Run). Merged server-side into
+     *  create_workflow_run.inputs BESIDE kickoff_prompt and folder_id, which are
+     *  RESERVED and win over any key spelled the same here (see the merge comment in
+     *  backend/app/api/threads.py). Only sent when the map is NON-EMPTY; absence — and
+     *  an empty map — produce the byte-identical pre-214 request body, which is what
+     *  keeps every ordinary Deep chat send unchanged. Values are strings: the server
+     *  declares `dict[str, str]`, so a non-string arrives as a 422 rather than as a
+     *  nested object on a flat path. */
+    /** Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn. */
+    activeConnectorIds?: string[]
+    inputs?: Record<string, string>
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -483,6 +514,21 @@ export async function postMessage(
       // WFIN-02 (D-01): additive — same shape as workflow_definition_id. Only sent
       // when a per-run folder override is present; absence = D-06 (author default).
       ...(options.folderId ? { folder_id: options.folderId } : {}),
+      // STEP-02 (D-214-04): additive, and CONDITIONAL for the same reason the two
+      // keys above are — an always-present key would change the request body of every
+      // chat message in the app. An EMPTY map is not sent either: a workflow that
+      // declares no launch inputs must post exactly what it posted before Phase 214.
+      ...(options.inputs && Object.keys(options.inputs).length > 0
+        ? { inputs: options.inputs }
+        : {}),
+      // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this message
+      // ⚠ AN EMPTY ARRAY IS SENT, NOT DROPPED. Omitting it used to reach a backend arm
+      // that read "absent" as EVERY enabled connection, so turning every chip off asked
+      // for all of them. The backend now treats absent and empty alike (none), and this
+      // line stops the wire lying about which one the person actually chose.
+      ...(options.activeConnectorIds
+        ? { active_connector_ids: options.activeConnectorIds }
+        : {}),
     }),
   })
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
@@ -501,6 +547,53 @@ export async function postMessage(
     )
   }
   return (await res.json()) as PostMessageResponse
+}
+
+/** Phase 216 (GRANT-03 / CHAT-07): Submit human approval decision for paused tool call. */
+/**
+ * Submit a decision on a paused tool call.
+ *
+ * ⚠ `always` IS A THIRD DECISION, NOT `allow` PLUS A FLAG. It means "let this through AND
+ * stop asking about this action on this connection", and the server does both — writing
+ * the grant with a read-merge-write it owns, because doing that here would put a
+ * lost-update race on a permission surface.
+ *
+ * ⚠ THE GRANT CAN FAIL WHILE THE APPROVAL SUCCEEDS. Approving needs the thread to be
+ * yours; changing a grant needs `org:manage`. The response reports both halves separately
+ * and the caller must not collapse them — telling someone their setting changed when it
+ * did not is the failure mode this whole surface was built to remove.
+ */
+export async function submitToolApproval(
+  threadId: string,
+  callId: string,
+  decision: "allow" | "reject" | "always",
+  options: { connectionId?: string; toolName?: string } = {},
+): Promise<{
+  status: string
+  call_id: string
+  decision: string
+  grant_persisted?: boolean
+  grant_problem?: string | null
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/tool-approval`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      call_id: callId,
+      decision,
+      ...(options.connectionId ? { connection_id: options.connectionId } : {}),
+      ...(options.toolName ? { tool_name: options.toolName } : {}),
+    }),
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      typeof body?.detail === "string" ? body.detail : "Failed to submit tool approval",
+      res.status,
+    )
+  }
+  return (await res.json()) as { status: string; call_id: string; decision: string }
 }
 
 /** Phase 063 (D-063-02): open GET /runs/{runId}/stream?since={since} and
@@ -638,6 +731,17 @@ export async function subscribeToRun(
         }
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
+        else if (t === "tool_approval_required" && callbacks.onToolApprovalRequired)
+          callbacks.onToolApprovalRequired({
+            callId: (parsed.call_id ?? parsed.callId) as string,
+            connectionId: (parsed.connection_id ?? parsed.connectionId) as string | undefined,
+            serviceId: (parsed.service_id ?? parsed.serviceId) as string,
+            serviceName: (parsed.service_name ?? parsed.serviceName) as string,
+            toolName: (parsed.tool_name ?? parsed.toolName) as string,
+            args: (parsed.args ?? {}) as Record<string, any>,
+            expiresAt: (parsed.expires_at ?? parsed.expiresAt) as string | undefined,
+            timeoutSeconds: (parsed.timeout_seconds ?? parsed.timeoutSeconds) as number | undefined,
+          })
         // Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice.
         // Informational branch (mirrors skill_activated) — carries NO `return`, so the
         // cursor-advance below still fires. Pre-fix this event fell through the ladder and
@@ -1272,11 +1376,42 @@ export interface WorkflowPhaseState {
    * recorded** (there is no backfill), and `step_count` distinguishes `0` (a real
    * measurement of nothing) from `null` (this phase type declares no count) — so the arm is
    * `typeof === "number"` and never `?? 0`.
+   *
+   * ── Phase 214 plan 02 (STEP-04 / STEP-05 / D-214-23) — THE SAME MIRROR, WIDENED AGAIN, FOR
+   *    THE SAME REASON, AND FOUND A DIFFERENT WAY ──────────────────────────────────────────
+   *
+   * The four fields below (`failure_reason` / `tool_name` / `capability` / `service_name`) are
+   * added here in the SAME COMMIT as `backend/app/models/thread.py::WorkflowPhaseState`, which
+   * is the whole point: the paragraph above records that `200-02` widened the backend and not
+   * this file, and the panel spent a phase unable to declare fields the wire was sending.
+   *
+   * ⚠ **WHAT IS DIFFERENT THIS TIME IS HOW IT WAS FOUND.** `200-07` caught it by review.
+   * Phase 214 caught the same seam BEFORE writing any code, by a mechanical producer→consumer
+   * derivation that walked `_failure_reason` from its writer to its readers and found the two
+   * hops no plan owned — this mirror, and `StreamsProvider.tsx::reconcilePhases`, which builds
+   * every `Phase` field-by-field so an unmapped field is `undefined` forever with no type error.
+   * ⚠ **And the mirror is now checked by a TEST rather than by this comment**:
+   * `panel/__tests__/PhaseReconcile.test.tsx` drives the real `reconcilePhases` over a real
+   * payload and asserts all four arrive, in BOTH branches, plus a structural fence over the two
+   * `Phase`-returning literals. It was observed RED on unmodified source first.
+   *
+   * ⚠ **STILL A TYPE, NOT A RUNTIME EXPORT** — the property the paragraph above relies on is
+   * unchanged, and it was re-proved by grep over THIS plan's real diff rather than quoted.
+   *
+   * Semantics are stated ONCE, on `WorkflowRunPhase`. The two that bind hardest here:
+   * `failure_reason` is `null` when NOT RECORDED and is never an empty string (so the panel's
+   * `reason_unknown` sentinel keeps its meaning), and `service_name` is `null` when the bound
+   * connection cannot be resolved — the surface then names the ACTION ALONE and never
+   * substitutes a string of its own.
    */
   started_at?: string | null
   completed_at?: string | null
   step_count?: number | null
   step_noun?: string | null
+  failure_reason?: string | null
+  tool_name?: string | null
+  capability?: string | null
+  service_name?: string | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py

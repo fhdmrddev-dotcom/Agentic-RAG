@@ -173,7 +173,26 @@ async def publish_workflow(
         )
 
     # ── stage 2: structural lint (pure; short-circuits BEFORE the golden run) ─────
-    lint_errors = lint_workflow(definition)
+    #
+    # ── PHASE 214 (STEP-03 / D-214-09 / D-214-10) — WHY THIS IS AN EXTENSION AND NOT A
+    #    SIXTH STAGE, since CONTEXT leaves that to discretion and only *cheap and before the
+    #    golden run* is binding. A sibling stage would have been ~14 lines and equally cheap;
+    #    extending keeps ONE lint stage, ONE `_block` call and ONE `blocked_stage` value, so
+    #    the refusal surface gains no stage to render and sketch 215's invariant #8 (exactly
+    #    one blocked stage) stays trivially true rather than newly-argued. The ordering
+    #    rationale is stage 2.6's, verbatim in shape: this check needs exactly what
+    #    `/validate` needs — the definition and the server-side registries — plus ONE
+    #    connection read for the MCP shape, and nothing whatsoever from a run.
+    #
+    # ⭐ THE PREDICATE IS THE SHARED `args.unsatisfiable_arguments`, the other half of the
+    #    `resolve_arguments` the EXECUTOR sends with (D-214-00). That is the same mechanical
+    #    argument stage 1 already won in this file for `business_requirement_missing`: one
+    #    source, so the gate and the thing it gates cannot disagree. A second copy here would
+    #    publish a workflow that then fails at the send, which is `BUG-260826-02` one level up.
+    tool_schemas = await _bound_tool_schemas(
+        definition, definition_id=definition_id, pool=pool
+    )
+    lint_errors = lint_workflow(definition, tool_schemas=tool_schemas)
     if lint_errors:
         return await _block(
             pool,
@@ -181,10 +200,7 @@ async def publish_workflow(
             user_id=user_id,
             definition_id=definition_id,
             stage="lint",
-            named_failures=[
-                {"code": e.code, "phase": e.phase_slug, "message": e.message}
-                for e in lint_errors
-            ],
+            named_failures=[_lint_named_failure(e) for e in lint_errors],
             golden_run_id=None,
         )
 
@@ -321,6 +337,11 @@ async def publish_workflow(
             stage="golden_run_error",
             named_failures=[f"golden run could not complete: {err_msg}"],
             golden_run_id=golden_run_id,
+            # BUG-260828-09: a crash mid-run usually leaves a ``failed`` phase row behind,
+            # and that row knows what the exception class name cannot say. When there is no
+            # such row this is ``None`` and the surface is byte-for-byte what shipped — the
+            # Python exception string is still the only thing we honestly have.
+            blocked_step=await _blocked_step_for_run(pool, golden_run_id, definition),
         )
 
     # The attempt now has a real run_id (the documented receipt-keying choice).
@@ -336,6 +357,13 @@ async def publish_workflow(
     # run never reaches the judge — block at the structural_gate stage with the run id.
     if terminal_status == "failed":
         named = _structural_failures(final_output)
+        # ── BUG-260828-09 — WHICH STEP, AND WHY, INSTEAD OF THE SHAPE OF THE PIPELINE ──
+        # The ``or [...]`` fallback below is what the operator read four times in one sitting.
+        # It fired because the deliverable harvest had already thrown the answer away (see
+        # ``_deliverable_output``); with that repaired, ``named`` now normally carries the
+        # engine's own sentence. ``blocked_step`` is the STRUCTURED half of the same fact —
+        # the step identity a surface needs to say it in the AUTHOR'S vocabulary rather than
+        # in ``Phase 1 (survey-library)``. Both ride the verdict; neither replaces the other.
         return await _block(
             pool,
             run_id=golden_run_id,
@@ -343,6 +371,39 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="structural_gate",
             named_failures=named or ["the golden run failed a structural gate"],
+            golden_run_id=golden_run_id,
+            blocked_step=await _blocked_step_for_run(pool, golden_run_id, definition),
+        )
+
+    # ── D-214-11: the golden run validates the arguments it RESOLVED — AND SENDS NOTHING ──
+    #
+    # The static gate above proves each source arm on its own terms; it cannot see a VALUE.
+    # An `ask` argument whose launcher left the field blank, or an `upstream` phase whose
+    # output came back empty, is structurally fine and still unsendable — and the golden run
+    # has just resolved exactly that object. Re-projecting it costs no model call and no
+    # wall-clock: the run already happened.
+    #
+    # ⭐ D-16's NO-SEND LINE IS UNTOUCHED. Nothing here constructs an adapter, and nothing
+    # here calls `send()`. The projection is `args.resolve_arguments` — the same pure function
+    # the executor uses — over the recorded intent the golden run already wrote. Publishing
+    # still cannot fire a real email, and the suite asserts it through the SHIPPED no-egress
+    # fence rather than a new mock.
+    #
+    # ⚠ IT BLOCKS AT `structural_gate` AND MINTS NO NEW `blocked_stage`. A new stage value
+    # would be a stage the refusal surface cannot name (sketch 215 §1 ships four stage words),
+    # and this failure genuinely belongs to the golden run's own gate: the run produced an
+    # argument object its action cannot accept.
+    resolved_arg_failures = await _golden_run_argument_failures(
+        definition, run_id=golden_run_id, pool=pool, tool_schemas=tool_schemas
+    )
+    if resolved_arg_failures:
+        return await _block(
+            pool,
+            run_id=golden_run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="structural_gate",
+            named_failures=resolved_arg_failures,
             golden_run_id=golden_run_id,
         )
 
@@ -466,6 +527,7 @@ async def _block(
     stage: str,
     named_failures: list,
     golden_run_id,
+    blocked_step: dict | None = None,
 ) -> dict:
     """Write a ``publish_blocked`` receipt + return the D-08 structured verdict.
 
@@ -484,6 +546,11 @@ async def _block(
             "blocked_stage": stage,
             "named_failures": named_failures,
             "golden_run_id": str(golden_run_id) if golden_run_id else None,
+            # BUG-260828-09: the receipt carries the answer too. A governance trail that
+            # records only the fallback sentence is a trail that cannot explain a refusal
+            # after the fact — which is how four identical blocks looked like four
+            # different mysteries.
+            "blocked_step": blocked_step,
         },
     )
     return {
@@ -491,6 +558,9 @@ async def _block(
         "blocked_stage": stage,
         "named_failures": named_failures,
         "golden_run_id": golden_run_id,
+        # ⚠ ADDITIVE AND OPTIONAL. Every stage that cannot name a step passes ``None``, and
+        # a ``None`` here renders as the surface that shipped — not as an empty card.
+        "blocked_step": blocked_step,
     }
 
 
@@ -513,6 +583,482 @@ async def _safe_audit(pool, run_id, *, user_id, event_type: str, metadata: dict)
             run_id,
             exc_info=True,
         )
+
+
+# ══ Phase 214 (STEP-03 / D-214-09..12) — the argument gate's own helpers ══════════════
+
+
+def _external_action_phases(definition) -> list:
+    """Every ``external_action`` phase of a definition, in ``phase_index`` order."""
+    phases = [
+        p
+        for p in (getattr(definition, "phases", None) or [])
+        if getattr(getattr(p, "config", None), "phase_type", None) == "external_action"
+    ]
+    return sorted(phases, key=lambda p: getattr(p, "phase_index", 0))
+
+
+async def _bound_tool_schemas(definition, *, definition_id: UUID, pool) -> dict:
+    """``{connection_id: {tool_name: inputSchema}}`` for the definition's MCP-shaped steps.
+
+    ⭐ THE ONE THING THE PURE LINT CANNOT DO FOR ITSELF, AND THE REASON IT LIVES HERE.
+    ``reachability.py`` is import-light so ``POST /workflows/validate`` can call
+    ``lint_workflow`` on every canvas keystroke; an MCP step's argument shape lives on the
+    connection's discovered-tool snapshot, which is a READ. So the I/O is done here, once per
+    distinct connection, and handed in.
+
+    ⛔ **THE SCHEMA IS OBTAINED THROUGH ``args.schema_for_bound_tool`` AND NOWHERE ELSE.**
+    That accessor is the same one the executor calls at ``phase_types`` GATE 6/7 and the same
+    one the approval pause calls, so the gate's schema and the executor's schema have
+    IDENTICAL PROVENANCE by construction rather than by assertion. A paired test handing one
+    schema object to both predicates proves ``f(s) == g(s)`` and is blind to
+    ``s_gate != s_executor``; a gate linting against a different schema than the executor
+    resolves against publishes a workflow that then sends an EMPTY argument object, silently.
+    This function must never grow its own extraction.
+
+    ⚠ NATIVE CAPABILITY STEPS ARE NOT READ FOR. Their schema is a pure in-process descriptor
+    lookup that ``reachability`` performs itself through the same accessor, so a workflow whose
+    external steps are all native performs ZERO extra I/O here. That is why the loop is over
+    MCP-shaped phases only, and why this is cheap enough to sit in stage 2.
+
+    ⛔ **AN UNREADABLE CONNECTION YIELDS NO ENTRY, WHICH THE GATE READS AS ``shape_unknown``
+    AND BLOCKS.** Absent, disabled, another org's, or a snapshot that never mentions the tool —
+    every one of them means *we cannot say what this action accepts*, and "unknown" must not
+    look like "satisfied" (D-214-10). ⚠ Returning ``{}`` on a failed read is therefore NOT a
+    silent pass: the map is always supplied, and a missing entry inside a supplied map is a
+    refusal. The ``None`` sentinel (never looked) is reserved for ``/validate``.
+    """
+    from app.services.connectors.args import schema_for_bound_tool  # function-local (Pitfall 4)
+
+    wanted: dict[str, set[str]] = {}
+    for phase in _external_action_phases(definition):
+        config = phase.config
+        tool_name = getattr(config, "tool_name", None)
+        if not tool_name:
+            continue  # a native capability — pure lookup, no connection read needed
+        connection_id = str(getattr(config, "connection_id", None) or "")
+        wanted.setdefault(connection_id, set()).add(str(tool_name))
+
+    if not wanted:
+        return {}
+
+    org_id = await _definition_org_id(pool, definition_id)
+    schemas: dict[str, dict] = {}
+    for connection_id, tool_names in wanted.items():
+        snapshot = await _connection_tool_snapshot(connection_id, org_id)
+        per_tool = {}
+        for tool_name in sorted(tool_names):
+            schema = schema_for_bound_tool(
+                capability=None, tool_name=tool_name, discovered_tools=snapshot
+            )
+            if schema is not None:
+                per_tool[tool_name] = schema
+        schemas[connection_id] = per_tool
+    return schemas
+
+
+async def _connection_tool_snapshot(connection_id: str, org_id) -> list | None:
+    """The bound connection's advertised-tool snapshot, or ``None`` when it cannot be read.
+
+    Resolved through ``connector_service.resolve_connection`` — the SAME resolver the executor
+    reaches the snapshot through at run time (``phase_types`` GATE 5), and the one that owns
+    the D-14 org scoping. A second, hand-written read here would be a second answer to
+    *"which connection is this?"*, which is the class of drift this whole plan exists to close.
+
+    ⚠ EVERY FAILURE DEGRADES TO ``None`` AND THEREFORE TO A REFUSAL — absent, cross-org,
+    disabled, credential-unreadable, or an org that does not resolve at all. This is the
+    fail-CLOSED direction: a publish that cannot establish what an action accepts must not mint
+    a version. It is logged, never raised, because ``publish_workflow`` never raises into the
+    route.
+    """
+    if not connection_id or not org_id:
+        return None
+    from app.services import connector_service  # function-local (Pitfall 4)
+
+    try:
+        resolved = await connector_service.resolve_connection(connection_id, str(org_id))
+    except Exception:  # noqa: BLE001 — an unreadable connection is a REFUSAL, never a raise
+        logger.info(
+            "214 STEP-03: connection %s did not resolve at publish time — its bound tools' "
+            "argument shapes are unknown, so the gate will refuse the steps that use it",
+            connection_id,
+            exc_info=True,
+        )
+        return None
+    return getattr(resolved, "discovered_tools", None)
+
+
+async def _definition_org_id(pool, definition_id: UUID):
+    """``workflow_definitions.org_id`` — the ONE read, shared by every consumer on this path.
+
+    Extracted from ``_resolve_publish_supabase`` (which now calls it) so the argument gate can
+    scope its connection reads WITHOUT constructing a service-role client it has no use for —
+    that would have been a third ``_resolve_publish_supabase`` call per publish, compounding
+    the IN-05 deferral recorded at stage 2.6. One implementation of the read is what keeps the
+    client scope, the grounding scope and the connection scope from ever disagreeing about
+    which tenant a publish is acting for.
+    """
+    return await pool.fetchval(
+        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
+    )
+
+
+def _lint_named_failure(e) -> dict:
+    """One ``named_failures`` entry for a lint error — the wire plan ``214-10`` consumes.
+
+    The shipped three keys for every code, PLUS ``step_name`` / ``argument`` / ``upstream`` for
+    the five argument-gap codes. The extra keys are added ONLY for those codes so the other
+    five stages' payload shape is byte-unchanged.
+
+    ⚠ THE BACKEND COMPOSES NO ENGLISH SENTENCE. D-213-15/-16 put the refusal in this gate;
+    sketch 215 §1 puts the WORDS in ``publishRefusalVocabulary.ts`` and asserts them for
+    character identity — so the wire carries KIND + STEP NAME + ARGUMENT NAME and the client
+    composes. ``message`` stays the diagnostic the other four stages already emit: it is for
+    the log and the audit receipt, not for the author's screen.
+
+    ⚠ ``step_name`` GOES THROUGH ``_clean_label``. It is an unbounded author- or model-authored
+    string that lands in a one-line slot AND in the PERSISTED ``harness_audit.metadata``, which
+    is exactly why ``_LABEL_MAX_CHARS`` and the ``Cf``-inclusive scrub exist — see that
+    constant's own comment for the 22-of-31 measurement that forced the category rule.
+    """
+    from app.services.harness.reachability import ARGUMENT_GAP_CODES  # function-local
+
+    entry = {"code": e.code, "phase": e.phase_slug, "message": e.message}
+    if e.code in ARGUMENT_GAP_CODES:
+        # ⚠ ``_clean_label`` returns None for a missing or empty name. ``reachability`` has
+        # already degraded a nameless phase to its slug (the ONE case where the author's word
+        # and the slug coincide — see that emit site), so this is a scrub, not a fallback.
+        entry["step_name"] = _clean_label(e.step_name)
+        entry["argument"] = e.argument
+        entry["upstream"] = e.upstream
+    return entry
+
+
+def _typed_scalar(value, declared_type: str) -> bool:
+    """Does a RESOLVED value match the property's declared scalar type?
+
+    Narrow on purpose — the four scalar types ``args.renderable_property`` admits, and nothing
+    else. ``bool`` is checked BEFORE ``integer``/``number`` because ``isinstance(True, int)`` is
+    True in Python and a boolean silently passing as an integer is precisely the kind of
+    almost-right value this check exists to catch.
+    """
+    if declared_type == "boolean":
+        return isinstance(value, bool)
+    if isinstance(value, bool):
+        return False
+    if declared_type == "string":
+        return isinstance(value, str)
+    if declared_type == "integer":
+        return isinstance(value, int)
+    if declared_type == "number":
+        return isinstance(value, (int, float))
+    return True  # an enum or an unrecognised type — the static gate already ruled on shape
+
+
+async def _golden_run_argument_failures(
+    definition, *, run_id, pool, tool_schemas
+) -> list:
+    """D-214-11 — validate the arguments the golden run RESOLVED, and send nothing.
+
+    The golden run wrote, per external-action phase, the ``recorded_intent`` it would have
+    acted on (``phase_types`` GATE 1 — D-16 suppresses the SEND only). This re-projects that
+    record through ``args.resolve_arguments`` — the executor's own function, over the same
+    schema obtained from the same accessor — and checks each REQUIRED declared property is
+    present, non-empty, and of the declared scalar type.
+
+    ⚠ WHAT THIS CATCHES THAT THE STATIC GATE CANNOT: a value. The static gate proves an
+    ``ask`` key is DECLARED; whether a person typed anything is a run-time fact. It proves an
+    ``upstream`` phase RUNS FIRST; whether that phase produced text is a run-time fact.
+
+    ⚠ THE VOCABULARY IS THE SAME FIVE AND IS NOT WIDENED HERE. A resolved value that is absent,
+    empty, or of the wrong type all report ``no_source`` — *nothing supplied a usable value* —
+    with the type detail in ``message`` for the log and the receipt. A sixth kind is not this
+    plan's to mint: ``publishRefusalVocabulary.ts`` keys a compiler-enforced ``Record`` on the
+    union, and adding a member is a cross-plan, cross-language change with its own sentence to
+    author. Recorded as a deliberate narrowing rather than left to be inferred.
+
+    ⛔ NOTHING IS SENT AND NO ADAPTER IS CONSTRUCTED. Every call below is pure.
+
+    Returns ``[]`` when the definition has no external-action step at all, so a workflow
+    without one performs no extra read.
+    """
+    phases = _external_action_phases(definition)
+    if not phases:
+        return []
+
+    from app.db.workflows import load_run_phases  # function-local (Pitfall 4)
+    from app.models.thread import phase_output_object
+    from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
+    from app.services.harness.reachability import _BODY_ARGUMENT_FOR_CAPABILITY
+
+    try:
+        rows = await load_run_phases(pool, run_id)
+    except Exception:  # noqa: BLE001 — never raise into the sealed orchestration
+        logger.warning(
+            "214 D-214-11: could not read the golden run's phases for %s — skipping the "
+            "resolved-argument check (the STATIC gate already passed)", run_id, exc_info=True,
+        )
+        return []
+
+    outputs: dict[str, dict] = {}
+    for row in sorted(rows or [], key=lambda r: r.get("phase_index", 0)):
+        parsed = phase_output_object(row.get("output"))
+        if isinstance(parsed, dict):
+            outputs[str(row.get("slug") or "")] = parsed
+
+    failures: list = []
+    for phase in phases:
+        config = phase.config
+        capability = getattr(config, "capability", None)
+        tool_name = getattr(config, "tool_name", None)
+        if tool_name:
+            connection_id = str(getattr(config, "connection_id", None) or "")
+            schema = (tool_schemas or {}).get(connection_id, {}).get(str(tool_name))
+            body_arg = None
+        elif capability:
+            schema = schema_for_bound_tool(
+                capability=capability, tool_name=None, discovered_tools=None
+            )
+            body_arg = _BODY_ARGUMENT_FOR_CAPABILITY.get(capability)
+        else:
+            continue
+
+        properties = (schema or {}).get("properties") or {}
+        required = [n for n in ((schema or {}).get("required") or []) if n in properties]
+        if not required:
+            continue
+
+        recorded = outputs.get(str(getattr(phase, "slug", "")), {}).get("recorded_intent")
+        run_inputs = recorded.get("inputs") if isinstance(recorded, dict) else None
+        # ⚠ NO RECORD IS NOT A FAILURE. A phase that was skipped by a branch, or a golden run
+        # whose spine did not reach it, has resolved nothing to validate — and accusing it
+        # would refuse a publish over a step that never ran.
+        if not isinstance(run_inputs, dict):
+            continue
+
+        # The upstream bag the executor holds: `accumulated_outputs[slug]` is the phase's WHOLE
+        # output dict, keyed by slug and nothing else. Only phases BEFORE this one are visible.
+        upstream_outputs = {
+            slug: out
+            for slug, out in outputs.items()
+            if slug != getattr(phase, "slug", None)
+        }
+        resolved = resolve_arguments(
+            config=config,
+            schema=schema,
+            upstream_outputs=upstream_outputs,
+            run_inputs=run_inputs,
+            body_arg=body_arg,
+        )
+
+        step_name = _clean_label(getattr(phase, "name", None)) or getattr(phase, "slug", None)
+        for name in required:
+            value = resolved.get(name)
+            missing = name not in resolved or value is None or (
+                isinstance(value, str) and not value.strip()
+            )
+            declared_type = properties.get(name, {}).get("type")
+            if missing:
+                reason = "resolved to nothing"
+            elif isinstance(declared_type, str) and not _typed_scalar(value, declared_type):
+                reason = f"resolved to a {type(value).__name__}, not the declared {declared_type}"
+            else:
+                continue
+            failures.append(
+                {
+                    "code": "no_source",
+                    "phase": getattr(phase, "slug", None),
+                    "message": (
+                        f"step {str(step_name or '')!r}: the required argument {name!r} "
+                        f"{reason} when the workflow actually ran"
+                    ),
+                    "step_name": step_name,
+                    "argument": name,
+                    "upstream": None,
+                }
+            )
+    return failures
+
+
+#: BUG-260828-09 — THE ONE PREFIX A FAILURE REASON CARRIES, AND ITS SINGLE PRODUCER.
+#:
+#: ``harness_engine`` composes every ``fail_run`` reason as ``Phase {n} ({slug}) <verb>: <cause>``
+#: — ``_route_on_failure`` (``:1200-1203``) writes the *gate failed after k attempt(s)* verb and
+#: ``_resolve_failure_with_ask_user`` (``:1525``) writes the *validation flagged* one. BOTH lead
+#: with an index the author never chose and a SLUG they can see nowhere on the canvas, which is
+#: exactly what ``BUG-260828-09`` property (1) forbids a refusal from leading with.
+#:
+#: ⚠ IT IS KEYED ON THE SLUG WE ALREADY HOLD, NOT ON A GUESSED PATTERN. The slug is interpolated
+#: (``re.escape``-d) from the failed phase row itself, so this can only ever strip a prefix that
+#: names THAT step — never a sentence that merely starts with the word "Phase".
+#:
+#: ⚠ ``[^:]*`` IS LOAD-BEARING AND MUST NOT BECOME ``.*``. The cause routinely contains its own
+#: colon (``citations_required: nothing was retrieved (0 sources) — …``), and a greedy match
+#: would eat the validator's name out of the one sentence this whole fix exists to surface.
+_REASON_PREFIX = r"^Phase\s+\d+\s+\({slug}\)[^:]*:\s*"
+
+
+def _deliverable_output(phases: list) -> dict:
+    """The run's deliverable — the LAST phase that actually PRODUCED something.
+
+    ── BUG-260828-09, AND IT IS MEASURED RATHER THAN REASONED ABOUT ────────────────────
+    The loop this replaces lived inline in ``_drive_golden_run`` and read, in effect,
+    *"the last phase whose output is a dict wins"*. A phase that never ran carries ``{}``
+    — which IS a dict. Measured on the live database 2026-08-28 across all four of the
+    operator's failed publish attempts; every one had the identical shape::
+
+        0 survey-library  failed   {"_failure_reason": "Phase 1 (survey-library) gate failed …"}
+        1 write-summary   pending  {}
+        2 act             pending  {}
+
+    So the two pending rows overwrote the failed row, ``_structural_failures`` was handed
+    ``{}``, it returned ``[]``, and the caller's ``or [...]`` fallback fired — the author
+    read *"the golden run failed a structural gate"* four times while the sentence naming
+    the step, the check and the cause sat one dict key away. **The information volume was
+    never the problem; the one useful sentence was being discarded before it was rendered.**
+
+    THE SELECTION RULE IS OTHERWISE UNCHANGED. On a run whose phases all produced content
+    — every ``completed`` golden run, which is every run that reaches the judge — this
+    returns what the loop it replaces returned, because no empty dict occurs. Only a run
+    that stopped part-way behaves differently, and only in the direction of keeping the
+    fact that it stopped.
+
+    ⚠ IT READS THROUGH ``phase_output_object`` AND NOT THROUGH A LOCAL ``json.loads``. The
+    inline loop carried its own unwrap; ``workflow_phases.output`` has TWO shapes in it
+    (D-200.1-01 — 527 of 588 non-null values are jsonb string scalars) and the read side
+    keeps exactly ONE home. A second copy here is a second copy that rots.
+
+    Total: a nullish list, a row with no output, an unparseable string and a list-valued
+    output all resolve to ``{}`` rather than raising.
+    """
+    from app.models.thread import phase_output_object  # function-local (the ONE unwrap)
+
+    deliverable: dict = {}
+    for row in sorted(phases or [], key=lambda q: (q or {}).get("phase_index", 0)):
+        obj = phase_output_object((row or {}).get("output"))
+        # An EMPTY dict is not a deliverable. That single word is the whole defect.
+        if obj:
+            deliverable = obj
+    return deliverable
+
+
+def _blocked_step(phases: list, definition) -> dict | None:
+    """WHICH step of the author's own workflow stopped the golden run, and WHY.
+
+    ── BUG-260828-09 — THE JOIN NOTHING PERFORMED ─────────────────────────────────────
+    The engine already writes a good sentence naming the step, the check that refused and
+    the consequence. It writes it in three places — ``workflow_phases.output``, a
+    ``run_failed`` ``harness_audit`` row, and an assistant message inside the ephemeral
+    ``[validation] publish golden run — …`` thread — and the publish verdict joined NONE
+    of them, so it was reachable only by querying Postgres. That is how it was found.
+    ``verdictModel.ts``'s ``structural_gate`` docblock states the gap from the client side
+    and calls it *"a SERVER change"*. This is that change.
+
+    Returns ``{step_slug, step_index, step_name, reason, cause}`` for the failed phase, or
+    ``None`` when no phase failed (a judge block, a lint block, a crash before any phase
+    ran) — in which case the surface is byte-for-byte what shipped.
+
+    ⚠ ``step_name`` IS ``None`` WHENEVER THE AUTHOR DID NOT NAME THE STEP, AND IT IS NOT
+    BACKFILLED WITH THE SLUG. The shipped precedent one function over
+    (``_golden_run_argument_failures``) falls back ``name or slug`` and consequently emitted
+    ``"step_name": "act"`` — a slug, in the field that promises an authored name. Property
+    (1) of the report forbids exactly that, so this returns the honest ``None`` and the
+    client resolves the face through ``phaseVocabulary.nodeTitle`` — the four-tier ladder
+    whose stated floor is that the slug never appears in its output. Measured on the live
+    definition: 2 of its 3 phases carry ``name: null``, so the unnamed arm is the ORDINARY
+    case here, not the edge case.
+
+    ⚠ ``cause`` IS THE REASON WITH ITS MACHINE PREFIX REMOVED, AND ``reason`` IS KEPT
+    VERBATIM BESIDE IT. Nothing is discarded: the raw sentence still rides the wire for the
+    disclosure, exactly as the raw verdict does. If the prefix does not match — a reason
+    composed by some future site in another shape — ``cause`` IS ``reason``, so a surface
+    leading with it can never render empty.
+
+    Total: a nullish list, a row with no output, a reason that is not a string and a
+    definition whose phases do not line up with the run's all resolve without raising.
+    """
+    import re
+
+    failed = None
+    for row in sorted(phases or [], key=lambda q: (q or {}).get("phase_index", 0)):
+        if (row or {}).get("status") == "failed":
+            failed = row
+            break
+    if failed is None:
+        return None
+
+    from app.models.thread import phase_output_object  # function-local (the ONE unwrap)
+
+    obj = phase_output_object(failed.get("output")) or {}
+    raw = obj.get("_failure_reason")
+    reason = str(raw).strip() if isinstance(raw, str) and raw.strip() else None
+
+    slug = failed.get("slug")
+    slug = str(slug) if slug else None
+    index = failed.get("phase_index")
+    index = int(index) if isinstance(index, int) else None
+
+    cause = reason
+    if reason and slug:
+        cause = re.sub(_REASON_PREFIX.format(slug=re.escape(slug)), "", reason, count=1).strip()
+        cause = cause or reason  # never hand a surface an empty sentence
+
+    return {
+        "step_slug": slug,
+        "step_index": index,
+        "step_name": _authored_step_name(definition, slug=slug, index=index),
+        "reason": reason,
+        "cause": cause,
+    }
+
+
+async def _blocked_step_for_run(pool, run_id, definition) -> dict | None:
+    """``_blocked_step`` over a run's phase rows — the one I/O half, on the FAILURE PATH ONLY.
+
+    ⚠ IT COSTS ONE READ AND ONLY WHEN A PUBLISH IS ALREADY LOST. A successful publish never
+    reaches either call site, so nothing on the happy path changes shape or timing. The read
+    is the same ``load_run_phases`` the golden run already performs — the same statement, the
+    same index — so no new query shape enters this file (D-214-23: the gap here was always
+    PROJECTION, never SELECTION).
+
+    Best-effort by construction: a read failure returns ``None`` and the refusal falls back to
+    exactly the surface that shipped. A publish decision that has already been made must never
+    become a 500 because the *explanation* could not be loaded.
+    """
+    if run_id is None:
+        return None
+    try:
+        from app.db.workflows import load_run_phases  # function-local
+
+        return _blocked_step(await load_run_phases(pool, run_id), definition)
+    except Exception:  # noqa: BLE001 — an unexplainable block is still an honest block
+        logger.warning(
+            "publish: could not load the failing step for run %s — the refusal still stands",
+            run_id,
+            exc_info=True,
+        )
+        return None
+
+
+def _authored_step_name(definition, *, slug: str | None, index: int | None) -> str | None:
+    """The step's name AS THE AUTHOR WROTE IT, or ``None`` — never the slug.
+
+    Matched on the slug first (stable across a re-order) and on ``phase_index`` only as a
+    fallback, because a run's phase rows and its definition's phase list are the same
+    sequence by construction. ``_clean_label`` bounds it for the same reason every other
+    author-authored string on this path is bounded (T-193.2-01): it reaches a one-line slot
+    and a persisted audit row, and it is an unbounded ``str | None`` at its declaration.
+    """
+    try:
+        for phase in getattr(definition, "phases", None) or []:
+            matched = (slug is not None and getattr(phase, "slug", None) == slug) or (
+                slug is None and index is not None and getattr(phase, "phase_index", None) == index
+            )
+            if matched:
+                return _clean_label(getattr(phase, "name", None))
+    except Exception:  # noqa: BLE001 — a malformed definition never blocks a refusal's cause
+        return None
+    return None
 
 
 def _structural_failures(final_output) -> list:
@@ -745,9 +1291,10 @@ async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool) -> t
     """
     from app import dependencies as _deps  # function-local (mirrors this module's posture)
 
-    _org_id = await pool.fetchval(
-        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
-    )
+    # Phase 214 — the read moved into ``_definition_org_id`` so the argument gate can scope its
+    # connection reads without constructing a client. The SQL, the parameter and the semantics
+    # are unchanged; what changed is that there is now one implementation of it rather than two.
+    _org_id = await _definition_org_id(pool, definition_id)
     if supabase is not None:
         if not _org_id:
             raise ValueError(
@@ -967,13 +1514,59 @@ async def _drive_golden_run(
             definition.project_folder_id, supabase=supabase, user_id=str(user_id)
         )
 
+    # ── 3a-pre. BUG-260828-10 — the golden run must ANSWER what the workflow asks for ──
+    #
+    # A launch-time argument is sourced `ask`, and a golden run has no launcher and nobody
+    # to ask. Before this, `inputs` carried `kickoff_prompt` and NOTHING else, so every such
+    # argument resolved to nothing and the structural gate afterwards reported
+    # `no_source: … resolved to nothing when the workflow actually ran`.
+    #
+    # ⚠ THE GATE WAS RIGHT ABOUT WHAT IT SAW; WHAT IT WAS SHOWN WAS WRONG. Validating
+    # *does this argument resolve* against a run structurally incapable of supplying it
+    # tests the harness, not the workflow — the gate could only ever return `no_source`
+    # for this source kind, so `Asked when this runs` was unpublishable for EVERY author.
+    # Measured 2026-08-28 by the operator: three phases green, citations green, blocked here.
+    #
+    # ⚠ THIS DOES NOT WEAKEN THE GATE. An argument with genuinely NO declared source still
+    # resolves to nothing and is still refused — that is `BUG-260826-02` and the reason the
+    # gate exists. Only a DECLARED input gets an answer here, which is precisely the case
+    # the author already told us about.
+    #
+    # ⚠ `.invalid` IS LOAD-BEARING, NOT DECORATION (RFC 2606): it is a reserved TLD that can
+    # never resolve, so a placeholder recipient cannot reach a person even if every other
+    # guard failed. The golden run already records instead of sending and withholds `org_id`
+    # so a credential cannot be scoped; this is a THIRD independent reason a publish-time
+    # send cannot deliver. Do not replace it with a real-looking address.
+    golden_inputs: dict[str, str] = {"kickoff_prompt": golden_input}
+    for _spec in getattr(definition, "inputs", None) or []:
+        _key = getattr(_spec, "key", None)
+        # Never shadow the kickoff prompt: it carries the author's real golden input.
+        if _key and _key not in golden_inputs:
+            # ⚠ KEY-AWARE, because a placeholder is READ BY A MODEL and shown in a receipt.
+            # The first cut used an address shape for EVERY field, so an essay workflow was
+            # handed `topic = golden-run-placeholder-topic@example.invalid` and dutifully wrote
+            # 200 words about an email address. Operator caught it on the first published run.
+            #
+            # `InputFieldSpec.type` is `"text"` for every field today, so the KEY is the only
+            # signal available. An address-shaped value goes only where an address belongs —
+            # everywhere else gets a plainly-worded placeholder that reads as one.
+            _k = _key.lower()
+            _is_addr = any(
+                _t in _k for _t in ("email", "mail", "recipient", "sender", "cc", "bcc")
+            ) or _k in {"to", "from"}
+            golden_inputs[_key] = (
+                f"golden-run-placeholder-{_key}@example.invalid"
+                if _is_addr
+                else f"golden run placeholder for {_key}"
+            )
+
     # ── 3. create the golden run (is_golden_run=True — the REAL run on the KB) ────
     run_id = await create_workflow_run(
         pool,
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         definition_id=definition_id,
         definition=definition,
-        inputs={"kickoff_prompt": golden_input},
+        inputs=golden_inputs,
         model=ctx_model or None,
         user_id=user_id,
         is_golden_run=True,
@@ -1021,7 +1614,7 @@ async def _drive_golden_run(
         current_user={"id": str(user_id)},
         user_settings=owner_settings,
         model=ctx_model,
-        inputs={"kickoff_prompt": golden_input},
+        inputs=golden_inputs,
         redis=redis,
         pool=pool,
         emit=_emit,
@@ -1055,18 +1648,12 @@ async def _drive_golden_run(
 
         phases = await load_run_phases(pool, run_id)
         terminal_status = "failed" if any(p.get("status") == "failed" for p in phases) else "completed"
-        final_output: dict = {}
-        for p in sorted(phases, key=lambda q: q.get("phase_index", 0)):
-            out = p.get("output")
-            if isinstance(out, str):
-                import json
-
-                try:
-                    out = json.loads(out)
-                except (ValueError, TypeError):
-                    out = None
-            if isinstance(out, dict):
-                final_output = out  # the LAST phase with an output wins (the deliverable)
+        # ── BUG-260828-09 — THE HARVEST IS AN EXTRACTED, TESTABLE HELPER NOW ─────────
+        # The loop that used to sit inline here accepted a `pending` phase's `{}` as "an
+        # output" and let it OVERWRITE the failed phase's `_failure_reason`. See
+        # `_deliverable_output` for the measurement; the selection rule is unchanged for
+        # every run whose phases all produced something.
+        final_output: dict = _deliverable_output(phases)
         _shell_status = "completed"
         return run_id, final_output, terminal_status
     except Exception as e:

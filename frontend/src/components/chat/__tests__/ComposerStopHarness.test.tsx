@@ -110,6 +110,13 @@ const {
 vi.mock("@/lib/api", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/api")>()
   return {
+    // ⚠ THE COMPOSER MOUNTS `ConnectorsFlyout`, WHICH CALLS THIS ON MOUNT. Phase 216
+    // added that component to `MessageInput` and did not widen the three suites that mock
+    // this module, so they have failed with `No "listConnectorConnections" export is
+    // defined on the "@/lib/api" mock` ever since — 10 red tests, none of them about
+    // connectors. A mock factory is an ALLOW-LIST: an export it omits does not fall back
+    // to the real module, it throws.
+    listConnectorConnections: vi.fn().mockResolvedValue([]),
     ApiError: actual.ApiError,
     postMessage: mockPostMessage,
     subscribeToRun: mockSubscribeToRun,

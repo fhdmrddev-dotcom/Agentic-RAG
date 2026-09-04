@@ -510,6 +510,33 @@ export const GROUNDING_NOTHING_TO_PROVE = "Nothing to prove here"
 /** Why the step is locked, when the cause is `detected`. */
 export const GROUNDING_WHY_DETECTED = "Because this step reads your documents."
 
+/**
+ * ── SEED-230 / BUG-260828-09 — THE CONSEQUENCE, WHICH THE PANEL NEVER NAMED ──────────────
+ *
+ * Everything else in this block describes a STATE ("held strictly", "a check runs on this
+ * step"). Nothing said what the state DOES, so a reasonable author reads the whole section as a
+ * quality setting rather than as a gate. The operator did exactly that: they scrolled past this
+ * panel and then spent four failed publishes discovering the rule by experiment.
+ *
+ * ⚠ IT RENDERS ON THE `detected` ARM ONLY, AND THAT IS A CORRECTNESS PROPERTY, NOT A CHOICE OF
+ * EMPHASIS. `grounding.effective_phase` synthesizes the `citations_required` gate for
+ * `grounding_cause(phase) == "detected"` and for nothing else — an `escalated` step is the
+ * author's own doing and gets NO synthesized gate, so promising it a publish refusal would be a
+ * claim about a check that does not exist.
+ *
+ * ⚠ IT CLAIMS A REFUSAL, NOT A FAILURE. The gate retries twice before the run fails, and a step
+ * that retrieves something on the retry publishes fine — measured, 2 of 8 attempts recovered
+ * that way. So the sentence is conditional on the OUTCOME ("if it retrieves nothing"), never on
+ * the state. Wording it as "this step cannot be published" would be false for most runs.
+ *
+ * It says the same words the refusal says on the other surface — the publish block now reads
+ * *"citations_required: nothing was retrieved (0 sources) — this step reads your documents and
+ * must show where its answer came from."* Two surfaces, one vocabulary: an author who meets
+ * either one recognises the other.
+ */
+export const GROUNDING_PUBLISH_CONSEQUENCE =
+  "If it runs and retrieves nothing, publishing refuses — this is the check that stops it."
+
 /** Why the step is locked, when the cause is `escalated` — the one authored cause. */
 export const GROUNDING_WHY_ESCALATED = "Because you turned this on by hand."
 

@@ -1290,29 +1290,133 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
 
 
 def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
-    if user_settings is not None:
-        if user_settings.embedding_api_key:
-            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
-            api_key = user_settings.embedding_api_key
-            base_url = user_settings.embedding_base_url or None
-        else:
-            # No dedicated key — reuse LLM credentials (key + base_url)
-            api_key = user_settings.llm_api_key
-            base_url = user_settings.embedding_base_url or user_settings.llm_base_url or None
-    else:
-        if settings.embedding_api_key:
-            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
-            api_key = settings.embedding_api_key
-            base_url = settings.embedding_base_url or None
-        else:
-            # No dedicated key — reuse LLM credentials (key + base_url)
-            api_key = settings.llm_api_key
-            base_url = settings.embedding_base_url or settings.llm_base_url or None
+    # ⚠ THE ROUTING LIVES IN `resolve_embedding_endpoint`, NOT HERE — because the outage
+    # message names the provider from that SAME call. Two earlier attempts derived the name
+    # from a separate input and both were measured naming an endpoint that was never called
+    # (210-REVIEW W-1, then the SC#10 roster). Resolve once, read twice.
+    api_key, base_url, _dedicated = resolve_embedding_endpoint(user_settings)
 
     kwargs: dict = {"api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
     return OpenAI(**kwargs)
+
+
+def resolve_embedding_endpoint(
+    user_settings: UserEffectiveSettings | None = None,
+) -> tuple[str, str | None, bool]:
+    """The ONE resolution of which credentials + endpoint an embedding call uses.
+
+    ⚠ THIS EXISTS SO A NAME CANNOT DRIFT FROM A ROUTE. ``get_embedding_client`` and
+    ``resolve_effective_embedding_provider`` both call it, so the provider we NAME in an
+    outage message is derived from the very ``base_url`` the client was built with.
+
+    Two prior attempts named the provider from a SEPARATE input and both were measured
+    wrong (210-REVIEW W-1, then the SC#10 roster): ``embedding_provider`` is a stored
+    LABEL that routes nothing, and substring-guessing a base URL missed LM Studio's
+    ``:1234`` while matching Ollama's ``:11434``. The rule that survives: resolve once,
+    read twice.
+
+    Returns ``(api_key, base_url_or_None, dedicated)``. ``base_url`` ``None`` means "the SDK
+    default", which is ``api.openai.com``. ``dedicated`` says whether EMBEDDING credentials
+    were used — the caller needs it, because when they were NOT, the stored
+    ``embedding_provider`` label describes an endpoint that was never contacted.
+    """
+    def _s(v) -> str:
+        # Defensive: every real settings field is a str, but a duck-typed or mocked caller
+        # can hand back anything, and a non-str must never be parsed as a URL.
+        return v if isinstance(v, str) else ""
+
+    src = user_settings if user_settings is not None else settings
+    if _s(getattr(src, "embedding_api_key", "")):
+        # Dedicated embedding key — use its own base_url only, never inherit LLM base_url.
+        return _s(src.embedding_api_key), (_s(getattr(src, "embedding_base_url", "")) or None), True
+    # No dedicated key — reuse LLM credentials (key + base_url).
+    return (
+        _s(getattr(src, "llm_api_key", "")),
+        (_s(getattr(src, "embedding_base_url", "")) or _s(getattr(src, "llm_base_url", "")) or None),
+        False,
+    )
+
+
+# Host -> canonical provider name. Ordered longest-first at match time so a more specific
+# host never loses to a shorter one. ⚠ AN ABSENT HOST IS NOT "openai": see below.
+_EMBEDDING_HOST_NAMES: dict[str, str] = {
+    "api.openai.com": "openai",
+    "generativelanguage.googleapis.com": "google",
+    "api.cohere.ai": "cohere",
+    "api.jina.ai": "jina",
+    "api.mistral.ai": "mistral",
+    "api.deepseek.com": "deepseek",
+    "api.anthropic.com": "anthropic",
+    "openrouter.ai": "openrouter",
+    "api.voyageai.com": "voyage",
+}
+
+# Local servers are identified by PORT, because the host is `localhost` for both.
+# ⚠ ``:11434`` (Ollama) was matched and ``:1234`` (LM Studio) was not — that single
+# omission made a shipped first-class preset claim "openai" (SC#10 roster, row 10).
+_EMBEDDING_PORT_NAMES: dict[str, str] = {
+    "11434": "ollama",
+    "1234": "lmstudio",
+}
+
+# The port map above may ONLY speak for these hosts. A remote service that happens to listen
+# on 1234 or 11434 is not LM Studio and not Ollama, and naming it so is a false name.
+_LOCAL_EMBEDDING_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", ""})
+
+
+def resolve_effective_embedding_provider(
+    user_settings: UserEffectiveSettings | None = None,
+) -> str:
+    """Name the provider whose endpoint ACTUALLY receives the embedding call (RAG-09 / SC#5).
+
+    Derived from ``resolve_embedding_endpoint`` — the same call that builds the client — so
+    the name and the route cannot disagree.
+
+    ⚠ AN UNRECOGNISED HOST RETURNS THE HOST, NEVER ``"openai"``. A self-hosted
+    OpenAI-compatible endpoint is not OpenAI, and calling it that sends an operator to check
+    the wrong account, which is the exact failure ``BUG-260815-05`` was filed for. The
+    hostname is a TRUE name; a guess is a false one.
+    """
+    from urllib.parse import urlparse
+
+    _, base_url, dedicated = resolve_embedding_endpoint(user_settings)
+
+    if not base_url:
+        # No base_url => the OpenAI SDK's own default endpoint. Only HERE, where no URL
+        # contradicts it, is a stored name the best available answer.
+        src = user_settings if user_settings is not None else settings
+
+        def _t(name: str) -> str:
+            v = getattr(src, name, "")
+            return v.strip() if isinstance(v, str) else ""
+
+        if dedicated:
+            # The label describes the endpoint that WAS contacted.
+            return _t("embedding_provider") or "openai"
+        # ⚠ NOT the label: with no dedicated key the call went out on the LLM's credentials,
+        # so `embedding_provider` describes an endpoint nothing contacted. This is W-1.
+        return _t("active_provider") or _t("llm_provider") or "openai"
+
+    parsed = urlparse(base_url if "//" in base_url else f"//{base_url}")
+    host = (parsed.hostname or "").lower()
+    port = str(parsed.port) if parsed.port else ""
+
+    # ⚠ GATED ON LOCALHOST, and the gate is the whole point of the arm. The port map exists
+    # ONLY because `localhost` is the hostname for both local servers. Ungated it claimed any
+    # host on those ports — `https://embed.internal.corp.example.com:1234` came back
+    # `lmstudio` — which is the same false-name failure the docstring forbids two paragraphs
+    # up, on a corporate endpoint instead of on OpenAI. Found by ultrareview (bug_004),
+    # driven RED 2026-08-27.
+    if port and port in _EMBEDDING_PORT_NAMES and host in _LOCAL_EMBEDDING_HOSTS:
+        return _EMBEDDING_PORT_NAMES[port]
+    for known, name in sorted(_EMBEDDING_HOST_NAMES.items(), key=lambda kv: -len(kv[0])):
+        if host == known or host.endswith("." + known):
+            return name
+    # Unknown endpoint: the host names it truthfully. Keep the port when there is one, so
+    # two services on one box stay distinguishable.
+    return f"{host}:{port}" if port else (host or "openai")
 
 
 # Per-provider safe max output token defaults (fallback when no model entry exists).

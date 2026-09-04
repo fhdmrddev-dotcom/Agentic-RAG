@@ -2338,3 +2338,172 @@ deliverable type (file / answer / both / neither). **C is ruled out**: it has no
 for the type to change. ⚠ The hero fixes what the column LEADS WITH; it does not by itself end the
 step-name duplication — the per-step **yields** are the proposal for that, and the rendered sketch
 must settle whether they earn it.
+
+### Phase 214 session — a step names its service and its action (2026-08-28)
+
+**Step 4 of the ratified method.** Step 1 (direction) is
+`214-stitch-step-names-service-and-action/` — eleven Stitch screens, four surfaces, base + two
+variants each. ⚠ **The two are never collapsed** (`SEED-155`): Stitch renders zero shipped
+components, and these four re-express the chosen direction against real ones. The stitch README's
+*"What the sketch must now settle"* list IS this decomposition.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 214 | argument-form-and-its-source | How does a step's argument declare where its value comes from — and does the shipped 400px panel survive a field-per-argument form? | *pending* — A 400px rail · B wide + source gutter · C wide + inline source | phase-214, step-01, step-02, arguments, panel-width, acceptance-bar |
+| 215 | publish-refuses-by-name | When publish refuses a step nothing can supply, what does it say — and what must it never say? | *pending* — A considered review · B refused on the canvas | phase-214, step-03, publish, refusal, gauntlet, acceptance-bar |
+| 216 | the-mark-and-the-action-everywhere | Does one shared step-identity element survive five run surfaces at four sizes — and does the approval pause show what actually leaves? | *pending* — A rich · B spare (⚠ B fails SC#4 by construction; it is the counter-example) | phase-214, step-04, step-05, seed-206, approval-pause, acceptance-bar |
+| 217 | the-door-that-knows-your-services | How does the describe door refuse a service the author named but never connected — and does the refusal point at the words that caused it? | *pending* — A picker first · B picker first + the anchor | phase-214, step-06, seed-208, describe-door, acceptance-bar |
+
+**All four are executable acceptance bars**, on the 213 pattern: `COPY.js` (the vocabulary that
+ports) + `index.html` + `drive.cjs` (the contract, executable) + a generated
+`BUILD-CONTRACT.generated.md`. **587 assertions across the four (141 · 129 · 138 · 179), 0 failing.**
+
+⭐ **What the sketches found that Stitch structurally could not.** Stitch drew `Cc` and `Reply to`
+rows for `send_email`. `smtp_adapter.INPUT_SCHEMA` declares **exactly three** properties under
+`additionalProperties: False`, and the adapter **raises on any undeclared key** — so a `cc` field
+would specify a form the backend refuses on every submission, while typechecking, rendering and
+passing every frontend test. That is the whole argument for step 4 existing.
+
+⚠ **One fork is deliberately left open for the operator: the panel track.** Sketch 214 §4 draws
+`400px` (shipped, `WorkflowBuilderPage.tsx:2817`) and `clamp(480px, 38%, 640px)` (Settings' track
+since 213) over byte-identical content. **The consequence is conditional** — 400px drops the source
+gutter and makes variant C the shape; the clamp ships variant B and changes a pinned assertion in
+the same commit.
+
+### SEED-224 session — the document space becomes the Library (2026-08-28)
+
+**Step 1 (direction)** is `STITCH-BRIEF-218-the-document-space.md` + the durable pixels under
+`218-the-library-and-its-tabs/stitch/`. **Step 3 (the bar)** is sketch 218. ⚠ Never collapsed.
+
+Operator direction, in two parts: follow the reference redesign closely — *"I like the journey, the
+charts, the simplicity, not many text pollution"* — but **"abide to our theme: not the colors, the
+content, the types of charts, the journey, the functionality."** So the reference supplies the
+journey and the chart vocabulary; every colour, radius and spacing value is a shipped token.
+
+Two operator decisions were taken mid-pass and are recorded in the brief: **Library Health MERGES
+into this surface (D-1)** and **the surface is renamed `Library` (D-2, front-end only)**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 218 | the-library-and-its-tabs | What is the Library's tab set, and which of the reference's surfaces can this app draw honestly? | **A · five tabs** (operator, 2026-08-28) | seed-224, bus-026, library-health, charts, acceptance-bar |
+
+**124 assertions, 0 failing — and 31+ of them read the LIVE SOURCE TREE**, not the sketch. Three were
+driven RED against planted defects and the file restored md5-identical.
+
+⭐ **What the sketch found that the Stitch pass structurally could not.** The shipped `Tabs` primitive
+puts the active trigger on `bg-background` over a `bg-muted` track — which is **lighter in light mode
+and DARKER on Deep Midnight (11% L → 4% L)**. Every reference image drew a lighter raised chip: a
+shape the shipped component cannot produce. Its only second cue is `shadow-sm`, invisible at 4%
+lightness. Second finding: the ingestion pipeline writes **six** stages, not the three the seed
+assumes, and two are conditional — so a fixed 3-segment bar draws a shape the pipeline never has.
+
+⚠ **And one finding in the drive script itself:** its SURFACE stripper consumed one closing tag too
+many and silently ate the second tab-bar arm — the remedy the sketch exists to propose — while still
+reading 70/70 green. **A stripper bug looks exactly like a passing suite.**
+
+**Second pass, same day — two operator observations, both measured true.** *"I did not see where I
+can upload documents"*: upload is a small button in a folder header's top-right corner, so the sketch
+gained an **upload** tab drawing it as the front door, with the reference's screen-07 stage-card row
+(an honest aggregate) above the queue. *"We have a lot of things that we can show but it is hidden
+and buried"*: **six columns are written for every document and reach no screen** — the parsed
+markdown of every file has ZERO non-test frontend references, and extracted tables and image
+descriptions are stored in full but rendered as a count. **None of it needs a migration.**
+
+⚠ **A third finding is in the drive script itself, again.** The fence proving the buried-column claim
+first shelled out to `grep -rl`, which failed on this box and returned an empty list — so it **passed
+vacuously, manufacturing the finding it was meant to verify**. It now walks the tree in JS behind two
+positive controls. Final: **124 assertions, 0 failing**, five driven RED against planted defects with
+the file restored md5-identical each time.
+
+### Phase 224 session — where a panel-owned step belongs (2026-09-02)
+
+Phase 224's structural question, drawn with the strings that ship today. The measured `Today` view is
+the sketch's spine: the run header counts **3 steps** while the rail enumerates **2**, the third being
+a card *outside* the frame; that card's title is the raw tool name uppercased by CSS; and the status
+sentence wears a `<Square>` that reads as an unticked box **because `☑` sits directly above it**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 223 | the-step-inside-the-run | A `write_todos` card is panel-owned, so it renders as a sibling beneath the run that counts it. Does it belong inside the run frame — and if so, as what? | **D · delete it** (operator, 2026-09-02) | phase-224, seed-240, seed-128, bug-260902-07, chat-surface, seam-card, acceptance-bar |
+
+⭐ **The composition fault is a guardrail's residue.** `MessageItem.tsx:841` says in writing: *"ADDITIVE
+ONLY — a new sibling renderer in MessageItem, never a touch of RunCard internals (G-5)."* The orphan
+below the run was placed there deliberately, to protect a hot file.
+
+⭐ **D is deletion, and the premise for keeping the card is measurably FALSE.** `SeamCard.tsx:3-8`
+justifies itself with *"the panel reconciles to current state and does NOT replay history, so the
+transcript must be self-contained."* But `StreamsProvider.tsx:106` says `useDerivedPanel` is *"a PURE
+read over the viewing thread's persisted chat `tool_calls`"* and `workspacePanel.ts:204` takes the
+latest `write_todos` snapshot from exactly those — **both surfaces read the same durable rows.** The
+card is a second render of one source, not a backup for a source that disappears.
+**`workspace_write` is redundant by a stronger argument still:** `FilesSection.tsx:158` *fetches from
+the server*. ⚠ **`ask_user` must survive the delete** — `You answered X` is the only record a human
+decided anything, and the panel shows a *pending* question, never an answered one.
+
+The operator was finishing a job this repo started: `MessageItem.tsx:536` deleted the **live** pointers
+at SEED-098 for the identical reason. Only the reload card survived, because nobody re-checked its
+premise.
+
+⭐ **A Stitch pass contributed two ideas the sketch missed, and then settled the field.** Project
+`10591382119939539231`; screenshot kept beside the sketch. It put the status line **inside** the run
+frame rather than beneath it, and gave each step's result its **own right-aligned column**. Folding
+both in revealed the decider: **variant C can adopt NEITHER**, because both live inside `RunCard`,
+which C exists to leave alone. *The variant that avoided the G-5 obligation is the one that cannot have
+the better design.* ⚠ Stitch's own palette drifted (olive checks, indigo nearly absent) and its
+References pill still has the affordance problem `BUG-260902-07` exists to fix — the recorded rule that
+**rules belong in `designMd`, not the prompts** was skipped here, and it showed exactly where it said it
+would.
+
+⚠ **Two `generate_screen_from_text` calls timed out at the tool boundary.** The first produced nothing
+across five polls over seven minutes; the second completed server-side ~2 min after timing out. **A
+timeout here means *unknown*, not *failed*.**
+
+**New bug filed from this session — `BUG-260902-07`.** The References footer opens by default whenever
+an answer carries inline markers (`MessageItem.tsx:619`), which for a grounded answer is *every time*,
+so the collapsed state is only ever seen on the degraded path; and its trigger (`CitationList.tsx:32-44`)
+is `text-xs text-muted-foreground` with a 12px chevron — no border, no surface, no separation from body
+copy. ⚠ **The two halves ship together or not at all:** while it is open by default the weak trigger is
+invisible, because nobody hunts for a control they never need. ⚠ This **reverses Phase 153's
+D-06/D-07 open-by-default contract** — recorded as a conscious reversal so a later phase does not
+"restore" it believing it was an oversight.
+
+Fenced per variant rather than per file: `a`/`b`/`d` carry the in-frame status, `c` keeps the external
+one, `today` is byte-identical to the measured original, the inline-arrow override covers exactly
+`today`+`c`, every `onclick` resolves to a defined function, every `getElementById` target exists, 16
+grounded source strings are present — with a negative control proving the fence can fail.
+
+| 226 | the-card-you-can-reach-and-its-clock | The approval gate expires after 120s with no countdown and renders inline, so it can arrive below the fold while the clock runs. Where should it live, and how does it show its time? | **A · docked above the composer** (operator, 2026-09-02), with **B's jump chip as the recorded fallback** | phase-224, bug-260902-04, seed-240, approval, safety-gate, acceptance-bar |
+
+⭐ **The clock in the sketch is the real one.** Its fence asserts `DURATION = 120` matches
+`tool_dispatcher.py:4443`, so the mockup cannot drift from the server constant it is arguing about.
+Each viewport has a real fold — the `Today` view reproduces the defect by making you scroll past the
+composer to find a card whose invisible clock is already running.
+
+⭐ **The measured constraint that binds every variant: a countdown CANNOT be built client-side.**
+`ToolApprovalRequest` carries `callId` · `connectionId` · `serviceId` · `serviceName` · `toolName` ·
+`args` and **no deadline**, and `120.0` exists only in the dispatcher. Inventing it in the client
+duplicates a server constant that will drift. **The deadline has to go on the wire** whichever variant
+ships — that is the honest net-new.
+
+⭐ **The app already had a home for "the agent needs you" and this card ignored it.**
+`panel/PendingAskCard.tsx` hosts a pending `ask_user` under a section headed exactly *"Needs you"*.
+That is variant C's whole argument — consistency rather than invention. **It lost on a safety
+ground:** the panel collapses to a 52px rail, so an approval arriving while it is closed puts the
+decision behind a click *with the clock running* — strictly worse than today unless arrival
+force-opens the panel. A safety gate may not be made harder to reach.
+
+**Why A won, and what it owes.** While a decision is pending it is **state, not content**, so it
+leaves the scrollback for the one region always on screen — the calm-loud interrupt of
+`panel-shell.md`, made structural rather than loud. Its cost is a reload seam: the transcript loses
+the moment unless the decision resolves back into it.
+
+⭐ **And that cost is smaller than it looked, because sketch 223 settled it in the same session.**
+223's winner D deletes `SeamCard`'s `write_todos` and `workspace_write` arms **but keeps `ask_user`**,
+on the grounds that it is the only record a human decided anything. **An approval decision is the same
+category** — so a docked card resolves through the pattern that survives: a new `SeamKind`, not new
+machinery.
+
+⚠ **The fallback carries a real trigger, not a vague one.** B is chosen if a docked approval's
+decision cannot be rendered back into the transcript at the quality `SeamCard` already reaches for
+`ask_user` — a hole on reload, or machinery beyond a new `SeamKind`. **Decide it at plan-phase, before
+the dock is built.**

@@ -4,12 +4,21 @@ title: Settings → Connections shows no "Add connection" button on cloud (local
 reported: 2026-08-10
 surface: Agentic-RAG
 severity: medium
-status: open
+status: folded
 affected_areas: [settings/connections, deployment/cloud-parity, admin/feature-visibility]
-folded_into: null
+folded_into: "212"
 verified_closed_by: null
 related_seeds: [SEED-144, SEED-145, SEED-146]
-re_open_trigger: null
+re_open_trigger: "⚠ FOLDED INTO 212 AND SHIPPED, BUT THE CLOUD HALF WAS NEVER VERIFIED — that is why
+  status stays `folded` and `verified_closed_by` stays null. Phase 212 shipped the catalog, the
+  Popular row and the Add affordance, and the reviewer DROVE all of it on 2026-08-27 — but only on
+  LOCAL, on an install whose `live_connectors` is flipped to `everyone` while the shipped cold
+  default is `off` (user_settings.py:1214). This report reproduces on `production` at `5d5ea200`,
+  and nothing in Phase 212 was driven there. The write affordance sits behind TWO conjuncts —
+  `isOrgAdmin && liveConnectorsOn` (ConnectionsTab.tsx) — and only the second was exercised.
+  FLIP TO `closed` ONLY AFTER: a cloud install shows the Add affordance and a Popular service
+  connects there. Until then this is shipped-but-unverified on the exact surface it was filed
+  against. Re-open immediately if a cloud user still sees no Add button after 212 deploys."
 reproduces_on:
   branch: production
   commit: 5d5ea200

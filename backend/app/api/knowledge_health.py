@@ -371,7 +371,15 @@ def _fetch_retrieval_trend(supabase: Client, user_id: str, days: int) -> list[di
         .execute()
     )
 
-    daily: dict[str, dict] = defaultdict(lambda: {"retrieval_count": 0, "unique_documents": set()})
+    daily: dict[str, dict] = defaultdict(
+        lambda: {
+            "retrieval_count": 0,
+            "unique_documents": set(),
+            "could_not_search": 0,
+            "found_something": 0,
+            "found_nothing": 0,
+        }
+    )
 
     for row in res.data:
         date_str = _parse_date(row.get("created_at") or "")
@@ -379,7 +387,20 @@ def _fetch_retrieval_trend(supabase: Client, user_id: str, days: int) -> list[di
             continue
         meta = row.get("metadata") or {}
         doc_ids = meta.get("document_ids") or []
-        daily[date_str]["retrieval_count"] += 1
+        # BE-4 (217.1 / LIB-06 / D-217.1-34): three explicit series, and `retrieval_count`'s
+        # meaning is preserved BYTE-FOR-BYTE — an error row (BE-4's `retrieval_status:
+        # "provider_error"` write) is EXCLUDED from retrieval_count, so a provider outage can
+        # never make the shipped Coverage Trend chart RISE. It increments its own
+        # `could_not_search` series instead.
+        is_error = meta.get("retrieval_status") == "provider_error"
+        if is_error:
+            daily[date_str]["could_not_search"] += 1
+        else:
+            daily[date_str]["retrieval_count"] += 1
+            if doc_ids:
+                daily[date_str]["found_something"] += 1
+            else:
+                daily[date_str]["found_nothing"] += 1
         for doc_id in doc_ids:
             daily[date_str]["unique_documents"].add(doc_id)
 
@@ -391,6 +412,9 @@ def _fetch_retrieval_trend(supabase: Client, user_id: str, days: int) -> list[di
             "date": day,
             "retrieval_count": daily[day]["retrieval_count"],
             "unique_documents": len(daily[day]["unique_documents"]),
+            "could_not_search": daily[day]["could_not_search"],
+            "found_something": daily[day]["found_something"],
+            "found_nothing": daily[day]["found_nothing"],
         })
 
     return result

@@ -41,6 +41,7 @@ import {
   GROUNDING_DIAL_LOOSE_LABEL,
   GROUNDING_DIAL_STRICT_LABEL,
   GROUNDING_LOCK_REFUSAL,
+  GROUNDING_PUBLISH_CONSEQUENCE,
   GROUNDING_NOTHING_TO_PROVE,
   GROUNDING_TOOL_LIST_IS_THE_CONTROL,
   GROUNDING_WHY_DETECTED,
@@ -671,5 +672,60 @@ describe("GovernanceSection 199-06 — the refusal survives the panel's density 
     expect(looseButton()).toHaveTextContent(GROUNDING_DIAL_LOOSE_LABEL)
     expect(strictButton()).toHaveTextContent(GROUNDING_DIAL_STRICT_LABEL)
     expect(screen.getByTestId("governance-arm")).toHaveTextContent(ACTION_RISK_ARM_LABEL)
+  })
+})
+
+// ── SEED-230 — THE CONSEQUENCE, AND THE ONE ARM IT MAY NOT APPEAR ON ────────────────────
+//
+// The operator scrolled past this whole section and then spent four failed publishes finding
+// the rule by experiment. Everything the section said described a STATE ("held strictly", "a
+// check runs on this step") and nothing said what the state DOES. These cases pin the sentence
+// that closes that, and — more importantly — pin where it must NOT appear.
+describe("SEED-230: the panel names the publish consequence", () => {
+  it("says it on a DETECTED step — the one the engine actually gates", () => {
+    renderSection(AGENT)
+    expect(screen.getByTestId("governance-publish-consequence").textContent).toBe(
+      GROUNDING_PUBLISH_CONSEQUENCE,
+    )
+  })
+
+  it("⭐ says NOTHING on an ESCALATED step, because no gate is attached to one", () => {
+    // `grounding.effective_phase` synthesizes `citations_required` for `detected` ONLY. An
+    // author who turned the dial by hand gets the seal and NO synthesized gate, so promising
+    // them a publish refusal would be a claim about a check that does not exist. This is the
+    // case that makes the sentence honest rather than merely present.
+    renderSection({ phaseType: "llm_agent", availableTools: ["execute_code"], groundingEscalated: true })
+    expect(screen.getByTestId("governance-why").textContent).toBe(GROUNDING_WHY_ESCALATED)
+    expect(screen.queryByTestId("governance-publish-consequence")).toBeNull()
+  })
+
+  it("says nothing on a step held to nothing", () => {
+    renderSection({ phaseType: "llm_agent", availableTools: ["execute_code"] })
+    expect(screen.queryByTestId("governance-publish-consequence")).toBeNull()
+  })
+
+  it("says nothing on a step type that carries no dial", () => {
+    renderSection({ phaseType: "llm_single", availableTools: ["search_documents"] })
+    expect(screen.queryByTestId("governance-publish-consequence")).toBeNull()
+  })
+
+  it("is CONDITIONAL on the outcome, never on the state", () => {
+    // The gate retries twice, and a step that retrieves something on the retry publishes fine
+    // — measured 2 of 8 attempts recovering exactly that way. So the copy may not say the step
+    // "cannot be published"; it must condition on what the run produces.
+    const copy = GROUNDING_PUBLISH_CONSEQUENCE.toLowerCase()
+    expect(copy).toContain("if ")
+    for (const forbidden of ["cannot be published", "can't be published", "will fail", "blocked"]) {
+      expect(copy).not.toContain(forbidden)
+    }
+  })
+
+  it("shares the refusal's vocabulary, so meeting either surface explains the other", () => {
+    // The publish block reads "…nothing was retrieved (0 sources) — this step reads your
+    // documents and must show where its answer came from". Both sides must say `retriev`.
+    renderSection(AGENT)
+    const panel = screen.getByTestId("governance-publish-consequence").textContent ?? ""
+    expect(panel.toLowerCase()).toContain("retriev")
+    expect(panel.toLowerCase()).toContain("publish")
   })
 })

@@ -48,6 +48,7 @@ Pinned for supply-chain stability; versions are authoritative in the Dockerfile.
 | `numpy` | 2.1.3 | Arrays / numerics | |
 | `scipy` | 1.14.1 | Scientific computing | |
 | `scikit-learn` | 1.5.2 | Basic ML | |
+| `ezdxf` | 1.3.5 | **Reading CAD DXF files** | Entity extraction (blocks, dimensions, specs) for quantity takeoff (Phase 220). |
 
 ### PDF + Unicode (the fpdf2 lesson)
 

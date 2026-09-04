@@ -39,6 +39,9 @@ const { mockUpdateGrants, mockUseOrgOptional } = vi.hoisted(() => {
 })
 vi.mock("@/providers/OrgProvider", () => ({ useOrgOptional: mockUseOrgOptional }))
 
+// 211-04 — the `?raw` self-read this file's new source fence needs. The house idiom
+// (`ExternalActionSection.test.tsx:27`), read through the same loader.
+import mcpToolPickerSource from "./McpToolPicker?raw"
 import {
   McpToolPicker,
   isToolGranted,
@@ -47,7 +50,7 @@ import {
   MCP_GRANT_GRANTED_LABEL,
   MCP_GRANT_DENIED_LABEL,
 } from "./McpToolPicker"
-import type { ConnectorConnection, McpConnectionConfig } from "@/lib/api"
+import type { ConnectorConnection, McpConnectionConfig, ToolGrantPosture } from "@/lib/api"
 import type { OrgValue } from "@/providers/OrgProvider"
 import {
   MCP_GRANT_ADMIN_ONLY_NOTE,
@@ -86,13 +89,19 @@ beforeEach(() => {
 const mockMcpConnection: ConnectorConnection = {
   id: "conn-mcp-1",
   org_id: "org-1",
+  // ⚠ 211-04 — REQUIRED, not decoration. Plan 211-02 made `service_id` a REQUIRED member of
+  // the wire type precisely so a client could not branch on an absence migration 127
+  // guarantees cannot exist. This fixture was the ONE typecheck error this plan owns, and it
+  // is closed by SATISFYING the contract rather than by softening it to `service_id?`.
+  service_id: "atlassian",
   name: "Atlassian MCP",
   config: {} as McpConnectionConfig,
   is_enabled: true,
   mcp_server_url: "https://mcp.atlassian.com/v1",
+  default_approval_posture: "ask",
   tool_grants: {
-    jira_create_issue: true,
-    jira_delete_issue: false,
+    jira_create_issue: "allow",
+    jira_delete_issue: "deny",
   },
   discovered_tools: [
     {
@@ -137,12 +146,24 @@ describe("McpToolPicker Component", () => {
     vi.clearAllMocks()
   })
 
-  it("renders null if connection has no mcp_server_url", () => {
+  // ⚠ REPLACED BY 211-04, AND THE REPLACEMENT IS THE PHASE. The shipped case here read
+  // *"renders null if connection has no mcp_server_url"* and it asserted THE DEFECT
+  // D-211-12 removes: a bound capability connection carrying a perfectly-shaped
+  // `discovered_tools` list rendered NOTHING, so plan 211-01's descriptors could never be
+  // displayed. The card now gates on BOUNDNESS; the endpoint decides nothing about
+  // rendering anywhere in this component. Its replacement is the pair below — the positive
+  // (a bound capability row DOES render) and the honest negative (no connection at all).
+  it("renders the card for a bound connection with NO mcp_server_url (D-211-12)", () => {
     const nonMcpConn: ConnectorConnection = {
       ...mockMcpConnection,
       mcp_server_url: null,
     }
-    const { container } = render(<McpToolPicker connection={nonMcpConn} />)
+    render(<McpToolPicker connection={nonMcpConn} />)
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+  })
+
+  it("NEGATIVE CONTROL — a null connection renders nothing at all", () => {
+    const { container } = render(<McpToolPicker connection={null} />)
     expect(container).toBeEmptyDOMElement()
   })
 
@@ -214,37 +235,61 @@ describe("McpToolPicker Component", () => {
     })
   })
 
-  it("validates and updates JSON arguments", () => {
-    const onChangeArgs = vi.fn()
-    render(
-      <McpToolPicker
-        connection={mockMcpConnection}
-        toolName="jira_create_issue"
-        onChangeArgs={onChangeArgs}
-      />
-    )
+  /**
+   * ⚠ 214-07 — THE TWO CASES THAT USED TO LIVE HERE DROVE THE FREE-FORM ARGUMENTS SURFACE
+   * (`validates and updates JSON arguments` · `shows error message on invalid JSON syntax in
+   * arguments`). THEY ARE REPLACED BY ABSENCE CASES, NOT DELETED.
+   *
+   * ⭐ A REMOVED ASSERTION AND A REMOVED FEATURE LOOK IDENTICAL IN A COUNT. Deleting them
+   * outright would have paid for a deleted surface with a smaller number, which is exactly the
+   * signal the count gate exists to notice — so the deletion is paid for in kind, and this
+   * block asserts MORE than the two it replaces: the two test ids are gone, the parse-error
+   * line is gone, and the whole card carries no free-form control at all.
+   */
+  it("⭐ the free-form arguments surface is GONE — both of its test ids resolve to nothing", () => {
+    render(<McpToolPicker connection={mockMcpConnection} toolName="jira_create_issue" />)
+    // NON-VACUITY FIRST: the card really rendered, with a bound action selected.
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument()
 
-    const textarea = screen.getByTestId("mcp-tool-args")
-    fireEvent.change(textarea, { target: { value: '{"summary": "Test bug"}' } })
-
-    expect(onChangeArgs).toHaveBeenCalledWith({ summary: "Test bug" })
-    expect(screen.queryByTestId("mcp-args-error")).not.toBeInTheDocument()
+    // The ids are assembled at runtime — a fence that spells its own needle counts its own
+    // prose, and this file's docblock above names both (the 187-24 trap).
+    expect(screen.queryByTestId("mcp-tool" + "-args")).toBeNull()
+    expect(screen.queryByTestId("mcp" + "-args-error")).toBeNull()
   })
 
-  it("shows error message on invalid JSON syntax in arguments", () => {
+  it("⛔ and NOTHING replaced it — no free-form control of any kind is on this card", () => {
+    const { container } = render(
+      <McpToolPicker connection={mockMcpConnection} toolName="jira_create_issue" />,
+    )
+    // POSITIVE CONTROL FIRST — the matcher really finds the element it looks for.
+    expect("<text".concat("area id=x/>")).toContain("<text" + "area")
+
+    expect(container.querySelectorAll("text" + "area")).toHaveLength(0)
+    const html = container.innerHTML.toLowerCase()
+    for (const needle of ["<text" + "area", "js" + "on", "tool arg" + "uments", "adv" + "anced"]) {
+      expect(html.includes(needle), needle).toBe(false)
+    }
+    // NON-VACUITY: there really is a card here to be empty of those things.
+    expect(html.length).toBeGreaterThan(200)
+  })
+
+  it("the `onChangeArgs` PROP survives the deletion — only the surface went", () => {
+    // ⚠ The prop is still on the contract and `ConnectionPicker` still passes it; what it
+    // now feeds is `ArgumentEditor`. A component that dropped the prop would have made the
+    // caller's write seam disappear silently, which is a different and worse change.
     const onChangeArgs = vi.fn()
     render(
       <McpToolPicker
         connection={mockMcpConnection}
         toolName="jira_create_issue"
+        toolArgs={{ summary: "Test bug" }}
         onChangeArgs={onChangeArgs}
-      />
+      />,
     )
-
-    const textarea = screen.getByTestId("mcp-tool-args")
-    fireEvent.change(textarea, { target: { value: '{summary: invalid}' } })
-
-    expect(screen.getByTestId("mcp-args-error")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    // ⛔ AND THIS CARD NEVER CALLS IT ANY MORE — the write moved, it did not vanish.
+    expect(onChangeArgs).not.toHaveBeenCalled()
   })
 })
 
@@ -269,7 +314,19 @@ describe("McpToolPicker Component", () => {
  *  compare equal afterwards. The UI-SPEC's evidence row permits a node COUNT or an innerHTML
  *  identity; the count is chosen because a 4 KB single-line capture makes every failure
  *  unreadable, and the non-vacuity case below is what stops the number being a tautology. */
-const BASE_DENIED_NODE_COUNT = 33
+/**
+ * ⚠ 214-07 — RE-BASELINED `33` → `30`, AND THE REASON IS THE ONLY THING THAT MAKES THAT
+ * LEGITIMATE. This pin's contract is *a provider-less render adds ZERO NEW NODES*; it is not
+ * a claim that the card's node count is frozen forever. This plan DELETED three of them — the
+ * wrapper, the label and the free-form control of the arguments surface — deliberately, as
+ * SC#1's whole content, and the count moved DOWN by exactly that.
+ *
+ * ⛔ A PIN RELAXED TO MAKE RED GO GREEN IS A PIN THAT NEVER FAILS AGAIN, so the number is
+ * re-measured rather than widened: it is still an EQUALITY against a constant, the delta is
+ * `-3` and it is attributed, and the non-vacuity case below still proves the number is not a
+ * tautology. A future edit that ADDS a node here is red exactly as before.
+ */
+const BASE_DENIED_NODE_COUNT = 30
 
 const deniedTool = "confluence_search"
 
@@ -395,9 +452,9 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
       "jira_delete_issue",
     ])
     expect(payload).toStrictEqual({
-      jira_create_issue: true,
-      jira_delete_issue: false,
-      confluence_search: true,
+      jira_create_issue: "allow",
+      jira_delete_issue: "deny",
+      confluence_search: "allow",
     })
   })
 
@@ -406,13 +463,13 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
     const { rerender } = renderPicker()
     rerender(
       <McpToolPicker
-        connection={{ ...mockMcpConnection, tool_grants: { late_arrival: true } }}
+        connection={{ ...mockMcpConnection, tool_grants: { late_arrival: "allow" } }}
         toolName={deniedTool}
       />,
     )
     fireEvent.click(screen.getByTestId("mcp-grant-toggle"))
     await waitFor(() => expect(mockUpdateGrants).toHaveBeenCalledTimes(1))
-    const [, payload] = mockUpdateGrants.mock.calls[0] as [string, Record<string, boolean>]
+    const [, payload] = mockUpdateGrants.mock.calls[0] as [string, Record<string, ToolGrantPosture>]
     expect(Object.keys(payload).sort()).toStrictEqual(["confluence_search", "late_arrival"])
   })
 
@@ -502,7 +559,7 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
     expect(screen.getByTestId("mcp-grant-toggle")).toHaveAttribute("aria-checked", "false")
     rerender(
       <McpToolPicker
-        connection={{ ...mockMcpConnection, tool_grants: { [deniedTool]: true } }}
+        connection={{ ...mockMcpConnection, tool_grants: { [deniedTool]: "allow" } }}
         toolName={deniedTool}
       />,
     )
@@ -524,5 +581,201 @@ describe("206.2-04 · the grant write — REPLACE semantics (D-206.2-16 / T-206.
     // The switch is OUTSIDE the badge — a control nested in a tinted status chip makes a
     // state reading look like a button, and would put a control inside SC#2c pinned region.
     expect(screen.getByTestId("mcp-grant-status").contains(toggle)).toBe(false)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⚠ ADDED, NEVER RE-BASELINED — 211-04 (D-211-12 / T-211-22), the closed loop.
+//
+// THE DEFECT THIS BLOCK EXISTS TO MAKE UNREPEATABLE. D-211-12 says the picker must read the
+// TOOL LIST rather than the endpoint. The NAIVE form of that — *render when
+// `discovered_tools.length > 0`, else return `null`* — creates a state whose only remedy is a
+// control that state has hidden: the list is empty, so the card returns null, so the Refresh
+// button (which lives AFTER the early return) never renders, so nothing can populate the list.
+// It was caught in plan review rather than in production, and these cases are what stop it
+// coming back.
+//
+// ⚠ EVERY CASE BELOW USES THE **REAL EMPTY-ARRAY SHAPE A SHIPPED ROW CARRIES** — `[]`, never a
+// synthetic populated fixture. A populated fixture is exactly what would have let the closed
+// loop ship: it can never reach the branch that returns null.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The LEGACY shape — a first-party capability connection as it exists on disk after
+ *  migration 127 §2b. `capability` is set, there is NO `mcp_server_url`, and the action list
+ *  is the one thing that varies between the two cases below. */
+const legacyConnection: ConnectorConnection = {
+  id: "conn-slack-1",
+  org_id: "org-1",
+  service_id: "slack",
+  capability: "post_message",
+  name: "#ops-alerts",
+  config: {} as McpConnectionConfig,
+  is_enabled: true,
+  mcp_server_url: null,
+  default_approval_posture: "ask",
+  tool_grants: {},
+  discovered_tools: [],
+}
+
+/** Plan 211-01's descriptor, in its REAL four-key shape — `name` / `title` / `description` /
+ *  `inputSchema`, with `required` arriving INSIDE `inputSchema` because `inputSchema` IS the
+ *  adapter's own declaration (211-01: "no REQUIRED_ARGS constant exists anywhere"). Mirrored
+ *  rather than invented, which is what makes the populated case a proof about the wire. */
+const POST_MESSAGE_DESCRIPTOR = {
+  name: "post_message",
+  title: "Post message",
+  description: "Post one plain-text message to the channel configured on this connection.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["text"],
+    properties: { text: { type: "string" } },
+  },
+}
+
+describe("211-04 · the action card renders for EVERY bound shape (D-211-12)", () => {
+  it("⭐ LEGACY + EMPTY LIST — the card, the sentence AND an enabled Refresh control", () => {
+    // ⭐ THE CASE THE REST OF THE PHASE STRUCTURALLY CANNOT PRODUCE. Every other fixture in
+    // this phase is pre-populated, and a pre-populated fixture can never reach the branch
+    // that would return null. This is the row shape that existed before migration 127 — and
+    // the row shape a FAILED descriptor write, or a capability added by a later phase with
+    // no backfill, still produces today.
+    render(<McpToolPicker connection={legacyConnection} toolName="" />)
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-no-tools")).toHaveTextContent(MCP_NO_TOOLS_DISCOVERED)
+    const refresh = screen.getByTestId("mcp-discover-btn")
+    expect(refresh).toBeInTheDocument()
+    expect(refresh).not.toBeDisabled()
+  })
+
+  it("⭐ LEGACY + ONE DESCRIPTOR — the action is listed, by its human label", () => {
+    render(
+      <McpToolPicker
+        connection={{ ...legacyConnection, discovered_tools: [POST_MESSAGE_DESCRIPTOR] }}
+        toolName=""
+      />,
+    )
+    const toolSelect = screen.getByTestId("mcp-tool-select") as HTMLSelectElement
+    // The WIRE VALUE is the tool's `name`; the LABEL is its `title`. Both are asserted,
+    // because binding writes the value and the author reads the label.
+    expect(Array.from(toolSelect.options).map((o) => o.value)).toContain("post_message")
+    expect(screen.getByText("Post message")).toBeInTheDocument()
+    expect(screen.queryByTestId("mcp-no-tools")).not.toBeInTheDocument()
+  })
+
+  it("a tool with NO title falls back to its name — `title` is optional on the wire", () => {
+    // 211-02's type makes `title` optional and its ABSENCE meaningful: the sanitizer omits
+    // the key entirely for a blank or non-string, so `name` must stay a reachable fallback.
+    render(
+      <McpToolPicker
+        connection={{ ...legacyConnection, discovered_tools: [{ name: "bare_tool" }] }}
+        toolName=""
+      />,
+    )
+    expect(screen.getByText("bare_tool")).toBeInTheDocument()
+  })
+
+  it("⭐ THE REFRESH CONTROL REALLY REACHES THE ENDPOINT ON THE LEGACY SHAPE", async () => {
+    // ⭐ `handleDiscover` is the ONLY caller of `POST /connections/{id}/discover` in the whole
+    // product, so this press is what makes plan 211-02's capability arm reachable at all.
+    // Without it, a capability row whose action list is empty could never be repaired from
+    // inside the product.
+    mockDiscover.mockResolvedValueOnce([POST_MESSAGE_DESCRIPTOR])
+    render(<McpToolPicker connection={legacyConnection} toolName="" />)
+    fireEvent.click(screen.getByTestId("mcp-discover-btn"))
+    await waitFor(() => {
+      expect(mockDiscover).toHaveBeenCalledWith("conn-slack-1")
+      expect(screen.getByText("Post message")).toBeInTheDocument()
+    })
+  })
+
+  it("MEMBER + LEGACY + EMPTY — no Refresh control, and the member's own sentence", () => {
+    mockUseOrgOptional.mockReturnValue(orgValue({ canManage: false, role: "member" }))
+    render(<McpToolPicker connection={legacyConnection} toolName="" />)
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    expect(screen.queryByTestId("mcp-discover-btn")).not.toBeInTheDocument()
+    expect(screen.getByTestId("mcp-no-tools")).toHaveTextContent(MCP_NO_TOOLS_ADMIN_ONLY)
+  })
+
+  it("⭐ THE LOOP CANNOT CLOSE ON EITHER SHAPE — empty list, Refresh present, both times", () => {
+    // The invariant stated once, over both shapes: there is NO state in which the only way to
+    // populate the list is a control the empty list has hidden.
+    for (const row of [
+      legacyConnection,
+      { ...mockMcpConnection, discovered_tools: [] },
+    ] as ConnectorConnection[]) {
+      const { unmount } = render(<McpToolPicker connection={row} toolName="" />)
+      expect(screen.getByTestId("mcp-no-tools")).toBeInTheDocument()
+      expect(screen.getByTestId("mcp-discover-btn")).toBeEnabled()
+      unmount()
+    }
+  })
+
+  it("the endpoint decides NOTHING about rendering — source fence over the component", () => {
+    // Asserted MECHANICALLY, because the failure mode is a future editor re-introducing the
+    // gate as a "harmless" guard somewhere lower in the tree. Comment lines are stripped
+    // first: this component's docblocks NAME the field it must not branch on.
+    const live = mcpToolPickerSource
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n")
+    // ⚠ THE NEEDLE IS ASSEMBLED AT RUNTIME — the 187-24 trap. Spelling it whole would put the
+    // token into a file that also `?raw`-reads its own subject's siblings.
+    const needle = "mcp_server" + "_url"
+    expect(live).not.toContain(needle)
+    // POSITIVE CONTROL — the needle really can find the gate it forbids.
+    expect(`if (!connection?.${needle}) return null`).toContain(needle)
+    // …and the haystack is this component's real source.
+    expect(mcpToolPickerSource).toContain("export function McpToolPicker")
+  })
+})
+
+describe("211-04 · the grant surface follows the ENFORCEMENT, not the card (Rule 2)", () => {
+  it("⚠ grantsEnforced=false — no badge, no switch, no scope note, no refusal sentence", () => {
+    // ⚠ THE BADGE WOULD OTHERWISE BE A MEASURED LIE. `phase_types.py`'s grant gate lives
+    // INSIDE `if getattr(connection, "mcp_server_url", None):`, so `tool_grants` is not
+    // consulted at all on the capability path — a step bound to a legacy connection is NOT
+    // "refused by policy at run time", whatever the map says. Before this plan the card never
+    // rendered for such a row, so the sentence could not appear; making the card render is
+    // what creates the obligation, and it is discharged here rather than shipped.
+    render(
+      <McpToolPicker
+        connection={{ ...legacyConnection, discovered_tools: [POST_MESSAGE_DESCRIPTOR] }}
+        toolName="post_message"
+        grantsEnforced={false}
+      />,
+    )
+    for (const id of [
+      "mcp-grant-status",
+      "mcp-grant-toggle",
+      "mcp-grant-scope-note",
+      "mcp-grant-admin-only",
+    ]) {
+      expect(screen.queryByTestId(id), id).not.toBeInTheDocument()
+    }
+    // …and the rest of the chosen-tool surface is UNAFFECTED: the description is a fact about
+    // the tool, not about a permission.
+    //
+    // ⚠ 214-07 — THE SECOND ASSERTION HERE NAMED THE ARGUMENTS SURFACE, WHICH THIS PLAN
+    // DELETED. It is replaced rather than dropped: what this case actually owes is *the
+    // non-grant surface survives a `grantsEnforced={false}` render*, and the action `<select>`
+    // carries that property just as well — better, in fact, since it is the control the
+    // arguments now hang off one component over.
+    expect(screen.getByTestId("mcp-tool-description")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument()
+  })
+
+  it("NON-VACUITY — the DEFAULT still renders the whole grant surface", () => {
+    // Without this, `grantsEnforced={false}` above would pass against a component that had
+    // simply stopped rendering the grant control for everybody.
+    render(
+      <McpToolPicker
+        connection={{ ...legacyConnection, discovered_tools: [POST_MESSAGE_DESCRIPTOR] }}
+        toolName="post_message"
+      />,
+    )
+    expect(screen.getByTestId("mcp-grant-status")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-grant-toggle")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-grant-scope-note")).toBeInTheDocument()
   })
 })

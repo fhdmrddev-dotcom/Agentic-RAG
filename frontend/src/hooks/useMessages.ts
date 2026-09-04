@@ -71,6 +71,8 @@ interface UseMessages {
      *  workflow id. When set, this send creates a workflow run; omitted on a
      *  Deep send (byte-identical). */
     workflowDefinitionId?: string,
+    /** Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this send turn. */
+    activeConnectorIds?: string[],
   ) => Promise<void>
   /** Phase 063 (D-063-03): server-side Stop via DELETE /runs/{rid}; now async. */
   stopStreaming: () => Promise<void>
@@ -105,7 +107,7 @@ export function useMessages(): UseMessages {
       isStreaming,
       fallbackNotice,
       loadMessages: (threadId) => actions.loadMessages(threadId, "chat"),
-      sendMessage: (threadId, content, model, onTitleUpdate, agentMode, provider, workflowDefinitionId) =>
+      sendMessage: (threadId, content, model, onTitleUpdate, agentMode, provider, workflowDefinitionId, activeConnectorIds) =>
         actions.sendMessage(threadId, content, {
           model,
           provider,
@@ -114,6 +116,7 @@ export function useMessages(): UseMessages {
           surfaceId: "chat",
           // Phase 092 (D-02): forward the picked workflow id (undefined = Deep).
           workflowDefinitionId,
+          activeConnectorIds,
         }),
       stopStreaming: actions.stopStream,
       abortStream: () => {}, // legacy no-op (D-063.1-07 — call site removed from ChatArea)

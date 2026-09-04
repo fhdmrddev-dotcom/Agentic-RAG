@@ -30,7 +30,7 @@
  * STRUCTURAL rules only (no contrast assertion).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, cleanup, within } from "@testing-library/react"
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 
@@ -70,7 +70,7 @@ const ROWS: ModelRegistryRow[] = [
 const AXE_TABLE_OPTS = { rules: { "empty-table-header": { enabled: false } } } as const
 
 function renderRegistry(rows: ModelRegistryRow[] | null, showTechnical = false) {
-  return render(
+  const result = render(
     <ModelRegistryTab
       rows={rows}
       onSetCapability={noop}
@@ -78,6 +78,13 @@ function renderRegistry(rows: ModelRegistryRow[] | null, showTechnical = false) 
       showTechnical={showTechnical}
     />,
   )
+  // The shipped tab lands FOLDED (an operator opens the provider they came for), so open
+  // every provider section before querying a row control — as a user does. Scoped to the
+  // provider headers: the add-by-ID form is also an aria-expanded disclosure.
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-provider] > button[aria-expanded="false"]')
+    .forEach((btn) => fireEvent.click(btn))
+  return result
 }
 
 /** Assert every provider/model brand icon is decorative-or-labeled: no SVG exposes an

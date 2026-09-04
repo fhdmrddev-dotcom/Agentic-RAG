@@ -33,6 +33,7 @@
  * no such field in either form, deliberately (`lib/api.ts:5535-5547`).
  */
 import type { ConnectorConnection, EffectiveFeatures, PublishedWorkflow } from "@/lib/api"
+import { connectionRowVerdict } from "./connectionRowVerdict"
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 0 · READING `live_connectors` OUT OF THE EFFECTIVE-FEATURES MAP
@@ -111,33 +112,167 @@ export const CONNECTION_STATE_READY = "✓ Ready"
 export const CONNECTION_STATE_NOT_CHECKED = "◌ Not checked"
 export const CONNECTION_STATE_CREDENTIAL_FAILED = "✕ Credential failed"
 export const CONNECTION_STATE_DISABLED = "⏻ Disabled"
+export const CONNECTION_STATE_REVOKED = "⚠ Revoked"
 
-/** The four states this surface can render, as a closed union. */
-export type ConnectionStateKind = "ready" | "not_checked" | "failed" | "disabled"
+/** Phase 221 (D-221-12) — a connection that is genuinely connected and can do NOTHING.
+ *
+ * ⚠ **THIS WORD EXISTS BECAUSE `✓ Ready` WAS A LIE ON A REAL ROW.** Measured 2026-08-30/31:
+ * Microsoft 365 read `OAuth connected · ✓ Ready` while advertising **zero** actions — an
+ * `oauth_byo` row whose discovery never completed. The credential is real, the status is
+ * `active`, and the row cannot perform a single thing.
+ *
+ * It is NOT `✕ Credential failed` (nothing failed) and NOT `◌ Not checked` (the check is
+ * not what is missing — the ACTIONS are). It is its own fact and gets its own word. */
+export const CONNECTION_STATE_UNUSABLE = "⚠ Not usable"
+
+/** Phase 221 (D-221-12) — some of this connection's applications cannot run.
+ *
+ * ⚠ Unreachable until plan 02 supplies `blockedApplicationCount`; it is declared here with
+ * its siblings rather than bolted on later, so the union is complete in one place. */
+export const CONNECTION_STATE_PARTLY = "⚠ Partly ready"
+
+/** Phase 221 plan 02 — the same state, WITH the number of applications that need attention.
+ *
+ * ⚠ THE COUNT IS THE ACTIONABLE HALF. `⚠ Partly ready` alone tells someone that something is
+ * wrong and nothing about how much; `⚠ Partly ready · 3 need attention` tells them whether
+ * this is a five-second fix or an afternoon. Acceptance #6 of this plan names the sentence
+ * verbatim, and it names it WITH the number.
+ *
+ * ⚠ It is a FUNCTION, not a second constant, so the count cannot drift from the verdict that
+ * produced it — `CONNECTION_STATE_WORDS` keeps the bare word for the closed-union walk that
+ * asserts every kind has one. */
+export const CONNECTION_STATE_PARTLY_COUNTED = (n: number) =>
+  `${CONNECTION_STATE_PARTLY} · ${n} need${n === 1 ? "s" : ""} attention`
+
+/** The states this surface can render, as a closed union. */
+export type ConnectionStateKind =
+  | "ready"
+  | "partly"
+  | "unusable"
+  | "not_checked"
+  | "failed"
+  | "disabled"
+  | "revoked"
 
 /** Every state word, keyed by kind — so the suite can walk all four rather than name
  *  four literals it might later disagree with. */
 export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
   ready: CONNECTION_STATE_READY,
+  partly: CONNECTION_STATE_PARTLY,
+  unusable: CONNECTION_STATE_UNUSABLE,
   not_checked: CONNECTION_STATE_NOT_CHECKED,
   failed: CONNECTION_STATE_CREDENTIAL_FAILED,
   disabled: CONNECTION_STATE_DISABLED,
+  revoked: CONNECTION_STATE_REVOKED,
 }
 
 /**
  * The row's state, derived during render and never stored.
  *
- * ⚠ `is_enabled === false` WINS over any verdict, and that ordering is the honest one: a
- * disabled connection sends nothing whatever its credential last did, so reading it as
- * `✓ Ready` would be the over-claim this phase exists to avoid. An ABSENT verdict is
- * `not_checked`, not `failed` — an unchecked connection is not a failing one (the same
- * narrowness `ConnectionPicker.isFailing` keeps).
+ * ── Phase 221 (D-221-12) · AN OAUTH ROW WITH NO ACTIONS IS NEVER `Ready` ───────────────
+ * ⚠ **THE CHECK IS SCOPED TO THE `oauth_byo` ARM, AND THE SCOPE IS THE WHOLE CORRECTNESS
+ * OF IT.** That arm — `auth_type === "oauth_byo" && status === "active"` — is what made
+ * Microsoft 365 read `✓ Ready` with zero tools: an OAuth row that connected and never
+ * completed discovery satisfies both halves. *Nothing is broken* and *nothing works* are
+ * different facts, and that arm could not tell them apart.
+ *
+ * ⚠ **A FIRST CUT APPLIED IT TO EVERY SHAPE AND WAS MEASURABLY WRONG. Nine tests caught
+ * it, three of them byte-for-byte row pins, and they were RIGHT.** A CAPABILITY row
+ * (`slack`, `smtp`, `jira`) advertises its actions from `SERVICE_TOOL_SPECS` — not from
+ * `discovered_tools`, which is a presentation cache the executor never consults. An empty
+ * column there says nothing about whether the connection works, so the broad rule marked
+ * three working connections `⚠ Not usable`. **The pins existed for exactly this and the
+ * finding is theirs, not mine.**
+ *
+ * ⚠ It is placed AFTER `disabled` and `revoked` on purpose: a disabled or revoked row also
+ * has nothing usable, and those two words say something more specific about WHY.
+ *
+ * ⚠ **AND IT DOES NOT OVERRIDE `◌ Not checked`, WHICH THE FIRST CUT DID.** Nine tests
+ * caught that overcorrection, and they were right: Phase 206.1's AR-03 says an EMPTY
+ * discovery is not evidence, because a row nobody has discovered looks identical to a row
+ * discovered and found barren. `discoveryHasRun` separates them — see
+ * `connectionRowVerdict.ts`. Both readings stop the row claiming `Ready`, which is the
+ * whole defect; neither invents a fact.
+ *
+ * ⚠ So Microsoft 365 — `oauth_byo`, `active`, zero actions, never checked — now reads
+ * `◌ Not checked` rather than `✓ Ready`. It reads `⚠ Not usable` the moment somebody
+ * presses Check and discovery still finds nothing.
  */
-export function connectionStateOf(connection: ConnectorConnection): ConnectionStateKind {
+export function connectionStateOf(
+  connection: ConnectorConnection,
+  /** Phase 221 plan 02 (D-221-12) — how many of this connection's applications are KNOWN
+   *  blocked, from the last Check in this session.
+   *
+   *  ⚠ OPTIONAL, AND ITS ABSENCE MEANS "NOBODY LOOKED" RATHER THAN "NONE". Availability is
+   *  a MEASUREMENT: it is produced by the Check action and is not stored on the row (no
+   *  migration — D-221's fence). So on a fresh page load nothing is known and this is
+   *  `undefined`, which reads as 0 and leaves the row saying `Ready` exactly as before.
+   *  That is the AR-03 stance, not a gap: an unmeasured application is not a blocked one,
+   *  and inventing `Partly ready` from no evidence would be the same error as `Ready` from
+   *  no evidence, pointed the other way. */
+  blockedApplications?: number,
+): ConnectionStateKind {
   if (!connection.is_enabled) return "disabled"
+  if (connection.status === "revoked") return "revoked"
+
+  if (connection.auth_type === "oauth_byo" && connection.status === "active") {
+    const verdict = connectionRowVerdict({
+      toolCount: connection.discovered_tools?.length ?? 0,
+      // Plan 02 supplies this from the per-application availability probe, via the Check
+      // action. `undefined` — nobody has checked in this session — still reads as 0, by
+      // absence of evidence and never by an assumption that everything works.
+      blockedApplicationCount: blockedApplications ?? 0,
+      // ⚠ `last_check_verdict` is the ONLY record that anything ever looked. `"ok"` with
+      // zero actions is a measurement; `"not_checked"` with zero actions is an absence.
+      discoveryHasRun: connection.last_check_verdict === "ok",
+    })
+    if (verdict === "unusable") return "unusable"
+    if (verdict === "partly") return "partly"
+    // `undiscovered` falls THROUGH to `not_checked` at the bottom — AR-03's word. What it
+    // must do is skip this arm's `ready`, and it does.
+    if (verdict === "ready") return "ready"
+  }
   if (connection.last_check_verdict === "failed") return "failed"
   if (connection.last_check_verdict === "ok") return "ready"
+
+  if (
+    (connection.mcp_server_url ?? "").trim().length > 0 &&
+    (connection.discovered_tools?.length ?? 0) > 0
+  ) {
+    return "ready"
+  }
+
   return "not_checked"
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 2b · THE POPULAR STRIP'S TWO ACTIONS (operator-driven, 2026-08-28)
+//
+// The strip used to render a single hard-coded "Connect" inline in JSX, because it never
+// consulted `connections` — so an already-connected service invited you to connect it again
+// and `onAdd` opened an empty CREATE form. Both words live here now, for the reason every
+// other string on this surface does: a sentence inline in JSX is one nobody can test for
+// drift (§11d).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The unconfigured action. Unchanged word — it was never the wrong one, only wrongly shown. */
+export const POPULAR_CONNECT = "Connect"
+
+/** The configured action. NOT "Connect" — the row exists, so the honest verb is to open it.
+ *  It matches the directory's own affordance one section down rather than inventing a third
+ *  vocabulary for the same act. */
+export const POPULAR_MANAGE = "Manage"
+
+/**
+ * How many connections this service already has.
+ *
+ * ⚠ IT COUNTS, rather than saying a bare "Connected", because D-212-03 allows several rows
+ * per service ("Prod Jira", "Sandbox Jira") and a person with two needs to know the Manage
+ * button opens ONE of them. Singular and plural are both spelled — an "1 connections" is the
+ * kind of small lie this surface's copy rules exist to prevent.
+ */
+export function popularConnectedLabel(count: number): string {
+  return count === 1 ? "1 connection" : `${count} connections`
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -167,7 +302,7 @@ export const CONNECTIONS_FILTER_CHIPS: ReadonlyArray<{
  */
 export function connectionsCountLabel(shown: number, total: number, filtered: boolean): string {
   if (filtered) return `${shown} of ${total}`
-  return `${total} ${total === 1 ? "connection" : "connections"}`
+  return `${total} ${total === 1 ? "service" : "services"}`
 }
 
 /**
@@ -180,8 +315,10 @@ export function connectionMatchesQuery(connection: ConnectorConnection, query: s
   if (!q) return true
   const mcpUrl = typeof connection.mcp_server_url === "string" ? connection.mcp_server_url : ""
   const cap = typeof connection.capability === "string" ? connection.capability : ""
+  const serviceId = typeof connection.service_id === "string" ? connection.service_id : ""
   const haystack = [
     connection.name,
+    serviceId,
     cap,
     mcpUrl,
     ...destinationFactsOf(connection),
@@ -321,9 +458,25 @@ export function usageCountsFrom(workflows: PublishedWorkflow[]): Record<string, 
   return counts
 }
 
-/** `N steps` — and at zero, the honest reading of a caller-scoped count. */
+/** `N steps` — and NOTHING at zero.
+ *
+ * ── ⚠ NOISE AUDIT 2026-08-31 (operator, item B1) ─────────────────────────────
+ * This returned the words `none you can see`, and on this install SEVEN consecutive rows
+ * said exactly that — one identical sentence per connected service, in a column whose
+ * every value was the same. Prose repeated on every row is read once and then never
+ * again, which makes it worse than blank: it occupies the place a real value would go.
+ *
+ * ⚠ THE SCOPING CAVEAT IS NOT LOST, and that is the only reason this can be deleted.
+ * `CONNECTIONS_USED_BY_SCOPE_NOTE` states it ONCE beneath the table — *"counts published
+ * workflow steps you can see; a colleague's published workflow is not counted here"* —
+ * which is where a caveat about a whole column belongs. The per-row echo of it was the
+ * same fact said eight times.
+ *
+ * ⚠ AND EMPTY IS NOT A LIE HERE. The column reads `Used by`; a blank cell under it says
+ * "by nothing", which is precisely what a zero count means. Returning "" rather than a
+ * dash keeps the row quiet instead of drawing the eye to an absence. */
 export function usedByLabel(count: number): string {
-  if (count <= 0) return "none you can see"
+  if (count <= 0) return ""
   return `${count} ${count === 1 ? "step" : "steps"}`
 }
 
@@ -376,7 +529,15 @@ export function credentialLabel(
  * does not exist — one word standing in for two facts, which is the `runFacts.ts` CR-01 /
  * `DecisionsList` D-20 defect for the fifth recorded time on this codebase.
  */
-export const CREDENTIAL_NO_CHECK_FOR_KIND = "no check for this kind"
+// ⚠ NOISE AUDIT 2026-08-31 (operator, item B4). Was `no check for this kind`. The
+// distinction the block above defends — *nobody has checked it* vs *it cannot be checked*
+// — is real and is KEPT; what changed is that it stops being said in words that describe
+// OUR implementation ("this kind" is a shape in our code, not a thing the reader has).
+// An em dash reads as "nothing to report here", which is the true and complete meaning
+// for a row whose credential simply has no check path, and the tooltip carries the rest.
+export const CREDENTIAL_NO_CHECK_FOR_KIND = "\u2014"
+export const CREDENTIAL_NO_CHECK_FOR_KIND_TITLE =
+  "This kind of connection has no credential check to run."
 
 /**
  * The credential cell's reading, by SHAPE.
@@ -402,6 +563,11 @@ export function credentialReadingOf(
   connection: ConnectorConnection,
   now: number = Date.now(),
 ): string {
+  if (connection.auth_type === "oauth_byo") {
+    if (connection.status === "revoked") return "OAuth (revoked)"
+    if (connection.account_email) return connection.account_email
+    return "OAuth connected"
+  }
   if (connection.mcp_server_url) return CREDENTIAL_NO_CHECK_FOR_KIND
   return credentialLabel(connection.last_checked_at, now)
 }
@@ -568,4 +734,4 @@ export const CONNECTIONS_BANNER_OPERATOR_LINE = `${CONNECTIONS_BANNER_OPERATOR_P
 export const CONNECTIONS_SECTION_TITLE = "Connections"
 
 export const CONNECTIONS_SECTION_DESCRIPTION =
-  "The real destinations your organisation's workflows may send to. A step sends nothing until a person approves it in the run."
+  "Services you can connect, and what they let the agent do for you. A step sends nothing until a person approves it in the run."

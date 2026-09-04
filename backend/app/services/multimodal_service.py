@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from supabase import Client
@@ -194,6 +195,36 @@ def _mime_to_extractor(mime: str) -> str:
     if mime in EXCEL_MIMES:
         return "openpyxl"
     return "unknown"
+
+
+def tables_stage_applies(mime: str | None) -> bool:
+    """Would the legacy per-mime table extractor look at this MIME type at all?
+
+    ⚠ This is NOT a claim that nothing was extracted: the `extracted_doc` fast path
+    (:479) can supply tables for ANY mime when Docling pre-extracted them, so a False
+    here can still sit beside a non-zero table_count. D-217-24's truthful rule is that
+    a stage is `skipped` iff `not applies_to_mime and count == 0` — and the count half
+    is the caller's job, never this predicate's.
+    """
+    if mime is None:
+        return False
+    return mime == PDF_MIME or mime == DOCX_MIME or mime in CSV_MIMES or mime in EXCEL_MIMES
+
+
+def images_stage_applies(mime: str | None) -> bool:
+    """Would the legacy per-mime image extractor look at this MIME type at all?
+
+    The images extractor's set is PDF and DOCX ONLY — deliberately narrower than
+    `tables_stage_applies`, which also covers CSV and Excel.
+
+    ⚠ This is NOT a claim that nothing was extracted: the `extracted_doc` fast path
+    (:479) can supply images for ANY mime when Docling pre-extracted them. D-217-24's
+    truthful rule is that a stage is `skipped` iff `not applies_to_mime and count == 0`
+    — and the count half is the caller's job, never this predicate's.
+    """
+    if mime is None:
+        return False
+    return mime == PDF_MIME or mime == DOCX_MIME
 
 
 def extract_csv_tables(raw: bytes) -> list[dict]:
@@ -394,6 +425,8 @@ def embed_and_store_table_chunks(
             "embedding": embedding,
             "embedding_model": _tbl_embedding_model,
             "embedding_dimensions": _tbl_embedding_dimensions,
+            # BE-1 (217.1): the honest "when the vector was written" timestamp.
+            "embedded_at": datetime.now(timezone.utc).isoformat(),
             **({"org_id": org_id} if org_id else {}),
         }
         for i, (chunk_text, embedding) in enumerate(zip(all_table_chunks, embeddings))
@@ -674,6 +707,48 @@ def describe_image(b64_png: str, app_settings: "UserEffectiveSettings", client=N
     return resp.choices[0].message.content or ""
 
 
+def _record_image_truncation(
+    supabase: Client, document_id: str, total: int, read: int
+) -> None:
+    """Record on the document that its images were capped — SEED-227.
+
+    ⚠ READ-MERGE-WRITE, never a bare overwrite. `documents.metadata` is a single jsonb
+    column and TWO GENERATED COLUMNS are derived from it (`document_type_norm` from
+    `document_type`, `date_typed` from `date`). Replacing the object would blank a
+    classification and a date that nothing here owns, and the generated columns would
+    follow silently.
+
+    Best-effort by construction: every failure is swallowed, because a note about
+    truncation must never be the thing that fails an ingestion. The caller is already
+    inside `extract_and_store_images`'s try; this adds its own so a metadata write cannot
+    cost the image rows that come after it.
+    """
+    try:
+        existing = (
+            supabase.table("documents")
+            .select("metadata")
+            .eq("id", document_id)
+            .limit(1)
+            .execute()
+        )
+        current = {}
+        if existing.data and isinstance(existing.data[0].get("metadata"), dict):
+            current = dict(existing.data[0]["metadata"])
+        # `_`-prefixed by CONVENTION, not by taste: DocumentDetailPanel documents that it
+        # "always ignores `_`-prefixed keys" and never enumerates raw metadata, which is
+        # what keeps a system fact off the user's editable field list — the same contract
+        # `_confidence`, `_source` and `_classification` already rely on.
+        current["_images"] = {"total": total, "read": read}
+        supabase.table("documents").update({"metadata": current}).eq(
+            "id", document_id
+        ).execute()
+        log.info(
+            "Document %s has %d images; read the first %d (cap)", document_id, total, read
+        )
+    except Exception as exc:
+        log.debug("Could not record image truncation for %s: %s", document_id, exc)
+
+
 def extract_and_store_images(
     raw: bytes,
     mime_type: str,
@@ -726,8 +801,16 @@ def extract_and_store_images(
             base_url=app_settings.llm_base_url or None,
         )
 
+        # SEED-227 — the cap TRUNCATES, and until now it did so in total silence: a
+        # 340-image document was indexed from its first 100 and every surface reported a
+        # clean ingestion. Record the fact the moment it is known, BEFORE the vision loop,
+        # because the loop is the part that can fail — the truncation is already true.
+        cap = app_settings.multimodal_max_vision_calls
+        if len(image_dicts) > cap:
+            _record_image_truncation(supabase, document_id, len(image_dicts), cap)
+
         rows: list[dict] = []
-        for img in image_dicts[:app_settings.multimodal_max_vision_calls]:
+        for img in image_dicts[:cap]:
             # Secondary size guard — extraction helpers filter too, but mocks bypass them in tests
             if img.get("width", 0) < 50 or img.get("height", 0) < 50:
                 continue
@@ -822,6 +905,8 @@ def extract_and_store_images(
                         "embedding": embedding,
                         "embedding_model": _img_embedding_model,
                         "embedding_dimensions": _img_embedding_dimensions,
+                        # BE-1 (217.1): the honest "when the vector was written" timestamp.
+                        "embedded_at": datetime.now(timezone.utc).isoformat(),
                     }
                     for (i, content), embedding in zip(descriptions, embeddings)
                 ]

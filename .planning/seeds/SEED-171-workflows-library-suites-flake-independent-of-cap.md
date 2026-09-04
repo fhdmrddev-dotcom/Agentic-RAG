@@ -201,3 +201,133 @@ source changed; no per-file count decreased; all five Phase-195 suites green
 **Later plans in Phase 195 verify on per-file counts plus their own suites, NOT on a green grand
 verdict.** Any plan that reports `count gate OK` should say which run number it was, and any plan that
 reports red must name the failing files before re-running.
+
+
+---
+
+## ⚠ THE SET IS SEVEN, NOT FIVE — measured 2026-08-29 (BUG-260829-01)
+
+Two more suites produced `STACK_TRACE_ERROR` under a full count-gate run on a tree where each
+was **provably unmodified** (`git diff --numstat HEAD` and `git status --short` both empty for
+the suite AND its component):
+
+| suite | in this phase's diff? | verdict |
+|---|---|---|
+| `src/components/workflows/PhaseNode.test.tsx` | **no — provably unmodified** | new member |
+| `src/components/workflows/PublishGauntlet.test.tsx` | ⚠ its COMPONENT was modified | see below |
+
+⭐ **THE FAILING SET CHANGED BETWEEN TWO CONSECUTIVE RUNS OF THE SAME TREE**, which is this
+seed's own signature restated: run 1 was `PhaseNode` ×1; run 2 was `WorkflowBuilderPage.canvas`
+×2 + `PhaseNode` ×3 + `PublishGauntlet` ×2; run 3 was **`count gate OK`, 0 failing**. Nothing
+was edited between them.
+
+⚠ **`PublishGauntlet.test.tsx` COULD NOT BE CALLED INNOCENT BY THE USUAL TEST**, because
+`PublishGauntlet.tsx` WAS in that change's diff. It was cleared by a different method, recorded
+here as the procedure to reuse: **three consecutive isolated runs passed (3/3), and a
+counterfactual with the change stashed also passed** — so the suite passes with and without the
+edit in isolation, and fails only under full-gate load. That is membership in this class, not a
+defect in the change.
+
+⚠ **AND THE COUNTERFACTUAL COST MORE THAN IT SHOULD HAVE.** `git stash push -- <one file>`
+followed by `git stash pop` popped a **year-old unrelated stash** and put 13 files into conflict
+across `.claude/`, `backend/app/config.py` and `frontend/package-lock.json`. Nothing was lost —
+every conflicted file was restored to HEAD and the ancient stash's content discarded — but the
+lesson is cheap to record and expensive to relearn: **on a repo with a pre-existing stash, and
+with a sibling agent committing to the same branch, do not use `stash push`/`pop` as a
+counterfactual.** Copy the file aside, or read the prior version with `git show HEAD:<path>`.
+
+---
+
+## Sighting — 2026-08-31, Phase 221-01 close
+
+**`src/pages/WorkflowBuilderPage.canvas.test.tsx`**, the fifth suite on this list, failed its
+own POSITIVE CONTROL again:
+
+```
+WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)
+  POSITIVE CONTROL — with the flag ON the very same read finds the key
+AssertionError: expected 0 to be greater than 0
+```
+
+⚠ **Byte-for-byte the assertion and the message recorded at `196-05`.** Same suite, same test,
+same expectation. That is now two independent sightings of one control, thirteen days apart.
+
+**Triage, in the order CLAUDE.md requires:**
+
+| step | result |
+|---|---|
+| filenames captured from the gate's own persisted JSON **before any re-run** | ✅ |
+| `git diff --numstat <phase base> HEAD` over the suite and its subjects | **empty — untouched** |
+| `git status --short` over `src/pages/` and `src/components/workflows/` | **clean** |
+| second gate run | **same suite, same test, same message** |
+| the suite ALONE, nothing else on the box | **154/154 passed** |
+| cap touched | **no** — it held at 2 throughout |
+
+⚠ **A suite that fails IN ISOLATION-adjacent conditions and passes alone, on an unchanged
+tree, is the shape this seed exists to name.** Worker oversubscription cannot explain a single
+suite failing while every other file in the same run passes.
+
+⚠ **Recorded as an observation, never as innocence.** The suite is *provably unmodified* by
+Phase 221; that is a different claim from *fine*. **One green sample of a flaky suite proves
+nothing**, and 154/154 in isolation is exactly one green sample.
+
+**The standing consequence, restated because this sighting demonstrates it:** `count gate OK`
+is **not reliably reachable on demand**, so a phase whose acceptance criterion is *"the gate is
+green"* has written a criterion that can fail for reasons no plan controls. 221-01's
+deterministic evidence is the per-file figures and the explicitly-run in-scope suites —
+settings 367/367, `tsc` 66 = baseline, backend `70 failed / 3287 passed` with 70 the untouched
+baseline.
+
+---
+
+## ⚠ SIGHTING 2026-09-02 (Phase 223 reviewer check) — THE SET IS **SEVEN**, AND THE FAILING TESTS SHARE A *KIND*
+
+Two full gate runs on the **same tree**, minutes apart, no sibling agent, `GSD_VITEST_MAX_WORKERS=2`,
+run from the repo root. **Filenames were captured from the gate's own persisted JSON BEFORE either
+re-run**, per this seed's procedure.
+
+| run | failed | file | the failing tests |
+|---|---|---|---|
+| 1 | **4** | `frontend/src/components/workflows/library/ForkNameDialog.test.tsx` | reset-on-open · trimmed-empty check · Cancel creates nothing · **aXe structural** |
+| 2 | **2** | `frontend/src/components/workflows/WorkflowCanvas.test.tsx` | **aXe** on a rendered canvas · **aXe** on the empty state |
+
+**Different file on each run.** Both **byte-unchanged** since the phase base (`git diff --numstat`
+returns empty for the component and its suite). Phase 223's entire frontend diff is five files —
+`ChatArea.tsx`, `MessageInput.tsx`, `MessageInput.connectors.test.tsx`, `lib/api/threads.ts`,
+`types/index.ts` — and **neither flaky file is among them**. `ForkNameDialog.test.tsx` then passed
+**25/25 in isolation**.
+
+⚠ **Say "provably unmodified", never "fine".** One green isolation run is not proof of innocence, and
+this seed's own history is that a suite cleared on one sample went red later.
+
+**The flaky set is now SEVEN:** `WorkflowsPage.test.tsx` · `WorkflowCard.test.tsx` ·
+`WorkflowBuilderPage.session.test.tsx` · `WorkflowRunPage.test.tsx` ·
+`WorkflowBuilderPage.canvas.test.tsx` · **`library/ForkNameDialog.test.tsx`** ·
+**`WorkflowCanvas.test.tsx`**.
+
+### ⭐ THE NEW FINDING IS NOT THE TWO FILES — IT IS THAT THE FAILING TESTS SHARE A KIND
+
+Across **both** runs, **every** failure was either an **`axe` accessibility assertion** or a
+**dialog-render assertion**. Three of the six were literally named *"no aXe violations"*.
+
+That is a sharper hypothesis than *"these files are flaky"*, and it is falsifiable: **`axe` runs are
+the slowest, most CPU-bound work in the whole suite** — a full accessibility tree walk over a rendered
+DOM — so under worker contention they are the tests most likely to cross a timeout boundary first.
+It predicts that the *identity* of the flaky file is close to irrelevant, and that what actually
+predicts a red run is **how many `axe` assertions a run happens to schedule concurrently**.
+
+⚠ **This does NOT resurrect the cap hypothesis this seed refuted.** The cap was `2` on both runs and
+both went red; §CORRECTION (b) stands. What is proposed is a *different* mechanism for the same
+refractory symptom, and it is stated as a hypothesis rather than a finding **because it has not been
+driven** — nobody has yet run the gate with the `axe` assertions excluded to see whether red
+disappears. That experiment is the cheapest next step and it has not been done.
+
+### Consequence for a reviewer, restated
+
+A red count gate is **not** evidence against the phase under review until the failing filenames have
+been checked against that phase's real diff. Here the check took one `git diff --numstat` and cleared
+223 outright. **The gate's deterministic half — per-file figures, the explicitly-run in-scope suites,
+`tsc`, and the backend baseline — is what actually carried the verdict:** `tsc` **66** = baseline,
+backend **70 failed** = baseline exactly, 13 in-scope unit tests green, and the live audit suite
+**5 passed / 0 skipped**.
+

@@ -23,7 +23,7 @@ class _StubPool:
         return {"def": self._def}
 
 
-# A constraintdef rendering all 19 types EXCEPT 'metadata.field.create' (one
+# A constraintdef rendering all 21 types EXCEPT 'connector.grant' (one
 # missing → frozenset is NOT a subset → must raise).
 _TYPES_MISSING_ONE = [
     "document.upload", "document.delete", "search.query", "code.execute",
@@ -31,7 +31,8 @@ _TYPES_MISSING_ONE = [
     "memory.remember", "memory.recall", "feedback.submit",
     "view.create", "view.delete", "relationship.create", "relationship.delete",
     "classification.apply", "classification.rule.create", "metadata.update",
-    # 'metadata.field.create' deliberately OMITTED
+    "metadata.field.create", "connector.call",
+    # 'connector.grant' deliberately OMITTED
 ]
 _DEF_MISSING_ONE = (
     "CHECK ((action_type = ANY (ARRAY["
@@ -39,11 +40,11 @@ _DEF_MISSING_ONE = (
     + "])))"
 )
 
-# A complete constraintdef rendering all 19 types (the synced case → no raise).
-_ALL_19 = _TYPES_MISSING_ONE + ["metadata.field.create"]
-_DEF_ALL_19 = (
+# A complete constraintdef rendering all 21 types (the synced case → no raise).
+_ALL_21 = _TYPES_MISSING_ONE + ["connector.grant"]
+_DEF_ALL_21 = (
     "CHECK ((action_type = ANY (ARRAY["
-    + ", ".join(f"'{t}'::text" for t in _ALL_19)
+    + ", ".join(f"'{t}'::text" for t in _ALL_21)
     + "])))"
 )
 
@@ -66,9 +67,9 @@ async def test_boot_guard_raises_when_constraint_absent():
 
 @pytest.mark.asyncio
 async def test_boot_guard_passes_when_synced():
-    """A live CHECK carrying all 19 types → no raise (frozenset is a subset)."""
+    """A live CHECK carrying all 21 types → no raise (frozenset is a subset)."""
     from app.services.audit_service import assert_action_types_synced
-    await assert_action_types_synced(_StubPool(_DEF_ALL_19))  # must NOT raise
+    await assert_action_types_synced(_StubPool(_DEF_ALL_21))  # must NOT raise
 
 
 @pytest.mark.asyncio
@@ -77,7 +78,7 @@ async def test_boot_guard_ignores_extra_db_type():
     from app.services.audit_service import assert_action_types_synced
     def_with_extra = (
         "CHECK ((action_type = ANY (ARRAY["
-        + ", ".join(f"'{t}'::text" for t in _ALL_19 + ["future.unused.type"])
+        + ", ".join(f"'{t}'::text" for t in _ALL_21 + ["future.unused.type"])
         + "])))"
     )
     await assert_action_types_synced(_StubPool(def_with_extra))  # must NOT raise

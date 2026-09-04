@@ -206,6 +206,25 @@ export const BLOCKED_SENTENCE: Record<string, string> = {
    * the author stops looking at their deliverable, and it points at the run rather than
    * claiming to have read it. Requirement 3 — do not imply the gate is exhaustive, do not
    * promise a future capability — is why it names no step and offers no link.
+   *
+   * ── ⚠ THAT PARAGRAPH IS NOW FALSE, AND IT IS KEPT ABOVE RATHER THAN OVERWRITTEN ──────
+   * `BUG-260828-09` (2026-08-28) made the server change it names. `PublishVerdict` now
+   * carries an optional `blocked_step` — the failing phase's identity plus the engine's own
+   * cause sentence — so the join it says nothing performs is performed, and the surface
+   * leads with a card that DOES name the step (`PublishBlockedStepCard`).
+   *
+   * ⚠ **THIS SENTENCE IS UNCHANGED ANYWAY, AND THE REASON IS NOT INERTIA.** It is the
+   * HEADLINE, and it is the arm that must still be right when `blocked_step` is absent — a
+   * pre-fix server, a run that crashed before any phase failed, a `structural_gate` block
+   * raised by the argument re-projection rather than by a step's own gate (which fails no
+   * phase and therefore names none). It still claims only which SIDE stopped. What changed
+   * is that a second, better-informed line now sits ABOVE it when the facts exist; a
+   * headline that named a step would have to invent one on every path where they do not.
+   *
+   * ⚠ The measured cause of the operator's four identical blocks was NOT a missing sentence
+   * — the engine wrote a good one every time. `_drive_golden_run`'s harvest treated a
+   * `pending` phase's `{}` as the deliverable and overwrote the failed phase's reason before
+   * anything could read it. Requirements 1 and 2 needed a plumbing fix, not new copy.
    */
   structural_gate:
     "Blocked during the trial run — a step's own checks refused what it produced, so the run never reached the review",

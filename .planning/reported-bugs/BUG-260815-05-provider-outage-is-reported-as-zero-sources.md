@@ -4,9 +4,9 @@ title: A retrieval-provider outage is reported to the operator as "nothing was r
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [RAG/retrieval, backend/harness, workflows/publish-gauntlet, observability, embeddings, settings, admin/control-room]
-folded_into: null
+folded_into: 210
 verified_closed_by: null
 related_seeds: [SEED-165]
 re_open_trigger: null
@@ -118,3 +118,9 @@ for the same reason. Retrieval needs the same three-state honesty.
 - Phase 193.1 `D-26` / `resolve_template_placeholders` — the three-state honesty precedent to copy
 - Phase 193.2 — the phase whose UAT this blocked; its thesis is *the system knows things it does not
   tell the author*
+
+---
+
+## Phase 210 disposition (2026-08-26) — FOLDED, not closed
+
+Code fixed and reviewed twice (`210-REVIEW.md` V-1/V-2/V-3 then W-1). **Not driven against a real embedding outage**, so the fix is unobserved end to end. ⚠ The W-1 fix was authored by Gemini and committed by the reviewer, so **no independent verifier exists for it** — `/code-review ultra` is the outstanding gate. Closes only after a driven outage names the right provider.

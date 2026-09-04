@@ -14,7 +14,20 @@ const ScrollArea = React.forwardRef<
     className={cn("relative overflow-hidden", className)}
     {...props}
   >
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+    {/* ⛔ BUG-260902-02 — `[&>div]:!block` IS LOad-BEARING, NOT COSMETIC.
+        Radix injects a wrapper div here carrying `display: table; min-width: 100%`. A table
+        SHRINK-WRAPS to its content, so one wide child (a fenced code block, a table, a long
+        token) makes that wrapper wider than the viewport instead of forcing the child to
+        wrap — and the viewport is `overflow-x: hidden`, so the excess is not scrollable, not
+        ellipsised and not reachable. Measured: with the workspace panel open the message
+        column stayed 865px inside a 718px viewport and **99px of every line was discarded in
+        silence**, including copyable code.
+
+        Radix uses `display: table` ONLY to measure content width for a HORIZONTAL scrollbar.
+        This app renders none — no `orientation="horizontal"` anywhere, and `<ScrollArea` has
+        two call sites, both vertical. So the measurement is unconsumed and `block` costs
+        nothing here. ⚠ If a horizontal scrollbar is ever added, revisit THIS line first. */}
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />

@@ -966,7 +966,13 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     expect(scope.textContent).not.toMatch(/[/\\]/)
     // Exactly one textbox: the kickoff textarea (the <select> + file input aren't textboxes).
     expect(within(modal).getAllByRole("textbox")).toHaveLength(1)
-    expect(within(modal).getByTestId("run-hint")).toBeInTheDocument()
+    // ⚠ 214-09 (STEP-02 / D-214-04): this line USED TO ASSERT `run-hint` PRESENT. The hint
+    // became real fields, and the assertion is INVERTED rather than deleted so a
+    // re-introduction reds. `strictPublished` declares only the reserved `kickoff_prompt`,
+    // which the kickoff textarea already collects — so this workflow draws no extra field
+    // and the "exactly one textbox" count above is unchanged, which is the point.
+    expect(within(modal).queryByTestId("run-hint")).toBeNull()
+    expect(within(modal).queryAllByTestId(/^run-input-/)).toHaveLength(0)
   })
 
   it("the Run button is ENABLED even on empty input", async () => {
@@ -988,9 +994,13 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
     // Phase 152: onLaunch now carries the two run inputs. Default state = no template +
     // the folder on the "workflow default" (author default) → NO override (D-06).
+    // 214-09 (STEP-02 / D-214-04): a THIRD member rides every invocation — `inputs`, the
+    // declared-input dict. `{}` here, and `{}` rather than `undefined` is the contract: an
+    // absent key and an empty object are different facts.
     expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp", {
       templateFile: null,
       folderId: null,
+      inputs: {},
     })
   })
 
@@ -1013,6 +1023,7 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     expect(onLaunch).toHaveBeenCalledWith(strictPublished, "", {
       templateFile: null,
       folderId: null,
+      inputs: {},
     })
   })
 

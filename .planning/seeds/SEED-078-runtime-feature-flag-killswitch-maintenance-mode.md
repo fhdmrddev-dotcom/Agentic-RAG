@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-078
 title: Unified runtime feature-flag / kill-switch / maintenance-mode system (no operator off-switch for a misbehaving capability)
-status: planted
+status: partially-folded
+folded_into: 210
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: admin / operator-tier & runtime governance — a cross-cutting runtime-control plane (feature flags + emergency kill-switch + maintenance/read-only mode), NOT a single feature

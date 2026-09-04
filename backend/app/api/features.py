@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
+from app.config import settings
 from app.dependencies import get_current_user, resolve_caller_role
 from app.models.user_settings import (
     _GOVERNED_FEATURES,
@@ -40,13 +41,8 @@ router = APIRouter(tags=["features"])
 async def get_effective_features(
     request: Request, current_user: dict = Depends(get_current_user)
 ) -> dict:
-    """Return the caller's effective feature→bool map (authed, per-user — Pattern 5).
+    """Return the caller's effective feature visibility map.
 
-    ``{"features": {feature: (operator OR audience=="everyone" OR greenlisted role)}}`` over
-    the four governed features. Operator → all True; end user → True for Everyone-audience
-    features PLUS any ``role``-audience feature their org role/group is greenlisted for. The
-    bool is derived from the SAME two seams the ``require_visible`` gate uses
-    (``feature_audience`` + ``resolve_feature_access``), so hide == refuse (VIS-01 / D-167-06).
     Never operator-gated: a non-operator reaches it (200) to learn their own map.
     """
     # T-184-UAT-02 — bound this worker's view of the flags before resolving the map. Every
@@ -79,5 +75,6 @@ async def get_effective_features(
                 )
             )
             for f in _GOVERNED_FEATURES
-        }
+        },
+        "scheduler_process_enabled": bool(settings.scheduler_process_enabled),
     }

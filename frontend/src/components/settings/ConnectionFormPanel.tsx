@@ -87,20 +87,28 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { ConnectorApiError } from "@/lib/api"
+import {
+  ConnectorApiError,
+  createOAuthAuthorizeUrl,
+  discoverConnectorTools,
+  probeMcpServer,
+  updateConnectorGrants,
+} from "@/lib/api"
 import type {
   ConnectorCapability,
   ConnectorCheckResult,
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
+  McpDiscoveredTool,
+  OAuthProvider,
+  ToolGrantPosture,
 } from "@/lib/api"
+import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
+import { ConnectionGrantsList } from "@/components/settings/ConnectionGrantsList"
+import { McpAuthDoor } from "@/components/settings/McpAuthDoor"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
-  CAPABILITY_CHOICES,
-  CAPABILITY_HELP,
-  CAPABILITY_LABEL,
-  CAPABILITY_LOCKED_NOTE,
   EMPTY_DRAFT,
   FIELD_JIRA_EMAIL_HELP,
   FIELD_JIRA_EMAIL_LABEL,
@@ -129,10 +137,11 @@ import {
   FOOTER_GLYPH,
   FIELD_MCP_SECRET_LABEL,
   FIELD_MCP_SECRET_OPTIONAL_NOTE,
-  FIELD_MCP_URL_HELP,
-  FIELD_MCP_URL_LABEL,
-  FIELD_MCP_URL_PLACEHOLDER,
   FIELD_SECRET_LABEL_NEUTRAL,
+  DISCOVER_FAILED_FALLBACK,
+  REFRESH_ACTIONS_BUSY,
+  REFRESH_ACTIONS_HELP,
+  REFRESH_ACTIONS_LABEL,
   FOOTER_PREFIX,
   FOOTER_SERVER_NOTE,
   MCP_SAVE_DISABLED_REASON,
@@ -161,13 +170,21 @@ import {
   SECRET_REPLACE_LABEL,
   SECRET_STORED_DATE_NOTE,
   SECRET_STORED_NOTE,
-  capabilityLabelOf,
+  SERVICE_HELP,
+  SERVICE_LABEL,
+  SERVICE_LOCKED_NOTE,
+  SERVICE_PLACEHOLDER,
+  SERVICE_SAVE_DISABLED_REASON,
+  SERVICE_SUGGESTIONS,
   configFromDraft,
+  draftIsSavable,
   destinationFooterOf,
   draftFromConnection,
   mcpHostOf,
   orgSharedLine,
   panelRegionLabelEdit,
+  serviceLabelOf,
+  shapeForService,
   secretStoredLabel,
   type ConnectionDraft,
   type ConnectionShape,
@@ -417,10 +434,12 @@ function NoticeLine({ children, testId }: { children: React.ReactNode; testId?: 
 
 export interface ConnectionFormPanelProps {
   open: boolean
-  /** `create` shows the capability chooser; `edit` renders the stored row. */
+  /** `create` asks which service; `edit` renders the stored row. */
   mode: "create" | "edit"
   /** The row being edited. Required in `edit` mode; ignored in `create`. */
   connection?: ConnectorConnection | null
+  /** Optional service preset for creation from catalog. */
+  presetServiceId?: string | null
   /** Render-only (U-02). `require_org_manage` on the API is the wall (plan 190-09). */
   isOrgAdmin: boolean
   /** Render-only (D-26 / §9). `require_visible("live_connectors")` on the three WRITE
@@ -431,7 +450,7 @@ export interface ConnectionFormPanelProps {
   orgName?: string | null
   onClose: () => void
   /** Absent ⇒ NO save affordance (removed, never inert). */
-  onCreate?: (body: ConnectorConnectionCreate) => Promise<void>
+  onCreate?: (body: ConnectorConnectionCreate) => Promise<ConnectorConnection | void>
   onUpdate?: (id: string, body: ConnectorConnectionUpdate) => Promise<void>
   /** 190-18 · §5c. Absent ⇒ NO check affordance. Runs on the STORED connection and returns a
    *  VERDICT — never a credential (`ConnectorCheckResult` declares none, and the Pydantic
@@ -444,6 +463,23 @@ export interface ConnectionFormPanelProps {
   /** §2g's victim count — the same caller-scoped FLOOR the table row renders
    *  (`connectionsCopy.usageCountsFrom`). It GRADES the disable guard; it never blocks. */
   usedBy?: number
+  /** Phase 221 — the parent's rows are STALE the moment a discovery succeeds.
+   *
+   *  ⚠ OPERATOR-REPORTED, 2026-08-31: *"I see Google Drive Google Contacts Google Gmail when
+   *  I refresh actions but once I navigate away it is all gone."* `discoverConnectorTools`
+   *  persists the refreshed list server-side and sets `probeResult` in memory — and NOTHING
+   *  ever told the tab. So the next open re-seeds from `connection.discovered_tools` out of
+   *  an array fetched BEFORE the discovery, and the panel silently shows the older shape.
+   *
+   *  ⚠ THE BUG PREDATES THE SIX-APPLICATION SPLIT; the split only made it VISIBLE. Until
+   *  Phase 221 the content of `discovered_tools` changed which rows appeared but never how
+   *  they were arranged, so a stale copy looked like a correct one. Grouping made the
+   *  staleness legible: without `app` the list degrades — correctly, per D-221-09 — to a
+   *  single unnamed application, which reads as "the categorisation disappeared".
+   *
+   *  Absent ⇒ the panel still works and the parent simply stays stale, which is the
+   *  behaviour every caller had before this prop existed. */
+  onDiscovered?: () => void
 }
 
 /** §2g's two sheets, and `null` for "no confirm open". Mirrors `ConnectionsTab`'s own
@@ -487,10 +523,33 @@ function saveRefusalFrom(error: unknown): SaveRefusal {
   return { kind: "generic" }
 }
 
+/** Collapse `tool_grants`'s two accepted spellings onto one, for comparison only.
+ *
+ *  `tool_grants` carries posture strings today and still reads the legacy booleans
+ *  (`grants.py::resolve_effective_posture` maps `true -> "allow"`, `false -> "deny"`), so
+ *  `{"x": true}` and `{"x": "allow"}` are the SAME permission. Comparing the raw objects
+ *  would report a change nobody made and fire a write on every save of an unmigrated row.
+ *
+ *  ⚠ COMPARISON ONLY — this never reaches the wire. The value SENT is `toolGrants` as the
+ *  person left it, and the server's `_sanitize_tool_grants` is the thing that decides what
+ *  is legal. Normalizing on the way out would make this function a second, quieter
+ *  sanitizer, and two sanitizers disagreeing is how a permission ships wrong. */
+function normalizeGrants(
+  grants: Record<string, ToolGrantPosture | boolean>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const key of Object.keys(grants).sort()) {
+    const raw = grants[key]
+    out[key] = raw === true ? "allow" : raw === false ? "deny" : String(raw)
+  }
+  return out
+}
+
 export function ConnectionFormPanel({
   open,
   mode,
   connection = null,
+  presetServiceId = null,
   isOrgAdmin,
   liveConnectorsOn,
   orgName,
@@ -501,6 +560,7 @@ export function ConnectionFormPanel({
   onDelete,
   onSetEnabled,
   usedBy = 0,
+  onDiscovered,
 }: ConnectionFormPanelProps) {
   const isMobile = useIsMobile()
   const rootRef = useRef<HTMLElement | null>(null)
@@ -517,40 +577,168 @@ export function ConnectionFormPanel({
   const [busy, setBusy] = useState(false)
   const [writeFailed, setWriteFailed] = useState(false)
   const [receipt, setReceipt] = useState<string | null>(null)
+  const [probing, setProbing] = useState(false)
+  const [probeResult, setProbeResult] = useState<McpDiscoveredTool[] | null>(null)
+  const [probeError, setProbeError] = useState<string | null>(null)
+  const [defaultPosture, setDefaultPosture] = useState<ToolGrantPosture>("ask")
+  const [toolGrants, setToolGrants] = useState<Record<string, ToolGrantPosture | boolean>>({})
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
    *  halves mirror a REAL server gate, and neither is the gate itself. */
   const canWrite = isOrgAdmin && liveConnectorsOn
   const readOnly = !canWrite
 
-  // ── Seed the draft when the panel opens (or the row behind it changes). ──
-  // ⚠ `secret` is seeded to `""` BY CONSTRUCTION — `draftFromConnection` is unable to do
-  // otherwise, because `ConnectorConnection` declares no credential field to copy from.
-  //
-  // ⚠ 190-18 — IT RE-SEEDS ON A DIFFERENT **ROW**, NOT ON A DIFFERENT **OBJECT**, and that
-  // is a fix rather than a tidy-up. This plan gives the panel a Check button whose container
-  // handler RE-FETCHES the list (the 068-A rule: a chip comes from the server's new truth,
-  // never from an optimistic flip). A re-fetch hands back a NEW object for the SAME row, so
-  // re-seeding on object identity would discard whatever the person had typed — at the exact
-  // moment they were checking a credential before saving it. The guard below is written as a
-  // seeded-key ref rather than as a narrowed dependency array so the dependency stays honest
-  // (`connection` IS read here) and the rule stays on.
+  /** The grants as they were when this panel opened, normalized and stringified.
+   *
+   *  Exists so the save path can tell "the person changed a permission" from "the person
+   *  renamed the connection", which is the difference between a write that must happen and
+   *  a network call that must not. Normalized because `tool_grants` accepts both the legacy
+   *  booleans and the posture strings, and `{"x": true}` and `{"x": "allow"}` are the SAME
+   *  permission — a raw compare would report a change nobody made. */
+  const initialGrantsRef = useRef<string>("{}")
+
   const seededKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!open) {
       seededKeyRef.current = null
       return
     }
-    const key = `${mode}:${connection?.id ?? ""}`
+    const key = `${mode}:${connection?.id ?? ""}:${presetServiceId ?? ""}`
     if (seededKeyRef.current === key) return
     seededKeyRef.current = key
-    setDraft(mode === "edit" && connection ? draftFromConnection(connection) : EMPTY_DRAFT)
+    if (mode === "edit" && connection) {
+      setDraft(draftFromConnection(connection))
+      setDefaultPosture(connection.default_approval_posture ?? "ask")
+      setToolGrants(connection.tool_grants ?? {})
+      // ⚠ The baseline the save path diffs against — see `grantsChanged`. Captured HERE,
+      // beside the seeding it mirrors, so the two can never drift apart.
+      initialGrantsRef.current = JSON.stringify(normalizeGrants(connection.tool_grants ?? {}))
+      setProbeResult(connection.discovered_tools ?? null)
+    } else if (mode === "create" && presetServiceId) {
+      const entry = getServiceCatalogEntry(presetServiceId)
+      const shape = shapeForService(presetServiceId)
+      setDraft({
+        ...EMPTY_DRAFT,
+        serviceId: presetServiceId,
+        capability: shape,
+        name: entry.isPopular && presetServiceId !== "custom_mcp" ? entry.name : "",
+      })
+      setDefaultPosture("ask")
+      setToolGrants({})
+      setProbeResult(null)
+    } else {
+      setDraft(EMPTY_DRAFT)
+      setDefaultPosture("ask")
+      setToolGrants({})
+      setProbeResult(null)
+    }
+    setProbeError(null)
     setReplacing(false)
     setSaveRefusal(null)
     setCheck({ kind: "idle" })
     setReceipt(null)
     setWriteFailed(false)
-  }, [open, mode, connection])
+  }, [open, mode, connection, presetServiceId])
+
+  /**
+   * ⭐ PHASE 212 (D-4) — ONE CONTROL, TWO ENDPOINTS, CHOSEN BY WHETHER THE ROW EXISTS YET.
+   *
+   * ⚠ THE PANEL CALLED `probeMcpServer` UNCONDITIONALLY UNTIL 2026-08-27, AND FOR A SAVED
+   * CONNECTION THAT PATH CANNOT AUTHENTICATE — BY DESIGN, NOT BY ACCIDENT. An edit renders the
+   * token MASKED (*"stored since 27 Aug"*) and leaves `draft.secret` EMPTY, because the stored
+   * value is never returned to a browser. So the probe sent no credential, the remote server
+   * answered `401`, and the operator regenerated tokens repeatedly against a path that had no
+   * way to succeed. `discoverConnectorTools` decrypts the stored secret SERVER-SIDE and
+   * returned 44 tools for the same GitHub row on the same credential.
+   *
+   * ── the rule ────────────────────────────────────────────────────────────────────────────
+   *   the row EXISTS  → `discoverConnectorTools(id)`. Serves ALL THREE shapes (an MCP row is
+   *                     asked over the network, a CAPABILITY row is re-read from its adapter's
+   *                     static descriptor with NO network call, a service-only row answers a
+   *                     worded 409). No secret leaves the browser.
+   *   it is a DRAFT   → `probeMcpServer({url, secret})`. The only case where the browser HAS a
+   *                     secret, and the only case with no row to read one from.
+   *
+   * ⚠ A TYPED SECRET DOES **NOT** SEND AN EXISTING ROW BACK TO THE PROBE, and the first draft
+   * of this fix had it doing so. Probing with a secret the row does not hold reports on a
+   * credential that is not stored — a green result for a token Save might never write. An
+   * existing connection reports on what is STORED; `Check credentials` follows the same rule
+   * on the same row, so the two controls cannot disagree.
+   *
+   * ⚠ THE URL GUARD MOVED INSIDE THE DRAFT ARM. As an unconditional first line it returned
+   * early for every capability row — `mcpServerUrl` is empty on one — which is why Slack, Jira
+   * and SMTP could never refresh even once the server grew an arm for them in Phase 211.
+   */
+  async function handleDiscoverTools() {
+    const savedRow = mode === "edit" && connection?.id ? connection.id : null
+    if (!savedRow && !draft.mcpServerUrl.trim()) return
+    setProbing(true)
+    setProbeError(null)
+    try {
+      let tools: McpDiscoveredTool[] = []
+      if (savedRow) {
+        tools = await discoverConnectorTools(savedRow)
+      } else {
+        const res = await probeMcpServer({
+          mcp_server_url: draft.mcpServerUrl.trim(),
+          secret: draft.secret.trim() || undefined,
+        })
+        tools = res.tools
+      }
+      setProbeResult(tools)
+      if (!draft.name.trim()) {
+        const suggested = mcpHostOf(draft.mcpServerUrl.trim())
+        if (suggested) {
+          set({ name: suggested })
+        }
+      }
+      // ⚠ DISCOVERY SEEDS NO GRANT, AND THE ABSENCE IS THE POINT (BUG-260901-01).
+      //
+      // This block used to write `next[t.name] = true` for every newly-found tool. It was
+      // wrong twice over, and the louder failure hid the graver one:
+      //
+      //  1. THE WIRE. `PATCH /grants` declares `dict[str, ToolGrantPosture]` —
+      //     `Literal["allow","ask","deny"]` — so Pydantic refused the body at the framework
+      //     boundary with `literal_error`, and every Save after any discovery, on every
+      //     connection shape, rendered `PANEL_SAVE_FAILED`. ⚠ `_sanitize_tool_grants` was
+      //     hardened the SAME DAY this seeding landed (`4aa28090b`) to refuse rather than
+      //     coerce, precisely so a missed call site would go RED at the seam — and its
+      //     refusal names the offending value. The route's annotation rejects first, so the
+      //     sentence written for this exact moment never reached anyone.
+      //
+      //  2. ⚠ THE PERMISSION, WHICH IS WORSE. `toolGroups.ts:235` maps `true -> "allow"`.
+      //     An ABSENT key already inherits the connection default through the three-rung
+      //     ladder (`:225`, mirroring `grants.py::resolve_effective_posture`). So seeding
+      //     did not merely break the wire — it silently ESCALATED every newly-discovered
+      //     action to Allow on a connection whose default is Deny. Had the save ever
+      //     worked, probing a stranger's MCP server would have persisted allow-on-41-tools.
+      //     **The broken save is the only reason a fail-open never reached the database.**
+      //
+      // Absence is already how both ends of the ladder spell "inherits the default", so the
+      // correct seed is no seed. A person who wants a posture sets one, and that act is what
+      // makes the grants dirty — discovering an action is not granting it.
+      // ⚠ Tell the parent its rows are stale — see `onDiscovered`. Only on the SAVED-row
+      // arm: the two probe arms above contact a server for a row that does not exist yet,
+      // so there is nothing for the tab to re-read.
+      //
+      // ⚠ This cannot clobber what is on screen. The seeding effect early-returns on an
+      // unchanged `mode:id` key, so the refreshed `connection` prop arriving from the
+      // reload does NOT re-seed `probeResult` — the person keeps looking at exactly what
+      // they just discovered, and the NEXT open reads the fresh copy.
+      if (savedRow) onDiscovered?.()
+    } catch (err) {
+      // WARNING: the fallback said "Failed to discover tools from MCP server", and this handler
+      // now serves three shapes - two of which contact no MCP server and one of which contacts
+      // nothing at all. Naming a server that was never involved sends the reader hunting an
+      // outage that does not exist, which is the same misnaming the route's own 502-narrowing
+      // exists to prevent. In practice `err.message` almost always wins now that both clients
+      // carry the server's own words; this is only the last resort.
+      setProbeError(err instanceof Error ? err.message : DISCOVER_FAILED_FALLBACK)
+      setProbeResult([])
+    } finally {
+      setProbing(false)
+    }
+  }
 
   // ── FOCUS RESTORE (§12 — net-new; `Dialog` would have given it free). ──
   // The opener is captured on open and re-focused on close, INCLUDING a close that follows
@@ -621,6 +809,26 @@ export function ConnectionFormPanel({
 
   const set = (patch: Partial<ConnectionDraft>) => setDraft((d) => ({ ...d, ...patch }))
 
+  /**
+   * ⭐ PHASE 211 — THE ONE PLACE `capability` IS DERIVED IN CREATE MODE, and the reason it is
+   * ONE place rather than two.
+   *
+   * `serviceId` is the identity a person supplies; `capability` is the field set that follows
+   * from it. Two controls can move that derivation — the service field and the endpoint field
+   * — so both call THIS, and nothing else assigns `capability` while creating. A second
+   * assignment site is how the two facts would come to disagree, which is the failure mode
+   * `ConnectionDraft`'s own docblock rejected alternative (a) over.
+   *
+   * ⚠ It derives from the NEXT draft, never from the current one: `set` is a functional
+   * update and the patch has not landed yet, so reading `draft.serviceId` here would resolve
+   * the shape from the keystroke BEFORE the one just typed.
+   */
+  const setShapedBy = (patch: Partial<ConnectionDraft>) =>
+    setDraft((d) => {
+      const next = { ...d, ...patch }
+      return { ...next, capability: shapeForService(next.serviceId, next.mcpServerUrl) }
+    })
+
   const canSubmit = mode === "create" ? onCreate !== undefined : onUpdate !== undefined
   const showSave = canWrite && canSubmit
 
@@ -662,6 +870,33 @@ export function ConnectionFormPanel({
    * resolver a RUN uses (plan 190-15 asserted the no-body property three ways: signature,
    * OpenAPI, and over the wire).
    */
+  /**
+   * Is this row authenticated by OAuth rather than by a stored credential?
+   *
+   * ⚠ THREE CONTROLS ON THIS PANEL WERE BUILT WHEN EVERY CONNECTION HAD A HOST AND A
+   * SECRET, AND THEY LIE ON AN OAUTH ROW. The operator met all three on a connection that
+   * was working:
+   *
+   *   · "Check credential" answered *"The check did not run ... nothing_to_check_yet"*.
+   *     An OAuth connection HAS no host to probe; the question worth asking of it is
+   *     "is the token live", which is a different check this panel does not implement.
+   *   · The 🔒 destination footer read *"sends to nothing yet — fill the fields above"*,
+   *     and there are no fields above: an OAuth row types no host and no port.
+   *   · The refusal banner then explained a failure that had not happened.
+   *
+   * The existing guard on the check button was `!connection.mcp_server_url` — written when
+   * there were TWO shapes and a remote server was the only one without a credential to
+   * probe. Phase 215 added a third. This is that guard, widened by name rather than by
+   * another negation, so the next shape is added HERE and not in four places.
+   *
+   * ⚠ ABSENCE, NEVER A DISABLED CONTROL. The sketch-069-A rule this repo follows
+   * everywhere: an affordance whose verb cannot run is worse than no affordance.
+   */
+  // ⚠ READ FROM THE DRAFT AND THE ROW, NOT FROM `capability` — that const is declared ~180
+  // lines BELOW this one, and naming it here is a temporal-dead-zone ReferenceError at
+  // render, not a compile error. `draft.capability` holds the same shape and is state.
+  const isOAuthRow = draft.capability === "oauth" || connection?.auth_type === "oauth_byo"
+
   async function handleCheck() {
     if (!connection || !onCheck || check.kind === "checking") return
     setCheck({ kind: "checking" })
@@ -684,55 +919,138 @@ export function ConnectionFormPanel({
     }
   }
 
+  const [authorizingOAuth, setAuthorizingOAuth] = useState(false)
+  const [oauthError, setOauthError] = useState<string | null>(null)
+
+  async function handleOAuthAuthorize() {
+    setAuthorizingOAuth(true)
+    setOauthError(null)
+    try {
+      let connId = connection?.id
+      if (!connId && mode === "create") {
+        const body: ConnectorConnectionCreate = {
+          service_id: draft.serviceId.trim(),
+          name: draft.name.trim() || serviceLabelOf(draft.serviceId),
+          config: configFromDraft(draft),
+          auth_type: "oauth_byo",
+          status: "active",
+        }
+        const created = await onCreate?.(body)
+        if (created && typeof created === "object" && "id" in created) {
+          connId = created.id
+        }
+      }
+
+      const prov: OAuthProvider = (draft.serviceId.toLowerCase().includes("microsoft") || draft.serviceId.toLowerCase().includes("onedrive"))
+        ? "microsoft"
+        : (draft.serviceId.toLowerCase().includes("github") ? "github" : "google")
+
+      const res = await createOAuthAuthorizeUrl({
+        provider: prov,
+        connection_id: connId || null,
+        custom_client_id: draft.customClientId?.trim() || null,
+        custom_client_secret: draft.customClientSecret?.trim() || null,
+      })
+      if (res.authorization_url) {
+        window.location.href = res.authorization_url
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to initiate OAuth authorization"
+      setOauthError(msg)
+      setAuthorizingOAuth(false)
+    }
+  }
+
   async function handleSave() {
     if (saving) return
     setSaving(true)
     setSaveRefusal(null)
     try {
-      if (mode === "create" && draft.capability === "mcp") {
-        // ══ 206.1 · THE MCP CREATE BODY (D-206.1-04) ══════════════════════════════════════
-        // ⚠ ITS KEY SET IS THE CONTRACT, and it is a DIFFERENT key set from a capability
-        // connection's — not a superset of it. Measured at the model:
-        // `_validate_connection_shape` branches on `mcp_server_url` FIRST and RETURNS before
-        // the capability arm, so a `capability` sent alongside a URL is at best ignored and at
-        // worst refused (`"mcp"` is not a member of the server's closed `ConnectorCapability`).
-        // `McpConfig` is `extra="forbid"` with exactly one field, so a `SendEmailConfig`-shaped
-        // config here is a 422 no client-side type can see.
-        // ⚠ `capability` is OMITTED ENTIRELY, never sent as null — present-and-null is not the
-        // same thing as absent, and only absence is what the branch above reads.
+      if (mode === "create") {
         const body: ConnectorConnectionCreate = {
+          service_id: draft.serviceId.trim(),
           name: draft.name.trim(),
-          mcp_server_url: draft.mcpServerUrl.trim(),
           config: configFromDraft(draft),
         }
-        // ⚠ AN EMPTY CREDENTIAL IS OMITTED, NOT SENT AS "" — the server's `NonEmpty` rejects an
-        // empty string as a PRESENT value, and D-206.1-06 makes the credential optional for
-        // this shape. Sending it would also be a pointless plaintext round trip for a value
-        // that is not there. The `:698` edit-branch omit idiom, reused.
-        if (draft.secret.trim() !== "") body.secret = draft.secret
-        await onCreate?.(body)
-      } else if (mode === "create") {
-        await onCreate?.({
-          capability: draft.capability as ConnectorCapability,
-          name: draft.name.trim(),
-          config: configFromDraft(draft),
-          secret: draft.secret,
-        })
+
+        if (draft.capability === "mcp") {
+          body.mcp_server_url = draft.mcpServerUrl.trim()
+          body.default_approval_posture = defaultPosture
+        } else if (draft.capability === "oauth") {
+          body.auth_type = "oauth_byo"
+          body.status = "active"
+        } else if (
+          draft.capability === "send_email" ||
+          draft.capability === "create_ticket" ||
+          draft.capability === "post_message"
+        ) {
+          body.capability = draft.capability
+        }
+
+        if (draft.capability === "mcp" || draft.capability === "service" || draft.capability === "oauth") {
+          if (draft.secret.trim() !== "") body.secret = draft.secret
+        } else {
+          body.secret = draft.secret
+        }
+        const created = await onCreate?.(body)
+        if (created && typeof created === "object" && "id" in created && Object.keys(toolGrants).length > 0) {
+          try {
+            await updateConnectorGrants(created.id, toolGrants)
+          } catch {
+            // non-fatal grant initialization
+          }
+        }
       } else if (connection) {
         const body: ConnectorConnectionUpdate = {
           name: draft.name.trim(),
           config: configFromDraft(draft),
+          default_approval_posture: defaultPosture,
         }
-        // ⚠ 206.1 — AN MCP ROW'S UPDATE CARRIES ITS URL, and the panel composing it correctly
-        // is the ONLY guard: `ConnectorConnectionUpdate` performs NO cross-field validation at
-        // all, so a body pairing an SMTP config with an MCP row is accepted at the model and
-        // discovered later, by somebody else. Before D-206.1-22's fix this branch composed a
-        // `SendEmailConfig` for every MCP row and 422'd into the generic save failure.
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
-        // A present `secret` is a REPLACE, never a merge — so it is sent ONLY when the
-        // person actually typed a new one. Sending an empty string would replace a working
-        // credential with nothing AND reset the verdict, in one silent UPDATE.
+        if (draft.capability === "oauth") body.auth_type = "oauth_byo"
         if (replacing && draft.secret !== "") body.secret = draft.secret
+
+        // ⚠ OPERATOR-DRIVEN ORDERING FIX, 2026-08-27 — THE GRANTS ARE WRITTEN **BEFORE**
+        // `onUpdate`, AND THE ORDER IS THE WHOLE FIX.
+        //
+        // Reported: *"when I change any permission for tools, it is not reflecting directly
+        // once I click save. When I navigate to another connection and go back, changes are
+        // reflected again."*
+        //
+        // `onUpdate` is `ConnectionsTab.handleUpdate`, which does
+        // `updateConnectorConnection(...)` and then `reload()`. With the grants write AFTER
+        // it, the refetch that `reload()` kicks off captured the row as it was BEFORE the
+        // grants landed — so the parent's `connections` kept the old `tool_grants`, the
+        // panel re-seeded from that stale object on its next open, and the change only
+        // appeared once something else forced a refetch. Nothing was lost; the write always
+        // succeeded. The DISPLAY was reading a list that had been refreshed too early.
+        //
+        // Writing grants first makes the single `reload()` inside `onUpdate` the LAST thing
+        // that happens, so it observes both writes. No second reload, no refetch-after-close
+        // race, and no optimistic local patch that could disagree with the server.
+        //
+        // ⚠ AND THE `try/catch` THAT WRAPPED THIS IS GONE, DELIBERATELY. It swallowed the
+        // failure as *"non-fatal"* and let `onClose()` run, so a permission write that the
+        // server REFUSED — a 422 from `_sanitize_tool_grants`, a 403, a dropped
+        // connection — closed the panel looking exactly like success. A silently dropped
+        // permission change is the same class of lie as a switch Save drops on the floor,
+        // and it is worse here because the person believes they have restricted something.
+        // Unwrapped, it reaches `handleSave`'s own `catch` → `setSaveRefusal(...)`, which
+        // is the mechanism every other refusal on this panel already uses: the panel stays
+        // open and says why.
+        //
+        // ⚠ AND IT ONLY RUNS WHEN A PERMISSION ACTUALLY CHANGED. Writing unconditionally
+        // put a network call on every save and, worse, let a refused grant write block a
+        // plain rename — a person editing a connection's NAME could be stopped by a
+        // permission they never touched. The diff is against the baseline captured at seed
+        // time, so "unchanged" means unchanged since this panel opened.
+        // ⚠ NO SHAPE GATE (2026-08-28, closing the UI half of BUG-260827-02). This read
+        // `draft.capability === "mcp"`, so a Slack/Jira/SMTP posture change was silently
+        // discarded at Save. `grantsChanged` is the only condition, and it is about whether
+        // the PERSON changed something — never about which wire the connection uses.
+        if (grantsChanged) {
+          await updateConnectorGrants(connection.id, toolGrants)
+        }
         await onUpdate?.(connection.id, body)
       }
       onClose()
@@ -778,8 +1096,60 @@ export function ConnectionFormPanel({
    *
    * For the three capabilities this is always truthy, so every reachable state today is
    * BYTE-IDENTICAL to what shipped.
+   *
+   * ⚠ 211 — THE THIRD SHAPE JOINS THE MCP ARM, and the type system is what said so: widening
+   * `ConnectionShape` made this assignment fail to compile rather than silently hand a
+   * `"service"` to a vocabulary total over exactly three capabilities. A service-only row has
+   * no credential and no check path at all, so it has no verdict for that copy to describe —
+   * the same fact the MCP arm records, met by a shape that has even less.
    */
-  const checkCapability: ConnectorCapability | null = capability === "mcp" ? null : capability
+  const checkCapability: ConnectorCapability | null =
+    capability === "mcp" || capability === "service" ? null : capability
+
+  /**
+   * PHASE 212 (D-4b) - the two axes the discovery controls read, derived ONCE.
+   *
+   * `isCapabilityShape` is `checkCapability !== null` said the other way round, and it is
+   * deliberately expressed as a DERIVATION of it rather than as a second `=== ` chain: the two
+   * must never disagree about which shapes have an adapter behind them, and a second chain is
+   * how they would. It is exactly the set `discover_connection_tools` serves from a static
+   * descriptor - `post_message`, `create_ticket`, `send_email`.
+   *
+   * WARNING: `grantsArePersisted` MIRRORS `handleSave`, WHICH WRITES `tool_grants` ONLY ON THE
+   * `mcp` SHAPE. It is not a style choice: rendering the "Granted" checkbox on a capability
+   * action would offer a switch that Save drops on the floor, which is the class of lie this
+   * surface's own §14 names as a failure condition. If `handleSave` ever grows a second arm,
+   * this constant is the one line that must move with it.
+   */
+  const isCapabilityShape = checkCapability !== null
+
+  /**
+   * Can a posture set on this screen actually be SAVED?
+   *
+   * ⚠ THIS READ `capability === "mcp"` UNTIL 2026-08-28, AND THAT WAS THE UI HALF OF
+   * `BUG-260827-02`. The old comment beside it argued the constant must MIRROR `handleSave`,
+   * *"which writes `tool_grants` ONLY ON THE `mcp` SHAPE"* — correct as a mirror, and it
+   * mirrored a defect. A Slack, Jira or SMTP connection rendered the full three-arm posture
+   * control and Save dropped every click on the floor, which the bug report names as the
+   * class of lie this surface must not tell.
+   *
+   * ⚠ NOTHING IN THE BACKEND EVER REQUIRED THE MCP SHAPE. Measured 2026-08-28:
+   * `PATCH /connections/{id}/grants` carries no shape guard, `update_connection_grants` has
+   * no shape branch, and `create_connection` already stores `static_descriptors_for_capability`
+   * into `discovered_tools` for every capability row. Gate 5.5 reads
+   * `tool_name or capability` as the grant key, so the key a capability row needs is the one
+   * its descriptor already advertises. The restriction lived entirely in these two lines.
+   *
+   * `"service"` is excluded and that is NOT a leftover: a service-only row genuinely has no
+   * action until Phase 215's OAuth gives it one, so `descriptors = []` and there is nothing
+   * to grant. Excluding it states a fact about the row; excluding the three capabilities
+   * stated a fact about our own save path.
+   */
+  const grantsArePersisted = capability !== "service"
+
+  /** Did the person actually touch a permission on this panel? See `initialGrantsRef`. */
+  const grantsChanged =
+    JSON.stringify(normalizeGrants(toolGrants)) !== initialGrantsRef.current
 
   /**
    * The host a SAVE-path refusal is about — the thing the person typed.
@@ -845,6 +1215,28 @@ export function ConnectionFormPanel({
    * SELECTS between the two ids below rather than either node borrowing the other's.
    */
   const mcpSaveDisabledReasonId = `${fieldId}-mcp-save-disabled-reason`
+
+  /**
+   * ⚠ 211 — A THIRD DISTINCT ID, for the same reason the second one exists.
+   *
+   * Three reasons a Save can be off (the cipher, an unusable address, an unnamed service) and
+   * therefore three ids: the button SELECTS between them and no node borrows another's, so a
+   * `container.querySelector` resolution can never find A sentence that is not the right one.
+   * The three states are mutually exclusive by shape, so at most one node is ever rendered.
+   */
+  const serviceSaveDisabledReasonId = `${fieldId}-service-save-disabled-reason`
+
+  /**
+   * ⚠ SCOPED TO THE `service` SHAPE, DELIBERATELY.
+   *
+   * `draftIsSavable` is total, but the three capability shapes return `true` from it
+   * unconditionally — they are ungated exactly as shipped, because adding a completeness gate
+   * to them would be a behaviour change with no defect behind it. The endpoint shape keeps
+   * its own `mcpUrlUnusable` predicate and its own sentence. What is NEW is the third shape:
+   * a blank identity is a certain refusal at both the model and the database, so saying so
+   * here costs nothing and spares a person a generic "Couldn't save that".
+   */
+  const serviceIncomplete = capability === "service" && !draftIsSavable(draft)
 
   const title = mode === "create" ? PANEL_TITLE_CREATE : (connection?.name ?? "")
   const regionLabel =
@@ -945,45 +1337,66 @@ export function ConnectionFormPanel({
           </p>
         )}
 
-        {/* ── The capability is chosen FIRST and the rest of the form appears (§3b). On
-               edit it is STATIC — `ConnectorConnectionUpdate` carries no `capability`. ── */}
+        {/* ── ⭐ 211 · THE SERVICE IS NAMED FIRST and the rest of the form follows (SC#1).
+               THE SAME SLOT, THE SAME POSITION, THE SAME `mb-3.5` + <label> + help + control
+               STRUCTURE the three-verb chooser occupied — D-211-07: this phase removes an
+               organising axis, it does not design a surface, so nothing about the layout
+               moves. On edit it is STATIC: editing identity is CONN-07 and Phase 212 owns it
+               (`ConnectorConnectionUpdate` carries no `service_id`, on purpose). ── */}
         {mode === "create" && !readOnly ? (
-          <div data-testid="connection-capability-chooser" className="mb-3.5">
+          <div data-testid="connection-service-field" className="mb-3.5">
             <label
-              htmlFor={`${fieldId}-capability`}
+              htmlFor={`${fieldId}-service`}
               className="mb-1 block text-[11px] font-medium text-foreground"
             >
-              {CAPABILITY_LABEL}
+              {SERVICE_LABEL}
             </label>
             <p
-              id={`${fieldId}-capability-help`}
+              id={`${fieldId}-service-help`}
               className="mb-1 text-[11px] leading-snug text-muted-foreground"
             >
-              {CAPABILITY_HELP}
+              {SERVICE_HELP}
             </p>
-            {/* A native <select>, the 190-12 precedent: one control, a real <label>, and no
-                portal for a keyboard user to escape into while a trap is armed. */}
-            <select
-              id={`${fieldId}-capability`}
-              value={draft.capability}
-              aria-describedby={`${fieldId}-capability-help`}
-              onChange={(e) => set({ capability: e.target.value as ConnectionShape })}
+            {/* ⚠ A TEXT INPUT WITH A `<datalist>`, NEVER A `<select>`. The 190-12 precedent
+                still holds — one control, a real <label>, and no portal for a keyboard user
+                to escape into while a trap is armed — but the CONTROL KIND is load-bearing
+                here: a `<select>` would make the curated set a CONSTRAINT, and a closed set
+                on this axis is migration 116's mistake moved to a nicer one (D-211-01). The
+                list suggests; the box accepts anything. */}
+            <input
+              id={`${fieldId}-service`}
+              type="text"
+              value={draft.serviceId}
+              list={`${fieldId}-service-suggestions`}
+              placeholder={SERVICE_PLACEHOLDER}
+              autoComplete="off"
+              aria-describedby={`${fieldId}-service-help`}
+              onChange={(e) => setShapedBy({ serviceId: e.target.value })}
               className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
-            >
-              {CAPABILITY_CHOICES.map((choice) => (
-                <option key={choice.capability} value={choice.capability}>
-                  {choice.label}
+            />
+            {/* ⚠ REACT ESCAPES THESE, and no `dangerouslySetInnerHTML` may ever take a value
+                from this lookup (T-211-14a). The identifiers here are our own literals; the
+                threat is the day Phase 212 sources them from a table. */}
+            <datalist id={`${fieldId}-service-suggestions`}>
+              {SERVICE_SUGGESTIONS.map((suggestion) => (
+                <option key={suggestion.service_id} value={suggestion.service_id}>
+                  {suggestion.label}
                 </option>
               ))}
-            </select>
+            </datalist>
           </div>
         ) : (
           <div data-testid="connection-capability-static" className="mb-3.5">
-            <div className="mb-1 text-[11px] font-medium text-foreground">{CAPABILITY_LABEL}</div>
-            <div className="text-[13px] text-foreground">{capabilityLabelOf(capability)}</div>
+            <div className="mb-1 text-[11px] font-medium text-foreground">{SERVICE_LABEL}</div>
+            {/* ⚠ IT READS THE IDENTITY AND DOES NOT OFFER TO CHANGE IT. CONN-07 is Phase
+                212's, and 211-02 deliberately left `ConnectorConnectionUpdate` without the
+                field — so a control here would compose a body the model discards, which is a
+                change that appears to work and does not. A miss degrades to the raw
+                identifier (D-211-02): never a placeholder, never a refusal. */}
+            <div className="text-[13px] text-foreground">{serviceLabelOf(draft.serviceId)}</div>
             {mode === "edit" && (
               <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                {CAPABILITY_LOCKED_NOTE}
+                {SERVICE_LOCKED_NOTE}
               </p>
             )}
           </div>
@@ -1101,26 +1514,114 @@ export function ConnectionFormPanel({
                editor, no transport picker, no timeout, no "test connection": each is a
                surface nobody threat-modelled (D-32 / T-190-17-SCOPE), and the `config` this
                form composes is `{ headers: {} }` precisely so it offers to fill nothing. ── */}
+        {/* ── PHASE 222 (D-222-01..08) · THE MCP AUTH DOOR — 5 States ── */}
         {capability === "mcp" && (
-          <Field
-            label={FIELD_MCP_URL_LABEL}
-            help={FIELD_MCP_URL_HELP}
-            htmlFor={`${fieldId}-mcp-url`}
-          >
-            {/* FULL WIDTH — one input, one column. The `1fr 92px` grid above exists for
-                host+port; an MCP URL has no second part, and borrowing that shape would
-                leave a 92px hole beside the field. `font-mono` because this is a machine
-                value, like the Jira project key; the label and help above are prose. */}
-            <TextControl
-              id={`${fieldId}-mcp-url`}
-              value={draft.mcpServerUrl}
-              onChange={(mcpServerUrl) => set({ mcpServerUrl })}
-              placeholder={FIELD_MCP_URL_PLACEHOLDER}
-              describedBy={`${fieldId}-mcp-url-help`}
-              readOnly={readOnly}
-              className="font-mono"
+          <div className="mb-4">
+            <McpAuthDoor
+              draft={draft}
+              onDraftChange={(patch) => setShapedBy(patch)}
+              mode={mode}
+              connection={connection}
+              canWrite={canWrite}
+              isOrgAdmin={isOrgAdmin}
+              liveConnectorsOn={liveConnectorsOn}
+              onCreate={onCreate}
+              onUpdate={onUpdate}
+              onDiscovered={onDiscovered}
+              onDiscoverTools={handleDiscoverTools}
+              probingTools={probing}
             />
-          </Field>
+          </div>
+        )}
+
+        {/* -- PHASE 212 (D-4b) -- THE CAPABILITY SHAPE'S REFRESH, FOUND BY THE OPERATOR.
+               "for the old connections like JIRA and email and slack it does not show
+               discover tools, it is only showing check credentials." Correct, and the same
+               defect family as D-4: `discover_connection_tools` has served the capability
+               shape since Phase 211 -- re-reading the adapter's own static descriptor with NO
+               network call -- and nothing ever rendered a control for it.
+
+               WARNING: EDIT MODE AND A SAVED ROW ONLY, because the endpoint reads a row by id.
+               A capability DRAFT has nothing to refresh from yet, so no control is offered
+               rather than one that would 404 -- the 185 rule: an affordance unable to act is
+               REMOVED, never disabled. The `mcp` shape keeps its own button beside the URL
+               field, where it also serves the pre-save probe. */}
+        {isCapabilityShape && mode === "edit" && connection?.id && !readOnly && (
+          <div className="mb-3.5">
+            <button
+              type="button"
+              disabled={probing}
+              onClick={() => void handleDiscoverTools()}
+              data-testid="connection-refresh-actions-btn"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+              aria-describedby={`${fieldId}-refresh-actions-help`}
+            >
+              {probing && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+              {probing ? REFRESH_ACTIONS_BUSY : REFRESH_ACTIONS_LABEL}
+            </button>
+            <p
+              id={`${fieldId}-refresh-actions-help`}
+              className="mt-1 text-[11px] leading-snug text-muted-foreground"
+            >
+              {REFRESH_ACTIONS_HELP}
+            </p>
+          </div>
+        )}
+
+        {/* WARNING: LIFTED OUT OF THE `mcp` ARM. These two nodes were nested inside it, so a
+             capability refresh could return a descriptor and a failure could return a worded
+             reason and NEITHER could render. The list is shape-aware below; the error is not,
+             because a reason is a reason whatever asked for it. */}
+        {probeError && (
+          <p
+            role="status"
+            data-testid="connection-probe-error"
+            className="mb-3 text-[11px] leading-snug text-destructive"
+          >
+            {probeError}
+          </p>
+        )}
+
+        {probeResult && probeResult.length > 0 && (
+          <div data-testid="connection-discovered-tools" className="mb-3.5">
+            <ConnectionGrantsList
+              tools={probeResult}
+              // Phase 221 plan 02 (D-221-04) — the per-application verdicts from the last
+              // Check, read straight off the check state machine.
+              //
+              // ⚠ NO SECOND PIECE OF STATE. `check` already holds the whole result; a
+              // parallel `availability` useState would be a second copy of one fact, free
+              // to be stale the moment somebody adds an early-return to `handleCheck`.
+              applicationAvailabilities={
+                check.kind === "done" ? check.result.application_availability : undefined
+              }
+              toolGrants={toolGrants}
+              defaultPosture={defaultPosture}
+              onChangeDefaultPosture={setDefaultPosture}
+              onChangeToolGrant={(toolName, posture) => {
+                setToolGrants((prev) => ({
+                  ...prev,
+                  [toolName]: posture,
+                }))
+              }}
+              onResetToolGrant={(toolName) => {
+                setToolGrants((prev) => {
+                  const next = { ...prev }
+                  delete next[toolName]
+                  return next
+                })
+              }}
+              // Phase 221 (D-221-05) — the middle rung. It writes into the SAME
+              // `tool_grants` object under an `app:` key, so the existing save path,
+              // its dirty-diff and `_sanitize_tool_grants` all carry it unchanged.
+              onChangeApplicationGrant={(application, posture) => {
+                setToolGrants((prev) => ({ ...prev, [`app:${application}`]: posture }))
+              }}
+              readOnly={readOnly}
+              grantsArePersisted={grantsArePersisted}
+              connectionName={draft.name || draft.serviceId}
+            />
+          </div>
         )}
 
         {capability === "post_message" && (
@@ -1140,7 +1641,77 @@ export function ConnectionFormPanel({
           </Field>
         )}
 
+        {capability === "oauth" && (
+          <div className="mb-4 rounded-lg border border-border bg-card/60 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-foreground">OAuth 2.0 Authorization</span>
+              {draft.accountEmail && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <Check className="h-3 w-3" />
+                  {draft.accountEmail}
+                </span>
+              )}
+            </div>
+
+            {draft.status === "revoked" && (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+                <span className="font-semibold">Authorization Revoked:</span> The provider reported that OAuth access was revoked. Please reconnect.
+              </div>
+            )}
+
+            <p className="text-[11px] leading-relaxed text-muted-foreground mb-3">
+              Authorize this connection with {serviceLabelOf(draft.serviceId)} using secure 1-click OAuth. Credentials and tokens are encrypted at rest with AES-256-GCM.
+            </p>
+
+            <button
+              type="button"
+              disabled={authorizingOAuth || readOnly}
+              onClick={() => void handleOAuthAuthorize()}
+              data-testid="connection-oauth-authorize-btn"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {authorizingOAuth && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {draft.accountEmail ? `Reconnect with ${serviceLabelOf(draft.serviceId)}` : `Connect with ${serviceLabelOf(draft.serviceId)}`}
+            </button>
+
+            {oauthError && (
+              <p className="mt-2 text-[11px] text-destructive">{oauthError}</p>
+            )}
+
+            <div className="mt-4 border-t border-border/60 pt-3">
+              <details className="text-[11px] text-muted-foreground">
+                <summary className="cursor-pointer font-medium hover:text-foreground">
+                  Advanced: Custom OAuth App Credentials (Optional)
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-foreground">Custom Client ID</label>
+                    <input
+                      type="text"
+                      value={draft.customClientId || ""}
+                      onChange={(e) => set({ customClientId: e.target.value })}
+                      placeholder="e.g. 12345-abcde.apps.googleusercontent.com"
+                      className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-foreground">Custom Client Secret</label>
+                    <input
+                      type="password"
+                      value={draft.customClientSecret || ""}
+                      onChange={(e) => set({ customClientSecret: e.target.value })}
+                      placeholder="Custom Client Secret"
+                      className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                    />
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        )}
+
         {/* ── 3 · The write-only secret (§3d / T-190-17-SECRET). ── */}
+        {capability !== "service" && capability !== "oauth" && (
         <Field label={secretLabel} htmlFor={`${fieldId}-secret`}>
           {mode === "create" || replacing ? (
             <>
@@ -1243,6 +1814,7 @@ export function ConnectionFormPanel({
             </>
           )}
         </Field>
+        )}
 
         {/* ── 4 · The org-shared line (§3e), at the foot of the fields. ── */}
         <p
@@ -1251,12 +1823,10 @@ export function ConnectionFormPanel({
         >
           {orgSharedLine(orgName?.trim() || ORG_SHARED_FALLBACK_NAME)}
         </p>
-      </div>
 
-      {/* ── The ALWAYS-ON 🔒 destination footer (§3c). Never conditional, never collapsible,
-             never hover-revealed, never behind an “advanced” disclosure — it lives in the
-             footer region so it stays on screen while the body scrolls. ── */}
-      <div className="border-t border-border px-[18px] py-4">
+        {/* ── The ALWAYS-ON 🔒 destination footer, notices, and action buttons (§3c).
+               Flows sequentially right after the form fields for user-friendly interaction. ── */}
+        <div className="mt-4 border-t border-border pt-4">
         {/* ═══════════════════════════════════════════════════════════════════════════
             190-18 · THE REFUSALS AND THE CHECK MOMENTS.
             They live in the FOOTER region, beside the controls they are about, so a
@@ -1316,7 +1886,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 1 — in flight. Says, before it runs, that nothing leaves. ── */}
-        {check.kind === "checking" && (
+        {!isOAuthRow && check.kind === "checking" && (
           <NoticeBlock
             tone="neutral"
             glyph="⟳"
@@ -1329,7 +1899,7 @@ export function ConnectionFormPanel({
         )}
 
         {/* ── §5c MOMENT 2 — the one green moment, and its second clause is load-bearing. ── */}
-        {check.kind === "done" && check.result.ok && checkCapability && (
+        {!isOAuthRow && check.kind === "done" && check.result.ok && checkCapability && (
           <NoticeBlock
             tone="positive"
             glyph={CHECK_SUCCESS_GLYPH}
@@ -1354,7 +1924,7 @@ export function ConnectionFormPanel({
                nothing answered) is not a rejection (we reached it and IT said no). Each
                arrives in its own `bucket` on the wire and renders its own heading, its own
                glyph and its own next step. §14 names the two forbidden swaps directly. */}
-        {check.kind === "done" && !check.result.ok && (
+        {!isOAuthRow && check.kind === "done" && !check.result.ok && (
           <NoticeBlock
             tone="destructive"
             glyph={
@@ -1440,7 +2010,7 @@ export function ConnectionFormPanel({
         {/* ── The check that did not run. A PLATFORM condition, deliberately outside §4d's
                three: telling someone to "correct the host" about a switched-off connection
                sends them to fix something that is not broken. ── */}
-        {check.kind === "platform" && (
+        {!isOAuthRow && check.kind === "platform" && (
           <NoticeBlock
             tone="destructive"
             glyph={CHECK_NOT_RUN_GLYPH}
@@ -1454,6 +2024,12 @@ export function ConnectionFormPanel({
           </NoticeBlock>
         )}
 
+        {/* ⚠ NOT RENDERED FOR AN OAUTH ROW. The footer states where a step SENDS, read from
+            the host and port fields — and an OAuth connection has neither, so it fell to its
+            "nothing yet — fill the fields above" arm and pointed at fields that do not
+            exist. Its always-on contract (§3c) is about a row that HAS a destination to
+            state; silence is the honest answer where there is none. */}
+        {!isOAuthRow && (<>
         <div
           data-testid="connection-destination-footer"
           data-refused={footer.refusedReason ? "true" : "false"}
@@ -1510,6 +2086,7 @@ export function ConnectionFormPanel({
           </p>
         )}
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{FOOTER_SERVER_NOTE}</p>
+        </>)}
 
         {/* ── 190-18 · §2g — THE GRADED DESTRUCTIVE GUARDS, on the row the panel is editing.
                Present only when a write is genuinely possible: an org admin, a live
@@ -1525,6 +2102,25 @@ export function ConnectionFormPanel({
                 which is precisely the drift `ConnectionsTab.tsx:1203-1206` claims passing the
                 handler unconditionally would prevent. It did not. The route now refuses with a
                 worded 409 as well; this guard is so the control is never OFFERED. */}
+            {/* ⚠ `!isOAuthRow` WAS HERE AND IS DELIBERATELY GONE (Phase 221 plan 02).
+                It was RIGHT when it was written: `POST /check` refused every OAuth row with
+                `409 nothing_to_check_yet`, and offering a control that can only fail is
+                worse than not offering it — the same reasoning as the `mcp_server_url`
+                guard beside it, which STAYS because that refusal is still true.
+
+                Plan 02 removed the refusal: an OAuth row is now checked by renewing its
+                token, and the check is what produces the per-application availability
+                verdicts. With this guard still in place the panel's Check never ran, so the
+                availability line could never render from here — a shipped feature with no
+                door, which is the failure class this surface keeps producing. Measured in a
+                real browser on 2026-09-01: six application groups on screen, zero ways to
+                ask whether any of them works.
+
+                ⚠ The five OTHER `!isOAuthRow` gates in this file are UNTOUCHED. They hide
+                §5c's host/port/identity result block, whose copy was authored for a
+                capability row reaching a named host; an OAuth row has no port and its
+                result is the availability lines themselves. Widening those is a copy
+                decision, not this plan's. */}
             {onCheck &&
               !connection.mcp_server_url &&
               (connection.is_enabled ? (
@@ -1631,6 +2227,17 @@ export function ConnectionFormPanel({
           </p>
         )}
 
+        {/* ── 211 — the same shape, the third reason. Same slot, same treatment, its own id. ── */}
+        {serviceIncomplete && (
+          <p
+            id={serviceSaveDisabledReasonId}
+            data-testid="connection-service-save-disabled-reason"
+            className="mb-1 text-[11px] leading-snug text-destructive"
+          >
+            {SERVICE_SAVE_DISABLED_REASON}
+          </p>
+        )}
+
         <div className="mt-3 flex items-center justify-end gap-2">
           {saveRefusal?.kind === "generic" && (
             <span
@@ -1652,7 +2259,7 @@ export function ConnectionFormPanel({
           {showSave && (
             <button
               type="button"
-              disabled={saving || saveBlocked || mcpUrlUnusable}
+              disabled={saving || saveBlocked || mcpUrlUnusable || serviceIncomplete}
               // ⚠ SELECTS BETWEEN TWO DISTINCT IDS, never shares one. The cipher refusal wins
               // when both hold: it is the one thing on this surface nothing the person types
               // can fix, so it is the reason worth reading first.
@@ -1661,7 +2268,9 @@ export function ConnectionFormPanel({
                   ? saveDisabledReasonId
                   : mcpUrlUnusable
                     ? mcpSaveDisabledReasonId
-                    : undefined
+                    : serviceIncomplete
+                      ? serviceSaveDisabledReasonId
+                      : undefined
               }
               onClick={() => void handleSave()}
               data-testid="connection-form-save"
@@ -1672,6 +2281,7 @@ export function ConnectionFormPanel({
             </button>
           )}
         </div>
+      </div>
       </div>
 
       {/* ── §2g's two sheets. The SAME copy the table row renders (`connectionsCopy`), so

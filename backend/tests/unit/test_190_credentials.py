@@ -56,6 +56,10 @@ SENTINEL_SECRET = "xoxb-SENTINEL-CREDENTIAL-MUST-NEVER-BE-LOGGED-190"
 def _payload(secret: str = SENTINEL_SECRET) -> ConnectorConnectionCreate:
     return ConnectorConnectionCreate(
         capability="post_message",
+        # Phase 211 (D-211-01) — required on every shape. The model and migration 127's
+        # `connector_connections_has_a_service_identity` agree exactly, so a payload without
+        # one is a 422 rather than a CheckViolationError surfacing as a 500.
+        service_id="slack",
         name="Ops — #alerts",
         config=PostMessageConfig(default_channel="C0ALERTS"),
         secret=secret,

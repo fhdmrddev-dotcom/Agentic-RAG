@@ -44,6 +44,67 @@ Claude's SessionStart hook parse them. Body text and answers are free-form.
 These roles are **per phase**, not permanent — the operator says who is building. What is
 permanent is the *separation*: whoever reviews did not build.
 
+## 3.1 · Critical phases — the roles SWAP, they are never broken
+
+**Ratified 2026-08-26 (operator, at the v3.9 scoping).** The default above — Gemini builds, Claude
+reviews — stands for ordinary work. **For critical work the operator wants Claude building.** That
+does not suspend §3; it swaps the seats, because the one thing that is permanent is the separation.
+
+### Is this phase critical? A test, not a list
+
+A phase is **Claude-built** if it hits **any one** of these. Otherwise it is Gemini-built.
+
+1. **Credentials or secrets** — storing, encrypting, or granting access to them.
+   *Precedent:* v3.6's Phase 190 review found `anon` **and** `authenticated` both holding
+   column-level SELECT on `connector_connections.secret_ciphertext`, after nineteen plans of
+   RED-first self-checking had missed it. Closed by migration 118.
+2. **The outbound egress boundary** — anything that opens a socket to the internet. SSRF, loopback,
+   RFC1918, cloud-metadata.
+3. **The permission or approval model.** A permission bug *is* a security bug.
+4. **A migration that commits a table shape.** `SEED-146`'s warning is that committing the
+   connection shape twice is the expensive mistake; migrations compound.
+5. **Anything that can fail OPEN.** *Precedent:* Phase 204's `load_run_budget` read
+   `workflow_runs.metadata` while `204-03` wrote `workflow_runs.inputs`; the read failed open, the
+   spend cap disarmed **silently**, and it was measured at 3m20s against a 120s cap — with **106
+   tests green**, because each parallel wave mocked the other side.
+
+Everything else — catalog UI, chips, marks, filters, copy, presentation layers — is Gemini's, and
+that is most of the work by volume.
+
+### Who reviews, once the seats have swapped
+
+| Phase | Builds | Reviews | Plus |
+|---|---|---|---|
+| Ordinary | Gemini | **Claude** — `NNN-PREFLIGHT.md` before execution, then a DRIVEN check after | — |
+| **Critical** | **Claude** | **Gemini** runs the mechanical gate: count gate, tsc, cross-plan seam audit, reachability of every new surface | ⭐ the **operator** runs `/code-review ultra` |
+
+⚠ **Be honest about the asymmetry.** Gemini reviewing Claude's security work is a weaker review than
+the reverse. `/code-review ultra` is a multi-agent cloud review that **only the operator can
+launch** — which is exactly what makes it independent of the builder. On credential and egress
+phases it is the real gate; the mechanical pass is the cheap screen in front of it.
+
+### Who runs `discuss-phase`? The BUILDER — with one carve-out
+
+`discuss-phase` is where design direction is set, so it belongs to whoever holds the phase.
+**The reviewer does not run it**, or the review becomes self-assessment before a line is written.
+
+**The carve-out:** CLAUDE.md makes three things MANDATORY at discuss-phase — the reported-bugs
+cross-check, the seeds-register sweep, and the G-5 hot-file scan. Those are **measurements, not
+directions**, and they are the reviewer's stated ownership. So the reviewer supplies them **on the
+bus, before discuss-phase opens**, as a *measurement pack*: re-derived gate baselines, re-derived
+G-5 triples, the open bug rows whose `affected_areas` touch the phase, and the seeds whose
+`trigger_when` names it. **Facts with no recommendation attached.** The builder decides what to do
+with them.
+
+⚠ A measurement pack that contains a suggested fix is a design direction wearing a lab coat. If you
+are the reviewer and you catch yourself writing *"so you should…"*, delete that clause.
+
+### Splitting one phase across both agents
+
+Allowed, but it is **the exact shape of the Phase 204 defect** — each side individually correct,
+individually green, and the join dead. So a split phase owes **an integration test that mocks
+NEITHER side**, and that test is a blocking gate, not a nice-to-have.
+
 ## 4 · The one rule that keeps this from rotting
 
 **A register nobody reads is a deletion that looks like a decision.** This project already has

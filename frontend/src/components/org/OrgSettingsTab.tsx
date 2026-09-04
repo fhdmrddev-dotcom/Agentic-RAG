@@ -27,7 +27,7 @@ interface OrgSettingsTabProps {
 /** The light org-config home — org identity + the three-homes seam (D-166-03). */
 export function OrgSettingsTab({ orgName }: OrgSettingsTabProps) {
   return (
-    <div className="mx-auto max-w-2xl px-6 py-6">
+    <div className="mx-auto max-w-6xl w-full px-6 py-6">
       <section
         aria-label="Organization settings"
         className="rounded-[10px] border border-border bg-card px-5 py-5"

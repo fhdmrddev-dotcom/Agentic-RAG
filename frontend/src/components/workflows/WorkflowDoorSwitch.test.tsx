@@ -51,12 +51,14 @@ const {
   // observable, not merely its effect.
   mockReadPlaceholders,
   mockUploadTemplate,
+  mockListConnections,
 } = vi.hoisted(() => ({
   mockGenerateWorkflow: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
   mockReadPlaceholders: vi.fn(),
   mockUploadTemplate: vi.fn(),
+  mockListConnections: vi.fn(),
 }))
 vi.mock("@/lib/api", () => ({
   // 204-03 (SCHED-01) — THE MEASURED MOCK BUDGET, SPENT IN THE COMMIT THAT ADDED THE EXPORTS.
@@ -76,7 +78,17 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: vi.fn(),
   listFolders: mockListFolders,
   listSkills: mockListSkills,
-  listConnectorConnections: () => Promise.resolve([]),
+  // 214-13 (STEP-06) — ALREADY DECLARED BEFORE THIS PHASE (206.2's connection work), and now
+  // reached by a SECOND consumer: the describe door mounts `DescribeServicePicker`. Promoted
+  // from a fixed `[]` to a hoisted mock so a case can drive the picker's real arms.
+  //
+  // ⚠ ITS ABSENCE WOULD NOT HAVE BEEN LOUD, which is why this is recorded rather than assumed
+  // lucky. The picker's read sits inside the shipped best-effort `try/catch`, so an undeclared
+  // export does NOT throw the visible *"No export is defined on the @/lib/api mock"* — it is
+  // SWALLOWED and the picker silently renders its "we could not ask" arm. That is the 196-08
+  // mock-budget trap wearing a disguise, and it DID fire one file over
+  // (`WorkflowDoorSwitch.baseline.test.tsx`, whose factory had no entry at all).
+  listConnectorConnections: mockListConnections,
   discoverConnectorTools: () => Promise.resolve([]),
   updateConnectorGrants: () => Promise.resolve({}),
   readTemplatePlaceholdersFromFile: mockReadPlaceholders,
@@ -113,6 +125,9 @@ beforeEach(() => {
   // The Builder's generate→draft seam — resolve to a valid drafted definition so the
   // CR-01 auto-draft hand-off completes cleanly.
   mockGenerateWorkflow.mockResolvedValue({ ok: true, definition: { slug: "vendor-risk", phases: [] } })
+  // 214-13 — the describe door's service picker. EMPTY is the honest default here: no case
+  // below is about connections, and the picker's empty arm adds no control and no gate.
+  mockListConnections.mockResolvedValue([])
 })
 
 describe("WorkflowDoorSwitch — the 'both' chooser (047-A variant A)", () => {
@@ -607,7 +622,14 @@ const SWEPT_SOURCES: { path: string; source: string }[] = [
 const NEEDLES: { id: string; spelling: "plain" | "escaped"; text: string }[] = Object.entries(
   doorVocabulary,
 ).flatMap(([id, value]) => {
-  const plain = value as string
+  // ⚠ A COMPOSED entry is a FUNCTION, not a string, and this sweep is about governed
+  // WORDS in source. Phase 214-03 added three composed ids to this module and the old
+  // `value as string` then called .replace on them, which threw at module scope and took the
+  // WHOLE suite (44 cases) to zero runs — a count-gate decrease, not a visible failure.
+  // Skipping non-strings keeps the needle set honest: a template has no fixed literal to
+  // sweep for, so it contributes no needle rather than a wrong one.
+  if (typeof value !== "string") return []
+  const plain = value
   const escaped = plain.replace(/&/g, "&amp;")
   const rows: { id: string; spelling: "plain" | "escaped"; text: string }[] = [
     { id, spelling: "plain", text: plain },
@@ -648,7 +670,14 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // `doorVocabulary.test.ts` — the two numbers are one fact read from two files, and a count
     // that moved on its own is a table nobody checked.
     // Sketch 200: 23 → 24 (`DESCRIBE_CTA_REFUSED`), same commit, same rule, third time.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(24)
+    // Sketch 217 (214-03): 24 → 36 — twelve flat ids added at once. ⚠ FOURTH TIME, AND THE
+    // FIRST TIME THE TWO NUMBERS MOVED IN DIFFERENT COMMITS: `GOVERNED_ID_COUNT` went to 36
+    // in `doorVocabulary.test.ts`, this half did not, and the arithmetic 24 + 12 = 36 is what
+    // proves the gap is the twelve additions rather than an unexplained drift. The three
+    // COMPOSED ids added in the same commit contribute 0 needles by construction — a function
+    // has no fixed literal to sweep for — so 36 is flat ids only, and `COMPOSED_ID_COUNT` is
+    // the sibling suite’s to hold.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(36)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.
@@ -944,7 +973,25 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
     expect(mockReadPlaceholders).toHaveBeenCalledTimes(0)
     // The KEY SET, not merely the absence of a value: `template_placeholders: undefined`
     // would satisfy a `toBeUndefined` and would still be a changed body on the wire.
-    expect(Object.keys(mockGenerateWorkflow.mock.calls[0][0]).sort()).toEqual(["describe"])
+    //
+    // ⚠ 214-13 (STEP-06) — THIS PIN GAINED A SECOND KEY, AND IT IS AN ARGUED CHANGE RATHER
+    // THAN A RE-BASELINE TO MAKE A RED GO GREEN. The pin did exactly its job: it caught the
+    // request body growing a field, which is what it exists for. The field is INTENTIONAL and
+    // belongs on THIS door only — `DescribeServicePicker` is always mounted here, so this door
+    // ALWAYS has an answer to *"which services may this workflow use?"*, and `[]` is the
+    // author's real decision (no external step may be emitted) rather than a missing value.
+    //
+    // ⚠ THE `template_placeholders` HALF OF THE ORIGINAL CLAIM IS UNCHANGED AND IS STILL
+    // ASSERTED BELOW: with no document supplied, that key is genuinely ABSENT. The two are
+    // checked apart so a future edit cannot smuggle one in under the other's name.
+    const body = mockGenerateWorkflow.mock.calls[0][0]
+    expect(Object.keys(body).sort()).toEqual(["allowed_connection_ids", "describe"])
+    expect("template_placeholders" in body).toBe(false)
+    expect("project_folder_id" in body).toBe(false)
+    // ⚠ `[]`, NEVER `undefined`. The two mean opposite things on the wire — `undefined` is
+    // *no preference* and reaches the server's UNCONSTRAINED arm, which is not what a door
+    // carrying a picker means when nothing is ticked.
+    expect(body.allowed_connection_ids).toEqual([])
   })
 
   it("WorkflowDoorSwitch.tsx: the two crossing props are genuinely ABSENT when nothing is supplied — a spread-conditional, not a default", () => {
@@ -1454,10 +1501,23 @@ describe("199-08 Task 2 — the describe box refuses OUT LOUD, and adds no rule 
     // NO focus ring (`focus:ring-0` on both arms), so `focus:ring-destructive` has nothing left
     // to swing against. The property this half guards — same token COUNT, exactly the named
     // slots differing, nothing else drifting — is unchanged and is still what is asserted.
+    //
+    // ⚠ 214-13 — THE TWO TOKENS ARE NOW `warning`, AND THIS IS AN ARGUED CHANGE RATHER THAN A
+    // RE-BASELINE TO MAKE A RED GO GREEN. Plan 214-03 recorded the ruling in
+    // `doorVocabulary.ts` ("THE COLOUR RULING"): sketch 217 invariant #11 says the refusal
+    // spends WARNING and never destructive, and sketches 214 #14 / 215 #9 assert
+    // `--destructive` is ABSENT from the new surfaces — so leaving the SHIPPED arm destructive
+    // while the new service arm is warning would make ONE mechanism read as TWO severities.
+    // The PROPERTY this half guards is untouched and is what still fails on a mistake: the same
+    // token COUNT, exactly the named slots differing, nothing else drifting. Only the token
+    // NAMES moved, and the negative assertions below prove `destructive` is genuinely gone
+    // rather than merely unasserted.
     fireEvent.change(box, { target: { value: " " } })
     const refusing = (box.getAttribute("class") ?? "").split(" ")
-    expect(refusing).toContain("border-destructive")
-    expect(refusing).toContain("focus:border-destructive")
+    expect(refusing).toContain("border-warning")
+    expect(refusing).toContain("focus:border-warning")
+    expect(refusing).not.toContain("border-destructive")
+    expect(refusing).not.toContain("focus:border-destructive")
     expect(refusing).not.toContain("border-border")
     expect(refusing).not.toContain("focus:border-primary")
     expect(refusing.length).toBe(RESTING.split(" ").length)
@@ -1474,5 +1534,256 @@ describe("199-08 Task 2 — the describe box refuses OUT LOUD, and adds no rule 
     expect(words.test(doorVocabulary.DESCRIBE_REFUSAL)).toBe(false)
     // POSITIVE CONTROL — the sweep really fires on the sheet's own caption.
     expect(words.test("Request too vague - Needs a goal and a source.")).toBe(true)
+  })
+})
+
+
+// ── 214-13 (STEP-06 · D-214-21 · sketch 217) — THE SECOND ARM ON THE ONE REFUSAL MECHANISM ──
+//
+// THE PROPERTY: the door refuses BY NAME when the author's prose names a service they have not
+// connected, offers exactly two next actions, drafts NOTHING, and points at their own words
+// only when it can do so unambiguously.
+describe("WorkflowDoorSwitch — the describe door refuses an unconnected service", () => {
+  /** A granted Slack connection, narrowed to what the picker and the refusal read. */
+  const slackConnection = {
+    id: "conn-slack",
+    org_id: "o1",
+    service_id: "slack",
+    name: "Acme Slack",
+    config: {},
+    is_enabled: true,
+    discovered_tools: [{ name: "post_message" }],
+    tool_grants: { post_message: "allow" },
+  }
+
+  async function openDoorAndType(text: string) {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    // The picker's read must SETTLE before the refusal is meaningful — until it does, the door
+    // knows of no connections and would refuse a service the author may well have.
+    await screen.findByTestId("describe-services")
+    fireEvent.change(screen.getByTestId("describe-box"), { target: { value: text } })
+    return screen.getByTestId("describe-box") as HTMLTextAreaElement
+  }
+
+  it("names the service, ANCHORS the author's own word, and drafts nothing", async () => {
+    await openDoorAndType("Every Monday, post the summary to Slack.")
+
+    const refusal = screen.getByTestId("describe-refusal")
+    expect(refusal).toHaveAttribute("role", "status")
+    // The SENTENCE is the governed one, composed — never a literal in the component.
+    expect(screen.getByTestId("describe-refusal-service")).toHaveTextContent(
+      doorVocabulary.DOOR_REFUSAL({ service: "Slack" }),
+    )
+    // The ANCHOR marks the author's own characters (#11/#12) …
+    expect(screen.getByTestId("describe-refusal-anchor")).toHaveTextContent("Slack")
+    // … and its tag is in the accessibility tree WITH NO HOVER EVENT FIRED (#12).
+    expect(screen.getByTestId("describe-refusal-anchor-tag")).toHaveTextContent(
+      doorVocabulary.DOOR_REFUSAL_ANCHOR,
+    )
+    // NOTHING IS DRAFTED (D-214-21) — the CTA is disabled and the generate seam is untouched.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    expect(mockGenerateWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("offers EXACTLY TWO next actions (#5), and the revise one keeps the author here", async () => {
+    const box = await openDoorAndType("Open a Jira ticket for each finding.")
+    const refusal = screen.getByTestId("describe-refusal")
+    expect(within(refusal).getAllByRole("button")).toHaveLength(2)
+    expect(screen.getByTestId("describe-refusal-connect")).toHaveTextContent(
+      doorVocabulary.DOOR_REFUSAL_CONNECT({ service: "Jira" }),
+    )
+    expect(screen.getByTestId("describe-refusal-revise")).toHaveTextContent(
+      doorVocabulary.DOOR_REFUSAL_REVISE,
+    )
+    // "The way to stay" lands them back in the box rather than dismissing a sentence.
+    fireEvent.click(screen.getByTestId("describe-refusal-revise"))
+    expect(document.activeElement).toBe(box)
+  })
+
+  it("the DISABLED CTA carries its reason and NAMES NO SERVICE (#3)", async () => {
+    await openDoorAndType("Every Monday, post the summary to Slack.")
+    const cta = screen.getByTestId("describe-draft")
+    expect(cta).toHaveTextContent(doorVocabulary.DOOR_CTA_REFUSED_SERVICE)
+    // The accessible name carries the reason and not the detail.
+    const name = cta.textContent ?? ""
+    expect(name).not.toMatch(/slack/i)
+    expect(name).not.toMatch(/jira|notion|github/i)
+  })
+
+  it("TWO services named ⇒ the UNANCHORED refusal — a mis-anchor is worse than no anchor", async () => {
+    await openDoorAndType("Read the Notion page and post it to Slack.")
+    // It still refuses, and still names a service …
+    expect(screen.getByTestId("describe-refusal-service")).toHaveTextContent(
+      doorVocabulary.DOOR_REFUSAL({ service: "Notion" }),
+    )
+    // … but the MARK is withheld, which is sketch 217 §4's fallback.
+    expect(screen.queryByTestId("describe-refusal-anchor")).toBeNull()
+    expect(screen.queryByTestId("describe-refusal-echo")).toBeNull()
+    // Two next actions either way.
+    expect(within(screen.getByTestId("describe-refusal")).getAllByRole("button")).toHaveLength(2)
+  })
+
+  it("a SUBSTRING hit refuses NOTHING, and the CTA is the ordinary one", async () => {
+    await openDoorAndType("Notionally this runs every Monday and writes a summary.")
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    const cta = screen.getByTestId("describe-draft")
+    expect(cta).toHaveTextContent(doorVocabulary.DESCRIBE_CTA)
+    expect(cta).toBeEnabled()
+  })
+
+  it("a CONNECTED service is not refused — the picker's read is what makes it true", async () => {
+    mockListConnections.mockResolvedValue([slackConnection])
+    await openDoorAndType("Every Monday, post the summary to Slack.")
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(screen.getByTestId("describe-draft")).toBeEnabled()
+  })
+
+  it("⭐ THE PRECEDENCE RULE — an EMPTY box with nothing connected reads the THINNESS reason", async () => {
+    // Sketch 217 §3: a workflow with no external step is perfectly legitimate, so refusing on
+    // the connection here would refuse for a reason that is NOT BINDING.
+    await openDoorAndType("   ")
+    expect(screen.getByTestId("describe-refusal")).toHaveTextContent(
+      doorVocabulary.DESCRIBE_REFUSAL,
+    )
+    const cta = screen.getByTestId("describe-draft")
+    expect(cta).toHaveTextContent(doorVocabulary.DESCRIBE_CTA_REFUSED)
+    expect(cta).not.toHaveTextContent(doorVocabulary.DOOR_CTA_REFUSED_SERVICE)
+    // POSITIVE CONTROL — the SERVICE arm is reachable from this very door, so the assertion
+    // above is the ordering doing the work rather than an arm that never renders at all.
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "post the summary to Slack" },
+    })
+    expect(screen.getByTestId("describe-draft")).toHaveTextContent(
+      doorVocabulary.DOOR_CTA_REFUSED_SERVICE,
+    )
+  })
+
+  it("⚠ THE ANCHOR SPENDS `warning` AND NOT `--destructive` (#11), and it is an UNDERLINE", async () => {
+    await openDoorAndType("Every Monday, post the summary to Slack.")
+    const anchor = screen.getByTestId("describe-refusal-anchor")
+    const tokens = (anchor.getAttribute("class") ?? "").split(" ")
+
+    // ⚠ READ AS TOKENS, NOT AS A COMPUTED COLOUR, AND THE LIMIT IS STATED RATHER THAN HIDDEN.
+    // jsdom compiles no Tailwind, so `getComputedStyle(anchor).textDecorationLine` is `""` for
+    // a utility class and a computed-style assertion here would be vacuous — this file's own
+    // sibling records that "fifteen of this sheet's seventeen colour tokens compile to nothing
+    // here and would render identically to an arm nobody painted". So the token is asserted at
+    // the class list AND proved to RESOLVE in the real config below, which is the shipped
+    // discipline (`WorkflowDoorSwitch.tsx`'s own note: "verified rather than assumed").
+    expect(tokens).toContain("underline")
+    expect(tokens).toContain("decoration-warning")
+    expect(tokens.some((t) => t.includes("destructive"))).toBe(false)
+    // POSITIVE CONTROL — the destructive predicate really fires on a class list carrying it.
+    expect("underline decoration-destructive".split(" ").some((t) => t.includes("destructive"))).toBe(
+      true,
+    )
+  })
+
+  it("the whole refusal block spends `warning` and carries no destructive token", async () => {
+    await openDoorAndType("Every Monday, post the summary to Slack.")
+    const html = screen.getByTestId("describe-refusal").outerHTML
+    expect(html).toContain("border-l-warning")
+    expect(html).not.toContain("destructive")
+    // POSITIVE CONTROL for the negative half.
+    expect('<div class="border-l-destructive"></div>').toContain("destructive")
+  })
+
+  it("`warning` RESOLVES in the real Tailwind config — a token that compiles to nothing is unpainted", async () => {
+    // The shipped verification habit, not a new one: 192.2 WR-01 measured `bg-warning` /
+    // `text-warning` compiling to NOTHING across four surfaces because the KEY was missing
+    // while the CSS variable existed. Read the config itself rather than trusting the name.
+    const config = (await import("../../../tailwind.config.js?raw")).default as string
+    expect(config).toContain("--warning")
+    expect(/warning:\s*\{/.test(config)).toBe(true)
+    // POSITIVE CONTROL — the needle shape can fail.
+    expect(/notacolour:\s*\{/.test(config)).toBe(false)
+  })
+
+  it("the author's prose is rendered as TEXT — no raw-HTML sink on this door (T-124-05)", async () => {
+    await openDoorAndType('<img src=x onerror="alert(1)"> post to Slack')
+    // The echo carries the literal characters; nothing was parsed as markup.
+    const echo = screen.getByTestId("describe-refusal-echo")
+    expect(echo.textContent).toContain('<img src=x onerror="alert(1)">')
+    expect(echo.querySelector("img")).toBeNull()
+    // …and the component names the raw-HTML PROP nowhere (the 214-03 anchor: on the `=`, since
+    // this file's own docblock PROMISES never to use it and a bare-word grep would count that).
+    expect(workflowDoorSwitchSource).not.toContain("dangerouslySetInnerHTML=")
+    expect("<p dangerouslySetInnerHTML={x} />").toContain("dangerouslySetInnerHTML=")
+  })
+})
+
+
+// ── 214-13 (STEP-06 · D-214-20) — THE KEY LINK: THE TICKED SET REACHES `/generate` ──────
+//
+// ⚠ THIS IS THE CASE THAT MAKES THE PHASE'S CLAIM CHECKABLE END TO END. The picker, the
+// Builder prop and the hook's request field are three separate hops in three separate files;
+// each one typechecks in isolation while the value never arrives. Nothing but a drive through
+// the real components can tell the difference — the 204 pre-flight's recorded lesson is that
+// both defects which reached the operator were SEAMS between plans, each side green.
+describe("WorkflowDoorSwitch — the ticked services ride POST /workflows/generate", () => {
+  const grantedSlack = {
+    id: "conn-slack",
+    org_id: "o1",
+    service_id: "slack",
+    name: "Acme Slack",
+    config: {},
+    is_enabled: true,
+    discovered_tools: [{ name: "post_message" }],
+    tool_grants: { post_message: "allow" },
+  }
+
+  it("a ticked service arrives as `allowed_connection_ids` on the generate body", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    fireEvent.click(await screen.findByTestId("describe-service-conn-slack"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    expect(mockGenerateWorkflow.mock.calls[0][0].allowed_connection_ids).toEqual(["conn-slack"])
+  })
+
+  it("ticking NOTHING sends `[]` — a decision, never a missing value", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await screen.findByTestId("describe-service-conn-slack")
+
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    const body = mockGenerateWorkflow.mock.calls[0][0]
+    expect(body.allowed_connection_ids).toEqual([])
+    // POSITIVE CONTROL — the key is PRESENT, so the `[]` above is a sent decision rather than
+    // an absent field that happens to read as empty at the assertion.
+    expect("allowed_connection_ids" in body).toBe(true)
+  })
+
+  it("un-ticking removes it again — the door holds the parent's set, not a copy", async () => {
+    mockListConnections.mockResolvedValue([grantedSlack])
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    const chip = await screen.findByTestId("describe-service-conn-slack")
+    fireEvent.click(chip)
+    expect(chip.getAttribute("aria-pressed")).toBe("true")
+    fireEvent.click(chip)
+    expect(chip.getAttribute("aria-pressed")).toBe("false")
+
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    expect(mockGenerateWorkflow.mock.calls[0][0].allowed_connection_ids).toEqual([])
   })
 })

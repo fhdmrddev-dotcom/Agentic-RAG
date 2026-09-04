@@ -328,6 +328,16 @@ interface RunLike {
     // Phase 200.1 (RUN-04) — the fifth field, optional for the same reason: every case in
     // this file that predates the plan omits it, which IS the no-answer shape.
     deliverable_text?: string | null
+    // ── Phase 214-11 — the four `214-02` shipped on `WorkflowRunPhaseRead`, mirrored here for
+    // the same stated reason as their five predecessors: optional, because every case in this
+    // file that predates this plan omits all four, and that omission IS the shape of a step
+    // that reaches nothing outside. ⚠ This local mirror had gone STALE against the wire — the
+    // widening landed in `lib/api/workflows.ts` and this type never followed, so a fixture
+    // carrying real wire fields was a typecheck error while the product handled them fine.
+    capability?: string | null
+    tool_name?: string | null
+    service_name?: string | null
+    failure_reason?: string | null
   }[]
 }
 
@@ -4078,5 +4088,116 @@ describe("WorkflowRunPage 200 — the page-resolved liveness boolean (PORT-canva
     // boolean is an equality against ONE reading, so this state cannot reach it. Asserted as
     // the inequality rather than through a consumer, because this page no longer has one.
     expect(readings()["final-check"]).not.toBe("running")
+  })
+})
+
+/**
+ * Phase 214-11 Task 2b (STEP-04 · D-214-16 · `SEED-206`) — THE SEAM, DRIVEN THROUGH THE PAGE.
+ *
+ * ⚠ THIS EXISTS BECAUSE RENDERING `RunSpine` AND `RunStepList` WITH PROPS PROVES THE WRONG
+ * HALF. Those component-level cases (in `StepIdentity.coverage.test.tsx`) show that each
+ * child renders the element when handed an action — they cannot show that THIS PAGE builds
+ * `actionOf` / `serviceOf` / `shapeOf` and passes them. Both halves green with the JOIN owned
+ * by nobody is the failure mode the 204 pre-flight measured: *"both defects that reached the
+ * operator were SEAMS between parallel plans, each side green."* So this mocks neither side.
+ */
+describe("WorkflowRunPage 214-11 — the page resolves the identity and its children render it", () => {
+  /** A run whose second step really reaches outside, with the four wire fields the server sends. */
+  function runWithExternalStep() {
+    return mkRun({
+      status: "completed",
+      phases: [
+        { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+        {
+          slug: "draft-letter",
+          phase_index: 1,
+          status: "completed",
+          phase_type: "external_action",
+          capability: "post_message",
+          tool_name: "post_message",
+          service_name: "Acme Slack (production)",
+        },
+        { slug: "final-check", phase_index: 2, status: "completed", phase_type: "llm_agent" },
+      ],
+    })
+  }
+
+  it("the run log's row for an external step is named by the identity, not by the bare title", async () => {
+    getWorkflowRun.mockResolvedValue(runWithExternalStep())
+    const { container } = renderPage()
+    await screen.findByTestId("run-transcript")
+
+    const ids = container.querySelectorAll("[data-step-identity]")
+    // ⚠ AT LEAST ONE, and the two ordinary steps in the same render are the negative control:
+    // the count must not equal the number of rows, or "it appears" would be satisfied by an
+    // element painted on every step.
+    expect(ids.length).toBeGreaterThan(0)
+    expect(ids.length).toBeLessThan(3)
+    expect(container.querySelector("[data-step-identity-action]")?.textContent).toBe(
+      "Posts a message",
+    )
+    expect(container.querySelector("[data-step-identity-service]")?.textContent).toBe(
+      "Acme Slack (production)",
+    )
+  })
+
+  it("an ordinary run reaches no identity at all — this is additive, not a re-skin", async () => {
+    // The POSITIVE CONTROL's mirror. Without it, the case above is consistent with an element
+    // that renders unconditionally, and the assertion would be measuring nothing.
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    const { container } = renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(container.querySelectorAll("[data-step-identity]")).toHaveLength(0)
+    // …and the ordinary rows still carry their authored names, unchanged.
+    expect(screen.getAllByTestId("step-title").length).toBeGreaterThan(0)
+  })
+
+  it("a null service_name renders the action ALONE — never a placeholder, never the id", async () => {
+    // The connection was deleted or belongs to another org. `null` is a LEGITIMATE wire value
+    // and the page must pass it through rather than substituting a word of its own.
+    getWorkflowRun.mockResolvedValue(
+      mkRun({
+        status: "completed",
+        phases: [
+          {
+            slug: "draft-letter",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "external_action",
+            capability: "post_message",
+            tool_name: "post_message",
+            service_name: null,
+          },
+        ],
+      }),
+    )
+    const { container } = renderPage()
+    await screen.findByTestId("run-transcript")
+
+    const id = container.querySelector("[data-step-identity]")
+    expect(id?.getAttribute("data-service-resolved")).toBe("false")
+    expect(container.querySelector("[data-step-identity-separator]")).toBeNull()
+    expect(id?.textContent).toBe("Posts a message")
+  })
+
+  it("no wire id reaches the run page's markup", async () => {
+    // Sketch 216 invariant #4, on THIS surface. ⚠ The needles are assembled at runtime so this
+    // file's own source does not contain them — the 187-24 trap.
+    getWorkflowRun.mockResolvedValue(runWithExternalStep())
+    const { container } = renderPage()
+    await screen.findByTestId("run-transcript")
+
+    const markup = container.innerHTML
+    for (const parts of [
+      ["post", "message"],
+      ["send", "email"],
+      ["create", "ticket"],
+      ["external", "action"],
+      ["ask", "question"],
+    ]) {
+      expect(markup).not.toContain(parts.join("_"))
+    }
+    // POSITIVE CONTROL — the sweep is worthless over an empty tree.
+    expect(markup).toContain("Posts a message")
   })
 })

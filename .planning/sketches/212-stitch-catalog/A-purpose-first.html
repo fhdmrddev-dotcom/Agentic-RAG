@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Catalog Row States</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#2d3449",
+                        "on-secondary-fixed": "#0d1c2d",
+                        "outline-variant": "#3c4a46",
+                        "outline": "#859490",
+                        "primary-fixed-dim": "#3cddc7",
+                        "primary-container": "#2dd4bf",
+                        "on-primary-fixed": "#00201c",
+                        "surface-container-highest": "#2d3449",
+                        "secondary-container": "#39485a",
+                        "on-tertiary-container": "#744000",
+                        "error": "#ffb4ab",
+                        "on-secondary-container": "#a7b6cc",
+                        "inverse-surface": "#dae2fd",
+                        "on-background": "#dae2fd",
+                        "surface": "#0b1326",
+                        "on-primary-fixed-variant": "#005047",
+                        "surface-container": "#171f33",
+                        "secondary-fixed": "#d4e4fa",
+                        "on-secondary": "#233143",
+                        "background": "#0b1326",
+                        "secondary-fixed-dim": "#b9c8de",
+                        "on-tertiary-fixed-variant": "#6b3b00",
+                        "on-surface-variant": "#bacac5",
+                        "on-primary-container": "#00574d",
+                        "secondary": "#b9c8de",
+                        "tertiary-fixed": "#ffdcc0",
+                        "on-primary": "#003731",
+                        "inverse-on-surface": "#283044",
+                        "on-tertiary": "#4b2800",
+                        "surface-container-lowest": "#060e20",
+                        "on-error": "#690005",
+                        "surface-container-high": "#222a3d",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "tertiary-container": "#ffac5a",
+                        "on-surface": "#dae2fd",
+                        "primary-fixed": "#62fae3",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#0b1326",
+                        "tertiary-fixed-dim": "#ffb875",
+                        "tertiary": "#ffd1aa",
+                        "surface-container-low": "#131b2e",
+                        "surface-bright": "#31394d",
+                        "inverse-primary": "#006b5f",
+                        "surface-tint": "#3cddc7",
+                        "on-tertiary-fixed": "#2d1600",
+                        "primary": "#57f1db",
+                        "error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-lg": "2rem",
+                        "unit": "4px",
+                        "container-padding": "2rem",
+                        "gutter": "1.5rem",
+                        "stack-sm": "0.5rem",
+                        "stack-md": "1rem"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen text-on-surface flex flex-col items-center py-stack-lg px-container-padding font-body-lg text-body-lg">
+<main class="w-full max-w-4xl flex flex-col gap-12">
+<!-- State 1: NOT CONNECTED -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Not Connected</h2>
+<div class="flex flex-row items-center justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-col gap-1">
+<p class="font-headline-md text-headline-md text-on-surface">Post updates and read channels in your workspace.</p>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps">
+<span>SLACK</span>
+</div>
+</div>
+<div>
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-label-caps text-label-caps hover:bg-primary-fixed transition-colors">CONNECT</button>
+</div>
+</div>
+</section>
+<!-- State 2: CONNECTED -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Connected</h2>
+<div class="flex flex-row items-center justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-col gap-1">
+<p class="font-headline-md text-headline-md text-on-surface">Post updates and read channels in your workspace.</p>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps">
+<span>SLACK</span>
+</div>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-low rounded-full text-on-surface-variant font-label-caps text-label-caps">
+<div class="w-1.5 h-1.5 rounded-full bg-primary-fixed-dim"></div>
+<span>CONNECTED</span>
+</div>
+</div>
+</section>
+<!-- State 3: CONNECTED, NEEDS ATTENTION -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Connected, Needs Attention</h2>
+<div class="flex flex-row items-start justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-col gap-1 max-w-2xl">
+<p class="font-headline-md text-headline-md text-on-surface">Raise and track issues for your team.</p>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps mb-2">
+<span>JIRA</span>
+</div>
+<p class="font-body-sm text-body-sm text-error">Your login for this service has expired, and updates have stopped.</p>
+</div>
+<div class="mt-1">
+<button class="bg-surface text-on-surface border border-outline-variant px-4 py-2 rounded font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">RECONNECT</button>
+</div>
+</div>
+</section>
+<!-- State 4: UNCURATED -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Uncurated</h2>
+<div class="flex flex-row items-center justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-row gap-4 items-center">
+<div class="w-8 h-8 bg-surface-high text-primary flex items-center justify-center rounded font-label-caps text-label-caps border border-outline-variant">
+                        DW
+                    </div>
+<div class="flex flex-col gap-1">
+<p class="font-headline-md text-headline-md text-on-surface">Search a shared internal knowledge base.</p>
+<div class="flex items-center gap-3 text-on-surface-variant font-label-caps text-label-caps">
+<span>deepwiki</span>
+<span class="text-outline">ADDED VIA URL</span>
+</div>
+</div>
+</div>
+<div>
+<button class="bg-surface text-on-surface border border-outline-variant px-4 py-2 rounded font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">MANAGE</button>
+</div>
+</div>
+</section>
+<!-- State 5: UNKNOWN PURPOSE -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Unknown Purpose</h2>
+<div class="flex flex-row items-center justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-col gap-1">
+<p class="font-headline-md text-headline-md text-on-surface-variant italic">Purpose unknown</p>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps">
+<span>UNKNOWN SERVICE</span>
+</div>
+</div>
+<div>
+<button class="bg-surface text-on-surface border border-outline-variant px-4 py-2 rounded font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">DEFINE</button>
+</div>
+</div>
+</section>
+<!-- State 6: WRITES REMOVED -->
+<section class="flex flex-col gap-4">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Writes Removed</h2>
+<div class="flex flex-row items-center justify-between p-4 -mx-4 rounded-lg hover:bg-surface-high transition-colors group">
+<div class="flex flex-col gap-1">
+<p class="font-headline-md text-headline-md text-on-surface">Post updates and read channels in your workspace.</p>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps">
+<span>SLACK</span>
+</div>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-low rounded-full text-on-surface-variant font-label-caps text-label-caps">
+<span>REMOVED</span>
+</div>
+</div>
+</section>
+</main>
+</body></html>

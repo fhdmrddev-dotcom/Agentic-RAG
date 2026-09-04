@@ -173,3 +173,114 @@ describe("DocumentList row chip — a11y", () => {
     ).toBeInTheDocument()
   })
 })
+
+// ── Phase 217.1 plan 05 — the seam extraction ──────────────────────────────────────────
+
+describe("DocumentList — the seven-column table survives the DocumentRow extraction", () => {
+  it("renders exactly 7 <th> in order chevron/Filename/Type/Size/Chunks/Status/Actions", () => {
+    renderList([makeDoc("d-1")])
+    const headers = document.querySelectorAll("thead th")
+    expect(headers).toHaveLength(7)
+    // Columns 2-7 carry text; column 1 is the empty chevron column.
+    expect(headers[1].textContent).toBe("Filename")
+    expect(headers[2].textContent).toBe("Type")
+    expect(headers[3].textContent).toBe("Size")
+    expect(headers[4].textContent).toBe("Chunks")
+    expect(headers[5].textContent).toBe("Status")
+    expect(headers[6].textContent).toBe("Actions")
+  })
+
+  it("the <th> class string stays px-4 py-3 … (the A1/A2 shed reads it)", () => {
+    renderList([makeDoc("d-1")])
+    const headers = document.querySelectorAll("thead th")
+    for (let i = 1; i < headers.length; i++) {
+      expect(headers[i].className).toContain("px-4 py-3")
+    }
+  })
+
+  it("a row renders exactly seven <td> — the nth-child shed depends on it", () => {
+    renderList([makeDoc("d-1")])
+    const cells = document.querySelectorAll("tbody tr:first-child td")
+    expect(cells).toHaveLength(7)
+  })
+})
+
+describe("DocumentList — the folder tag pill (D-217.1-31)", () => {
+  const folders = [
+    {
+      id: "f-legal",
+      user_id: "user-1",
+      name: "Legal",
+      parent_id: null,
+      is_org_shared: false,
+      created_at: "2026-01-01",
+      updated_at: "2026-01-01",
+    },
+  ]
+
+  it("a row whose folder_id resolves renders the folder-name pill", () => {
+    const doc = makeDoc("d-1", { folder_id: "f-legal" })
+    render(
+      <TooltipProvider>
+        <DocumentList documents={[doc]} onDelete={vi.fn()} onRefresh={vi.fn()} currentUserId="user-1" folders={folders} />
+      </TooltipProvider>,
+    )
+    const pill = screen.getByTestId("folder-pill")
+    expect(pill.textContent).toBe("Legal")
+  })
+
+  it("a row with folder_id: null renders the Root pill — never Uncategorized", () => {
+    const doc = makeDoc("d-1", { folder_id: null })
+    render(
+      <TooltipProvider>
+        <DocumentList documents={[doc]} onDelete={vi.fn()} onRefresh={vi.fn()} currentUserId="user-1" folders={folders} />
+      </TooltipProvider>,
+    )
+    const pill = screen.getByTestId("folder-pill")
+    expect(pill.textContent).toBe("Root")
+    expect(screen.queryByText("Uncategorized")).not.toBeInTheDocument()
+  })
+})
+
+describe("DocumentList — chunk proportion bar (LIB-03)", () => {
+  it("the Chunks cell renders the proportion bar with the tabular count", () => {
+    renderList([makeDoc("d-1", { chunk_count: 12 }), makeDoc("d-2", { chunk_count: 6 })])
+    const bars = screen.getAllByTestId("chunk-proportion-bar")
+    expect(bars).toHaveLength(2)
+    // The highest count (12) is the bar's denominator.
+    expect(bars[0].textContent).toContain("12")
+    expect(bars[1].textContent).toContain("6")
+  })
+
+  it("value 0 renders a visible empty track, never a missing element", () => {
+    renderList([makeDoc("d-1", { chunk_count: 0 })])
+    const bar = screen.getByTestId("chunk-proportion-bar")
+    expect(bar).toBeInTheDocument()
+    expect(bar.textContent).toContain("0")
+  })
+})
+
+describe("DocumentList — the Status cell (strip for processing, sentence for failed)", () => {
+  it("a processing row renders the inline six-stage IngestionStrip", () => {
+    renderList([makeDoc("d-1", { status: "processing", ingestion_step: "embedding" })])
+    expect(screen.getByTestId("ingestion-strip")).toBeInTheDocument()
+  })
+
+  it("a failed row renders the classified sentence, never the raw dict", () => {
+    renderList([
+      makeDoc("d-1", {
+        status: "failed",
+        error_message: '{"code": "23505", "message": "duplicate key value violates unique constraint"}',
+      }),
+    ])
+    const sentence = screen.getByTestId("row-failure-sentence")
+    expect(sentence.textContent).toContain("already in your library")
+    expect(sentence.textContent).not.toContain("23505")
+  })
+
+  it("a completed row still renders the DocumentStatusBadge", () => {
+    renderList([makeDoc("d-1", { status: "completed" })])
+    expect(screen.queryByTestId("ingestion-strip")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("row-failure-sentence")).not.toBeInTheDocument()
+  })
+})

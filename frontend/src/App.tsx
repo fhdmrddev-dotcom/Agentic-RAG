@@ -99,7 +99,7 @@ import { visibleNavItems } from "@/lib/nav-items"
 // FALLBACK, not a `default:` that throws, so a union member with no branch silently
 // renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
 // branch ships in the same commit as this member.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -123,7 +123,15 @@ function App() {
       alive = false
     }
   }, [])
-  const [activeView, setActiveView] = useState<ActiveView>("chat")
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    // BUG-260903-01 / SEED-185: both OAuth callbacks land on `/app?connections=1&…`, and until
+    // 2026-09-03 nothing read it — the person arrived on Chat with their result in the URL.
+    // Read once, land on Connections, and drop the query so a reload does not re-route.
+    const q = new URLSearchParams(window.location.search)
+    if (q.get("connections") !== "1") return "chat"
+    window.history.replaceState(null, "", window.location.pathname)
+    return "connections"
+  })
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null)
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio is a
   // focused full-surface entered WITH a skillId + a tab (mirroring the shipped Tuner
@@ -227,7 +235,7 @@ function App() {
     return <SetupWizard />
   }
   if (atSetupPath && setupStatus.finalized) {
-    return <FinalizedLockout onGoToApp={() => window.location.assign("/")} />
+    return <FinalizedLockout onGoToApp={() => window.location.assign("/app")} />
   }
 
   // Phase 167 (INV-01 / INV-02 / D-167-01): the pre-auth /invite accept-invite branch,

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Catalog Row Component State Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#bacac5",
+                        "secondary": "#b9c8de",
+                        "surface": "#0b1326",
+                        "error": "#ffb4ab",
+                        "surface-tint": "#3cddc7",
+                        "on-tertiary-container": "#744000",
+                        "on-primary-container": "#00574d",
+                        "on-secondary-container": "#a7b6cc",
+                        "on-background": "#dae2fd",
+                        "tertiary-fixed": "#ffdcc0",
+                        "on-tertiary": "#4b2800",
+                        "surface-container-lowest": "#060e20",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "on-secondary": "#233143",
+                        "inverse-surface": "#dae2fd",
+                        "primary-fixed": "#62fae3",
+                        "background": "#0b1326",
+                        "primary-fixed-dim": "#3cddc7",
+                        "on-surface": "#dae2fd",
+                        "on-error": "#690005",
+                        "secondary-container": "#39485a",
+                        "on-secondary-fixed": "#0d1c2d",
+                        "outline-variant": "#3c4a46",
+                        "inverse-on-surface": "#283044",
+                        "error-container": "#93000a",
+                        "surface-variant": "#2d3449",
+                        "inverse-primary": "#006b5f",
+                        "on-primary-fixed": "#00201c",
+                        "primary": "#57f1db",
+                        "secondary-fixed-dim": "#b9c8de",
+                        "surface-dim": "#0b1326",
+                        "outline": "#859490",
+                        "on-tertiary-fixed": "#2d1600",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#005047",
+                        "surface-container-highest": "#2d3449",
+                        "surface-bright": "#31394d",
+                        "tertiary": "#ffd1aa",
+                        "surface-container-high": "#222a3d",
+                        "surface-container": "#171f33",
+                        "tertiary-fixed-dim": "#ffb875",
+                        "surface-container-low": "#131b2e",
+                        "secondary-fixed": "#d4e4fa",
+                        "tertiary-container": "#ffac5a",
+                        "primary-container": "#2dd4bf",
+                        "on-tertiary-fixed-variant": "#6b3b00",
+                        "on-primary": "#003731"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "2rem",
+                        "unit": "4px",
+                        "container-padding": "2rem",
+                        "gutter": "1.5rem",
+                        "stack-md": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter", "sans-serif"],
+                        "label-caps": ["JetBrains Mono", "monospace"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "body-sm": ["Inter", "sans-serif"],
+                        "display-lg": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .row-hover-group .hover-action { opacity: 0; transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out; visibility: hidden; }
+        .row-hover-group:hover .hover-action, .force-hover .hover-action { opacity: 1; visibility: visible; }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen p-container-padding font-body-lg">
+<div class="max-w-4xl mx-auto space-y-stack-lg pb-stack-lg">
+<!-- Header -->
+<div class="border-b border-outline-variant pb-stack-sm mb-stack-lg">
+<h1 class="font-display-lg text-display-lg">Catalog Row Component States</h1>
+<p class="font-body-lg text-on-surface-variant mt-2">Design Direction: "The name leads, the action arrives on hover."</p>
+</div>
+<!-- 1. NOT CONNECTED (Slack) -->
+<section class="space-y-stack-sm">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">1. NOT CONNECTED (Slack)</h2>
+<!-- At Rest -->
+<div class="mb-4">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded hover:bg-surface-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzhqmzvs2Ibuv5lCFfo_7Yt-CFSEzUTlAvcxZnQ8v6DbSxnKAkoYFhk4efVjFHH_JBwngITKurENnhnyt88Ec6ULmgcRfjbsNu_W1L4k0wl6tyL2KWC_V0uLUuv8ph5erYXedPRfMXzJ9Vvgu3LTGmwcs7_jXWgDlegNwSDfzkdVOwlzYpcxtrGEP4hPUehJhTlTihttUKICsVic2Q_ELubpdxjJpKOLD8dOTOtx-ZXf6xUdQU-5RH3QJQyEEPz3lFrGDxZunscMk"/>
+<div class="flex flex-col">
+<span class="font-body-lg text-on-surface font-medium">Slack</span>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-body-sm font-medium hover:bg-primary-fixed transition-colors">Connect</button>
+</div>
+</div>
+</div>
+<!-- On Hover -->
+<div>
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-high transition-colors duration-200 border border-outline-variant">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBa1G_FyE8zX4M-qHlyk_2m0kI8JY6D6yAo2FFAQ9za9EPHpk1zFYjNTi_OLQDeLg8ggGBdkzfOrStRHDgKzD8EwYRe3V8__1xfoQV8QLcyGfd400v8i_DLgM34MeaGIljenrX4ZCyaq6puriEU7PerDH1PLCiYRun_64MN80qJ7qcRbpK2AV4Ndvh70TC-B1iGPOPkYLjU8mfa4Md5ZY3I18Zj7bk_psyXf45TYB1RCRGLTjf_fiY6qoIQ9Quf36wxCv9CS_Fjsk8"/>
+<div class="flex flex-col">
+<span class="font-body-lg text-on-surface font-medium">Slack</span>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-body-sm font-medium hover:opacity-90 transition-opacity">Connect</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. CONNECTED (Slack) -->
+<section class="space-y-stack-sm pt-stack-lg border-t border-outline-variant/30">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">2. CONNECTED (Slack)</h2>
+<!-- At Rest -->
+<div class="mb-4">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded hover:bg-surface-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXr1GHvQWeCfgV68UYL-W4W2sL9ilkGubpUCaz-8BdHh60wQdaSllbm4y7SahHAKrkZ1Rv4KwzF85n99KnaSNPkkry5xQVZCp09zxIrlLPOLpYra4hjRARwh198KSt4u-yQbiyO0cBlwaJjQBZQFzrDLNNF6yxI3XwWDHIMVraW6VzgaWbGGzyvTXRObyoCVqpk9nFJiBStkL8MntlRsbSyCj8zXVCWrCVWtB0Xp-USghaEu1-DxeKqbm10zhPt7yKjlOittBRk8U"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium">Slack</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-outline-variant/50">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Connected</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Manage</button>
+</div>
+</div>
+</div>
+<!-- On Hover -->
+<div>
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-high transition-colors duration-200 border border-outline-variant">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKHXqzbp6fsHgtw323m9B9wwYawGG4j7XxVmvjn-p1Wh8YJhP9ptjG92Cf0H6XsRlY_zzYhvmYObRj8W9_gKQVOsSjunGXF-kyOucJdNX6agTEu-tx96oZTJwFp1unvJTennHjpMMbO31vEx_8ZMu1Ttymdkp4kuHPsnfdt2fePtSB1vuShO4g4FP8Toj7NPWp5uWZy1oedk3Xm1mbputP68p1aKCuj5Qzl36pJO5oZNg7LfO8GXvdWi2at2TdMnJyMp5cohfXqbY"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium">Slack</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-outline-variant/50">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Connected</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Manage</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. CONNECTED, NEEDS ATTENTION (Jira) -->
+<section class="space-y-stack-sm pt-stack-lg border-t border-outline-variant/30">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">3. CONNECTED, NEEDS ATTENTION (Jira)</h2>
+<!-- At Rest -->
+<div class="mb-4">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded hover:bg-surface-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A sleek, flat 32x32 pixel digital icon representing Jira software, styled minimally on a dark, sophisticated background typical of professional developer tools." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDocDSywglc7xS4ydAk4-Fgpjq80v7wgHCSYcvheGIYQAuN-OUnGfWYG3fwWmBqoExi_wVUFX_yxQYMLrQs0d5Xs1EQcEknFeGRpO7ANxHSQwGN5NQSl6mzNDbcxMklBXBcfYeh7wtN7_rvRNOOFrd3S6zHMOT66mL2ZEo5Cy91DxxMgW-TZ9MOinS40zhy28mva2yJaOWt2lAPeaZOwVwyaxzxxLNfJ_uF2HxhlpoXvnz9GH0StofDGI-h3AGAcriYpWth89dIISg"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium">Jira</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-error/30">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="font-label-caps text-label-caps text-error">Needs Attention</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Raise and track issues for your team.</span>
+<span class="font-body-sm text-error mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                                Your login for this service has expired, and updates have stopped.
+                            </span>
+</div>
+</div>
+<div class="hover-action self-start mt-1">
+<button class="bg-transparent border border-error text-error px-4 py-2 rounded font-body-sm hover:bg-error/10 transition-colors">Reconnect</button>
+</div>
+</div>
+</div>
+<!-- On Hover -->
+<div>
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-high transition-colors duration-200 border border-outline-variant">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A sleek, flat 32x32 pixel digital icon representing Jira software, styled minimally on a dark, sophisticated background typical of professional developer tools." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4AjSGYnakV8RUQlnXFuz9GJd07OPhn9CpAF6m8Q9gue9zc_-NwCqLvOGyTTI2BQECCJAiVGHAh1g5IFKDK4dAM-NZwn_euaU-YQ3yldholHRYo8EojTppX8XoLBpNM2LH4CxiqG_OlyNjJeTDjlYY27Zbb8E-PLpQuMBivY88CTB_Dfc-MFRAzCZoLNf7dEFBAcce9OO9y9de80ZEkKz-Q57TmyoNKcRdyQhH9cqXePGRnip0iGSPAQlVTIfjnd0Ez6kLZfruivo"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium">Jira</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-error/30">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+<span class="font-label-caps text-label-caps text-error">Needs Attention</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Raise and track issues for your team.</span>
+<span class="font-body-sm text-error mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                                Your login for this service has expired, and updates have stopped.
+                            </span>
+</div>
+</div>
+<div class="hover-action self-start mt-1">
+<button class="bg-transparent border border-error text-error px-4 py-2 rounded font-body-sm hover:bg-error/10 transition-colors">Reconnect</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. UNCURATED (deepwiki) -->
+<section class="space-y-stack-sm pt-stack-lg border-t border-outline-variant/30">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">4. UNCURATED (deepwiki)</h2>
+<!-- At Rest -->
+<div class="mb-4">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded hover:bg-surface-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<span class="font-label-caps text-label-caps text-on-surface">DW</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-baseline gap-2">
+<span class="font-body-lg text-on-surface font-medium">deepwiki</span>
+<span class="font-label-caps text-label-caps text-outline-variant">Added via URL</span>
+</div>
+<span class="font-body-sm text-on-surface-variant">Search a shared internal knowledge base.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Manage</button>
+</div>
+</div>
+</div>
+<!-- On Hover -->
+<div>
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-high transition-colors duration-200 border border-outline-variant">
+<div class="flex items-center gap-gutter">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<span class="font-label-caps text-label-caps text-on-surface">DW</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-baseline gap-2">
+<span class="font-body-lg text-on-surface font-medium">deepwiki</span>
+<span class="font-label-caps text-label-caps text-outline-variant">Added via URL</span>
+</div>
+<span class="font-body-sm text-on-surface-variant">Search a shared internal knowledge base.</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Manage</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. UNKNOWN PURPOSE -->
+<section class="space-y-stack-sm pt-stack-lg border-t border-outline-variant/30">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">5. UNKNOWN PURPOSE</h2>
+<!-- At Rest -->
+<div class="mb-4">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded hover:bg-surface-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant border-dashed">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">question_mark</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-lg text-on-surface font-medium">Unknown Service</span>
+<span class="font-body-sm text-on-surface-variant italic">Purpose unknown</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Define</button>
+</div>
+</div>
+</div>
+<!-- On Hover -->
+<div>
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-high transition-colors duration-200 border border-outline-variant">
+<div class="flex items-center gap-gutter">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center border border-outline-variant border-dashed">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">question_mark</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-lg text-on-surface font-medium">Unknown Service</span>
+<span class="font-body-sm text-on-surface-variant italic">Purpose unknown</span>
+</div>
+</div>
+<div class="hover-action">
+<button class="bg-transparent border border-outline text-on-surface px-4 py-2 rounded font-body-sm hover:bg-surface-container-highest transition-colors">Define</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 6. WRITES REMOVED (Slack) -->
+<section class="space-y-stack-sm pt-stack-lg border-t border-outline-variant/30">
+<h2 class="font-label-caps text-label-caps text-secondary mb-4">6. WRITES REMOVED (Slack)</h2>
+<!-- At Rest -->
+<div class="mb-4 opacity-50">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">At Rest</div>
+<div class="row-hover-group flex items-center justify-between p-stack-sm rounded transition-colors duration-200 grayscale">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBp9hEjWzTVAuMdjja0_Jwgf8tdAmFVo0tQP8QTkA20_bG-R1Hv_S1razGGq-qAymHQiURm3-V3TH7BQsSYYHMC5K6j1q8Nt2QAtc6TKIWWjecEggJ2GTldmyxrltyv6lk8KUAnm6RVaem06s9pEzbw60pLWSgXrtKFJv2GqgjbNZpxK6010tjcLLgo2-gAeTF-qPI6nBTcz4IWppoG3EMQDqcKAcOAmx2e4zgNso31mWjcpHRblToyvk8sb1R7qBk8xbCnO-jC1RI"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium line-through decoration-outline">Slack</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-outline-variant/50">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Removed</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<!-- Intentionally no hover action here -->
+</div>
+</div>
+<!-- On Hover -->
+<div class="opacity-50">
+<div class="text-xs text-outline mb-1 font-label-caps uppercase">On Hover (No Action)</div>
+<div class="force-hover row-hover-group flex items-center justify-between p-stack-sm rounded bg-surface-container-highest transition-colors duration-200 border border-outline-variant grayscale">
+<div class="flex items-center gap-gutter">
+<img class="w-8 h-8 rounded object-cover bg-surface-container-highest" data-alt="A clean, minimalist 32x32 pixel digital rendering of the Slack logo icon, set against a dark, high-end sleek background reflecting a premium software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsG4NabGfINhs-AqXmdYkYNkqkAe_jBBbYVuQY1qDFntOQc2K_MfxYYfFu4YYiqr_G4NSqjfl8PkYyaCOn9eFNhn_Vec_7LNY986QV7VU0Dp-7iDBWGIRfC4yU2z1EtkpOA0jdfCMlDRXXgS0ndDr3mjgdIaMY0ZlZBD_XtDySQvqxw4tJr3pSHtcKYNZ6SGe2LEcfBsnE9aY13Upk5-3Ds54eHXhwPP3OrjNH8vCIXKWiG4U6ynmt3MU2os8kW61MIIGvojtBTN0"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-on-surface font-medium line-through decoration-outline">Slack</span>
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-full border border-outline-variant/50">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Removed</span>
+</div>
+</div>
+<span class="font-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

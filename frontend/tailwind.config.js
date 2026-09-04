@@ -62,6 +62,14 @@ export default {
         // is graphic-level (≥3:1) and stays for the glyph/border; this token is the
         // text-safe shade. Used via text-accent-violet-text (PhaseCard retrying).
         "accent-violet-text": "hsl(var(--accent-violet-text))",
+        // Phase 217-06 (D-217-20 / D-217-21) — the ACTIVE TAB surface. Same theme-paired
+        // mapping shape as panel-status-* / accent-violet above; declared in index.css in
+        // BOTH the :root and the .dark block. A NEW token rather than a swap, because no
+        // existing token is lighter than --muted in both themes — --background is DARKER
+        // than its track on Deep Midnight, which is the bug this fixes. Consumed via
+        // bg-tab-active by the SHARED components/ui/tabs.tsx primitive, so SettingsPage,
+        // KnowledgeHealthPage and the Library all inherit it with no page-local branch.
+        "tab-active": "hsl(var(--tab-active))",
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",

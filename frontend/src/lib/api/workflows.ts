@@ -302,6 +302,32 @@ export async function listDraftWorkflows(signal?: AbortSignal): Promise<Workflow
  *
  * The token is inserted BEFORE `signal` in the argument list. That is safe because no
  * call site passed a third argument (verified by grep across `frontend/src`, 186-03).
+ *
+ * ── ⚠ THE BODY IS THE WHOLE DEFINITION, AND THAT IS A MEASUREMENT, NOT AN INTENTION ───
+ *
+ * `BUG-260828-02` records that *"`frontend/src/lib/api/workflows.ts` never sends `inputs`:
+ * zero occurrences"*. That grep is TRUE and its conclusion is FALSE, and plan `214.1-01`
+ * drove the distinction rather than reasoning about it.
+ *
+ * `body` is `JSON.stringify(def)` — the whole object, with NO field whitelist — and `def` is
+ * `selectDefinition(snapshot)` handed over whole by `useDraftPersistence.ts`, which is
+ * literally `{ ...meta, phases }`. So EVERY key the builder store puts on `meta` already
+ * ships, including one this module has never named. A driven test asserts exactly that on the
+ * PARSED request body (`DeclaredInputsEditor.test.tsx`, section B): a real store, the real
+ * hook, this real function, and `globalThis.fetch` as the only stub. It was FALSIFIED before
+ * it was trusted — with the store's write repointed at a differently-named key it reads
+ * `expected { slug: 'risk-register', …(5) } to have property "inputs"`.
+ *
+ * ⛔ SO NO FIELD WHITELIST WAS ADDED HERE, DELIBERATELY. One would be new machinery
+ * defending nothing, and it would have to grow a line for every future definition field — a
+ * second, drifting copy of a shape the server already owns strictly (`WorkflowDefinition` is
+ * `extra="forbid"`). The pass-through is the contract.
+ *
+ * ⚠ THE COROLLARY IS THE REAL HAZARD, and it is why this note exists rather than a
+ * one-liner: because nothing filters, a stray key anywhere on `meta` reaches a model that
+ * FORBIDS extras, and the first autosave after it appears returns 422 and the write is lost.
+ * The fence therefore lives at the MINTING sites, not here — see
+ * `components/workflows/declaredInputs.ts` for the one that mints `inputs[]`.
  */
 export async function updateWorkflowDraft(
   id: string,
@@ -596,6 +622,35 @@ export interface WorkflowRunPhase {
    *  fence sweeping its own RAW source for it at zero occurrences, and this tree has recorded
    *  six times that a comment naming a forbidden token satisfies the grep meant to forbid it. */
   deliverable_text?: string | null
+  /** Phase 214 (STEP-05 / D-214-23) — WHY this step failed, in the adapter's or the gate's own
+   *  words: the step's `output["_failure_reason"]`, written by `fail_phase` on every failure.
+   *
+   *  ⚠ **`null` MEANS NOT RECORDED, AND AN EMPTY STRING IS NEVER SENT.** The server normalises
+   *  whitespace-only to `null`, so absence has exactly one spelling and the panel's
+   *  `reason_unknown` sentinel keeps meaning what it says. **Never `?? ""`** — that is the
+   *  same collapse `step_count`'s `0`-vs-`null` rule forbids twenty lines up, and it is the
+   *  reason `BUG-260826-05` read "reason not captured" while the reason sat in the row.
+   *
+   *  ⚠ Non-null on failed steps only. ⚠ **MODEL / THIRD-PARTY-INFLUENCED CONTENT** — it can
+   *  originate from a vendor's error body. Render it as a text node; the raw-HTML prop is
+   *  deliberately not spelled here (`WorkflowRunPage.tsx` sweeps its own source for it). */
+  failure_reason?: string | null
+  /** Phase 214 (STEP-04 / D-214-16) — the ACTION this step runs, by its wire name, derived
+   *  server-side from the definition that executed (`config.tool_name`). `null` on every phase
+   *  type that is not `external_action`, and on a step that names only a native capability. */
+  tool_name?: string | null
+  /** Phase 214 (STEP-04) — the native capability (`send_email` | `create_ticket` |
+   *  `post_message`). `null` on an MCP step, which carries a `tool_name` and no capability at
+   *  all — an absence that is a FACT, not a gap. */
+  capability?: string | null
+  /** Phase 214 (STEP-04 / D-214-14 / D-213-02) — the SERVICE a person would name: the bound
+   *  connection's display name, resolved server-side at read time. **Computed, never stored.**
+   *
+   *  ⚠ **`null` IS LEGITIMATE and means the connection could not be resolved** (deleted,
+   *  another org's, or none bound). The shared identity element renders the ACTION ALONE for
+   *  it. **Never substitute**: not "Unknown service", not the capability id, not the connection
+   *  id — never draw a name the system cannot know. */
+  service_name?: string | null
 }
 
 /**
@@ -660,6 +715,7 @@ export interface WorkflowRunRead {
   /** The raw `workflow_definitions.definition` JSONB of the version that ran. */
   definition: WorkflowDefinitionJSON | null
   phases: WorkflowRunPhase[]
+  metadata?: Record<string, any> | null
 }
 
 /**

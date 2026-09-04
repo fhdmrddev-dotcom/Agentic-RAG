@@ -400,8 +400,23 @@ async def read_path(
     supabase: Client,
     start_line: int | None = None,
     end_line: int | None = None,
+    numbered: bool = True,
 ) -> dict:
-    """Fetch full_markdown for a document, optionally sliced to a line range."""
+    """Fetch full_markdown for a document, optionally sliced to a line range.
+
+    Phase 217 (D-217-05) — ONE slicer, TWO callers.
+
+    `numbered` defaults to True so `GET /kb/read` is byte-identical: an AGENT needs
+    addressable `42: ` lines to cite and re-read. `GET /documents/{id}/content` passes
+    `numbered=False`, because a PERSON reading their own document must not get a line
+    number glued to every line — and it breaks Markdown rendering outright.
+
+    Error returns additionally carry `error_kind` — one of `"not_found"` / `"empty"` /
+    `"range"` — plus `total_lines` where it is known. `/kb/read` deliberately folds all
+    three into a single 404 and reads only `error`, so these keys are purely additive and
+    change nothing on the agent path. The Library needs them apart: a document with no
+    text is not a missing document, and a page past the end is not an error either.
+    """
     from app.utils.db import aexec  # noqa: PLC0415
 
     try:
@@ -425,32 +440,46 @@ async def read_path(
                     .maybe_single()
                 )
         if not result or not result.data:
-            return {"error": f"Document '{document_id}' not found or access denied."}
+            return {"error": f"Document '{document_id}' not found or access denied.", "error_kind": "not_found"}
     except Exception:
-        return {"error": f"Document '{document_id}' not found or access denied."}
+        return {"error": f"Document '{document_id}' not found or access denied.", "error_kind": "not_found"}
 
     doc = result.data
     markdown = doc.get("full_markdown") or ""
 
     if not markdown:
-        return {"error": "No content available for this document."}
+        return {
+            "error": "No content available for this document.",
+            "error_kind": "empty",
+            "filename": doc["filename"],
+            "total_lines": 0,
+        }
 
     lines = markdown.splitlines()
     total_lines = len(lines)
 
     if start_line is not None and end_line is not None:
         if start_line < 1 or end_line < start_line or start_line > total_lines:
-            return {"error": f"Line range {start_line}-{end_line} is out of bounds. Document has {total_lines} lines."}
+            return {
+                "error": f"Line range {start_line}-{end_line} is out of bounds. Document has {total_lines} lines.",
+                "error_kind": "range",
+                "filename": doc["filename"],
+                "total_lines": total_lines,
+            }
         end_line = min(end_line, total_lines)
         sliced = lines[start_line - 1 : end_line]
-        numbered = "\n".join(f"{start_line + i}: {line}" for i, line in enumerate(sliced))
+        # D-217-05 — the ONE divergence between the agent path and the human path.
+        if numbered:
+            body = "\n".join(f"{start_line + i}: {line}" for i, line in enumerate(sliced))
+        else:
+            body = "\n".join(sliced)
         return {
             "document_id": document_id,
             "filename": doc["filename"],
             "start_line": start_line,
             "end_line": end_line,
             "total_lines": total_lines,
-            "content": numbered,
+            "content": body,
         }
 
     return {

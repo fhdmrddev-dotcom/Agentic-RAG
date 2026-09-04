@@ -82,13 +82,19 @@ describe("Phase 095 Plan 04 — useFollowScroll (D-03)", () => {
     })
     // release
     act(() => {
+      result.current.noteUserGesture()
       result.current.onScroll()
     })
     expect(result.current.isPinned).toBe(false)
-    // now the viewport is back at the bottom
+    // now the USER scrolls the viewport back to the bottom.
+    // ⚠ `noteUserGesture()` was added to this case by BUG-260904-02 and it is not a
+    // weakening: a re-arm now requires a real user input, precisely so the tail of our own
+    // smooth scroll can no longer re-arm on the reader's behalf. The negative control lives
+    // in the "tail of our own smooth scroll" case below — without a gesture, no re-arm.
     const vpBottom = atBottom()
     rerender({ v: vpBottom })
     act(() => {
+      result.current.noteUserGesture()
       result.current.onScroll()
     })
     expect(result.current.isPinned).toBe(true)
@@ -133,6 +139,110 @@ describe("Phase 095 Plan 04 — useFollowScroll (D-03)", () => {
     })
     expect(result.current.isPinned).toBe(false)
     expect(result.current.showJumpToLive).toBe(false)
+  })
+
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // BUG-260904-02 / BUG-260823-01 — the smooth-scroll TAIL must not re-arm the pin
+  // ══════════════════════════════════════════════════════════════════════════════
+  //
+  // ⚠ THE DEFECT, IN ONE SENTENCE: `beginProgrammaticScroll` cleared its flag after ONE
+  // animation frame, but `scrollIntoView({behavior:"smooth"})` keeps emitting scroll events
+  // for HUNDREDS of milliseconds — so every frame of our own animation after the first was
+  // read as a user scroll, and because those frames travel TOWARD the bottom they took the
+  // re-arm branch and switched the pin back on under a reader who had just scrolled away.
+  // The auto-follow then dragged them down, they scrolled up again, and the loop repeated.
+  // That is the operator's report: "if I scroll up it is forcing me to go down."
+  //
+  // The fix is two-part and both halves are fenced below: the programmatic window lasts
+  // until the animation settles rather than one frame, and a RE-ARM now requires a real
+  // user gesture — our own scrolls can no longer vote themselves back into following.
+
+  it("⭐ the tail of our own smooth scroll does NOT re-arm a pin the user released", () => {
+    const vp = scrolledUp()
+    const { result, rerender } = renderHook(({ v }) => useFollowScroll(() => v, true), {
+      initialProps: { v: vp },
+    })
+
+    // The user scrolls up, by hand: gesture first, then the scroll event it causes.
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // An auto-follow smooth scroll was ALREADY in flight when they did that. Its
+    // animation keeps running and keeps firing scroll events, several frames later,
+    // arriving at the bottom. None of them is the user.
+    const vpBottom = atBottom()
+    rerender({ v: vpBottom })
+    act(() => {
+      result.current.beginProgrammaticScroll()
+      result.current.onScroll()
+      result.current.onScroll()
+      result.current.onScroll()
+    })
+
+    // The reader stays where they put themselves.
+    expect(result.current.isPinned).toBe(false)
+    expect(result.current.showJumpToLive).toBe(true)
+  })
+
+  it("⭐ MEASURED IN A BROWSER: the tail cannot re-arm just because the user gestured a moment ago", () => {
+    // ⚠ THE SECOND HALF OF BUG-260904-02, AND THE FIRST FIX DID NOT COVER IT. Driven in a real
+    // browser on a run with a live tool step: scrolling up still dragged the reader back
+    // +1136 px (5661 -> 6797) with the chip already gone. The release fired correctly; then the
+    // tail of our own in-flight smooth scroll re-armed inside the gesture window — because the
+    // tail arrives milliseconds after the very gesture that released the pin.
+    //
+    // The tool-card path is where this bites hardest: it uses
+    // `preparingEl.scrollIntoView({behavior:"smooth"})` on every token delta, so an animation is
+    // essentially always in flight, which is exactly what the operator reported —
+    // "mostly when it is generating and calling tools in the card, not in the raw text".
+    const vp = scrolledUp()
+    const { result, rerender } = renderHook(({ v }) => useFollowScroll(() => v, true), {
+      initialProps: { v: vp },
+    })
+
+    // An auto-follow smooth scroll is in flight, THEN the user scrolls up out of it.
+    act(() => {
+      result.current.beginProgrammaticScroll()
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // The tail of that same animation now lands at the bottom, well inside the gesture window.
+    const vpBottom = atBottom()
+    rerender({ v: vpBottom })
+    act(() => {
+      result.current.onScroll()
+      result.current.onScroll()
+    })
+
+    // It must NOT take hold again. A gesture buys the right to let go, never to grab back.
+    expect(result.current.isPinned).toBe(false)
+    expect(result.current.showJumpToLive).toBe(true)
+  })
+
+  it("a user gesture CANCELS the programmatic window immediately (scrolling away mid-animation still releases)", () => {
+    const vp = atBottom()
+    const { result, rerender } = renderHook(({ v }) => useFollowScroll(() => v, true), {
+      initialProps: { v: vp },
+    })
+    act(() => {
+      result.current.beginProgrammaticScroll()
+    })
+    // Mid-animation, the user grabs the wheel and scrolls up. Their scroll must win
+    // over our in-flight window — otherwise the fix above would make the pin unbreakable
+    // for as long as tokens keep arriving, which is the same bug wearing the other mask.
+    const vpUp = scrolledUp()
+    rerender({ v: vpUp })
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
   })
 
   it("onScroll is a no-op (no throw) when the viewport is not yet mounted", () => {

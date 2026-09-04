@@ -245,12 +245,65 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # Empty on purpose: the allowed host is the org-configured one, supplied per call. An
     # entry here would be a second, staler source of truth for it.
     "send_email": (),
+    # ⚠ A NEW HOST, ADDED DELIBERATELY AND NARROWLY (2026-08-31). Every other entry here
+    # belongs to a capability VERB; this one belongs to a SERVICE reached with an OAuth
+    # access token. It exists because `services/cloud_storage.py` was calling
+    # googleapis.com with a RAW `httpx.AsyncClient` — no scheme check, no allow-list, no
+    # DNS pin, no redirect refusal, no size cap — on a path that downloads a file a
+    # person names. That module sits OUTSIDE `services/connectors/`, so the D-05 source
+    # fence never walked it and the gap was invisible to the guard written for it.
+    #
+    # SUFFIX-matched, so `www.googleapis.com` and `oauth2.googleapis.com` pass while
+    # `evilgoogleapis.com` does not — the leading-dot rule `_host_is_allowed` documents.
+    "drive_read": ("googleapis.com",),
+    # ⚠ THE SAME HOST AS `drive_read`, AND A SEPARATE KEY ON PURPOSE (2026-08-31).
+    # Gmail lives under googleapis.com too, so this entry buys no HOST separation. What
+    # it buys is that a SPEC declares exactly one key: a Drive tool cannot reach Gmail
+    # and a Gmail tool cannot reach Drive, because neither names the other's key. The
+    # separation is auditable in `SERVICE_TOOL_SPECS` — one grep per key — which a
+    # shared `google_read` would have destroyed the moment a second scope was added.
+    # The OAuth scopes stay the real boundary; this is the one the code can check.
+    "gmail_read": ("googleapis.com",),
+    # Round 1 (2026-08-31) - four more read-only Google surfaces on the SAME connection.
+    # All resolve to googleapis.com, so these keys buy no HOST separation; what they buy
+    # is that a spec DECLARES exactly one, so a Calendar tool cannot reach Gmail. That is
+    # the property an audit can grep. The OAuth scopes stay the real boundary.
+    "sheets_read": ("googleapis.com",),
+    "docs_read": ("googleapis.com",),
+    "calendar_read": ("googleapis.com",),
+    "contacts_read": ("googleapis.com",),
+    # ── WRITES · Phase 221 step 2 (2026-09-01) ────────────────────────────────────────
+    # ⚠ SIX MORE KEYS ON ONE HOST, AND THE REASON IS THE SAME ONE STATED ABOVE, SHARPENED.
+    # These buy no HOST separation — everything Google is `googleapis.com`. What they buy
+    # is that a spec declares exactly ONE key, so `grep -c "drive_write"` over
+    # `SERVICE_TOOL_SPECS` answers *"which actions can change a Drive"* exactly, and a READ
+    # tool structurally cannot name a write key. Folding writes into `*_read` would have
+    # made that question unanswerable from the code, on the one axis where the answer
+    # matters most.
+    "drive_write": ("googleapis.com",),
+    "gmail_write": ("googleapis.com",),
+    "sheets_write": ("googleapis.com",),
+    "docs_write": ("googleapis.com",),
+    "calendar_write": ("googleapis.com",),
+    "contacts_write": ("googleapis.com",),
 }
 
 _HOST_MATCH: dict[str, str] = {
     "post_message": _EXACT,
     "create_ticket": _SUFFIX,
     "send_email": _CALLER,
+    "drive_read": _SUFFIX,
+    "gmail_read": _SUFFIX,
+    "sheets_read": _SUFFIX,
+    "docs_read": _SUFFIX,
+    "calendar_read": _SUFFIX,
+    "contacts_read": _SUFFIX,
+    "drive_write": _SUFFIX,
+    "gmail_write": _SUFFIX,
+    "sheets_write": _SUFFIX,
+    "docs_write": _SUFFIX,
+    "calendar_write": _SUFFIX,
+    "contacts_write": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -259,6 +312,18 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "post_message": frozenset({"https"}),
     "create_ticket": frozenset({"https"}),
     "send_email": frozenset({"smtps", "smtp+starttls"}),
+    "drive_read": frozenset({"https"}),
+    "gmail_read": frozenset({"https"}),
+    "sheets_read": frozenset({"https"}),
+    "docs_read": frozenset({"https"}),
+    "calendar_read": frozenset({"https"}),
+    "contacts_read": frozenset({"https"}),
+    "drive_write": frozenset({"https"}),
+    "gmail_write": frozenset({"https"}),
+    "sheets_write": frozenset({"https"}),
+    "docs_write": frozenset({"https"}),
+    "calendar_write": frozenset({"https"}),
+    "contacts_write": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {
@@ -580,7 +645,34 @@ async def send_pinned_http(
     url: str,
     *,
     json: Any | None = None,
+    #: A RAW request body, for the one thing a JSON body cannot express: an upload.
+    #:
+    #: ⚠ ADDED 2026-09-01 FOR A MEASURED DEFECT, not for generality. `create_file` needed
+    #: to put bytes in a Drive file, `send_pinned_http` spoke only JSON, and the result was
+    #: a file created EMPTY that reported success — the exact failure its own docstring
+    #: warned about. The alternative was hand-assembling a `multipart/related` body in a
+    #: caller, which is more code in a worse place.
+    #:
+    #: ⚠ EVERY SECURITY PROPERTY OF THIS FUNCTION IS BODY-AGNOSTIC AND NONE OF THEM MOVES:
+    #: the destination is validated and pinned before a body is looked at, the SNI name is
+    #: restored the same way, redirects are still refused explicitly, and the RESPONSE cap
+    #: is unchanged. What a request carries has never been part of where it is allowed to
+    #: go, and this does not make it part of it.
+    #:
+    #: ⚠ MUTUALLY EXCLUSIVE WITH `json` — httpx would silently let one win. Refused here,
+    #: because a caller that passed both has a bug and deserves to be told at the seam.
+    content: bytes | None = None,
     headers: Mapping[str, str] | None = None,
+    #: Query parameters, encoded by the transport rather than by the caller.
+    #:
+    #: ⚠ THE ENCODING BELONGS HERE AND NOT IN A CALLER, for a reason the connector
+    #: source fence states as a rule: no module under `services/connectors/` may import
+    #: `urllib` (or any transport), so a caller that needed one query parameter had to
+    #: either hand-roll percent-encoding or trip the fence. Both are worse than this
+    #: line. Validation is unaffected — `validate_destination` drops query and fragment
+    #: before it looks at anything, so a parameter can never influence the host that was
+    #: pinned.
+    params: Mapping[str, str] | None = None,
     auth: tuple[str, str] | None = None,
     timeout: float,
     max_bytes: int,
@@ -616,6 +708,12 @@ async def send_pinned_http(
     # the D-06 ordering fence installs recording stubs with `monkeypatch.setattr`, and making
     # it a coroutine or hiding it behind a wrapper name would make that ordering unobservable
     # — the exact shape RESEARCH §R10 rejected.
+    if json is not None and content is not None:
+        raise ValueError(
+            "send_pinned_http was given both 'json' and 'content'. Refused rather than "
+            "letting one silently win: a caller that passed both does not know which body "
+            "it is sending."
+        )
     pinned = await run_in_threadpool(
         validate_destination, capability, url, None,
         allowed_host=allowed_host, resolver=resolver,
@@ -651,6 +749,8 @@ async def send_pinned_http(
             method,
             target,
             json=json,
+            content=content,
+            params=dict(params) if params else None,
             headers=outgoing,
             timeout=explicit_timeout,
         )

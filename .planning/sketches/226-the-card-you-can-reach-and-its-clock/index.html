@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>The Card You Can Reach — and its clock</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* tokens — copied verbatim from frontend/src/index.css */
+:root {
+  --background: 220 20% 97%; --foreground: 222 47% 11%;
+  --card: 0 0% 100%; --primary: 239 84% 67%;
+  --muted: 220 14% 94%; --muted-foreground: 220 9% 46%;
+  --destructive: 0 84% 60%; --success: 142 71% 45%; --warning: 38 92% 60%;
+  --border: 220 13% 89%; --radius: 0.5rem;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --background: 216 45% 4%; --foreground: 226 60% 97%;
+  --card: 220 30% 7%; --primary: 239 100% 82%;
+  --muted: 220 30% 11%; --muted-foreground: 220 16% 65%;
+  --destructive: 0 72% 51%; --success: 142 71% 45%; --warning: 38 92% 60%;
+  --border: 220 20% 16%;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--sans); background: hsl(var(--background));
+  color: hsl(var(--foreground)); min-height: 100vh; padding: 1.75rem 2rem 5rem;
+  -webkit-font-smoothing: antialiased;
+}
+.head { max-width: 1220px; margin: 0 auto 1.25rem; }
+.head h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; }
+.head .q { margin-top: .4rem; font-size: .875rem; color: hsl(var(--muted-foreground)); max-width: 70ch; line-height: 1.55; }
+.toolbar { max-width: 1220px; margin: 0 auto 1.5rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.tab {
+  font: 500 .8125rem/1 var(--sans); padding: .5rem .85rem; border: 1px solid hsl(var(--border));
+  border-radius: 999px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: all .16s;
+}
+.tab:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary) / .5); }
+.tab[aria-selected="true"] { background: hsl(var(--primary) / .14); border-color: hsl(var(--primary) / .55); color: hsl(var(--primary)); }
+.tab.is-today[aria-selected="true"] { background: hsl(var(--destructive) / .14); border-color: hsl(var(--destructive) / .5); color: hsl(var(--destructive)); }
+.spacer { flex: 1; }
+.ghost { font: 500 .75rem/1 var(--sans); padding: .5rem .8rem; cursor: pointer; background: transparent;
+  color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+.ghost:hover { color: hsl(var(--foreground)); }
+
+.stage { max-width: 1220px; margin: 0 auto; display: grid; grid-template-columns: 640px 1fr; gap: 2rem; align-items: start; }
+@media (max-width: 1080px) { .stage { grid-template-columns: 1fr; } }
+
+/* a viewport with a real fold */
+.viewport {
+  position: relative; height: 460px; border: 1px dashed hsl(var(--border)); border-radius: 12px;
+  background: hsl(var(--background)); display: flex; flex-direction: column; overflow: hidden;
+}
+.vp-label { font: 500 .625rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground)); padding: .7rem .9rem .4rem; }
+.scroll { flex: 1; overflow-y: auto; padding: 0 .9rem; scroll-behavior: smooth; }
+.composer {
+  border-top: 1px solid hsl(var(--border)); background: hsl(var(--card));
+  padding: .6rem .9rem; display: flex; gap: .5rem; align-items: center; flex: none;
+}
+.composer .field { flex: 1; height: 34px; border: 1px solid hsl(var(--border)); border-radius: 10px;
+  background: hsl(var(--background)); display: flex; align-items: center; padding: 0 .6rem;
+  font-size: .8125rem; color: hsl(var(--muted-foreground) / .7); }
+.composer .send { width: 34px; height: 34px; border-radius: 10px; background: hsl(var(--primary) / .18);
+  color: hsl(var(--primary)); display: grid; place-items: center; font-size: .8rem; }
+
+.bubble { font-size: .8125rem; line-height: 1.6; color: hsl(var(--foreground) / .9); margin: .7rem 0; }
+.bubble.user { background: hsl(var(--muted)); border-radius: 12px; padding: .5rem .7rem; }
+.filler { color: hsl(var(--muted-foreground) / .55); }
+
+/* the approval card */
+.appr {
+  border: 1px solid hsl(var(--warning) / .45); border-radius: 12px;
+  background: hsl(var(--warning) / .06); margin: .7rem 0; overflow: hidden;
+}
+.appr-head { display: flex; align-items: center; gap: .5rem; padding: .55rem .75rem; }
+.appr-head .hl { font-weight: 600; font-size: .8125rem; color: hsl(var(--warning)); }
+.appr-head .clock {
+  margin-left: auto; font: 600 .6875rem/1 var(--mono); font-variant-numeric: tabular-nums;
+  padding: .22rem .45rem; border-radius: 999px;
+  background: hsl(var(--warning) / .16); border: 1px solid hsl(var(--warning) / .45); color: hsl(var(--warning));
+}
+.appr-head .clock.low { background: hsl(var(--destructive) / .18); border-color: hsl(var(--destructive) / .5); color: hsl(var(--destructive)); }
+.appr-body { padding: 0 .75rem .55rem; font-size: .8125rem; }
+.appr-sub { color: hsl(var(--muted-foreground)); margin-bottom: .45rem; }
+.appr-args { font: 400 .75rem/1.6 var(--mono); color: hsl(var(--foreground) / .85);
+  background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: .4rem .55rem; }
+.appr-args .k { color: hsl(var(--muted-foreground)); }
+.appr-acts { display: flex; gap: .45rem; padding: .55rem .75rem .7rem; flex-wrap: wrap; align-items: center; }
+.btn { font: 500 .75rem/1 var(--sans); padding: .42rem .7rem; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.btn.ok { background: hsl(var(--success) / .18); border-color: hsl(var(--success) / .45); color: hsl(var(--success)); }
+.btn.no { background: transparent; border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+.btn.always { background: transparent; border-color: hsl(var(--warning) / .4); color: hsl(var(--warning)); }
+.always-note { font-size: .6875rem; color: hsl(var(--muted-foreground)); width: 100%; }
+
+/* variant A — docked above the composer */
+.dock { border-top: 1px solid hsl(var(--warning) / .35); flex: none; }
+.dock .appr { margin: .5rem .9rem; }
+
+/* variant B — the jump chip */
+.jump {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 62px; z-index: 5;
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  font: 500 .75rem/1 var(--sans); padding: .4rem .7rem; border-radius: 999px;
+  background: hsl(var(--warning) / .18); border: 1px solid hsl(var(--warning) / .5); color: hsl(var(--warning));
+  box-shadow: 0 4px 14px hsl(216 45% 2% / .5);
+}
+.jump .mono { font: 600 .6875rem/1 var(--mono); font-variant-numeric: tabular-nums; }
+
+/* variant C — panel */
+.split { display: grid; grid-template-columns: 1fr 210px; height: 100%; }
+.panelcol { border-left: 1px solid hsl(var(--border)); background: hsl(var(--card)); padding: .7rem .6rem; overflow-y: auto; }
+.panel-h { font: 500 .625rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground)); margin-bottom: .5rem; }
+.pointer {
+  display: flex; align-items: center; gap: .4rem; margin: .7rem 0; font-size: .75rem;
+  color: hsl(var(--warning)); border-left: 2px solid hsl(var(--warning) / .5); padding: .3rem .5rem;
+  background: hsl(var(--warning) / .06); border-radius: 0 8px 8px 0;
+}
+
+.notes { font-size: .8125rem; line-height: 1.6; color: hsl(var(--muted-foreground)); }
+.notes h3 { font-size: .8125rem; color: hsl(var(--foreground)); margin-bottom: .5rem; font-weight: 600; }
+.notes ul { margin: 0 0 1.1rem 1rem; }
+.notes li { margin-bottom: .45rem; }
+.notes code { font: .75rem/1.4 var(--mono); background: hsl(var(--muted)); padding: .1rem .3rem; border-radius: 4px; }
+.notes .bad { color: hsl(var(--destructive)); font-weight: 600; }
+.notes .good { color: hsl(var(--success)); font-weight: 600; }
+.callout { margin-top: .75rem; padding: .55rem .7rem; border-radius: var(--radius); font-size: .75rem; line-height: 1.55;
+  border-left: 2px solid hsl(var(--destructive)); background: hsl(var(--destructive) / .07); color: hsl(var(--muted-foreground)); }
+.callout.ok { border-left-color: hsl(var(--success)); background: hsl(var(--success) / .07); }
+.callout b { color: hsl(var(--foreground)); font-weight: 600; }
+.panel-view { display: none; }
+.panel-view.active { display: grid; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Sketch 226 — The card you can reach, and its clock</h1>
+  <p class="q"><b>Design question:</b> the approval gate expires after <b>120 s</b> with no countdown, and
+  the card renders inline in the message list — so it can arrive below the fold while the clock runs.
+  Where should it live, and how does it show the time it has? <b>Scroll each viewport</b>; the countdown
+  is live.</p>
+</div>
+
+<div class="toolbar" role="tablist">
+  <button class="tab is-today" role="tab" aria-selected="true" data-view="today">Today (measured)</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="a">A · Docked above the composer</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="b">B · Inline + jump chip</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="c">C · Panel hosts it</button>
+  <span class="spacer"></span>
+  <button class="ghost" onclick="restart()">↻ Restart clock</button>
+  <button class="ghost" onclick="toggleTheme()">◐ Theme</button>
+</div>
+
+<!-- ─────────────────────────── TODAY ─────────────────────────── -->
+<div class="stage panel-view active" data-view="today">
+  <div class="viewport">
+    <div class="vp-label">today — inline, no clock. scroll down to find it.</div>
+    <div class="scroll">
+      <div class="bubble user">Find the Q3 rate sheet in our Drive and summarise the increases.</div>
+      <div class="bubble filler">I'll search the connected Google Workspace for the rate sheet. Let me look for
+        files matching that description across the shared drives you've given me access to…</div>
+      <div class="bubble filler">Scanning shared drives. This may take a moment while I match filenames and
+        recently-modified documents against your description…</div>
+      <div class="bubble filler">Narrowing to spreadsheets modified in the last two quarters, then reading the
+        most likely candidate…</div>
+      <div class="appr">
+        <div class="appr-head"><span class="hl">Paused — waiting for you.</span></div>
+        <div class="appr-body">
+          <div class="appr-sub">Nothing has been sent yet.</div>
+          <div class="appr-args"><span class="k">query:</span> rate sheet<br><span class="k">corpora:</span> drive</div>
+        </div>
+        <div class="appr-acts">
+          <button class="btn ok">Approve once</button>
+          <button class="btn no">Deny</button>
+          <button class="btn always">Always allow search_files on this connection</button>
+          <span class="always-note">Changes the setting above, not just this run.</span>
+        </div>
+      </div>
+    </div>
+    <div class="composer"><div class="field">Message…</div><div class="send">↑</div></div>
+  </div>
+
+  <div class="notes">
+    <h3>What is measured here</h3>
+    <ul>
+      <li><code>tool_dispatcher.py:4443</code> — <code>asyncio.wait_for(…, timeout=120.0)</code>. Hardcoded.
+        The operator watched two runs expire at <b>~2 m 05 s</b>.</li>
+      <li><span class="bad">The card has no notion of time at all.</span> Grep <code>ChatToolApprovalCard.tsx</code>
+        for <code>timeout</code>/<code>countdown</code>/<code>expire</code>: the only <code>120</code> in the file
+        is <code>ARG_VALUE_CHARS</code>, unrelated.</li>
+      <li>Mounted at <code>MessageItem.tsx:524</code> — <b>inline in the message list</b>. Nothing pins it, so a
+        long preamble pushes it under the composer while the clock runs.</li>
+      <li>Copy is real: <code>grantsVocabulary.ts:61-71</code> — <em>"Paused — waiting for you."</em>,
+        <em>"Nothing has been sent yet."</em>, <em>"Approve once"</em>, <em>"Deny"</em>.</li>
+    </ul>
+    <div class="callout">
+      ⭐ <b>A safety gate that is annoying to satisfy is a safety gate that gets switched off.</b> Every expiry
+      teaches the person that <em>"Always allow"</em> is the button that stops this happening — and that is the
+      permanent grant Phase 223 just made auditable.
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────────── A ───────────────────────────── -->
+<div class="stage panel-view" data-view="a">
+  <div class="viewport">
+    <div class="vp-label">A — the card leaves the flow and docks above the composer</div>
+    <div class="scroll">
+      <div class="bubble user">Find the Q3 rate sheet in our Drive and summarise the increases.</div>
+      <div class="bubble filler">I'll search the connected Google Workspace for the rate sheet. Let me look for
+        files matching that description across the shared drives you've given me access to…</div>
+      <div class="bubble filler">Scanning shared drives. This may take a moment while I match filenames and
+        recently-modified documents against your description…</div>
+      <div class="bubble filler">Narrowing to spreadsheets modified in the last two quarters, then reading the
+        most likely candidate…</div>
+      <div class="bubble filler">Still scanning. Scroll all you like — the card stays put.</div>
+    </div>
+    <div class="dock">
+      <div class="appr">
+        <div class="appr-head">
+          <span class="hl">Paused — waiting for you.</span>
+          <span class="clock" data-clock>2:00</span>
+        </div>
+        <div class="appr-body">
+          <div class="appr-sub">Google Workspace · search_files · nothing has been sent yet.</div>
+          <div class="appr-args"><span class="k">query:</span> rate sheet<br><span class="k">corpora:</span> drive</div>
+        </div>
+        <div class="appr-acts">
+          <button class="btn ok">Approve once</button>
+          <button class="btn no">Deny</button>
+          <button class="btn always">Always allow search_files on this connection</button>
+          <span class="always-note">Changes the setting above, not just this run.</span>
+        </div>
+      </div>
+    </div>
+    <div class="composer"><div class="field">Paused — answer above to continue</div><div class="send">↑</div></div>
+  </div>
+
+  <div class="notes">
+    <h3>The claim</h3>
+    <ul>
+      <li><span class="good">Unmissable by construction.</span> While a decision is pending it is not
+        <em>content</em>, it is <em>state</em> — so it leaves the scrollback and occupies the one region always
+        on screen.</li>
+      <li>Precedent exists: <code>panel-shell.md</code>'s <em>calm-loud interrupt</em> — a blocked loop is made
+        unmissable <b>structurally</b> rather than by shouting. The composer already locks during a pause.</li>
+    </ul>
+    <h3>The cost</h3>
+    <ul>
+      <li>The transcript loses the moment. On reload the decision has to resolve back into the message list, or
+        the record has a hole — the same reload seam <code>SeamCard</code> exists for.</li>
+      <li>⚠ Two pending approvals would stack over the composer and eat the column. Rare, but the design has to
+        say what it does.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ───────────────────────────── B ───────────────────────────── -->
+<div class="stage panel-view" data-view="b">
+  <div class="viewport">
+    <div class="vp-label">B — stays inline; the view holds it, and a chip chases you</div>
+    <div class="scroll" id="scroll-b">
+      <div class="bubble user">Find the Q3 rate sheet in our Drive and summarise the increases.</div>
+      <div class="appr" id="card-b">
+        <div class="appr-head">
+          <span class="hl">Paused — waiting for you.</span>
+          <span class="clock" data-clock>2:00</span>
+        </div>
+        <div class="appr-body">
+          <div class="appr-sub">Google Workspace · search_files · nothing has been sent yet.</div>
+          <div class="appr-args"><span class="k">query:</span> rate sheet<br><span class="k">corpora:</span> drive</div>
+        </div>
+        <div class="appr-acts">
+          <button class="btn ok">Approve once</button>
+          <button class="btn no">Deny</button>
+          <button class="btn always">Always allow search_files on this connection</button>
+        </div>
+      </div>
+      <div class="bubble filler">Scroll down past the card to see the chip appear…</div>
+      <div class="bubble filler">Still scrolling. The chip below carries the remaining time, so the clock is never
+        off screen even when the card is.</div>
+      <div class="bubble filler">More content, so the card can genuinely leave the viewport.</div>
+      <div class="bubble filler">And more.</div>
+    </div>
+    <div class="jump" id="jump-b" hidden onclick="jumpToCard()">↑ Approval waiting <span class="mono" data-clock>2:00</span></div>
+    <div class="composer"><div class="field">Paused — answer above to continue</div><div class="send">↑</div></div>
+  </div>
+
+  <div class="notes">
+    <h3>The claim</h3>
+    <ul>
+      <li><span class="good">Reuses a pattern already shipped.</span> Sketch 015-C's never-vanishes strip +
+        <em>"Jump to live"</em> chip is exactly this shape, already built for the run status.</li>
+      <li>The transcript keeps the moment in place, so <b>no reload seam is needed</b> — the card is where it
+        happened.</li>
+      <li>⭐ <b>The chip carries the clock.</b> The time is never off screen even when the card is.</li>
+    </ul>
+    <h3>The cost</h3>
+    <ul>
+      <li>It is a <em>pointer</em>, not the decision. You still have to travel to act — one extra step at the
+        exact moment the clock matters most.</li>
+      <li>⚠ If the person is at the bottom composing when it arrives, the chip is the only signal, and it is
+        small.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ───────────────────────────── C ───────────────────────────── -->
+<div class="stage panel-view" data-view="c">
+  <div class="viewport">
+    <div class="split">
+      <div style="display:flex;flex-direction:column;min-width:0;">
+        <div class="vp-label">C — the panel already has a home for "the agent needs you"</div>
+        <div class="scroll">
+          <div class="bubble user">Find the Q3 rate sheet in our Drive and summarise the increases.</div>
+          <div class="bubble filler">I'll search the connected Google Workspace for the rate sheet…</div>
+          <div class="pointer">⏸ Waiting for your decision → see the panel <span style="margin-left:auto;font:600 .6875rem/1 var(--mono)" data-clock>2:00</span></div>
+          <div class="bubble filler">Scanning shared drives…</div>
+          <div class="bubble filler">More content below.</div>
+        </div>
+        <div class="composer"><div class="field">Paused — answer in the panel</div><div class="send">↑</div></div>
+      </div>
+      <div class="panelcol">
+        <div class="panel-h">Needs you</div>
+        <div class="appr" style="margin:0;">
+          <div class="appr-head" style="flex-wrap:wrap;gap:.35rem;">
+            <span class="hl" style="font-size:.75rem;">Paused</span>
+            <span class="clock" data-clock style="margin-left:auto;">2:00</span>
+          </div>
+          <div class="appr-body" style="padding:0 .5rem .5rem;">
+            <div class="appr-sub" style="font-size:.6875rem;">Google Workspace · search_files</div>
+            <div class="appr-args" style="font-size:.6875rem;"><span class="k">query:</span> rate sheet</div>
+          </div>
+          <div class="appr-acts" style="padding:.4rem .5rem .55rem;gap:.35rem;">
+            <button class="btn ok" style="font-size:.6875rem;">Approve once</button>
+            <button class="btn no" style="font-size:.6875rem;">Deny</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>The claim — consistency, not a new idea</h3>
+    <ul>
+      <li>⭐ <span class="good">The app already has this home.</span> <code>panel/PendingAskCard.tsx</code> hosts a
+        pending <code>ask_user</code>, and the panel section is literally headed <em>"Needs you"</em>. Two kinds
+        of <em>"the agent is waiting on you"</em> living in two different places is the drift.</li>
+      <li>The chat pointer + panel card is the shipped seam (sketch 007-C), not an invention.</li>
+    </ul>
+    <h3>The cost — and it is the big one</h3>
+    <ul>
+      <li><span class="bad">The panel collapses to a 52px rail.</span> If it is closed when the approval arrives,
+        the decision is behind a click <em>and</em> the clock is running. That is strictly worse than today
+        unless arrival force-opens the panel.</li>
+      <li>At the measured 300px floor the card is cramped — <em>"Always allow"</em> barely fits, and it is the
+        button whose consequence most needs room to be read.</li>
+      <li>⚠ <code>WorkspacePanel</code> has <b>no mount in any workflow page</b>, so this lands in chat only.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* ── the clock is real, because the point is what 120s feels like ───────── */
+var DURATION = 120;
+var remaining = DURATION;
+var timer = null;
+
+function fmt(s) {
+  var m = Math.floor(s / 60), r = s % 60;
+  return m + ":" + (r < 10 ? "0" : "") + r;
+}
+function paint() {
+  var txt = fmt(remaining);
+  document.querySelectorAll("[data-clock]").forEach(function (el) {
+    el.textContent = txt;
+    if (el.classList.contains("clock")) el.classList.toggle("low", remaining <= 30);
+  });
+}
+function tick() {
+  if (remaining > 0) { remaining -= 1; paint(); }
+  else { clearInterval(timer); timer = null; }
+}
+function restart() {
+  remaining = DURATION;
+  paint();
+  if (timer) clearInterval(timer);
+  timer = setInterval(tick, 1000);
+}
+
+/* ── variant B: the chip appears only once the card has left the view ───── */
+function syncJump() {
+  var sc = document.getElementById("scroll-b");
+  var card = document.getElementById("card-b");
+  var chip = document.getElementById("jump-b");
+  if (!sc || !card || !chip) return;
+  var gone = card.getBoundingClientRect().bottom < sc.getBoundingClientRect().top;
+  chip.hidden = !gone;
+}
+function jumpToCard() {
+  var card = document.getElementById("card-b");
+  if (card) card.scrollIntoView({ block: "center" });
+}
+
+/* ── tabs ──────────────────────────────────────────────────────────────── */
+document.querySelectorAll(".tab[data-view]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var view = btn.getAttribute("data-view");
+    document.querySelectorAll(".tab[data-view]").forEach(function (b) {
+      b.setAttribute("aria-selected", String(b === btn));
+    });
+    document.querySelectorAll(".panel-view").forEach(function (p) {
+      p.classList.toggle("active", p.getAttribute("data-view") === view);
+    });
+  });
+});
+
+function toggleTheme() {
+  var root = document.documentElement;
+  root.setAttribute("data-theme", root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+}
+
+var sb = document.getElementById("scroll-b");
+if (sb) sb.addEventListener("scroll", syncJump);
+restart();
+syncJump();
+</script>
+
+</body>
+</html>

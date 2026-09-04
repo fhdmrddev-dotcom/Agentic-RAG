@@ -24,20 +24,48 @@
  * needs, and this product has a written rule against exactly that shape.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Play, Trash2, X } from "lucide-react"
+import { AlertTriangle, Loader2, Play, Trash2, X } from "lucide-react"
+
+// BUG-260829-01 — the cron composer and the plain-language echo. A pure module rather than
+// locals here for the reason every sibling vocabulary file records: a component may not export
+// shared constants (`react-refresh/only-export-components`), and the grammar is testable on its
+// own in a way a JSX-embedded regex is not.
+import {
+  CRON_FIELD_ORDER,
+  CRON_MEANS_PREFIX,
+  CRON_UNREADABLE,
+  DAILY_TIME_LABEL,
+  dailyCron,
+  describeCron,
+  timeOfDailyCron,
+} from "@/components/workflows/cronPlain"
 
 import {
   createWorkflowSchedule,
   deleteSchedule,
+  getEffectiveFeaturesPayload,
   listWorkflowSchedules,
   triggerSchedule,
   updateSchedule,
 } from "@/lib/api"
 import type { ScheduleCadenceKind, WorkflowSchedule } from "@/types/schedule"
+import { launchInputFields, type DefShape } from "@/components/workflows/soulData"
 
 export interface WorkflowScheduleModalProps {
   /** The workflow being scheduled. `id` is its definition id; `name` is what the header says. */
   workflow: { id: string; name: string }
+  /**
+   * Phase 214-09 (STEP-02 / D-214-04) — the workflow's definition, for its DECLARED entry
+   * inputs and nothing else.
+   *
+   * ⚠ OPTIONAL, AND ITS ABSENCE IS A REAL STATE RATHER THAN A DEFAULT. A caller that does not
+   * hold the definition (this modal shipped with a `{ id, name }` scope and nothing more)
+   * renders the form exactly as it shipped: no field region, and a payload byte-identical to
+   * today's. It is NOT fetched here — this component reads the schedule list and the feature
+   * payload, and adding a definition read would give it a third feed for a presentation fact
+   * its caller already has in hand.
+   */
+  definition?: DefShape | null
   onClose: () => void
   /** Fired after any create/delete/toggle so a caller can refresh a badge if it has one. */
   onChanged?: (schedules: WorkflowSchedule[]) => void
@@ -90,6 +118,7 @@ function cadenceText(s: WorkflowSchedule): string {
 
 export function WorkflowScheduleModal({
   workflow,
+  definition,
   onClose,
   onChanged,
 }: WorkflowScheduleModalProps) {
@@ -101,21 +130,37 @@ export function WorkflowScheduleModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [schedulerEnabled, setSchedulerEnabled] = useState<boolean | null>(null)
 
   const [name, setName] = useState("")
   const [kind, setKind] = useState<ScheduleCadenceKind>("cron")
   const [cron, setCron] = useState(CRON_PRESETS[1].expr)
   const [intervalSeconds, setIntervalSeconds] = useState(INTERVAL_CHOICES[2].seconds)
   const [timezone, setTimezone] = useState(localZone)
-  const [maxTokens, setMaxTokens] = useState(50000)
-  const [maxDuration, setMaxDuration] = useState(600)
+  const [maxTokens, setMaxTokens] = useState(500000)
+  const [maxDuration, setMaxDuration] = useState(1800)
   const [kickoff, setKickoff] = useState("")
+  // ── 214-09 (STEP-02 / D-214-04): the DECLARED entry inputs this schedule must supply ──
+  //
+  // ⚠ THE SAME RESOLVER THE LIBRARY RUN MODAL USES, NOT A SECOND COPY OF THE RULE.
+  // `launchInputFields` is `entryInputFields` minus the reserved run-scaffolding keys
+  // (`kickoff_prompt`, `folder_id`) — so this form cannot drift from that one, and the
+  // "two arms, never three" label rule below is the same rule rendered on a second surface.
+  // An absent `definition`, or a definition declaring nothing, gives `[]` → no field region.
+  const launchFields = useMemo(() => launchInputFields(definition ?? null), [definition])
+  const [inputValues, setInputValues] = useState<Record<string, string>>({})
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await listWorkflowSchedules(workflow.id)
+      const [rows, featuresPayload] = await Promise.all([
+        listWorkflowSchedules(workflow.id),
+        getEffectiveFeaturesPayload().catch(() => null),
+      ])
       setSchedules(rows)
+      if (featuresPayload && typeof featuresPayload.scheduler_process_enabled === "boolean") {
+        setSchedulerEnabled(featuresPayload.scheduler_process_enabled)
+      }
       setLoadFailed(false)
       onChanged?.(rows)
     } catch {
@@ -183,6 +228,29 @@ export function WorkflowScheduleModal({
 
   const onCreate = () =>
     withBusy(async () => {
+      // ── 214-09 (STEP-02 / D-214-04): the schedule's `inputs` dict stops being kickoff-only ──
+      //
+      // ⭐ THIS SIDE OF THE PHASE IS COMPLETE END TO END, unlike the library door.
+      // `scheduler_service.py:139-162` already spreads a schedule's stored `inputs` into
+      // `run_inputs`, so a declared key entered here reaches `_external_action_inputs` on
+      // every unattended run. That is precisely why a scheduled `send_email` step could
+      // never receive its recipient before: there was nowhere to put one.
+      //
+      // ⚠ ALONGSIDE `kickoff_prompt`, NEVER REPLACING IT. The pre-change dict is built
+      // FIRST and the declared values are layered on top, so a definition that declares
+      // nothing produces the object this form has always sent, byte for byte.
+      //
+      // ⚠ A DECLARED KEY SPELLED `kickoff_prompt` WINS, AND THAT IS A DECISION.
+      // `launchInputFields` already strips the reserved keys, so the collision cannot
+      // actually arise from this form — but the ordering is written this way rather than
+      // the other because if it ever did, the AUTHOR's declared field is the one a person
+      // filled in on purpose. It costs nothing either way for the run itself:
+      // `_NON_ACTION_RUN_INPUTS = frozenset({"kickoff_prompt"})` excludes that key from
+      // action inputs BY NAME, so a step could never have read it as an argument anyway.
+      const inputs: Record<string, string> = kickoff.trim()
+        ? { kickoff_prompt: kickoff.trim() }
+        : {}
+      for (const f of launchFields) inputs[f.key] = inputValues[f.key] ?? ""
       await createWorkflowSchedule(workflow.id, {
         name: name.trim(),
         // ⚠ EXACTLY ONE cadence goes on the wire. Sending both is a 422 by design, and
@@ -192,10 +260,11 @@ export function WorkflowScheduleModal({
         timezone,
         max_tokens_per_run: maxTokens,
         max_duration_seconds: maxDuration,
-        inputs: kickoff.trim() ? { kickoff_prompt: kickoff.trim() } : {},
+        inputs,
       })
       setName("")
       setKickoff("")
+      setInputValues({})
       await refresh()
     })
 
@@ -251,6 +320,23 @@ export function WorkflowScheduleModal({
         </div>
 
         <div className="flex flex-col gap-6 p-6">
+          {schedulerEnabled === false && (
+            <div
+              role="status"
+              data-testid="scheduler-inactive-warning"
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-[12px] text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+              <div>
+                <span className="font-semibold text-amber-100">Scheduler daemon is inactive</span>
+                <p className="mt-0.5 leading-relaxed text-amber-200/90">
+                  Automations scheduler daemon is inactive on this installation. Schedules will not execute
+                  automatically on cadence unless the scheduler process is enabled or triggered manually.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ── what already exists ─────────────────────────────────────────────── */}
           <section className="flex flex-col gap-2">
             <h3 className="text-[13px] font-medium text-foreground">Existing schedules</h3>
@@ -349,6 +435,47 @@ export function WorkflowScheduleModal({
               />
             </label>
 
+            {/* ── 214-09 (STEP-02 / D-214-04): the workflow's DECLARED entry inputs ──────
+                ABOVE the cadence controls, because they say WHAT this schedule will run
+                with; the cadence says WHEN. A value entered once here is sent on every
+                unattended run — which is exactly why it is one named field per DECLARED key.
+
+                ⛔ NO EDITOR FOR AN ARBITRARY DICT IS BUILT HERE, and CONTEXT.md's deferral
+                on that half stands. A control that let a person invent their own key on a
+                scheduling surface is the JSON escape hatch SC#1 forbids one screen over.
+
+                ⚠ THE REFUSAL IS DELIBERATELY NOT SPELLED IN THE WORDS ITS FENCE MATCHES.
+                The plan's acceptance criterion is a raw `grep -ciE` over THIS FILE, and prose
+                describing the absence would be counted as evidence of the presence — the
+                187-24 trap. The fence that actually guards this is in the suite, anchored on
+                comment-stripped CODE and carrying a positive control.
+
+                ⚠ TWO ARMS, NEVER THREE — the same rule the library Run modal renders. An
+                AUTHORED label is prose a human wrote → body face. A key with no label keeps
+                the mono face. Absence renders the KEY, never a fabricated friendly name. */}
+            {launchFields.length > 0 && (
+              <div data-testid="schedule-inputs" className="flex flex-col gap-3">
+                {launchFields.map((f) => (
+                  <label key={f.key} className="flex flex-col gap-1">
+                    {f.label ? (
+                      <span className="text-[12px] text-muted-foreground">{f.label}</span>
+                    ) : (
+                      <span className="font-mono text-[12px] text-muted-foreground">{f.key}</span>
+                    )}
+                    <input
+                      type="text"
+                      data-testid={`schedule-input-${f.key}`}
+                      value={inputValues[f.key] ?? ""}
+                      onChange={(e) =>
+                        setInputValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                      }
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+
             <fieldset className="flex flex-col gap-2">
               <legend className="text-[12px] text-muted-foreground">How often</legend>
               <div className="flex gap-3">
@@ -381,6 +508,28 @@ export function WorkflowScheduleModal({
                       </option>
                     ))}
                   </select>
+                  {/* ── BUG-260829-01 — THE COMMON CASE NEEDS NO CRON ────────────────────
+                      The five presets above have HARDCODED times, so every time that is not
+                      03:00 / 08:00 / 06:00 / on-the-hour fell through to the raw box below.
+                      The operator wanted 04:18 and had to hand-write `18 4 * * *`. This control
+                      composes it: pick a time, the expression is written for you. It REFLECTS
+                      an expression already in the field (via `timeOfDailyCron`) rather than
+                      resetting, so choosing a preset and then nudging the time both work. */}
+                  <label className="flex items-center gap-2">
+                    <span className="shrink-0 text-[12px] text-muted-foreground">
+                      {DAILY_TIME_LABEL}
+                    </span>
+                    <input
+                      type="time"
+                      data-testid="schedule-daily-time"
+                      value={timeOfDailyCron(cron) ?? ""}
+                      onChange={(e) => {
+                        const next = dailyCron(e.target.value)
+                        if (next) setCron(next)
+                      }}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
+                    />
+                  </label>
                   <input
                     data-testid="schedule-cron"
                     value={cron}
@@ -388,6 +537,24 @@ export function WorkflowScheduleModal({
                     spellCheck={false}
                     className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[13px] text-foreground"
                   />
+                  {/* ── BUG-260829-01 — SAY IT BACK, SO A TYPO IS VISIBLE BEFORE IT SAVES ──
+                      `18 4` and `4 19` are equally plausible to anyone who does not already
+                      know the field order, and a schedule that fires at the wrong hour reports
+                      NOTHING — you find out the next morning, or you never do. The echo reads
+                      the expression back; when it cannot, it says so and claims nothing about
+                      validity, because the SERVER owns that verdict and plenty of legal cron
+                      (a star-slash-number step, `1,15`, `MON`) is simply unphraseable here. */}
+                  <p
+                    data-testid="schedule-cron-means"
+                    className="text-[12px] leading-relaxed text-muted-foreground"
+                  >
+                    {describeCron(cron, timezone)
+                      ? `${CRON_MEANS_PREFIX} ${describeCron(cron, timezone)}`
+                      : CRON_UNREADABLE}
+                    <span className="ml-1 font-mono text-[11px] opacity-70">
+                      {CRON_FIELD_ORDER}
+                    </span>
+                  </p>
                   <label className="flex flex-col gap-1">
                     <span className="text-[12px] text-muted-foreground">
                       Time zone — the schedule fires by this clock, not the server&apos;s

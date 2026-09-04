@@ -67,16 +67,32 @@ function StatusIndicator({ status }: { status: TodoStatus }) {
   return <Circle className="h-4 w-4 flex-none text-panel-muted-foreground" aria-hidden="true" />
 }
 
+/**
+ * ⚠ Phase 224-05 (SEED-240) — THE BADGE NO LONGER DICTATES THE WRAP POINT.
+ *
+ * Measured by the operator at 1536x639: the panel column is `clamp(300px,30%,420px)`
+ * (`ChatLayout.tsx:727`) and resolved to **308px** — essentially its FLOOR — inside which a
+ * todo label was allotted ~186px before the status badge, so *"Search knowledge base for
+ * report data"* broke mid-phrase while the badge aligned to the first line only.
+ *
+ * ⚠ **Widening the panel is NOT available**: 308px means the clamp is already at its
+ * minimum on an ordinary laptop, so the fix has to be the row's layout.
+ *
+ * The row now wraps: the label takes the width it needs (floor `9rem`, so a short label
+ * keeps its badge inline exactly as before) and the badge drops to its own line only when
+ * the sentence genuinely needs the room. Nothing is truncated and nothing is hidden — the
+ * status word stays in the accessible tree, which the 088-05 colour rule requires.
+ */
 function TodoRow({ todo }: { todo: Todo }) {
   const status = normalizeStatus(todo.status)
   return (
-    <li className="flex items-start gap-2 px-3 py-1.5 text-[0.82rem] leading-relaxed">
+    <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
       <span className="mt-0.5">
         <StatusIndicator status={status} />
       </span>
       <span
         className={cn(
-          "min-w-0 flex-1 text-foreground/90",
+          "min-w-[9rem] flex-1 text-foreground/90",
           // Phase 088-05 (UAT SC#2): completed-todo text is meaningful content →
           // panel-scoped AA muted (light --muted-foreground was 4.01:1 on panel).
           status === "completed" && "text-panel-muted-foreground line-through",
@@ -111,13 +127,13 @@ function DerivedRow({ item }: { item: DerivedPanelItem }) {
   // ("pending" | "in_progress" | "completed") — normalize defensively anyway.
   const status = normalizeStatus(item.status)
   return (
-    <li className="flex items-start gap-2 px-3 py-1.5 text-[0.82rem] leading-relaxed">
+    <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
       <span className="mt-0.5">
         <StatusIndicator status={status} />
       </span>
       <span
         className={cn(
-          "min-w-0 flex-1 text-foreground/90",
+          "min-w-[9rem] flex-1 text-foreground/90",
           status === "completed" && "text-panel-muted-foreground line-through",
         )}
       >

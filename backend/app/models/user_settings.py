@@ -1194,23 +1194,29 @@ _GOVERNED_FEATURES: dict[str, str] = {
     "model_management": "operators",
     "workflow_authoring": "everyone",
     "governance_health": "everyone",
-    # Phase 181 (REVERT-01 / D-181-01,05): the v3.6 visual_workflow_canvas layer ships
-    # behind a governed flag whose cold default is the 5th audience enum member "off" —
-    # hidden from EVERYONE, operators included. This is the ONE authoritative cold default
-    # (an unseeded feature_visibility key falls through to it), which is why NO migration is
-    # needed: the app_settings.feature_visibility JSONB gains the key only on an operator
-    # flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and back).
-    "visual_workflow_canvas": "off",
-    # Phase 190 (CONN-03 / D-26): live outbound sending ships behind a governed flag whose
-    # cold default is the same 5th audience enum member "off" — hidden from EVERYONE,
-    # operators included. NO migration is needed for exactly the reason stated above: this
-    # dict is the ONE authoritative cold default (an unseeded feature_visibility key falls
-    # through to it), and the app_settings.feature_visibility JSONB gains the key only on an
-    # operator flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and
-    # back). With it off an external_action step behaves exactly as it does today: it
-    # records, it does not send, and it reads "Not sent — recorded" — an already-tested
-    # state, which is what makes this off-switch cheap and honest rather than a second code
-    # path (UI-SPEC §9).
+    # Phase 214 (D-214-19) — FLIPPED "off" -> "everyone". Phase 181 (REVERT-01 / D-181-01,05)
+    # shipped the v3.6 canvas layer behind this flag at the 5th audience enum member "off",
+    # hidden from EVERYONE, operators included. That default is now WRONG: the canvas layer
+    # has shipped through 199, 200, 209, 211 and 213 and is the surface this milestone
+    # governs, so left "off" the phase's own criteria render for NOBODY on a fresh install.
+    # ⚠ Phase 209's 16/16 browser drive ran against a hand-flipped DATABASE and therefore
+    # shipped nothing to anyone — a criterion verified behind a flipped row is not shipped.
+    # This dict is still the ONE authoritative cold default (an unseeded feature_visibility
+    # key falls through to it), which is why NO migration is needed: the
+    # app_settings.feature_visibility JSONB gains the key only on an operator flip via
+    # set_feature_visibility's atomic `||` merge, and the flip is now "everyone" -> "off"
+    # for an operator who wants it hidden rather than "off" -> "everyone" to turn it on.
+    "visual_workflow_canvas": "everyone",
+    # Phase 190 (CONN-03 / D-26): live outbound sending. ⚠ THIS ONE STAYS "off", and
+    # D-214-19 says so explicitly — arming real outbound sending for every user is a bigger
+    # decision than Phase 214's criteria describe, so it remains a separately armed one.
+    # ⚠ Do NOT read this default off its neighbour above: the two were near-copies until
+    # 2026-08-28 and the canvas flip made adjacency a liar. The reasons differ — the canvas
+    # governs what a user can SEE; this governs whether a step really SENDS.
+    # With it off an external_action step behaves exactly as it does today: it records, it
+    # does not send, and it reads "Not sent — recorded" — an already-tested state, which is
+    # what makes this off-switch cheap and honest rather than a second code path
+    # (UI-SPEC §9). NO migration is needed here either, for the same cold-default reason.
     "live_connectors": "off",
 }
 

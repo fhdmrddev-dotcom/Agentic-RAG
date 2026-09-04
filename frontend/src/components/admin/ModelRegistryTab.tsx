@@ -73,11 +73,31 @@ const NUM_FIELDS: readonly NumField[] = [
   { key: "llm_call_timeout_seconds", label: "Timeout", tech: "llm_call_timeout_seconds", suffix: "s" },
 ]
 
-/** Compact large token counts (400000 → "400k"); small values render verbatim. */
+/** The capability columns a Reset may clear — the scope of the row-level "Reset overrides".
+ *
+ *  ⚠ `enabled` / `deprecated` / `deprecated_reason` are DELIBERATELY EXCLUDED even though the
+ *  backend tracks them in `overridden_fields` exactly like the rest (`_MODEL_CAP_COLUMNS` has
+ *  eight entries, not five). They are operator LIFECYCLE state, not capabilities, and clearing
+ *  them is not a no-op: `_registry_row` resolves a null `enabled` to **True**
+ *  (`model_registry.py`), so a "reset" on a model an operator deliberately hid would put it
+ *  back in front of users. A reset hands back the built-in DEFAULT; it never makes a
+ *  visibility decision on the operator's behalf. */
+const RESETTABLE_CAPS = [
+  "context_window_tokens",
+  "max_output_tokens",
+  "llm_call_timeout_seconds",
+  "native_tools",
+  "emit_tier",
+] as const
+
+/** ONE numbering convention for every numeric cell: thousands-grouped digits, plus the
+ *  field's unit suffix where it has one (`16,384` · `4,096` · `550s`). ⚠ There used to be a
+ *  compact-`k` branch here that fired only when `n % 100 === 0`, so one column could read
+ *  `400k` while the column beside it read `131,072` — the same quantity styled two ways in
+ *  one row. These are inline-EDITABLE values: the operator types the exact integer back, so
+ *  the display must be the number they typed, never a rounded rendering of it. */
 function fmtNum(n: number, suffix?: string): string {
-  if (suffix) return `${n}${suffix}`
-  if (n >= 1000 && n % 100 === 0) return `${n / 1000}k`
-  return n.toLocaleString()
+  return `${n.toLocaleString("en-US")}${suffix ?? ""}`
 }
 
 /** Group rows by provider, preserving first-seen provider order (stable sections). */
@@ -101,7 +121,16 @@ export function ModelRegistryTab({
   showTechnical,
 }: ModelRegistryTabProps) {
   const groups = useMemo(() => (rows ? groupByProvider(rows) : []), [rows])
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // ⚠ This tracks the OPEN sections, not the closed ones — so the empty initial Set means
+  // EVERY provider lands FOLDED, which is what an operator opening this tab should see. The
+  // registry is provider-grouped precisely because nobody reads all of it at once, and with
+  // every section open the page ran to several screens before "Discover models".
+  //
+  // Storing the OPEN set is also what makes "folded by default" work without an effect:
+  // provider names are only known AFTER the fetch resolves, so a `collapsed` set would have
+  // to be back-filled once `rows` arrives — which flashes the table open on first paint and
+  // has to decide what to do about a provider that appears later.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   if (rows === null) {
     return (
@@ -124,7 +153,7 @@ export function ModelRegistryTab({
   }
 
   function toggleSection(provider: string) {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(provider)) next.delete(provider)
       else next.add(provider)
@@ -139,7 +168,7 @@ export function ModelRegistryTab({
       {onAddModel && <AddModelSection onAddModel={onAddModel} />}
       <section aria-label="Model registry" className="space-y-2.5">
       {groups.map(([provider, providerRows]) => {
-        const isCollapsed = collapsed.has(provider)
+        const isCollapsed = !expanded.has(provider)
         const Logo = providerLogo(provider)
         const shownCount = providerRows.filter((r) => r.enabled).length
         return (
@@ -173,28 +202,42 @@ export function ModelRegistryTab({
 
             {!isCollapsed && (
               <div className="overflow-x-auto border-t border-border/60">
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full border-collapse text-sm table-fixed">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <Th>
+                      {/* Column widths are set here and enforced by table-fixed so every
+                          provider section renders with identical proportions. */}
+                      <Th className="w-[21%]">
                         Model {showTechnical && <TechName>model_id</TechName>}
                       </Th>
                       {NUM_FIELDS.map((f) => (
-                        <Th key={f.key}>
-                          {f.label} {showTechnical && <TechName>{f.tech}</TechName>}
+                        <Th key={f.key} className="w-[10%]">
+                          {f.label}
+                          {showTechnical && (
+                            <TechName className="block break-all leading-tight">{f.tech}</TechName>
+                          )}
                         </Th>
                       ))}
-                      <Th>
+                      <Th className="w-[8%]">
                         Tools {showTechnical && <TechName>native_tools</TechName>}
                       </Th>
-                      <Th>
-                        Document filling {showTechnical && <TechName>emit_tier</TechName>}
+                      <Th className="w-[16%]">
+                        <span className="inline-flex items-center gap-1">
+                          Document filling {showTechnical && <TechName>emit_tier</TechName>}
+                          <span
+                            title="Setting this records what you believe the provider supports; nothing verifies it against the provider."
+                            aria-label="Document filling note"
+                            className="cursor-help select-none text-muted-foreground/50 hover:text-muted-foreground"
+                          >
+                            ⓘ
+                          </span>
+                        </span>
                       </Th>
-                      <Th>
+                      <Th className="w-[6%]">
                         Enabled {showTechnical && <TechName>enabled</TechName>}
                       </Th>
-                      <Th>Users see</Th>
-                      <Th aria-label="Row actions" />
+                      <Th className="w-[9%]">Users see</Th>
+                      <Th className="w-[10%]" aria-label="Row actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -219,10 +262,10 @@ export function ModelRegistryTab({
   )
 }
 
-function Th({ children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+function Th({ children, className, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className="border-t border-border/40 px-3 py-2 text-left font-medium first:pl-4"
+      className={cn("border-t border-border/40 px-3 py-2 text-left font-medium first:pl-4", className)}
       {...rest}
     >
       {children}
@@ -230,8 +273,8 @@ function Th({ children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>)
   )
 }
 
-function TechName({ children }: { children: React.ReactNode }) {
-  return <span className="font-mono text-[9px] text-muted-foreground">{children}</span>
+function TechName({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <span className={cn("font-mono text-[9px] text-muted-foreground", className)}>{children}</span>
 }
 
 /** One capability row. Owns only its transient write state (busy / receipt / the
@@ -256,6 +299,9 @@ function ModelRow({
 
   const id = row.model_id
   const overridden = new Set(row.overridden_fields)
+  // WR-05 honest lock: anthropic/google route through their native SDK branches, which never
+  // consult `native_tools` — so neither the toggle NOR its Reset does anything there.
+  const toolsGated = row.provider === "anthropic" || row.provider === "google"
 
   /** The single write chokepoint — busy → onSetCapability → ✎ receipt flash, or the
    *  in-row plain refusal on a rejection (the server 409 detail is `ApiError.message`). */
@@ -296,8 +342,8 @@ function ModelRow({
       <tr data-model={id} data-coupling={row.enabled ? "shown" : "hidden"} className="hover:bg-accent/20">
         {/* Model id + org-default marker + the deprecated toggle. */}
         <td className="border-t border-border/40 py-2 pl-4 pr-3 align-middle">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-foreground">{id}</span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="block truncate font-mono text-xs text-foreground">{id}</span>
             {row.is_default && (
               <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-warning">
                 org default
@@ -335,15 +381,30 @@ function ModelRow({
             byte-identical. Silent inertness on an operator control is banned (Control-Room
             honest-locks doctrine), so the toggle is gated with the always-native tooltip. */}
         <td className="border-t border-border/40 px-3 py-2 align-middle">
-          <RowToggle
-            on={row.native_tools}
-            busy={busy}
-            label={`Native tools for ${id}`}
-            tone="primary"
-            gated={row.provider === "anthropic" || row.provider === "google"}
-            gatedTitle="Always native on this provider — Anthropic/Google models run their native SDK paths, which don't consult this toggle."
-            onToggle={() => void write({ native_tools: !row.native_tools })}
-          />
+          <div className="flex min-w-0 items-center gap-1.5">
+            <RowToggle
+              on={row.native_tools}
+              busy={busy}
+              label={`Native tools for ${id}`}
+              tone="primary"
+              gated={toolsGated}
+              gatedTitle="Always native on this provider — Anthropic/Google models run their native SDK paths, which don't consult this toggle."
+              onToggle={() => void write({ native_tools: !row.native_tools })}
+            />
+            {/* ⚠ `native_tools` lands in `overridden_fields` exactly like the numeric columns,
+                but this cell used to render the EFFECTIVE value and nothing else — so once an
+                operator flipped Tools they could not see it was an override, and had no way
+                back to the built-in default from this screen at all. On a gated provider the
+                marker is read-only: a write here changes no routing, and offering an inert
+                click is the silent inertness the honest-locks doctrine bans. */}
+            <SourceTag
+              overridden={overridden.has("native_tools")}
+              fieldLabel="Tools"
+              modelId={id}
+              busy={busy}
+              onReset={toolsGated ? undefined : () => void write({ native_tools: null })}
+            />
+          </div>
         </td>
 
         {/* emit_tier — this tab's FIRST enum column (NUM_FIELDS is int-only, RowToggle is
@@ -379,6 +440,7 @@ function ModelRow({
         <td className="border-t border-border/40 px-3 py-2 align-middle">
           <div className="flex items-center justify-end gap-2">
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />}
+            <RowResetControl row={row} busy={busy} onWrite={write} />
             {receipt && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning" role="status">
                 <Check className="h-3 w-3 text-success" aria-hidden="true" />✎ recorded
@@ -452,7 +514,7 @@ function EmitTierControl({
   const effective = row.emit_tier ?? "coerce"
 
   return (
-    <div className="flex min-w-[13rem] flex-col gap-1">
+    <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5">
         <select
           className="w-full rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground disabled:opacity-50"
@@ -471,37 +533,17 @@ function EmitTierControl({
             </option>
           ))}
         </select>
-        {overridden ? (
-          <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
-            ovr
-          </span>
-        ) : (
-          <span className="shrink-0 text-[9px] italic text-muted-foreground">def</span>
-        )}
+        {/* The shared marker — which is also this field's Reset (explicit `null` clears the
+            override to DEF). It replaces a bespoke lowercase `ovr`/`def` pair that disagreed
+            with the OVR/DEF every other column renders for the very same state. */}
+        <SourceTag
+          overridden={overridden}
+          fieldLabel="Document filling"
+          modelId={row.model_id}
+          busy={busy}
+          onReset={() => void onWrite({ emit_tier: null })}
+        />
       </div>
-
-      {/* Reset appears ONLY on an overridden field and sends an explicit `null` — the same
-          explicit-null-is-Reset semantics the numeric cells use, honoured by the backend
-          guard loop's `if val is None: continue` arm. */}
-      {overridden && (
-        <button
-          type="button"
-          className="self-start text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
-          disabled={busy}
-          onClick={() => void onWrite({ emit_tier: null })}
-        >
-          Reset to default
-        </button>
-      )}
-
-      {/* Open Question 2, answered here. Surfacing an already-doc-verified value makes no new
-          provider claim — but making it EDITABLE introduces an unverified assertion, and this
-          caption is the whole of what keeps that honest. Same register as RowToggle's
-          honest-lock docblock: say what the control does and does not guarantee. */}
-      <span className="text-[10px] leading-snug text-muted-foreground">
-        Setting this records what you believe the provider supports; nothing verifies it
-        against the provider.
-      </span>
 
       {showTechnical && <TechName>emit_tier: {row.emit_tier ?? "null"}</TechName>}
     </div>
@@ -573,56 +615,166 @@ function NumericCell({
           }
         }}
         onBlur={(e) => commitFrom(e.target.value)}
-        className="w-24 rounded-[5px] border border-primary bg-background px-1.5 py-1 font-mono text-xs text-foreground"
+        className="w-full min-w-0 rounded-[5px] border border-primary bg-background px-1.5 py-1 font-mono text-xs text-foreground"
       />
     )
   }
 
+  // ⚠ The tag sits OUTSIDE the edit button, not inside it. It is a button now (it carries
+  // the Reset), and a button nested in a button is invalid HTML whose click reaches both.
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-1.5">
       <button
         type="button"
         disabled={busy}
         aria-label={`Edit ${field.label} for ${modelId}`}
         onClick={onStartEdit}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-[5px] border border-transparent px-1.5 py-0.5 text-left transition-colors hover:border-border hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60",
+          "inline-flex min-w-0 items-center rounded-[5px] border border-transparent px-1.5 py-0.5 text-left transition-colors hover:border-border hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60",
           !overridden && "italic text-muted-foreground",
         )}
       >
-        <span className="font-mono text-xs">
+        <span className="truncate font-mono text-xs">
           {value === null ? "—" : fmtNum(value, field.suffix)}
         </span>
-        <SourceTag overridden={overridden} />
       </button>
-      {overridden && (
-        <button
-          type="button"
-          disabled={busy}
-          aria-label={`Reset ${field.label} for ${modelId}`}
-          title="Reset to the built-in default"
-          onClick={onReset}
-          className="inline-flex items-center gap-0.5 rounded-[5px] border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-        >
-          <RotateCcw className="h-2.5 w-2.5" aria-hidden="true" />
-          Reset
-        </button>
-      )}
+      <SourceTag
+        overridden={overridden}
+        fieldLabel={field.label}
+        modelId={modelId}
+        busy={busy}
+        onReset={onReset}
+      />
     </div>
   )
 }
 
 /** OVR (your stored edit, primary) vs DEF (inherited from the built-in registry, dim). */
-function SourceTag({ overridden }: { overridden: boolean }) {
+/** The row-level "put this model back how you found it" — ONE write that clears EVERY
+ *  overridden capability at once.
+ *
+ *  The backend already makes this a single request: `set_model_capability` writes only the
+ *  keys PRESENT in the body and treats an explicit `null` as a clear (`admin.py`), so five
+ *  nulls is one parameterized upsert, one cache invalidation and one ✎ `model.capability.set`
+ *  receipt — not five round trips, and not five audit rows for one intention.
+ *
+ *  ⚠ ARM-TO-CONFIRM, per the Control-Room graded-action-guards rule. Clearing up to five
+ *  stored values is a bigger step than clearing one, so the first click ARMS (naming the
+ *  count it is about to clear) and only the second commits. It disarms itself after 4s so an
+ *  armed destructive control is never left sitting on the screen. The accessible name is
+ *  STABLE across both states — an assistive-tech user must not have the control rename itself
+ *  underneath them mid-interaction.
+ *
+ *  Renders NOTHING on a row with no capability overrides: an action with no effect is not an
+ *  affordance, and this column is shared with the lock. */
+function RowResetControl({
+  row,
+  busy,
+  onWrite,
+}: {
+  row: ModelRegistryRow
+  busy: boolean
+  onWrite: (patch: ModelCapabilityPatch) => Promise<void>
+}) {
+  const [armed, setArmed] = useState(false)
+  const disarmAt = useRef<number | null>(null)
+  // The timer outlives a row that unmounts while armed (a re-fetch replaces the list) — clear
+  // it, or the callback fires setState on a gone component.
+  useEffect(
+    () => () => {
+      if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+    },
+    [],
+  )
+
+  const stored = RESETTABLE_CAPS.filter((c) => row.overridden_fields.includes(c))
+  if (stored.length === 0) return null
+
+  const noun = stored.length === 1 ? "value" : "values"
   return (
-    <span
+    <button
+      type="button"
+      disabled={busy}
+      aria-label={`Reset ${stored.length} overridden ${noun} for ${row.model_id}`}
+      title={`Clear every operator override on this model (${stored.join(", ")}) and fall back to the built-in defaults.`}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true)
+          disarmAt.current = window.setTimeout(() => setArmed(false), 4000)
+          return
+        }
+        if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+        setArmed(false)
+        void onWrite(Object.fromEntries(stored.map((c) => [c, null])) as ModelCapabilityPatch)
+      }}
       className={cn(
-        "rounded px-1 py-px font-mono text-[9px] tracking-wide",
-        overridden ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+        "inline-flex flex-none items-center gap-0.5 rounded-[5px] border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-50",
+        armed
+          ? "border-warning bg-warning/15 font-medium text-warning"
+          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
       )}
     >
-      {overridden ? "OVR" : "DEF"}
-    </span>
+      <RotateCcw className="h-2.5 w-2.5 flex-none" aria-hidden="true" />
+      {armed ? `Reset ${stored.length}?` : stored.length}
+    </button>
+  )
+}
+
+/** The per-field OVR/DEF marker — and, on an overridden field, the Reset ITSELF.
+ *
+ *  The tag IS the button. D-149-03's Reset used to be a separate control beside it, which
+ *  cost most of a column's width in a `table-fixed` table: three numeric cells carrying
+ *  value + tag + Reset overflowed their 8% columns and painted over Tools. The marker
+ *  already appears on exactly the fields that CAN be reset, so folding the action into it
+ *  costs zero extra width — and it extends to any column that can carry an override, which
+ *  is how `native_tools` finally got one. The accessible name is unchanged
+ *  (`Reset <field> for <model>`), so a Reset is still a named control.
+ *
+ *  DEF is a plain span, never a button: there is no stored override to clear, so there is
+ *  nothing to click. Same for an overridden field whose reset is inert (the gated
+ *  anthropic/google Tools column) — offering a click that changes no routing would be the
+ *  silent-inertness the honest-locks doctrine bans. */
+function SourceTag({
+  overridden,
+  fieldLabel,
+  modelId,
+  busy,
+  onReset,
+}: {
+  overridden: boolean
+  fieldLabel: string
+  modelId: string
+  busy?: boolean
+  /** Omit to render the marker read-only (a DEF field, or an override that cannot be cleared). */
+  onReset?: () => void
+}) {
+  if (!overridden || !onReset) {
+    return (
+      <span
+        className={cn(
+          "flex-none rounded px-1 py-px font-mono text-[9px] tracking-wide",
+          overridden ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+        )}
+      >
+        {overridden ? "OVR" : "DEF"}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      aria-label={`Reset ${fieldLabel} for ${modelId}`}
+      title={`Set by an operator — click to reset ${fieldLabel} to the built-in default`}
+      onClick={onReset}
+      className="group/ovr inline-flex flex-none items-center gap-0.5 rounded bg-primary/15 px-1 py-px font-mono text-[9px] tracking-wide text-primary transition-colors hover:bg-primary/30 disabled:opacity-50"
+    >
+      OVR
+      <RotateCcw
+        className="h-2 w-2 flex-none opacity-0 transition-opacity group-hover/ovr:opacity-100"
+        aria-hidden="true"
+      />
+    </button>
   )
 }
 

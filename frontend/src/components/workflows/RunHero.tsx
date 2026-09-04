@@ -52,6 +52,7 @@ function resolveEmptySentence(
   failedStepTitle: string | null,
   phases: readonly WorkflowRunPhase[],
   titleOf: (slug: string) => string,
+  metadata?: Record<string, any> | null,
 ): string {
   switch (status) {
     case "completed":
@@ -66,8 +67,27 @@ function resolveEmptySentence(
       }
       return HERO_EMPTY_FAILED_GENERIC
     }
-    case "cancelled":
+    case "cancelled": {
+      const cb = metadata?.circuit_breaker
+      if (cb && typeof cb === "object") {
+        if (cb.reason === "token_budget_exceeded") {
+          const used = Number(cb.cumulative_tokens ?? 0).toLocaleString()
+          const max = Number(cb.max_tokens ?? 0).toLocaleString()
+          return `Stopped: Token budget exceeded (used ${used} of ${max} tokens).`
+        }
+        // ⚠ `max_duration_exceeded`, NOT `duration_budget_exceeded`. This literal is
+        // `REASON_MAX_DURATION` in `backend/app/services/circuit_breaker.py:56`; the
+        // sibling token arm above matched and only this one drifted, so the duration
+        // sentence never rendered. Pinned from the backend side in
+        // `test_210_run_metadata_reaches_the_client.py` so a rename is caught there.
+        if (cb.reason === "max_duration_exceeded") {
+          const elapsed = cb.elapsed_seconds ?? 0
+          const maxDur = cb.max_duration_seconds ?? 0
+          return `Stopped: Duration limit exceeded (${elapsed}s of ${maxDur}s).`
+        }
+      }
       return HERO_EMPTY_CANCELLED
+    }
     case "timed_out":
       return HERO_EMPTY_FAILED_GENERIC
     default: {
@@ -108,6 +128,7 @@ export function RunHero({
       failedStepTitle,
       run.phases,
       titleOf,
+      run.metadata,
     )
 
     return (

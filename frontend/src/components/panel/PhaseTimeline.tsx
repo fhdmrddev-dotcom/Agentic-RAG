@@ -33,6 +33,21 @@ import type { Phase } from "@/types"
 // derivation module so the canvas run view reads the same one. `timed_out` is carried
 // forward unchanged (D-188-21) — the measurement is recorded in that module's docblock.
 import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
+// ── Phase 214-11 Task 2 (STEP-04 / D-214-16) — THE TIMELINE'S STEP IDENTITY IS `PhaseCard`'S,
+//    AND THAT IS A DECISION RATHER THAN AN OMISSION.
+//
+// This module does not import `StepIdentity` and must not. It renders one `PhaseCard` per
+// phase (`:359-362`) and passes the whole `Phase` row down, so the identity arrives here as a
+// CONSEQUENCE of the card mounting it — which is precisely D-214-16's *"coverage should be a
+// consequence of one component existing, not a list kept in sync."* A second mount here would
+// be the second home the decision exists to prevent, and the two could then disagree about the
+// same step on the same screen.
+//
+// ⚠ SO THE CLAIM IS VERIFIED AT RUNTIME, NOT BY A GREP OVER THIS FILE. `__tests__/
+// PhaseTimeline.test.tsx` renders the timeline with an `external_action` row and asserts
+// `[data-step-identity]` is really in the tree — *verify it renders, do not assume the child
+// does*. A grep would be satisfied by this very paragraph, which is the 187-24 trap and is why
+// the paragraph is not the evidence.
 import { PhaseCard } from "./PhaseCard"
 // WR-05 — the panel's status vocabulary, read from its ONE home rather than re-derived.
 import { statusWord } from "./phaseStatusMeta"

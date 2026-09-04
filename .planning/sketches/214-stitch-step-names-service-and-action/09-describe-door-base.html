@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Describe Workflow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#dee2f1",
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "error": "#ffb4ab",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-primary-fixed": "#0b0664",
+                        "secondary-container": "#571ac2",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-container-highest": "#303540",
+                        "on-tertiary-container": "#004c1e",
+                        "surface-container-lowest": "#090e18",
+                        "surface-container-low": "#171c26",
+                        "on-error": "#690005",
+                        "outline": "#918f9c",
+                        "inverse-primary": "#5355a9",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-container": "#1b202a",
+                        "inverse-surface": "#dee2f1",
+                        "background": "#0e131e",
+                        "tertiary-container": "#26c760",
+                        "on-tertiary-fixed": "#002109",
+                        "surface-dim": "#0e131e",
+                        "surface-bright": "#343945",
+                        "primary-container": "#a3a5ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "secondary": "#d0bcff",
+                        "primary-fixed": "#e1e0ff",
+                        "surface-container-high": "#252a35",
+                        "on-secondary": "#3b0091",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#c1c1ff",
+                        "secondary-fixed": "#e9ddff",
+                        "primary": "#c3c4ff",
+                        "on-primary": "#242478",
+                        "on-background": "#dee2f1",
+                        "on-secondary-container": "#c3abff",
+                        "surface-variant": "#303540",
+                        "outline-variant": "#464651",
+                        "surface": "#0e131e",
+                        "inverse-on-surface": "#2b303c",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "tertiary": "#4ee478",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "on-primary-container": "#353789",
+                        "on-tertiary": "#003915"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {}
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom utilities for strict typography mapping if needed */
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Smooth scrolling and focus outline resets */
+        html { scroll-behavior: smooth; }
+        *:focus-visible { outline: 2px solid theme('colors.primary'); outline-offset: 2px; }
+        
+        /* Hide scrollbar for textarea */
+        textarea::-webkit-scrollbar { display: none; }
+        textarea { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-[#060A0F] text-on-surface font-body antialiased overflow-x-hidden">
+<!-- SideNavBar (From JSON) -->
+<nav class="h-screen w-64 fixed left-0 top-0 flex flex-col bg-[#080B11] border-r border-[#212631]/50 z-20">
+<div class="flex flex-col h-full py-6">
+<!-- Header -->
+<div class="px-6 mb-8 flex flex-col gap-1">
+<h1 class="font-headline text-lg font-bold text-[#F4F6FE]">Aether Intelligence</h1>
+<span class="font-label text-[11px] uppercase tracking-wider text-[#9AA3B5]">Deep Midnight</span>
+</div>
+<!-- Primary Nav -->
+<div class="flex flex-col gap-1 flex-1 px-3">
+<!-- Chat (Inactive) -->
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] rounded-md hover:bg-[#151B24] duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="chat_bubble">chat_bubble</span>
+<span class="font-headline font-semibold text-[14px]">Chat</span>
+</a>
+<!-- Workflows (Active) -->
+<a class="text-[#A3A5FF] bg-[#A3A5FF]/15 border-r-2 border-[#635BFF] flex items-center px-4 py-3 gap-3 transition-colors translate-x-1 duration-200 rounded-l-md" href="#">
+<span class="material-symbols-outlined fill text-[20px]" data-icon="account_tree">account_tree</span>
+<span class="font-headline font-semibold text-[14px]">Workflows</span>
+</a>
+<!-- Knowledge (Inactive) -->
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] rounded-md hover:bg-[#151B24] duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="database">database</span>
+<span class="font-headline font-semibold text-[14px]">Knowledge</span>
+</a>
+</div>
+<!-- CTA -->
+<div class="px-6 mb-6">
+<button class="w-full flex items-center justify-center gap-2 bg-[#A3A5FF] text-[#060A0F] py-2.5 rounded hover:bg-[#c1c1ff] transition-colors font-headline font-semibold text-[14px]">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Workflow
+                </button>
+</div>
+<!-- Footer Nav -->
+<div class="flex flex-col gap-1 px-3 mt-auto">
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] rounded-md hover:bg-[#151B24] duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-headline font-semibold text-[14px]">Settings</span>
+</a>
+<a class="text-[#9AA3B5] flex items-center px-4 py-3 gap-3 transition-colors hover:text-[#F4F6FE] rounded-md hover:bg-[#151B24] duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="menu_book">menu_book</span>
+<span class="font-headline font-semibold text-[14px]">Documentation</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- TopAppBar (From JSON) -->
+<header class="h-16 fixed top-0 right-0 left-64 z-10 bg-[#060A0F] border-b border-[#212631]/50 flex items-center justify-between px-8">
+<!-- Search/Brand Left Context -->
+<div class="flex items-center gap-4">
+<!-- Product Name active anchor -->
+<span class="font-headline font-medium text-[15px] text-[#F4F6FE]">Workflows</span>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+</button>
+<button class="text-[#9AA3B5] hover:text-[#F4F6FE] transition-colors h-8 w-8 flex items-center justify-center rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+<button class="border border-[#212631] text-[#A3A5FF] px-4 py-1.5 rounded text-[13px] font-headline font-medium hover:bg-surface-container transition-colors">
+                Execute Run
+            </button>
+<div class="h-8 w-8 rounded-full bg-surface-variant border border-outline-variant flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-outline-variant text-[18px]">person</span>
+</div>
+</div>
+</header>
+<!-- Main Canvas (The "Calm Instrument" Workspace) -->
+<main class="ml-64 pt-16 min-h-screen flex flex-col items-center">
+<!-- Center Column Constraint -->
+<div class="w-full max-w-3xl px-8 py-24 flex flex-col flex-1 relative">
+<!-- Top Half: The Description Input -->
+<div class="relative w-full group mb-20">
+<div class="absolute -left-6 top-1.5 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300">
+<span class="material-symbols-outlined text-primary-fixed-dim text-[16px]">edit</span>
+</div>
+<textarea class="w-full bg-transparent border-0 border-b border-[#212631] focus:border-primary-container focus:ring-0 resize-none font-display text-4xl leading-tight text-on-surface placeholder:text-outline-variant pb-4 transition-colors" placeholder="Describe your workflow..." rows="3" spellcheck="false">Every Monday, scan Salesforce for new leads and post a summary to Slack.</textarea>
+</div>
+<!-- Middle Section: Connected Services Vocabulary -->
+<div class="flex flex-col gap-4 mb-20">
+<h3 class="font-label text-xs uppercase tracking-widest text-outline-variant font-semibold">Connected Services</h3>
+<div class="flex items-center gap-3">
+<!-- Slack (ON - Active/Highlighted) -->
+<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-container/10 border border-primary-container text-primary-fixed-dim shadow-[0_0_15px_rgba(163,165,255,0.05)] transition-all">
+<span class="material-symbols-outlined text-[20px]">forum</span>
+<span class="font-body text-sm font-medium">Slack</span>
+</div>
+<!-- Jira (OFF) -->
+<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low border border-[#212631] text-outline opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">bug_report</span>
+<span class="font-body text-sm font-medium">Jira</span>
+</div>
+<!-- Gmail (OFF) -->
+<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low border border-[#212631] text-outline opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">mail</span>
+<span class="font-body text-sm font-medium">Gmail</span>
+</div>
+<!-- GitHub (OFF) -->
+<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-low border border-[#212631] text-outline opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">code</span>
+<span class="font-body text-sm font-medium">GitHub</span>
+</div>
+</div>
+</div>
+<!-- Bottom Half: The Refusal Block -->
+<div class="flex flex-col gap-5 p-6 rounded-xl bg-[#0D1117] border border-[#212631] mt-auto">
+<div class="flex items-start gap-4">
+<div class="mt-0.5 w-8 h-8 rounded-full bg-surface-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-outline text-[18px]">cloud_off</span>
+</div>
+<div class="flex flex-col gap-1">
+<p class="font-body text-on-surface-variant text-[15px] leading-relaxed">
+                            Salesforce is not connected.
+                        </p>
+</div>
+</div>
+<div class="flex items-center gap-3 pl-12">
+<button class="bg-on-surface text-surface-container-lowest px-4 py-2 rounded font-headline font-semibold text-sm hover:bg-white transition-colors flex items-center gap-2">
+                        Connect Salesforce
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+<button class="px-4 py-2 rounded border border-[#212631] text-outline hover:text-on-surface hover:bg-surface-container transition-colors font-headline font-medium text-sm">
+                        Revise description
+                    </button>
+</div>
+</div>
+</div>
+<!-- Sticky Footer Action -->
+<div class="w-full fixed bottom-0 left-64 right-0 p-6 bg-gradient-to-t from-[#060A0F] to-transparent pointer-events-none flex justify-center">
+<div class="w-full max-w-3xl flex justify-end pointer-events-auto">
+<button class="flex items-center gap-2 px-6 py-3 rounded-lg bg-surface-container-low border border-[#212631] text-outline cursor-not-allowed opacity-75">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+<span class="font-headline font-medium text-[15px]">Waiting for connection</span>
+</button>
+</div>
+</div>
+</main>
+<script>
+        // Minimal interaction logic to automatically adjust textarea height if needed, 
+        // though resizing is disabled for the tight design spec.
+        const textarea = document.querySelector('textarea');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    </script>
+</body></html>

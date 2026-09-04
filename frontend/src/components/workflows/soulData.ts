@@ -78,7 +78,14 @@ export interface DefShape {
   // them (`RunModal.tsx`) turned it into a documented refusal built on a premise that was
   // measurably false. Widening the member is the whole fix; see `entryInputFields` below
   // for the one subset it genuinely does not cover.
-  inputs?: Array<{ key?: string; label?: string | null }> | null
+  // ── 214.1-01 (STEP-02) — THE SECOND ONE-MEMBER WIDENING, for the same reason and by the
+  // same method as the `label` one directly above. `InputFieldSpec.required` is a
+  // `bool = True` on the backend model and has ALWAYS travelled inside
+  // `WorkflowDefinition.inputs`; this read-shape threw it away, so the three launch doors
+  // could not tell a required field from an optional one and drew them identically. Widening
+  // the member is the whole fix — `entryInputFields` below carries it, and
+  // `LaunchInputFields` renders it as the SHIPPED mark rather than a new string.
+  inputs?: Array<{ key?: string; label?: string | null; required?: boolean | null }> | null
   input_keys?: string[] | null
   phases?: Array<{
     slug?: string
@@ -164,11 +171,31 @@ export function tierForDefinition(def: DefShape | null | undefined) {
  * `list[str]`) has NO label anywhere, on the wire or off it, and that subset stays
  * unlabelled: the key is the only true thing there is to print. Inventing a friendly
  * sentence for it would be fabricating an author's words.
+ *
+ * ⚠ 214.1-01 ADDS A THIRD ABSENCE ARM TO THAT SAME RULE, and it is written HERE beside the
+ * code it governs rather than in a plan nobody will read again: **A LABEL EQUAL TO ITS KEY IS
+ * AN ABSENCE.** The declared-input door writes `label: key` on a one-click declaration,
+ * because `InputFieldSpec.label` is a required `str` and inventing a friendly name would be
+ * exactly the fabrication the two arms exist to refuse. Without this arm every such
+ * declaration would print in the BODY face, which tells a reader *"a human phrased this
+ * word"* about a word nobody phrased. A label identical to the key carries nothing the key
+ * does not, so it is dropped and the key renders in the mono face. The comparison is made
+ * AFTER trimming, for the same reason the whitespace arm exists.
  */
 export interface EntryInputField {
   key: string
   /** The author's own label. ABSENT means the definition has none — never a default. */
   label?: string
+  /**
+   * Whether a launcher marks this field required.
+   *
+   * ⚠ ABSENT ON THE WIRE READS `true`, because `InputFieldSpec.required` is `bool = True`
+   * server-side. Defaulting the other way here would be a client that disagreed with the
+   * model about what a definition says — a second copy of a server predicate, and a wrong one.
+   * ⛔ It is a MARK, never a block: see `LaunchInputFields.tsx`'s docblock for why, and for
+   * the re-open trigger that would change it.
+   */
+  required?: boolean
 }
 
 /**
@@ -180,19 +207,26 @@ export interface EntryInputField {
 export function entryInputFields(def: DefShape | null | undefined): EntryInputField[] {
   if (!def) return []
   if (Array.isArray(def.input_keys) && def.input_keys.length > 0) {
-    return def.input_keys.map((key) => ({ key }))
+    // A bare `input_keys` row carries no label and no requiredness anywhere, on the wire or
+    // off it. `required` still reads `true` — that is the model's default, not an invention.
+    return def.input_keys.map((key) => ({ key, required: true }))
   }
   const fromInputs = (def.inputs ?? [])
-    .filter((i): i is { key?: string; label?: string | null } => !!i)
+    .filter((i): i is { key?: string; label?: string | null; required?: boolean | null } => !!i)
     .map((i) => {
+      const key = i.key ?? ""
       const label = typeof i.label === "string" ? i.label.trim() : ""
-      // An empty or whitespace-only label is an ABSENCE, not a value to print.
-      return label ? { key: i.key ?? "", label } : { key: i.key ?? "" }
+      // ⚠ ABSENT reads TRUE, matching `InputFieldSpec.required = True`. Only an explicit
+      // `false` is falsy here, so a `null` or a missing key both mean required.
+      const required = i.required !== false
+      // An empty or whitespace-only label is an ABSENCE, not a value to print — and so is a
+      // label EQUAL TO ITS KEY, which carries nothing the key does not (see the docblock).
+      return label && label !== key ? { key, label, required } : { key, required }
     })
     .filter((f) => !!f.key)
   if (fromInputs.length > 0) return fromInputs
   // The wire kickoff is always content-only → kickoff_prompt (D-103-CONF-1).
-  return [{ key: "kickoff_prompt" }]
+  return [{ key: "kickoff_prompt", required: true }]
 }
 
 /**
@@ -204,6 +238,46 @@ export function entryInputFields(def: DefShape | null | undefined): EntryInputFi
  */
 export function entryInputKeys(def: DefShape | null | undefined): string[] {
   return entryInputFields(def).map((f) => f.key)
+}
+
+/**
+ * Phase 214-09 (STEP-02 / D-214-04) — the RUN-SCAFFOLDING keys a launcher must NOT draw a
+ * field for, because another control on the same form already collects them and the server
+ * STRIPS a launcher-supplied copy.
+ *
+ * ⚠ THIS MIRRORS A BACKEND FROZENSET AND SAYS SO RATHER THAN RE-DERIVING IT.
+ * `backend/app/models/message.py::RESERVED_RUN_INPUT_KEYS` is
+ * `frozenset({"kickoff_prompt", "folder_id"})`, and BOTH kickoff merge sites strip those keys
+ * out of a launcher's `inputs` dict before they reach `create_workflow_run.inputs`. Plan
+ * `214-16` measured the strip into existence; this constant is the client half of the same
+ * one rule. ⚠ A DIVERGENCE IS A SILENT DATA LOSS, NOT A TYPE ERROR — a field drawn for a key
+ * the server strips is `BUG-260826-01` in a new costume: a control a person fills in whose
+ * value reaches nothing. Change the two together or not at all.
+ *
+ * Both keys already have their own control on every launcher this phase touches: the Run
+ * modal's kickoff textarea and its KB-scope `<select>`; the schedule form's "Starting
+ * instruction" textarea. A second control for the same fact is not a feature.
+ */
+export const RESERVED_LAUNCH_INPUT_KEYS: ReadonlySet<string> = new Set([
+  "kickoff_prompt",
+  "folder_id",
+])
+
+/**
+ * The declared entry inputs a LAUNCHER should render a field for.
+ *
+ * `entryInputFields` answers *"what does this definition declare?"* and its last arm falls
+ * back to `[{ key: "kickoff_prompt" }]` for a definition that declares nothing at all — which
+ * is the right answer to that question and the WRONG list to draw a form from. Every
+ * definition would grow a text field beside the kickoff textarea that collects the same fact,
+ * and the server would strip the value on arrival.
+ *
+ * So this is `entryInputFields` MINUS the reserved keys, and nothing else: same resolver, same
+ * precedence, same two-arm label rule. An empty result means *"this launcher asks for nothing
+ * extra"* and a caller renders no field region at all.
+ */
+export function launchInputFields(def: DefShape | null | undefined): EntryInputField[] {
+  return entryInputFields(def).filter((f) => !RESERVED_LAUNCH_INPUT_KEYS.has(f.key))
 }
 
 /**

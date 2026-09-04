@@ -1,0 +1,957 @@
+<title>Six Applications, One Token</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOKENS — copied verbatim from frontend/src/index.css. Not invented.
+   Bare :root is the LIGHT set; the two guarded blocks redefine only tokens.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --background: 220 20% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --primary: 239 84% 67%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 220 14% 94%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 220 14% 92%;
+  --destructive: 0 84% 60%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 60%;
+  --border: 220 13% 89%;
+
+  --page: 222 24% 95%;
+  --ink: 222 30% 16%;
+  --ink-dim: 222 12% 42%;
+  --rule: 222 16% 84%;
+  --mark: 258 80% 40%;
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --app-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --app-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: 216 45% 4%;
+    --foreground: 226 60% 97%;
+    --card: 220 30% 7%;
+    --primary: 239 100% 82%;
+    --primary-foreground: 243 100% 32%;
+    --muted: 220 30% 11%;
+    --muted-foreground: 220 16% 65%;
+    --accent: 220 25% 14%;
+    --destructive: 0 72% 51%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 60%;
+    --border: 220 20% 16%;
+
+    --page: 220 32% 6%;
+    --ink: 226 45% 92%;
+    --ink-dim: 220 16% 62%;
+    --rule: 220 20% 18%;
+    --mark: 258 95% 84%;
+  }
+}
+:root[data-theme="dark"] {
+  --background: 216 45% 4%;
+  --foreground: 226 60% 97%;
+  --card: 220 30% 7%;
+  --primary: 239 100% 82%;
+  --primary-foreground: 243 100% 32%;
+  --muted: 220 30% 11%;
+  --muted-foreground: 220 16% 65%;
+  --accent: 220 25% 14%;
+  --destructive: 0 72% 51%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 60%;
+  --border: 220 20% 16%;
+
+  --page: 220 32% 6%;
+  --ink: 226 45% 92%;
+  --ink-dim: 220 16% 62%;
+  --rule: 220 20% 18%;
+  --mark: 258 95% 84%;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: hsl(var(--page)); color: hsl(var(--ink));
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 40px 28px 96px; }
+
+.masthead { border-bottom: 1px solid hsl(var(--rule)); padding-bottom: 26px; margin-bottom: 34px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .12em;
+  text-transform: uppercase; color: hsl(var(--mark)); margin: 0 0 12px; }
+h1 { font-size: clamp(30px, 4.4vw, 44px); font-weight: 600; line-height: 1.1;
+  letter-spacing: -.021em; margin: 0 0 14px; text-wrap: balance; }
+.standfirst { font-size: 17px; line-height: 1.6; color: hsl(var(--ink-dim)); max-width: 63ch; margin: 0; }
+.standfirst strong { color: hsl(var(--ink)); font-weight: 600; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 22px;
+  font-family: var(--mono); font-size: 11.5px; color: hsl(var(--ink-dim)); }
+.meta b { color: hsl(var(--ink)); font-weight: 500; }
+
+h2 { font-size: 13px; font-weight: 600; letter-spacing: .075em; text-transform: uppercase;
+  color: hsl(var(--ink-dim)); margin: 0 0 6px; padding-bottom: 9px;
+  border-bottom: 1px solid hsl(var(--rule)); }
+.h2note { font-size: 14px; color: hsl(var(--ink-dim)); margin: 0 0 18px; max-width: 68ch; }
+.stage { margin-top: 54px; }
+
+.split { display: grid; grid-template-columns: 460px minmax(0, 1fr); gap: 40px; align-items: start; }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0,1fr); } }
+.panel-frame { position: sticky; top: 26px; }
+.frame-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em;
+  text-transform: uppercase; color: hsl(var(--ink-dim)); margin-bottom: 10px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE PANEL — app tokens only. Geometry mirrors ConnectionGrantsList.tsx.
+   ══════════════════════════════════════════════════════════════════════════ */
+.app { font-family: var(--app-sans); background: hsl(var(--background));
+  color: hsl(var(--foreground)); border: 1px solid hsl(var(--border));
+  border-radius: 12px; overflow: hidden; box-shadow: 0 18px 44px -28px rgb(0 0 0 / .55); }
+.app-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+.conn-head { display: flex; gap: 11px; align-items: flex-start; padding: 14px;
+  border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+.conn-head .grow { min-width: 0; flex: 1; }
+.conn-name { font-size: 14px; font-weight: 600; letter-spacing: -.005em; }
+.conn-sub { font-size: 11.5px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+.conn-sub .dot { opacity: .45; margin: 0 5px; }
+
+.mark { width: 30px; height: 30px; flex: none; border-radius: 8px; display: grid; place-items: center;
+  border: 1px solid hsl(var(--border)); background: hsl(var(--muted));
+  font-size: 12px; font-weight: 700; letter-spacing: -.02em; color: hsl(var(--muted-foreground)); }
+.mark.sm { width: 22px; height: 22px; border-radius: 6px; font-size: 10px; }
+.mark[data-app="drive"]    { color: hsl(45 95% 55%); }
+.mark[data-app="gmail"]    { color: hsl(4 78% 60%); }
+.mark[data-app="sheets"]   { color: hsl(145 62% 43%); }
+.mark[data-app="docs"]     { color: hsl(217 89% 62%); }
+.mark[data-app="calendar"] { color: hsl(217 89% 62%); }
+.mark[data-app="contacts"] { color: hsl(199 92% 50%); }
+
+.linkish { background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+  font-size: 11.5px; color: hsl(var(--muted-foreground));
+  text-decoration: underline; text-underline-offset: 2px; }
+.linkish:hover { color: hsl(var(--foreground)); }
+.linkish.danger { color: hsl(var(--destructive)); }
+
+.default-card { border-radius: 8px; border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / .4); padding: 12px; }
+.default-card .lbl { font-size: 11px; font-weight: 500; }
+.default-card .note { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 6px; line-height: 1.45; }
+
+.seg { display: inline-flex; border: 1px solid hsl(var(--border)); border-radius: 6px;
+  overflow: hidden; background: hsl(var(--card)); flex: none; }
+.seg button { font: inherit; font-size: 11px; font-weight: 500; padding: 4px 10px; border: 0;
+  border-left: 1px solid hsl(var(--border)); cursor: pointer; background: transparent;
+  color: hsl(var(--muted-foreground)); transition: background .12s, color .12s; }
+.seg button:first-child { border-left: 0; }
+.seg button:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.seg button[aria-pressed="true"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 600; }
+.seg button[aria-pressed="true"][data-deny] { background: hsl(var(--destructive)); color: #fff; }
+.seg.tiny button { padding: 3px 8px; font-size: 10.5px; }
+
+/* ── application groups ───────────────────────────────────────────────── */
+.apps { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
+.appgroup + .appgroup { border-top: 1px solid hsl(var(--border)); }
+.appgroup { background: hsl(var(--card)); }
+.apphead { display: flex; align-items: flex-start; gap: 10px; padding: 10px 11px; width: 100%;
+  text-align: left; background: none; border: 0; font: inherit; cursor: pointer; }
+.apphead:hover { background: hsl(var(--accent) / .5); }
+.apphead .grow { min-width: 0; flex: 1; }
+.apptitle { display: flex; align-items: center; gap: 8px; }
+.appname { font-size: 12.5px; font-weight: 600; letter-spacing: -.004em; }
+.appcount { font-size: 10.5px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.appline { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; line-height: 1.4; }
+.chev { width: 14px; height: 14px; flex: none; margin-top: 4px;
+  color: hsl(var(--muted-foreground)); transition: transform .16s; }
+.appgroup[data-open="true"] .chev { transform: rotate(90deg); }
+
+.avail { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 10.5px; line-height: 1.45; }
+.avail svg { width: 12px; height: 12px; flex: none; margin-top: 1px; }
+.avail[data-state="off"]   { color: hsl(var(--warning)); }
+.avail[data-state="scope"] { color: hsl(var(--primary)); }
+.avail button.linkish { font-size: 10.5px; color: inherit; }
+
+/* ── the DIRECTION band — the second axis, and it carries NO control ──── */
+.dirband {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 11px 6px 43px;
+  background: hsl(var(--muted) / .5);
+  border-top: 1px solid hsl(var(--border));
+}
+.dirband .lab { font-size: 10px; font-weight: 600; letter-spacing: .07em;
+  text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.dirband .n { font-size: 10px; color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums; opacity: .8; }
+.dirband[data-dir="write"] .lab { color: hsl(var(--warning)); }
+.dirband .grow { flex: 1; }
+.dirband .nocontrol { font-size: 9.5px; color: hsl(var(--muted-foreground)); opacity: .7; font-style: italic; }
+.dirband.proposed { background: transparent; border-top-style: dashed; }
+.dirband .soon { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  border: 1px dashed hsl(var(--border)); border-radius: 4px; padding: 1px 5px;
+  color: hsl(var(--muted-foreground)); }
+
+/* ── action rows ──────────────────────────────────────────────────────── */
+.arow { display: flex; align-items: flex-start; gap: 12px; padding: 10px;
+  border-left: 2px solid transparent; background: hsl(var(--card)); }
+.arow + .arow, .dirband + .arow { border-top: 1px solid hsl(var(--border)); }
+.dirband + .arow { border-top: 0; }
+.arow.overridden { border-left-color: hsl(var(--primary)); background: hsl(var(--primary) / .06); }
+.arow.ghost { opacity: .5; }
+.arow .grow { min-width: 0; flex: 1; }
+.aname { font-family: var(--app-mono); font-size: 12px; font-weight: 500; }
+.adesc { font-size: 11px; line-height: 1.35; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tag { border: 1px solid hsl(var(--border)); border-radius: 4px; padding: 2px 6px;
+  font-size: 10px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.tag.changes { border-color: hsl(var(--warning) / .35); color: hsl(var(--warning)); }
+.disabled-veil { opacity: .48; }
+
+/* ── the connections list rows ────────────────────────────────────────── */
+.rows { border: 1px solid hsl(var(--border)); border-radius: 10px; overflow: hidden; background: hsl(var(--card)); }
+.row { display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; }
+.row + .row { border-top: 1px solid hsl(var(--border)); }
+.row .grow { min-width: 0; flex: 1; }
+.rowname { font-size: 13px; font-weight: 500; }
+.rowsub { font-size: 11.5px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+.pill { font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.pill.ok   { color: hsl(var(--success)); border-color: hsl(var(--success) / .35); }
+.pill.warn { color: hsl(var(--warning)); border-color: hsl(var(--warning) / .35); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANNOTATION LAYER
+   ══════════════════════════════════════════════════════════════════════════ */
+.decks { display: flex; flex-direction: column; gap: 22px; }
+.deck { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 14px; }
+.dnum { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .03em;
+  color: hsl(var(--mark)); border: 1px solid hsl(var(--mark) / .35); border-radius: 6px;
+  height: 24px; display: grid; place-items: center; }
+.dtitle { font-size: 15.5px; font-weight: 600; letter-spacing: -.008em; margin: 0 0 6px; line-height: 1.3; }
+.dbody { font-size: 14px; line-height: 1.62; color: hsl(var(--ink-dim)); margin: 0; }
+.dbody + .dbody { margin-top: 9px; }
+.dbody strong { color: hsl(var(--ink)); font-weight: 600; }
+.dbody code, .icode { font-family: var(--mono); font-size: .87em;
+  background: hsl(var(--mark) / .11); color: hsl(var(--ink)); padding: 1px 5px; border-radius: 4px; }
+.rec { margin-top: 10px; padding: 10px 12px; border-radius: 7px;
+  border: 1px solid hsl(var(--mark) / .3); background: hsl(var(--mark) / .07);
+  font-size: 13.5px; line-height: 1.55; color: hsl(var(--ink)); }
+.rec b { font-family: var(--mono); font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+  color: hsl(var(--mark)); display: block; margin-bottom: 3px; }
+.rec.stop { border-color: hsl(var(--warning) / .5); background: hsl(var(--warning) / .09); }
+.rec.stop b { color: hsl(38 82% 46%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rec.stop b { color: hsl(var(--warning)); } }
+:root[data-theme="dark"] .rec.stop b { color: hsl(var(--warning)); }
+.cost { margin-top: 8px; font-family: var(--mono); font-size: 11.5px; color: hsl(var(--ink-dim)); }
+.cost b { color: hsl(var(--ink)); font-weight: 500; }
+
+.measured { border-left: 2px solid hsl(var(--mark)); padding: 2px 0 2px 15px; margin: 26px 0; }
+.measured p { margin: 0; font-size: 14px; line-height: 1.6; color: hsl(var(--ink-dim)); }
+.measured p + p { margin-top: 8px; }
+.measured strong { color: hsl(var(--ink)); font-weight: 600; }
+.measured .tagline { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: hsl(var(--mark)); margin-bottom: 6px; }
+
+.tablewrap { overflow-x: auto; margin-top: 16px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid hsl(var(--rule)); vertical-align: top; }
+th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: hsl(var(--ink-dim)); font-weight: 500; }
+td.mono { font-family: var(--mono); font-size: 12px; }
+td.num { font-variant-numeric: tabular-nums; }
+.v-ok  { color: hsl(var(--success)); font-weight: 500; }
+.v-off { color: hsl(var(--warning)); font-weight: 500; }
+
+footer { margin-top: 62px; padding-top: 20px; border-top: 1px solid hsl(var(--rule));
+  font-family: var(--mono); font-size: 11.5px; color: hsl(var(--ink-dim)); line-height: 1.7; }
+:focus-visible { outline: 2px solid hsl(var(--mark)); outline-offset: 2px; border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Sketch 221 · rev 2 · G-2 · approval required before build</p>
+    <h1>Six Applications, One Token</h1>
+    <p class="standfirst">
+      Google Workspace stops being one undifferentiated list and becomes <strong>six
+      applications</strong> — Drive, Gmail, Sheets, Docs, Calendar, Contacts — under a single
+      connection, a single token, a single Revoke. Inside each application, reads and writes
+      separate. <strong>Application is the first axis; direction is the second.</strong> One
+      component renders both this and a single-product connector like GitHub, where there is only
+      ever one application and the direction bands become the whole screen.
+    </p>
+    <div class="meta">
+      <span><b>Connection</b> unchanged — 1 row, 1 OAuth token</span>
+      <span><b>Grouping</b> application › direction › action</span>
+      <span><b>Backend</b> one field through discovery</span>
+    </div>
+  </header>
+
+  <div class="measured">
+    <p class="tagline">Measured 2026-08-31, after you enabled the remaining APIs</p>
+    <p>
+      All six Google APIs now answer, and <strong>10 of the 15 actions returned real data</strong> —
+      a live message, the primary calendar, the system labels, a busy-block window. Four had nothing
+      in the account to read. One is a genuine defect: <code>read_doc</code> handed a
+      <code>.docx</code> id returns a bare <code>HTTP 400 FAILED_PRECONDITION</code>, and a model
+      will do exactly that, because <code>search_files</code> hands back <code>.docx</code> and
+      native-Doc ids side by side.
+    </p>
+    <p>
+      Earlier the same day, <strong>three of the six were switched off and the panel said nothing
+      about any of them.</strong> That state is not gone — it is one console toggle away, and it is
+      what the availability line in D4 exists to surface.
+    </p>
+  </div>
+
+  <!-- ═══ STAGE 1 — Google, six applications ═══════════════════════════ -->
+  <section class="stage">
+    <h2>Case A — Google Workspace · six applications</h2>
+    <p class="h2note">
+      Drive is expanded to show both bands. Its two read actions ship today; the write band below
+      them is step 2 of your order, drawn here so the shape is agreed before it is built.
+    </p>
+
+    <div class="split">
+      <div class="panel-frame">
+        <div class="frame-label">Settings › Connections › Google Workspace — 460px</div>
+        <div class="app">
+
+          <div class="conn-head">
+            <div class="mark" data-app="drive">G</div>
+            <div class="grow">
+              <div class="conn-name">Google Workspace</div>
+              <div class="conn-sub">fhdmrd@gmail.com<span class="dot">·</span>6 applications<span class="dot">·</span>15 actions</div>
+            </div>
+            <button class="linkish danger" type="button">Revoke</button>
+          </div>
+
+          <div class="app-body">
+            <div class="default-card">
+              <div class="lbl">Every action asks first unless changed below.</div>
+              <div style="margin-top:7px">
+                <span class="seg" role="group" aria-label="Default for this connection">
+                  <button type="button" aria-pressed="false">Allow</button>
+                  <button type="button" aria-pressed="true">Ask</button>
+                  <button type="button" aria-pressed="false" data-deny>Deny</button>
+                </span>
+              </div>
+              <div class="note">Applications inherit this. An action inherits its application.</div>
+            </div>
+
+            <div class="apps">
+
+              <!-- DRIVE — open, two direction bands -->
+              <div class="appgroup" data-open="true">
+                <button class="apphead" type="button" aria-expanded="true">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="drive">D</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Drive</span><span class="appcount">2 actions</span></div>
+                    <div class="appline">Finding and reading files in this account's Drive.</div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="Drive default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+
+                <div class="dirband" data-dir="read">
+                  <span class="lab">Only reads</span><span class="n">2</span>
+                  <span class="grow"></span>
+                  <span class="nocontrol">no bulk control — see D3</span>
+                </div>
+                <div class="arow">
+                  <div class="grow">
+                    <div class="aname">search_files</div>
+                    <div class="adesc">Find files by name; returns id, type, size and last-modified time.</div>
+                    <div class="tags"><span class="tag">Only reads</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="search_files permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+                <div class="arow overridden">
+                  <div class="grow">
+                    <div class="aname">read_file</div>
+                    <div class="adesc">Read one file's text by its Drive id. A Doc or Sheet is exported first.</div>
+                    <div class="tags">
+                      <span class="tag">Only reads</span>
+                      <button class="linkish" type="button" style="font-size:10px">Use the default</button>
+                    </div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="read_file permission">
+                    <button type="button" aria-pressed="true">Allow</button>
+                    <button type="button" aria-pressed="false">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+
+                <div class="dirband proposed" data-dir="write">
+                  <span class="lab">Changes something</span><span class="n">3</span>
+                  <span class="grow"></span>
+                  <span class="soon">Step 2</span>
+                </div>
+                <div class="arow ghost">
+                  <div class="grow">
+                    <div class="aname">create_file</div>
+                    <div class="adesc">Create a new file. Only files this app created are ever visible to it.</div>
+                    <div class="tags"><span class="tag changes">Changes something outside</span><span class="tag">drive.file</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="create_file permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+                <div class="arow ghost">
+                  <div class="grow">
+                    <div class="aname">update_file</div>
+                    <div class="adesc">Replace the contents of a file this app created.</div>
+                    <div class="tags"><span class="tag changes">Changes something outside</span><span class="tag">drive.file</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="update_file permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+              </div>
+
+              <!-- GMAIL -->
+              <div class="appgroup">
+                <button class="apphead" type="button" aria-expanded="false">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="gmail">M</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Gmail</span><span class="appcount">5 actions</span></div>
+                    <div class="appline">Searching and reading mail, labels, threads and attachments.</div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="Gmail default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+              </div>
+
+              <!-- SHEETS -->
+              <div class="appgroup">
+                <button class="apphead" type="button" aria-expanded="false">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="sheets">S</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Sheets</span><span class="appcount">2 actions</span></div>
+                    <div class="appline">Listing a spreadsheet's tabs and reading its cells.</div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="Sheets default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+              </div>
+
+              <!-- DOCS -->
+              <div class="appgroup">
+                <button class="apphead" type="button" aria-expanded="false">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="docs">W</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Docs</span><span class="appcount">1 action</span></div>
+                    <div class="appline">Reading the text of a Google Doc.</div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="Docs default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+              </div>
+
+              <!-- CALENDAR -->
+              <div class="appgroup">
+                <button class="apphead" type="button" aria-expanded="false">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="calendar">31</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Calendar</span><span class="appcount">4 actions</span></div>
+                    <div class="appline">Listing calendars and events, reading one event, finding busy blocks.</div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="Calendar default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+              </div>
+
+              <!-- CONTACTS — the scope arm, still reachable -->
+              <div class="appgroup">
+                <button class="apphead" type="button" aria-expanded="false">
+                  <svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <div class="mark sm" data-app="contacts">C</div>
+                  <div class="grow">
+                    <div class="apptitle"><span class="appname">Contacts</span><span class="appcount">1 action</span></div>
+                    <div class="appline">Searching this account's contacts by name or email.</div>
+                    <div class="avail" data-state="scope">
+                      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.8v3.6M8 10.6v.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                      <span>You did not grant permission for contacts. <button class="linkish" type="button">Add it without reconnecting</button></span>
+                    </div>
+                  </div>
+                  <span class="seg tiny disabled-veil" role="group" aria-label="Contacts default">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decks">
+
+        <div class="deck">
+          <div class="dnum">D1</div>
+          <div>
+            <h3 class="dtitle">Six applications — but never six authentications</h3>
+            <p class="dbody">
+              Six separate connections would mean six consent screens, six refresh tokens, six rows
+              in your list for one Google account, and six places to revoke. While the consent screen
+              is in <strong>Testing</strong>, each of those refresh tokens expires independently every
+              7 days — six weekly breakages instead of one.
+            </p>
+            <p class="dbody">
+              It would also reverse a direction already written into the code.
+              <code>service_tools.py</code> records it: a <code>gmail</code> service id
+              <em>"would have meant a second row, a second consent and two places to revoke."</em>
+            </p>
+            <div class="rec">
+              <b>Recommended</b>
+              Keep one connection, and get the real benefit of separate auth another way —
+              <strong>incremental consent</strong>. Grant Drive now, add Calendar later, same
+              connection, same token. That is what the Contacts row above offers: <em>"add it without
+              reconnecting."</em>
+            </div>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D2</div>
+          <div>
+            <h3 class="dtitle">Application first, direction second</h3>
+            <p class="dbody">
+              Claude.ai groups Rovo purely by direction because Rovo has <strong>one axis</strong> —
+              it is a single product surface. Google is six products, six APIs, six scopes and six
+              independent failure modes.
+            </p>
+            <p class="dbody">
+              This morning three of them were switched off <em>separately</em>, and this evening you
+              enabled them <em>separately</em>. Direction cannot express "Calendar is switched off";
+              application can. <strong>Organise on the axis your failures actually arrive on.</strong>
+            </p>
+            <p class="dbody">
+              Direction still earns its place one level down, where it answers a different question:
+              not <em>which product is this</em> but <em>can this action change anything</em>.
+            </p>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D3</div>
+          <div>
+            <h3 class="dtitle">The direction band carries no bulk control</h3>
+            <p class="dbody">
+              This is the one part of Claude.ai's design not to copy. Each of their groups —
+              including <em>Read-only tools · 22</em> — carries its own <code>Needs approval</code>
+              dropdown, so one click sets twenty-two tools at once, keyed on direction.
+            </p>
+            <p class="dbody">
+              Your ROADMAP forbids precisely that, in these words: <strong>"the grant-time gate must
+              NOT key on direction, because a read is exactly where prompt injection enters."</strong>
+              A poisoned search result is the attack; <em>allow all reads</em> is its front door.
+            </p>
+            <div class="rec stop">
+              <b>Do not build</b>
+              A posture control on the read band. The band groups and counts; it does not grant.
+              The bulk control lives on the <strong>application</strong>, where the axis is the
+              product and not the direction.
+            </div>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D4</div>
+          <div>
+            <h3 class="dtitle">The availability line, and its three states</h3>
+            <p class="dbody">
+              Three different things stop an application working, and today they are
+              indistinguishable until a tool fails in chat: the Cloud API is off; the scope was never
+              granted; or it works. The first two have <em>opposite</em> remedies — one is a console
+              visit where reconnecting is useless, the other a scope grant where the console is
+              useless.
+            </p>
+            <p class="dbody">
+              So the panel says which. <strong>A working application says nothing at all</strong> —
+              silence is the healthy state. Only a blocked one speaks, and it names the remedy rather
+              than a status.
+            </p>
+            <div class="rec">
+              <b>Recommended</b>
+              Fill it from the existing <span class="icode">Check</span> action, which today only
+              verifies credentials. One check, six verdicts, cached beside
+              <span class="icode">last_check_verdict</span>.
+            </div>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D5</div>
+          <div>
+            <h3 class="dtitle">Three permission levels, matching the three grouping levels</h3>
+            <p class="dbody">
+              Today the ladder is <em>action → connection default</em>. The application becomes the
+              middle rung: <em>action → application → connection default</em>. "Allow everything Drive
+              does, ask about everything else" is the sentence people want, and it is unsayable now
+              without setting fifteen switches.
+            </p>
+            <p class="dbody">
+              Stored as an <code>app:drive</code> key inside the existing <code>tool_grants</code>
+              object — no new column, no migration.
+              <code>resolve_effective_posture</code> gains one lookup between its two existing steps
+              and keeps failing closed.
+            </p>
+            <div class="cost"><b>Cost</b> ~10 lines in <span class="icode">grants.py</span> · 1 line in the sanitizer's key filter</div>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D6</div>
+          <div>
+            <h3 class="dtitle">An application's Allow never reaches its writes</h3>
+            <p class="dbody">
+              When the write band lands, setting Drive to <strong>Allow</strong> must not silently arm
+              <code>create_file</code>. A write starts at Ask and only an explicit per-action Allow
+              moves it — which is also why the write rows above are drawn at Ask even though Drive's
+              own <code>read_file</code> is overridden to Allow.
+            </p>
+            <p class="dbody">
+              Building the ladder with that rule stated now is far cheaper than retrofitting it onto
+              a shipped Allow that already cascades.
+            </p>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D7</div>
+          <div>
+            <h3 class="dtitle">One backend field, and it is not the one you'd guess</h3>
+            <p class="dbody">
+              The grouping key exists in <code>SERVICE_TOOL_SPECS</code> but does not reach the
+              browser. <code>extra_descriptors_for_service</code> strips it deliberately and says so:
+              <em>"the execution fields are STRIPPED here rather than carried through … none of which
+              has any business seeing a URL path."</em>
+            </p>
+            <p class="dbody">
+              That reasoning is right and should not be reversed. Add a separate presentation-safe
+              <code>app</code> key to each spec and emit it beside <code>title</code>. It carries no
+              host, no path, no method.
+            </p>
+            <div class="cost"><b>Cost</b> 1 key × 15 specs · 1 line in the projection · 1 field on <span class="icode">McpDiscoveredTool</span></div>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D8</div>
+          <div>
+            <h3 class="dtitle">Six product marks, or one Google glyph six times?</h3>
+            <p class="dbody">
+              The sketch draws neutral monogram tiles in each product's hue, because inventing brand
+              marks in a sketch is worse than admitting the gap. Shipped, the icon convention sources
+              marks from <code>@lobehub/icons</code> via <code>lib/connectionMark.tsx</code>, which
+              knows exactly one <code>google</code> mark today.
+            </p>
+            <div class="rec">
+              <b>Recommended</b>
+              Six distinct marks. The premise of the split is that these read as six applications;
+              six copies of one glyph undoes it at a glance. Any of the six lobehub lacks falls back
+              to the monogram rather than blocking.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STAGE 2 — GitHub, one application ════════════════════════════ -->
+  <section class="stage">
+    <h2>Case B — GitHub · one application, 44 actions</h2>
+    <p class="h2note">
+      The same component, on a single-product connector. There is one application, so its header
+      collapses away and the direction bands become the whole screen — which is the Rovo shape you
+      screenshotted. Counts are real: <strong>44 discovered tools, 27 read-only, 17 write</strong>,
+      read from the live connection row.
+    </p>
+
+    <div class="split">
+      <div class="panel-frame" style="position:static">
+        <div class="frame-label">Settings › Connections › GitHub — 460px</div>
+        <div class="app">
+
+          <div class="conn-head">
+            <div class="mark">GH</div>
+            <div class="grow">
+              <div class="conn-name">GitHub</div>
+              <div class="conn-sub">api.github.com<span class="dot">·</span>44 actions</div>
+            </div>
+            <button class="linkish danger" type="button">Remove</button>
+          </div>
+
+          <div class="app-body">
+            <div class="default-card">
+              <div class="lbl">Every action asks first unless changed below.</div>
+              <div style="margin-top:7px">
+                <span class="seg" role="group" aria-label="Default for this connection">
+                  <button type="button" aria-pressed="false">Allow</button>
+                  <button type="button" aria-pressed="true">Ask</button>
+                  <button type="button" aria-pressed="false" data-deny>Deny</button>
+                </span>
+              </div>
+              <div class="note">One application, so an action inherits the connection directly.</div>
+            </div>
+
+            <div class="apps">
+              <div class="appgroup" data-open="true">
+                <div class="dirband" data-dir="read" style="border-top:0">
+                  <span class="lab" style="padding-left:0">Only reads</span><span class="n">27</span>
+                  <span class="grow"></span>
+                  <span class="nocontrol">no bulk control — see D3</span>
+                </div>
+                <div class="arow">
+                  <div class="grow">
+                    <div class="aname">get_file_contents</div>
+                    <div class="tags"><span class="tag">Only reads</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="get_file_contents permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+                <div class="arow">
+                  <div class="grow">
+                    <div class="aname">list_commits</div>
+                    <div class="tags"><span class="tag">Only reads</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="list_commits permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+                <div class="arow">
+                  <div class="grow">
+                    <div class="aname">search_code</div>
+                    <div class="tags"><span class="tag">Only reads</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="search_code permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+
+                <div class="dirband" data-dir="write">
+                  <span class="lab" style="padding-left:0">Changes something</span><span class="n">17</span>
+                  <span class="grow"></span>
+                  <span class="nocontrol">no bulk control — see D3</span>
+                </div>
+                <div class="arow">
+                  <div class="grow">
+                    <div class="aname">create_pull_request</div>
+                    <div class="tags"><span class="tag changes">Changes something outside</span></div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="create_pull_request permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="true">Ask</button>
+                    <button type="button" aria-pressed="false" data-deny>Deny</button>
+                  </span>
+                </div>
+                <div class="arow overridden">
+                  <div class="grow">
+                    <div class="aname">delete_file</div>
+                    <div class="tags">
+                      <span class="tag changes">Changes something outside</span>
+                      <button class="linkish" type="button" style="font-size:10px">Use the default</button>
+                    </div>
+                  </div>
+                  <span class="seg tiny" role="group" aria-label="delete_file permission">
+                    <button type="button" aria-pressed="false">Allow</button>
+                    <button type="button" aria-pressed="false">Ask</button>
+                    <button type="button" aria-pressed="true" data-deny>Deny</button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decks">
+        <div class="deck">
+          <div class="dnum">D9</div>
+          <div>
+            <h3 class="dtitle">One component, both shapes</h3>
+            <p class="dbody">
+              A connector's applications are just <em>the distinct values of the</em>
+              <code>app</code> <em>key across its tools</em>. Google resolves to six; GitHub, Jira,
+              Notion and every MCP server resolve to one.
+            </p>
+            <p class="dbody">
+              When there is exactly one, its header is redundant — the connection header already
+              names it — so it collapses and the direction bands rise to the top. That is not a
+              special case in the code; it is <code>if (apps.length === 1)</code> skipping one row.
+              <strong>Rendering Rovo's screen costs nothing extra.</strong>
+            </p>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D10</div>
+          <div>
+            <h3 class="dtitle">Where the search box goes</h3>
+            <p class="dbody">
+              The shipped list has a <em>Search 44 actions</em> box, and at 44 it is the only way to
+              find anything. It stays — above the groups, filtering across all of them, with groups
+              that match nothing hidden while the search is active.
+            </p>
+            <p class="dbody">
+              Google at 15 does not need it and Google at 30 will. Keeping one behaviour for both
+              beats a box that appears at a threshold nobody can predict.
+            </p>
+          </div>
+        </div>
+
+        <div class="deck">
+          <div class="dnum">D11</div>
+          <div>
+            <h3 class="dtitle">Direction must not be inferred where it is unknown</h3>
+            <p class="dbody">
+              <code>readOnlyHint</code> was measured <strong>absent</strong> on the one MCP server we
+              can reach, and the spec says an unannotated tool is to be treated as destructive. So a
+              connector whose tools carry no hint gets <strong>no direction bands at all</strong> —
+              one ungrouped list — rather than a silently wrong "Only reads" heading.
+            </p>
+            <div class="rec stop">
+              <b>Fail closed</b>
+              Bands appear only when the direction is <em>known</em>. Absence is not a third band; it
+              is the absence of banding.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STAGE 3 — the list ═══════════════════════════════════════════ -->
+  <section class="stage">
+    <h2>Case C — the connections list</h2>
+    <p class="h2note">Nothing splits out here. Google stays one row and gains an honest verdict.</p>
+    <div class="split">
+      <div class="panel-frame" style="position:static">
+        <div class="frame-label">Settings › Connections — list rows</div>
+        <div class="app">
+          <div class="rows">
+            <div class="row">
+              <div class="mark" data-app="drive">G</div>
+              <div class="grow">
+                <div class="rowname">Google Workspace</div>
+                <div class="rowsub">6 applications · 15 actions</div>
+              </div>
+              <span class="pill ok">Ready</span>
+            </div>
+            <div class="row">
+              <div class="mark">M</div>
+              <div class="grow">
+                <div class="rowname">Microsoft 365</div>
+                <div class="rowsub">Connected, but no actions were ever discovered</div>
+              </div>
+              <span class="pill warn">Not usable</span>
+            </div>
+            <div class="row">
+              <div class="mark">GH</div>
+              <div class="grow">
+                <div class="rowname">GitHub</div>
+                <div class="rowsub">44 actions · 27 read, 17 change something</div>
+              </div>
+              <span class="pill ok">Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decks">
+        <div class="deck">
+          <div class="dnum">D12</div>
+          <div>
+            <h3 class="dtitle">"Ready" stops being a lie</h3>
+            <p class="dbody">
+              Google is one row with a count. Its verdict is derived, so when an API goes off again it
+              reads <strong>Partly ready · 3 need attention</strong> without anyone maintaining a flag.
+            </p>
+            <p class="dbody">
+              The same derived rule fixes Microsoft 365, which today shows
+              <em>OAuth connected · ✓ Ready</em> with <strong>zero tools</strong> — an
+              <code>oauth_byo</code> row that never completed discovery. A connection with no usable
+              actions is <strong>Not usable</strong>, not Ready. That closes your open item #4 as a
+              side effect rather than as its own phase.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stage">
+    <h2>What this costs</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Change</th><th>Where</th><th>Size</th></tr></thead>
+        <tbody>
+          <tr><td>An <code>app</code> key on each Google spec</td><td class="mono">connectors/service_tools.py</td><td class="num">15 lines</td></tr>
+          <tr><td>Emit it through discovery</td><td class="mono">extra_descriptors_for_service</td><td class="num">1 line</td></tr>
+          <tr><td>Application rung in the posture ladder</td><td class="mono">connectors/grants.py</td><td class="num">~10 lines</td></tr>
+          <tr><td>Allow the <code>app:</code> key prefix</td><td class="mono">_sanitize_tool_grants</td><td class="num">1 line</td></tr>
+          <tr><td>Per-application availability verdicts</td><td class="mono">the existing Check action</td><td class="num">new, small</td></tr>
+          <tr><td>Grouping, bands, availability line</td><td class="mono">ConnectionGrantsList.tsx</td><td class="num">the bulk</td></tr>
+          <tr><td>Derived row verdict</td><td class="mono">connectionsCopy.ts + row</td><td class="num">small</td></tr>
+          <tr><td>Six product marks</td><td class="mono">lib/connectionMark.tsx</td><td class="num">6 entries</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="h2note" style="margin-top:16px">
+      No migration. No change to the connection row, the token, the consent screen or the OAuth flow.
+      <code>ConnectionGrantsList.tsx</code> carries almost all of it, which is also the G-5 question
+      to settle at planning: that file is 344 lines and this roughly doubles it.
+    </p>
+  </section>
+
+  <footer>
+    Sketch 221 rev 2 · <span style="opacity:.7">.planning/sketches/221-six-applications-one-token/</span><br>
+    Tokens are Deep Midnight, copied from frontend/src/index.css — both themes.<br>
+    Geometry mirrors ConnectionGrantsList.tsx as shipped; this is a re-expression, not the component.<br>
+    Approve or redirect D1–D12 before any code is written.
+  </footer>
+
+</div>

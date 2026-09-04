@@ -22,8 +22,39 @@
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
+- ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
 
 ---
+
+## v3.9 Connections: Any Service, Any Tool — SHIPPED 2026-09-04
+
+**16 phases** (210-217 CORE + inserts 214.1 / 217.1 + 220-227; 218 ABSORBED into 217.1; **219
+DEFERRED**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days, git tag `v3.9`.
+**34 ✅ delivered · 3 ⚠ partial · 2 ⛔ never-driven, of 39 requirements.**
+Full detail: [`milestones/v3.9-ROADMAP.md`](milestones/v3.9-ROADMAP.md) ·
+requirements: [`milestones/v3.9-REQUIREMENTS.md`](milestones/v3.9-REQUIREMENTS.md) ·
+audit: [`milestones/v3.9-MILESTONE-AUDIT.md`](milestones/v3.9-MILESTONE-AUDIT.md) ·
+phases: `milestones/v3.9-phases/`
+
+⭐ **The one sentence it was measured against came true.** A person connects a **service** — not a
+protocol — sees every tool it offers, grants each one individually, and uses it by name in chat and
+as a specific step on the canvas. **Nothing is per-vendor:** Notion connects by OAuth with no
+developer console and returns 41 tools for zero lines of tool code; six Google applications sit
+under one token with 11/11 live writes.
+
+⚠ **Phase 219 (`A Connected Source Feeds the Library`) is DEFERRED, not dropped** — operator
+decision 2026-09-04, carried into the **Connected Knowledge** milestone with `LIB-08/09/10` and
+`SEED-209/210/211/212`. Its SC#1 (*"watched on a schedule"*) is word for word v3.9's own binding
+re-open trigger for those four security seeds, whose scope text reads: shipping auto-ingest without
+them *"is not a gap, it is a security defect."* **The trigger did not fire — it was kept from firing
+by moving the feature.**
+
+⚠ **Two phases shipped with their headline feature ABSENT at HEAD while every gate was green** —
+213 (the approval moment: Gate 5.5 fell through on `ask`, so the whole ask/refusal vocabulary was
+consumed by nothing) and 216 (the chat wiring dead inside an `except` arm, invisible to 6,929 green
+tests). Both found by driving, neither by a suite.
+
+
 
 ## v3.8 Document Intelligence, Automations & Connectors — SHIPPED 2026-08-26
 
@@ -44,7 +75,6 @@ carried forward with re-open triggers rather than closed silently.
 day one of the milestone. Both repaired at the audit; both are the SECOND consecutive milestone to
 close this way.
 
-
 ## Prior Milestone Archive: v3.7 Workflow Product Completion — SHIPPED 2026-08-24
 
 17 phases, 145 plans, migrations 119-123, git tag `v3.7`. 20/20 requirements satisfied.
@@ -54,7 +84,6 @@ audit: [`milestones/v3.7-MILESTONE-AUDIT.md`](milestones/v3.7-MILESTONE-AUDIT.md
 ⚠ **Collapsed at v3.8's close, not at its own** — this section carried 1,305 lines that were
 already byte-for-byte in `milestones/v3.8-ROADMAP.md`'s sibling archive. The duplicate is exactly
 the context cost the archive step exists to prevent, and it survived one whole milestone.
-
 
 ## v3.5 UX Consolidation & Chat Polish — ✅ SHIPPED 2026-07-23 (CORE); STRETCH deferred
 
@@ -98,6 +127,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [ ] **Phase 180 (STRETCH): Agent-Loop Behavior Honesty** — honor step-by-step/todo-loop, Anthropic user-facing end summary, bounded tool iterations (LOOP-01..03)
 
 ### Phase Details
+
 
 #### Phase 174: Run-State & Lifecycle Honesty
 

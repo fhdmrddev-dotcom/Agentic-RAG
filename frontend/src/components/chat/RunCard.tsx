@@ -1,11 +1,32 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
+import { Bot, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { providerLogo } from "@/lib/providerLogo"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { RunStatusStrip } from "./RunStatusStrip"
-import { outerBannerLabel } from "@/lib/toolMeta"
+import { outerBannerLabel, toolLabel } from "@/lib/toolMeta"
+import { FoldTrigger } from "./FoldTrigger"
+// ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE ONE STEP-IDENTITY ELEMENT.
+//
+// ⚠ THE SHAPE THIS SURFACE HANDS IN IS DELIBERATELY EMPTY, AND THAT IS THE HONEST ANSWER
+// RATHER THAN A MISSING ONE. A chat agent's tools run IN PROCESS: `execute_code`,
+// `search_documents` and the rest reach no connection, so there is no service to name and no
+// vendor whose mark could be borrowed. The shared resolver is TOTAL over that input and
+// returns its NAMED neutral, which is exactly D-206.1-10's rule — never nothing, and never
+// another service's mark. ⛔ Passing `{ tool_name: tc.name }` would hit the MCP arm and paint
+// the MCP logo on `execute_code`, which is a lie no map can detect; it is not a shortcut
+// available here.
+//
+// ⚠ THE RESOLVER IS NOT NAMED IN THIS PARAGRAPH ON PURPOSE. This plan greps `components/chat`
+// and `components/panel` for it at ZERO occurrences — the rule being *no surface reaches past
+// the element to the map* — and prose quoting the needle turns that guard into a lie about
+// itself. It did, on the first draft of this comment (the 187-24 trap).
+//
+// ⚠ AND IT RESOLVES NOTHING (T-214-11-04). `toolLabel` is the shipped chat-side name resolver
+// this card's own banner already reads — one home, so the strip and the identity cannot spell
+// one tool two ways.
+import { StepIdentity } from "@/components/workflows/StepIdentity"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { categorizeError } from "@/lib/errorCategories"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -194,6 +215,25 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
       ? lastTool
       : null
 
+  // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 2) — WHAT THIS RUN IS
+  //    DOING RIGHT NOW, said as a step identity.
+  //
+  // ONE identity per card, on the step in flight — not one per tool row. The sketch draws a
+  // per-step list because it is drawing a WORKFLOW run; a chat run's per-tool detail already
+  // has a home in `ToolCallPanel` below, and a mark repeated down that list would be a second
+  // mark on rows that already carry one (icon-convention §1: reuse the seam, don't re-map).
+  //
+  // ⚠ AN UNNAMED TOOL RENDERS NO IDENTITY. `toolLabel` returns the RAW ID for a tool it has no
+  // phrase for, and an id-shaped face is worse than a generic one (PATTERNS §4d's floor) — it
+  // is also how a wire id would reach a run surface, which invariant #4 forbids. Comparing the
+  // resolved phrase against the id is what makes that structural rather than a deny-list: a
+  // tool added tomorrow with no phrase is silently excluded, in the safe direction.
+  const activeToolPhrase = activeTool ? toolLabel(activeTool.name) : null
+  const activeIdentity =
+    activeTool && activeToolPhrase && activeToolPhrase !== activeTool.name
+      ? activeToolPhrase
+      : null
+
   // ---- D-04 unified step count (Phase 095 Plan 02) ----
   // ALL THREE RunCard count sites — the header title, the RunStatusStrip "Step N",
   // and the collapsed-row "N steps" — read this ONE integer so they can never
@@ -329,9 +369,33 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               REAL resolved `{provider} · {model} · turn N` (message.provider/model
               from the additive enrich); falls back to `turn N` for legacy/no-run
               messages. Rendered as React text children only (T-095.1-03-01). */}
-          <div className="font-mono text-xs text-muted-foreground truncate">
-            {runSub}
+          {/* ⚠ NOISE AUDIT 2026-08-31 (operator, item A5) — KEPT, but as a title.
+                 `anthropic · claude-sonnet-4-5-20250929 · turn 1` is REAL attribution and
+                 the one place a reload can prove which model actually answered — so it is
+                 not deleted. It is also, on almost every card, the composer's own setting
+                 restated in 45 monospace characters. It now shows the model alone, with
+                 the provider and turn on hover: the fact stays reachable, the line stops
+                 being the widest thing on a card whose subject is the run. */}
+          <div
+            className="font-mono text-xs text-muted-foreground truncate"
+            title={runSub}
+          >
+            {message.model || runSub}
           </div>
+          {/* ── Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 2) — the step
+                 in flight, said as an identity. `size="chip"` is the sketch's `xs`, which is
+                 this surface's own size and the reason SIZE IS A MODIFIER rather than a fork.
+                 ⚠ Nothing is rendered when no tool is in flight, or when the tool has no
+                 authored phrase — never an empty element, never a raw id. */}
+          {activeIdentity && (
+            <StepIdentity
+              shape={{}}
+              action={activeIdentity}
+              service={null}
+              size="chip"
+              className="mt-0.5 text-muted-foreground"
+            />
+          )}
           {hasStart && (
             <RunStatusStrip
               placement="header"
@@ -377,26 +441,24 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           aria-label="Expand run details"
         >
           <Bot className="w-4 h-4 text-primary/60 flex-shrink-0" />
-          {/* D-04: same unifiedStepCount as the header + strip — relabeled
-              "N tool calls" → "N steps" per SKETCH-CONSISTENCY (the three
-              sites can never disagree). */}
-          <span>
-            Run · {stepCount} step{stepCount === 1 ? "" : "s"}
-          </span>
-          <span aria-hidden="true">·</span>
+          {/* ── ⚠ NOISE AUDIT 2026-08-31 (operator, items A2 + A3) ──────────────────
+                 This row used to read `Run · 2 steps · ✓ done · 18.3s` while sitting DIRECTLY
+                 BELOW a header already saying `Run · 2 steps` and `18.3s`. Measured in the
+                 running app, a collapsed card read:
+
+                   Run · 2 steps / anthropic · claude-sonnet-4-5 · turn 1 / ⏱ 18.3s / Step 2
+                   Run · 2 steps · ✓ done · 18.3s
+
+                 — the step count three times and the duration twice, in nine lines.
+
+                 ⚠ THE COUNT AND THE DURATION STAY IN THE HEADER, NOT HERE, because the
+                 header is present in BOTH states and this row is collapsed-only. Deleting
+                 the header copy instead would make an expanded run lose its duration
+                 entirely. What this row keeps is the one fact the header cannot carry: the
+                 VERDICT, which is also the reason a person would open it. */}
           <span title={message.runError || undefined}>
             {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
-          {/* D-095.1-05 honesty rule: only show the elapsed segment when there
-              is a TRUE duration (persisted completedAt − startedAt, or a
-              same-session frozen end). A terminal run with no real end-time
-              shows the status word but NO fabricated duration. */}
-          {hasElapsed && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono">{elapsedLabel}</span>
-            </>
-          )}
           <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
         </button>
       )}
@@ -416,19 +478,23 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           {message.reasoningContent ? (
             <Collapsible open={thinkingOpen} onOpenChange={setThinkingOpen} className="mb-2">
               <CollapsibleTrigger asChild>
+                {/* Phase 224-05 (BUG-260902-07, second half): the SHARED FoldTrigger — the
+                    same element CitationList mounts. This trigger carried the identical
+                    buried-control defect (text-xs, muted/80, a bare 12px chevron, no
+                    surface) and is fixed ONCE for both rather than twice similarly.
+                    ⚠ NO `count`: reasoning has no countable unit and inventing one would be
+                    fabricated precision. ⚠ The DEFAULT is untouched — `useState(false)`
+                    above is correct and flipping it would be a regression dressed as
+                    consistency (224-PREFLIGHT §3.2). */}
                 <button
                   data-testid="thinking-trigger"
                   aria-expanded={thinkingOpen}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/80 hover:text-foreground transition-colors w-full text-left"
+                  className="px-3 py-1.5 text-left"
                 >
-                  {thinkingOpen ? (
-                    <ChevronDown className="w-3 h-3 shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3 shrink-0" />
-                  )}
-                  <span className="truncate">
-                    {isStreamingNow ? "Thinking..." : "Thinking"}
-                  </span>
+                  <FoldTrigger
+                    open={thinkingOpen}
+                    label={isStreamingNow ? "Thinking..." : "Thinking"}
+                  />
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
@@ -593,16 +659,70 @@ function statusGlyph(s: Message["runStatus"]): string {
   return "✓"
 }
 
+/** The suffix a category earns, or nothing.
+ *
+ * ⚠ **OPERATOR-REPORTED 2026-09-01: a run read `✗ failed - failed`.** The composition was
+ * `${statusWord} - ${categorizeError(err).shortLabel}`, and `DEFAULT_CATEGORY.shortLabel`
+ * is the literal string `"failed"` — so every UNRECOGNISED error printed the status word
+ * twice with a dash between them.
+ *
+ * ⚠ THE DEFAULT IS NOT THE BUG AND IS NOT CHANGED. `"failed"` is the right *label* for an
+ * uncategorised error wherever a category is shown on its own; what was wrong is appending
+ * it to a word that already says it. A category that merely repeats the status has told the
+ * reader nothing, so it is omitted — the row then reads `✗ failed`, which is the honest
+ * amount of information we actually have.
+ *
+ * ⚠ Compared case-insensitively and on the trimmed value, because this guards against a
+ * MEANING collision rather than a byte one: `timed out` vs `Timed out` would otherwise slip
+ * through and print `timed out - Timed out`.
+ */
+function categorySuffix(word: string, runError?: string): string {
+  if (!runError) return ""
+  const label = categorizeError(runError).shortLabel.trim()
+  if (!label) return ""
+  if (label.toLowerCase() === word.trim().toLowerCase()) return ""
+  return ` - ${label}`
+}
+
 function statusWord(s: Message["runStatus"], runError?: string): string {
   if (s === "completed" || s === undefined) return "done"
-  if (s === "failed") {
-    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
-    return `failed${suffix}`
-  }
-  if (s === "timed_out") {
-    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
-    return `timed out${suffix}`
-  }
+  if (s === "failed") return `failed${categorySuffix("failed", runError)}`
+  if (s === "timed_out") return `timed out${categorySuffix("timed out", runError)}`
   if (s === "cancelled") return "cancelled"
   return "done"
+}
+
+// ── Phase 227 Plan 03 (SC#1 / SC#3) — RunTerminalStatus ───────────────────────
+// Encapsulates terminal status derivation ("Agent reached time limit" / "Response stopped")
+// and copy conditions. Exported for MessageItem delegation.
+//
+// SC#3 preparation: Moving this terminal status line INSIDE the RunCard frame in a future
+// phase (e.g., at the bottom of the expanded body or below the Next-up footer) is a
+// localized 1-file edit inside RunCard.tsx.
+export function RunTerminalStatus({
+  message,
+  isStreaming,
+  className,
+}: {
+  message: Message
+  isStreaming?: boolean
+  className?: string
+}) {
+  if (isStreaming) return null
+  const showTerminal =
+    message.stopped ||
+    message.runStatus === "timed_out" ||
+    (message.runStatus === "cancelled" && !!message.content)
+  if (!showTerminal) return null
+
+  const copy =
+    message.runStatus === "timed_out"
+      ? "Agent reached time limit"
+      : "Response stopped"
+
+  return (
+    <div className={cn("flex items-center gap-1.5 mt-1 text-xs text-muted-foreground", className)}>
+      <span className="italic">{copy}</span>
+    </div>
+  )
 }

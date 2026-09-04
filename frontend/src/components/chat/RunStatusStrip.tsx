@@ -74,7 +74,14 @@ export function RunStatusStrip({
         placement === "header-bare"
           ? "text-muted-foreground"
           : placement === "header"
-            ? "rounded-full border border-border bg-[hsl(220_30%_11%/0.8)] px-2.5 py-1 text-muted-foreground"
+            ? // BUG-260904-03: this was the literal `bg-[hsl(220_30%_11%/0.8)]` — the DARK theme's
+              // surface, frozen into the markup. In light theme it rendered a near-black pill
+              // (measured `rgba(20, 25, 36, 0.8)` on a white page), which is the "badge colour …
+              // is in black" the operator reported. ⚠ `220 30% 11%` is EXACTLY the dark block's
+              // `--muted`, so `bg-muted/80` is byte-identical in dark and finally correct in
+              // light — a token swap, not a re-design. The floating variant one line below
+              // already used a token (`bg-popover/92`); only this branch was hardcoded.
+              "rounded-full border border-border bg-muted/80 px-2.5 py-1 text-muted-foreground"
             : "rounded-full border border-primary/40 bg-popover/92 px-3 py-1.5 shadow-lg backdrop-blur-md",
         isDone && "text-success",
       )}
@@ -95,8 +102,17 @@ export function RunStatusStrip({
         </>
       )}
 
-      {/* Step N — the D-04 unifiedStepCount, identical to the header/collapsed-row */}
-      <span>Step {stepCount}</span>
+      {/* ── ⚠ NOISE AUDIT 2026-08-31 (operator, item A4) ──────────────────────────
+             `Step N` is PROGRESS, and progress is only information while something is
+             progressing. On a finished run it restated a number already in the title
+             (`Run · 2 steps`), in the collapsed row, and — once expanded — beside every
+             numbered step in the list. Four spellings of one integer.
+
+             ⚠ IT IS GATED ON `activityVerb`, NOT ON A NEW PROP. That verb is non-null
+             exactly while the run is live (`RunCard` passes `null` the moment it is
+             terminal), so this reads "while running" from the value already here rather
+             than adding a second source that could disagree with the first. */}
+      {activityVerb && <span>Step {stepCount}</span>}
 
       {/* activity verb — only while live; the bouncing dot signals motion */}
       {activityVerb && (

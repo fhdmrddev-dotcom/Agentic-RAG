@@ -218,6 +218,23 @@ REVOKE ALL ON public.connector_connections FROM authenticated;
 
 -- One column per line so the OMISSION is visible in a diff. The column that is not
 -- here is `secret_ciphertext`.
+-- ⚠ MEASURED DRIFT, 2026-08-26 (Phase 211). This list had fallen FOUR COLUMNS behind the
+--    live table, and the failure it ships is TOTAL rather than partial. `_SELECTABLE_COLUMNS`
+--    (connector_service.py) is DERIVED from `ConnectorConnectionResponse`'s keys, so every
+--    read projects every response field by name. A greenfield project bootstrapped from
+--    full-schema.sql would therefore name four columns `authenticated` has no grant on and
+--    PostgREST answers `42501 permission denied for table connector_connections` — on EVERY
+--    connector read, including a pre-existing row that has nothing to do with the new column.
+--    It looks like an outage, not a permissions bug. That is migration 118's own lesson,
+--    recorded in this very file, recurring because the mirror is manual.
+--
+--    Three of the four (`mcp_server_url`, `tool_grants`, `discovered_tools`) drifted in at
+--    Phase 206 and were latent for the whole milestone; `service_id` is migration 127's.
+--    Derived from the live table, not retyped:
+--      select column_name from information_schema.column_privileges
+--       where table_name='connector_connections' and grantee='authenticated'
+--         and privilege_type='SELECT';
+--    Compare that set against this block whenever a migration adds a column here.
 GRANT SELECT (
     id,
     org_id,
@@ -229,7 +246,11 @@ GRANT SELECT (
     last_checked_at,
     last_check_verdict,
     created_at,
-    updated_at
+    updated_at,
+    mcp_server_url,
+    tool_grants,
+    discovered_tools,
+    service_id
 ) ON public.connector_connections TO authenticated;
 
 -- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit

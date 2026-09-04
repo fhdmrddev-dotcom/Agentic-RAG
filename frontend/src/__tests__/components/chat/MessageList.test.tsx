@@ -125,12 +125,21 @@ function setViewportGeometry(
 
 function fireScroll(vp: HTMLElement) {
   act(() => {
-    // The mount auto-scroll effect flags a programmatic scroll and schedules a
-    // rAF to clear it. jsdom never auto-flushes rAF, so flush any pending frames
-    // before the user scroll — otherwise `onScroll` would skip the release,
-    // mistaking the user scroll for our own auto-follow. (In the browser the rAF
-    // clears within ~16ms, well before a real user scroll.)
+    // ⚠ REWRITTEN BY BUG-260904-02, and the comment it replaced is the bug's own
+    // confession. It used to read: *"the mount auto-scroll effect flags a programmatic
+    // scroll and schedules a rAF to clear it … flush any pending frames before the user
+    // scroll — otherwise onScroll would skip the release … (In the browser the rAF clears
+    // within ~16ms, well before a real user scroll.)"* That last parenthesis is false for
+    // `behavior:"smooth"`, which keeps emitting scroll events for HUNDREDS of ms — so in the
+    // browser our own animation was read as the user, and near the bottom it re-armed the
+    // pin under a reader who had just scrolled away.
+    //
+    // The hook no longer guesses from timing: a user gesture cancels our claim on the scroll
+    // and is what a re-arm requires. So the faithful simulation of a person scrolling is a
+    // GESTURE followed by the scroll event it causes — which is also what a browser always
+    // delivers. A bare `scroll` with no input before it is something no human can produce.
     flushRaf()
+    vp.dispatchEvent(new Event("wheel"))
     vp.dispatchEvent(new Event("scroll"))
   })
 }
@@ -189,9 +198,17 @@ describe("Phase 095 Plan 04 — MessageList follow-but-release chip (D-03)", () 
     fireScroll(vp)
     expect(screen.getByTestId("jump-to-live-chip")).toBeInTheDocument()
     // re-arm
+    // ⚠ BUG-260904-02: a RE-ARM is refused until our own in-flight scroll has settled — the
+    // mount auto-scroll opened that window, and the tail of such a scroll re-arming on the
+    // reader's behalf IS the bug (measured in a browser at +1136 px on a tool-calling run).
+    // jsdom's clock does not move on its own, so step it past the settle window: the user
+    // scrolls back a moment later, which is what a person does.
+    const realNow = Date.now
+    vi.spyOn(Date, "now").mockImplementation(() => realNow() + 1000)
     setViewportGeometry(vp, { scrollHeight: 1000, clientHeight: 500, scrollTop: 500 })
     fireScroll(vp)
     expect(screen.queryByTestId("jump-to-live-chip")).toBeNull()
+    vi.mocked(Date.now).mockRestore()
   })
 
   it("NOT streaming → no chip even when scrolled up (the chip is a live-run affordance)", () => {

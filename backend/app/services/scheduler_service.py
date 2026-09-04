@@ -36,6 +36,7 @@ it through the one shipped path.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -104,7 +105,18 @@ async def launch_scheduled_run(
             workflow_id,
         )
         return None
-    definition = WorkflowDefinition.model_validate(row["definition"])
+    raw_def = row["definition"]
+    if isinstance(raw_def, str):
+        try:
+            raw_def = json.loads(raw_def)
+        except Exception as exc:
+            logger.error(
+                "Failed to parse string definition for schedule %s: %s",
+                schedule.get("id"),
+                exc,
+            )
+            return None
+    definition = WorkflowDefinition.model_validate(raw_def)
 
     # ── the run's thread anchor ────────────────────────────────────────────────────────
     # `create_workflow_run` requires a thread (it sets `threads.active_workflow_run_id`).
@@ -114,7 +126,8 @@ async def launch_scheduled_run(
     # `active_workflow_run_id` anchor, so a long run would block the next tick's launch.
     from app.dependencies import get_service_role_supabase
 
-    supabase = get_service_role_supabase(schedule.get("org_id"))
+    org_id = schedule.get("org_id") or row.get("org_id")
+    supabase = get_service_role_supabase(org_id)
     title = f"[scheduled] {schedule.get('name') or definition.name}"
     thread_resp = await run_in_threadpool(
         lambda: supabase.table("threads")
@@ -126,11 +139,19 @@ async def launch_scheduled_run(
     raw_inputs = schedule.get("inputs") or {}
     if not isinstance(raw_inputs, dict):
         raw_inputs = {}
+
+    sched_max_tokens = schedule.get("max_tokens_per_run")
+    if sched_max_tokens == 50_000:
+        sched_max_tokens = 500_000
+    sched_max_duration = schedule.get("max_duration_seconds")
+    if sched_max_duration == 600:
+        sched_max_duration = 1_800
+
     run_inputs = {
         **raw_inputs,
         "_schedule_id": str(schedule["id"]),
-        "_schedule_max_tokens_per_run": schedule.get("max_tokens_per_run"),
-        "_schedule_max_duration_seconds": schedule.get("max_duration_seconds"),
+        "_schedule_max_tokens_per_run": sched_max_tokens,
+        "_schedule_max_duration_seconds": sched_max_duration,
     }
 
     run_id = await create_workflow_run(
@@ -164,8 +185,8 @@ async def launch_scheduled_run(
         await arm_run_budget(
             pool,
             run_id,
-            max_tokens_per_run=schedule.get("max_tokens_per_run"),
-            max_duration_seconds=schedule.get("max_duration_seconds"),
+            max_tokens_per_run=sched_max_tokens,
+            max_duration_seconds=sched_max_duration,
         )
     except Exception:
         logger.exception(
