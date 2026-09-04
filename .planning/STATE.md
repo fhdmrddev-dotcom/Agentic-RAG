@@ -37,10 +37,10 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 228 — v3.9 Closeout: The Debt Gets a Number (not started)
+Phase: 228 — v3.9 Closeout: The Debt Gets a Number (context gathered)
 Plan: —
-Status: Roadmap approved; ready for /gsd:discuss-phase 228
-Last activity: 2026-09-04 — ROADMAP.md written, 14 phases (228-241), 38/38 requirements mapped
+Status: Context gathered; ready for /gsd:plan-phase 228
+Last activity: 2026-09-04 — Phase 228 discuss-phase complete; 228-CONTEXT.md and 228-DISCUSSION-LOG.md written
 
 ### Roadmap facts (2026-09-04)
 
