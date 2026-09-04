@@ -1374,3 +1374,35 @@ def needs_setup(target) -> bool:
 # for the enumerated INFRA_KEYS (store-wins — placeholder-safe) so a wizard-configured
 # one-box picks up its real infra values without a rebuild. No-op on a fresh box (no store).
 apply_setup_overlay(settings)
+
+
+def primary_frontend_origin() -> str:
+    """The ONE origin a server-side redirect or emailed link may be built from.
+
+    ⚠ WHY THIS EXISTS, MEASURED ON LIVE PRODUCTION 2026-09-04 (BUG-260904-04).
+    ``FRONTEND_URL`` is a COMMA-SEPARATED LIST — `main.py` splits it for CORS
+    (``settings.frontend_url.split(",")``) and the deployment runbook requires every live
+    origin to be listed. But four sites consumed the raw string with only ``.rstrip("/")``
+    and interpolated it into a URL, so on a two-origin cloud install every OAuth callback
+    emitted:
+
+        Location: https://superrag.cloud,https://agentic-rag-rho.vercel.app/app?connections=1&...
+
+    whose authority is ``superrag.cloud,https:`` — not a host. The browser cannot navigate
+    it, so **every** OAuth consent (Notion, Google, Microsoft) landed on an error page.
+
+    ⚠ THE TOKENS WERE STILL SAVED. The callback exchanges the code and calls
+    ``save_oauth_tokens`` BEFORE it redirects, so the connection genuinely completed while
+    the person saw a failure — which is exactly why this survived a live Google connect and
+    was only caught by reading the `Location` header directly.
+
+    ⚠ IT WAS INVISIBLE LOCALLY AND ALWAYS WILL BE: local ``FRONTEND_URL`` is a single
+    origin, so the split is a no-op and every test passes. `225-VALIDATION.md` verified all
+    eight redirect sites — on local. **Only a multi-origin install reproduces it.**
+
+    First entry wins: the runbook puts the canonical product origin first, and the rest are
+    alternates that exist for CORS. Never use this for CORS — that must keep the full list.
+    """
+    raw = getattr(settings, "frontend_url", "") or "http://localhost:5173"
+    first = next((part.strip() for part in raw.split(",") if part.strip()), "")
+    return (first or "http://localhost:5173").rstrip("/")

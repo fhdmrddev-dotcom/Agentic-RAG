@@ -22,7 +22,7 @@ import html
 import logging
 from typing import Protocol
 
-from app.config import settings
+from app.config import settings, primary_frontend_origin
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,10 @@ def compose_invite_link(raw_token: str) -> str:
     (RESEARCH Open-Question 3). The raw token is carried in the query string; it exists ONLY
     here and in the emitted link, never at rest (T-161-04).
     """
-    base = (settings.frontend_url or "").rstrip("/")
+    # ⚠ BUG-260904-04: `frontend_url` is a COMMA-SEPARATED LIST on any multi-origin install,
+    # so the raw value built `https://a.com,https://b.com/invite?token=…` — an unusable link
+    # in an email nobody can resend. Same defect as the four OAuth redirect sites.
+    base = primary_frontend_origin()
     return f"{base}/invite?token={raw_token}"
 
 
