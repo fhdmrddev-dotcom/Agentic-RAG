@@ -1019,4 +1019,31 @@ Post here when execution is done and I will verify by driving, same as 228.
 
 Phase 229 execution complete. All 4 plans executed, G-5 hot file documents.py discharged with same-commit ledger sync, all 4 test suites pass (26/26), all mechanical gates green (backend unit 70 <= 71, tsc 66, drift 0, budget 107k). 229-VERIFICATION.md ready for reviewer verification.
 
-**Answer:**
+**Answer:** Phase 229 post-execution verification: ACCEPTED — PASS, no corrections owed. This is the cleanest phase handover so far; both blocking pre-flight gaps were closed the way they were asked and I proved them at runtime rather than reading them.
+
+DRIVEN, not read (the two that mattered):
+- SC#1 PROVEN LIVE. I called mint_document_row against the real database with the exact shape the old connector path used. It INSERTED: file_path set, status='pending', content_hash written, version_number=1, is_latest=True. That is the row PostgREST used to refuse with PGRST204. The import is genuinely fixed, not theoretically fixed.
+- G-2 PROVEN LIVE. Same bytes minted twice with the second call in the still-pending window and on_conflict="link" returned is_duplicate=True AND THE SAME ROW ID. That is exactly the race I flagged — before this it raised 409 and the attachment was recorded as failed. Probe rows cleaned up.
+
+RE-RAN INDEPENDENTLY:
+- backend baseline: 70 failed / 3508 passed / 0 collection errors. That is one FEWER failure than the 71 baseline and +11 passing — the gate now has headroom it did not have at 228.
+- Phase 229's own suites: 16/16 pass (test_ingest_splice, test_connector_import_splice, test_email_attachment_cascade_splice).
+- CLAUDE.md size: 107,413 chars, 42,587 headroom, OK.
+- Frontend untouched by this phase (verified with git diff --numstat), so the vitest gate cannot be affected — I did not run it, and that is deliberate rather than skipped.
+
+PRE-FLIGHT GAPS — all seven closed, verified individually:
+- G-1 ✅ the widening is GONE. ingest_splice.py contains no is_org_shared at all and the folder check reads select("id, user_id") — byte-identical in shape to documents.py:610-617. Deferred to 231 with the recursive folder_is_org_shared(uuid) named, and TM-229-01 updated so the threat model no longer describes a widening as a mitigation. Exactly right.
+- G-2 ✅ on_conflict: Literal["raise","link"] = "raise" in the signature, so /upload keeps its 409 race behaviour untouched; the email cascade passes "link". The disposition is in the signature, not the caller's except, which is what was asked.
+- G-3 ✅ sequence pinned: pending -> extracting -> metadata -> completed (or failed).
+- G-4 ✅ created_at/updated_at omitted from doc_data; Postgres defaults remain the timestamp authority. I verified the minted dict is field-for-field identical to today's /upload doc_data — 11 keys, no more.
+- G-5 ✅ all four chunk-write sites named and audited.
+- G-6 ✅ email entry route named — POST /documents/upload with message/rfc822 — and pinned by test_email_reachability_route_post_upload, so SC#3 is drivable rather than fixture-only.
+- G-7 ✅ triple RE-DERIVED live (75 commits / 32 phases / 2408 L) rather than copied from the roadmap, and CLAUDE.md line 584 + docs/HOT-FILE-LEDGER.md updated in the SAME commit (ba3010ffc). Disposition cell 147 chars, under the 200 cap.
+
+THE STRUCTURAL CHECK, which is how my own pre-flight said this phase would fail: the extraction is REAL. documents.py has no surviving dedupe_query, no existing_versions block, no hashlib.sha256 — every is_latest line in the diff is a DELETION. There is no second door. The one remaining is_latest write is the restore-a-version endpoint, which is a different feature and is untouched by this phase.
+
+TWO OBSERVATIONS, neither a defect and neither needing action now:
+1. Two writers of is_latest disagree on scope. mint_document_row retires siblings by (user_id, filename) — USER-scoped, correctly matching the old upload path. The restore-version endpoint at documents.py:882-892 retires by (user_id, filename, folder_id) — FOLDER-scoped. Both predate this phase and 229 changed neither, so this is pre-existing and out of scope. Recording it so it is not re-derived: restoring a version and uploading a version disagree about what "sibling" means.
+2. The "-127 lines from 2535" delta in 229-VERIFICATION.md measures against the STALE ledger cell. The true prior figure was 2562 (I measured it at roadmapping), so the real reduction is 154 lines. The current figure 2408 is correct and independently confirmed — only the delta's baseline is off. Not worth a correction commit; noted so a future reader does not inherit it.
+
+Nothing blocks Phase 230 (The Durable Ingestion Queue). Its own pre-flight rule from the roadmap still stands: prove the queue on /upload FIRST, before any adapter uses it, so a red run is never ambiguous between the queue and a new adapter.
