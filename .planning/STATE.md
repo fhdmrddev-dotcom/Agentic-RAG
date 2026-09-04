@@ -48,6 +48,33 @@ Last activity: 2026-09-05 — Phase 229 executed (Gemini) and independently veri
 
 
 
+
+### ⚠ `BUG-260905-01` + `SEED-247` — the ingestion doors are INVERTED (operator, 2026-09-05)
+
+Found by the operator driving Phase 229's one visible change. **Three facts, all measured:**
+
+1. **Cloud import lives in the CHAT composer only** (`MessageInput.tsx:363-379` →
+   `ConnectedFilePickerModal` at `:633`). There is **no cloud-import entry point in the Library**.
+2. **It writes to the Library ROOT and cannot do otherwise** — `connectors.py:1703-1709` calls
+   `async_mint_document_row(...)` with **no `folder_id`** and **no `org_id`**, and the modal has **no
+   folder picker**. ⚠ **NOT a Phase 229 regression:** 229 preserved the call's existing shape, and before
+   229 the route failed outright with `PGRST204`. **229 is what made this reachable enough to notice.**
+3. **Chat has NO local-file upload at all** — zero hits for `type="file"` / `Paperclip` / `onDrop` /
+   `uploadDocument` in `MessageInput.tsx`. The upload button exists only in the Library
+   (`LibraryPage.tsx:555`). **The two doors are exactly inverted.**
+
+⛔ **AND THE DEEPER ONE: a thread-scoped document CANNOT BE EXPRESSED.** `documents` has **no `thread_id`
+column**; `workspace_files` is the AGENT's per-thread scratch, not a home for a person's attachment. So
+**every ingested file is permanent, user-global and in the Library** — a file dropped into chat while
+thinking becomes retrievable by every future question. That is the inbound mirror of the hygiene problem
+`SEED-209`/`SEED-210` describe for connectors.
+
+⭐ **Sequencing:** the folder picker + moving import into the Library is **small** and fits **Phase 233**
+(the preview phase is already about what enters the Library and where). **`SEED-247` (thread-scoped
+attachments) is the larger half** and must not be smuggled into a phase that has not scoped it. ⚠ Its
+retrieval-scope question touches **the same four RLS sites Phase 231 is about to write** — cheap to allow
+for there, expensive afterwards, exactly like department access.
+
 ### ⭐ Phase 231 must consider DEPARTMENT-LEVEL ACCESS (operator, 2026-09-05)
 
 **Direction:** *"consider … one big company needs to manage its knowledge base with different access
@@ -209,6 +236,7 @@ instrument for a Deep pause.
 
 | Phase | Decision |
 |---|---|
+| **233** | ⭐ **Where an imported file LANDS — `BUG-260905-01`.** Cloud import currently sits in the CHAT composer and writes to the Library **root** with no folder picker; chat has **no local upload at all**. The two doors are inverted. The folder picker + moving import into the Library is 233's natural subject. |
 | **231** | ⭐ **DEPARTMENT-LEVEL ACCESS — operator direction 2026-09-05: *"keep department access in mind for phase 231."*** See the note below. |
 | 235 | `SURF-03`'s home surface (three options tabled; recommendation app-shell signal + Health-tab row) |
 | 240 | Confirm-or-flip the message-vs-thread boundary — D-3 decided it, but two research files disagree |
