@@ -167,6 +167,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
             capPaused: state.cap_paused,
             continuesRemaining: state.continues_remaining,
           })
+        } else if (state.cap_paused) {
+          const runId = (state.active_workflow_run_id || state.latest_producer_run_id || "") as string
+          if (runId) {
+            streamActions.setWorkflowLockForThread(tid, {
+              runId,
+              mode: "harness",
+              capPaused: true,
+              continuesRemaining: state.continues_remaining,
+            })
+          } else {
+            streamActions.clearWorkflowLockForThread(tid)
+          }
         } else {
           // Deep, or a stale/terminal anchor (SC#5 self-heal) — never leave a
           // dangling lock on this thread.

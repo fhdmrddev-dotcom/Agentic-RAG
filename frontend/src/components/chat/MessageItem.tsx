@@ -503,10 +503,11 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 size="sm"
                 onClick={() => onResume?.(message)}
                 className="mt-2 text-xs"
-                aria-label="Resume run"
+                aria-label="Retry turn"
+                data-testid="retry-turn-button"
               >
                 <RotateCcw className="w-3 h-3 mr-1.5" />
-                Resume
+                Retry turn
               </Button>
             )}
 

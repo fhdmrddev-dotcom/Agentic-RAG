@@ -2064,6 +2064,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       wf.latest_producer_run_id,
                     )
                   }
+                } else if (wf.cap_paused) {
+                  const runId = (wf.active_workflow_run_id || wf.latest_producer_run_id || "") as string
+                  if (runId) {
+                    actions.setWorkflowLockForThread(threadId, {
+                      runId,
+                      mode: "harness",
+                      capPaused: true,
+                      continuesRemaining: wf.continues_remaining,
+                    })
+                  } else {
+                    actions.clearWorkflowLockForThread(threadId)
+                  }
                 } else {
                   // Stale / terminal / Deep → unlock (honors the F2 self-heal).
                   actions.clearWorkflowLockForThread(threadId)
@@ -2797,7 +2809,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
             await useStreamsStore
               .getState()
-              .actions.sendMessage(threadId, userMsg.content, { surfaceId })
+              .actions.sendMessage(threadId, userMsg.content, {
+                surfaceId,
+                model: failedMessage.model,
+                provider: failedMessage.provider,
+              })
           } finally {
             resumeInFlightRef.current = false
           }

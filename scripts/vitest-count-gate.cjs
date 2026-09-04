@@ -3142,6 +3142,9 @@ const BASELINE = {
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
   "MessageList.runline.baseline.test.tsx": 8,
+  // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
+  "MessageItem.retry.test.tsx": 4,
+  "MessageItem.capPaused.test.tsx": 5,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4406,6 +4409,9 @@ const TARGETS = [
   "src/__tests__/components/chat/MessageList.test.tsx",
   "src/__tests__/components/chat/MessageList.dedup.test.tsx",
   "src/__tests__/components/chat/MessageList.runline.baseline.test.tsx",
+  // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
+  "src/components/chat/__tests__/MessageItem.retry.test.tsx",
+  "src/components/chat/__tests__/MessageItem.capPaused.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

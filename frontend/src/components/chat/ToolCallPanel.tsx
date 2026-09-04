@@ -47,6 +47,8 @@ interface Props {
   iterationCount?: number
   /** Phase 56 D-08/D-09: ordered list of skill activations to interleave with tool rows. */
   activatedSkills?: SkillActivation[]
+  /** BUG-260823-02: True when the run is actively streaming. When false (history/settled), entrance animations are suppressed to prevent blink waves. */
+  isStreaming?: boolean
 }
 
 // ---- Live elapsed timer (running tools) ----
@@ -67,9 +69,9 @@ function ElapsedTimer({ startedAt }: { startedAt: number }) {
 
 // ---- Skill activation row (Phase 56 D-08/D-09) ----
 
-function SkillRow({ activation }: { activation: SkillActivation }) {
+function SkillRow({ activation, isStreaming }: { activation: SkillActivation; isStreaming?: boolean }) {
   return (
-    <div className="pt-2.5 animate-toolSlideIn" data-testid="skill-load-card">
+    <div className={cn("pt-2.5", isStreaming && "animate-toolSlideIn")} data-testid="skill-load-card">
       <div className="flex items-center gap-2.5">
         <span className="flex-shrink-0 p-1 rounded-md bg-muted/50 text-violet-400">
           <Zap className="w-3.5 h-3.5" />
@@ -82,7 +84,7 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
           )}
         </span>
         <span className="flex-shrink-0">
-          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
+          <CheckCircle2 className={cn("w-3.5 h-3.5 text-success", isStreaming && "animate-checkPop")} />
         </span>
       </div>
     </div>
@@ -91,7 +93,7 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
 
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
+export function ToolCallPanel({ toolCalls, activatedSkills, isStreaming = false }: Props) {
   // Phase 095 Plan 03 Task 2 (D-04 single dedup home): import the ONE shared
   // dedup from @/lib/stepCount instead of an inline copy.
   const deduplicatedToolCalls = useMemo(() => dedupToolCalls(toolCalls), [toolCalls])
@@ -145,7 +147,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
           return (
             <div key={`skill-${i}-${item.activation.occurredAt}`}>
               {i > 0 && <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />}
-              <SkillRow activation={item.activation} />
+              <SkillRow activation={item.activation} isStreaming={isStreaming} />
             </div>
           )
         }
@@ -192,11 +194,16 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
         const isActive = tc.status === "running" || tc.status === "preparing"
         const isCollapsedToEssence = (isFinished || isActive) && !expandedSteps.has(stepKey)
 
+        // BUG-260823-02: Suppress entrance slide animation for settled historical tool calls.
+        // Only active tools during live streaming animate; historical rows render settled.
+        const shouldAnimate = isStreaming && isToolActive
+
         return (
           <div
             key={stepKey}
             className={cn(
-              "pt-2.5 animate-toolSlideIn",
+              "pt-2.5",
+              shouldAnimate && "animate-toolSlideIn",
               isToolActive && "tc-active-wrap rounded-md px-2",
             )}
             data-testid={isToolActive ? "tc-active" : undefined}
