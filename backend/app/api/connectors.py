@@ -1269,9 +1269,9 @@ async def mcp_oauth_callback(
     """
     from app.dependencies import get_redis
     from app.services.mcp_oauth import McpOAuthError, complete_authorization
-    from app.config import settings
+    from app.config import settings, primary_frontend_origin
 
-    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+    frontend_url = primary_frontend_origin()  # BUG-260904-04: FRONTEND_URL is a LIST
 
     # ⚠ `error_description` IS LOGGED AND NEVER PUT IN THE REDIRECT. It is attacker-supplied
     # text from an untrusted authorization server; reflecting it into a URL the browser then
@@ -1325,9 +1325,9 @@ async def create_oauth_authorize_url(
 ) -> OAuthAuthorizeResponse:
     """Phase 215 (OAUTH-01, OAUTH-02) — Generate PKCE authorization URL for Google / Microsoft."""
     from app.services.oauth_service import build_authorization_url
-    from app.config import settings
+    from app.config import settings, primary_frontend_origin
 
-    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+    frontend_url = primary_frontend_origin()  # BUG-260904-04: FRONTEND_URL is a LIST
     # ⚠ THE BACKEND, NOT THE FRONTEND. This route is `GET /connectors/oauth/callback` on
     # THIS service; the frontend has no router and no dev proxy, so the old value pointed
     # Google at Vite's SPA fallback, which answered 200 and did nothing with the code.
@@ -1458,9 +1458,9 @@ async def oauth_callback(
         resolve_client_credentials,
         verify_oauth_state,
     )
-    from app.config import settings
+    from app.config import settings, primary_frontend_origin
 
-    frontend_url = getattr(settings, "frontend_url", "http://localhost:5173").rstrip("/")
+    frontend_url = primary_frontend_origin()  # BUG-260904-04: FRONTEND_URL is a LIST
 
     if error:
         logger.warning("OAuth authorization returned error: %s (%s)", error, error_description)
