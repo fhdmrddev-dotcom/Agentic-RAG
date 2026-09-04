@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.9
 milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
 status: executing
-last_updated: "2026-09-03T08:40:00.000Z"
-last_activity: 2026-09-03
+last_updated: "2026-09-04T06:40:00.000Z"
+last_activity: 2026-09-04
 progress:
   total_phases: 13
-  completed_phases: 12
-  total_plans: 80
-  completed_plans: 91
+  completed_phases: 13
+  total_plans: 83
+  completed_plans: 94
   # + SEED-235 fixed out-of-phase (chat approval card)
-  percent: 92
+  percent: 100
 ---
 
 # Project State
@@ -33,10 +33,20 @@ See: `.planning/PROJECT.md` (updated 2026-08-26)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 225 — One Way to Hold a Secret Mid-Handshake EXECUTED (plans 225-01..02 committed 9ed81511b, ec3d75a9d). Ready for reviewer browser verification (SC#5).
+**Current focus:** Phase 227 — The Run Frame Has One Owner EXECUTED, VERIFIED & CLOSED (2026-09-04). SC#2 discharged in real browser (227-VALIDATION.md).
 Phase numbering continues at **210**.
 
 ## Current Position
+
+✅ **PHASE 227: The Run Frame Has One Owner — EXECUTED (Gemini), VERIFIED & DRIVEN IN REAL BROWSER (Claude + Operator, 2026-09-04) — `227-VALIDATION.md`.**
+⭐ SC#2 DISCHARGED: driven across all eight run states in a real browser comparing normalized rendered DOM against pre-227 worktree (commit `74b8385e1`). All states byte-identical.
+All three plans shipped (`227-01` at `26cb7397e`, `227-02` at `a743aeef4`, `227-03` at `585d451dd`, closure fixes at `157bb58e8`):
+- **Single Run Frame Owner (SC#1)**: `RunTerminalStatus` extracted to `RunCard.tsx` and consumed by `MessageItem.tsx`. All run frame chrome, badges, timers, and terminal derivations reside in `RunCard.tsx`.
+- **Characterization & Visual Invariance (SC#2)**: Authoring characterization suite in Wave 1 before refactoring; all 8 run states mechanically verified and browser-driven.
+- **Localized Layout (SC#3)**: Result column layout localized in `StepRow.tsx`; run status positioning localized in `RunCard.tsx`.
+- **G-5 Hot-File Extraction Discharged (SC#4)**: `ToolCallPanel.tsx` decomposed from 1019 to 351 L (-65%) via `ToolCallDetails.tsx`, `StepRow.tsx`, and `toolStepDerivation.ts`. `MessageItem.tsx` reduced from 822 to 702 L (-15%) by shedding `UserMessageBubble.tsx` and `messageText.ts`. `RunCard.tsx` re-derived at 26 / 12 / 728 L.
+- **Coverage & Baseline Gate Adoption (SC#5)**: Adopted 16 run-frame covering test suites into `vitest-count-gate.cjs` (215/215 pinned, 7407 total, 0 failing).
+- **Gates**: `tsc` exact baseline 66 (unused imports cleaned). `check-claude-md-size` OK (106939 chars). All decision comments restored.
 
 ✅ **PHASE 225: One Way to Hold a Secret Mid-Handshake — EXECUTED (Gemini) & VERIFIED BY CLAUDE IN A REAL BROWSER (2026-09-03) — `225-VALIDATION.md`.**
 ⭐ SC#5 driven: real `state` to Google was a 43-char opaque handle; Redis held the secret + verifier under that handle; the operator's consent consumed it and rewrote `connector_tokens` at 17:06 UTC; landed on `/app?connections=1&oauth_connected=1`. ✅ The Chat-instead-of-Connections landing is FIXED by a G-3 quick task (operator 'go', 2026-09-03): `App.tsx` reads `?connections=1` once in the view initializer and drops the query; driven in Chrome. `BUG-260903-01` closed. ⚠ **`/code-review ultra` SKIPPED BY DECISION (operator, 2026-09-03):** the free allowance was exhausted and the cost is unknown; against `master` the diff was 4,694 files anyway, so a `review-base-225` branch was cut at `ae7aac884` to scope it. **Replaced by** an in-session `/code-review high review-base-225` and a scoped `/security-review` of the same diff — weaker than ultra because the reviewer also pre-flighted the code; recorded here rather than left silent. Re-open trigger: credits available before the v3.9 production push → run `/code-review ultra review-base-225`. Advisory left open: Redis outage at the callback is a raw 500, not a redirect.
