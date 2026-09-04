@@ -1146,6 +1146,19 @@ class Settings(BaseSettings):
     # offline over a weekend wakes up and launches every overdue schedule at once.
     scheduler_max_claims_per_tick: int = 10
 
+    # ── Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon ────
+    # Worker enabled by default for restart survival and asynchronous upload processing.
+    ingest_worker_enabled: bool = True
+    # Concurrency limit per worker process (asyncio.Semaphore). Bounds concurrent
+    # document extractions and embeddings to prevent provider rate-limit saturation.
+    ingest_max_concurrent_jobs: int = 3
+    # Worker poller tick interval.
+    ingest_poll_interval_seconds: float = 2.0
+    # Lease timeout for in-flight jobs. If a worker dies/restarts, jobs held longer than
+    # this duration are reclaimed by reclaim_stale_ingestion_claims (G-1 / SC#1).
+    ingest_lease_timeout_seconds: int = 300
+
+
     @model_validator(mode="after")
     def _validate_run_stale_sweep_bounds(self) -> "Settings":
         """WR-02 (Phase 145 review) — defense-in-depth bounds on the two stale-sweep

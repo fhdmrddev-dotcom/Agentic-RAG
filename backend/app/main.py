@@ -536,6 +536,35 @@ async def lifespan(app_instance):
             _scheduler = None
     app_instance.state.workflow_scheduler = _scheduler
 
+    # Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon.
+    # Runs in every worker with concurrency bounding and stale claim recovery (G-1).
+    _ingestion_queue = None
+    if not _setup_mode and getattr(settings, "ingest_worker_enabled", True):
+        try:
+            from app.services.ingestion_queue_service import IngestionQueueService
+            from app.dependencies import get_supabase
+
+            _pg_pool = await get_pg_pool()
+            _ingestion_queue = IngestionQueueService(
+                pool=_pg_pool,
+                supabase_factory=get_supabase,
+                max_concurrent_jobs=settings.ingest_max_concurrent_jobs,
+                poll_interval_seconds=settings.ingest_poll_interval_seconds,
+                lease_timeout_seconds=settings.ingest_lease_timeout_seconds,
+            )
+            # Boot-time sweep to rescue in-flight jobs stranded across restarts (G-1 / SC#1)
+            await _ingestion_queue.run_stale_sweep()
+            _ingestion_queue.start()
+            logger.info(
+                "Ingestion queue service started (max concurrent %d, poll every %.1fs)",
+                settings.ingest_max_concurrent_jobs,
+                settings.ingest_poll_interval_seconds,
+            )
+        except Exception:
+            logger.exception("Ingestion queue service failed to start (app continues)")
+            _ingestion_queue = None
+    app_instance.state.ingestion_queue_service = _ingestion_queue
+
     yield
 
     # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
@@ -549,6 +578,14 @@ async def lifespan(app_instance):
             await _sched.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Workflow scheduler stop failed at lifespan shutdown")
+
+    # Phase 230 — stop the ingestion queue worker before cancelling in-flight tasks
+    try:
+        _iq = getattr(app_instance.state, "ingestion_queue_service", None)
+        if _iq is not None:
+            await _iq.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Ingestion queue service stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and

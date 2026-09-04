@@ -125,6 +125,13 @@ Then edit `./.env` and fill in:
   `SCHEDULER_MAX_CLAIMS_PER_TICK` (default `10`) is backpressure — it stops a box that was
   offline over a weekend from launching every overdue schedule at once. Each schedule carries
   its own per-run token and duration ceilings, set in the app when the schedule is created.
+- **Durable Ingestion Queue (Phase 230, QUEUE-01 / QUEUE-05)** — `INGEST_WORKER_ENABLED`
+  ships **`true`** by default. Runs in each uvicorn worker process to process document ingestion
+  asynchronously with concurrency bounding, restart recovery, and provider outage resilience.
+  `INGEST_MAX_CONCURRENT_JOBS` (default `3`) is the semaphore size bounding concurrent embeddings
+  per worker; `INGEST_POLL_INTERVAL_SECONDS` (default `2.0`) is the polling frequency for due jobs;
+  `INGEST_LEASE_TIMEOUT_SECONDS` (default `300`) is the lease timeout used by the stale-claim
+  sweeper to rescue in-flight jobs stranded if a worker crashes or restarts (SC#1).
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick

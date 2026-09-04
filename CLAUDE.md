@@ -576,8 +576,8 @@ wc -l <file>                                                           # lines
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 8 / 5 / 334 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 78 / 60 / 1331 | ⚠ **FIRES** | no seam proposed — a barrel of wire types; ⚠ absent until 196, at 56 phases (214) |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 74 / 54 / 835 | ⚠ **FIRES** | honoured by construction (204) |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 73 / 43 / 1331 | ⚠ **FIRES** | honoured by construction (204) — seam named: `MODEL_CAPABILITIES` + its readers out |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 79 / 45 / 876 | ⚠ **FIRES** | honoured by construction (204 / **230**) — lifespan queue daemon start/stop added beside scheduler |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 78 / 37 / 1428 | ⚠ **FIRES** | honoured by construction (204 / **230**) — 4 ingest knobs added; seam MODEL_CAPABILITIES out stays OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 32 / 12 / 1733 | ⚠ **FIRES** | ⚠ absent at 12 phases (added 196) |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 30 / 16 / 639 | ⚠ **FIRES** | honoured by construction (**SEED-227**) — one knob added at the four seams `rerank_enabled` already uses; ⚠ absent at 16 phases (added 196) |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |

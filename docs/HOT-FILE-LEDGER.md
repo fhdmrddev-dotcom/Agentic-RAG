@@ -4688,6 +4688,24 @@ refactor recommendation FIRST.
 
 ---
 
+### `backend/app/main.py` — Phase 230, honoured by construction
+
+**Measured 2026-09-05: `79 commits / 45 phases / 876 L`** (supersedes `74 / 54 / 835`).
+
+**Purely additive:** Lifespan startup instantiates and starts `IngestionQueueService` and executes the initial stale-claim sweep (`reclaim_stale_ingestion_claims`) to rescue in-flight jobs stranded across crashes/restarts (G-1 / SC#1). Lifespan shutdown stops the worker cleanly. No existing route, sweep, or middleware was restructured. The named seam for this file (registration module doing one thing 40× — no seam proposed) is unchanged.
+
+---
+
+### `backend/app/config.py` — Phase 230, honoured by construction
+
+**Measured 2026-09-05: `78 commits / 37 phases / 1428 L`** (supersedes `73 / 43 / 1331`).
+
+**Purely additive:** Appends four fields to `Settings`: `ingest_worker_enabled` (default `True`), `ingest_max_concurrent_jobs` (`3`), `ingest_poll_interval_seconds` (`2.0`), and `ingest_lease_timeout_seconds` (`300`). Synchronized with zero drift across `backend/.env.example`, `deploy/onebox.env.example`, `docker-compose.prod.yml`, and `docs/OPERATOR.md`. `MODEL_CAPABILITIES` and its readers are untouched.
+
+**THE NAMED SEAM REMAINS OWED:** `MODEL_CAPABILITIES` + its two readers want `services/model_registry.py`, with a same-commit re-export in `config.py`.
+
+---
+
 ### `backend/app/db/workflows.py` — Phase 205, honoured by construction
 
 **Measured 2026-08-24: `44 commits / 22 phases / 2514 L`** — **G-5 FIRES**.
