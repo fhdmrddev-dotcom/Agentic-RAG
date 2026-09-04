@@ -159,11 +159,16 @@ Full narrative: `.planning/milestones/v3.9-STATE-at-close.md`. Condensed so noth
   steps across Vercel / Coolify / Supabase Auth / CORS. **Verify on a preview before promoting.**
 - ⚠ **25 reported bugs open on `surface: Agentic-RAG`** (`STATE.md` said 23 at the close; re-counted
   2026-09-04). Six are probably ONE root cause in the resume path — see the table below.
-- ⚠ **The backend unit baseline needs one honest re-derivation before it can gate anything.**
-  `pytest tests/unit -q --continue-on-collection-errors` reads **95 failed / 3394 passed / 2 errors**;
-  the `71` quoted all through v3.9 was measured over a different set (two collection errors from
-  missing `ezdxf` / `reportlab` abort collection without that flag). Nothing failing names oauth,
-  connector, mcp or chat.
+- ✅ **The backend unit baseline WAS re-derived, and the claim recorded here was WRONG — kept, not
+  overwritten.** This bullet asserted *"reads **95 failed / 3394 passed / 2 errors**; the `71` quoted
+  all through v3.9 was measured over a different set."* **Measured 2026-09-04 at Phase 228 pre-flight**
+  (main working tree, quiet, verdict line read verbatim):
+  `backend/venv/Scripts/pytest.exe tests/unit -q --continue-on-collection-errors` →
+  **`71 failed, 3497 passed, 2 xfailed, 2 xpassed, 35 warnings in 77.75s`, ZERO collection errors.**
+  ⭐ **The `71` reproduces exactly** — the missing `ezdxf` / `reportlab` have since been installed, so
+  the two collection errors are gone. Phase 228's plan `228-01` was RIGHT and this file was stale.
+  ⚠ At `failed <= 71` against a measured `71` the gate has **ZERO headroom** by design. Nothing failing
+  names oauth, connector, mcp or chat.
 
 ### Chat run-lifecycle findings — still open, still unrouted
 

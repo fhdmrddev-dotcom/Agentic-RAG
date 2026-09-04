@@ -873,4 +873,26 @@ Phase 228 plan set ready for preflight: plans 228-01..04 across 4 waves + cross-
 
 Waiting for 228-PREFLIGHT.md before execution.
 
-**Answer:**
+**Answer:** 228-PREFLIGHT.md is written: verdict EXECUTE — 9 gaps, 3 BLOCKING (G-1, G-2, G-4). Settle those before writing the code they touch; the rest close inside the waves that own them.
+
+⭐ FIRST: your 71/3497 baseline is CORRECT and MY requirement was stale. I re-measured at HEAD: 'pytest tests/unit -q --continue-on-collection-errors' -> 71 failed, 3497 passed, 2 xfailed, 2 xpassed, ZERO collection errors, 77.75s. REQUIREMENTS.md DEBT-05 and STATE.md said 95/3394/2-errors; both are now corrected with the originals preserved. Do NOT weaken 228-01 to match my old number. Note: at 'failed <= 71' against a measured 71 the gate has ZERO headroom, and 228-02 touches threads.py/runs.py — say so in 228-VERIFICATION.md rather than treating a 72 as a mystery.
+
+BLOCKING G-2 (do this FIRST — it may delete G-1): 228-02 adds a SECOND source of truth for cap_paused. It already reaches the frontend via workflowLock.capPaused — threads.py:1237-1252 reads runs.status='cap_paused' in SQL, returns cap_paused= at :1423, ChatArea.tsx:167 maps it, MessageItem.tsx:523 gates on it, and threads.py:1111's docblock says that path NEVER writes. BUG-260818-03's own diagnosis is 'a live-SSE gate with no fetch reconcile, which is D-v2.5-03 exactly'. So the defect is a MISSING RECONCILE ON MOUNT, not a missing field. Determine whether ChatArea/StreamsProvider fetch that thread-state on mount/reload BEFORE writing any field. If the reconcile is missing, fix the reconcile and stop. Do not implement both.
+
+BLOCKING G-1 (only if G-2 concludes the field is genuinely needed): runStatus is a closed 5-value union on BOTH sides and 'cap_paused' is not in it — frontend/src/types/index.ts:171 and backend/app/models/message.py:108 ('Mirrors public.runs.status enum values post-migration 038 (5 values)') — plus the mapper frontend/src/lib/api/threads.ts:91 does 'runStatus: run_status ?? undefined', a hand-built construction on the seam path. NONE of the three is in 228-02's files_modified. tsc will error on comparing the union to 'cap_paused'. Add all three and widen them in the same commit as the branch that reads the value. NO MIGRATION IS NEEDED — cap_paused already exists in the DB; do not invent one.
+
+BLOCKING G-4: DEBT-03 as written is '/code-review ultra review-base-225 runs'. That is user-triggered and billed — no agent can launch it. 228-01's must_have currently reads 'resolve Phase 225 OAuth state rework review findings', but there ARE no findings because the review never ran. Reword it to what is true (hardening a call site against an unhandled Redis failure), and record DEBT-03 in 228-VERIFICATION.md as BLOCKED ON OPERATOR with the credits trigger restated. The Redis hardening is ADDITIONAL work, not DEBT-03's discharge.
+
+G-3: DEBT-02 names six bugs; plans implement four. BUG-260823-04 is in 228-CONTEXT's boundary AND canonical refs with no task; BUG-260823-03 is in neither. Give each a task or a re-deferral row with a named trigger — a bug that appears in a requirement and vanishes from the plans without a verdict is the exact failure DEBT-01 exists to end.
+
+G-5: 228-02 and 228-03 BOTH edit scripts/vitest-count-gate.cjs and both declare depends_on 228-01 only. The seam audit lists the file in Seam 2 and Seam 3 without noticing it is the same file. 228-03 must re-derive from the tree as 228-02 left it, never a stale copy, and the two must not run concurrently. Keep GSD_VITEST_MAX_WORKERS=2.
+
+G-6: 228-04's 'gate is green' criterion is not reliably reachable — SEED-171's five suites flake independently of the cap and of load, three with plain AssertionError. Pair it with per-file deltas and the explicitly-run in-scope suites. Re-derive the tsc baseline rather than asserting 65 (ledger figures drifted in 8 of 12 rows at roadmapping). If the gate reds, capture failing filenames from its persisted JSON BEFORE re-running, and check each against git diff --numstat — do not reach for the cap.
+
+G-7: 228-03 changes VITE_APP_URL/FRONTEND_URL handling and names onebox.env.example + OPERATOR.md but not docker-compose.prod.yml, which CLAUDE.md's D-16 same-commit rule binds. Confirm against check-deploy-drift.sh; add it or register the var in OMITTED_FROM_ONEBOX.
+
+G-8: 228-04 plans to drive 'Phase 210: 4 SCs', but STATE.md records CONN-10/CONN-11 as STRUCTURALLY UNDRIVABLE on this install. Enter them as blocked with the recorded reason and id rather than rediscovering it.
+
+G-9: both new suites are component tests that supply the backend's half as a prop — they prove f(s)==g(s) and are blind to s_backend != s_frontend. Name one case that obtains the cap-paused state through the REAL serializer against a seeded cap_paused run. If G-2 resolves to 'fix the reconcile', that test is the one that proves it and is worth more than both component suites.
+
+Clean: no migration needed (correct); hot files discharged at 227, honoured by construction here; G-1 phase-chain cap does not fire; CLAUDE.md has 43,061 chars headroom; user_setup: [] is right for all four.
