@@ -89,6 +89,49 @@ register before archiving, and `LIB-05..07` — which had traceability rows but 
 progress table was stale by four rows in the same way and was corrected at the audit. A per-phase-close
 gate is worth more than a fourth warning paragraph.
 
+## v3.9 production push — 2026-09-04
+
+**Promoting `develop` → `master` → `production` on the operator's explicit instruction.** Production
+tip before the push: `32992901e` (**698 commits behind**). Live and healthy at the start:
+`superrag.cloud` 200, `api.superrag.cloud/health` `{"status":"ok","redis":"ok","maintenance":false}`.
+
+**Cloud migrations owed at this push (8, in order, pasted into the cloud SQL editor):** 127, 128, 129,
+140, 141, 150, 151, 152. All eight were checked for the v3.6 paste trap (a `COMMIT` inside a
+`PROCEDURE`, which made migs 105/107 unpasteable) — **all clean**; 140 and 141 carry a plain top-level
+`BEGIN;`…`COMMIT;` pair. 127 / 128 / 150 carry backfills of EXISTING rows, not seeds.
+⚠ **152 is the only one that can fail on data**: it drops and re-adds `audit_log_action_type_check`
+with a fixed 21-value list. Diffed against mig 071 (the last to touch it) it is a strict superset, so
+it should pass — if it errors, read `SELECT DISTINCT action_type FROM audit_log` rather than widening
+the constraint by hand.
+
+⛔ **`BACKEND_PUBLIC_URL` must be set in Coolify to `https://api.superrag.cloud`.** It defaults to
+`http://localhost:8000` (`config.py:1279`) and is the base for all four OAuth redirect URIs
+(`connectors.py:1195/1231/1334/1518`). **Unset on cloud, every OAuth connect redirects the user to
+localhost and dies with no error naming the cause.** The six
+`{GOOGLE,MICROSOFT,GITHUB}_OAUTH_CLIENT_{ID,SECRET}` vars are optional (default `""`); without them a
+user must BYO a pair in the form's Advanced section. Also verify `SECRETS_ENCRYPTION_KEY` is present —
+migs 129/150 store tokens as `enc:v1:` ciphertext and that path **fails soft to plaintext** rather
+than erroring.
+
+✅ Sandbox tag unchanged at `agentic-rag-sandbox:101.1` — no host rebuild, no keeper recreate.
+✅ `scripts/check-deploy-drift.sh` → **PASS**.
+⚠ `www.superrag.cloud` does not resolve (curl `000`). Pre-existing; not caused by this push.
+
+### Two owed items were surfaced at the push and DEFERRED BY THE OPERATOR — recorded, not absorbed
+
+1. **`SEED-242` (product at `app.<domain>`) fired and was deferred by one push.** v3.9 therefore ships
+   the landing at `https://superrag.cloud/` and the product at `https://superrag.cloud/app` — already a
+   visible change to the root domain, which served the app before this push. ⚠ **Measured blocker
+   recorded in the seed:** the reviewer's Vercel token lists only `rag-app`; **the live `agentic-rag`
+   project is not visible to it**, so the Vercel steps cannot be agent-driven. Trigger re-pointed to
+   the next production push.
+2. **`/code-review ultra review-base-225` was declined a SECOND time** (credits). Its trigger read
+   *"credits available before the v3.9 production push"* — that push is this one, so the trigger has
+   now fired and been declined once. **Re-pointed to the next production push.** ⚠ This is the OAuth
+   state-handling code (opaque handle, Redis-held secret and PKCE verifier); the review that replaced
+   it was authored by someone who had also pre-flighted the code.
+
+
 ## Deferred Items
 
 Acknowledged and deferred at the v3.9 milestone close on 2026-09-04 (`gsd-sdk query audit-open` →
