@@ -39,8 +39,8 @@ continues at **228**.
 
 Phase: 229 — The One Ingest Splice
 Plan: 229-01..04 executed & verified; 229-VERIFICATION.md ready for review
-Status: ✅ **COMPLETE (ready for reviewer verification)** — all 4 plans executed, G-5 hot file documents.py discharged with same-commit ledger sync, all 4 test suites passing (26/26), backend unit baseline passed (70 <= 71), tsc 66 errors match baseline, deploy drift 0.
-Last activity: 2026-09-05 — Phase 229 execution and verification complete. Ready for Claude review.
+Status: ✅ **COMPLETE — REVIEWER-VERIFIED 2026-09-05, PASS, no corrections owed** (was: ready for reviewer verification) — all 4 plans executed, G-5 hot file documents.py discharged with same-commit ledger sync, all 4 test suites passing (26/26), backend unit baseline passed (70 <= 71), tsc 66 errors match baseline, deploy drift 0.
+Last activity: 2026-09-05 — Phase 229 executed (Gemini) and independently verified by DRIVING (Claude). See below.
 
 
 
@@ -87,6 +87,46 @@ department access; it has to not FORECLOSE it.**
 column and the recursive `folder_is_org_shared()` function are **two definitions of one word**. 231 owns
 resolving that too — adding a department dimension on top of an unresolved org-shared predicate would
 compound it.
+
+
+### ✅ Phase 229 VERIFIED (2026-09-05, Claude — DRIVEN, not read)
+
+**Verdict: PASS, no corrections owed.** All seven pre-flight gaps closed as asked.
+
+⭐ **The two that mattered were proven at RUNTIME:**
+- **SC#1** — `mint_document_row` called against the real DB **INSERTED** the row PostgREST used to refuse
+  with `PGRST204`: `file_path` set, `status='pending'`, `content_hash` written, `version_number=1`,
+  `is_latest=True`. **The connector import is genuinely fixed.**
+- **G-2** — same bytes minted twice, the second inside the still-`pending` window with
+  `on_conflict="link"`, returned `is_duplicate=True` **and the same row id** — the exact race that
+  previously raised 409 and recorded the attachment as *failed*. Probe rows cleaned up.
+
+✅ **Re-ran independently:** backend **70 failed / 3508 passed / 0 errors** — **one FEWER failure than the
+71 baseline and +11 passing** · Phase 229's suites **16/16** · CLAUDE.md **107,413** chars · frontend
+**untouched** (`git diff --numstat`), so the vitest gate cannot be affected — deliberately not run rather
+than skipped.
+
+⭐ **THE STRUCTURAL CHECK PASSED** — the one the pre-flight named as this phase's failure mode:
+**the extraction is REAL.** `documents.py` retains no `dedup_query`, no `existing_versions` block, no
+`hashlib.sha256`; **every `is_latest` line in the diff is a DELETION.** There is no second door.
+
+**Gaps verified individually:** G-1 the widening is GONE (no `is_org_shared` in `ingest_splice.py`;
+folder check is `select("id, user_id")`; deferred to 231; **`TM-229-01` corrected so the threat model no
+longer describes a widening as a mitigation**) · G-2 disposition in the SIGNATURE, default `"raise"` so
+`/upload` keeps its 409 · G-3 sequence pinned · G-4 timestamps omitted, minted dict field-for-field
+identical to `/upload`'s 11 keys · G-5 four chunk sites audited · G-6 email route named
+(`POST /documents/upload`, `message/rfc822`) and pinned by a test · G-7 triple **re-derived live**
+(`75 / 32 / 2408`), CLAUDE.md + `docs/HOT-FILE-LEDGER.md` in the SAME commit (`ba3010ffc`).
+
+⚠ **Two observations, neither a defect, neither needing action:**
+1. **Two writers of `is_latest` disagree on scope.** `mint_document_row` retires siblings by
+   `(user_id, filename)` — USER-scoped, correctly matching the old upload path. The **restore-version**
+   endpoint (`documents.py:882-892`) retires by `(user_id, filename, folder_id)` — FOLDER-scoped. Both
+   **predate 229 and neither was changed by it.** Recorded so it is not re-derived: *restoring* a version
+   and *uploading* a version disagree about what a sibling is.
+2. The `-127 lines from 2535` delta in `229-VERIFICATION.md` measures against the **stale** ledger cell;
+   the true prior figure was **2562**, so the real reduction is **154**. The current `2408` is correct and
+   independently confirmed — only the delta's baseline is off.
 
 ### Phase 229 — pre-planning obligation DISCHARGED (2026-09-05, Claude)
 
