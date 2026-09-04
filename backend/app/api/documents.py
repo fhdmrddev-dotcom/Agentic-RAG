@@ -246,112 +246,18 @@ def _upload_pipeline(
     supabase: Client,
     engines_dict: dict[str, str] | None = None,
 ) -> None:
-    """Phase 071.2 D-071.2-05 — runs in BackgroundTask after /upload (or
-    /reingest) returns 201/200.
+    """Phase 229 (TRUST-01) — delegates to unified splice_document pipeline."""
+    from app.services.ingest_splice import splice_document  # noqa: PLC0415
 
-    Steps:
-      1. Storage upload (sync supabase call; ok inside BackgroundTask task body —
-         not an async handler, so supabase-py runs on the BackgroundTask thread
-         pool without blocking the event loop). Skipped if `storage_path` is
-         empty / None (reingest path — file already in storage).
-      2. Layer 2 wall-clock-wrapped extract via the per-aspect composer
-         (`extract_composable`, Phase 071.2 D-071.2-01..04). When
-         `engines_dict` is None, the composer reads defaults from
-         `app_settings.extraction_*_engine_*`.
-      3. Call existing ingest_document(document_id, text, user_id, supabase, raw,
-         mime_type, filename, None, extracted_doc, extract_duration_ms) — keep
-         signature byte-identical (Pitfall 2 — 071.1 tests stay green).
-      4. On any unhandled exception: UPDATE documents SET status='failed',
-         error_message=<short summary> (T-071.2-01-01 mitigation — don't echo
-         supabase-py internals into error_message).
-    """
-    from app.services.extraction_service import extract_composable, get_extractor  # noqa: PLC0415
-
-    # Step 1 — storage upload (only on the /upload path; /reingest path passes
-    # an empty `storage_path` to signal "file already in storage, skip upload").
-    if storage_path:
-        try:
-            supabase.storage.from_("documents").upload(
-                path=storage_path,
-                file=raw,
-                file_options={"content-type": mime_type},
-            )
-        except Exception:
-            # Storage upload failure doesn't block ingestion — same swallow shape
-            # as the pre-071.2 inline call site at documents.py:330-331.
-            pass
-
-    # Step 2 — extract via the per-aspect composer with a wall-clock fail-safe.
-    # Phase 071.3 Plan 04 (D-071.3-09): Docling auto-fallback path removed
-    # entirely — non-timeout exceptions fail loud (status='failed' +
-    # error_message); D-071-11 visibility intent preserved.
-    extract_start = time.perf_counter()
-    extracted_doc: ExtractedDocument | None = None
-    engine_used: str | None = None
-    text: str = ""
-
-    # Wall-clock fail-safe for the per-aspect composer. Post-Docling-rip
-    # (Phase 071.3 Plan 04 D-071.3-09), the only remaining heavy engines are
-    # camelot tables + pymupdf fence subprocess; 130s upper bound matches the
-    # legacy Layer 2 ceiling so behavior is unchanged for non-Docling stalls.
-    wall_clock_s = 130.0
-
-    try:
-        # Phase 071.2 D-071.2-01..04 — route PDF/DOCX through the per-aspect
-        # composer. Non-PDF/non-DOCX MIMEs still flow through the legacy
-        # `extract_text` helper (composer is PDF/DOCX-only).
-        from app.services.extraction_service import PDF_MIME as _PDF, DOCX_MIME as _DOCX  # noqa: PLC0415
-        if mime_type not in (_PDF, _DOCX):
-            text = extract_text(raw, mime_type)
-        else:
-            # We are inside a BackgroundTask thread (not an async handler), so
-            # asyncio.wait_for is not directly usable. Use a small asyncio.run
-            # bridge so the Layer 2 wall-clock pattern still applies. Mirrors
-            # the /reextract Layer 2 shape (071.1 SP-2) but in sync context.
-            # NOTE: extract_composable is sync; running inside BackgroundTask
-            # thread, so no run_in_threadpool needed (test_071_1_threadpool_sweep
-            # exempts _upload_pipeline because it's a sync def).
-            async def _run_with_timeout() -> ExtractedDocument:
-                from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
-                return await asyncio.wait_for(
-                    run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
-                    timeout=wall_clock_s,
-                )
-
-            extracted_doc = asyncio.run(_run_with_timeout())
-            text = extracted_doc.text
-            engine_used = extracted_doc.extractor_name or None
-    except Exception as exc:
-        # Step 4 — surface a user-safe failure on the documents row + log full
-        # detail server-side (T-071.2-01-01 mitigation).
-        log.warning(
-            "upload_pipeline failed for %s: %s",
-            document_id,
-            exc,
-        )
-        try:
-            supabase.table("documents").update({
-                "status": "failed",
-                "error_message": str(exc)[:500],
-            }).eq("id", document_id).execute()
-        except Exception:
-            pass  # don't double-fault on telemetry write failure
-        return
-
-    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
-
-    # Step 3 — hand off to the existing ingest_document (signature byte-identical).
-    ingest_document(
-        document_id,
-        text,
-        user_id,
-        supabase,
-        raw,
-        mime_type,
-        filename,
-        engine_used,        # engine_override — extractor_name from composer or None for default
-        extracted_doc,
-        extract_duration_ms,
+    splice_document(
+        document_id=document_id,
+        raw=raw,
+        mime_type=mime_type,
+        filename=filename,
+        user_id=user_id,
+        storage_path=storage_path,
+        supabase=supabase,
+        engines_dict=engines_dict,
     )
 
 
@@ -598,129 +504,33 @@ async def upload_document(
             detail="File is empty",
         )
 
-    # Validate folder ownership: only the folder owner may upload into it.
-    # Phase 071.2 D-071.2-06: wrap sync supabase call in run_in_threadpool
-    # (mirrors /reextract 618-626 lambda-wrap shape).
-    if folder_id:
-        folder_check = await run_in_threadpool(
-            lambda: supabase.table("folders")
-            .select("id, user_id")
-            .eq("id", folder_id)
-            .maybe_single()
-            .execute()
-        )
-        if not folder_check.data:
-            raise HTTPException(status_code=404, detail="Folder not found")
-        if folder_check.data["user_id"] != current_user["id"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot upload to a folder you do not own",
-            )
+    # Phase 229 (TRUST-01) — unified minting via async_mint_document_row
+    from app.services.ingest_splice import async_mint_document_row  # noqa: PLC0415
 
-    content_hash = hashlib.sha256(raw).hexdigest()
-
-    # Case 1: exact duplicate already completed (is_latest=True) in the same folder — skip re-ingestion
-    # Dedup only matches the current latest version; stale versions do not short-circuit upload.
-    # Duplicate check is folder-scoped: same file in different folders creates separate entries.
-    dedup_query = (
-        supabase.table("documents")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .eq("content_hash", content_hash)
-        .eq("status", "completed")
-        .eq("is_latest", True)
+    mint_result = await async_mint_document_row(
+        raw=raw,
+        filename=filename,
+        mime_type=mime_type,
+        user_id=current_user["id"],
+        supabase=supabase,
+        folder_id=folder_id,
     )
-    if folder_id:
-        dedup_query = dedup_query.eq("folder_id", folder_id)
-    else:
-        dedup_query = dedup_query.is_("folder_id", "null")
-    # Phase 071.2 D-071.2-06: wrap dedup .execute() in run_in_threadpool.
-    existing = await run_in_threadpool(lambda: dedup_query.limit(1).execute())
-    if existing.data:
+    doc = mint_result.document
+
+    if mint_result.is_duplicate:
         response.status_code = status.HTTP_200_OK
-        return existing.data[0]
+        return doc
 
-    # Case 2: same filename → create new version instead of deleting stale document.
-    # Old files are retained in storage for future restore (Phase 29).
-    # Phase 071.2 D-071.2-06: wrap existing-versions SELECT in run_in_threadpool.
-    existing_versions = await run_in_threadpool(
-        lambda: supabase.table("documents")
-        .select("id, version_number")
-        .eq("user_id", current_user["id"])
-        .eq("filename", file.filename)
-        .order("version_number", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if existing_versions.data:
-        next_version = existing_versions.data[0]["version_number"] + 1
-        # Retire all previous versions from retrieval (user-scoped, not folder-scoped).
-        # Phase 071.2 D-071.2-06: wrap is_latest=False UPDATE cascade in run_in_threadpool.
-        await run_in_threadpool(
-            lambda: supabase.table("documents")
-            .update({"is_latest": False})
-            .eq("user_id", current_user["id"])
-            .eq("filename", file.filename)
-            .execute()
-        )
-    else:
-        next_version = 1
-
-    # Phase 071.2 D-071.2-05 — instant-201 BackgroundTask refactor.
-    # INSERT documents row with status='pending' FIRST so Supabase Realtime broadcasts
-    # the new row to the frontend immediately. Extract + chunk + multimodal moved into
-    # `_upload_pipeline` BackgroundTask (closes "/upload blocks 1-120s before 201" UX
-    # defect surfaced during Phase 072 discuss-phase setup).
-    document_id = str(uuid4())
-    storage_path = f"{current_user['id']}/{document_id}/{file.filename}"
-
-    doc_data = {
-        "id": document_id,
-        "user_id": current_user["id"],
-        "filename": file.filename,
-        "file_path": storage_path,
-        "file_size": len(raw),
-        "mime_type": mime_type,
-        "status": "pending",
-        "content_hash": content_hash,
-        "folder_id": folder_id,
-        "version_number": next_version,
-        "is_latest": True,
-    }
-    # Phase 078 CQ-DEDUP-01 D-078-04: catch unique-violation race at INSERT time.
-    # The fast-path SELECT above handles the common case; this catches the narrow
-    # race window where two concurrent uploads pass the SELECT simultaneously.
-    try:
-        result = await run_in_threadpool(
-            lambda: supabase.table("documents").insert(doc_data).execute()
-        )
-        doc = result.data[0]
-    except Exception as exc:
-        # Detect PostgreSQL unique_violation (code 23505) from the partial index.
-        # supabase-py surfaces this as an APIError whose message contains "23505".
-        exc_str = str(exc)
-        if "23505" in exc_str:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="File already exists in this folder",
-            )
-        raise
-
-    # Phase 071.2 D-071.2-05 — schedule heavy work as BackgroundTask. The handler
-    # returns 201 within ~1s; _upload_pipeline does storage upload + Layer 2
-    # wall-clock-wrapped extract + ingest_document inside the BackgroundTask
-    # thread (not the async handler), so the event loop stays unblocked.
-    # Phase 071.2 D-071.2-03 — parse `?engines=` hint (admin-disable aware).
     engines_dict = _parse_engines_hint(engines)
     background_tasks.add_task(
         _upload_pipeline,
         doc["id"],
         raw,
         mime_type,
-        file.filename,
+        filename,
         current_user["id"],
-        storage_path,
-        service_supabase,   # D-05: detached pipeline stays service-role (pdf_extraction_runs INSERT)
+        mint_result.storage_path,
+        service_supabase,
         engines_dict,
     )
     background_tasks.add_task(
@@ -728,9 +538,10 @@ async def upload_document(
         user_id=current_user["id"],
         action_type="document.upload",
         metadata={"document_id": doc["id"], "filename": doc["filename"], "folder_id": folder_id},
-        supabase=service_supabase,   # D-05: detached audit writer stays service-role
+        supabase=service_supabase,
     )
 
+    response.status_code = status.HTTP_201_CREATED
     return doc
 
 

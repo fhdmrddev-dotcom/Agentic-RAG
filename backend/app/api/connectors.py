@@ -1677,9 +1677,8 @@ async def import_connection_file(
     supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 216 (ATTACH-01 / D-216-09): User-initiated single file import."""
-    from uuid import uuid4
     from app.services.cloud_storage import fetch_cloud_file
-    from app.api.documents import _upload_pipeline
+    from app.services.ingest_splice import async_mint_document_row, splice_document
     from app.dependencies import get_supabase
 
     conn = await connector_service.get_connection(
@@ -1699,44 +1698,31 @@ async def import_connection_file(
             detail=f"Failed to download cloud file: {exc}",
         )
 
-    doc_id = str(uuid4())
-    storage_path = f"{user['id']}/{doc_id}/{filename}"
-
-    # Create document row in database
-    doc_row = {
-        "id": doc_id,
-        "user_id": user["id"],
-        "filename": filename,
-        "mime_type": mime_type,
-        "file_size": len(raw_bytes),
-        "status": "processing",
-        "storage_path": storage_path,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    await aexec(supabase.table("documents").insert(doc_row))
-
-    # Ingest in background
-    srv_supabase = get_supabase()
-    background_tasks.add_task(
-        _upload_pipeline,
-        document_id=doc_id,
+    # Phase 229 (TRUST-01, SC#1, SC#2): mint document row via async_mint_document_row
+    # Resolves PGRST204 storage_path column error and guarantees identical dedupe and versioning.
+    mint_result = await async_mint_document_row(
         raw=raw_bytes,
-        mime_type=mime_type,
         filename=filename,
+        mime_type=mime_type,
         user_id=user["id"],
-        storage_path=storage_path,
-        supabase=srv_supabase,
+        supabase=supabase,
     )
+    doc = mint_result.document
 
-    return {
-        "id": doc_id,
-        "filename": filename,
-        "mime_type": mime_type,
-        "file_size": len(raw_bytes),
-        "status": "processing",
-    }
+    if not mint_result.is_duplicate:
+        srv_supabase = get_supabase()
+        background_tasks.add_task(
+            splice_document,
+            document_id=doc["id"],
+            raw=raw_bytes,
+            mime_type=mime_type,
+            filename=filename,
+            user_id=user["id"],
+            storage_path=mint_result.storage_path,
+            supabase=srv_supabase,
+        )
+
+    return doc
 
 
 
