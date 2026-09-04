@@ -137,8 +137,54 @@ evidence for why that extraction must precede any new adapter.
 
 ## Traceability
 
-*Empty — filled by the roadmapper.*
+**Filled by the roadmapper 2026-09-04** against `.planning/ROADMAP.md` → *v4.0 Connected Knowledge —
+ACTIVE*. **38 REQ-IDs · 38 mapped · 0 orphans · 0 duplicates.**
 
-| REQ-ID | Phase | Status |
-|---|---|---|
-| — | — | — |
+⚠ **The count is 38, not the 34 quoted at intake.** LIB 3 · SRC 6 · PREV 3 · VIS 6 · QUEUE 6 ·
+TRUST 4 · RULES 2 · SURF 3 · DEBT 5. `38 − 5 DEBT = 33`, which is probably where *34* came from. The
+intake figure is recorded rather than overwritten, because a coverage check run against the wrong
+denominator is exactly how `LIB-08/09/10` survived an entire milestone living only in a heading.
+
+| REQ-ID | Phase | Status | Note |
+|---|---|---|---|
+| LIB-08 | 234 | Pending | The watch loop, on the **shipped** scheduler |
+| LIB-09 | 233 | Pending | Amended by D-1 — four buckets, not three |
+| LIB-10 | 235 | Pending | |
+| SRC-01 | 232 | Pending | The contract; **measured** at 238 and 239 |
+| SRC-02 | 232 | Pending | No new OAuth scope |
+| SRC-03 | 238 | Pending | ⚠ Graph 302 / `downloadUrl` stays adapter-internal |
+| SRC-04 | 239 | Pending | Adding a source adds **rows, not code** |
+| SRC-05 | 240 | Pending | Shape phase, own discuss-phase, sequenced last |
+| SRC-06 | 234 | Pending | ⚠ **H-5** — structural, same plan as the diff |
+| PREV-01 | 233 | Pending | ⚠ **G-2 sketch mandatory** |
+| PREV-02 | 233 | Pending | D-1's two-tier identity |
+| PREV-03 | 233 | Pending | The preview writes nothing |
+| VIS-01 | 231 | Pending | ⚠ **H-1** — policies first, DEFINER bodies last, one transaction |
+| VIS-02 | 231 | Pending | ⚠ **G-2 sketch** — the sentence is the deliverable |
+| VIS-03 | 234 | Pending | Absence never deletes |
+| VIS-04 | 234 | Pending | |
+| VIS-05 | 234 | Pending | ⚠ **Not 235** — freeze is retrieval-affecting and security-bearing (D-4) |
+| VIS-06 | 234 | Pending | ⚠ **H-4, MEASURED** — rule eval lives inside `ingest_document` (`documents.py:2483`), so 234 is the phase where connector documents first reach the rules engine, not 237 |
+| QUEUE-01 | 230 | Pending | |
+| QUEUE-02 | 230 | Pending | ⚠ **H-3** — proven on `/upload` first |
+| QUEUE-03 | 234 | Pending | ⚠ **Not 230** — it is a watch lease; nothing to overlap until a watch exists |
+| QUEUE-04 | 230 | Pending | The 300,000-token-per-request ceiling is the one a naive batcher misses |
+| QUEUE-05 | 230 | Pending | D-2 — same-vector-space fallback only; closes ⛔ `BUG-260815-05` |
+| QUEUE-06 | 241 | Pending | Harness ships at **230**; tuning and verdict here |
+| TRUST-01 | 229 | Pending | ⚠ **H-2** — precedes every adapter; fixes D-5's two shipped defects |
+| TRUST-02 | 236 | Pending | GA gate; ⚠ full 8-row native roster |
+| TRUST-03 | 234 | Pending | Pitfall 4's trifecta fence — same phase as the first sync, never after |
+| TRUST-04 | 231 | Pending | Provenance from the first row, not retrofitted |
+| RULES-01 | 237 | Pending | One AST, one matcher, scope discriminator |
+| RULES-02 | 237 | Pending | Source facts as first-class filterable fields |
+| SURF-01 | 234 | Pending | *"checked every N minutes"* — never *"instantly"* |
+| SURF-02 | 235 | Pending | ⚠ **G-2 sketch** |
+| SURF-03 | 235 | Pending | ⚠⚠ **Home is an OPEN SCOPING DECISION** — there is no in-app notification surface in this product. Forced at 235's discuss-phase; recommendation is an app-shell signal **plus** the Health-tab row. **Closing it against the Health tab alone does not satisfy the requirement.** |
+| DEBT-01 | 228 | Pending | Owed v3.9 verification — driven or re-deferred with a reason |
+| DEBT-02 | 228 | Pending | Resume-path cluster **triaged together** |
+| DEBT-03 | 228 | Pending | `/code-review ultra review-base-225` |
+| DEBT-04 | 228 | Pending | ⚠ **Gated on a production push — may be driven OUT OF ORDER**, recorded against 228 wherever it lands (`SEED-242`) |
+| DEBT-05 | 228 | Pending | The baseline must state the command **and** its flag |
+
+**Per-phase totals:** 228 → 5 · 229 → 1 · 230 → 4 · 231 → 3 · 232 → 2 · 233 → 4 · 234 → 9 · 235 → 3 ·
+236 → 1 · 237 → 2 · 238 → 1 · 239 → 1 · 240 → 1 · 241 → 1. **Sum = 38.**

@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-04T00:00:00.000Z"
 last_activity: 2026-09-04
 progress:
-  total_phases: 0
+  total_phases: 14
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -37,10 +37,38 @@ continues at **228**.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 228 — v3.9 Closeout: The Debt Gets a Number (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-04 — Milestone v4.0 Connected Knowledge started
+Status: Roadmap approved; ready for /gsd:discuss-phase 228
+Last activity: 2026-09-04 — ROADMAP.md written, 14 phases (228-241), 38/38 requirements mapped
+
+### Roadmap facts (2026-09-04)
+
+- **14 phases, 228-241.** Migrations reserved **153-163**, monotonic; gaps 130-139 / 142-149 NEVER backfilled.
+- ⚠ **The requirement count is 38, not the 34 quoted at intake** (33 feature + 5 DEBT). `REQUIREMENTS.md`
+  Traceability is filled and mechanically verified: **38 rows, 0 duplicates, 0 orphans**. A coverage check
+  run against the wrong denominator is exactly how `LIB-08/09/10` survived a milestone living only in a heading.
+- ⭐ **Phase 234 retires the CLAUDE.md manual-upload-only rule IN THE SAME COMMIT** (`SEED-142`), and carries a
+  **MANDATORY threat model**. **Phase 231 also carries a MANDATORY threat model.**
+- ⚠ **`DEBT-04`** (`app.<domain>`, `SEED-242`) is gated on an operator production push and **MAY BE DRIVEN OUT
+  OF ORDER** — record it against 228 wherever it lands, never re-scope it.
+- ⚠ **`SURF-03` has no home surface in this product.** Decision owed at 235's discuss-phase; recommendation is
+  app-shell signal + Health-tab row. **Closing it against the Health tab alone does NOT satisfy it** — that is
+  still a page you have to open.
+- ⚠ **Ledger row OWED for `backend/app/services/scheduler_service.py`** (measures **5/2/399**, no row today) in
+  234's commit — `LIB-08` binds the whole watch loop to it, so G-5 cannot fire on it at any count.
+  **G-5 extraction OWED on `retrieval_service.py`** (fires at 231 *and* 241; a third landing must propose the
+  extraction first).
+- ⚠ **G-5 triples were re-derived from git at roadmapping and 8 of 12 had DRIFTED** — e.g. `documents.py`
+  measured `73/30/2562` against a cell reading `72/30/2535`. Re-derive, never read the cell.
+
+### Open decisions owed at discuss-phase
+
+| Phase | Decision |
+|---|---|
+| 235 | `SURF-03`'s home surface (three options tabled; recommendation app-shell signal + Health-tab row) |
+| 240 | Confirm-or-flip the message-vs-thread boundary — D-3 decided it, but two research files disagree |
+| 241 | Verify local↔cloud pgvector parity LIVE before `hnsw.iterative_scan` is planned as the `SEED-076` remedy |
 
 ### The milestone in one sentence
 
@@ -77,17 +105,27 @@ safely and at a customer's scale.
 - ⚠ **A file removed at the source is NOT removed from the Library** unless explicitly asked for. A
   revoked share must never silently delete knowledge the agent depends on.
 - ⚠ **Write and delete grants are OFF by default** — inherit Phase 213's approval model, invent nothing.
-- ⚠ **`LIB-08` / `LIB-09` / `LIB-10` must be WRITTEN INTO `REQUIREMENTS.md`.** They have never
-  existed outside a roadmap heading; a requirement that lives only in a heading is invisible to every
-  coverage check. This is the same gap recorded for `LIB-05..07`.
+- ✅ **`LIB-08` / `LIB-09` / `LIB-10` ARE NOW IN `REQUIREMENTS.md`** (done 2026-09-04) — they had never
+  existed outside a roadmap heading, and a requirement that lives only in a heading is invisible to every
+  coverage check. Same gap as `LIB-05..07`. ⚠ **`LIB-09` was AMENDED** at scoping: four buckets, not three
+  (D-1). The constraint is kept here rather than deleted because the *class* of failure recurs.
 
-### ⚠ Known shape-risk, stated at intake rather than discovered later
+### ⚠ Known shape-risk — stated at intake, then SOFTENED by measurement (original kept)
 
-**Email is a second SHAPE smuggled in as a fourth provider.** Drive, OneDrive and MCP-file are one
-shape — a file with a path and a hash. A mailbox is threads, quoting, and attachments-as-children,
-with no stable document boundary. That is the same class of problem as `SEED-212`, which this
-milestone deliberately deferred. Expect email to behave like a shape decision, not an adapter, and
-scope it accordingly.
+**Stated at intake:** *"Email is a second SHAPE smuggled in as a fourth provider. Drive, OneDrive and
+MCP-file are one shape — a file with a path and a hash. A mailbox is threads, quoting, and
+attachments-as-children, with no stable document boundary."*
+
+⭐ **MEASURED, AND THE WARNING WAS OVER-STATED ABOUT THE CODE (D-3).** ~80% already ships:
+`strip_quoted_replies()` runs before chunking; attachments-as-children ship with caps; Gmail and Graph
+both land on one `parse_eml_bytes()`. PITFALLS independently confirms the manifestation is
+**dedup/retrieval poisoning, not a broken adapter** — and the tool that prevents it already exists, so
+the risk is failing to ROUTE the sync path through it.
+
+**What survives the softening:** mail is still sequenced **LAST** (Phase 240) with its own
+discuss-phase, and the document boundary is a real decision — **one message = one document, `thread_key`
+groups** (D-3). ⚠ Two research files disagreed on that boundary; **240 must confirm or flip it**, not
+inherit it silently.
 
 ### Seeds folded (18)
 
