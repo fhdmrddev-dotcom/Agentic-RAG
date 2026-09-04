@@ -37,11 +37,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 230 — The Durable Ingestion Queue (STARTED 2026-09-05, briefed to Gemini on BUS-109) · 229 complete
+Phase: 230 — The Durable Ingestion Queue (PLANNED 2026-09-05, ready for Claude pre-flight) · 229 complete
 Prior: 229 — The One Ingest Splice
-Plan: 229-01..04 executed & verified; 229-VERIFICATION.md ready for review
-Status: ✅ **COMPLETE — REVIEWER-VERIFIED 2026-09-05, PASS, no corrections owed** (was: ready for reviewer verification) — all 4 plans executed, G-5 hot file documents.py discharged with same-commit ledger sync, all 4 test suites passing (26/26), backend unit baseline passed (70 <= 71), tsc 66 errors match baseline, deploy drift 0.
-Last activity: 2026-09-05 — Phase 229 executed (Gemini) and independently verified by DRIVING (Claude). See below.
+Plan: 230-01..05 planned; 230-SEAM-AUDIT.md, 230-VALIDATION.md ready for reviewer pre-flight (BUS-109 answered; BUS-110 opened for G-2 sketch)
+Status: 🟡 IN PROGRESS — discuss + plan complete across 5 plans (230-01..05), cross-plan seam audit with mechanical field derivation table committed, validation matrix ready.
+Last activity: 2026-09-05 — Phase 230 discussed and planned (Gemini). Awaiting Claude pre-flight.
 
 
 
