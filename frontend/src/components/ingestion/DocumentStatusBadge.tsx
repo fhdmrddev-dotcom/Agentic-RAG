@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { TERM_MAP, usePlainLabel, type TermKey } from "@/lib/termMap"
 
 interface Props {
-  status: "pending" | "processing" | "completed" | "failed"
+  status: "pending" | "processing" | "completed" | "failed" | "paused"
   /** Phase 56 D-13: granular sub-status; only consulted while status='processing'. */
   ingestionStep?: string | null
 }
@@ -12,6 +12,7 @@ const styles: Record<Props["status"], string> = {
   processing: "bg-blue-100 text-blue-800",
   completed: "bg-green-100 text-green-800",
   failed: "bg-red-100 text-red-800",
+  paused: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-500/30",
 }
 
 export function DocumentStatusBadge({ status, ingestionStep }: Props) {

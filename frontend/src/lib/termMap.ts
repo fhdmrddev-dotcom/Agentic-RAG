@@ -108,6 +108,11 @@ export const TERM_MAP = {
     helper: "Something went wrong reading this file.",
     technical: "failed",
   },
+  "status.paused": {
+    plain: "Paused",
+    helper: "Provider rate limited — waiting to resume automatically.",
+    technical: "paused",
+  },
 
   // ── Surface B — document detail / metadata (mostly plain from Phase 112). ──
   "doc.metadata_section": {

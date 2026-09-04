@@ -409,7 +409,7 @@ export function DocumentRow({
                   variant="ghost"
                   size="sm"
                   onClick={() => onReingest(doc.id)}
-                  disabled={reingesting || doc.status === "pending" || doc.status === "processing"}
+                  disabled={reingesting || doc.status === "pending" || doc.status === "processing" || doc.status === "paused"}
                   className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
                   aria-label="Re-ingest document"
                 >

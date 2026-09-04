@@ -515,7 +515,21 @@ describe("IngestionTab — the queue table (D-217.1-07)", () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "q1", status: "pending" }), doc({ id: "q2", status: "processing" })] })
     await user.click(screen.getByRole("tab", { name: "In progress" }))
-    expect(screen.getByText(/2 files/)).toBeInTheDocument()
+    expect(screen.getByText("(2 files)")).toBeInTheDocument()
+    expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
+  })
+
+  it("renders IngestionPauseBanner at top of In progress when document is paused on 429", async () => {
+    const user = userEvent.setup()
+    renderPlain({
+      documents: [
+        doc({ id: "p1", status: "paused" as any, error_message: "Rate limit reached (429)" }),
+        doc({ id: "p2", status: "completed" }),
+      ],
+    })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    expect(screen.getByTestId("ingestion-pause-banner")).toBeInTheDocument()
+    expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
   })
 })
 

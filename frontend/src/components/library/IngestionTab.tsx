@@ -37,6 +37,8 @@ import { formatBytes } from "@/lib/formatBytes"
 import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
+import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
+import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import {
   cardForStage,
   PIPELINE_CARDS,
@@ -114,8 +116,19 @@ export function IngestionTab({
 
   // Completed + failed for the History tab.
   const historyDocs = documents.filter((d) => d.status === "completed" || d.status === "failed")
-  const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing")
+  const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing" || d.status === "paused")
+  const completedDocs = documents.filter((d) => d.status === "completed")
   const failed = documents.filter((d) => d.status === "failed")
+
+  const totalBatchCount = inFlight.length + completedDocs.length
+  const pausedDoc = inFlight.find(
+    (d) =>
+      d.status === "paused" ||
+      d.error_message?.toLowerCase().includes("rate limit") ||
+      d.error_message?.toLowerCase().includes("429") ||
+      d.error_message?.toLowerCase().includes("quota")
+  )
+  const isPaused = Boolean(pausedDoc)
 
   // The ⌥ Technical-names reveal.
   const { showTechnical } = useTechnicalNamesOptional() ?? { showTechnical: false }
@@ -161,6 +174,20 @@ export function IngestionTab({
 
         {/* ── IN PROGRESS — the pipeline row + queue table ──────────────── */}
         <TabsContent value="in-progress" data-testid="ingestion-subtab-in-progress">
+          {/* ── Refusal Banner (SC#3, closes BUG-260815-05) — sits at top of sub-tab ─────── */}
+          {isPaused && (
+            <div className="mb-5">
+              <IngestionPauseBanner
+                provider="OpenAI"
+                statusCode={429}
+                statusText="insufficient_quota"
+                verbatimError={pausedDoc?.error_message || undefined}
+                completedCount={completedDocs.length}
+                totalCount={totalBatchCount > 0 ? totalBatchCount : 340}
+              />
+            </div>
+          )}
+
           <div>
             <h2 className="text-lg font-semibold leading-tight">Where every file is right now</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -180,6 +207,18 @@ export function IngestionTab({
               ))}
             </div>
           </div>
+
+          {/* ── THE BATCH LANE (Sketch 227 Variant B winner) ──────────────── */}
+          {inFlight.length > 0 && (
+            <div className="mt-6" data-testid="ingestion-batch-lane-wrapper">
+              <IngestionBatchLane
+                totalFiles={totalBatchCount > 0 ? totalBatchCount : inFlight.length}
+                completedFiles={completedDocs.length}
+                isPaused={isPaused}
+                activeFileName={inFlight.find((d) => d.status === "processing")?.filename}
+              />
+            </div>
+          )}
 
           {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
           <div className="mt-6" data-testid="ingestion-queue">

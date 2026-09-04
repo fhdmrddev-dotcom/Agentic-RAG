@@ -510,7 +510,7 @@ export interface Document {
   file_path: string
   file_size: number
   mime_type: string
-  status: "pending" | "processing" | "completed" | "failed"
+  status: "pending" | "processing" | "completed" | "failed" | "paused"
   error_message: string | null
   /** Phase 56 D-10/D-11 · corrected Phase 217 (D-217-09/D-217-23): the granular sub-status the
    *  ingestion pipeline last entered. SIX steps, not four — in the order `backend/app/api/documents.py`
