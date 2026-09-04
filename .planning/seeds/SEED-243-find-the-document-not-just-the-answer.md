@@ -74,3 +74,65 @@ not new extraction.
 A person who knows a document exists can find it **without guessing a phrase that appears inside
 it** — by type, by owner, by date, by folder, by relationship. And the rules surface is somewhere
 they can find without being told where it is.
+
+## ⭐ OPERATOR ADDITION, 2026-09-04 — GET THE FILE BACK OUT, AND SAY WHAT IT IS
+
+> *"we should be able to download any document from the database — currently we are not able to
+> download any document. And also we should have some rich data about the document, like when it
+> was created, how many pages, etc., similar to DMS applications."*
+
+### Half 1 — download: the file is ALREADY THERE; only the door is missing
+
+Verified at HEAD, not assumed:
+
+- **The original bytes are stored.** `backend/app/api/documents.py:675` writes every upload to the
+  Supabase Storage bucket `documents` at `{user_id}/{document_id}/{filename}`, and `:681` records
+  that path on the row as `file_path`.
+- **The backend already reads them back**, in at least three places — re-embed and re-classify both
+  call `supabase.storage.from_("documents").download(target["file_path"])` (`:1139`, `:1507`),
+  wrapped in `run_in_threadpool` per D-071.2-06.
+- ⛔ **There is NO route that hands the file to a person.** `grep "@router.*download"` across
+  `backend/app/api/` returns NOTHING, and the only `download` in the document UI is
+  `TakeoffSection.tsx:161`, which builds a CSV client-side from takeoff rows — not the source file.
+
+⭐ **So this is a genuinely small piece of work sitting on a fully-built foundation**: one
+org-scoped endpoint returning a short-lived signed URL (never a service-role stream), plus a row
+action. Two things it must get right, because they are the reasons it is not a five-minute task:
+
+1. **Authorization, not just authentication.** The read must be scoped to the caller's org through
+   RLS the way every other document read is — `BUG-260903-02` this week was exactly a cross-org
+   read/write that reached the service role. A signed URL is a bearer token; it must be short-lived
+   and minted only after the ownership check.
+2. **Versions.** `documents` carries `version_number` and `is_latest`, so "download the document" is
+   ambiguous the moment a file has history. Decide whether the action downloads the latest or the
+   version being viewed — and say which in the UI.
+
+### Half 2 — rich file facts: some exist, the interesting ones do not
+
+Measured from the live `documents` table:
+
+| Fact | State |
+|---|---|
+| `created_at`, `updated_at` | ✅ stored |
+| `file_size`, `mime_type`, `filename` | ✅ stored |
+| `version_number`, `is_latest`, `content_hash` | ✅ stored |
+| `chunk_count`, `extractor`, `ingestion_step`, `status` | ✅ stored |
+| **page count** | ⛔ **NOT stored anywhere.** `extraction_service.py:172` iterates `reader.pages` to join text and then DISCARDS the count |
+| table / image counts | server-side today (`SEED-224` neighbourhood), not on the row |
+| author / original created-date FROM the file | ⛔ absent — the PDF/DOCX properties are never read |
+
+⭐ **The page count is one line at the extraction site** — the loop that needs it already runs. The
+richer set (embedded author, the document's OWN creation date rather than our upload date, word
+count, producing application) comes from the same file properties every DMS shows, and is a small
+extractor change rather than a new pipeline.
+
+⚠ **Say which date is which.** A DMS distinguishes *"created"* (in the source document) from
+*"added"* (to this system), and today we only have the second while labelling it `created_at`. A
+person reading "created 2026-09-04" about a contract signed in 2019 is being misled by a field name.
+
+### Why both halves belong in THIS seed
+
+They are the same missing idea: **the document as an object in its own right**, not merely as a
+source of passages. You cannot run a document management system where the file cannot leave and its
+own properties are unknown — and both are cheap here precisely because the storage and the
+extraction pass already exist.
