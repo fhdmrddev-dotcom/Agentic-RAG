@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: executing
-last_updated: "2026-09-04T16:46:00.000Z"
-last_activity: 2026-09-04
+status: planning
+last_updated: "2026-09-05T00:41:00.000Z"
+last_activity: 2026-09-05
 progress:
   total_phases: 14
   completed_phases: 1
@@ -37,10 +37,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 229 — The One Ingest Splice (STARTED 2026-09-05, briefed to Gemini on BUS-106)
-Plan: 228-01..04 complete; 229 not yet planned
-Status: ✅ **COMPLETE** — executed, reviewer-verified, both corrections APPLIED (`7199fc144`). ⚠ **4 passed / 1 BLOCKED** — `DEBT-03` is not closed and must not be read as closed.
-Last activity: 2026-09-04 — Phase 228 executed and independently verified (Gemini built, Claude pre-flighted + verified). Full schema regenerated, verification debt audited in 228-VERIFICATION.md, resume/continue resolved, subdomain routing configured, and backend unit baseline gate enforced.
+Phase: 229 — The One Ingest Splice
+Plan: 229 context gathered; planning next
+Status: 🔄 **PLANNING** — discuss-phase complete; 229-CONTEXT.md and 229-DISCUSSION-LOG.md locked, ready for plan-phase
+Last activity: 2026-09-05 — Phase 229 discuss-phase complete (context captured, D-01..D-17 locked, SEED-115 updated with operator dual-tier storage & centralized access model).
+
 
 
 
