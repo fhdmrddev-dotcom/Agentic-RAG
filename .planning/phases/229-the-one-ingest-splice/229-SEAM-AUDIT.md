@@ -12,7 +12,7 @@ For every field that Phase 229 moves, normalizes, or touches across the ingestio
 |---|---|---|---|---|
 | `file_path` | Replaces invalid `storage_path` in `connectors.py:1713` and manual paths in `documents.py:681` | `storage_path = f"{user_id}/{document_id}/{filename}"` assigned to `doc_data["file_path"]` | PostgREST `documents` INSERT, storage downloader, reextract | Resolves `PGRST204` column rejection on `connectors.py` (SC#1) |
 | `content_hash` | Previously only computed in `documents.py:620` (`upload_document`); omitted in `connectors.py` | `hashlib.sha256(raw).hexdigest()` computed in `mint_document_row` | `documents.content_hash`, `documents_dedup_idx` partial index | Enables connector & attachment deduplication (SC#2, SC#3) |
-| `folder_id` | Provided via query/body in `/upload`; omitted in `connectors.py` | Validates owner/org-shared visibility, defaults `None` (root) | `documents.folder_id`, `documents_dedup_idx` scoping | Prevents unauthorized folder injection; ensures folder-scoped deduplication |
+| `folder_id` | Provided via query/body in `/upload`; omitted in `connectors.py` | Validates strict folder ownership (`folder.user_id == caller; raise 403 on mismatch`, G-1), defaults `None` (root) | `documents.folder_id`, `documents_dedup_idx` scoping | Prevents unauthorized folder injection; preserves exact upload contract (SC#4) |
 | `version_number` | Previously queried in `documents.py:648`; omitted in `connectors.py`; hardcoded 1 in email cascade | Queries max `version_number` on `(user_id, filename)`, assigns `max + 1` | `documents.version_number`, Library UI | Unifies version history across all ingress doors (SC#2, SC#4) |
 | `is_latest` | Previously updated in `documents.py:661`; omitted in `connectors.py`; hardcoded True in email cascade | Updates prior versions to `False` on filename match; mints new version with `True` | `documents.is_latest`, retrieval filters, Library UI | Retires stale versions from retrieval queries across all doors |
 | `status` & `ingestion_step` | Mints with `'pending'`; progresses through `'processing'` to `'completed'` or `'failed'` | Initialized to `'pending'` in `mint_document_row`, updated to `'completed'` or `'failed'` in `splice_document` | Supabase Realtime, frontend badges, Library UI | Prevents orphaned `'pending'` rows on extraction errors (SC#3) |
@@ -49,11 +49,12 @@ For every field that Phase 229 moves, normalizes, or touches across the ingestio
 
 | Component | Detail |
 |---|---|
-| **What 229-03 writes** | `backend/app/api/documents.py` (email attachment cascade refactored to per-attachment isolated `try...except`, calling `mint_document_row`, linking duplicate attachments in `document_relationships`, storing `metadata["attachments"]` manifest, marking failures `status='failed'`), `backend/app/services/multimodal_service.py` (audited on chunk path), `backend/tests/integration/test_email_attachment_cascade_splice.py`. |
-| **What 229-04 reads** | Final line count reduction for `documents.py` G-5 discharge; mechanical test baseline. |
+| **What 229-03 writes** | `backend/app/api/documents.py` (email attachment cascade refactored to per-attachment isolated `try...except`, calling `mint_document_row(on_conflict="link")`, linking duplicate attachments in `document_relationships`, storing `metadata["attachments"]` manifest, marking failures `status='failed'`), `backend/app/services/multimodal_service.py` (audited on chunk path), `backend/tests/integration/test_email_attachment_cascade_splice.py`. |
+| **What 229-04 reads** | Final line count reduction for `documents.py` G-5 discharge; mechanical test baseline; verified 4-site chunk writes (documents.py:2338 text, multimodal_service.py:435 table, multimodal_service.py:913 image, documents.py:2534 authoritative recount). |
 | **Files on the path in between** | 1. `backend/app/api/documents.py` (ingest_document and attachment cascade).<br>2. `backend/app/services/email_extraction_service.py` (attachment parsing).<br>3. `backend/app/services/multimodal_service.py` (table and image chunk writes).<br>4. Supabase Postgres `document_relationships` and `document_chunks` tables. |
-| **Failure mode guarded against** | Blanket exception swallowing where failure on attachment 1 aborts attachment 2 (D-5 defect 2 / SC#3); unique-violation collisions when two emails carry identical attachments (Claude's BUS-106 inference); orphaned `pending` rows; desynchronized `chunk_count`. |
+| **Failure mode guarded against** | Blanket exception swallowing where failure on attachment 1 aborts attachment 2 (D-5 defect 2 / SC#3); unique-violation collisions on `documents_dedup_idx` when two attachments or emails carry identical bytes during pending/processing states (G-2); orphaned `pending` rows; desynchronized `chunk_count`. |
 | **Verification mechanism** | `pytest backend/tests/integration/test_email_attachment_cascade_splice.py -v`. Exit code 0 required. |
+
 
 ---
 

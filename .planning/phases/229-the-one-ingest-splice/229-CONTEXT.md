@@ -39,9 +39,10 @@ This is a **pure refactor** with **no new user-facing capability** and **no data
 
 ### Deduplication Policy Across Producers
 - **D-05 (Connector Parity with Upload):** When `import_connection_file` detects an exact duplicate (`is_duplicate=True`), it returns HTTP 200 with the existing completed document row (exact parity with `/upload`), skipping redundant storage uploads and re-extraction.
-- **D-06 (Email Duplicate Attachment Linking):** When an email attachment matches an existing completed document (`is_duplicate=True`), the cascade skips re-uploading and re-extracting, and immediately writes the `document_relationships` record (`rel_type='attached_to'`, `source_doc_id=existing_doc_id`, `target_doc_id=parent_email_id`). This avoids unique-constraint collisions on `documents_dedup_idx` while preserving the complete attachment relationship graph.
+- **D-06 (Email Duplicate Attachment Linking & Collision Resolution - G-2):** When an email attachment matches an existing completed document (`is_duplicate=True`), the cascade skips re-uploading and re-extracting, and immediately writes the `document_relationships` record (`rel_type='attached_to'`, `source_doc_id=existing_doc_id`, `target_doc_id=parent_email_id`). To handle concurrent or same-ingest attachments whose status is still pending/processing (where the SELECT misses but the unique partial index `documents_dedup_idx` collides on `23505`), `mint_document_row()` takes `on_conflict: Literal["raise", "link"] = "raise"`. Callers on the attachment path pass `"link"`, causing `23505` to re-query the non-failed document and return it as a linked duplicate rather than failing.
 - **D-07 (Uniform Folder Scoping):** Deduplication queries are uniformly folder-scoped across all producers: `(user_id, content_hash, folder_id, status='completed', is_latest=True)`, defaulting to `folder_id IS NULL` (root) when omitted.
 - **D-08 (Uniform Versioning on Matching Filename):** When a file with an identical filename but different content arrives, `mint_document_row()` queries the highest `version_number` for `(user_id, filename)`, retires previous versions with `is_latest=False`, and mints the new document with `version_number = max + 1` and `is_latest=True`.
+
 
 ### Email Attachment Cascade Isolation & Failure Reporting (SC#3)
 - **D-09 (Per-Attachment Isolation):** Process email attachments in an isolated per-attachment `try...except` block within the iteration loop. An extraction or storage failure on attachment 1 logs detailed contextual errors and proceeds to process attachment 2.
@@ -60,7 +61,8 @@ This is a **pure refactor** with **no new user-facing capability** and **no data
   4. Authoritative live recount from `document_chunks` to update `documents.chunk_count` and mark `status='completed'`.
 
 ### Forward-Compatible Tenancy & Access Governance
-- **D-17 (Extensible Access & Folder Validation):** `mint_document_row()` accepts optional `org_id: str | None = None` and arbitrary `metadata: dict | None = None`. Folder validation checks owner OR org-shared visibility (`user_id == caller OR is_org_shared == True`), ensuring that the splice never hardcodes single-user assumptions or blocks group-based access control.
+- **D-17 (Extensible Signatures & Strict Ownership Parity - G-1):** `mint_document_row()` accepts optional `org_id: str | None = None` and arbitrary `metadata: dict | None = None`. To preserve SC#4 ("nothing a person can see changed on the upload path"), folder validation enforces strict owner parity (`folder.user_id == caller; raise 403 on mismatch`), matching `documents.py:610-617` byte-for-byte. Any permission widening for org-shared ancestor folders is routed to Phase 231 (which owns RLS and visibility across the four RLS sites).
+
 
 ### Claude's Discretion
 - Internal helper decomposition within `backend/app/services/ingest_splice.py`.
