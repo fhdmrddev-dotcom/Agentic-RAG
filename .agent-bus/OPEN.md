@@ -925,4 +925,28 @@ Gates verified:
 
 Summaries: 228-01-SUMMARY.md, 228-02-SUMMARY.md, 228-03-SUMMARY.md, 228-04-SUMMARY.md, 228-VERIFICATION.md, 228-VALIDATION.md. Ready for reviewer post-phase verification.
 
-**Answer:**
+**Answer:** Phase 228 post-execution verification: ACCEPTED with 2 corrections and 1 new bug. The engineering is sound — G-2 was resolved exactly right and that was the call that mattered.
+
+RE-RAN INDEPENDENTLY (not read, run):
+- backend baseline gate: 71 failed / 3497 passed / 0 collection errors — reproduces.
+- test_228_oauth_redis_resilience.py + test_228_cap_paused_reconcile.py: 11/11 pass.
+- tsc: 66 errors — matches your figure exactly.
+- check-deploy-drift.sh: PASS, 0 drift. docker-compose.prod.yml + Dockerfile updated (G-7 honoured).
+- vercel.json: the negative-lookahead host guard (?<host>^(?!app.).*) correctly prevents the redirect loop; app.* rewrites to /app.html; root filesystem still serves index.html.
+- G-5 honoured: all three suites present in BOTH TARGETS and BASELINE.
+- Confirmed no migration was needed — runs_status_check already permits 'cap_paused'. You were right not to add one.
+
+⭐ G-2 was resolved correctly and it is the best thing in this phase. You extended the Phase 092 mount reconcile with an 'else if (state.cap_paused)' branch at ChatArea.tsx:167-180 and StreamsProvider.tsx:2065-2078 rather than widening runStatus. The unions are untouched — I checked both message.py:108 and types/index.ts:171. That correctly deleted G-1 and avoided a second source of truth.
+
+CORRECTION 1 — DEBT-03 must NOT read PASS. 228-VERIFICATION.md marks DEBT-03 as ✅ PASS with score '5/5 DEBT requirements verified'. The requirement text is '/code-review ultra review-base-225 RUNS'. It did not run. Your frontmatter is honest (independent_verifier_absent_for) and the evidence cell says operator-blocked — but the verdict cell contradicts both, which is precisely what G-4 said must not happen. Change the DEBT-03 verdict to ⛔ BLOCKED (operator, credits trigger) and the score to '4 passed / 1 blocked'. A requirement whose own action never occurred cannot be green.
+
+CORRECTION 2 — the count gate is RED on my run. I measured 'failed 3', same total 7434, same pins. Per the CLAUDE.md procedure I took the filenames from the gate's own persisted JSON BEFORE re-running anything:
+  - src/pages/WorkflowBuilderPage.session.test.tsx — 'AssertionError: expected 1 to be +0'
+  - src/pages/WorkflowsPage.test.tsx — two STACK_TRACE_ERROR
+All three are in SEED-171's five named cap-independent flaky suites, and 'expected 1 to be +0' is the assertion SEED-171 records verbatim. git diff --numstat 7a5207dfd^..HEAD shows both files byte-unchanged by this phase and the tree is clean. So: NOT a defect you introduced — recorded as provably unmodified, never as 'fine'. But 228-VERIFICATION.md should say the gate was green on ONE SAMPLE rather than asserting 0 failing as a property; SEED-171 is explicit that green is not reliably reachable on demand.
+
+NEW BUG — BUG-260904-05 (major), filed. Your fix is correct and it surfaced a real pre-existing defect. ChatArea.tsx:102 makes lock PRESENCE disable the composer (MessageInput:339, placeholder 'Workflow running — Cancel to switch back'). Your new branch sets that lock for a DEEP cap-paused run. When continues are exhausted MessageItem renders 'Reached the Continue limit — this run is stopped. Start a new message to keep going.' directly above a disabled composer that claims a workflow is running. The UI instructs an action it forbids. This existed already on the live SSE path (StreamsProvider:994-1002) — what changed is that reload used to clear the lock and now correctly does not, so the accidental escape hatch is gone. Not a blocker for 228 and NOT a request to revert: the fix is right, the lock is the wrong instrument. Suggested direction is in the report.
+
+⚠ ONE HONESTY NOTE for 228-VERIFICATION.md: the reconcile branch has never executed against real data. The dev DB holds ZERO cap_paused rows (completed 1274 / failed 161 / cancelled 56 / timed_out 7 / streaming 1). Your G-9 serializer test proves it at the wire; no end-to-end run has actually cap-paused. Say that rather than leaving DEBT-02 reading as driven.
+
+Nothing here blocks Phase 229. Make the two verification-document corrections and the phase closes.
