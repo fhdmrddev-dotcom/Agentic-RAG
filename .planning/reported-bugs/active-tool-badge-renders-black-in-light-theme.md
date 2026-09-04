@@ -6,6 +6,7 @@ surface: Agentic-RAG
 severity: medium
 status: open
 affected_areas: [frontend/chat, theming, light-theme, StepRow.tsx, StatusPill.tsx, ToolCallPanel]
+not_caused_by: 227
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-092]
@@ -56,3 +57,10 @@ or refutes it. If it reproduces identically on `7334f8d84`, it is pre-existing a
 Switch to light theme, start a run with a tool, and inspect the active step: the rail node,
 its glow and the running pill all carry the accent, and text on them meets contrast (SEED-092
 is the standing WCAG AA seed for this app).
+
+## Cleared of Phase 227 — 2026-09-04
+
+The before/after drive () compared the normalized rendered DOM of the active
+rail node and the step rows between  (pre-227) and . **They are byte-identical.**
+Whatever produces the black mark is present in the pre-227 build too, so the refactor neither caused
+nor hid it. Diagnose it on its own, on the three candidates listed above.

@@ -1,77 +1,75 @@
-# Phase 227 Validation: The Run Frame Has One Owner
-
-**Validation Date:** 2026-09-04  
-**Author:** Gemini (Builder)  
-**Reviewer:** Claude  
-**Verdict:** PASS  
-
+---
+phase: 227
+title: "SC#2 — nothing changes on screen"
+driven_by: claude (reviewer) with the operator, in a real browser
+date: 2026-09-04
+before: 7334f8d84   # the pre-flight commit, immediately before Wave 1
+after: 57274c7e0    # Phase 227 complete (Waves 1-3)
+verdict: "SC#2 DISCHARGED — all eight run states render identically across the two builds."
 ---
 
-## 1. Mechanical Gates
+# Phase 227 — SC#2 validation: the before/after drive
 
-### 1.1 Vitest Count Gate
-- **Command:** `$env:GSD_VITEST_MAX_WORKERS="2"; node scripts/vitest-count-gate.cjs`
-- **Output:**
-  ```text
-  count gate OK — 215/215 pinned files present, no per-file decrease, 0 failing.
-  total 7407  ·  failed 0  ·  pinned total 6675 (+732)
-  ```
-- **Covering Suites Adopted in BASELINE:**
-  - `RunCard.characterization.test.tsx` (8 tests)
-  - `ToolCallPanel.test.tsx` (16 tests)
-  - `MessageItem.cancelledRun.test.tsx` (8 tests)
-  - `MessageItem.test.tsx` (24 tests)
-  - All 16 run-frame covering test suites verified green (149 tests).
+## How it was driven, and why this is stronger than screenshots
 
-### 1.2 TypeScript Compilation Check
-- **Command:** `(npx tsc --noEmit -p tsconfig.app.json 2>&1 | Select-String "error TS").Count` (inside `frontend/`)
-- **Output:** `66` (0 new errors against pre-Phase-227 baseline of 66; 3 TS6133s in `MessageItem.tsx` removed).
-- *Note:* Pre-existing `BUG-260904-01` (`TS2304: Cannot find name 'continueRun'` at `MessageItem.tsx:647`) is tracked independently and untouched.
+Two dev servers, **one backend**, the same signed-in account, the same threads:
 
-### 1.3 CLAUDE.md Size & Ledger Integrity Gate
-- **Command:** `node scripts/check-claude-md-size.cjs`
-- **Output:**
-  ```text
-  CLAUDE.md                                  106939 chars   71.3% of limit  headroom   43061  [OK]
-  claude-md size gate OK — every CLAUDE.md loads, all under 120000 chars.
-  ```
+| Port | Build | Commit |
+|---|---|---|
+| `5173` | **AFTER** — Phase 227 complete | `57274c7e0` |
+| `5174` | **BEFORE** — pre-227 | `7334f8d84`, in a bootstrapped worktree at `.claude/worktrees/pre227` |
 
----
+One backend serves both because **Phase 227 changed no wire format** — that is what makes the
+comparison sound rather than convenient. The same thread therefore renders from byte-identical
+server data on both sides, and any difference is the frontend's.
 
-## 2. Success Criteria Audit
+⚠ **The comparison is the normalized rendered DOM, not a screenshot.** Radix-generated ids,
+`aria-controls` / `aria-labelledby` and tick durations are stripped; for the live run the text
+nodes are stripped too, since timers move while the run is streaming. A screenshot comparison
+would have been defeated by animation timing and by the reviewer's own eyes — **the failure mode
+this phase's ROADMAP names outright**: *"a refactor with no visual contract is a rewrite with
+extra steps."*
 
-| Criterion | Target | Measured / Proof | Status |
+⚠ **Two of the eight states were reached by DATABASE QUERY, not by hunting the sidebar.** The
+run-status distribution in local Postgres is `completed 1264 · failed 159 · cancelled 56 ·
+timed_out 7`, and the timed-out and sub-agent threads were selected from it by name. Guessing
+which thread holds which state is how a state gets silently skipped and the table still reads
+complete.
+
+## The eight states
+
+| # | State | Thread driven | Result |
 |---|---|---|---|
-| **SC#1: Single Frame Ownership** | Run frame chrome + terminal status owned by `RunCard` | `RunTerminalStatus` extracted to `RunCard.tsx` and consumed by `MessageItem.tsx`. All frame headers, progress shimmers, badges, and terminal derivations reside in `RunCard.tsx`. | **PASS** |
-| **SC#2: Byte-Identical Visual Fidelity** | All 8 run states mechanically verified | `RunCard.characterization.test.tsx` tests all 8 states. 8/8 tests pass. | **PASS** |
-| **SC#3: Future 1-File Edit Readiness** | Future layout shifts localized | Result column layout localized in `StepRow.tsx`. Run status positioning localized in `RunCard.tsx`. Future adjustments are 1-file edits. | **PASS** |
-| **SC#4: G-5 Hot-File Extraction** | Monolithic hot files decomposed and discharged | `ToolCallPanel.tsx`: 1019 → 351 L (-65%). `MessageItem.tsx`: 823 → 702 L (-15%). `RunCard.tsx` re-derived at 26 / 12 / 728 L. | **PASS** |
+| 1 | streaming (live) | new run, same prompt sent to both tabs | **IDENTICAL** — strip ×1, rows ×3, nodes ×3, rails ×2, snums ×3 (text-stripped skeletons) |
+| 2 | settled | `Latest BOQ Price Search Request` | **IDENTICAL** — collapsed cards 1016 chars ×2; step rows 1177 / 1308 / 1386 / 1308; rail nodes 164 ×4 |
+| 3 | failed | `Write and run a Python script that benchmarks…` | **IDENTICAL** — 1 row, 1 node |
+| 4 | timed-out | `generate weekly report` | **IDENTICAL** — 3 rows, 3 nodes; *"Agent reached time limit"* present on both |
+| 5 | cancelled | `History of the Internet` | **IDENTICAL** — *"Response stopped"* present on both |
+| 6 | paused on approval | `UAT-C · approval pause (delete me)` | **IDENTICAL** — 2 rows, 1951 chars each |
+| 7 | no tools | `Short Greeting Message` | **IDENTICAL** — 0 rows, 0 nodes on both |
+| 8 | sub-agent | `can you search for RPA research and create…` | **IDENTICAL** — 3 rows, 3 nodes |
 
----
+Raw captures are under the session scratchpad (`{before,after}-{runcards,steps,approval,sweep,sweep2,live}.json`);
+each pair was diffed with `difflib` per element rather than compared by length alone.
 
-## 3. SC#2 Run State Coverage & Browser Drive Status
+## Two observations recorded rather than left implicit
 
-### 3.1 Mechanically Driven States (8 of 8 Covered in `RunCard.characterization.test.tsx`)
-1. **Streaming active run (`status: "running"`):** Live duration timer rendered via `ElapsedTimer`, pulsing loader glyph, tool list displayed.
-2. **Settled completed run (`status: "done"`):** Green checkmark glyph, execution duration, terminal status badge, resting essence rows.
-3. **Failed run (`status: "error"`):** Red error glyph, destructive error pill, error message rendered via `ToolResultBlock`.
-4. **Timed out run (`status: "timed_out"`):** Amber clock glyph, timeout status pill.
-5. **Cancelled run (`status: "cancelled"`):** Stop glyph `■`, cancelled badge, partial tool list preserved.
-6. **Paused on tool approval (`status: "paused_on_approval"`):** Amber shield glyph, approval banner / `ChatToolApprovalCard` embedded.
-7. **No-tools run (text-only generation / reasoning):** Clean run frame with reasoning delta summary and zero tool artifacts.
-8. **Sub-agent tool run (`tc.sub_agent` attached):** Subagent nested block with model moniker, task summary, and streaming Markdown body.
+- **`status-pill` count is 0 on every done step, on BOTH builds.** The operator's 2026-08-31
+  noise audit renders exactly as decided, and it is unchanged by the refactor. ⚠ This is also
+  why plan `227-01` had to correct a stale assertion rather than "fix" the component — the test
+  was wrong, the shipped behaviour was right, and both facts are now proven from the running app.
+- **"↓ Jump to live" appeared** during the live run once the view had been scrolled. So the
+  follow-but-release affordance **exists and renders**; `BUG-260904-02` is therefore a *re-arming*
+  defect, not a missing release. That narrows the search for whoever fixes it.
 
-### 3.2 Browser Drive Verification
-- **Mechanical Characterization:** **DRIVEN & PASSED** (8/8 unit characterization tests green, 0 regressions across all 16 covering suites).
-- **Human Interactive Browser Drive:** **OWED to Operator** (Visual inspection in live browser session across the 8 states before production milestone tag).
+## What this does NOT prove
 
----
-
-## 4. Re-check Closure Items (BUS-101)
-
-1. **TSC Error Count Cleaned:** Removed unused `useLayoutEffect`, `useRef`, and `cn` imports in `MessageItem.tsx`. `tsc` count verified at exactly `66` (pre-227 baseline).
-2. **`RunCard.tsx` Ledger Row Re-derived:** Measured at `26 commits / 12 phases / 728 L` (gained `RunTerminalStatus`). Recorded in both `CLAUDE.md` and `docs/HOT-FILE-LEDGER.md`.
-3. **Decision Comments Restored:**
-   - `frontend/src/components/chat/StepRow.tsx`: Restored `NOISE AUDIT 2026-08-31 (operator, item A6)` block, `Variant B merged live chip` note, and `Phase 075.8 Task 2 (sketch 002 D5)` mapping docblocks.
-   - `frontend/src/components/chat/ToolCallPanel.tsx`: Restored `075.6 Plan 02 / SPEC Req #4 default-expand-for-active-preparing rule`, per-tool-id panel state notes, and `Phase 075.8 Task 3` bottom progress shimmer notes.
-   - `frontend/src/components/chat/ToolCallDetails.tsx`: Restored `ToolResultBlock` and `SubAgentBlock` root fix docblocks.
+- **Pixel-level styling.** The DOM (tags, classes, attributes) is identical, so any pixel
+  difference would have to come from CSS that changed outside these components. Phase 227 touched
+  no stylesheet — but this drive did not measure rendered pixels, and saying otherwise would be
+  the "shipped green against the wrong contract" failure again.
+- **`BUG-260904-03`** (active-tool mark black in light theme) is **not attributable to 227**:
+  the classes on the active node are byte-identical across the two builds, so whatever produces
+  the black is present in the BEFORE build too. That is the check the bug report asked for, and
+  it clears this phase.
+- The states were driven on **one thread each**. A state is a shape, not a single row.
