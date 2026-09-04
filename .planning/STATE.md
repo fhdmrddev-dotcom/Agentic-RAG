@@ -180,6 +180,45 @@ live will exercise — consistent with CONN-10/CONN-11 being undrivable rather t
    it was authored by someone who had also pre-flighted the code.
 
 
+## ⚠ HOTFIX 2026-09-04 — `BUG-260904-04`: `FRONTEND_URL` is a LIST, and every OAuth redirect was an unusable URL
+
+**Found by the operator minutes after the v3.9 push** — *"why is it not connecting to Notion… it is the
+redirect, it's not working."* Diagnosed by reading the live `Location` header rather than the code.
+
+```
+Location: https://superrag.cloud,https://agentic-rag-rho.vercel.app/app?connections=1&...
+```
+
+That authority is `superrag.cloud,https:` — **not a host**. Notion, Google and Microsoft alike.
+
+**Root cause — two consumers of one setting disagreed.** `FRONTEND_URL` is comma-separated *by design*
+(the runbook requires every origin for CORS; `main.py:714` splits it). **Four sites interpolated the raw
+string:** the three `connectors.py` redirect bases and ⚠ **`email_provider.py:37`, the INVITE EMAIL
+LINK** — a broken link in a mail nobody can resend. Fixed by `primary_frontend_origin()` in `config.py`;
+**CORS deliberately keeps the full list.**
+
+⭐ **THE SURPRISE WORTH KEEPING: the tokens save BEFORE the redirect.** `save_oauth_tokens` runs, then the
+`RedirectResponse` returns — so **Google Workspace read `OAuth connected · ✓ Ready` in the UI on the very
+same install whose redirect was broken.** The UI and the browser disagreed and the UI was right. That is
+why a *successful* operator connect did not reveal it, and why it had to be caught by curl.
+
+⚠ **NO TEST COULD HAVE CAUGHT IT, AND THAT IS STRUCTURAL.** Local `FRONTEND_URL` is a single origin, so
+the split is a no-op and the defect **does not exist locally**. `225-VALIDATION.md` verified all eight
+redirect sites and was correct — on local. Driven RED against the planted defect: **5 of 8 cases failed,
+and the 3 that PASSED are single-origin, trailing-slash and empty** — exactly the shapes every prior test
+used. That distribution IS the finding.
+
+**Shipped:** `69fc6d9d3` on `develop`, cherry-picked to `production` as `19b50abac` in a throwaway
+worktree (torn down; venv + node_modules intact). Verified live afterwards, **both properties at once**:
+redirects carry ONE origin AND CORS still admits both while rejecting `evil.example.com`.
+Backend suites: **255 passed, 0 failed** across oauth / connector / mcp / invite.
+
+⚠ **The guard covers the RESOLVER, not its call sites.** A fifth site reading `settings.frontend_url`
+raw is invisible to it — that is `BUG-260904-04`'s re-open trigger.
+⚠ **Notion is still UNCONFIRMED.** This bug guaranteed a broken-looking Notion connect, but whether the
+exchange ALSO fails earlier (RFC 7591 dynamic registration) is **undriven**. Retry Notion first.
+
+
 ## Deferred Items
 
 Acknowledged and deferred at the v3.9 milestone close on 2026-09-04 (`gsd-sdk query audit-open` →
