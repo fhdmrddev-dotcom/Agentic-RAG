@@ -3103,6 +3103,17 @@ const BASELINE = {
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
   "scrollAreaViewportWidth.test.tsx": 2,
+  // ── BUG-260904-02 (2026-09-04) — the follow-but-release scroll machine ───────────────
+  // ⚠ FOUND IN NEITHER KNOB while carrying the entire scroll discipline of the chat: the gate
+  // has never executed it and nothing guarded its count. Adopted here, in the commit that fixes
+  // the defect it failed to catch.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT: the three fences that keep a streaming run from dragging a
+  // reader who scrolled away — the smooth-scroll TAIL must not re-arm the pin, a gesture must
+  // cancel our claim for the purpose of letting go but NEVER for taking hold again, and an
+  // upward gesture must release synchronously rather than a commit later. Each was driven RED,
+  // and two of them only after a REAL mouse wheel refuted a synthetic one that measured clean.
+  "useFollowScroll.test.ts": 10,
   // ── BUG-260904-01 (2026-09-04) — the Continue button's ONLY behavioural guard ──────────
   // Pinned in the SAME COMMIT that creates it (a BASELINE key naming a path that does not yet
   // exist makes this gate ERROR at exit 2, not fail). Bare name confirmed unique tree-wide.
@@ -4371,6 +4382,9 @@ const TARGETS = [
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
+  // ── BUG-260904-02 — see the matching BASELINE entry. `src/__tests__/hooks` is reached by no
+  // ── directory entry in this file, so this suite needed BOTH knobs. ───────────────────
+  "src/__tests__/hooks/useFollowScroll.test.ts",
   // ── BUG-260904-01 — see the matching BASELINE entry for what it guards. FILE-LEVEL,
   // ── deliberately not the bare directory `src/components/chat/__tests__`, verbatim the
   // ── reasoning this script already records for its neighbours. ────────────────────────
