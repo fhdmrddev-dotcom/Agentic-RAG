@@ -72,11 +72,21 @@ describe("ToolCallPanel — unified essence cards (no card-to-text flip)", () =>
     // one-line ToolEssenceLine CARD — identical to the settled view.
     const essences = container.querySelectorAll("[data-testid='tool-result-summary']")
     expect(essences.length).toBe(5)
-    // Every finished essence card carries its status-pill badge (the "DONE ·
-    // Ns" chip) — proving there is no badge-less degraded text representation.
+    // 2026-08-31 Noise audit (operator, item A6): Plain done steps do NOT
+    // carry a redundant done status-pill when the run header already says done.
     essences.forEach((row) => {
-      expect(row.querySelector("[data-testid='status-pill']")).toBeTruthy()
+      expect(row.querySelector("[data-testid='status-pill']")).toBeNull()
     })
+
+    // POSITIVE CONTROL: An active/running step DOES carry its status pill.
+    const toolsWithRunning: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkActiveTool({ id: "t2", iteration: 0 }),
+    ]
+    const { container: runningContainer } = renderWithTooltip(<ToolCallPanel toolCalls={toolsWithRunning} />)
+    const runningPill = runningContainer.querySelector("[data-testid='status-pill']")
+    expect(runningPill).toBeTruthy()
+    expect(runningPill?.getAttribute("data-status")).toBe("running")
     // The removed "Focus Mode" degraded-text summary rows no longer exist.
     expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(0)
     expect(container.querySelectorAll("[data-testid='collapsed-steps-summary']").length).toBe(0)

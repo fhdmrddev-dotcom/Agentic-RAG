@@ -85,7 +85,7 @@ export function SsoTab({ configs, canManageSso, onCreate, onRemove }: SsoTabProp
   const showForm = canManageSso && (!hasConnections || adding)
 
   return (
-    <section aria-label="Single sign-on" className="mx-auto max-w-2xl px-6 py-6">
+    <section aria-label="Single sign-on" className="mx-auto max-w-6xl w-full px-6 py-6">
       <div className="rounded-lg border border-border bg-card px-6 py-6">
         {/* Heading — 700 Manrope, indigo shield glyph. */}
         <div className="mb-2 flex items-center gap-2">

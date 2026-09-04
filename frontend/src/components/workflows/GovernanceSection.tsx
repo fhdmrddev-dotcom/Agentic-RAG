@@ -87,6 +87,7 @@ import {
   GROUNDING_DIAL_STRICT_LABEL,
   GROUNDING_LOCK_REFUSAL,
   GROUNDING_NOTHING_TO_PROVE,
+  GROUNDING_PUBLISH_CONSEQUENCE,
   GROUNDING_TOOL_LIST_IS_THE_CONTROL,
   GROUNDING_WHY_DETECTED,
   GROUNDING_WHY_ESCALATED,
@@ -329,6 +330,17 @@ export function GovernanceSection({
           {cause !== null && (
             <p data-testid="governance-why" className={NOTE_CLASSES}>
               {cause === "detected" ? GROUNDING_WHY_DETECTED : GROUNDING_WHY_ESCALATED}
+            </p>
+          )}
+
+          {/* ── SEED-230 — WHAT THE STATE DOES, not just what it is ──────────────────────
+              Everything above describes a state; nothing said it can stop a publish, so the
+              section reads as a quality setting. `detected` ONLY: `effective_phase`
+              synthesizes the gate for that cause and no other, so rendering this on
+              `escalated` would promise a check that is never attached. */}
+          {cause === "detected" && (
+            <p data-testid="governance-publish-consequence" className={NOTE_CLASSES}>
+              {GROUNDING_PUBLISH_CONSEQUENCE}
             </p>
           )}
 

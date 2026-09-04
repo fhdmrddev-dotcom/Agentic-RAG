@@ -48,25 +48,14 @@ describe("Chat↔Panel Seam (D-05) — live pointer vs reload card", () => {
     expect(screen.getByRole("button", { name: /open panel/i })).toBeInTheDocument()
   })
 
-  it("reload SeamCard for workspace_write renders a file chip + version", () => {
-    render(<SeamCard kind="workspace_write" payload={{ path: "summary.md", version: 3 }} />)
-    expect(screen.getByText("summary.md")).toBeInTheDocument()
-    expect(screen.getByText("· v3")).toBeInTheDocument()
-  })
-
-  it("reload SeamCard for write_todos renders the final-state note '☑ N todos · all done'", () => {
-    render(<SeamCard kind="write_todos" payload={{ todoTotal: 3, todoDone: 3 }} />)
-    expect(screen.getByText(/☑ 3 todos · all done/i)).toBeInTheDocument()
-  })
-
-  it("never renders raw JSON / a raw byte dump for a panel-owned tool (write_todos / workspace_write / ask_user)", () => {
+  it("never renders raw JSON / a raw byte dump for a panel-owned tool (ask_user)", () => {
     const { container: c1 } = render(
       <SeamPointer kind="workspace_write" label="summary.md" />,
     )
     const { container: c2 } = render(
       <SeamCard
         kind="ask_user"
-        payload={{ question: "Q?", answer: "A", path: "x.md", version: 1, todoTotal: 1, todoDone: 1 }}
+        payload={{ question: "Q?", answer: "A" }}
       />,
     )
     // no stringified object braces in the rendered text

@@ -42,6 +42,7 @@ import { render, screen, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ConnectionsTabView } from "../ConnectionsTab"
+import { CATALOG_SERVICES } from "../servicesCatalog"
 // The container's SOURCE via Vite's `?raw` loader — the shipped house idiom for a fence the
 // rendered DOM cannot express (`ConnectionPicker.test.tsx:31`, `CanvasToolbar.test.tsx:32`).
 import connectionsTabSource from "../ConnectionsTab?raw"
@@ -68,6 +69,7 @@ import {
   moreActionsLabel,
   usageCountsFrom,
   usedByLabel,
+  connectionStateOf,
 } from "../connectionsCopy"
 import type { ConnectorConnection, PublishedWorkflow } from "@/lib/api"
 
@@ -78,6 +80,10 @@ function makeConnection(overrides: Partial<ConnectorConnection> = {}): Connector
     id: "conn-1",
     org_id: "org-1",
     capability: "send_email",
+    // ⚠ REQUIRED since 211-02 — migration 127's `connector_connections_has_a_service_identity`
+    // guarantees a non-blank value on every row, so a fixture without one models a row the
+    // server cannot produce. The row-level surface reads it in Phase 212, not here.
+    service_id: "smtp",
     name: "Ops mailbox",
     config: { host: "smtp.fastmail.com", port: 465, from_address: "ops@northwind.co", tls: "implicit" },
     is_enabled: true,
@@ -118,6 +124,7 @@ function renderTab(
   return render(
     <ConnectionsTabView
       connections={THREE_ROWS}
+      catalogServices={[]}
       usageCounts={{}}
       isOrgAdmin
       liveConnectorsOn
@@ -602,16 +609,23 @@ describe("the Used by derivation (§2c — the count that names the victims)", (
     expect(usageCountsFrom(odd)).toEqual({})
   })
 
-  it("zero reads as `none you can see`, never as a bare `0 steps`", () => {
-    // The read is OWNER-scoped, so zero is a FLOOR. `0 steps` would claim nothing depends
-    // on this connection, which this read cannot support.
-    expect(usedByLabel(0)).toBe("none you can see")
+  it("zero reads as NOTHING, never as a bare `0 steps` — and never as a repeated sentence", () => {
+    // The read is OWNER-scoped, so zero is a FLOOR: `0 steps` would claim nothing depends
+    // on this connection, which this read cannot support. That reasoning is unchanged.
+    //
+    // ⚠ NOISE AUDIT 2026-08-31 (operator, item B1). What changed is the SPELLING. Zero
+    // used to render the words `none you can see`, and on the operator's install SEVEN
+    // consecutive rows said exactly that — one identical sentence per connected service,
+    // in a column where every value was the same. The scoping caveat it was carrying is
+    // said ONCE below the table (`CONNECTIONS_USED_BY_SCOPE_NOTE`), which is where a
+    // caveat about a whole column belongs; the per-row echo was that fact said eight times.
+    expect(usedByLabel(0)).toBe("")
     expect(usedByLabel(1)).toBe("1 step")
     expect(usedByLabel(4)).toBe("4 steps")
 
     renderTab({ usageCounts: { "conn-1": 1 } })
     const cells = screen.getAllByTestId("connections-row-usedby").map((c) => c.textContent)
-    expect(cells).toEqual(["1 step", "none you can see", "none you can see"])
+    expect(cells).toEqual(["1 step", "", ""])
   })
 })
 
@@ -630,13 +644,13 @@ describe("the 155-C column contract and the read's four states", () => {
     expect(container.querySelector("table")).toBeNull()
   })
 
-  it("the Sends to cell carries the 🔒 mark and the real host — and `fixed` only on Slack", () => {
+  it("the Sends to cell carries the real host — and `fixed` only on Slack", () => {
     renderTab()
     const cells = screen.getAllByTestId("connections-row-destination")
     expect(cells[0].textContent).toContain("smtp.fastmail.com:465")
     expect(cells[1].textContent).toContain("northwind.atlassian.net")
     expect(cells[2].textContent).toContain("slack.com/api")
-    cells.forEach((cell) => expect(cell.textContent).toContain("🔒"))
+    cells.forEach((cell) => expect(cell.textContent).toContain(""))
     expect(cells[0].textContent).not.toContain("fixed")
     expect(cells[2].textContent).toContain("fixed")
   })
@@ -717,6 +731,14 @@ describe("SC#3 — the marks reach the row, and they are each their own", () => 
       id: "conn-4",
       name: "DeepWiki MCP",
       capability: null,
+      // ⚠ ITS OWN IDENTITY, 2026-08-28. This inherited `makeConnection`'s default
+      // `service_id: "smtp"` while being an MCP row — a combination the server cannot
+      // produce (an SMTP identity implies the `send_email` capability, and this row has
+      // none). It was inert until `connectionMark` learned to let a KNOWN identity outrank
+      // the transport for capability-less rows; then the fixture resolved to the mail glyph
+      // and this suite's own distinctness assertion caught it. The fixture was wrong, not
+      // the ladder — and an uncurated hostname is what a real custom-MCP row carries.
+      service_id: "mcp.deepwiki.com",
       mcp_server_url: "https://mcp.deepwiki.com/mcp",
       config: { headers: {} },
       last_checked_at: null,
@@ -789,56 +811,24 @@ describe("SC#3 — the marks reach the row, and they are each their own", () => 
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // 14 · Phase 206.1-02 Task 1 — THE WIDE RENDER, PINNED BYTE-FOR-BYTE
-//
-// ⚠ CAPTURED AND COMMITTED BEFORE ONE LINE OF DENSE CODE EXISTS. A baseline only proves
-// something if it PREDATES the change — the `cardFace.ts` precedent, where the
-// characterization pin was committed ONE COMMIT BEFORE the seam existed and then passed
-// with an empty `numstat`. Item 2 of this phase adds a SECOND row shape behind a `dense`
-// prop; the only thing that can prove the FIRST shape did not move while that happened is
-// a record taken while it was the only shape there was.
-//
-// PROVENANCE OF THE IDIOM: there is NO `outerHTML` capture anywhere in the settings suites
-// today (measured — the only `innerHTML` uses here are needle scans), so this is IMPORTED
-// from `frontend/src/components/workflows/PhaseNodeCard.test.tsx:2640-2647` (the capture
-// helper), `:2649-2673` (the capture-rule docblock whose wording is copied below) and
-// `:2792-2825` (the marker rows). It is not extended from a local example, and saying so
-// is what stops a later reader treating it as this file's house style.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
+// ⚠ RE-BASELINED 2026-08-31 (noise audit, item B2). These captures are a byte-identity
+// fence, so an INTENTIONAL visual change must re-record them or the fence pins the past.
+// What changed: the 🔒 that opened every `Sends to` cell was removed — it was on every
+// row, so it distinguished nothing. The captures below differ from their 206.1-02
+// originals by exactly that one `<span aria-hidden="true">🔒</span>` per row, and by
+// nothing else; that narrowness is the point of re-recording rather than deleting.
 describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => {
-  /** ⚠ A FIXED CLOCK, not a reading of one. `ConnectionRow` renders
-   *  `credentialLabel(connection.last_checked_at, now)`, so a capture taken against
-   *  `Date.now()` is a record of the afternoon it was taken and differs tomorrow.
-   *  `PhaseNodeCard`'s captures are safe only because a subtree fence forbids `Date.now`
-   *  and `Math.random` across that whole tree; THIS file has no such fence, so the
-   *  discipline has to live in the fixture. Both constants below are literals. */
   const CAPTURE_NOW = Date.parse("2026-08-25T12:00:00.000Z")
   const CAPTURE_CHECKED_AT = "2026-08-22T12:00:00.000Z"
 
-  /**
-   * Three shapes, each distinct so the baseline says something: a long SMTP destination, a
-   * Slack row (the only shape that carries the `fixed` tag), and a Jira row.
-   *
-   * ⚠ THE CAPTURE SET DELIBERATELY CONTAINS NO MCP-SHAPED ROW, AND THAT ABSENCE IS A
-   * DECISION — this sentence exists so a later phase does not "fix" it. Plan 03 of this
-   * phase introduces `credentialReadingOf`, whose MCP arm returns
-   * `CREDENTIAL_NO_CHECK_FOR_KIND` **unconditionally**: it ignores `last_checked_at`
-   * entirely, by design, because an MCP row can never be checked. So an MCP-shaped
-   * fixture's credential cell renders DIFFERENT TEXT once wave 3 lands, and no choice of
-   * `last_checked_at` avoids it — the arm does not read that field. Pinning that cell here
-   * would make this baseline booby-trapped by its own phase, and the philosophy below (a
-   * diff against this record is a BEHAVIOUR CHANGE, not a test to update) only holds if the
-   * record itself is not. A `create_ticket` row exercises the same five cells, the same
-   * mark slot and the same ⋯, so the pin loses nothing it was measuring: its job is to
-   * prove the WIDE row's shipped markup did not move when the dense branch arrived, not to
-   * enumerate shapes. An MCP row's wide render is pinned by plan 03's own tests instead,
-   * where the change to that cell is the thing under test rather than a collision.
-   */
   const CAPTURE_ROWS: Record<string, ConnectorConnection> = {
     SEND_EMAIL: makeConnection({
       id: "cap-1",
       name: "Ops mailbox",
       capability: "send_email",
+      service_id: "smtp",
       config: {
         host: "smtp.eu-west.fastmail-business.example.com",
         port: 465,
@@ -852,6 +842,7 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
       id: "cap-2",
       name: "#ops-alerts",
       capability: "post_message",
+      service_id: "slack",
       config: { default_channel: "#ops-alerts" },
       last_checked_at: CAPTURE_CHECKED_AT,
       last_check_verdict: "ok",
@@ -860,6 +851,7 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
       id: "cap-3",
       name: "Northwind Jira",
       capability: "create_ticket",
+      service_id: "jira",
       config: {
         base_url: "northwind.atlassian.net",
         project_key: "NW",
@@ -870,22 +862,6 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
     }),
   }
 
-  /**
-   * ⚠ THE ONE DECLARED NORMALIZATION — declared, and COUNTED, rather than done quietly.
-   *
-   * Radix's `DropdownMenuTrigger` sets `id={useId()}` on the ⋯ button, and React's `useId`
-   * value is a function of HOW MANY components have rendered before it, not of the row's
-   * own markup. Measured while taking these captures: the three rows below printed
-   * `id="radix-_r_p3_"`, `id="radix-_r_pc_"` and `id="radix-_r_pl_"` for markup that is
-   * otherwise character-identical, and that number MOVES when any case is added anywhere
-   * above this block. A case added above is not a behaviour change in the wide row and must
-   * not be able to redden this pin — so the id VALUE is normalized away.
-   *
-   * ⚠ AND THE NORMALIZATION IS ITSELF NON-VACUOUS: the substitution count is returned and
-   * asserted at exactly ONE per row. A ⋯ trigger that stopped rendering yields ZERO
-   * replacements and the case goes red, rather than quietly passing against a shorter
-   * string. Normalizing without counting is how a pin stops watching the thing it names.
-   */
   const RADIX_ID = /id="radix-[^"]*"/g
   const RADIX_ID_NORMALIZED = 'id="radix-NORMALIZED"'
 
@@ -898,9 +874,6 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
     return { html: out, replaced }
   }
 
-  /** One render, the row's and the header's `outerHTML`, unmounted — shared by the capture
-   *  and the assertion so both read the DOM the same way
-   *  (`PhaseNodeCard.test.tsx:2640-2647`). */
   function wideCapture(connection: ConnectorConnection): {
     row: string
     header: string
@@ -924,47 +897,21 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
       rendered.container.querySelector('[data-testid="connections-header"]')!.outerHTML,
     )
     rendered.unmount()
-    // The header holds no Radix control, so its own replacement count is expected to be 0
-    // and is asserted here rather than carried: an id appearing there would be new surface.
     expect(header.replaced).toBe(0)
     return { row: row.html, header: header.html, rowRadixIds: row.replaced }
   }
 
-  /**
-   * ⚠ THESE LITERALS ARE A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT
-   * of the rendered DOM of the tree as it stands at this commit — `ConnectionsTab.tsx`
-   * unmoved, no `dense` prop in existence — by running `wideCapture` above and pasting what
-   * it printed. Not one attribute here was typed from the source, computed by hand, or
-   * reasoned about. That is the whole point: an expectation records what its author
-   * BELIEVED the geometry to be, and a move that changed the geometry to match that belief
-   * would pass it.
-   *
-   * OBSERVED TWICE on the unchanged tree before it was committed, and the two runs agreed
-   * byte for byte — so it is a baseline rather than one sample of something that might vary.
-   * The clock is a literal (see `CAPTURE_NOW`), which is what makes that stability a
-   * property of the markup rather than of the hour.
-   *
-   * NOT ONE STRING BELOW WAS HAND-EDITED. Hand editing turns a capture back into an
-   * expectation recording what its author believed the change did, and silently masks any
-   * other attribute the edit disturbed.
-   *
-   * A DIFF AGAINST THIS RECORD IS A BEHAVIOUR CHANGE IN THE WIDE ROW — and NOT A TEST TO
-   * UPDATE. Adding the dense shape is supposed to add a second branch, not move the first
-   * one. If this goes red while the dense branch lands, the dense branch is wrong;
-   * re-capturing it to make it green would delete the only evidence anybody has that the
-   * wide row still renders what it rendered.
-   */
   const WIDE_HTML_BASELINE: Record<string, { row: string; header: string }> = {
     SEND_EMAIL: {
-      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-mail h-4 w-4 flex-none text-muted-foreground\" aria-hidden=\"true\"><path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"></path><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"></rect></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Ops mailbox</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">smtp.eu-west.fastmail-business.example.com:465</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Ops mailbox\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] flex-col gap-0.5\"><div class=\"flex items-center gap-2 min-w-0\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-mail h-4 w-4 flex-none text-muted-foreground\" aria-hidden=\"true\"><path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"></path><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\"></rect></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Ops mailbox</button></div><span data-testid=\"connection-tagline\" class=\"truncate text-[11px] text-muted-foreground\">Direct outbound notifications via standard mail servers.</span></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span class=\"truncate\">smtp.eu-west.fastmail-business.example.com:465</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none flex items-center gap-1.5 text-[11px]\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center gap-1.5 text-[11px] font-medium text-success\"><span class=\"h-1.5 w-1.5 rounded-full flex-none bg-success\" aria-hidden=\"true\"></span>✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Ops mailbox\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
       header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
     },
     POST_MESSAGE: {
-      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><path fill=\"#e01e5a\" d=\"M53.841 161.32c0 14.832-11.987 26.82-26.819 26.82S.203 176.152.203 161.32c0-14.831 11.987-26.818 26.82-26.818H53.84zm13.41 0c0-14.831 11.987-26.818 26.819-26.818s26.819 11.987 26.819 26.819v67.047c0 14.832-11.987 26.82-26.82 26.82c-14.83 0-26.818-11.988-26.818-26.82z\"></path><path fill=\"#36c5f0\" d=\"M94.07 53.638c-14.832 0-26.82-11.987-26.82-26.819S79.239 0 94.07 0s26.819 11.987 26.819 26.819v26.82zm0 13.613c14.832 0 26.819 11.987 26.819 26.819s-11.987 26.819-26.82 26.819H26.82C11.987 120.889 0 108.902 0 94.069c0-14.83 11.987-26.818 26.819-26.818z\"></path><path fill=\"#2eb67d\" d=\"M201.55 94.07c0-14.832 11.987-26.82 26.818-26.82s26.82 11.988 26.82 26.82s-11.988 26.819-26.82 26.819H201.55zm-13.41 0c0 14.832-11.988 26.819-26.82 26.819c-14.831 0-26.818-11.987-26.818-26.82V26.82C134.502 11.987 146.489 0 161.32 0s26.819 11.987 26.819 26.819z\"></path><path fill=\"#ecb22e\" d=\"M161.32 201.55c14.832 0 26.82 11.987 26.82 26.818s-11.988 26.82-26.82 26.82c-14.831 0-26.818-11.988-26.818-26.82V201.55zm0-13.41c-14.831 0-26.818-11.988-26.818-26.82c0-14.831 11.987-26.818 26.819-26.818h67.25c14.832 0 26.82 11.987 26.82 26.819s-11.988 26.819-26.82 26.819z\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">#ops-alerts</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">slack.com/api · #ops-alerts</span><span class=\"flex-none rounded border border-border px-1 text-[11px] text-muted-foreground\">fixed</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for #ops-alerts\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] flex-col gap-0.5\"><div class=\"flex items-center gap-2 min-w-0\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><path fill=\"#e01e5a\" d=\"M53.841 161.32c0 14.832-11.987 26.82-26.819 26.82S.203 176.152.203 161.32c0-14.831 11.987-26.818 26.82-26.818H53.84zm13.41 0c0-14.831 11.987-26.818 26.819-26.818s26.819 11.987 26.819 26.819v67.047c0 14.832-11.987 26.82-26.82 26.82c-14.83 0-26.818-11.988-26.818-26.82z\"></path><path fill=\"#36c5f0\" d=\"M94.07 53.638c-14.832 0-26.82-11.987-26.82-26.819S79.239 0 94.07 0s26.819 11.987 26.819 26.819v26.82zm0 13.613c14.832 0 26.819 11.987 26.819 26.819s-11.987 26.819-26.82 26.819H26.82C11.987 120.889 0 108.902 0 94.069c0-14.83 11.987-26.818 26.819-26.818z\"></path><path fill=\"#2eb67d\" d=\"M201.55 94.07c0-14.832 11.987-26.82 26.818-26.82s26.82 11.988 26.82 26.82s-11.988 26.819-26.82 26.819H201.55zm-13.41 0c0 14.832-11.988 26.819-26.82 26.819c-14.831 0-26.818-11.987-26.818-26.82V26.82C134.502 11.987 146.489 0 161.32 0s26.819 11.987 26.819 26.819z\"></path><path fill=\"#ecb22e\" d=\"M161.32 201.55c14.832 0 26.82 11.987 26.82 26.818s-11.988 26.82-26.82 26.82c-14.831 0-26.818-11.988-26.818-26.82V201.55zm0-13.41c-14.831 0-26.818-11.988-26.818-26.82c0-14.831 11.987-26.818 26.819-26.818h67.25c14.832 0 26.82 11.987 26.82 26.819s-11.988 26.819-26.82 26.819z\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">#ops-alerts</button></div><span data-testid=\"connection-tagline\" class=\"truncate text-[11px] text-muted-foreground\">Post updates and read channels in your workspace.</span></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span class=\"truncate\">slack.com/api · #ops-alerts</span><span class=\"flex-none rounded border border-border px-1 text-[11px] text-muted-foreground\">fixed</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none flex items-center gap-1.5 text-[11px]\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center gap-1.5 text-[11px] font-medium text-success\"><span class=\"h-1.5 w-1.5 rounded-full flex-none bg-success\" aria-hidden=\"true\"></span>✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for #ops-alerts\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
       header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
     },
     CREATE_TICKET: {
-      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] items-center gap-2\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><defs><linearGradient id=\"SVGSBI7obaC\" x1=\"98.031%\" x2=\"58.888%\" y1=\".161%\" y2=\"40.766%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient><linearGradient id=\"SVGHifZlbzE\" x1=\"100.665%\" x2=\"55.402%\" y1=\".455%\" y2=\"44.727%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient></defs><path fill=\"#2684ff\" d=\"M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0\"></path><path fill=\"url(#SVGSBI7obaC)\" d=\"M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667\"></path><path fill=\"url(#SVGHifZlbzE)\" d=\"M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Northwind Jira</button></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span aria-hidden=\"true\">🔒</span><span class=\"truncate\">northwind.atlassian.net · NW</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center text-[11px] font-medium text-success\">✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Northwind Jira\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
+      row: "<div data-testid=\"connections-row\" data-state=\"ready\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3\"><div class=\"flex min-w-0 flex-[2] flex-col gap-0.5\"><div class=\"flex items-center gap-2 min-w-0\"><svg viewBox=\"0 0 256 256\" width=\"1.2em\" height=\"1.2em\" aria-hidden=\"true\" class=\"h-4 w-4 flex-none\"><defs><linearGradient id=\"SVGSBI7obaC\" x1=\"98.031%\" x2=\"58.888%\" y1=\".161%\" y2=\"40.766%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient><linearGradient id=\"SVGHifZlbzE\" x1=\"100.665%\" x2=\"55.402%\" y1=\".455%\" y2=\"44.727%\"><stop offset=\"18%\" stop-color=\"#0052cc\"></stop><stop offset=\"100%\" stop-color=\"#2684ff\"></stop></linearGradient></defs><path fill=\"#2684ff\" d=\"M244.658 0H121.707a55.5 55.5 0 0 0 55.502 55.502h22.649V77.37c.02 30.625 24.841 55.447 55.466 55.467V10.666C255.324 4.777 250.55 0 244.658 0\"></path><path fill=\"url(#SVGSBI7obaC)\" d=\"M183.822 61.262H60.872c.019 30.625 24.84 55.447 55.466 55.467h22.649v21.938c.039 30.625 24.877 55.43 55.502 55.43V71.93c0-5.891-4.776-10.667-10.667-10.667\"></path><path fill=\"url(#SVGHifZlbzE)\" d=\"M122.951 122.489H0c0 30.653 24.85 55.502 55.502 55.502h22.72v21.867c.02 30.597 24.798 55.408 55.396 55.466V133.156c0-5.891-4.776-10.667-10.667-10.667\"></path></svg><button type=\"button\" data-testid=\"connections-row-name\" class=\"truncate text-left text-[13px] font-medium text-foreground hover:underline\">Northwind Jira</button></div><span data-testid=\"connection-tagline\" class=\"truncate text-[11px] text-muted-foreground\">Raise and track issues for your team.</span></div><div data-testid=\"connections-row-destination\" class=\"flex min-w-0 flex-[2] items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground\"><span class=\"truncate\">northwind.atlassian.net · NW</span></div><div data-testid=\"connections-row-usedby\" class=\"w-24 flex-none whitespace-nowrap text-[11px] text-muted-foreground\">2 steps</div><div data-testid=\"connections-row-credential\" class=\"w-32 flex-none whitespace-nowrap font-mono text-[11px] text-muted-foreground\">checked 3d ago</div><div class=\"w-36 flex-none flex items-center gap-1.5 text-[11px]\"><span data-testid=\"connections-row-state\" class=\"inline-flex items-center gap-1.5 text-[11px] font-medium text-success\"><span class=\"h-1.5 w-1.5 rounded-full flex-none bg-success\" aria-hidden=\"true\"></span>✓ Ready</span></div><div class=\"flex w-8 flex-none items-center justify-end\"><button type=\"button\" aria-label=\"More actions for Northwind Jira\" data-testid=\"connections-row-more\" class=\"inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground\" id=\"radix-NORMALIZED\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-ellipsis h-4 w-4\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"19\" cy=\"12\" r=\"1\"></circle><circle cx=\"5\" cy=\"12\" r=\"1\"></circle></svg></button></div></div>",
       header: "<div data-testid=\"connections-header\" class=\"flex items-center gap-x-3 border-b border-border bg-muted/20 px-3.5 py-2\"><div data-column=\"Connection\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Connection</div><div data-column=\"Sends to\" class=\"text-[11px] font-medium text-muted-foreground flex-[2] min-w-0\">Sends to</div><div data-column=\"Used by\" class=\"text-[11px] font-medium text-muted-foreground w-24 flex-none\">Used by</div><div data-column=\"Credential\" class=\"text-[11px] font-medium text-muted-foreground w-32 flex-none\">Credential</div><div data-column=\"State\" class=\"text-[11px] font-medium text-muted-foreground w-36 flex-none\">State</div><div class=\"w-8 flex-none\" aria-hidden=\"true\"></div></div>",
     },
   }
@@ -1049,10 +996,9 @@ describe("the WIDE row render is pinned byte-for-byte (206.1-02 Task 1)", () => 
     }
   })
 
-  it("SEND_EMAIL captured the 🔒 destination and NOT the Slack-only `fixed` tag", () => {
+  it("SEND_EMAIL captured the destination and NOT the Slack-only `fixed` tag", () => {
     const html = WIDE_HTML_BASELINE.SEND_EMAIL.row
     expect(html).toContain("connections-row-destination")
-    expect(html).toContain("🔒")
     expect(html).not.toContain(CONNECTION_FIXED_TAG)
   })
 
@@ -1610,7 +1556,7 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
     expect(chips[2]).toHaveTextContent("Not connected")
   })
 
-  it("filtering by Connected shows only ready rows (including MCP)", async () => {
+  it("filtering by Connected shows configured connections", async () => {
     const user = userEvent.setup({ delay: null })
     renderTab({ connections: TEST_ROWS })
     const chips = screen.getAllByTestId("connections-filter-chip")
@@ -1618,11 +1564,11 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
 
     expect(screen.getByText("Slack Alerts")).toBeInTheDocument()
     expect(screen.getByText("DeepWiki Search")).toBeInTheDocument()
-    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
-    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
+    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
+    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
   })
 
-  it("filtering by Not connected shows failing, disabled, and unchecked rows", async () => {
+  it("filtering by Not connected hides configured connections when rendered without catalog services", async () => {
     const user = userEvent.setup({ delay: null })
     renderTab({ connections: TEST_ROWS })
     const chips = screen.getAllByTestId("connections-filter-chip")
@@ -1630,8 +1576,8 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
 
     expect(screen.queryByText("Slack Alerts")).not.toBeInTheDocument()
     expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
-    expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
-    expect(screen.getByText("Old Mailer")).toBeInTheDocument()
+    expect(screen.queryByText("Jira Tracker")).not.toBeInTheDocument()
+    expect(screen.queryByText("Old Mailer")).not.toBeInTheDocument()
   })
 
   it("search input matches name, capability, and mcp_server_url without hiding MCP rows", async () => {
@@ -1647,5 +1593,392 @@ describe("Phase 209 (Item 3) — state-based filter chips and query matcher", ()
     await user.type(input, "create_ticket")
     expect(screen.getByText("Jira Tracker")).toBeInTheDocument()
     expect(screen.queryByText("DeepWiki Search")).not.toBeInTheDocument()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 212 (Gap Closure) — browsable catalog, group headers, and one-click Connect
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("Phase 212 (Gap Closure) — browsable catalog, group headers, and one-click Connect", () => {
+  it("renders browsable catalog of services with Popular and All services group headers when connections = []", () => {
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    // Table header rendered, not empty state block
+    expect(screen.getByTestId("connections-header")).toBeInTheDocument()
+    expect(screen.queryByTestId("connections-empty")).toBeNull()
+
+    // Group headers per Sketch 203 Section 4
+    expect(screen.getByTestId("connections-group-popular")).toHaveTextContent("Popular")
+    expect(screen.getByTestId("connections-group-all")).toHaveTextContent("All services")
+
+    // Curated popular services present (in cards and table)
+    expect(screen.getAllByText("Slack").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("GitHub").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Notion").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Jira").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText("Email (SMTP)").length).toBeGreaterThanOrEqual(1)
+
+    // Curated other services present
+    expect(screen.getByText("Figma")).toBeInTheDocument()
+    expect(screen.getByText("Linear")).toBeInTheDocument()
+    expect(screen.getByText("Sentry")).toBeInTheDocument()
+  })
+
+  it("unconfigured catalog rows render Mark, Name, Tagline, default host with , —, Not set, Not connected, and Connect button", () => {
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // GitHub row
+    const githubButtons = screen.getAllByRole("button", { name: "GitHub" })
+    expect(githubButtons.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Track code changes and manage pull requests.")).toBeInTheDocument()
+    expect(screen.getByText("api.github.com")).toBeInTheDocument()
+
+    // Connect button
+    const connectButtons = screen.getAllByTestId("connections-catalog-connect")
+    expect(connectButtons.length).toBeGreaterThan(0)
+    expect(connectButtons[0]).toHaveTextContent("Connect")
+
+    // State word & indicator
+    const stateChips = screen.getAllByTestId("connections-row-state")
+    expect(stateChips[0]).toHaveTextContent("Not connected")
+  })
+
+  it("clicking Connect button or service name on an unconfigured catalog service invokes onAdd with the preset serviceId", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // Find GitHub row's Connect button in the table
+    const githubRow = screen.getAllByRole("button", { name: "GitHub" })[0].closest('[data-testid="connections-row"]') as HTMLElement
+    const githubConnect = within(githubRow).getByTestId("connections-catalog-connect")
+    await user.click(githubConnect)
+    expect(onAdd).toHaveBeenCalledWith("github")
+
+    // Click Notion name in the table
+    const notionButtons = screen.getAllByRole("button", { name: "Notion" })
+    await user.click(notionButtons[0])
+    expect(onAdd).toHaveBeenCalledWith("notion")
+  })
+
+  it("filtering by Not connected displays all unconfigured catalog services and hides all configured connections (SC#2)", async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <ConnectionsTabView
+        connections={THREE_ROWS}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[2]) // Not connected
+
+    // Unconfigured services appear
+    expect(screen.getByText("GitHub")).toBeInTheDocument()
+    expect(screen.getByText("Notion")).toBeInTheDocument()
+    expect(screen.getByText("Google Workspace")).toBeInTheDocument()
+
+    // Configured connections from THREE_ROWS are all hidden under Not connected
+    expect(screen.queryByText("Ops mailbox")).not.toBeInTheDocument()
+    expect(screen.queryByText("#ops-alerts")).not.toBeInTheDocument()
+    expect(screen.queryByText("ENG Jira")).not.toBeInTheDocument()
+  })
+
+  it("filtering by Connected shows configured connections (including MCP/unchecked) and hides unconfigured catalog services", async () => {
+    const user = userEvent.setup({ delay: null })
+    const mcpRow = makeConnection({
+      id: "conn-deepwiki",
+      service_id: "mcp.deepwiki.com",
+      name: "DeepWiki",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/sse",
+      last_check_verdict: null,
+    })
+
+    render(
+      <ConnectionsTabView
+        connections={[...THREE_ROWS, mcpRow]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    await user.click(chips[1]) // Connected
+
+    // Configured connections (including DeepWiki MCP) are visible
+    expect(screen.getByText("Ops mailbox")).toBeInTheDocument()
+    expect(screen.getByText("#ops-alerts")).toBeInTheDocument()
+    expect(screen.getByText("DeepWiki")).toBeInTheDocument()
+
+    // Unconfigured catalog services are hidden
+    expect(screen.queryByText("GitHub")).not.toBeInTheDocument()
+    expect(screen.queryByText("Notion")).not.toBeInTheDocument()
+  })
+
+  it("searching for a catalog service filters to the matching service row", async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const input = screen.getByTestId("connections-filter-input")
+    await user.type(input, "Figma")
+
+    expect(screen.getByText("Figma")).toBeInTheDocument()
+    expect(screen.queryByText("Linear")).not.toBeInTheDocument()
+    expect(screen.queryByText("Slack")).not.toBeInTheDocument()
+  })
+
+  it("when a service is already connected in the database, it renders as a configured row without duplicating", () => {
+    const customSlackRow = makeConnection({
+      id: "conn-slack-custom",
+      service_id: "slack",
+      name: "Team Slack Channel",
+      capability: "post_message",
+      config: { default_channel: "#general" },
+      last_check_verdict: "ok",
+    })
+
+    render(
+      <ConnectionsTabView
+        connections={[customSlackRow]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    // Configured row appears
+    expect(screen.getByText("Team Slack Channel")).toBeInTheDocument()
+
+    // Unconfigured Slack row does NOT duplicate
+    expect(screen.queryByText("Post updates and read channels in your workspace.")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Slack" })).toBeNull()
+  })
+
+  it("renders Popular cards row above the filter bar per Screenshot 2026-08-24 202011.png and lets user connect from card", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onAdd = vi.fn()
+    render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        onAdd={onAdd}
+        {...handlers}
+      />,
+    )
+
+    // Popular card section exists
+    const popularSection = screen.getByTestId("connections-popular-section")
+    expect(popularSection).toBeInTheDocument()
+    expect(within(popularSection).getByText("Popular")).toBeInTheDocument()
+
+    // Cards exist inside
+    const cards = within(popularSection).getAllByTestId("connections-popular-card")
+    expect(cards.length).toBe(3)
+
+    // Clicking connect on a popular card triggers onAdd with service ID
+    const firstCard = cards[0]
+    const cardConnect = within(firstCard).getByTestId("connections-popular-connect")
+    await user.click(cardConnect)
+    expect(onAdd).toHaveBeenCalled()
+  })
+
+  it("renders ZERO elements carrying a title attribute across full catalog render", () => {
+    const { container } = render(
+      <ConnectionsTabView
+        connections={[]}
+        catalogServices={CATALOG_SERVICES}
+        usageCounts={{}}
+        isOrgAdmin
+        liveConnectorsOn
+        {...handlers}
+      />,
+    )
+
+    const withTitle = container.querySelectorAll("[title]")
+    expect(withTitle.length).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// An MCP row's evidence is its DISCOVERY — operator-driven, 2026-08-28
+//
+// Reported: a GitHub connection that had just discovered its tools still read
+// "◌ Not checked". That was not a stale badge, it was a PERMANENT one:
+// `POST /connections/{id}/check` refuses an MCP row with a 409 by design
+// (`check_not_available_for_mcp`), so `last_check_verdict` can NEVER become "ok" on this
+// shape. Every MCP connection ever made was pinned to "Not checked" for life.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("connectionStateOf — an MCP row reads its discovery", () => {
+  const mcpRow = (over: Partial<ConnectorConnection> = {}): ConnectorConnection =>
+    ({
+      id: "c1",
+      is_enabled: true,
+      last_check_verdict: "not_checked",
+      mcp_server_url: "https://mcp.example.com/mcp",
+      discovered_tools: [{ name: "search_code" }],
+      ...over,
+    }) as ConnectorConnection
+
+  it("a discovered MCP connection is READY — the server answered, and that is the evidence", () => {
+    expect(connectionStateOf(mcpRow())).toBe("ready")
+  })
+
+  it("⚠ an EMPTY discovery is NOT evidence — absence read as success is the old defect", () => {
+    expect(connectionStateOf(mcpRow({ discovered_tools: [] }))).toBe("not_checked")
+    expect(connectionStateOf(mcpRow({ discovered_tools: undefined }))).toBe("not_checked")
+  })
+
+  it("NEGATIVE CONTROL — discovery does NOT outrank a real failure or a disable", () => {
+    // Without this, the new arm could paint a disabled or failing row green, which is the
+    // over-claim `is_enabled` is deliberately ordered first to prevent.
+    expect(connectionStateOf(mcpRow({ is_enabled: false }))).toBe("disabled")
+    expect(connectionStateOf(mcpRow({ last_check_verdict: "failed" }))).toBe("failed")
+  })
+
+  it("NEGATIVE CONTROL — a CAPABILITY row is untouched by the new arm", () => {
+    // It has no `mcp_server_url`, so its ladder is byte-identical to what shipped: an
+    // unchecked Slack row is still "not_checked" no matter what it has discovered.
+    const slack = {
+      id: "c2",
+      is_enabled: true,
+      last_check_verdict: "not_checked",
+      capability: "post_message",
+      discovered_tools: [{ name: "post_message" }],
+    } as unknown as ConnectorConnection
+    expect(connectionStateOf(slack)).toBe("not_checked")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// The Popular strip reads the connections it used to ignore — operator-driven, 2026-08-28
+//
+// Reported: *"the applications in the popular section … still showing connect and when I
+// press connect it is opening a new form empty even though those applications are already
+// connected"*. The strip mapped `catalogServices` and consulted `connections` NOWHERE, so
+// it could only say "Connect", and `onAdd` opens a CREATE panel — hence the empty form.
+// The directory below it had been reading this correctly all along, so one screen
+// disagreed with itself about whether GitHub was connected.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("the Popular strip knows what is already connected", () => {
+  const githubRow = (over: Partial<ConnectorConnection> = {}): ConnectorConnection =>
+    makeConnection({
+      id: "conn-gh",
+      name: "GitHub",
+      capability: null,
+      service_id: "github",
+      mcp_server_url: "https://mcp.github.com/mcp",
+      ...over,
+    })
+
+  function popularCardFor(name: string) {
+    return screen
+      .getAllByTestId("connections-popular-card")
+      .find((card) => within(card).queryByText(name))
+  }
+
+  it("a CONNECTED popular service offers Manage, not Connect", () => {
+    renderTab({
+      connections: [githubRow()],
+      catalogServices: CATALOG_SERVICES,
+      onOpen: vi.fn(),
+      onAdd: vi.fn(),
+    })
+    const card = popularCardFor("GitHub")
+    expect(card).toBeDefined()
+    expect(within(card!).queryByTestId("connections-popular-connect")).toBeNull()
+    expect(within(card!).getByTestId("connections-popular-manage")).toBeInTheDocument()
+  })
+
+  it("Manage opens the EXISTING row — it does not open an empty create form", () => {
+    // The half the operator actually felt. `onAdd` is asserted NOT called, because calling it
+    // is precisely what produced the blank panel.
+    const onOpen = vi.fn()
+    const onAdd = vi.fn()
+    const row = githubRow()
+    renderTab({ connections: [row], onOpen, onAdd, catalogServices: CATALOG_SERVICES })
+
+    within(popularCardFor("GitHub")!).getByTestId("connections-popular-manage").click()
+
+    expect(onOpen).toHaveBeenCalledWith(row)
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
+  it("it says HOW MANY, because a service may hold several (D-212-03)", () => {
+    renderTab({
+      connections: [githubRow(), githubRow({ id: "conn-gh-2", name: "GitHub CI" })],
+      catalogServices: CATALOG_SERVICES,
+    })
+    expect(
+      within(popularCardFor("GitHub")!).getByTestId("connections-popular-configured"),
+    ).toHaveTextContent("2 connections")
+  })
+
+  it("NEGATIVE CONTROL — an UNCONFIGURED popular service still offers Connect", () => {
+    // Without this, hiding Connect unconditionally would pass every assertion above and
+    // leave nobody able to connect anything.
+    renderTab({
+      connections: [],
+      catalogServices: CATALOG_SERVICES,
+      onOpen: vi.fn(),
+      onAdd: vi.fn(),
+    })
+    const card = popularCardFor("GitHub")
+    expect(card).toBeDefined()
+    expect(within(card!).getByTestId("connections-popular-connect")).toBeInTheDocument()
+    expect(within(card!).queryByTestId("connections-popular-configured")).toBeNull()
   })
 })

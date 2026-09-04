@@ -23,6 +23,8 @@ VALID_ACTION_TYPES = frozenset({
     "classification.apply", "classification.rule.create",  # 118
     "metadata.update",                                  # 112
     "metadata.field.create",                            # 111
+    # Phase 223 (GRANT-05 / SC#1 / SC#1a / lockstep with migration 152 CHECK):
+    "connector.call", "connector.grant",
 })
 
 

@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 218 — the Library and its tabs</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  /* ══════════════════════════════════════════════════════════════════════════════════════
+     SKETCH 218 — the Library.
+
+     ⭐ WHAT IS BORROWED FROM THE REFERENCE (Stitch `projects/6647337692456837497`):
+        the CONTENT, the chart TYPES, the JOURNEY, the simplicity, the functionality.
+     ⭐ WHAT IS NOT: its palette. The operator's direction is explicit — *"we should abide to
+        our theme"*. Every colour below is a token from `frontend/src/index.css`, unchanged.
+
+     So the reference's steel-blue-on-white becomes Deep Midnight, and its journey survives
+     intact: upload → pipeline → manage → index → retrieve → per-document detail.
+     ══════════════════════════════════════════════════════════════════════════════════════ */
+  body { padding-top: 46px; }
+
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 6px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  #variant-nav .brandline {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim);
+    margin-right: 10px; letter-spacing: .04em;
+  }
+  .variant-tab {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all .15s ease-out;
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  .sheet { padding: 22px 26px 90px; max-width: 1300px; margin: 0 auto; }
+  .sheet > h2 { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 600; margin: 0 0 4px; }
+  .lede { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; max-width: 84ch; }
+  h3.sub { font-size: 12px; margin: 30px 0 10px; color: var(--color-text-muted); font-family: var(--font-mono); font-weight: 500; letter-spacing: .04em; }
+  .caption { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-dim); margin: 0 0 8px; }
+
+  /* ── the shipped page frame — every value MEASURED from IngestionPage.tsx ─────────── */
+  .page { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 12px; padding: 32px; }
+  .page h1 { font-family: var(--font-headline); font-size: 1.5rem; font-weight: 700; color: var(--color-text); margin: 0; letter-spacing: -.015em; }
+  .page .pagesub { color: var(--color-text-muted); margin: 6px 0 0; font-size: .875rem; }
+  .pagehead { margin-bottom: 22px; }
+
+  /* ⭐ THE REFERENCE'S BREADCRUMB — content borrowed, colour ours. Screens 13 and 09 both
+     open with one, and it is what makes a five-tab space navigable rather than modal. */
+  .crumbs { font-size: 11.5px; color: var(--color-text-dim); margin-bottom: 10px; font-family: var(--font-sans); }
+  .crumbs a { color: var(--color-text-muted); text-decoration: none; }
+  .crumbs a:hover { color: var(--color-primary); }
+  .crumbs .sep { margin: 0 7px; opacity: .5; }
+
+  /* ── the shipped Tabs primitive, class for class (components/ui/tabs.tsx) ─────────── */
+  .tabslist {
+    display: inline-flex; height: 40px; align-items: center; justify-content: center;
+    border-radius: 8px; background: var(--color-muted); padding: 4px; color: var(--color-text-muted);
+  }
+  .tabtrigger {
+    display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+    border-radius: 4px; padding: 6px 12px; font-size: .875rem; font-weight: 500;
+    background: transparent; border: 0; color: inherit; cursor: pointer; font-family: inherit;
+    transition: color .15s ease-out, background .15s ease-out;
+  }
+  .tabtrigger:hover { color: var(--color-text); }
+  .tabtrigger[data-state="active"] { background: var(--color-bg); color: var(--color-text); box-shadow: 0 1px 2px 0 rgb(0 0 0 / .05); }
+  .tabslist.remedy .tabtrigger[data-state="active"] { color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
+
+  .body { display: flex; flex-direction: row; gap: 24px; margin-top: 20px; }
+  .sidebar {
+    width: 288px; flex-shrink: 0; padding: 12px; border-radius: 12px;
+    background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+    border: 1px solid var(--color-border-soft); align-self: flex-start;
+  }
+  .grouplabel { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--color-text-dim); font-weight: 600; margin: 4px 0 6px 6px; }
+  .navrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: .82rem; color: var(--color-text-muted); cursor: pointer; }
+  .navrow:hover { background: var(--color-accent); color: var(--color-text); }
+  .navrow.sel { background: var(--color-accent); color: var(--color-text); }
+  .navrow .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .navrow .gpill { font-family: var(--font-mono); font-size: 9px; border: 1px solid var(--color-border); border-radius: 3px; padding: 0 3px; color: var(--color-text-dim); }
+  .main { flex: 1; min-width: 0; }
+
+  /* ── cards ────────────────────────────────────────────────────────────────────────── */
+  .card { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); }
+  .card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .card > header h4 { margin: 0; font-family: var(--font-headline); font-size: .95rem; font-weight: 600; }
+  .card > header .hsub { font-size: 11.5px; color: var(--color-text-dim); margin: 3px 0 0; font-weight: 400; }
+  .cardbody { padding: 16px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tiles.three { grid-template-columns: repeat(3, 1fr); }
+  .tile { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); padding: 14px 16px; position: relative; overflow: hidden; }
+  .tile .tl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-dim); }
+  .tile .tv { font-family: var(--font-headline); font-size: 1.6rem; font-weight: 600; color: var(--color-text); margin: 8px 0 4px; letter-spacing: -.02em; }
+  .tile .ts { font-size: 11.5px; color: var(--color-text-dim); }
+  .tile .spark { position: absolute; right: 12px; top: 12px; opacity: .9; }
+
+  /* ── the document table ───────────────────────────────────────────────────────────── */
+  table.doclist { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  table.doclist th { padding: 11px 14px; text-align: left; font-weight: 500; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); font-size: .76rem; background: color-mix(in srgb, var(--color-muted) 55%, transparent); }
+  table.doclist th:last-child { text-align: right; }
+  table.doclist td { padding: 10px 14px; border-bottom: 1px solid var(--color-border-soft); vertical-align: middle; }
+  table.doclist tbody tr { transition: background .12s ease-out; }
+  table.doclist tbody tr:hover { background: color-mix(in srgb, var(--color-accent) 60%, transparent); }
+  table.doclist td.fn { font-family: var(--font-mono); font-size: .78rem; color: var(--color-text); }
+  table.doclist td.num { font-family: var(--font-mono); font-size: .78rem; color: var(--color-text-muted); }
+  table.doclist td:last-child { text-align: right; color: var(--color-text-dim); }
+  .typemark { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .04em; padding: 2px 5px; border-radius: 4px; background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  /* ⭐ the reference's TAG CHIPS (screen 11) — content borrowed; ours are the shipped
+     classification labels rather than free-text tags, so the ✕ is absent: a suggested label
+     is removed on the classification surface that owns it, never silently here. */
+  .tag { font-size: 10.5px; padding: 1px 7px; border-radius: 9999px; background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent); }
+  .cbar { height: 2px; background: var(--color-border); border-radius: 1px; margin-top: 3px; }
+  .cbar > i { display: block; height: 100%; background: var(--color-primary); border-radius: 1px; }
+  /* the reference's pagination footer (screen 11) */
+  .tfoot { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 10px 14px; font-size: 11.5px; color: var(--color-text-dim); border-top: 1px solid var(--color-border-soft); }
+  .tfoot .pg { display: inline-flex; gap: 4px; }
+  .tfoot .pg span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--color-border); border-radius: 5px; cursor: pointer; }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; padding: 2px 10px; font-size: .75rem; font-weight: 500; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .badge.success { background: var(--color-success-dim); color: var(--color-success); }
+  .badge.success .dot { background: var(--color-success); }
+  .badge.primary { background: var(--color-primary-dim); color: var(--color-primary); }
+  .badge.primary .dot { background: var(--color-primary); animation: pulse 1.6s ease-in-out infinite; }
+  .badge.danger { background: var(--color-danger-dim); color: var(--color-danger); }
+  .badge.danger .dot { background: var(--color-danger); }
+  .badge.dim { background: var(--color-muted); color: var(--color-text-dim); }
+  .badge.dim .dot { background: var(--color-text-dim); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+  /* ── the stage strip — SIX stages, two conditional ────────────────────────────────── */
+  .stages { display: flex; gap: 2px; }
+  .stg { flex: 1; min-width: 32px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 9px; letter-spacing: .03em; font-family: var(--font-mono); text-transform: uppercase; }
+  .stg.done { background: color-mix(in srgb, var(--color-primary) 28%, transparent); color: var(--color-primary); }
+  .stg.now { background: var(--color-primary); color: #10132a; font-weight: 600; animation: pulse 1.6s ease-in-out infinite; }
+  .stg.todo { border: 1px dashed var(--color-border); color: var(--color-text-dim); }
+  .stg.skip { border: 1px dashed var(--color-border); color: var(--color-text-dim); opacity: .45; text-decoration: line-through; }
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ THE CHARTS. The operator asked for best-in-class, professional, animated.
+     Four types, each borrowed from a specific reference screen:
+       · vertical bars   ← V2's "Retrieval Frequency"      → searches over time
+       · progress ring   ← screen 13's "Vector DB Health"  → coverage (an HONEST ratio)
+       · horizontal bars ← screen 09's frequency strip     → most retrieved
+       · sparkline       ← V2's "Embedding Quality" line   → per-tile trend
+     Every one is inline SVG/CSS: no library, no gradient, no 3D, no decorative flourish.
+     Animation is a single 700ms ease-out entrance with a per-item stagger — it reveals the
+     data, it does not perform.
+     ══════════════════════════════════════════════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .bar, .hbar > i, .ring-fg, .spark-path { animation: none !important; transition: none !important; }
+  }
+
+  .chartwrap { position: relative; padding: 8px 8px 0 44px; }
+  .grid { position: absolute; left: 44px; right: 8px; top: 8px; bottom: 0; pointer-events: none; }
+  .grid .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--color-border-soft); }
+  .grid .gl span { position: absolute; left: -34px; top: -7px; font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+  .chart { display: flex; align-items: flex-end; gap: 3px; height: 150px; position: relative; }
+  .chart .bar {
+    flex: 1; background: var(--color-primary); border-radius: 3px 3px 0 0; min-height: 3px;
+    transform-origin: bottom; transform: scaleY(0); position: relative; cursor: pointer;
+  }
+  .chart .bar:hover { background: var(--color-primary-strong); }
+  .is-live .chart .bar { animation: growY .7s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes growY { to { transform: scaleY(1) } }
+  /* the value appears on hover — never printed on 30 bars at once */
+  .chart .bar::after {
+    content: attr(data-v); position: absolute; bottom: 100%; left: 50%; transform: translate(-50%,-6px);
+    font-family: var(--font-mono); font-size: 10px; color: var(--color-text); background: var(--color-surface-hi);
+    border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 5px; opacity: 0;
+    transition: opacity .12s ease-out; pointer-events: none; white-space: nowrap;
+  }
+  .chart .bar:hover::after { opacity: 1; }
+
+  /* ⭐ THE BAR IS TWO-TONE, AND THE SECOND TONE IS THE POINT.
+     A search that returned nothing still writes its row — the returned-document list is simply
+     empty. So every bar splits into "found something" and "found nothing" with no new data and
+     no new write. This is the one fact in the product nobody can currently see: how often the
+     agent asked your library a question and came back empty-handed.
+     ⚠ Colour still never carries alone — the legend prints both words and both counts. */
+  .chart .bar { display: flex; flex-direction: column-reverse; }
+  .chart .bar .hit { flex: 1 1 auto; background: var(--color-primary); border-radius: 0 0 0 0; }
+  .chart .bar .miss { flex: 0 0 auto; background: var(--color-warning); border-radius: 0; }
+  /* ⚠ THE THIRD SEGMENT — searches that COULD NOT RUN. Phase 210 made the chat message
+     honest about a provider outage, but the error path RETURNS BEFORE the audit write, so
+     an outage currently writes no row at all and the chart simply DIPS. A dip is a quieter
+     version of the same lie: "nobody searched" and "search was broken" look identical. */
+  .chart .bar .err { flex: 0 0 auto; background: var(--color-danger); border-radius: 3px 3px 0 0; }
+  .chart .bar .hit:only-child { border-radius: 3px 3px 0 0; }
+  .chart .bar:hover .hit { background: var(--color-primary-strong); }
+
+  .xaxis { display: flex; justify-content: space-between; padding: 8px 8px 4px 44px; font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+
+  /* the progress ring */
+  .ring { display: block; }
+  .ring-bg { fill: none; stroke: var(--color-muted); }
+  .ring-never { stroke: color-mix(in srgb, var(--color-warning) 34%, var(--color-muted)); }
+  .ring-fg { fill: none; stroke: var(--color-primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; }
+  .is-live .ring-fg { animation: sweep 1s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes sweep { to { stroke-dashoffset: var(--dash-to) } }
+  .ringwrap { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
+  .ringlabel { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .ringlabel b { display: block; font-family: var(--font-headline); font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; }
+  .ringlabel span { font-size: 10.5px; color: var(--color-text-dim); }
+
+  /* horizontal bars */
+  .hrow { display: flex; align-items: center; gap: 14px; padding: 9px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .hrow:last-child { border-bottom: 0; }
+  .hrow .nm { font-family: var(--font-mono); font-size: .76rem; color: var(--color-text); width: 240px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar { flex: 1; height: 8px; background: var(--color-muted); border-radius: 4px; overflow: hidden; }
+  .hbar > i { display: block; height: 100%; background: var(--color-primary); border-radius: 4px; width: 0; }
+  .is-live .hbar > i { animation: growX .8s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes growX { to { width: var(--w) } }
+  .hrow .ct { font-family: var(--font-mono); font-size: .76rem; color: var(--color-text); width: 46px; text-align: right; }
+  .hrow .ago { font-family: var(--font-mono); font-size: .72rem; color: var(--color-text-dim); width: 62px; text-align: right; }
+
+  /* sparkline */
+  .spark-path { fill: none; stroke: var(--color-primary); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 200; stroke-dashoffset: 200; }
+  .is-live .spark-path { animation: draw 1.1s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0 } }
+  .spark-fill { fill: var(--color-primary); opacity: .1; }
+
+  /* ── chips ───────────────────────────────────────────────────────────────────────── */
+  .chiprow { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 9999px; padding: 5px 12px; font-size: .78rem; color: var(--color-text-muted); cursor: pointer; transition: all .12s ease-out; }
+  .chip:hover { color: var(--color-text); border-color: var(--color-primary); }
+  .chip.on { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+  .chip .b { font-family: var(--font-mono); font-size: 10.5px; opacity: .85; }
+
+
+  .chipgroup { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; flex-wrap: wrap; }
+  .chipgroup .cglabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-dim); width: 92px; flex-shrink: 0; }
+  .chipgroup .chiprow { margin: 0; }
+
+  table.checks { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  table.checks th { padding: 10px 16px; text-align: left; font-weight: 500; font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-dim); border-bottom: 1px solid var(--color-border-soft); }
+  table.checks td { padding: 9px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  table.checks td.q { font-family: var(--font-mono); font-size: .76rem; color: var(--color-text); }
+  table.checks td.rk { font-family: var(--font-mono); font-size: .76rem; color: var(--color-text-muted); }
+  .was { text-decoration: line-through; color: var(--color-text-dim); margin-right: 6px; }
+  .fchip { font-family: var(--font-mono); font-size: .7rem; background: var(--color-muted); border: 1px solid var(--color-border); border-radius: 4px; padding: 2px 6px; color: var(--color-text-muted); }
+
+  .btn { font: inherit; font-size: .8rem; font-weight: 500; padding: 7px 14px; border-radius: 8px; background: var(--color-primary); color: #10132a; border: 0; cursor: pointer; transition: filter .12s ease-out; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .btn.ghost:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+  /* ── the dropzone + pipeline (reference screen 03 / the V1 hub) ───────────────────── */
+  .dropzone { border: 1.5px dashed var(--color-border); border-radius: 12px; padding: 26px; text-align: center; background: color-mix(in srgb, var(--color-surface) 40%, transparent); transition: all .15s ease-out; }
+  .dropzone:hover { border-color: var(--color-primary); background: var(--color-primary-dim); }
+  .dropzone .dz1 { font-size: .95rem; color: var(--color-text); font-weight: 500; }
+  .dropzone .dz2 { font-size: 11.5px; color: var(--color-text-dim); margin-top: 5px; }
+
+  /* ── the detail panel (reference screen 15) — 430px, the SHIPPED track width ──────── */
+  .detail { width: 430px; flex-shrink: 0; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); overflow: hidden; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: .8rem; border-bottom: 1px solid var(--color-border-soft); }
+  .kv:last-child { border-bottom: 0; }
+  .kv .k { color: var(--color-text-dim); }
+  .kv .v { color: var(--color-text); font-family: var(--font-mono); font-size: .76rem; text-align: right; }
+  .insight { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border-soft); font-size: .8rem; }
+  .insight:last-child { border-bottom: 0; }
+  .insight .ic { width: 16px; color: var(--color-text-dim); flex-shrink: 0; }
+  .insight .lab { color: var(--color-text-muted); }
+  .insight .val { margin-left: auto; font-family: var(--font-mono); font-size: .78rem; color: var(--color-text); text-align: right; }
+  .chunk { border: 1px solid var(--color-border-soft); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background: var(--color-bg); }
+  .chunk .ch { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); margin-bottom: 6px; letter-spacing: .04em; }
+  .chunk p { margin: 0; font-size: .78rem; line-height: 1.6; color: var(--color-text-muted); }
+
+  /* ── annotation blocks — stripped from the SURFACE before the drive asserts ───────── */
+  [data-anno] { border-left: 2px solid var(--color-warning); padding: 8px 0 8px 12px; margin: 14px 0; font-size: 11.5px; color: var(--color-text-dim); line-height: 1.7; max-width: 94ch; }
+  [data-anno] b { color: var(--color-warning); font-weight: 600; }
+  [data-anno] code { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ THE CHART PALETTE — richer, and still entirely ours.
+     The reference gets its richness from FOUR blues. We have five state tokens that already
+     carry meaning in this product, so a multi-series chart can be read WITHOUT a legend:
+       primary  = the agent found it      success = ready / holding
+       violet   = re-embedding            warning = stale / needs attention
+       danger   = failed / slipped        dim     = never touched
+     ⚠ Colour still never carries alone — every series prints its word beside its swatch.
+     ══════════════════════════════════════════════════════════════════════════════════════ */
+  .s-primary { background: var(--color-primary); }
+  .s-violet  { background: var(--color-accent-violet); }
+  .s-success { background: var(--color-success); }
+  .s-warning { background: var(--color-warning); }
+  .s-danger  { background: var(--color-danger); }
+  .s-dim     { background: var(--color-text-dim); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 16px 0; }
+  .legend .li { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-muted); }
+  .legend .sw { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .legend .li b { font-family: var(--font-mono); font-size: 11px; color: var(--color-text); font-weight: 500; }
+
+  /* stacked composition bar — one row, every state, no pie chart */
+  .stackbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--color-muted); }
+  .stackbar > i { display: block; height: 100%; width: 0; }
+  .is-live .stackbar > i { animation: growX .9s cubic-bezier(.22,1,.36,1) forwards; }
+
+  /* the library-wide pipeline stage cards (reference screen 07) */
+  .stagecards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .scard { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); padding: 13px 14px; position: relative; }
+  .scard .sh { display: flex; align-items: center; gap: 8px; font-size: .84rem; font-weight: 500; color: var(--color-text); }
+  .scard .sn { font-family: var(--font-headline); font-size: 1.35rem; font-weight: 600; margin: 9px 0 3px; letter-spacing: -.02em; }
+  .scard .sl { font-size: 11px; color: var(--color-text-dim); }
+  .scard .sbar { height: 3px; border-radius: 2px; background: var(--color-muted); margin-top: 11px; overflow: hidden; }
+  .scard .sbar > i { display: block; height: 100%; width: 0; border-radius: 2px; }
+  .is-live .scard .sbar > i { animation: growX .8s cubic-bezier(.22,1,.36,1) forwards; }
+  .scard .ico { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; flex-shrink: 0; }
+  .scard .ico.ok { background: var(--color-success-dim); color: var(--color-success); }
+  .scard .ico.run { background: var(--color-primary-dim); color: var(--color-primary); animation: pulse 1.6s ease-in-out infinite; }
+  .scard .ico.idle { background: var(--color-muted); color: var(--color-text-dim); }
+  .scard .arrow { position: absolute; right: -8px; top: 50%; transform: translateY(-50%); color: var(--color-text-dim); font-size: 12px; z-index: 1; }
+
+  /* the big front-door dropzone (reference screen 03) */
+  .dropbig { border: 1.5px dashed var(--color-border); border-radius: 14px; padding: 40px 26px; text-align: center;
+             background: color-mix(in srgb, var(--color-surface) 40%, transparent); transition: all .18s ease-out; cursor: pointer; }
+  .dropbig:hover { border-color: var(--color-primary); background: var(--color-primary-dim); }
+  .dropbig svg { display: block; margin: 0 auto 14px; }
+  .dropbig .d1 { font-family: var(--font-headline); font-size: 1.12rem; font-weight: 600; color: var(--color-text); }
+  .dropbig .d2 { font-size: 12px; color: var(--color-text-dim); margin: 6px 0 16px; }
+  .dropbig .d3 { font-size: 11px; color: var(--color-text-dim); margin-top: 14px; font-family: var(--font-mono); letter-spacing: .02em; }
+
+  /* extracted tables + image descriptions — the buried content, rendered */
+  .xtable { width: 100%; border-collapse: collapse; font-size: .74rem; }
+  .xtable th { background: var(--color-muted); color: var(--color-text-muted); padding: 6px 9px; text-align: left; font-weight: 500; font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; }
+  .xtable td { padding: 6px 9px; border-bottom: 1px solid var(--color-border-soft); font-family: var(--font-mono); color: var(--color-text-muted); }
+  .figrow { display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid var(--color-border-soft); }
+  .figrow:last-child { border-bottom: 0; }
+  .figbox { width: 46px; height: 46px; border-radius: 6px; background: var(--color-muted); border: 1px solid var(--color-border); display: grid; place-items: center; color: var(--color-text-dim); font-size: 15px; flex-shrink: 0; }
+  .figrow p { margin: 0; font-size: .76rem; line-height: 1.55; color: var(--color-text-muted); }
+  .figrow .fmeta { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); margin-bottom: 3px; letter-spacing: .04em; }
+
+  /* the buried-capability audit table */
+  table.audit { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  table.audit th { padding: 9px 12px; text-align: left; font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--color-text-dim); border-bottom: 1px solid var(--color-border); }
+  table.audit td { padding: 9px 12px; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; color: var(--color-text-muted); }
+  table.audit td.c { font-family: var(--font-mono); font-size: .74rem; color: var(--color-text); }
+  .no { color: var(--color-danger); font-weight: 600; }
+  .yes { color: var(--color-success); font-weight: 600; }
+
+  .subnav { display: flex; gap: 20px; border-bottom: 1px solid var(--color-border); margin: 16px 0 0; }
+  .subnav button { background: 0; border: 0; font: inherit; font-size: .82rem; color: var(--color-text-dim); padding: 8px 0 9px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .subnav button:hover { color: var(--color-text); }
+  .subnav button.on { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+
+  /* ── connected sources ──────────────────────────────────────────────────────────── */
+  .srow { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .srow:last-child { border-bottom: 0; }
+  .smark { width: 30px; height: 30px; border-radius: 7px; background: var(--color-muted); border: 1px solid var(--color-border); display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
+  .sbody { flex: 1; min-width: 0; }
+  .stitle { font-size: .84rem; color: var(--color-text); font-weight: 500; }
+  .stitle .sacct { color: var(--color-text-dim); font-weight: 400; font-family: var(--font-mono); font-size: .74rem; }
+  .smeta { font-size: 11.5px; color: var(--color-text-muted); margin-top: 3px; }
+  .smeta code { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
+  .smeta2 { font-size: 11px; color: var(--color-text-dim); margin-top: 3px; }
+  .smeta2.warn, .warn { color: var(--color-warning); }
+  .sstat { text-align: right; width: 62px; flex-shrink: 0; }
+  .sstat b { display: block; font-family: var(--font-mono); font-size: .9rem; color: var(--color-text); font-weight: 500; }
+  .sstat span { font-size: 10px; color: var(--color-text-dim); }
+  .sact { width: 92px; text-align: right; color: var(--color-text-dim); flex-shrink: 0; }
+  .grantrow { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--color-border-soft); font-size: .82rem; }
+  .grantrow:last-child { border-bottom: 0; }
+  .grantrow .gname { color: var(--color-text-muted); }
+
+  /* ── view cards ─────────────────────────────────────────────────────────────────── */
+  .vgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .vcard { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); padding: 14px 16px; }
+  .vcard.vempty { border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border)); }
+  .vhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .vname { font-family: var(--font-headline); font-size: .95rem; font-weight: 600; color: var(--color-text); }
+  .vcount { font-family: var(--font-mono); font-size: 1.1rem; color: var(--color-text); }
+  .vcount.vzero { color: var(--color-warning); }
+  .vrule { font-size: 11.5px; color: var(--color-text-dim); margin: 7px 0 11px; line-height: 1.6; }
+  .vrule b { color: var(--color-text-muted); font-weight: 500; }
+  .vbar { height: 5px; border-radius: 3px; background: var(--color-muted); overflow: hidden; }
+  .vbar > i { display: block; height: 100%; width: 0; border-radius: 3px; }
+  .is-live .vbar > i { animation: growX .8s cubic-bezier(.22,1,.36,1) forwards; }
+  .vfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; font-size: 11px; color: var(--color-text-dim); }
+  .vfoot .vact { cursor: pointer; }
+
+  /* ── chunk boundary shading ─────────────────────────────────────────────────────── */
+  .ck { margin: 0; padding: 9px 11px; font-size: .78rem; line-height: 1.65; color: var(--color-text-muted); border-radius: 6px; }
+  .ck1 { background: color-mix(in srgb, var(--color-primary) 12%, transparent); border-left: 2px solid var(--color-primary); }
+  .ck2 { background: color-mix(in srgb, var(--color-accent-violet) 12%, transparent); border-left: 2px solid var(--color-accent-violet); margin: -6px 0; }
+
+  .sxs { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+</style>
+</head>
+<body>
+
+<nav id="variant-nav">
+  <span class="brandline">SKETCH 218 · the Library</span>
+  <button class="variant-tab active" data-v="a">A · five tabs</button>
+  <button class="variant-tab" data-v="b">B · four tabs</button>
+  <button class="variant-tab" data-v="h">Health</button>
+  <button class="variant-tab" data-v="i">Indexing</button>
+  <button class="variant-tab" data-v="g">Ingestion</button>
+  <button class="variant-tab" data-v="d">Document detail</button>
+  <button class="variant-tab" data-v="u">⭐ upload</button>
+  <button class="variant-tab" data-v="s">⭐ sources</button>
+  <button class="variant-tab" data-v="v">Views</button>
+  <button class="variant-tab" data-v="c">Chunking</button>
+  <button class="variant-tab" data-v="x">⭐ what we hide</button>
+  <button class="variant-tab" data-v="f">⚠ findings</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     A — five tabs · the Documents tab
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant active" id="v-a">
+  <div class="sheet">
+    <h2>A · five tabs — Documents · Views · Ingestion · Indexing · Health</h2>
+    <p class="lede">The reference's journey and table, in our tokens. Library Health is merged into tab 5
+      (D-1) and the page is renamed <b>Library</b> (D-2).</p>
+
+    <div class="page">
+      <div class="pagehead" data-block="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span><a>Engineering</a><span class="sep">›</span>Documents</p>
+        <h1>Library</h1>
+        <p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+
+      <div class="tabslist" data-tabset="A" data-block="tabslist">
+        <button class="tabtrigger" data-state="active">Documents</button>
+        <button class="tabtrigger">Views</button>
+        <button class="tabtrigger">Ingestion</button>
+        <button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+
+      <div class="body">
+        <aside class="sidebar" data-block="sidebar">
+          <div class="grouplabel">Folders</div>
+          <div class="navrow sel">📁 Engineering <span class="cnt">24</span></div>
+          <div class="navrow">📁 Marketing <span class="cnt">182</span></div>
+          <div class="navrow">📁 HR Policies <span class="cnt">12</span></div>
+          <div class="navrow">📁 Uncategorized <span class="cnt">4</span></div>
+          <div class="grouplabel" style="margin-top:16px">Views</div>
+          <div class="navrow">⧩ Needs review <span class="cnt">8</span></div>
+          <div class="navrow">⧩ Recently added <span class="cnt">34</span></div>
+          <div class="navrow">⧩ Contracts <span class="gpill">G</span> <span class="cnt">19</span></div>
+        </aside>
+
+        <div class="main">
+          <div class="tiles three" style="margin-bottom:16px" data-block="stat-tiles">
+            <div class="tile">
+              <div class="tl">Chunks</div><div class="tv">1,284</div><div class="ts">across 24 documents</div>
+              <svg class="spark" width="62" height="26" viewBox="0 0 62 26" aria-hidden="true">
+                <path class="spark-fill" d="M0,22 L10,19 L20,20 L31,13 L41,10 L51,7 L62,4 L62,26 L0,26 Z"/>
+                <path class="spark-path" d="M0,22 L10,19 L20,20 L31,13 L41,10 L51,7 L62,4"/>
+              </svg>
+            </div>
+            <div class="tile"><div class="tl">Vectors</div><div class="tv">12,847</div><div class="ts">text-embedding-3-small</div></div>
+            <div class="tile">
+              <div class="tl">Found by a search</div><div class="tv">31</div><div class="ts">last 30 days</div>
+              <svg class="spark" width="62" height="26" viewBox="0 0 62 26" aria-hidden="true">
+                <path class="spark-fill" d="M0,10 L10,14 L20,8 L31,16 L41,12 L51,18 L62,15 L62,26 L0,26 Z"/>
+                <path class="spark-path" d="M0,10 L10,14 L20,8 L31,16 L41,12 L51,18 L62,15"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="card">
+            <table class="doclist" data-block="doclist">
+              <thead><tr>
+                <th style="width:26px"></th><th>Filename</th><th data-shed>Type</th><th data-shed>Size</th>
+                <th data-shed>Chunks</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td>›</td>
+                  <td class="fn">architecture_v2_final.pdf<div style="margin-top:4px"><span class="tag">Engineering</span></div></td>
+                  <td><span class="typemark">PDF</span></td><td class="num">2.4 MB</td>
+                  <td class="num">412<div class="cbar"><i style="width:100%"></i></div></td>
+                  <td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td>
+                </tr>
+                <tr>
+                  <td>›</td>
+                  <td class="fn">q3_roadmap_notes.docx<div style="margin-top:4px"><span class="tag">Planning</span></div></td>
+                  <td><span class="typemark">DOCX</span></td><td class="num">1.1 MB</td>
+                  <td class="num">156<div class="cbar"><i style="width:38%"></i></div></td>
+                  <td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td>
+                </tr>
+                <tr>
+                  <td>›</td><td class="fn">supplier_terms_2026.pdf</td>
+                  <td><span class="typemark">PDF</span></td><td class="num">840 KB</td>
+                  <td class="num">—</td>
+                  <td><div class="stages" style="max-width:250px">
+                    <span class="stg done">Read</span><span class="stg now">Split</span><span class="stg todo">Index</span>
+                    <span class="stg todo">Tbl</span><span class="stg skip">Img</span><span class="stg todo">Label</span>
+                  </div></td><td>⋯</td>
+                </tr>
+                <tr>
+                  <td>›</td><td class="fn">legacy_export.csv</td>
+                  <td><span class="typemark">CSV</span></td><td class="num">12.4 MB</td><td class="num">—</td>
+                  <td><span class="badge danger"><span class="dot"></span>Failed</span>
+                      <div style="font-size:11px;color:var(--color-text-dim);margin-top:4px">The file had a character we could not store.</div></td>
+                  <td>⋯</td>
+                </tr>
+                <tr>
+                  <td>›</td><td class="fn">board_deck_jan.pptx</td>
+                  <td><span class="typemark">PPTX</span></td><td class="num">45.2 MB</td><td class="num">—</td>
+                  <td><span class="badge dim"><span class="dot"></span>Queued</span></td><td>⋯</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="tfoot" data-block="tfoot">
+              <span>Rows per page: 25</span><span>1–5 of 24</span>
+              <span class="pg"><span>‹</span><span>›</span></span>
+            </div>
+          </div>
+
+          <div data-anno><b>⚠ Two things the reference's table has that ours must not.</b>
+            (1) A <b>"Semantic Match %"</b> column — semantic match is a property of a <i>query</i>, not of a
+            stored document, so there is no value to put in that cell when nobody has searched.
+            (2) <b>Free-text tags with an ✕</b> — our labels come from the classification surface, and
+            removing one here would silently contradict the rule that produced it. <b>The column order is
+            otherwise fixed and load-bearing</b>: <code>IngestionPage.tsx</code> sheds columns 3–5 by
+            <code>nth-child</code> when the 430px panel opens.</div>
+        </div>
+      </div>
+    </div>
+
+    <div data-anno><b>⚠ Tab 2 has no content of its own.</b> The sidebar beside it already renders the whole
+      <code>ViewsGroup</code> — counts, the <code>G</code> pill, Edit / Rename / Delete. So <b>Views</b> is
+      either a duplicate, or Views leaves the sidebar and a saved view stops being a one-click filter —
+      a regression of Phase 114's D-114-1. <b>Variant B drops the tab and changes nothing else.</b></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     B — four tabs
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-b">
+  <div class="sheet">
+    <h2>B · four tabs — Documents · Ingestion · Indexing · Health</h2>
+    <p class="lede">Identical to A but <b>Views is not a tab</b>. It stays in the sidebar where it already
+      works, and every tab in the bar owns content nothing else renders.</p>
+    <div class="page">
+      <div class="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span><a>Engineering</a><span class="sep">›</span>Documents</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist" data-tabset="B">
+        <button class="tabtrigger" data-state="active">Documents</button>
+        <button class="tabtrigger">Ingestion</button>
+        <button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+      <div class="body">
+        <aside class="sidebar">
+          <div class="grouplabel">Folders</div>
+          <div class="navrow sel">📁 Engineering <span class="cnt">24</span></div>
+          <div class="navrow">📁 Marketing <span class="cnt">182</span></div>
+          <div class="navrow">📁 HR Policies <span class="cnt">12</span></div>
+          <div class="grouplabel" style="margin-top:16px">Views</div>
+          <div class="navrow">⧩ Needs review <span class="cnt">8</span></div>
+          <div class="navrow">⧩ Recently added <span class="cnt">34</span></div>
+          <div class="navrow">⧩ Contracts <span class="gpill">G</span> <span class="cnt">19</span></div>
+        </aside>
+        <div class="main">
+          <div class="tiles three" style="margin-bottom:16px">
+            <div class="tile"><div class="tl">Chunks</div><div class="tv">1,284</div><div class="ts">across 24 documents</div></div>
+            <div class="tile"><div class="tl">Vectors</div><div class="tv">12,847</div><div class="ts">text-embedding-3-small</div></div>
+            <div class="tile"><div class="tl">Found by a search</div><div class="tv">31</div><div class="ts">last 30 days</div></div>
+          </div>
+          <div class="card">
+            <table class="doclist">
+              <thead><tr><th style="width:26px"></th><th>Filename</th><th data-shed>Type</th><th data-shed>Size</th><th data-shed>Chunks</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr><td>›</td><td class="fn">architecture_v2_final.pdf</td><td><span class="typemark">PDF</span></td><td class="num">2.4 MB</td><td class="num">412<div class="cbar"><i style="width:100%"></i></div></td><td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td></tr>
+                <tr><td>›</td><td class="fn">q3_roadmap_notes.docx</td><td><span class="typemark">DOCX</span></td><td class="num">1.1 MB</td><td class="num">156<div class="cbar"><i style="width:38%"></i></div></td><td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td></tr>
+                <tr><td>›</td><td class="fn">board_deck_jan.pptx</td><td><span class="typemark">PPTX</span></td><td class="num">45.2 MB</td><td class="num">—</td><td><span class="badge dim"><span class="dot"></span>Queued</span></td><td>⋯</td></tr>
+              </tbody>
+            </table>
+            <div class="tfoot"><span>Rows per page: 25</span><span>1–3 of 24</span><span class="pg"><span>‹</span><span>›</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-anno><b>What B costs:</b> a five-tab bar reads as a fuller product, and the reference draws five.
+      <b>What B buys:</b> every tab owns something, and nothing is rendered twice with two sources of
+      selection state that can disagree.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     HEALTH — the charts screen
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-h">
+  <div class="sheet">
+    <h2>Health — Library Health, merged into tab 5</h2>
+    <p class="lede">The reference's analytics journey (V2's frequency bars + screen 13's ring + screen 09's
+      per-document strip), over numbers this app can actually produce.</p>
+
+    <div class="page">
+      <div class="pagehead" data-block="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Health</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist" data-block="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger" data-state="active">Health</button>
+      </div>
+
+      <div style="margin-top:20px">
+        <!-- ⭐ the ring + the bars, side by side: the reference's screen-13 composition -->
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:14px">
+          <div class="card" data-block="coverage-ring">
+            <header><h4>Coverage</h4></header>
+            <div class="cardbody" style="display:flex;align-items:center;gap:18px">
+              <div class="ringwrap">
+                <svg class="ring" width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
+                  <!-- ⭐ the remainder is NOT grey: 137 never-found documents are a REAL state, not
+                       absence of data. Drawing them as empty track would hide the bigger number. -->
+                  <circle class="ring-bg ring-never" cx="66" cy="66" r="56" stroke-width="11"/>
+                  <circle class="ring-fg" cx="66" cy="66" r="56" stroke-width="11"
+                          stroke-dasharray="351.9" stroke-dashoffset="351.9" style="--dash-to:215.3"/>
+                </svg>
+                <div class="ringlabel"><b>87</b><span>of 224</span></div>
+              </div>
+              <div style="line-height:1.7">
+                <div class="li" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--color-text-muted)">
+                  <span class="sw s-primary" style="width:9px;height:9px;border-radius:2px"></span>found by a search <b style="font-family:var(--font-mono);color:var(--color-text)">87</b></div>
+                <div class="li" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--color-text-muted);margin-top:5px">
+                  <span class="sw" style="width:9px;height:9px;border-radius:2px;background:color-mix(in srgb, var(--color-warning) 34%, var(--color-muted))"></span>never found <b style="font-family:var(--font-mono);color:var(--color-text)">137</b></div>
+                <div style="font-size:11px;color:var(--color-text-dim);margin-top:8px">in the last 30 days</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" data-block="searches-chart">
+            <header>
+              <div><h4>Searches over time</h4></div>
+              <div class="tabslist" style="height:30px">
+                <button class="tabtrigger" style="padding:3px 9px;font-size:.72rem">7d</button>
+                <button class="tabtrigger" data-state="active" style="padding:3px 9px;font-size:.72rem">30d</button>
+                <button class="tabtrigger" style="padding:3px 9px;font-size:.72rem">90d</button>
+              </div>
+            </header>
+            <div class="legend">
+              <span class="li"><span class="sw s-primary"></span>found something <b>371</b></span>
+              <span class="li"><span class="sw s-warning"></span>found nothing <b>41</b></span>
+              <span class="li"><span class="sw s-danger"></span>could not search <b>6</b></span>
+            </div>
+            <div class="chartwrap">
+              <div class="grid"><div class="gl" style="top:0"><span>50</span></div>
+                <div class="gl" style="top:50%"><span>25</span></div>
+                <div class="gl" style="top:100%"><span>0</span></div></div>
+              <div class="chart" id="chart-h"></div>
+            </div>
+            <div class="xaxis"><span>Jul 30</span><span>Aug 8</span><span>Aug 17</span><span>Aug 28</span></div>
+          </div>
+        </div>
+
+        <div class="tiles" style="margin-top:14px" data-block="stat-tiles">
+          <div class="tile"><div class="tl">Documents</div><div class="tv">224</div><div class="ts">12 added this month</div></div>
+          <div class="tile"><div class="tl">Searches</div><div class="tv">412</div><div class="ts">last 30 days</div></div>
+          <div class="tile"><div class="tl">Never found</div><div class="tv">137</div><div class="ts">in the last 30 days</div></div>
+          <div class="tile"><div class="tl">Checked queries</div><div class="tv">12</div><div class="ts">9 holding, 3 slipped</div></div>
+        </div>
+
+        <!-- ⭐ TWO GROUPS, NOT ONE ROW OF SEVEN. Merging Governance in brings three more
+             signals, and seven undifferentiated chips is a filter bar nobody reads. They split
+             on the question they answer: "is it being used?" vs "is it in good shape?" -->
+
+    <div data-anno><b>⚠ PHASE 210 FIXED THE CHAT MESSAGE, NOT THE ANALYTICS — measured 2026-08-28.</b>
+      It ships <code>retrieval_status: "provider_error"</code> and a clear sentence to the user
+      (<i>"your documents were never queried"</i>). ⭐ But <b>that path RETURNS BEFORE the audit
+      write</b>, so a search that failed on a provider outage <b>writes no row at all</b> — and this
+      chart would simply <b>dip toward zero</b> with no explanation. <b>A dip is a quieter version of
+      the same lie:</b> "nobody searched" and "search was broken" look identical.
+      <b>The fix is one audit write on the error path</b>, and it is what turns the third segment above
+      from a drawing into a measurement. Until it lands, the red segment renders from nothing and the
+      Health tab must not claim it.</div>
+
+        <div class="chipgroup" data-block="chipgroup-being-used">
+          <span class="cglabel">Being used</span>
+          <div class="chiprow">
+            <span class="chip on">Most found <span class="b">87</span></span>
+            <span class="chip">Never found <span class="b">137</span></span>
+            <span class="chip">Weak matches <span class="b">23</span></span>
+          </div>
+        </div>
+        <div class="chipgroup" data-block="chipgroup-in-good-shape">
+          <span class="cglabel">In good shape</span>
+          <div class="chiprow">
+            <span class="chip">Stale <span class="b">41</span></span>
+            <span class="chip">Unclassified <span class="b">18</span></span>
+            <span class="chip">Broken links <span class="b">3</span></span>
+            <span class="chip">Unsure metadata <span class="b">12</span></span>
+          </div>
+        </div>
+
+        <div class="card" data-block="document-bars">
+          <div class="legend" style="padding:12px 16px 4px;border-bottom:1px solid var(--color-border-soft)">
+            <span class="li"><span class="sw s-primary"></span>ready</span>
+            <span class="li"><span class="sw s-violet"></span>re-indexing</span>
+            <span class="li"><span class="sw s-warning"></span>stale — the file changed after it was indexed</span>
+          </div>
+          <div class="hrow"><span class="nm">Q3_Earnings_Report.pdf</span><span class="hbar"><i class="s-primary" style="--w:100%;animation-delay:.00s"></i></span><span class="ct">412</span><span class="ago">2d ago</span></div>
+          <div class="hrow"><span class="nm">Architecture_V2_Draft.md</span><span class="hbar"><i class="s-primary" style="--w:92%;animation-delay:.05s"></i></span><span class="ct">380</span><span class="ago">2d ago</span></div>
+          <div class="hrow"><span class="nm">HR_Policy_2023.txt</span><span class="hbar"><i class="s-violet" style="--w:76%;animation-delay:.10s"></i></span><span class="ct">315</span><span class="ago">3d ago</span></div>
+          <div class="hrow"><span class="nm">API_Integration_Guide.pdf</span><span class="hbar"><i class="s-primary" style="--w:58%;animation-delay:.15s"></i></span><span class="ct">240</span><span class="ago">5d ago</span></div>
+          <div class="hrow"><span class="nm">Onboarding_Checklist.docx</span><span class="hbar"><i class="s-warning" style="--w:46%;animation-delay:.20s"></i></span><span class="ct">189</span><span class="ago">6d ago</span></div>
+          <div class="hrow"><span class="nm">Database_Schema_v4.json</span><span class="hbar"><i class="s-primary" style="--w:35%;animation-delay:.25s"></i></span><span class="ct">145</span><span class="ago">1w ago</span></div>
+        </div>
+
+        <div class="card" style="margin-top:16px" data-block="checks">
+          <header>
+            <div><h4>Checked queries</h4><p class="hsub">Questions you expect a document to answer.</p></div>
+            <button class="btn">Add a check</button>
+          </header>
+          <table class="checks">
+            <thead><tr><th>Question</th><th>Should find</th><th>Rank</th><th>Verdict</th></tr></thead>
+            <tbody>
+              <tr><td class="q">"What is the PTO policy?"</td><td><span class="fchip">HR_Policy_2023.txt</span></td><td class="rk">1</td><td><span class="badge success"><span class="dot"></span>Holding</span></td></tr>
+              <tr><td class="q">"API rate limits"</td><td><span class="fchip">API_Integration_Guide.pdf</span></td><td class="rk">1</td><td><span class="badge success"><span class="dot"></span>Holding</span></td></tr>
+              <tr><td class="q">"Q3 revenue breakdown"</td><td><span class="fchip">Q3_Earnings_Report.pdf</span></td><td class="rk"><span class="was">2</span>6</td><td><span class="badge danger"><span class="dot"></span>Slipped</span></td></tr>
+              <tr><td class="q">"Database migration steps"</td><td><span class="fchip">Database_Schema_v4.json</span></td><td class="rk">2</td><td><span class="badge success"><span class="dot"></span>Holding</span></td></tr>
+              <tr><td class="q">"New user onboarding flow"</td><td><span class="fchip">Onboarding_Checklist.docx</span></td><td class="rk">—</td><td><span class="badge dim"><span class="dot"></span>Not checked yet</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div data-anno><b>⚠ The ring is honest and the reference's ring was not.</b> Screen 13 draws
+      <i>"Vector Database Health 98%"</i> — a number with nothing behind it. This ring draws
+      <b>87 of 224</b>, a real ratio of documents a search actually returned, and it prints the
+      <b>numerator and denominator</b> rather than a percentage — so a reader cannot mistake a coverage
+      count for a quality grade. <b>Same chart type, opposite honesty.</b></div>
+
+    <div data-anno><b>⚠ The word "golden" is already spent.</b> <code>workflow_runs.is_golden_run</code> is
+      the publish gauntlet's one live run. The reference says <i>"Mark as Golden Answer"</i>; this says
+      <b>Checked queries</b>, so one product does not carry two unrelated meanings on one word.</div>
+
+    <div data-anno><b>⛔ Cut from screen 09:</b> the section-level retrieval heatmap with its narrative
+      executive summary — four walls of prose in coloured blocks, and per-section scoring needs a
+      per-chunk score nobody stores. <b>The per-document strip above replaces it</b> and is backed today.</div>
+
+
+    <div data-anno><b>⭐ Governance merges here too — operator, 2026-08-28, and the evidence is
+      stronger than "it only has three rows".</b> That page's own heading is
+      <b>"Document Governance"</b>; all three of its signals are document signals (broken document
+      relationships, unclassified documents, low-confidence document metadata); its own docblock calls
+      it <i>"Library Health, three different lists"</i>; and <b>every row is already a pure link-out
+      into the DocumentDetailPanel this Library owns</b> — it never mutates anything itself.
+      <b>It is a filtered view of the Library wearing its own nav icon.</b></div>
+
+    <div data-anno><b>⚠ THE MERGE HAS A NAME COLLISION, AND IT WOULD HAVE SHIPPED SILENTLY.</b>
+      Library Health already has a <b>"Low Confidence"</b> tab and Governance has a
+      <b>"Low-confidence metadata"</b> card. <b>They are different measurements:</b>
+      Library Health's is <i>average retrieval similarity below <b>0.38</b></i> — how well searches
+      matched. Governance's is <i>an extracted field below the confidence tier at <b>0.5</b></i> — how
+      sure the extractor was about a value. <b>Two thresholds, two meanings, one pair of words</b>, and
+      the merge puts them side by side in the same row. Renamed here to <b>Weak matches</b> and
+      <b>Unsure metadata</b> — plain words, and neither prints its mechanism.</div>
+
+    <div data-anno><b>⚠ And the merge must carry a permission, not just a list.</b> The Governance nav
+      entry is <b>feature-gated</b> (<code>governance_health</code>) while Documents is ungoverned and
+      always visible. Folding gated signals into an ungated tab would <b>show them to people the map
+      currently hides them from</b>. The gate moves to the three merged chips, or the tab; it does not
+      simply evaporate with the nav row. <b>A merge that drops a permission is a leak, not a tidy-up.</b></div>
+
+    <div data-anno><b>⭐ What this buys the navigation.</b> Two top-level homes retire into one
+      (<i>Library Health</i> and <i>Governance</i>), taking the primary nav from eight entries to six —
+      and both were document-scoped surfaces sitting outside the document space.
+      ⚠ <b>The remaining question, which this sketch deliberately does NOT answer:</b>
+      <b>Classification</b> is still its own home, adjacent to Documents. It is different in kind — it
+      is a <i>rules-authoring</i> surface, not a view of documents — so it is not obviously the same
+      merge, and folding it in without asking would be exactly the scope creep this project's
+      guardrails exist to stop.</div>
+
+    <h3 class="sub">The one shipped tile the merge must rule on — drawn both ways</h3>
+    <div class="sxs">
+      <div>
+        <p class="caption">arm 1 · as Library Health ships it today</p>
+        <div class="tile"><div class="tl">Retrieval Score</div><div class="tv">0.61</div></div>
+      </div>
+      <div>
+        <p class="caption">arm 2 · the same number, saying what it measures</p>
+        <div class="tile" data-block="match-strength-tile"><div class="tl">Match strength</div><div class="tv">0.61</div>
+          <div class="ts">average similarity of what searches returned</div></div>
+      </div>
+    </div>
+    <div data-anno><b>⚠ This is not "the number is fake".</b> <code>Retrieval Score</code> is derived from
+      real similarity thresholds in the health service. The objection is that <b>it does not say what it
+      measures</b>, so a reader assumes it means quality — the same trap as the reference's
+      <i>"Embedding Quality 92%"</i>, but with a real number underneath. <b>Silently dropping a shipped tile
+      is the worse option.</b> Arm 2 keeps the value and adds the one line that makes it true.
+      <b>The operator picks; this sketch does not.</b></div>
+
+    <div data-anno><b>⚠ The merge removes the app's fallback view.</b> <code>ChatLayout.tsx:879</code>
+      renders <code>&lt;KnowledgeHealthPage /&gt;</code> as the trailing <code>else</code> of the view chain,
+      and <code>App.tsx:98</code> says so itself: <i>"a union member with no branch silently renders
+      Knowledge Health"</i>. Deleting the page without installing a replacement in the same commit turns a
+      known-safe mis-route into a <b>blank screen</b> — strictly worse than the bug the fallback was
+      covering for. <b>This is a seam between two plans</b>: one deletes a nav entry, another builds a tab,
+      both green, and the fallback nobody owned disappears between them.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     INDEXING — reference screen 13, made honest
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-i">
+  <div class="sheet">
+    <h2>Indexing — the vector store, the model, and re-indexing</h2>
+    <p class="lede">Reference screen 13's composition kept: a health card, an embedding-model card with
+      re-index, and a collections table. <b>Its 98% donut is replaced by the two numbers that are real.</b></p>
+
+    <div class="page">
+      <div class="pagehead" data-block="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Indexing</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist" data-block="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger">Ingestion</button><button class="tabtrigger" data-state="active">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">
+        <div class="card" data-block="vector-store-card">
+          <header><h4>Vector store</h4></header>
+          <div class="cardbody">
+            <div class="kv"><span class="k">Vectors</span><span class="v">12,847</span></div>
+            <div class="kv"><span class="k">Chunks indexed</span><span class="v">12,847 of 12,847</span></div>
+            <div class="kv"><span class="k">Documents with no vectors</span><span class="v">0</span></div>
+            <div class="kv"><span class="k">Last indexed</span><span class="v">14 min ago</span></div>
+          </div>
+        </div>
+        <div class="card" data-block="embedding-model-card">
+          <header><h4>Embedding model</h4></header>
+          <div class="cardbody">
+            <div class="kv"><span class="k">Model</span><span class="v">text-embedding-3-small</span></div>
+            <div class="kv"><span class="k">Dimensions</span><span class="v">1536</span></div>
+            <div class="kv"><span class="k">Provider</span><span class="v">OpenAI</span></div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <button class="btn ghost">Change model</button>
+              <button class="btn">Re-index everything</button>
+            </div>
+            <p style="font-size:11px;color:var(--color-text-dim);margin:10px 0 0;line-height:1.6">
+              Changing the model re-embeds all 12,847 chunks. Search keeps working on the old vectors
+              until it finishes.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px" data-block="folders-table">
+        <header><h4>Folders</h4><button class="btn ghost">Re-index selected</button></header>
+        <table class="doclist">
+          <thead><tr><th>Folder</th><th>Documents</th><th>Chunks</th><th>Vectors</th><th>Last indexed</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr><td class="fn">Engineering</td><td class="num">24</td><td class="num">1,284</td><td class="num">1,284</td><td class="num">14 min ago</td><td>⋯</td></tr>
+            <tr><td class="fn">Marketing</td><td class="num">182</td><td class="num">8,910</td><td class="num">8,910</td><td class="num">2 h ago</td><td>⋯</td></tr>
+            <tr><td class="fn">HR Policies</td><td class="num">12</td><td class="num">640</td><td class="num">640</td><td class="num">1 d ago</td><td>⋯</td></tr>
+            <tr><td class="fn">Uncategorized</td><td class="num">4</td><td class="num">—</td><td class="num">—</td><td class="num">never</td><td>⋯</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div data-anno><b>⛔ What screen 13 draws that we must not.</b> <b>(1) "Vector Database Health 98%"</b> —
+      there is no health metric behind it; the honest facts are <i>how many vectors</i> and <i>are any
+      documents missing them</i>, both shown above. <b>(2) "Query Latency p99: 15ms"</b> — search latency is
+      computed and <b>thrown away</b>; the retrieval call returns a float it does not persist, so that tile
+      would be inventing a number. It is omitted rather than faked, and it becomes available the day the
+      value is stored. <b>(3) The Source column</b> (SharePoint / Zendesk / Confluence / Google Drive) —
+      ingestion is manual upload only; connectors are <code>SEED-142</code>. A Source column would advertise
+      a capability that does not exist.</div>
+
+    <div data-anno><b>The last row is the point of the table.</b> <i>Uncategorized</i> has 4 documents and
+      <b>no chunks and no vectors</b> — it renders <code>—</code> and <code>never</code>, not <code>0</code>
+      and not a green tick. A folder the agent cannot read is the thing this tab exists to surface.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     INGESTION — reference screen 03 / the V1 hub's dropzone + pipeline
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-g">
+  <div class="sheet">
+    <h2>Ingestion — the dropzone and the queue</h2>
+    <p class="lede">The reference's upload journey: drop → a pipeline you can watch → a queue with per-file
+      stages. <b>Its three dots become our six real stages.</b></p>
+
+    <div class="page">
+      <div class="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Ingestion</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger" data-state="active">Ingestion</button><button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+
+      <div style="margin-top:20px">
+        <div class="dropzone">
+          <div class="dz1">Drop files here, or choose them</div>
+          <div class="dz2">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB — into <b>Engineering</b></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <header><h4>In progress</h4><p class="hsub">3 files</p></header>
+          <table class="doclist">
+            <thead><tr><th>Filename</th><th style="width:46%">Stage</th><th>Size</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="fn">supplier_terms_2026.pdf</td>
+                <td><div class="stages"><span class="stg done">Read</span><span class="stg done">Split</span><span class="stg done">Index</span><span class="stg now">Tbl</span><span class="stg todo">Img</span><span class="stg todo">Label</span></div></td>
+                <td class="num">840 KB</td><td>⋯</td>
+              </tr>
+              <tr>
+                <td class="fn">meeting_notes.txt</td>
+                <td><div class="stages"><span class="stg done">Read</span><span class="stg done">Split</span><span class="stg now">Index</span><span class="stg skip">Tbl</span><span class="stg skip">Img</span><span class="stg todo">Label</span></div></td>
+                <td class="num">14 KB</td><td>⋯</td>
+              </tr>
+              <tr>
+                <td class="fn">board_deck_jan.pptx</td>
+                <td><div class="stages"><span class="stg todo">Read</span><span class="stg todo">Split</span><span class="stg todo">Index</span><span class="stg todo">Tbl</span><span class="stg todo">Img</span><span class="stg todo">Label</span></div>
+                    <div style="font-size:11px;color:var(--color-text-dim);margin-top:4px">Waiting</div></td>
+                <td class="num">45.2 MB</td><td>⋯</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <header><h4>Needs attention</h4><p class="hsub">1 file</p></header>
+          <table class="doclist">
+            <tbody>
+              <tr>
+                <td class="fn">legacy_export.csv</td>
+                <td><span class="badge danger"><span class="dot"></span>Failed</span>
+                    <div style="font-size:11px;color:var(--color-text-dim);margin-top:4px">The file had a character we could not store.</div></td>
+                <td class="num">12.4 MB</td>
+                <td style="text-align:right"><button class="btn ghost">Try again</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div data-anno><b>⚠ Why there is no percentage and no ETA.</b> Two of the six stages
+      (<code>Tbl</code>, <code>Img</code>) are decided <i>while the file runs</i>, so the pipeline's length is
+      unknown when the strip first renders — a determinate bar would have no honest denominator. The strip
+      shows <b>stages reached</b>, and a skipped stage is <b>struck through</b> rather than left as an
+      unexplained empty box: an absent thing that looks pending is the failure this design avoids.</div>
+
+    <div data-anno><b>⛔ Cut from screens 03 and 07:</b> the token-usage pie chart and per-stage token
+      columns — ingestion token accounting does not exist, and the pipeline reads honestly with stages
+      alone. <b>⛔ Cut from screen 08:</b> the S3 / Google Drive connector cards — ingestion is manual
+      upload only (<code>SEED-142</code> owns that, and whoever ships it changes the rule in CLAUDE.md in
+      the same commit).</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     DOCUMENT DETAIL — reference screen 15 + the V1 hub's Chunks Preview
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-d">
+  <div class="sheet">
+    <h2>Document detail — metadata, retrieval history, chunks</h2>
+    <p class="lede">The reference's screen 15, in the <b>shipped 430px panel track</b> rather than a modal —
+      <code>DocumentDetailPanel</code> already exists and is a cross-surface shell.</p>
+
+    <div class="page">
+      <div class="body" style="margin-top:0">
+        <div class="main">
+          <div class="card">
+            <table class="doclist">
+              <thead><tr><th style="width:26px"></th><th>Filename</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr style="background:var(--color-accent)"><td>›</td><td class="fn">architecture_v2_final.pdf</td><td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td></tr>
+                <tr><td>›</td><td class="fn">q3_roadmap_notes.docx</td><td><span class="badge success"><span class="dot"></span>Ready</span></td><td>⋯</td></tr>
+                <tr><td>›</td><td class="fn">supplier_terms_2026.pdf</td><td><span class="badge primary"><span class="dot"></span>Working</span></td><td>⋯</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div data-anno><b>⚠ The list SHEDS three columns when the panel opens</b> —
+            <code>Type</code>, <code>Size</code>, <code>Chunks</code> (nth-child 3–5), keeping Filename +
+            Status + Actions. That is shipped behaviour, and it is why the panel is drawn <i>beside</i> a
+            shortened table rather than over a full one.</div>
+        </div>
+
+        <aside class="detail">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--color-border-soft);display:flex;align-items:center;justify-content:space-between">
+            <div style="min-width:0">
+              <div style="font-family:var(--font-mono);font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">architecture_v2_final.pdf</div>
+              <div style="font-size:11px;color:var(--color-text-dim);margin-top:3px">Engineering</div>
+            </div>
+            <span style="color:var(--color-text-dim);cursor:pointer">✕</span>
+          </div>
+
+          <div style="padding:14px 16px">
+            <p class="caption">Details</p>
+            <div class="kv"><span class="k">Type</span><span class="v">PDF</span></div>
+            <div class="kv"><span class="k">Size</span><span class="v">2.4 MB</span></div>
+            <div class="kv"><span class="k">Added</span><span class="v">12 Aug 2026</span></div>
+            <div class="kv"><span class="k">Chunks</span><span class="v">412</span></div>
+            <div class="kv"><span class="k">Version</span><span class="v">3</span></div>
+          </div>
+
+          <div style="padding:0 16px 14px">
+            <p class="caption">Retrieval</p>
+            <div class="insight"><span class="ic">↺</span><span class="lab">Times found</span><span class="val">48</span></div>
+            <div class="insight"><span class="ic">⌕</span><span class="lab">Last question</span><span class="val" style="max-width:200px;white-space:normal;font-size:.74rem">"What are the Q4 performance benchmarks?"</span></div>
+            <div class="insight"><span class="ic">◷</span><span class="lab">Last found</span><span class="val">2d ago</span></div>
+            <div class="insight"><span class="ic">▤</span><span class="lab">Average relevance</span><span class="val" style="color:var(--color-text-dim)">not recorded yet</span></div>
+            <div style="margin-top:12px">
+              <p class="caption">Found per week</p>
+              <div class="card" style="padding:10px 12px;background:var(--color-bg)">
+                <div class="chart" style="height:52px;gap:4px" id="chart-d"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 16px 16px">
+            <p class="caption">Chunks · 412</p>
+            <div class="chunk">
+              <div class="ch"><span>CHUNK 1</span><span>page 12 · 128 tokens</span></div>
+              <p>The system architecture uses a service-per-domain split, with the retrieval path isolated
+                behind a single interface so the embedding provider can be replaced without touching…</p>
+            </div>
+            <div class="chunk">
+              <div class="ch"><span>CHUNK 2</span><span>page 12 · 116 tokens</span></div>
+              <p>…callers. Each document is chunked on paragraph boundaries with a 200-token overlap, which
+                keeps a definition and its example in the same chunk more often than a fixed window does.</p>
+            </div>
+            <button class="btn ghost" style="width:100%">Show all 412</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div data-anno><b>⭐ Three of the four Retrieval rows are backed TODAY</b> — times found, last question
+      and last found all come from search audit rows the app already writes on every
+      <code>search_documents</code> call. <b>⚠ The fourth is not, and says so rather than showing 0.00.</b>
+      The per-hit similarity <i>is</i> computed and then dropped before the row is written, so
+      <b>"Average relevance" renders "not recorded yet"</b>. The reference prints
+      <i>"Avg. Relevance Score: 0.92"</i> — a number this app cannot currently produce.
+      <b>Adding it is one key on an existing JSON column, not a migration.</b></div>
+
+    <div data-anno><b>⛔ Cut from screen 15:</b> the full "Document Content Viewer" pane rendering the
+      original file. The chunks <i>are</i> what the agent searches, so showing them is more honest than
+      showing a page image the retrieval path never sees — and the chunk text is already stored and already
+      returned by both search paths. <b>The chunk list costs one read endpoint and no schema.</b></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ UPLOAD — the front door. The operator could not find it, and that IS the finding.
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-u">
+  <div class="sheet">
+    <h2>⭐ Upload — the front door of the whole journey</h2>
+    <p class="lede">The operator's words: <i>"I did not see for example where I can upload documents."</i>
+      Today the control is a <b>small button in the top-right corner of a folder header</b>. The reference
+      opens on a full-width dropzone, and it is right to.</p>
+
+    <div class="page">
+      <div class="pagehead" data-block="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Ingestion</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist" data-block="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger" data-state="active">Ingestion</button>
+        <button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button>
+      </div>
+
+      <div class="subnav" data-block="subnav">
+        <button class="on">Add files</button><button>In progress</button>
+        <button>Needs attention</button><button>History</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="dropbig" data-block="dropbig">
+          <svg width="46" height="46" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+            <path d="M13 31a8 8 0 0 1-.9-15.9A11 11 0 0 1 33 17.2 7 7 0 0 1 34.5 31H29" stroke="var(--color-primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M23 38V22m0 0-5.5 5.5M23 22l5.5 5.5" stroke="var(--color-primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="d1">Drop files here</div>
+          <div class="d2">or</div>
+          <button class="btn">Choose files</button>
+          <div class="d3">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB</div>
+        </div>
+
+        <div data-block="folder-picker" style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.82rem;color:var(--color-text-muted)">
+          <span>Add to</span>
+          <span style="display:inline-flex;align-items:center;gap:7px;border:1px solid var(--color-border);border-radius:8px;padding:6px 11px;background:var(--color-surface)">📁 Engineering <span style="color:var(--color-text-dim)">▾</span></span>
+          <span style="color:var(--color-text-dim);font-size:11.5px">Everything you add here is searchable by the agent.</span>
+        </div>
+
+        <h3 class="sub" style="margin-top:26px">Where every file is right now</h3>
+        <div class="stagecards" data-block="stagecards">
+          <div class="scard">
+            <div class="sh"><span class="ico ok">✓</span> Reading</div>
+            <div class="sn">218</div><div class="sl">files read</div>
+            <div class="sbar"><i class="s-success" style="--w:100%"></i></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="scard">
+            <div class="sh"><span class="ico run">◐</span> Splitting</div>
+            <div class="sn">2</div><div class="sl">being split now</div>
+            <div class="sbar"><i class="s-primary" style="--w:64%;animation-delay:.06s"></i></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="scard">
+            <div class="sh"><span class="ico run">◐</span> Indexing</div>
+            <div class="sn">1</div><div class="sl">being indexed now</div>
+            <div class="sbar"><i class="s-violet" style="--w:38%;animation-delay:.12s"></i></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="scard">
+            <div class="sh"><span class="ico idle">·</span> Labelling</div>
+            <div class="sn">0</div><div class="sl">waiting</div>
+            <div class="sbar"><i class="s-dim" style="--w:0%;animation-delay:.18s"></i></div>
+          </div>
+        </div>
+
+        <div data-anno><b>⭐ This row is the reference's screen 07, and it is honest.</b> A count of
+          documents currently at each stage is a real aggregate we can produce today from the step every
+          document already carries. <b>⛔ Its "Token Usage Overview" pie chart is not</b> — ingestion token
+          accounting does not exist, so those four slices would be invented.</div>
+
+        <h3 class="sub">The queue</h3>
+        <div class="card">
+          <table class="doclist" data-block="queue">
+            <thead><tr><th>File</th><th style="width:42%">Stage</th><th>Folder</th><th>Size</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="fn">supplier_terms_2026.pdf</td>
+                <td><div class="stages"><span class="stg done">Read</span><span class="stg done">Split</span><span class="stg done">Index</span><span class="stg now">Tbl</span><span class="stg todo">Img</span><span class="stg todo">Label</span></div></td>
+                <td class="num">Engineering</td><td class="num">840 KB</td>
+                <td style="text-align:right"><span style="color:var(--color-text-dim);cursor:pointer">✕</span></td>
+              </tr>
+              <tr>
+                <td class="fn">meeting_notes.txt</td>
+                <td><div class="stages"><span class="stg done">Read</span><span class="stg done">Split</span><span class="stg now">Index</span><span class="stg skip">Tbl</span><span class="stg skip">Img</span><span class="stg todo">Label</span></div></td>
+                <td class="num">Engineering</td><td class="num">14 KB</td>
+                <td style="text-align:right"><span style="color:var(--color-text-dim);cursor:pointer">✕</span></td>
+              </tr>
+              <tr>
+                <td class="fn">board_deck_jan.pptx</td>
+                <td><div class="stages"><span class="stg todo">Read</span><span class="stg todo">Split</span><span class="stg todo">Index</span><span class="stg todo">Tbl</span><span class="stg todo">Img</span><span class="stg todo">Label</span></div>
+                    <div style="font-size:11px;color:var(--color-text-dim);margin-top:4px">Waiting its turn</div></td>
+                <td class="num">Marketing</td><td class="num">45.2 MB</td>
+                <td style="text-align:right"><span style="color:var(--color-text-dim);cursor:pointer">✕</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">Needs attention</h3>
+        <div class="card">
+          <table class="doclist" data-block="needs-attention">
+            <tbody>
+              <tr>
+                <td class="fn">legacy_export.csv</td>
+                <td><span class="badge danger"><span class="dot"></span>Failed</span>
+                    <div style="font-size:11px;color:var(--color-text-dim);margin-top:4px">The file had a character we could not store.</div></td>
+                <td class="num">12.4 MB</td>
+                <td style="text-align:right"><button class="btn ghost">Try again</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div data-anno><b>⛔ The reference's per-file upload percentages are drawn as STAGES here, and that
+      is a measurement not a preference.</b> <code>DocumentUpload.tsx</code> reports only
+      <i>"Uploading N files…"</i> — there is <b>no</b> <code>onUploadProgress</code> anywhere in the upload
+      path, so a percentage bar would be a number the client cannot know. <b>Either the upload gains real
+      progress reporting, or the queue shows stages. It shows stages.</b></div>
+
+    <div data-anno><b>⚠ The accepted formats above are MEASURED from the file input, not guessed:</b>
+      <code>.txt .md .pdf .docx .pptx .xlsx .csv .epub</code>. ⚠ <b>Outlook messages are NOT among
+      them</b>, although one has reached ingestion in this project and failed there. <b>A dropzone that
+      lists a format the input rejects sends the user to a dead end</b> — so the line states the real set,
+      and widening it is a decision for the plan, not a caption.</div>
+
+    <div data-anno><b>⛔ Cut from screens 03 and 08:</b> the per-file <i>Confidentiality</i> toggle
+      (sharing is a folder property, not a per-upload one — setting it here would contradict the folder it
+      lands in) and the <b>S3 / Google Drive connector cards</b> (<code>SEED-142</code>; ingestion is manual
+      upload only, and whoever ships a connector changes that rule in the same commit).</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ WHAT WE ALREADY STORE AND NEVER SHOW
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-x">
+  <div class="sheet">
+    <h2>⭐ What we already store and never show</h2>
+    <p class="lede">The operator's instinct — <i>"we have a lot of things that we can show but it is
+      hidden and buried"</i> — measured against the live schema and a grep of the frontend.
+      <b>Six columns are written for every document and reach no screen at all.</b></p>
+
+    <div class="card" data-meta>
+      <table class="audit">
+        <thead><tr><th>stored today</th><th>shown?</th><th>what it would give the user</th></tr></thead>
+        <tbody>
+          <tr><td class="c">documents.full_markdown</td><td class="no">no — 0 refs</td>
+              <td>⭐ <b>The whole parsed text of every file.</b> The reference's "Document Content Viewer" is buildable with no new extraction at all.</td></tr>
+          <tr><td class="c">document_tables.headers + .rows</td><td class="no">count only</td>
+              <td>The extracted tables <b>as tables</b>. We store real cell data and render the number <i>3</i>.</td></tr>
+          <tr><td class="c">document_images.description</td><td class="no">count only</td>
+              <td>A written description of every figure — <b>what the agent actually reads</b> where a person sees a picture.</td></tr>
+          <tr><td class="c">documents.extractor</td><td class="no">no</td>
+              <td>Which engine parsed this file. <b>The first thing you want when an extraction looks wrong.</b></td></tr>
+          <tr><td class="c">document_chunks.embedding_model</td><td class="no">no</td>
+              <td>Which chunks are still on the old model mid-re-embed — the honest answer to <i>"is search caught up yet?"</i></td></tr>
+          <tr><td class="c">the recorded question text</td><td class="no">aggregate only</td>
+              <td>⭐ <b>The actual questions that found this document.</b> Already written on every search.</td></tr>
+          <tr><td class="c">table page · image bbox</td><td class="no">no</td>
+              <td>Where in the document each element came from.</td></tr>
+          <tr><td class="c">document_relationships</td><td class="yes">yes</td>
+              <td>supersedes / amends / references / attached_to — already in the panel.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div data-anno><b>⚠ This is not a feature request — it is a rendering gap over data that already
+      exists.</b> Nothing in this table needs a migration, a new extraction pass, or a provider call.
+      It is the cheapest richness available anywhere in this redesign, and it is what makes the
+      document detail deeper than the reference's.</div>
+
+    <h3 class="sub">Rendered — the same document, with the buried facts shown</h3>
+    <div class="sxs">
+      <div>
+        <p class="caption">extracted tables · stored, never rendered</p>
+        <div class="card"><div class="cardbody" style="padding:12px">
+          <div style="font-family:var(--font-mono);font-size:9.5px;color:var(--color-text-dim);margin-bottom:7px;letter-spacing:.04em">TABLE 1 · PAGE 4</div>
+          <table class="xtable">
+            <thead><tr><th>Region</th><th>Q3</th><th>Q4</th></tr></thead>
+            <tbody>
+              <tr><td>EMEA</td><td>1.24M</td><td>1.51M</td></tr>
+              <tr><td>AMER</td><td>2.08M</td><td>2.11M</td></tr>
+              <tr><td>APAC</td><td>0.62M</td><td>0.88M</td></tr>
+            </tbody>
+          </table>
+        </div></div>
+      </div>
+      <div>
+        <p class="caption">image descriptions · stored, never rendered</p>
+        <div class="card"><div class="cardbody" style="padding:12px">
+          <div class="figrow"><div class="figbox">▤</div><div>
+            <div class="fmeta">FIGURE 1 · PAGE 2</div>
+            <p>A system diagram showing the retrieval path isolated behind one interface, with the embedding provider on the far side of it.</p></div></div>
+          <div class="figrow"><div class="figbox">▤</div><div>
+            <div class="fmeta">FIGURE 2 · PAGE 7</div>
+            <p>A bar chart comparing search results before and after the chunk-overlap change, over six weeks.</p></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <h3 class="sub">And the question list — already written on every search</h3>
+    <div class="card">
+      <header><h4>Questions that found this document</h4><p class="hsub">48 times in 30 days</p></header>
+      <div class="cardbody" style="padding:6px 16px 12px">
+        <div class="insight"><span class="ic">⌕</span><span class="lab" style="font-family:var(--font-mono);font-size:.74rem">"What are the Q4 performance benchmarks?"</span><span class="val">12×</span></div>
+        <div class="insight"><span class="ic">⌕</span><span class="lab" style="font-family:var(--font-mono);font-size:.74rem">"How is the retrieval path isolated?"</span><span class="val">9×</span></div>
+        <div class="insight"><span class="ic">⌕</span><span class="lab" style="font-family:var(--font-mono);font-size:.74rem">"chunk overlap rationale"</span><span class="val">7×</span></div>
+        <div class="insight"><span class="ic">⌕</span><span class="lab" style="font-family:var(--font-mono);font-size:.74rem">"EMEA Q4 revenue"</span><span class="val">4×</span></div>
+      </div>
+    </div>
+    <div data-anno><b>⭐ Nothing here is new data.</b> Every search the agent runs already writes the
+      question and the documents it returned. <b>The list is a GROUP BY over rows we have kept all
+      along</b> — and it answers the one question a person actually has about a document in a knowledge
+      base: <i>what is this thing being used for?</i></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     ⭐ SOURCES — connected cloud storage. Operator direction, 2026-08-28.
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-s">
+  <div class="sheet">
+    <h2>⭐ Sources — a connected drive that feeds the Library</h2>
+    <p class="lede">Operator: <i>"we need to have connectors with the cloud storage, to and from, based on
+      a specific event or trigger… somewhere I remember we discussed this for this milestone."</i>
+      <b>You did — it is <code>SEED-142</code>, and this milestone is where it becomes reachable.</b></p>
+
+    <div class="page">
+      <div class="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span><a>Ingestion</a><span class="sep">›</span>Sources</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger">Views</button>
+        <button class="tabtrigger" data-state="active">Ingestion</button>
+        <button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button>
+      </div>
+      <div class="subnav">
+        <button>Add files</button><button class="on">Sources</button>
+        <button>In progress</button><button>Needs attention</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="card">
+          <header>
+            <div><h4>Connected sources</h4><p class="hsub">Folders the agent keeps reading, on a schedule.</p></div>
+            <button class="btn ghost">Connect a source</button>
+          </header>
+
+          <div class="srow">
+            <div class="smark" style="color:#4285f4">▲</div>
+            <div class="sbody">
+              <div class="stitle">Google Drive · <span class="sacct">fhdmrd@gmail.com</span></div>
+              <div class="smeta"><code>/Shared drives/Engineering/Specs</code> → 📁 Engineering</div>
+              <div class="smeta2">PDF · DOCX · PPTX &nbsp;·&nbsp; checked every 15 minutes &nbsp;·&nbsp; last checked 4 min ago</div>
+            </div>
+            <div class="sstat"><b>218</b><span>added</span></div>
+            <div class="sstat"><b>2</b><span>failed</span></div>
+            <div><span class="badge success"><span class="dot"></span>Watching</span></div>
+            <div class="sact">⋯</div>
+          </div>
+
+          <div class="srow">
+            <div class="smark" style="color:#0364b8">▣</div>
+            <div class="sbody">
+              <div class="stitle">OneDrive · <span class="sacct">contracts@acme.com</span></div>
+              <div class="smeta"><code>/Contracts/2026</code> → 📁 HR Policies</div>
+              <div class="smeta2">PDF only &nbsp;·&nbsp; checked every hour &nbsp;·&nbsp; last checked 22 min ago</div>
+            </div>
+            <div class="sstat"><b>41</b><span>added</span></div>
+            <div class="sstat"><b>0</b><span>failed</span></div>
+            <div><span class="badge dim"><span class="dot"></span>Paused</span></div>
+            <div class="sact">⋯</div>
+          </div>
+
+          <div class="srow">
+            <div class="smark" style="color:var(--color-danger)">▲</div>
+            <div class="sbody">
+              <div class="stitle">Google Drive · <span class="sacct">old-admin@acme.com</span></div>
+              <div class="smeta"><code>/Marketing/Collateral</code> → 📁 Marketing</div>
+              <div class="smeta2 warn">Its permission expired 3 days ago. Nothing has been read since.</div>
+            </div>
+            <div class="sstat"><b>—</b><span>added</span></div>
+            <div class="sstat"><b>—</b><span>failed</span></div>
+            <div><span class="badge danger"><span class="dot"></span>Needs reconnecting</span></div>
+            <div class="sact"><button class="btn ghost" style="font-size:.74rem;padding:4px 10px">Reconnect</button></div>
+          </div>
+        </div>
+
+        <div data-anno><b>⚠ The third row is the one that earns this screen.</b> A source that has silently
+          stopped reading is <b>indistinguishable from a source with nothing new</b> — and unlike a manual
+          upload, <b>nobody is standing there to notice.</b> It states when it stopped and what that means
+          in a sentence, and it is the only row offering an action. <b>Silence is not success</b> applies
+          harder to a connector than to anything else in this product.</div>
+
+        <h3 class="sub">What a source brings in — before it brings it in</h3>
+        <div class="card">
+          <header><div><h4>First read · Google Drive</h4>
+            <p class="hsub">Nothing has been added yet. This is what it would add.</p></div>
+            <div style="display:flex;gap:8px"><button class="btn ghost">Change what it watches</button><button class="btn">Add these 218</button></div>
+          </header>
+          <div class="cardbody" style="padding:14px 16px">
+            <div class="legend" style="padding:0 0 10px">
+              <span class="li"><span class="sw s-primary"></span>will be added <b>218</b></span>
+              <span class="li"><span class="sw s-warning"></span>already here <b>34</b></span>
+              <span class="li"><span class="sw s-dim"></span>type not supported <b>96</b></span>
+            </div>
+            <div class="stackbar">
+              <i class="s-primary" style="--w:63%"></i><i class="s-warning" style="--w:10%;animation-delay:.08s"></i><i class="s-dim" style="--w:27%;animation-delay:.16s"></i>
+            </div>
+            <p style="font-size:11.5px;color:var(--color-text-dim);margin:12px 0 0;line-height:1.6">
+              The 34 already here were matched by content, not by name — the same file uploaded by hand
+              will not be added twice.</p>
+          </div>
+        </div>
+
+        <div data-anno><b>⭐ A dry run is not a nicety here, it is the safety property.</b> Manual upload is
+          self-limiting: a person picks the files. A connected drive can put <b>thousands</b> of documents
+          into the thing the agent answers from, and <i>every one of them changes what the agent says</i>.
+          <b>Showing the shape of the import before it happens is the difference between a feature and an
+          accident.</b> ⚠ The dedupe arm is real, not aspirational — every document already stores a
+          content hash, so "already here" is a lookup rather than a guess.</div>
+
+        <h3 class="sub">What it is allowed to do</h3>
+        <div class="card"><div class="cardbody">
+          <div class="grantrow"><span class="gname">See the file list</span><span class="badge success"><span class="dot"></span>Allowed</span></div>
+          <div class="grantrow"><span class="gname">Read a file's contents</span><span class="badge success"><span class="dot"></span>Allowed</span></div>
+          <div class="grantrow"><span class="gname">Write a file back to the drive</span><span class="badge dim"><span class="dot"></span>Not allowed</span></div>
+          <div class="grantrow"><span class="gname">Delete a file on the drive</span><span class="badge dim"><span class="dot"></span>Not allowed</span></div>
+        </div></div>
+
+        <div data-anno><b>⭐ This list is not new machinery — it is the milestone's own model, rendered.</b>
+          A connection is <i>{service identity, auth, discovered tools, per-tool grants}</i>, so a drive is
+          <b>rows, not code</b>: the same per-tool consent that already governs every other service governs
+          this one. <b>Two-way is a GRANT, not a separate feature</b> — the operator's "to and from" is the
+          third row being switched on, and it inherits the approval model rather than inventing one.</div>
+
+        <div data-anno><b>⚠ Two rules this screen encodes, and both are deliberate.</b>
+          <b>(1) "Connect a source" leaves for Settings › Connections.</b> It does not collect a credential
+          here. A credential form on an ingestion screen is a new outbound trust surface with no prior
+          review cycle — the same reason the describe door refused to grow one.
+          <b>(2) A file removed from the drive is NOT removed from the Library</b> unless the person asks
+          for that explicitly. A revoked share or a moved folder would otherwise <b>silently delete
+          knowledge the agent depends on</b>, and the person who lost it never chose to.</div>
+
+        <div data-anno><b>⚠ The words are "checked every 15 minutes", never "instantly" or "on change".</b>
+          The scheduler this rides on runs on a cron or an interval — <b>there is no change feed and no
+          webhook</b>. Saying "as soon as a document appears" would promise a mechanism that does not
+          exist. When a delta cursor or a webhook lands, <b>the sentence changes in the same commit.</b></div>
+      </div>
+    </div>
+
+    <h3 class="sub">⭐ What this actually costs — re-measured 2026-08-28, and it is far less than the seed says</h3>
+    <div class="card" data-meta>
+      <table class="audit">
+        <thead><tr><th>what auto-ingest needs</th><th>state</th><th>where</th></tr></thead>
+        <tbody>
+          <tr><td class="c">a scheduler</td><td class="yes">✅ SHIPPED</td>
+              <td><code>scheduler_service.py</code> + <code>workflow_schedules</code> (cron, interval, timezone, active, budgets). ⚠ <b><code>SEED-142</code> says "none exists" — that claim is now STALE.</b></td></tr>
+          <tr><td class="c">OAuth</td><td class="yes">✅ IN THIS MILESTONE</td>
+              <td>Phase <b>215 · BYO OAuth</b> — token / refresh / expiry / scope / account identity.</td></tr>
+          <tr><td class="c">a read capability</td><td class="yes">✅ SHIPPED</td>
+              <td>v3.8's MCP client — any official server, per-tool consent, <b>zero per-vendor adapter code</b>.</td></tr>
+          <tr><td class="c">per-tool grants</td><td class="yes">✅ THIS MILESTONE</td>
+              <td>the whole point of v3.9 — a connection is rows, not code.</td></tr>
+          <tr><td class="c">per-file dedupe</td><td class="yes">✅ SHIPPED</td>
+              <td><code>documents.content_hash</code>, plus <code>version_number</code> / <code>is_latest</code> for re-ingest-on-change.</td></tr>
+          <tr><td class="c">a failure surface for documents nobody chose to upload</td><td class="yes">✅ designed here</td>
+              <td>the <i>Needs attention</i> list and the source's own state row.</td></tr>
+          <tr><td class="c"><b>change detection (delta cursor / webhook)</b></td><td class="no">⛔ MISSING</td>
+              <td>the real gap. Until it exists the schedule polls, and <b>the UI must say so.</b></td></tr>
+          <tr><td class="c"><b>external folder → our folder mapping</b></td><td class="no">⛔ MISSING</td>
+              <td>net-new config, drawn above as <code>path → 📁 folder</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div data-anno><b>⚠ SEED-142 lists five blockers for auto-ingest and FOUR OF THEM HAVE SINCE SHIPPED.</b>
+      It was written 2026-08-08, before v3.8 delivered both the scheduler and the MCP client, and before
+      v3.9 put OAuth and per-tool grants on the board. <b>Its verdict — "nothing about that is buildable"
+      — is out of date, and a planner reading it today would defer work that is now mostly substrate
+      that already exists.</b> The seed needs this measurement written back into it.</div>
+
+    <div data-anno><b>⚠ And it fires a standing rule.</b> <code>CLAUDE.md</code> still reads <i>"Ingestion
+      is manual file upload only — no connectors or automated pipelines"</i>, marked <b>dated, not
+      permanent</b>, with the instruction that <b>whoever ships the first sync connector changes that rule
+      in the same commit.</b> This design is that trigger. It must not ship with the rule left standing.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     TAB 2 — VIEWS & COLLECTIONS (the gap variant A creates)
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-v">
+  <div class="sheet">
+    <h2>Views &amp; Collections — tab 2</h2>
+    <p class="lede">⚠ <b>This tab had no design until now.</b> The sketch argued for dropping it; variant A
+      keeps it, so it needs content of its own — otherwise it is the sidebar again with more clicks.</p>
+
+    <div class="page">
+      <div class="pagehead" data-block="pagehead">
+        <p class="crumbs"><a>Library</a><span class="sep">›</span>Views</p>
+        <h1>Library</h1><p class="pagesub">What the agent can read, and how well it reads it.</p>
+      </div>
+      <div class="tabslist" data-block="tabslist">
+        <button class="tabtrigger">Documents</button><button class="tabtrigger" data-state="active">Views</button>
+        <button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button>
+        <button class="tabtrigger">Health</button>
+      </div>
+
+      <div style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <p style="margin:0;font-size:.82rem;color:var(--color-text-muted)">A view is a saved question about your library. The sidebar switches between them; this is where they are made and compared.</p>
+          <button class="btn">New view</button>
+        </div>
+
+        <div class="vgrid" data-block="vgrid">
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Needs review</span><span class="vcount">8</span></div>
+            <div class="vrule">type is <b>contract</b> · added in the <b>last 30 days</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:6%"></i></div>
+            <div class="vfoot"><span>8 of 224 documents</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Recently added</span><span class="vcount">34</span></div>
+            <div class="vrule">added in the <b>last 7 days</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:15%;animation-delay:.05s"></i></div>
+            <div class="vfoot"><span>34 of 224 documents</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard">
+            <div class="vhead"><span class="vname">Contracts <span class="gpill">G</span></span><span class="vcount">19</span></div>
+            <div class="vrule">type is <b>contract</b></div>
+            <div class="vbar"><i class="s-primary" style="--w:8%;animation-delay:.1s"></i></div>
+            <div class="vfoot"><span>Built in · shared with everyone</span><span class="vact">⋯</span></div>
+          </div>
+          <div class="vcard vempty">
+            <div class="vhead"><span class="vname">Q3 board pack</span><span class="vcount vzero">0</span></div>
+            <div class="vrule">folder is <b>Marketing</b> · type is <b>report</b> · added <b>after 1 Jul</b></div>
+            <div class="vbar"><i class="s-dim" style="--w:1%;animation-delay:.15s"></i></div>
+            <div class="vfoot"><span class="warn">Matches nothing right now</span><span class="vact">⋯</span></div>
+          </div>
+        </div>
+
+        <div data-anno><b>⭐ The fourth card is what makes this a tab rather than a list.</b> A saved view
+          that has quietly stopped matching anything is invisible in a sidebar — it just shows
+          <code>0</code> beside a name, next to seven other names. <b>Here it is a card that says
+          <i>"Matches nothing right now"</i></b>, and the rule that produced the nothing is on its face.
+          A view is a saved question; <b>a question with no answers is worth seeing.</b></div>
+
+        <div data-anno><b>⚠ THE BUILD CONSTRAINT variant A creates, and it is the reason the sketch
+          argued the other way.</b> Views now render in <b>two places</b> — this tab and the Documents
+          sidebar. <b>One source of truth, two renderings.</b> Selecting a view here must select it there;
+          a second piece of selection state is the defect this shape invites, and it will not announce
+          itself — the two lists will simply disagree.</div>
+
+        <h3 class="sub">⛔ What is NOT drawn here, and why</h3>
+        <div data-anno><b>The reference's "collection search-quality score" (screen 10) is cut.</b> A score
+          per collection needs enough retrieval history per collection to be honest, and a number that
+          means nothing until week three is worse than no number in week one. <b>It re-opens when the
+          Health tab has real history</b> — the seed already carries that trigger.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     CHUNKING — reference screen 900d
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-c">
+  <div class="sheet">
+    <h2>Chunking — what the agent actually searches, and why it is cut that way</h2>
+    <p class="lede">The reference's screen 4, which the first pass skipped entirely. Its strongest idea is
+      the <b>left pane: the original text with the chunk boundaries drawn on it.</b></p>
+
+    <div class="sxs">
+      <div>
+        <p class="caption">the source, with the cuts shown</p>
+        <div class="card"><div class="cardbody" style="padding:14px">
+          <p class="ck ck1">The system architecture uses a service-per-domain split, with the retrieval
+            path isolated behind a single interface so the embedding provider can be replaced without
+            touching callers.</p>
+          <p class="ck ck2">Each document is chunked on paragraph boundaries with an overlap, which keeps
+            a definition and its example in the same chunk more often than a fixed window does.</p>
+          <p class="ck ck1">Retrieval runs two arms — a vector search and a keyword search — and merges
+            them, so an exact term still matches when the embedding does not.</p>
+        </div></div>
+        <div data-anno><b>The overlap is why the shading interleaves.</b> A reader who has ever wondered
+          <i>"why did it find that paragraph and not this one"</i> gets the answer from this pane alone.</div>
+      </div>
+      <div>
+        <p class="caption">how it is cut today</p>
+        <div class="card"><div class="cardbody">
+          <div class="kv"><span class="k">Chunk size</span><span class="v">1000 characters</span></div>
+          <div class="kv"><span class="k">Overlap</span><span class="v">200 characters</span></div>
+          <div class="kv"><span class="k">Split on</span><span class="v">paragraph boundaries</span></div>
+          <div class="kv"><span class="k">Applies to</span><span class="v">every new document</span></div>
+          <p style="font-size:11.5px;color:var(--color-text-dim);margin:12px 0 0;line-height:1.6">
+            Changing these re-splits and re-indexes everything. Search keeps working on the old chunks
+            until it finishes.</p>
+        </div></div>
+        <div data-anno><b>⚠ CHARACTERS, NOT TOKENS — and the reference says tokens.</b>
+          <code>chunk_size = 1000</code> / <code>chunk_overlap = 200</code> are character counts.
+          Drawing a "512 tokens" slider would be a <b>units lie</b>: the number would not mean what the
+          system does with it, and a person tuning it would be tuning something else.</div>
+        <div data-anno><b>⚠ And these are ENV/CONFIG values today, not settings.</b> They live in
+          <code>config.py</code>, not in <code>user_settings</code> / <code>app_settings</code> — which
+          <b>collides with the standing rule</b> that <i>settings live in the Settings UI; env vars are
+          for secrets and infra only</i>. Chunk size is a behaviour knob, not infrastructure.
+          <b>Surfacing it as a control means moving it first</b> — which is a real task, not a render.</div>
+      </div>
+    </div>
+
+    <div data-anno><b>⛔ The reference's live "Preview" with sliders is NOT drawn as shipping v1.</b>
+      Re-chunking on a slider drag implies a preview path that re-runs the splitter on demand; that is
+      buildable (the splitter is pure, and the parsed text is already stored) but it is <b>a feature, not
+      a rendering of existing state</b>. Drawn here as the read-only truth first — <b>see how it is cut
+      before you are offered a knob to change it.</b></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════
+     FINDINGS
+     ══════════════════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-f">
+  <div class="sheet">
+    <h2>⚠ findings — two things only a rendered sketch could catch</h2>
+
+    <h3 class="sub">1 · the shipped tab bar INVERTS between themes</h3>
+    <p class="lede">Every reference image draws the selected tab as a lighter, raised chip. The shipped
+      <code>Tabs</code> primitive does that in light mode and the <b>opposite</b> in dark.</p>
+
+    <div class="card" data-meta style="padding:18px">
+      <table class="checks" style="max-width:660px">
+        <thead><tr><th>theme</th><th>track <code>bg-muted</code></th><th>active <code>bg-background</code></th><th>reads as</th></tr></thead>
+        <tbody>
+          <tr><td class="q">light</td><td class="rk">94% L</td><td class="rk">97% L</td><td>lighter <b style="color:var(--color-success)">(+3)</b> — a raised chip ✅</td></tr>
+          <tr><td class="q">Deep Midnight</td><td class="rk">11% L</td><td class="rk">4% L</td><td>darker <b style="color:var(--color-danger)">(−7)</b> — a hole ⚠</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sxs" style="margin-top:16px">
+      <div>
+        <p class="caption">arm 1 · the shipped classes, unchanged</p>
+        <div class="tabslist"><button class="tabtrigger" data-state="active">Documents</button><button class="tabtrigger">Views</button><button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button></div>
+        <div data-anno style="border-color:var(--color-danger)"><b>The selected tab is the darkest thing in
+          the control.</b> Its only other cue is <code>shadow-sm</code> — a 5%-opacity black shadow, which is
+          <b>invisible on a 4%-lightness surface</b>.</div>
+      </div>
+      <div>
+        <p class="caption">arm 2 · one added ring, nothing else changed</p>
+        <div class="tabslist remedy"><button class="tabtrigger" data-state="active">Documents</button><button class="tabtrigger">Views</button><button class="tabtrigger">Ingestion</button><button class="tabtrigger">Indexing</button><button class="tabtrigger">Health</button></div>
+        <div data-anno><b>Colour is not the only carrier.</b> ⚠ This changes a <b>shared shadcn primitive</b> —
+          Settings and Library Health mount the same component, so it lands on three surfaces at once.</div>
+      </div>
+    </div>
+
+    <h3 class="sub">2 · the ingestion pipeline has SIX stages, not three</h3>
+    <div class="sxs">
+      <div>
+        <p class="caption">⛔ what the reference draws — three</p>
+        <div class="card" style="padding:18px"><div class="stages"><span class="stg done">Parse</span><span class="stg now">Chunk</span><span class="stg todo">Embed</span></div></div>
+        <div data-anno style="border-color:var(--color-danger)"><b>It drops labelling entirely</b> and
+          collapses three distinct extract phases into one. A file being labelled right now has
+          <i>no segment to be in</i>.</div>
+      </div>
+      <div>
+        <p class="caption">✅ what the pipeline actually writes — six</p>
+        <div class="card" style="padding:18px"><div class="stages"><span class="stg done">Read</span><span class="stg done">Split</span><span class="stg done">Index</span><span class="stg done">Tbl</span><span class="stg now">Img</span><span class="stg todo">Label</span></div></div>
+        <div data-anno>Measured from the write sites in the ingestion path; the term map already carries a
+          plain label for every one. <b>Zero schema, zero backend — a render change only,</b> and the
+          cheapest honest win in the whole redesign.</div>
+      </div>
+    </div>
+
+    <div data-anno style="margin-top:22px"><b>⭐ Both findings are why step 3 exists.</b> A generative tool
+      drew a light-mode chip on a dark background — a shape the shipped component <i>cannot</i> produce —
+      and it looked right. <b>Rendering the real classes and reading the real pipeline is the only thing
+      that could have caught either</b>, and it is exactly the <code>SEED-155</code> failure mode: an
+      approved mockup drawing an atom the build does not render.</div>
+  </div>
+</section>
+
+<script>
+// ── the chart series are FIXED, never random: a sketch whose chart changes on every load
+//    cannot be an acceptance bar, and a reviewer cannot tell a rendering bug from noise.
+var SERIES = [4,7,11,5,14,22,9,27,6,17,24,31,18,8,29,38,21,12,26,15,35,44,30,19,10,23,41,16,28,25]
+var SERIES_D = [3,6,4,9,7,12,8,5]
+// the miss series — searches that came back empty on that day.
+var MISS = [1,0,2,0,3,1,0,4,1,0,2,3,0,1,5,2,0,1,3,0,2,4,1,0,2,1,3,0,2,1]
+// ⚠ the outage series — searches that could not run at all. Two consecutive days.
+var ERR  = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,2,0,0,0,0,0,0]
+
+// ⭐ EVERY BAR IS TWO SEGMENTS: searches that found something, and searches that found
+// nothing. MISS[] is the second series — a search returning zero documents still writes its
+// row, so this needs no new data and no new write. It is the one fact nobody can see today.
+function fill(el, data, max, miss, err) {
+  if (!el || el.childElementCount) return
+  data.forEach(function (v, i) {
+    var m = miss ? miss[i] || 0 : 0
+    var e = err ? err[i] || 0 : 0
+    var b = document.createElement("div")
+    b.className = "bar"
+    b.style.height = Math.round((v / max) * 100) + "%"
+    b.style.animationDelay = (i * 0.018).toFixed(3) + "s"
+    var label = String(v)
+    if (m > 0) label += " · " + m + " found nothing"
+    if (e > 0) label += " · " + e + " could not search"
+    b.setAttribute("data-v", label)
+    var hit = document.createElement("span"); hit.className = "hit"
+    b.appendChild(hit)
+    if (m > 0) {
+      var ms = document.createElement("span"); ms.className = "miss"
+      ms.style.height = Math.round((m / v) * 100) + "%"
+      b.appendChild(ms)
+    }
+    if (e > 0) {
+      var es = document.createElement("span"); es.className = "err"
+      es.style.height = Math.round((e / v) * 100) + "%"
+      b.appendChild(es)
+    }
+    el.appendChild(b)
+  })
+}
+fill(document.getElementById("chart-h"), SERIES, 50, MISS, ERR)
+fill(document.getElementById("chart-d"), SERIES_D, 12)
+
+// ── replay the entrance animation each time a variant is shown, so the charts are seen
+//    animating rather than only on first load.
+function play(section) {
+  section.classList.remove("is-live")
+  void section.offsetWidth   // force reflow so the animation restarts
+  section.classList.add("is-live")
+}
+play(document.getElementById("v-a"))
+
+document.querySelectorAll("#variant-nav .variant-tab").forEach(function (b) {
+  b.addEventListener("click", function () {
+    document.querySelectorAll("#variant-nav .variant-tab").forEach(function (x) { x.classList.remove("active") })
+    document.querySelectorAll(".variant").forEach(function (x) { x.classList.remove("active") })
+    b.classList.add("active")
+    var sec = document.getElementById("v-" + b.dataset.v)
+    sec.classList.add("active")
+    play(sec)
+    window.scrollTo(0, 0)
+  })
+})
+
+// ── the tab bars and chips are real controls, not pictures
+document.querySelectorAll(".tabslist").forEach(function (list) {
+  list.querySelectorAll(".tabtrigger").forEach(function (t) {
+    t.addEventListener("click", function () {
+      list.querySelectorAll(".tabtrigger").forEach(function (x) { x.removeAttribute("data-state") })
+      t.setAttribute("data-state", "active")
+    })
+  })
+})
+document.querySelectorAll(".chiprow").forEach(function (row) {
+  row.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () {
+      row.querySelectorAll(".chip").forEach(function (x) { x.classList.remove("on") })
+      c.classList.add("on")
+    })
+  })
+})
+</script>
+</body>
+</html>

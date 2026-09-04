@@ -413,6 +413,17 @@ export interface PostMessageConnectionConfig {
  *  with no secret was accepted). Keep this a declared shape here for the same reason. */
 export interface McpConnectionConfig {
   headers?: Record<string, string>
+  /** Phase 222 — the client id an MCP authorization server issued us, either under RFC 7591
+   *  dynamic registration or brought by the operator.
+   *
+   *  ⚠ AN ID, NEVER A SECRET. Migration 150's rule holds: the secret lives encrypted in
+   *  `oauth_client_secret_ciphertext`, out of a column every org member can SELECT.
+   *
+   *  ⚠ THIS MIRROR WAS MISSED WHEN THE SERVER MODEL GAINED THE FIELD (`29152a983`), and the
+   *  gap is what made `McpAuthDoor.test.tsx` unable to state a fixture the backend accepts.
+   *  A wire type that has drifted from its model does not fail — it just refuses to describe
+   *  reality. */
+  custom_client_id?: string | null
 }
 
 export type ConnectorConnectionConfig =
@@ -425,6 +436,29 @@ export interface McpDiscoveredTool {
   name: string
   description?: string
   inputSchema?: Record<string, unknown>
+  /**
+   * Phase 211 (D-211-09) — the tool's human-readable label, forwarded by `mcp_client.py`'s
+   * sanitizer since plan 211-01 widened its ALLOW-LIST by exactly these two keys.
+   *
+   * ⚠ OPTIONAL, AND ITS ABSENCE IS MEANINGFUL RATHER THAN EMPTY. The sanitizer coerces with
+   * `str(...).strip()` and contributes NO key at all when the server sent a blank or a
+   * non-string, so `name` stays a reachable fallback. A `title: ""` would have made every
+   * label renderer choose between an empty string and a truthiness check.
+   */
+  title?: string
+  /**
+   * Phase 211 (D-211-09) — the tool's declared OUTPUT schema, when the server publishes one.
+   *
+   * ⚠ NEVER DEFAULTED, on either side. The MCP specification makes `outputSchema` optional
+   * while `inputSchema` is mandatory, so an absent value means *"this server did not say"* and
+   * an invented `{}` would mean *"this tool returns nothing"* — two different facts. Phase 214
+   * reads it for argument satisfiability and needs to tell them apart.
+   */
+  outputSchema?: Record<string, unknown>
+  /**
+   * Phase 213 (GRANT-01) — tool read-only annotation if declared by server.
+   */
+  readOnlyHint?: boolean
   /**
    * Phase 209 (SC#2) — the tool's own MCP `annotations` object, forwarded verbatim by
    * `mcp_client.py`'s sanitizer when the server sends one.
@@ -439,6 +473,26 @@ export interface McpDiscoveredTool {
     readOnlyHint?: boolean
     [key: string]: unknown
   }
+  /**
+   * Phase 221 (D-221-07) — which APPLICATION this action belongs to, when the service has
+   * more than one. Google Workspace is one connection and one token covering six:
+   * `drive` | `gmail` | `sheets` | `docs` | `calendar` | `contacts`.
+   *
+   * ⚠ **THIS IS NOT `capability`, AND THAT DISTINCTION IS THE WHOLE DECISION.**
+   * `extra_descriptors_for_service` STRIPS `capability`, `http_method`, `path`,
+   * `api_method` and `writes` on purpose — *"they are ours, they are not part of any tool
+   * contract"* — and un-stripping `capability` to obtain the grouping would have shipped
+   * `googleapis.com` hosts and HTTP verbs to every picker and grant list in the product.
+   * `app` names a PRODUCT and carries no host, no path and no method.
+   *
+   * ⚠ **OPTIONAL, AND ITS ABSENCE IS MEANINGFUL RATHER THAN EMPTY.** The server omits the
+   * key entirely for a single-product service (GitHub, Jira, Notion, every MCP server)
+   * rather than sending `null`, so there is exactly ONE absent-shape for a consumer to
+   * handle. `groupToolsByApplication` reads absence as *"one unnamed application"* and
+   * renders a single collapsed group — which is how the same component draws the
+   * Rovo-shaped screen (D-221-09).
+   */
+  app?: string
 }
 
 /** What a client is allowed to learn about a connection.
@@ -454,15 +508,38 @@ export interface McpDiscoveredTool {
  *  `last_check_verdict` is a QUALITY HINT the picker renders (UI-SPEC §6d), never an
  *  authorization boundary — mig 116 says so in the column's own COMMENT. A `failed`
  *  connection is still listed and still bindable. */
+export type ToolGrantPosture = "allow" | "ask" | "deny"
+
 export interface ConnectorConnection {
   id: string
   org_id: string
   capability?: ConnectorCapability | null
+  service_id: string
   name: string
   config: ConnectorConnectionConfig
+  /**
+   * Phase 215's OAuth facts, and they were MISSING here while the server sent all five.
+   *
+   * ⚠ `ConnectorConnectionResponse` (the Pydantic wall) has declared `auth_type`,
+   * `status`, `error_message`, `account_email` and `account_name` since Phase 215; this
+   * type declared none of them, so ~20 `tsc` errors sat across `connectionsCopy.ts`,
+   * `connectionFormCopy.ts`, `ConnectionFormPanel.tsx` and `ConnectorsFlyout.tsx` while the
+   * data flowed correctly at runtime. Vitest does not typecheck, so the count gate could
+   * never see them — the type had stopped guarding this surface entirely.
+   *
+   * ⚠ `custom_client_secret` IS DELIBERATELY NOT HERE, in either this type or `config`.
+   * The server does not return it: it lives encrypted in `oauth_client_secret_ciphertext`
+   * (migration 150), ungranted to `authenticated`, precisely so it cannot be read back.
+   */
+  auth_type?: "static_key" | "oauth_byo" | null
+  status?: "active" | "revoked" | "error" | null
+  error_message?: string | null
+  account_email?: string | null
+  account_name?: string | null
   is_enabled: boolean
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture | boolean>
   discovered_tools?: McpDiscoveredTool[]
   last_checked_at?: string | null
   last_check_verdict?: "not_checked" | "ok" | "failed" | null
@@ -475,10 +552,19 @@ export interface ConnectorConnection {
  *  tenant-selection parameter (the D-14 leak with a friendlier name). */
 export interface ConnectorConnectionCreate {
   capability?: ConnectorCapability | null
+  /** Phase 211 — REQUIRED on every shape, matching `ConnectorConnectionCreate`'s Pydantic
+   *  `ServiceId` exactly (non-blank, max 64).
+   *
+   *  ⚠ A LAXER CLIENT TYPE HERE WOULD TURN A 422 INTO A RUNTIME SURPRISE IN A BROWSER. Making
+   *  it `service_id?: string` would let a form submit without one, typecheck perfectly, and
+   *  fail only against the live server — which is the failure mode a wire contract exists to
+   *  move to compile time. Required on the server, required here. */
+  service_id: string
   name: string
   config?: ConnectorConnectionConfig
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture>
   /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
    *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
   secret?: string
@@ -493,7 +579,8 @@ export interface ConnectorConnectionUpdate {
   secret?: string
   is_enabled?: boolean
   mcp_server_url?: string | null
-  tool_grants?: Record<string, boolean>
+  default_approval_posture?: ToolGrantPosture
+  tool_grants?: Record<string, ToolGrantPosture>
   discovered_tools?: McpDiscoveredTool[]
 }
 

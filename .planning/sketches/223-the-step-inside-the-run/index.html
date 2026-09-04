@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>The Step Inside The Run — where a panel-owned card belongs</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOKENS — copied verbatim from frontend/src/index.css
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --background: 220 20% 97%; --foreground: 222 47% 11%;
+  --card: 0 0% 100%; --card-foreground: 222 47% 11%;
+  --primary: 239 84% 67%; --primary-foreground: 0 0% 100%;
+  --muted: 220 14% 94%; --muted-foreground: 220 9% 46%;
+  --accent: 220 14% 92%;
+  --destructive: 0 84% 60%; --success: 142 71% 45%; --warning: 38 92% 60%;
+  --border: 220 13% 89%; --radius: 0.5rem;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --background: 216 45% 4%; --foreground: 226 60% 97%;
+  --card: 220 30% 7%; --card-foreground: 226 60% 97%;
+  --primary: 239 100% 82%; --primary-foreground: 243 100% 32%;
+  --muted: 220 30% 11%; --muted-foreground: 220 16% 65%;
+  --accent: 220 25% 14%;
+  --destructive: 0 72% 51%; --success: 142 71% 45%; --warning: 38 92% 60%;
+  --border: 220 20% 16%;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  min-height: 100vh; padding: 1.75rem 2rem 5rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── page chrome ───────────────────────────────────────────────────────── */
+.head { max-width: 1180px; margin: 0 auto 1.25rem; }
+.head h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+.head .q {
+  margin-top: .4rem; font-size: .875rem; color: hsl(var(--muted-foreground));
+  max-width: 68ch; line-height: 1.55;
+}
+.toolbar {
+  max-width: 1180px; margin: 0 auto 1.5rem; display: flex; gap: .5rem;
+  align-items: center; flex-wrap: wrap;
+}
+.tab {
+  font: 500 .8125rem/1 var(--sans); padding: .5rem .85rem;
+  border: 1px solid hsl(var(--border)); border-radius: 999px;
+  background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer;
+  transition: all .16s ease;
+}
+.tab:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary) / .5); }
+.tab[aria-selected="true"] {
+  background: hsl(var(--primary) / .14); border-color: hsl(var(--primary) / .55);
+  color: hsl(var(--primary));
+}
+.tab.is-today[aria-selected="true"] {
+  background: hsl(var(--destructive) / .14); border-color: hsl(var(--destructive) / .5);
+  color: hsl(var(--destructive));
+}
+.spacer { flex: 1; }
+.ghost {
+  font: 500 .75rem/1 var(--sans); padding: .5rem .8rem; cursor: pointer;
+  background: transparent; color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+}
+.ghost:hover { color: hsl(var(--foreground)); }
+
+/* ── the stage: a chat column at its real measured width ───────────────── */
+.stage { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 700px 1fr; gap: 2rem; align-items: start; }
+@media (max-width: 1100px) { .stage { grid-template-columns: 1fr; } }
+
+.column {
+  background: hsl(var(--background));
+  border: 1px dashed hsl(var(--border));
+  border-radius: 12px; padding: 1.25rem;
+}
+.column-label {
+  font: 500 .6875rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground)); margin-bottom: .9rem;
+}
+.notes { font-size: .8125rem; line-height: 1.6; color: hsl(var(--muted-foreground)); }
+.notes h3 { font-size: .8125rem; color: hsl(var(--foreground)); margin-bottom: .5rem; font-weight: 600; }
+.notes ul { margin: 0 0 1.1rem 1rem; }
+.notes li { margin-bottom: .45rem; }
+.notes code { font: .75rem/1.4 var(--mono); background: hsl(var(--muted)); padding: .1rem .3rem; border-radius: 4px; }
+.notes .bad { color: hsl(var(--destructive)); font-weight: 600; }
+.notes .good { color: hsl(var(--success)); font-weight: 600; }
+
+/* ── message + run card ────────────────────────────────────────────────── */
+.msg { display: flex; gap: .75rem; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 8px; flex: none;
+  background: hsl(var(--primary) / .16); color: hsl(var(--primary));
+  display: grid; place-items: center; font: 600 .75rem/1 var(--mono);
+}
+.msg-body { min-width: 0; flex: 1; }
+
+.runcard {
+  border: 1px solid hsl(var(--border)); border-radius: 14px;
+  background: hsl(var(--card)); overflow: hidden;
+}
+.run-head {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .6rem .85rem; border-bottom: 1px solid hsl(var(--border) / .6);
+  font: 500 .75rem/1 var(--mono); color: hsl(var(--muted-foreground));
+}
+.run-head .dot { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--success)); flex: none; }
+.run-head .sep { opacity: .4; }
+.run-head .right { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.rail { padding: .3rem 0 .45rem; }
+.step {
+  display: grid; grid-template-columns: 26px 1fr; align-items: start;
+  padding: .4rem .85rem .4rem .6rem; position: relative;
+}
+.node {
+  width: 18px; height: 18px; border-radius: 50%; margin-top: 1px;
+  display: grid; place-items: center; position: relative;
+  font: 600 .625rem/1 var(--mono);
+  background: hsl(var(--success) / .18); color: hsl(var(--success));
+  border: 1px solid hsl(var(--success) / .45);
+}
+.step:not(:last-child) .node::after {
+  content: ""; position: absolute; top: 19px; left: 50%; transform: translateX(-50%);
+  width: 1px; height: calc(100% + .35rem); min-height: 14px;
+  background: hsl(var(--border));
+}
+/* Stitch's second idea: the result gets its own right-aligned column, so the
+   actions scan down one edge and the outcomes down the other. Variant `today`
+   and variant `c` keep the old inline arrow — see the override below. */
+.step-line {
+  min-width: 0; font-size: .8125rem; line-height: 1.45;
+  display: grid; grid-template-columns: 1fr auto; gap: .9rem; align-items: baseline;
+}
+.step-title { color: hsl(var(--foreground) / .92); min-width: 0; }
+.step-title .mark { color: hsl(var(--muted-foreground)); margin-right: .3rem; }
+.step-res {
+  color: hsl(var(--muted-foreground)); text-align: right;
+  font: 400 .75rem/1.4 var(--mono); white-space: nowrap;
+}
+/* the measured Today reference must not change, and variant C may not touch
+   RunCard internals — so both keep the shipped inline form. */
+[data-view="today"] .step-line, [data-view="c"] .step-line { display: block; }
+[data-view="today"] .step-res, [data-view="c"] .step-res {
+  text-align: left; font: inherit; white-space: normal;
+}
+[data-view="today"] .step-res::before, [data-view="c"] .step-res::before {
+  content: "\2192"; margin: 0 .35rem; opacity: .5;
+}
+
+/* Stitch's first idea: the status belongs to the run, so it lives in the run's
+   frame rather than hanging beneath it. */
+.run-status {
+  display: flex; align-items: center; gap: .5rem;
+  border-top: 1px solid hsl(var(--border) / .6);
+  padding: .5rem .85rem; font-size: .75rem; color: hsl(var(--warning));
+}
+.run-status .word {
+  font: 500 .625rem/1 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  padding: .2rem .4rem; border-radius: 4px;
+  background: hsl(var(--warning) / .14); border: 1px solid hsl(var(--warning) / .4);
+}
+.run-status .txt { color: hsl(var(--muted-foreground)); }
+.step .open {
+  font: 500 .6875rem/1 var(--sans); color: hsl(var(--primary));
+  background: none; border: 0; cursor: pointer; padding: 0; margin-left: .5rem;
+}
+.step .open:hover { color: hsl(var(--foreground)); }
+
+/* panel-owned band (variant B) */
+.panel-band {
+  border-top: 1px dashed hsl(var(--border));
+  background: hsl(var(--primary) / .045);
+  padding: .5rem .85rem .55rem 1.2rem;
+  display: flex; align-items: center; gap: .5rem; font-size: .8125rem;
+}
+.panel-band .tagline {
+  font: 500 .625rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+  color: hsl(var(--primary)); opacity: .8;
+}
+
+/* ── the seam card, as it ships today ─────────────────────────────────── */
+.seam {
+  margin-top: .5rem; border: 1px solid hsl(var(--border));
+  border-radius: var(--radius); background: hsl(var(--card)); overflow: hidden;
+}
+.seam-head {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .375rem .75rem; border-bottom: 1px solid hsl(var(--border) / .6);
+  font: 400 .625rem/1 var(--mono); letter-spacing: .1em;
+  text-transform: uppercase; color: hsl(var(--muted-foreground) / .75);
+}
+.seam-head .open {
+  margin-left: auto; text-transform: none; letter-spacing: 0;
+  color: hsl(var(--primary)); background: none; border: 0; cursor: pointer;
+  font: 400 .6875rem/1 var(--sans);
+}
+.seam-body { padding: .5rem .75rem; font-size: .8125rem; color: hsl(var(--foreground) / .9); }
+
+/* ── terminal line ─────────────────────────────────────────────────────── */
+.terminal {
+  display: flex; align-items: center; gap: .375rem;
+  margin-top: .25rem; font-size: .75rem; color: hsl(var(--muted-foreground));
+}
+.terminal .glyph-square {
+  width: 12px; height: 12px; border: 1.4px solid currentColor; border-radius: 2px; flex: none;
+}
+.terminal .rule { flex: 1; height: 1px; background: hsl(var(--border)); }
+.terminal em { font-style: italic; }
+.terminal.fixed { color: hsl(var(--warning)); }
+.terminal.fixed .word {
+  font: 500 .625rem/1 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  padding: .2rem .4rem; border-radius: 4px;
+  background: hsl(var(--warning) / .14); border: 1px solid hsl(var(--warning) / .4);
+}
+
+/* ── annotation callouts ───────────────────────────────────────────────── */
+.callout {
+  margin-top: .75rem; padding: .55rem .7rem; border-radius: var(--radius);
+  font-size: .75rem; line-height: 1.55;
+  border-left: 2px solid hsl(var(--destructive)); background: hsl(var(--destructive) / .07);
+  color: hsl(var(--muted-foreground));
+}
+.callout.ok { border-left-color: hsl(var(--success)); background: hsl(var(--success) / .07); }
+.callout b { color: hsl(var(--foreground)); font-weight: 600; }
+
+
+/* -- sources / references footer -------------------------------------- */
+.answer { font-size: .875rem; line-height: 1.65; color: hsl(var(--foreground) / .92); }
+.answer p { margin-bottom: .7rem; }
+.answer sup {
+  font: 600 .625rem/1 var(--mono); color: hsl(var(--primary));
+  background: hsl(var(--primary) / .14); border-radius: 4px;
+  padding: .1rem .22rem; margin-left: .12rem; vertical-align: super;
+}
+.ref-trigger-today {
+  display: flex; align-items: center; gap: .375rem; margin-top: .75rem;
+  font-size: .75rem; color: hsl(var(--muted-foreground));
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.ref-rows { margin-top: .5rem; display: flex; flex-direction: column; gap: .5rem; }
+.ref-row {
+  border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+  background: hsl(var(--card)); padding: .5rem .65rem; font-size: .75rem;
+}
+.ref-row .n { font: 600 .625rem/1 var(--mono); color: hsl(var(--primary)); margin-right: .4rem; }
+.ref-row .snip { color: hsl(var(--muted-foreground)); display: block; margin-top: .25rem; line-height: 1.5; }
+.ref-trigger-fix {
+  display: inline-flex; align-items: center; gap: .45rem; margin-top: .9rem;
+  font: 500 .75rem/1 var(--sans); cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / .55);
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px; padding: .34rem .7rem .34rem .55rem;
+  transition: all .16s ease;
+}
+.ref-trigger-fix:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary) / .5); background: hsl(var(--primary) / .08); }
+.ref-trigger-fix .chev { font: 600 .625rem/1 var(--mono); opacity: .7; }
+.ref-trigger-fix .cnt { font: 600 .6875rem/1 var(--mono); color: hsl(var(--foreground) / .8); }
+.hairline { height: 1px; background: hsl(var(--border) / .8); margin-top: .9rem; }
+.two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.mini-label { font: 500 .625rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-bottom: .6rem; }
+.mini-label.bad { color: hsl(var(--destructive)); }
+.mini-label.good { color: hsl(var(--success)); }
+
+.panel-view { display: none; }
+.panel-view.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Sketch 223 — The step inside the run</h1>
+  <p class="q"><b>Design question:</b> a <code>write_todos</code> card is panel-owned, so today it renders as a
+  sibling <em>beneath</em> the run that counts it. Does it belong <em>inside</em> the run frame — and if so, as
+  what? Every string below is the one that ships today.</p>
+</div>
+
+<div class="toolbar" role="tablist">
+  <button class="tab is-today" role="tab" aria-selected="true" data-view="today">Today (measured)</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="a">A · A row on the rail</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="b">B · Panel-owned band</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="c">C · Bracketed sibling</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="d">D · Delete it ★</button>
+  <button class="tab" role="tab" aria-selected="false" data-view="src">Sources fold</button>
+  <span class="spacer"></span>
+  <button class="ghost" onclick="toggleTheme()">◐ Theme</button>
+</div>
+
+<!-- ══════════════════════════════════ TODAY ══════════════════════════════ -->
+<div class="stage panel-view active" data-view="today">
+  <div class="column">
+    <div class="column-label">chat column · 700px · as it ships</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div class="runcard">
+          <div class="run-head">
+            <span class="dot"></span><span>Run · 3 steps</span>
+            <span class="sep">·</span><span>anthropic · claude-sonnet-4-5</span>
+            <span class="right">⏱ 18.3s</span>
+          </div>
+          <div class="rail">
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">⌕</span>Search the knowledge base</span>
+                <span class="step-res">6 results</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">▶</span>Run code</span>
+                <span class="step-res">chart.png</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- the sibling, outside the frame -->
+        <div class="seam">
+          <div class="seam-head">
+            <span>write_todos</span>
+            <button class="open">open panel ↗</button>
+          </div>
+          <div class="seam-body">☑ 1 todos</div>
+        </div>
+
+        <div class="terminal">
+          <span class="glyph-square"></span>
+          <em>Agent reached time limit</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>Three faults, one screenshot.</b> The header counts <b>3 steps</b> and the rail enumerates <b>2</b> — the
+      third is the card below, outside the frame. The card's title is the raw tool name, uppercased by CSS.
+      And the status sentence wears a square that reads as an unticked box <em>because <code>☑</code> sits
+      directly above it</em>.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Where each string comes from</h3>
+    <ul>
+      <li><code>WRITE_TODOS</code> — <code>SeamCard.tsx:43</code> returns the raw kind; <code>:51</code> applies
+        <code>uppercase</code>. <span class="bad">Nobody typed this string.</span></li>
+      <li><code>☑ 1 todos</code> — <code>SeamCard.tsx:83</code>. It receives <em>counts only</em>; rendering the
+        raw payload is forbidden by <code>T-087-13</code>, so it cannot say <em>which</em> todo.</li>
+      <li><code>Agent reached time limit</code> — <code>MessageItem.tsx:799</code>, glyph is lucide
+        <code>&lt;Square&gt;</code> at 12px, chosen as <em>stop</em>.</li>
+    </ul>
+    <h3>Why it is outside the frame</h3>
+    <ul>
+      <li><code>MessageItem.tsx:841</code> says so in writing: <em>"ADDITIVE ONLY — a new sibling renderer in
+        MessageItem, never a touch of RunCard internals (G-5)."</em></li>
+      <li><span class="bad">The composition fault is a guardrail's residue.</span> Moving it inside means taking
+        the <code>RunCard</code> extraction the ledger already reads <em>extraction due</em>.</li>
+    </ul>
+    <h3>The word already exists</h3>
+    <ul>
+      <li><code>toolNames.ts:114</code> — <code>write_todos: "Track its to-dos"</code>. It lives in
+        <code>components/workflows/</code> and chat never imports it. <span class="good">Same shape as the
+        <code>connectionMark</code> move 214-08 already took.</span></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ A ══════════════════════════════════ -->
+<div class="stage panel-view" data-view="a">
+  <div class="column">
+    <div class="column-label">variant A · the card becomes step 3</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div class="runcard">
+          <div class="run-head">
+            <span class="dot"></span><span>Run · 3 steps</span>
+            <span class="sep">·</span><span>anthropic · claude-sonnet-4-5</span>
+            <span class="right">⏱ 18.3s</span>
+          </div>
+          <div class="rail">
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">⌕</span>Search the knowledge base</span>
+                <span class="step-res">6 results</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">▶</span>Run code</span>
+                <span class="step-res">chart.png</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">☑</span>Track its to-dos</span>
+                <span class="step-res">1 of 1 done</span>
+                <button class="open">open panel ↗</button>
+              </div>
+            </div>
+          </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <b>The count becomes true by construction.</b> Three steps in the header, three rows on the rail — the
+      honest count is no longer a claim the renderer can contradict. The status line drops the square entirely
+      and takes a word.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>What this costs</h3>
+    <ul>
+      <li><span class="bad">Requires touching <code>RunCard</code> internals</span> — the thing
+        <code>MessageItem.tsx:841</code> was written to avoid. This variant <em>is</em> the extraction.</li>
+      <li>It asserts a panel-owned pointer is <em>a step like any other</em>. It is not: the panel holds live
+        state, the rail records what happened. Variant B disputes this.</li>
+    </ul>
+    <h3>What it buys</h3>
+    <ul>
+      <li>One rail, one grammar, one count. No second component to keep in sync.</li>
+      <li><code>open panel ↗</code> survives as the row's affordance — the seam is kept, not deleted.</li>
+      <li>The <code>☑</code> glyph moves onto the row that <em>means</em> todos, so the square below is free to
+        stop looking like a checkbox.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ B ══════════════════════════════════ -->
+<div class="stage panel-view" data-view="b">
+  <div class="column">
+    <div class="column-label">variant B · inside the frame, but not on the rail</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div class="runcard">
+          <div class="run-head">
+            <span class="dot"></span><span>Run · 2 steps</span>
+            <span class="sep">·</span><span>anthropic · claude-sonnet-4-5</span>
+            <span class="right">⏱ 18.3s</span>
+          </div>
+          <div class="rail">
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">⌕</span>Search the knowledge base</span>
+                <span class="step-res">6 results</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">✓</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">▶</span>Run code</span>
+                <span class="step-res">chart.png</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel-band">
+            <span class="tagline">in the panel</span>
+            <span>Track its to-dos · 1 of 1 done</span>
+            <button class="open" style="margin-left:auto;font:500 .6875rem/1 var(--sans);color:hsl(var(--primary));background:none;border:0;cursor:pointer;">open panel ↗</button>
+          </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <b>The count stays honest a different way.</b> Two agent steps, counted as two. The todo pointer is inside
+      the frame — so it visibly belongs to this run — but sits in its own band, because it is a window onto live
+      state, not a thing the agent did and finished.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>The claim this makes</h3>
+    <ul>
+      <li><em>Panel = now, chat = happened</em> — the seam rule from sketch 007. A todo list is still changing;
+        a search that returned 6 results is over. <span class="good">B keeps that distinction visible.</span></li>
+      <li>The header count means <b>agent steps</b>, unambiguously. In A it means <em>rows</em>, which is a
+        subtly different promise.</li>
+    </ul>
+    <h3>What it costs</h3>
+    <ul>
+      <li>Still touches <code>RunCard</code> — the band is inside the frame. Same G-5 obligation as A.</li>
+      <li>A second slot to maintain. Two grammars in one card, and the next panel-owned tool has to pick one.</li>
+      <li><span class="bad">Risk:</span> if the band is quiet enough to read as secondary, it may read as
+        <em>ignorable</em> — which is how it got missed in the first place.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ C ══════════════════════════════════ -->
+<div class="stage panel-view" data-view="c">
+  <div class="column">
+    <div class="column-label">variant C · untouched RunCard, bracketed sibling</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div style="border-left:2px solid hsl(var(--border));border-bottom-left-radius:10px;padding-left:.7rem;margin-left:.15rem;">
+          <div class="runcard">
+            <div class="run-head">
+              <span class="dot"></span><span>Run · 2 steps</span>
+              <span class="sep">·</span><span>anthropic · claude-sonnet-4-5</span>
+              <span class="right">⏱ 18.3s</span>
+            </div>
+            <div class="rail">
+              <div class="step">
+                <div class="node">✓</div>
+                <div class="step-line">
+                  <span class="step-title"><span class="mark">⌕</span>Search the knowledge base</span>
+                  <span class="step-res">6 results</span>
+                </div>
+              </div>
+              <div class="step">
+                <div class="node">✓</div>
+                <div class="step-line">
+                  <span class="step-title"><span class="mark">▶</span>Run code</span>
+                  <span class="step-res">chart.png</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="seam">
+            <div class="seam-head">
+              <span style="text-transform:none;letter-spacing:.02em;font-family:var(--sans);font-size:.6875rem;">Track its to-dos</span>
+              <button class="open">open panel ↗</button>
+            </div>
+            <div class="seam-body">1 of 1 done</div>
+          </div>
+
+          <div class="terminal fixed" style="margin-top:.5rem;">
+            <span class="word">Stopped</span>
+            <span>Agent reached its time limit</span>
+            <span class="rule"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <b>The cheapest correct-shaped option.</b> <code>RunCard</code> is byte-unchanged. A continuation bracket
+      groups the run and everything that belongs to it, so the card stops reading as an orphan without anything
+      moving.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Why this variant exists</h3>
+    <ul>
+      <li>The workflow asks that one variant follow <em>the path of least resistance for the target stack</em>.
+        This is it: a wrapper in <code>MessageItem</code>, no <code>RunCard</code> edit, <span class="good">no G-5
+        obligation triggered.</span></li>
+      <li>The vocabulary fix (<code>TOOL_PHRASES</code>) and the glyph fix ship here too — they are independent of
+        where the card sits.</li>
+    </ul>
+    <h3>What it does not fix</h3>
+    <ul>
+      <li><span class="bad">The count still disagrees</span> unless the header is re-derived — a bracket groups
+        visually but the run does not know the card exists.</li>
+      <li>It is a <em>drawing</em> of containment rather than containment. The next panel-owned tool lands
+        outside again, and the bracket has to be widened by hand.</li>
+      <li>⚠ It leaves both <em>extraction due</em> ledger rows untouched, so the debt is deferred, not paid.</li>
+      <li>⭐ <span class="bad">And it can adopt NEITHER improvement the Stitch pass found.</span> Both the
+        status-inside-the-frame and the right-aligned result column live <em>inside</em> <code>RunCard</code>,
+        which this variant exists to leave alone. Compare its step rows and its dangling status line against
+        A, B or D &mdash; C is the only one still carrying the shipped inline form.</li>
+    </ul>
+  </div>
+</div>
+
+
+<!-- =============================== D ================================= -->
+<div class="stage panel-view" data-view="d">
+  <div class="column">
+    <div class="column-label">variant D &middot; the card is gone</div>
+    <div class="msg">
+      <div class="avatar">AI</div>
+      <div class="msg-body">
+        <div class="runcard">
+          <div class="run-head">
+            <span class="dot"></span><span>Run &middot; 2 steps</span>
+            <span class="sep">&middot;</span><span>anthropic &middot; claude-sonnet-4-5</span>
+            <span class="right">&#9201; 18.3s</span>
+          </div>
+          <div class="rail">
+            <div class="step">
+              <div class="node">&#10003;</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">&#8981;</span>Search the knowledge base</span>
+                <span class="step-res">6 results</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="node">&#10003;</div>
+              <div class="step-line">
+                <span class="step-title"><span class="mark">&#9654;</span>Run code</span>
+                <span class="step-res">chart.png</span>
+              </div>
+            </div>
+          </div>
+          <div class="run-status">
+            <span class="word">Stopped</span>
+            <span class="txt">Agent reached its time limit</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <b>The orphan does not need a home. It needs deleting.</b> Two steps, counted as two, and nothing
+      below the frame. The todos live in the panel, where they were already live &mdash; and where they
+      are still correct after a reload.
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Why the premise for keeping it is false</h3>
+    <ul>
+      <li><code>SeamCard.tsx:3-8</code> justifies itself: <em>&ldquo;on thread reload the panel reconciles
+        to current state and does NOT replay history, so the transcript must be self-contained.&rdquo;</em></li>
+      <li><span class="good">Measured: the panel does not need to replay.</span>
+        <code>StreamsProvider.tsx:106</code> &mdash; <code>useDerivedPanel</code> is <em>&ldquo;a PURE read
+        over the viewing thread&rsquo;s persisted chat tool_calls&rdquo;</em>, and
+        <code>workspacePanel.ts:204</code> takes the latest <code>write_todos</code> snapshot from them.</li>
+      <li><b>Both surfaces read the same durable rows.</b> The card is a second render of one source, not a
+        backup for a source that disappears.</li>
+    </ul>
+    <h3>workspace_write is redundant too, by a stronger argument</h3>
+    <ul>
+      <li><code>FilesSection.tsx:158</code> uses <code>useWorkspaceFiles</code>, which
+        <span class="good">fetches from the server</span> (<code>getThreadWorkspaceFiles</code> via
+        <code>usePanelReconcile</code>) &mdash; not a derive from the transcript at all.</li>
+      <li>That is <em>more</em> durable than the chat row, so its seam card is the weaker copy of the two.</li>
+    </ul>
+    <h3>&#9888; ask_user must survive</h3>
+    <ul>
+      <li>Same component, different kind. <code>You answered X</code> is the <b>only</b> record that a human
+        made a decision &mdash; the panel shows a <em>pending</em> question, never an answered one.</li>
+      <li><code>SeamCard.tsx:6-8</code> says it <em>&ldquo;CLOSES the documented ask_user reload
+        gap&rdquo;</em>. <span class="bad">Deleting the whole component takes that with it.</span></li>
+    </ul>
+    <h3>The precedent</h3>
+    <ul>
+      <li><code>MessageItem.tsx:536</code> &mdash; <em>&ldquo;SEED-098 Change 2: the loose write_todos /
+        workspace_write pointers are GONE &mdash; todos live only in the right Workspace panel.&rdquo;</em>
+        The <b>live</b> pointers were already deleted for this exact reason. This finishes the job.</li>
+      <li>&#9888; Cost, stated plainly: the panel collapses to a 52px rail, so a reopened thread shows todos
+        only once it is open. A click, not a loss.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ========================== SOURCES FOLD =========================== -->
+<div class="stage panel-view" data-view="src">
+  <div class="column">
+    <div class="column-label">BUG-260902-07 &middot; today (left) vs proposed (right)</div>
+
+    <div class="two-up">
+      <div>
+        <div class="mini-label bad">today &mdash; open, trigger is prose</div>
+        <div class="answer">
+          <p>The Q3 rate sheet lists 14 line items, with the largest increase on
+            structural steel at 8.2%<sup>1</sup>. Labour rates were unchanged<sup>2</sup>.</p>
+        </div>
+        <button class="ref-trigger-today">&#9662; References &middot; 2 sources</button>
+        <div class="ref-rows">
+          <div class="ref-row">
+            <span class="n">1</span>sample_master_rate_sheet.xlsx
+            <span class="snip">&ldquo;Structural steel &mdash; Q3 unit rate 8.2% above Q2&hellip;&rdquo;</span>
+          </div>
+          <div class="ref-row">
+            <span class="n">2</span>labour_schedule_2026.pdf
+            <span class="snip">&ldquo;Base labour rates held at the 2026 agreement&hellip;&rdquo;</span>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:.8rem;">
+          <b>The footer is taller than the answer.</b> And the only way to close it is a 12px line of the
+          lowest-contrast text in the message, sitting directly under body copy.
+        </div>
+      </div>
+
+      <div>
+        <div class="mini-label good">proposed &mdash; folded, trigger is a control</div>
+        <div class="answer">
+          <p>The Q3 rate sheet lists 14 line items, with the largest increase on
+            structural steel at 8.2%<sup>1</sup>. Labour rates were unchanged<sup>2</sup>.</p>
+        </div>
+        <div class="hairline"></div>
+        <button class="ref-trigger-fix" onclick="toggleRefs(this)">
+          <span class="chev">&#9656;</span>References<span class="cnt">2</span>
+        </button>
+        <div class="ref-rows" id="refs-fix" hidden>
+          <div class="ref-row">
+            <span class="n">1</span>sample_master_rate_sheet.xlsx
+            <span class="snip">&ldquo;Structural steel &mdash; Q3 unit rate 8.2% above Q2&hellip;&rdquo;</span>
+          </div>
+          <div class="ref-row">
+            <span class="n">2</span>labour_schedule_2026.pdf
+            <span class="snip">&ldquo;Base labour rates held at the 2026 agreement&hellip;&rdquo;</span>
+          </div>
+        </div>
+        <div class="callout ok" style="margin-top:.8rem;">
+          <b>The answer is the message again.</b> A hairline separates chrome from prose; the control has a
+          surface, so it reads as pressable without shouting. <b>Press it</b> &mdash; it works.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Measured cause</h3>
+    <ul>
+      <li><code>MessageItem.tsx:619</code> passes
+        <code>defaultOpen={hasInRangeMarker(&hellip;)}</code>. A grounded answer normally has markers, so in
+        ordinary use <span class="bad">it is open every time</span>; the collapsed state is only ever seen
+        on the degraded path.</li>
+      <li><code>CitationList.tsx:32-44</code> &mdash; the trigger is
+        <code>text-xs text-muted-foreground</code> with a 12px chevron. No border, no surface, no weight, no
+        separation from the answer body.</li>
+    </ul>
+    <h3>&#9888; This reverses a shipped decision</h3>
+    <ul>
+      <li><code>CitationList.tsx:9-14</code> calls it the <em>&ldquo;canonical open-by-default contract
+        (D-06/D-07)&rdquo;</em> from Phase 153, whose sketch 075-A paired numbered markers with an open
+        footer so the two read as one object.</li>
+      <li>The operator&rsquo;s direction supersedes it. Recorded in <code>BUG-260902-07</code> so a later
+        phase does not &ldquo;restore&rdquo; the old behaviour believing it was an oversight.</li>
+    </ul>
+    <h3>Why the two halves ship together</h3>
+    <ul>
+      <li>While it is open by default the weak trigger is invisible &mdash; nobody hunts for a control they
+        never need. <span class="bad">Folding it makes that trigger the only way back in</span>, so half one
+        without half two takes a surface that is merely noisy and makes it feel broken.</li>
+      <li>The count stays visible while closed. A fold that hid <em>how many sources there are</em> would
+        trade one readability problem for a worse one.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.tab[data-view]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var view = btn.getAttribute('data-view');
+    document.querySelectorAll('.tab[data-view]').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b === btn));
+    });
+    document.querySelectorAll('.panel-view').forEach(function (p) {
+      p.classList.toggle('active', p.getAttribute('data-view') === view);
+    });
+  });
+});
+function toggleRefs(btn) {
+  var rows = document.getElementById('refs-fix');
+  var open = !rows.hidden;
+  rows.hidden = open;
+  btn.querySelector('.chev').innerHTML = open ? '&#9656;' : '&#9662;';
+}
+function toggleTheme() {
+  var root = document.documentElement;
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+</script>
+
+</body>
+</html>

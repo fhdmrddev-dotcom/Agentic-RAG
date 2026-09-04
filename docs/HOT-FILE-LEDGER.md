@@ -6,6 +6,61 @@ This file holds each row's **narrative** — the measured reasons, the correctio
 their originals, the RED-driven plants, the invariants each file now carries, and the named seam
 the next refactor should take.
 
+## ⚠ BATCH RE-DERIVATION 2026-09-02 — THIRTEEN OF FOURTEEN ROWS MEASURED STALE, AND ONE WAS WRONG IN THE DANGEROUS DIRECTION
+
+Fourteen rows re-derived in one pass with `CLAUDE.md`'s own recipe (6-digit dated quick-task buckets
+excluded from the phase count). **Thirteen were stale. One was `WorkspacePanel.tsx`, and it was exactly
+right.** Superseded figures are recorded beside the new ones, never over them.
+
+| file | row said | **measured 2026-09-02** | drift |
+|---|---|---|---|
+| `chat/MessageItem.tsx` | 57 / 29 / 856 | **58 / 29 / 863** | +1 commit |
+| `chat/ToolCallPanel.tsx` | 47 / 19 / 995 | **50 / 19 / 1019** | +3 commits, +24 L |
+| `chat/ChatArea.tsx` | 63 / 30 / 571 | **67 / 32 / 595** | **+2 phases** |
+| `chat/RunCard.tsx` | 22 / 10 / 661 | **24 / 10 / 688** | +27 L |
+| `chat/MessageInput.tsx` | 25 / 13 / 478 | **29 / 14 / 643** | **+1 phase, +165 L** |
+| `layout/ChatLayout.tsx` | 41 / 22 / 911 | **46 / 24 / 921** | **+2 phases** |
+| `services/tool_dispatcher.py` | 72 / 29 / 4624 | **77 / 32 / 4679** | **+3 phases, +55 L** |
+| `api/connectors.py` | 24 / 10 / 1643 | **25 / 11 / 1678** | **+1 phase, +35 L** |
+| `api/threads.py` | 238 / 78 / 1408 | **243 / 80 / 1590** | **+2 phases, +182 L** |
+| `services/connector_service.py` | 16 / 5 / 1461 | **21 / 7 / 1601** | **+2 phases, +140 L** |
+| `models/message.py` | 15 / 8 / 120 | **17 / 10 / 124** | **+2 phases** |
+| ⛔ `lib/api/threads.ts` | 3 / 2 / 1600 | **7 / 3 / 1683** | **+1 phase — CROSSES THE G-5 THRESHOLD** |
+| `types/index.ts` | 71 / 57 / 1209 | **78 / 60 / 1331** | **+3 phases, +122 L** |
+| ✅ `panel/WorkspacePanel.tsx` | 16 / 10 / 646 | **16 / 10 / 646** | none — the one accurate row |
+
+### ⛔ `frontend/src/lib/api/threads.ts` was PRESENT AND WRONG, which is worse than absent
+
+Its G-5 cell read **`no (2 phases)`** and it measures **3**. `CLAUDE.md` states the failure mode
+exactly: *"A row that is present and WRONG answers the auditor with `satisfied` and stops the audit,
+which is worse than an absent row."* This is that, caught in the wild. The cell is now
+**`⚠ FIRES — EXACTLY AT THRESHOLD`**.
+
+⚠ **It is also a file the 207 split created with no row of its own** — `lib/api.ts`'s row is the
+**barrel**, not these modules, and that distinction is already recorded in three sibling rows. The
+next phase to modify it owes it a named seam.
+
+### ⭐ ONE ROW ROTTED DURING THE SESSION THAT MEASURED IT
+
+`tool_dispatcher.py` was measured **76 / 31 / 4643** earlier the same day, while writing the Phase 223
+pre-flight, and **77 / 32 / 4679** a few hours later — Phase 223's own commits landed in between.
+**The ledger's standing thesis is that a figure written at a phase's close goes stale on the next
+commit that touches the file; here it went stale inside a single working session.** Recorded because
+it is a demonstration, not an anecdote: **re-derive at the moment of use, never quote a table.**
+
+### Why this sweep happened at all
+
+The Phase 224 pre-flight quoted four of these rows to Gemini with the caveat *"re-derive rather than
+quoting these"* — and then the sweep found the caveat was load-bearing on **every one of them**.
+⚠ **A caveat is not a fix.** The rows are corrected here so discuss-phase reads the right numbers
+instead of correcting them, and so the four hot files in 224's blast radius
+(`MessageItem` · `ToolCallPanel` · `ChatArea` · `WorkspacePanel`) plus the two the ROADMAP omits
+(`RunCard.tsx`, `ChatLayout.tsx`) are all current at hand-off.
+
+⚠ **No disposition cell was changed by this sweep** — only triples, plus the one G-5 verdict that the
+new phase count forced. **Re-measuring a file is not the same as re-judging it**, and conflating the
+two is how a sweep silently discharges obligations nobody discharged.
+
 ## How to use it
 
 - **`CLAUDE.md` is the guardrail.** The discuss-phase audit scans PLAN.md `files_modified`
@@ -89,6 +144,12 @@ a guard, and this repo has measured that twice.
 
 **Re-derived 2026-08-17 (extraction):** `47 commits / 19 phases / 995 L` · quick-task buckets excluded: `260322`, `260328`, `260630` · **G-5 FIRES** (19 phases vs threshold 3) — extraction due — ⚠ row read `satisfied (075.7)` for ~19 phases.
 
+**⚠ UPDATED 2026-09-04 (Phase 227 Wave 2 / 227-02) — THE G-5 OBLIGATION WAS DISCHARGED: `51 commits / 23 phases / 351 L`.**
+Decomposed monolithic ToolCallPanel (1019 lines → 351 lines, a 65% reduction, shedding 668 lines):
+- Extracted `ToolCallDetails.tsx` (~188 L): parameter display, result dispatch across all tool bodies, subagent markdown.
+- Extracted `StepRow.tsx` (~158 L): 2-column timeline rail spine, status node, essence card presentation. Prepares SC#3 right-aligned result column as a localized 1-file edit.
+- Extracted `toolStepDerivation.ts` (~60 L, B-3): pure step computation and derivation map generation.
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **47 commits / 19 phases / 995 L**.
@@ -97,11 +158,11 @@ a guard, and this repo has measured that twice.
 
 ### Phases touched (verbatim)
 
-067 / 067.5 / 075 / 075.4 / 075.6 / 075.7 (6+)
+067 / 067.5 / 075 / 075.4 / 075.6 / 075.7 (6+) / 227 (G-5 discharge)
 
 ### G-5 status (verbatim)
 
-satisfied (075.7 — 2026-05-24)
+satisfied (075.7 — 2026-05-24) · **DISCHARGED (Phase 227 / 2026-09-04)**
 
 ---
 
@@ -115,6 +176,12 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 **Re-derived 2026-08-17 (extraction):** `57 commits / 29 phases / 856 L` · quick-task buckets excluded: `260328`, `260405`, `260630` · **G-5 FIRES** (29 phases vs threshold 3) — extraction due — ⚠ row read `satisfied (075.7)` for ~29 phases.
 
+**⚠ UPDATED 2026-09-04 (Phase 227 Wave 3 / 227-03) — THE G-5 OBLIGATION WAS DISCHARGED: `62 commits / 33 phases / 702 L`.**
+Decomposed non-message presentation responsibilities (823 lines → 702 lines, shedding 121 lines):
+- Extracted `messageText.ts` (~54 L): two-pass paragraph and sentence-level deduplication (`dedupParagraphs`).
+- Extracted `UserMessageBubble.tsx` (~65 L): user message presentation, 7-line clamp, gradient fade.
+- Delegated terminal run status to `RunTerminalStatus` in `RunCard.tsx` (SC#1 / SC#3 preparation).
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **57 commits / 29 phases / 856 L**.
@@ -123,11 +190,11 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 ### Phases touched (verbatim)
 
-075 / 075.1 / 075.4 / 075.6 / 075.7 (5+)
+075 / 075.1 / 075.4 / 075.6 / 075.7 (5+) / 227 (G-5 discharge)
 
 ### G-5 status (verbatim)
 
-satisfied (075.7 — 2026-05-24)
+satisfied (075.7 — 2026-05-24) · **DISCHARGED (Phase 227 / 2026-09-04)**
 
 ---
 
@@ -225,6 +292,9 @@ carries the verdict — ****extraction TAKEN 2026-08-17**** — and this is the 
 
 > **extraction TAKEN 2026-08-17** — SSE transport → `run_transport.py`; next seam named in the detail file
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `234 / 76 / 1273` → `238 / 78 / 1408`.** 214-16 added `launch_inputs` to the existing request model and changed no transport. The SSE-transport discharge is untouched. Phase buckets gain `214`.
+
 ## `frontend/src/providers/StreamsProvider.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `84 commits / 33 phases / 4119 L` · quick-task buckets excluded: `260529` · **G-5 FIRES** (33 phases vs threshold 3) — honoured by construction (194.1) — largest file in the frontend tree.
@@ -244,6 +314,9 @@ carries the verdict — ****extraction TAKEN 2026-08-17**** — and this is the 
 carries the verdict — **honoured by construction (194.1)** — and this is the cell it carried before the split:
 
 > honoured by construction (194.1) — largest file in the frontend tree
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `84 / 33 / 4119` → `85 / 34 / 4144`.** 214-02 carried the failure reason through the existing reconcile path; no new stream concern. Phase buckets gain `214`.
 
 ## `frontend/src/hooks/useMessages.ts`
 
@@ -359,6 +432,9 @@ carries the verdict — **honoured by construction (199 / **200**)** — and thi
 
 > honoured by construction (199 / **200**) — three concerns added, **none** put here (`connectionState.ts`, `phaseVocabulary.ts`, `ThemeProvider.tsx`). ⚠ **STALE FOR THE FOURTH CONSECUTIVE CLOSE, in TWO documents at once**: this row read `25 / 7 / 1405` and `200-CHECKLIST.md` §6.6 read `26 / 7 / 1390`, re-derived by `200-01` only hours earlier in the same phase. ⚠ **The payload memo must sit ABOVE `settledNodes`** — the anti-blink fence slices the source at the overlay memo and forbids the run lookup in the whole remainder; ⚠ **and the memo's docblock may not QUOTE that anchor** — doing so moved the `indexOf` and handed the fence an EMPTY slice, observed RED. ⚠ Pointer/selection are **first-class plane props** because `FlowEdge`'s criterion-24 grep forbids the four handler spellings in the edge itself
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `27 / 8 / 1565` → `31 / 9 / 1708`.** The row read `27 / 8 / 1565` and was stale by three phases before this phase started (measured by 214-04 at execute time). Phase buckets gain `214`.
+
 ## `frontend/src/components/workflows/FlowEdge.tsx`
 
 **Added 2026-08-20 (Phase 200-06, D-16 / X-16) — it was ABSENT from BOTH this file and CLAUDE.md.**
@@ -455,6 +531,10 @@ carries the verdict — **honoured by construction (199) — ⚠ the 200 canvas 
 > ⚠ **THE PHASE 200 CANVAS PORT IS REVERTED HERE (2026-08-20) — the operator saw BOTH faces rendered and chose the earlier one**, naming the ring around the mark and the card silhouette. The card is 137-B again (248px, `rounded-[22px]`, centred, frosted, the 62px mark floating above the top edge); `NodeIconWell.tsx` is restored VERBATIM from `cd6f7b1d`; `NodeCornerMarks` / `NodeRunOverlay` go back with it, because every mark they place had moved only because the card did. ⚠ **THE THREE CONSTANTS MOVE AS A SET OR THE CONNECTORS DETACH**: `RUN_MODE_NODE_MIN_HEIGHT` 84→120, `CANVAS_LAYOUT.NODE_MIN_HEIGHT` 72→104, `EDGE_ANCHOR_Y` 36→28. ⚠ **THE PORT'S THREE CONTENT SLOTS SURVIVE** — the effect banner, the branch condition and the elapsed are CAPABILITIES, not silhouette. ⚠ **THE PROOF IS THAT NOTHING WAS RE-BASELINED**: `PhaseNodeCard.test.tsx`, `canvasModel.test.ts`, `FlowEdge.test.tsx` and `WorkflowCanvas.editing.test.tsx` are restored from `cd6f7b1d` UNEDITED and PASS — three `CARD_HTML_BASELINE` byte-captures and the twelve editing affordances, none re-typed. That is also why `NodeIconWell` came back WITHOUT the port's `canvas-icon-well` test id. ⚠ row read `12 / 7 / 313`. honoured by construction (199) — the hover lift, fill only. ⚠ `grep -n "hover:"` over the whole node subtree returned **ZERO** before 199-01; the badge budget is a max-2 tuple and a third badge is a **typecheck error**, not a preference
 
 ## `backend/app/services/harness/phase_types.py`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `50 / 23 / 2809` → `51 commits / 24 phases / 2925 L`** · quick-task buckets: **none**. Recorded beside every previous value below, never over them. **G-5 fires at 24 phases; 214.1-03 honoured it by construction** — `_wired_services_block` hands each LLM step the connected-service FACT the agent was previously inventing, composed at the four sites that already frame external actions. ⚠ **THE EXTRACTION OBLIGATION REMAINS OWED, NOT DISCHARGED**, and `BUG-260827-01` closing under `/gsd:fast` did not discharge it either.
+
+⚠ **214.1-03 MEASURED FOUR COMPOSITION SITES, NOT THREE** — `llm_batch_agents` composes the same framing and had been missed. **Both binding arms are read** (native `capability` AND `tool_name`), because the bug's own SMTP step is the native arm and reading `tool_name` alone returns `""` for it. The site count was established by **AST**, not by grep, precisely because a grep criterion counts its own prose (the 187-24 trap).
 
 **Re-derived 2026-08-17 (extraction):** `38 commits / 15 phases / 2393 L` · **G-5 FIRES** (15 phases vs threshold 3) — extraction due — not taken in 190 (no 2nd concern).
 
@@ -613,6 +693,9 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 > ⚠ **was ABSENT at TWENTY-TWO phases** (added 206.3); honours G-5 by construction. `_external_action_mcp_body` separated to avoid capability index errors.
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `47 / 21 / 2664` → `50 / 23 / 2809`.** 214-01 re-pointed this file at the argument leaf (`backend/app/services/connectors/args.py`) for BOTH shapes, so the resolution logic left. ⚠ **An `upstream` argument source is INERT on native capability rows here** — see `SEED-217`. Phase buckets gain `214`.
+
 ## `frontend/src/pages/WorkflowsPage.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `34 commits / 12 phases / 1176 L` · **G-5 FIRES** (12 phases vs threshold 3) — satisfied (192 / 192.1).
@@ -634,6 +717,9 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 carries the verdict — **satisfied (192 / 192.1)** — and this is the cell it carried before the split:
 
 > satisfied (192 / 192.1) — re-derived 192.2; row read `34 / 12 / 1176`, its **FIFTH consecutive staling**, and TWO phases (197, 192.2) landed since. ⚠ 192.2's own share is `+7 / −0`: it forwards its ALREADY-HOISTED `now` into `cardFace(row, now)` — 107 rows each taking the `Date.now()` default can straddle a band boundary mid-render ⚠ honoured by construction (**204**) — `+15 / −0`: one state, one prop, one modal MOUNT; the page still declares no modal. Row read `39 / 14 / 1340`, its **SIXTH** consecutive staling, and it was stale BEFORE 204-03 began. ⚠ the schedule state holds `{id, name}` and never a whole row.
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `41 / 16 / 1383` → `43 / 17 / 1415`.** ⚠ **The word `satisfied` is what this row used to say, and it is exactly the state `StreamsProvider.tsx` was in when it turned out to be wrong by 28 phases.** 214-13 named this file as the owner of the refusal's connect button; the prop is threaded and lands on nothing. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/library/WorkflowCard.tsx`
 
@@ -702,7 +788,25 @@ carries the verdict — **honoured by construction (193 / 193.1 / 199)** — and
 
 > honoured by construction (193 / 193.1 / 199) — ⚠ **`WorkflowDoorSwitch.baseline.test.tsx` pins `<WorkflowSoul scale="card" />` BYTE-FOR-BYTE, and `199-03` WITHDREW its own completed soul re-tone rather than re-baseline it.** The refusal renders only on a NON-EMPTY refused input, and the textarea's class list is a **concatenation** so the unconditional arm stays character-identical
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 9 / 575` → `18 / 12 / 1075`.** `DescribeServicePicker.tsx` and `describeServiceMatch.ts` are separate files; the switch gained the mount, not the logic. Phase buckets gain `214`.
+
 ## `frontend/src/pages/WorkflowBuilderPage.tsx`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `55 / 20 / 2956` → `56 commits / 21 phases / 2977 L`** · quick-task buckets excluded: `260809`, `260814`. Recorded beside every previous value below, never over them. **G-5 fires at 21 phases and was honoured BY CONSTRUCTION for the SIXTH consecutive phase**, on a measurement rather than an argument:
+
+| probe | before 214.1 | after |
+|---|---|---|
+| `useState[(<]` | **21** | **21** |
+| `useEffect(` | 7 | 7 |
+| `fetch(` | 0 | 0 |
+| `git diff --numstat` | — | **21 added / 0 deleted** |
+
+The page gained **one import and one gated node** — `declaredInputsAffordance = canvasEnabled ? <DeclaredInputsEditor /> : null`, rendered inside `identityGroup` beside `statefulAffordance`. The dialog's open flag, the pending key and the refusal all live INSIDE the component, which reads the store through the provider this page already mounts. **Zero `useState`, zero deleted lines** is the measurable form of *honoured by construction*.
+
+⚠ **THE PLACEMENT INSIDE THE EXISTING `canvasEnabled ? (…) : null` IS LOAD-BEARING, NOT TIDINESS.** Band 3 of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting `identityGroup` — a literal already re-captured twice, whose own note says no third is expected. Living inside the gate is what makes the flag-off header structurally unable to see this node; a sibling node reached by a second condition would have forced that third re-capture. **`FLAG_OFF_HEADER_MARKUP` is byte-unmoved.** The flag-ON atom pin did move (+3: `"✎"`, `"Asked when this runs"`, `"0"`) and was re-baselined — **forcing exactly that acknowledgement is what the literal list is FOR.**
+
+**The obligation is still NOT discharged.** The page continues to host the Builder shell, the canvas mount, the publish gauntlet, the descriptor resolution and the save/concurrency machinery. It inherits `56 / 21 / 2977`.
 
 **Re-derived 2026-08-17 (extraction):** `41 commits / 12 phases / 2348 L` · quick-task buckets excluded: `260809`, `260814` · **G-5 FIRES** (12 phases vs threshold 3) — honoured by construction (193.1 / 193.2).
 
@@ -767,6 +871,9 @@ carries the verdict — **honoured by construction ×4 (193.1 / 193.2 / 197 / **
 
 > honoured by construction ×4 (193.1 / 193.2 / 197 / **200.3**) — ⚠ row read `49 / 15 / 2762`. ⚠ **THE ONE DEFECT v3.7 SHIPPED LIVED HERE AND ITS OWN VERIFICATION SCORED IT ✓ VERIFIED: a guard on `persistence.dirty`, which is not a member of `DraftPersistence` — permanently `undefined`, so ▶ Test Run's draft flush NEVER RAN.** ⚠ **NEITHER BEHAVIOURAL TEST COULD SEE IT; ONLY THE TYPECHECK COULD — and the audit ran bare `npx tsc --noEmit`, which checks ZERO FILES.** `-p tsconfig.app.json` names it as TS2339 immediately, so **this page owes the PROJECT-SCOPED typecheck in its acceptance criteria**; the bare command is not a weaker check, it is one that measures nothing and reports success. Detail file carries the fix + its driven counterfactual
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `51 / 17 / 2867` → `55 / 20 / 2956`.** 214-04 widened the panel; 214-13 mounted the describe-door picker. Neither added a concern the page did not already host. Phase buckets gain `214`.
+
 ## `backend/app/api/workflow_runs.py`
 
 **⚠ ADDED 2026-08-19 by Phase 200 plan `200-02` (D-16) — BECAUSE IT WAS ABSENT, NOT BECAUSE IT WAS NEW.** Before this commit the file had **no row in `CLAUDE.md`'s scan list and no section here**, so **G-5 could never have fired on it at any count**. Wave 1 (`200-01`) found it at `3 commits / 3 phases / 260 L` — **EXACTLY AT THE G-5 THRESHOLD**, which is the `libraryRow.ts` / `doorVocabulary.ts` state where a missing row costs most: the guardrail is due to fire on the very next phase and there is nothing for it to fire on. Wave 1 identified **four** files owing rows; this plan owns **one** of them and deliberately did not absorb the other three (`FlowEdge.tsx` → `200-06`, `PhaseTimeline.tsx` and `phaseStatusMeta.ts` → `200-07`).
@@ -815,6 +922,9 @@ carries the verdict — **honoured by construction (200 / 200.1) — at threshol
 
 > ⚠ **was ABSENT from BOTH at THREE phases — exactly at threshold** (added 200, D-16), the `libraryRow.ts` state where a missing row costs most. Honoured by construction (200 / **200.1**) — ⚠ row read `6 / 4 / 672`, **CURRENT at 200.1's base and stale only because this phase touched it**. ⚠ **THE THREE-PLACE LOCKSTEP IS THE INVARIANT**: projection + model + serializer, because `response_model` DROPS UNDECLARED KEYS SILENTLY — and only the `.select()` string is invisible to every type checker; 200.1 moved the model + serializer of a projection that **already selected the column**, so that string is asserted byte-identical. ⚠ **NEW INVARIANT: READ EXACTLY ONE KEY BY NAME** — never iterate `output`'s keys, never a filtered copy, never a deny-list. A live census found **19 distinct keys, EIGHT in no design document**, so the deny-list was incomplete the day it would have been written (Phase 185: it cannot be made fail-closed). The fence is a **SET EQUALITY over the real response body** with a planted never-before-seen key. ⚠ **The plan's `grep -c 'select("\*")' == 0` criterion was UNSATISFIABLE AT ITS OWN BASE** — it read **2**, both comments, one shipped at base; the fence is an **AST walk** (187-24, fifth firing). ⚠ Its test fake's `select` was a **no-op that discarded its column list**; the counterfactual was DRIVEN — a forgotten projection passed GREEN under the old fake. ⚠ `output` is SELECTED and now has **exactly ONE key on the wire**; `0` ≠ `null`
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `7 / 5 / 776` → `11 / 8 / 1003`.** 214-02 widened the read side with the failure reason; 214-16 with the launch inputs. Both are fields on models this file already serializes. Phase buckets gain `214`.
+
 ## `backend/app/models/thread.py`
 
 **ADDED 2026-08-21 (Phase 200.1, plan `200.1-01`) — and it was ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE.** Re-derived at this plan's base commit `4ffae459` with the `CLAUDE.md` recipe: **`12 commits / 8 phases / 217 L`** — **G-5 FIRES at 8 phases against a threshold of 3**, and `grep -c "models/thread.py" CLAUDE.md` returned **`0`**. The file has been invisible to its own guardrail since the project began: the `backend/app/config.py` finding (42 phases) and the `frontend/src/components/layout/ChatLayout.tsx` finding (21 phases) for a third time, and found the same way — by re-deriving the triple of a file a plan was about to edit rather than by reading the table. ⚠ **It was NAMED IN ANOTHER FILE'S SECTION WITH NO ROW OF ITS OWN** (`backend/app/api/workflow_runs.py` → *"THE READ-SIDE EXTRACTOR HAS ONE HOME, AND IT IS NOT THIS FILE"*), which is precisely the drift the same-commit sync rule forbids — the `useTemplateFirstDraft.ts` state, one directory over. Phase buckets, verbatim: `08` · `075` · `092` · `098` · `127` · `188` · `194.1` · `200`. It inherits **`13 / 9 / 295`** with this plan's own commit.
@@ -841,6 +951,9 @@ Stated rather than left implied. The named test is *does this add a genuinely SE
 carries the verdict — **honoured by construction (200.1)** — and this is the cell it carried before the split:
 
 > ⚠ **THIS FILE NOW HOLDS THE FIRST RECORDED EXCEPTION TO ITS OWN LOCKSTEP RULE (`D-200.1-02-A`).** `WorkflowPhaseState` says in writing that it and `WorkflowRunPhaseRead` *"must be widened in the SAME commit"*; `deliverable_text` went on the run model and **deliberately NOT here**, because the rule's stated purpose (*"the same facts, two surfaces, silently disagreeing"*) does not apply — **the chat surface already renders this text: it is the assistant's message**, so adding it would be a SECOND rendering of the same words on the same screen. It also keeps the exposure behind the CANVAS-GATED door (this model's route has none). Written in BOTH places, trigger named: *a chat-surface affordance needing the deliverable independently of the message stream*. ⚠ row read `13 / 9 / 295`, correct at ITS commit and moved by wave 2. ⚠ **was ABSENT FROM BOTH FOR ITS ENTIRE LIFE — invisible to its own guardrail at any count** (added 200.1; measured `12 / 8 / 217` at the plan's base, `grep -c` in CLAUDE.md returned **0**), and ⚠ **it was NAMED IN `api/workflow_runs.py`'s SECTION WITH NO ROW OF ITS OWN** — the `useTemplateFirstDraft.ts` drift, which the same-commit sync rule exists to forbid. honoured by construction (200.1) — one read-side concern gained one helper; `declared_phase_measure`'s body below the opening guard is asserted **byte-identical** against the base commit, with a non-vacuity check on the slice. ⚠ **THIS IS THE ONE HOME FOR THE READ SIDE**: two independent wire models serialize the same `workflow_phases` rows (`WorkflowPhaseState` here, ungated CHAT; `WorkflowRunPhaseRead` there, canvas-gated RUN PAGE) and a second copy is how they come to disagree about one row — `phase_types.py` cannot be reached from the API layer. ⚠ **`0` and `None` are DIFFERENT answers**; `bool` is excluded because it subclasses `int`; and the unwrap must **degrade, never raise** (it parses model-influenced jsonb — a raise 500s the run page for that run's owner). ⚠ **`phase_output_object` exists because the read was silently dead on 484 of 484 `completed` rows** and the absent-arm render is HONEST, so nothing could catch it — D-200.1-01 and its two re-open triggers are recorded IN THE SOURCE
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `14 / 9 / 319` → `16 / 10 / 438`.** 214-16 carried the launch inputs; the read-side lockstep rule and its one recorded exception are unchanged. Phase buckets gain `214`.
 
 ## `backend/app/api/workflows.py`
 
@@ -920,6 +1033,9 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 > extraction due — not taken in q5r, 197 or 192.2; honoured by construction in 192.2 (two optional fields on two existing models), no override. ⚠ **AND HERE IS THE CONTRAST WITH 197, which was MEASURED NOT MODIFIED:** the three library feeds **DO** declare a `response_model`, and that **drops undeclared keys SILENTLY** — a green db test beside an unchanged UI. 192.2 drove all three routes through a real `TestClient` rather than trusting the db test
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `38 / 19 / 2143` → `41 / 21 / 2211`.** ⚠ **THE OBLIGATION IS NOT DISCHARGED.** 214-05 added the argument-satisfiability gate and explicitly did NOT take the extraction. `extraction due` has now stood for three phases. Phase buckets gain `214`.
+
 ## `backend/app/services/harness/grounding.py`
 
 **Re-derived 2026-08-17 (extraction):** `18 commits / 5 phases / 1252 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.1).
@@ -941,6 +1057,9 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 carries the verdict — **honoured by construction (193.1)** — and this is the cell it carried before the split:
 
 > honoured by construction (193.1). ⚠ **MEASURED NOT MODIFIED by 197** — the predicate already had exactly ONE home, so the phase added a second CONSUMER (an import), never a second copy. ⚠ **RE-DERIVED 2026-08-25 (`206.2-04`): the row read `18 / 5 / 1252` and that figure was CURRENT AT THIS PHASE'S BASE — wave 1 moved it, and that distinction is the whole point of this cell. *A cell measured and confirmed is evidence; one nobody re-derived is not, and the two look identical.* ⚠ **THE 189-ERA CR-01 DOCBLOCK IN `_unregistered_tools` MADE TWO CLAIMS THAT STOPPED BEING TRUE THE DAY PHASE 206 LANDED, AND `206.2-01` CORRECTED THEM BESIDE THE ORIGINALS RATHER THAN DELETING THEM.** It said the rule *"costs `external_action` NOTHING"* because the D-03 validator replaces `available_tools` with `[capability]` over a closed `Literal`; Phase 206 made `tool_name` OUTRANK `capability` in that same validator, so an MCP step derives `available_tools = [tool_name]`, rule 2 flagged it, and stage 2.6 `grounding_fidelity` **BLOCKED every MCP publish**. **Nothing caught it because nothing in production could reach the shape** — the authoring door is 206.2's own work, one phase later. ⚠ **THE ADMISSION IS `external_action`-SCOPED AND THAT IS ASSERTED, NOT ASSUMED:** `206.2-04` drove `POST /workflows/validate` with the SAME MCP tool name on an `llm_agent` phase and got `unregistered_tool` / severity `error` / `ok:false`, while the real saved definition returned `{"ok": true, "verdicts": []}`
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `19 / 6 / 1311` → `21 / 8 / 1414`.** ⚠ **Recorded as NOT discharged.** 211 changed the connection's axis and 214 changed nothing here beyond what the argument leaf required; the closed capability set is intact and the seam is still owed. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/PhaseFormPanel.tsx`
 
@@ -1099,6 +1218,9 @@ carries the verdict — **honoured by construction ×5 (185 / 193 / 193.1 / 199 
 
 > honoured by construction ×5 (185 / 193 / 193.1 / 199 / **200**) — ⚠ **the FOURTH consecutive close at which this row was stale, and this time in TWO documents at once**: it read `21 / 10 / 1289` and `200-CHECKLIST.md` §6.6 read `22 / 10 / 1290`, re-derived only hours earlier by `200-01`. ⚠ **`PhaseFormPanel.test.tsx` pins `useState`/`useMemo`/`useEffect` at an ABSOLUTE ZERO** — `199-06` answered it with `FieldGuidance.tsx` and `200-04` with `StepCardSection.tsx`; **the pin passed UNEDITED, measured — the whole 220-line block diffs BYTE-IDENTICAL.** ⚠ **THE EIGHTH LIVE WR-04 SINK LIVED HERE AND ITS RED WAS WORSE THAN PREDICTED**: React REFUSED the function child, so a named tool's chip label rendered as **NOTHING AT ALL**, not as `[Function Object]`. **Next seam NAMED:** the seven per-type field blocks (~360 L) → one `PhaseTypeFields.tsx`. ⚠ **STALE FOR THE FIFTH CONSECUTIVE CLOSE, and this time it was stale BEFORE the phase that corrected it began:** the cell read `24 / 11 / 1375` and measures **`29 / 13 / 1561`** at `206.2-04` — five commits, two whole phases (**205** and **206.2**) and 186 lines adrift. `206.2-03` re-derived it and recorded the correction in a SUMMARY; a figure written in a summary is not in the scan list, which is why it stayed wrong here for one more wave
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `29 / 13 / 1561` → `30 / 14 / 1566`.** 214-07 replaced the JSON textarea with `ArgumentEditor`, a child; the panel gained +5 lines net. Phase buckets gain `214`.
+
 ## `frontend/src/components/workflows/toolNames.ts`
 
 **Measured at creation 2026-08-19 (plan `200-04`): `1 commit / 1 phase / 128 L` · G-5 does not fire (1 phase).**
@@ -1226,6 +1348,9 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 
 > honoured by construction (193.2 / 194 / 192.2 / **200.1**), no override — ⚠ **RE-DERIVED AGAIN AT 200.1's CLOSE AND FOUND CURRENT** (`43 / 21 / 2194`, unchanged): wave 2 did not touch this file, and a MEASURED non-touch is a stronger statement than silence. — ⚠ *"hottest backend module by phase"* is now a **TIE** with `api/workflows.py` (19 each), qualified rather than rewritten. ⚠ ONE shared `LEFT JOIN LATERAL … LIMIT 1`; **`r.user_id = $1` is SECURITY-BEARING** (these feeds bypass RLS) and the `AS` renames are what keep the shipped `WHERE`/`ORDER BY` byte-identical. ⚠ **THE ROW WAS RE-DERIVED AT 200.1 AND FOUND CURRENT (`42 / 20 / 2154`) — a cell measured and confirmed is evidence; one nobody re-derived is not, and the two look identical.** ⚠ **THE THREE TERMINAL PHASE WRITERS STOPPED PRE-ENCODING** (`complete_phase` / `fail_phase` / `record_phase_not_sent`): the pool ALREADY encodes jsonb, so `json.dumps` made every value a STRING SCALAR — **484 of 484 `completed` rows**. **The fix is to stop pre-encoding, NEVER to add a cast**; every SQL literal is asserted byte-identical against the base commit, because `IS DISTINCT FROM 'cancelled'` IS the access boundary on a service-role pool. ⚠ **The `json.dumps` fence is an AST walk, not a regex** — these docstrings discuss `json.dumps` at length (the 187-24 trap, 4th recorded firing). ⚠ **FOUR SHIPPED TEST SITES WERE DEFENDING THE DEFECT** by `json.loads`-ing the bound arg; they now read through the shipped unwrap, because **a test that re-states an encoding PINS that encoding**
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `43 / 21 / 2194` → `48 / 25 / 2585`.** 214 read and wrote the same rows through the same accessors; no second persistence concern entered. Phase buckets gain `214`.
+
 ## `backend/app/services/harness/publish_service.py`
 
 **Re-derived 2026-08-17 (extraction):** `19 commits / 7 phases / 1243 L` · **G-5 FIRES** (7 phases vs threshold 3) — honoured by construction (193.2).
@@ -1299,7 +1424,29 @@ The duplicate row's own cell is preserved verbatim rather than deleted (G-5 ⚠ 
 
 > ⚠ **was ABSENT at ELEVEN phases** (added 206.3); preserves `golden_run_id` and formats exception types clearly on trial run errors.
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `22 / 9 / 1223` → `23 / 10 / 1567`.** The five new lint codes are minted through the same `LintError(` seam the file already owned. ⚠ `test_182`'s drift detector was structurally blind to expression-minted codes — `SEED-220`. Phase buckets gain `214`.
+
 ## `backend/app/services/workflow_authoring.py`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `14 / 8 / 881` → `15 commits / 9 phases / 989 L`** · quick-task buckets: **none** (this file has still never been touched by a dated task). Recorded beside every previous value below, never over them. **G-5 fires at 9 phases and was honoured BY CONSTRUCTION**, argued rather than asserted: the whole diff is **`+110 / -2`**, and the two deleted lines are the two halves of ONE existing prompt sentence that was extended. No new emit path, no new refusal branch, no new `{"ok": False}` return, no `WF_SCHEMA` change, no schema edit anywhere.
+
+⭐ **WHAT 214.1-02 ADDED, AND WHY IT COULD NOT HAVE BEEN THE PROMPT ALONE.** SC#4 requires an AI-drafted workflow to be publishable **without hand-repair** — a GUARANTEE — and this module already records, twice, that *"a prompt clause reduces how often the model composes such a step; it can never guarantee absence."* So the change is two halves:
+
+1. **The cheap half** — `inputs` joins the SAME definition-level sentence that already names `slug`, `version`, `name`, `status` and `business_requirement`. Exactly the `business_requirement` precedent, one field on one sentence. **Measured before the edit: `grep -c inputs` → 0, while `WF_SCHEMA` ALREADY advertised the field and its `InputFieldSpec` `$defs` entry** (asserted at runtime, not assumed). The schema was never the gap; the prompt was. The added clause is **112 characters**, against a 236-char vocabulary frame — proportionate, and not a second nudge toward `external_action`.
+2. **The half that guarantees it** — `_declare_asked_arguments`, a pure walk beside `_check_allowed_connections` in the identical shape: the prompt reduces, the server-side walk of what was ACTUALLY emitted makes the claim true.
+
+⚠ **THE DERIVATION'S RULES, each of which is a way it could have gone wrong:**
+- **`model_copy`, never an in-place mutation and never a model-level validator hook** — the save path persists `model_dump(mode="json")`, so a derivation living in the model would be BAKED into the JSONB. Asserted by a diff criterion: `git diff | grep -c "^+.*\.inputs = "` → **0**.
+- **The SINGLE success path only**, after the vocabulary refusal and beside the two provenance stamps, so a first-emit and a retry-emit result are treated identically. The four `{"ok": False}` returns are **byte-untouched** — a failed generation makes no claim about publishability.
+- **`key = ask_key or <property>`** — the SAME rule `connectors/args.py` resolves and refuses with. A second answer would draft a workflow the publish gate then refuses.
+- **`RESERVED_RUN_INPUT_KEYS` is IMPORTED and skipped**, never re-typed, so a third reserved key inherits the skip with no edit. A declared `folder_id` would mint a field whose value the server strips.
+- **`None` and `[]` are not collapsed** — nothing to add returns `wd` untouched.
+- **It invents no value**: `label` is the key (see `LaunchInputFields.tsx`, where `label === key` reads as an ABSENCE), `required` is the schema default, `type` is the only type this phase has.
+
+⚠ **THE 197 EMIT-CONTRACT FENCE FIRED ON THIS CHANGE, AND THAT IS THE FENCE WORKING.** `inputs` sat in `test_workflow_authoring_requirement.py`'s `ADVERTISED_BUT_NOT_ASKED` allowlist; teaching the prompt to ask for it turned that suite red on the commit that did so. The allowlist is two-directional by design and cannot be grown *or* shrunk in silence, so the row was removed **in the same commit** — and its REASON (*"a generated draft that invented launch inputs would hand the author a form nobody asked for"*) is **preserved verbatim there and refuted on both halves**: no draft could be repaired at all before 214.1 (`BUG-260828-02`), and nothing is invented (only keys the model's own `arg_sources` already named). The removal also left `is_stateful`'s *"same shape as `inputs` above"* cross-reference dangling; that row now carries its own reason instead of a borrowed one.
+
+**The seam the next refactor should take** is unchanged and neither taken nor obstructed by 214.1: grounding-assembly reads and definition-shaping are already two concerns, and `_declare_asked_arguments` joins the second.
 
 **Re-derived 2026-08-17 (extraction):** `12 commits / 6 phases / 572 L` · **G-5 FIRES** (6 phases vs threshold 3) — honoured by construction (193.2).
 
@@ -1321,6 +1468,9 @@ carries the verdict — **honoured by construction (193.2 / **197**)** — and t
 
 > honoured by construction (193.2 / **197**) — gained ONE key on ONE success return (`readiness`), sourced by IMPORT from `grounding.py`; row read `12 / 6 / 572`
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 7 / 625` → `14 / 8 / 881`.** 214-13 enforced the describe door's vocabulary constraint on the EMITTED definition rather than on the prompt. Phase buckets gain `214`.
+
 ## `backend/app/models/harness.py`
 
 **Re-derived 2026-08-17 (extraction):** `17 commits / 16 phases / 611 L` · **G-5 FIRES** (16 phases vs threshold 3) — honoured by construction (193.2).
@@ -1341,7 +1491,16 @@ carries the verdict — **honoured by construction (193.2)** — and this is the
 
 > honoured by construction (193.2)
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `17 / 16 / 611` → `20 / 19 / 766`.** 214-01 added `arg_sources` to `ExternalActionPhaseConfig`; 214-02 the failure reason. Both are fields on shapes this file already owns. Phase buckets gain `214`.
+
 ## `frontend/src/components/workflows/builderStore.ts`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `12 / 6 / 907` → `14 commits / 8 phases / 968 L`** · quick-task buckets excluded: `260809`. Recorded beside every previous value below, never over them. **G-5 fires at 8 phases and was honoured BY CONSTRUCTION:** `setDeclaredInputs` is **the SIXTH `meta` writer** and takes the shape the five before it take — a spread producing a fresh `meta` object, which is exactly what the store's own dirty subscription and `useDraftPersistence`'s two-reference identity check key on.
+
+⭐ **IT IS THE ONE WRITE PATH FOR `definition.inputs[]`**, and that single-home rule is what lets the client-side extras fence live at one minting site (`declaredInputs.declaredInputFor`) rather than being re-spelled at every caller. `selectDefinition` is literally `{ ...meta, phases }` and `updateWorkflowDraft` sends it whole with no whitelist — so **every key this store puts on `meta` reaches the wire**, including one the API module has never named. That was DRIVEN and then FALSIFIED (repointing this action's write at a differently-named key reddens the assertion), not reasoned about.
+
+⚠ **THE COROLLARY IS A STANDING HAZARD FOR ANY FUTURE `meta` WRITER:** because nothing filters, a stray key added here reaches a server model that FORBIDS extras, and the first autosave after it returns 422 with the write lost. A new `meta` field is therefore a change to the server shape too, in the same commit.
 
 **Re-derived 2026-08-17 (extraction):** `11 commits / 5 phases / 837 L` · quick-task buckets excluded: `260809` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.2).
 
@@ -1443,6 +1602,9 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 > honoured by construction (194)
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `46 / 16 / 2567` → `54 / 20 / 3135`.** The approval composer takes the service it cannot know as a parameter; a failing connection lookup can no longer kill the pause. Phase buckets gain `214`.
+
 ## `frontend/src/components/chat/RunCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `21 commits / 9 phases / 608 L` · **G-5 FIRES** (9 phases vs threshold 3) — honoured by construction (194).
@@ -1462,6 +1624,11 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 carries the verdict — **honoured by construction (194)** — and this is the cell it carried before the split:
 
 > honoured by construction (194)
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `21 / 9 / 608` → `22 / 10 / 661`.** 214-11 mounted `StepIdentity`; the card takes props from the same wire as every other surface (T-214-11-04). Phase buckets gain `214`.
+
+**⚠ RE-DERIVED AT PHASE 227's CLOSE (2026-09-04, plan `227-03`) — recorded BESIDE the previous value, never over it: `24 / 10 / 688` → `26 / 12 / 728`.** Gained `RunTerminalStatus` (SC#1 / SC#3 single-owner terminal status row). Phase buckets gain `224` and `227`.
 
 ## `frontend/src/components/chat/MessageInput.tsx`
 
@@ -1601,6 +1768,9 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 
 > honoured by construction (194.1)
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `10 / 5 / 629` → `13 / 7 / 736`.** ⚠ **A shipped vocabulary with no consumer.** 214-11 measured `ASK_PAUSED` count `0` in this file. Recorded as an open finding, not as a mitigation. Phase buckets gain `214`.
+
 ## `frontend/src/pages/WorkflowRunPage.tsx`
 
 **RE-DERIVED 2026-08-17 AT PHASE 195 CLOSE (plan `195-08`):** `14 commits / 4 phases / 1156 L` · **G-5 FIRES** (4 phases vs threshold 3) — **PAST the threshold now, not at it** — honoured by construction (194.1, **195**). **⚠ ONE SEAM OF THE FIVE THIS SECTION NAMED HAS BEEN TAKEN — see "The seam, TAKEN" below.**
@@ -1660,6 +1830,9 @@ carries the verdict — **honoured by construction (194.1)** — and this is the
 carries the verdict — **honoured by construction (200, 200.1, **200.2**)** — and this is the cell it carried before the split:
 
 > honoured by construction (200, 200.1, **200.2**) — centre re-composed (hero -> summary strip -> step list in both views), foot region retired, modular leaf components mounted (`RunHero.tsx`, `RunStepList.tsx`), line count dropped 1830→1601. ⚠ **THE DELIVERABLE REGION NAMES ITS DELIVERABLE BY TYPE AS OF 200.1 — FOUR RENDERS, NONE FOLDED** (row read `23 / 6 / 1683`, CURRENT at 200.1's base). It was file-only, which was TRUE AND USELESS on the common case: **479 rows carry `output.text` against 60 carrying a file, 8×**. ⚠ **THE FILE-ONLY ARM IS PROVED BYTE-IDENTICAL** — the region's whole `innerHTML` captured by rendering `3a14fc08`'s OWN component before any page edit, never re-captured from the new code. ⚠ **THE ANSWER IS THE LAST ROW WITH TEXT, NOT THE FINAL ROW, AND NOT *ANY* ROW WITH TEXT** — a `confirm` step's `text` is a **QUESTION**. ⚠ **THIS HEADING MAY CLAIM AUTHORSHIP AND THE FILE HEADING MAY NOT** (D-02's list is THREAD-scoped; the answer is the run's own rows). ⚠ **THE OLD SENTENCE IS SUPERSEDED, NOT DELETED** — all FOUR reference sites moved in one commit. ⚠ **A PROSE MENTION OF THE RAW-HTML ESCAPE HATCH TURNED THIS PAGE'S OWN ZERO-OCCURRENCE FENCE RED, OBSERVED** (187-24, sixth firing) — that fence sweeps RAW source, unlike the `codeOf` empty-state fence. ⚠ **THE FOUR PHASE-195 SEAMS REMAIN AND NONE WAS TAKEN HERE.** ⚠ **THE HEADER IS A TWO-CELL BAND AS OF 2026-08-20, and that is the fix for a defect a CONSTANT could not reach.** `RunSpine` carried a `h-[72px]` strip whose docblock said it *"MATCHES THE PAGE HEADER'S HEIGHT"* — it could not, because it cannot SEE that header; measured, the page header renders **112px**, so the panel's heading sat **90px** below the page's. Two flex cells make them equal height BY CONSTRUCTION. ⚠ **`items-center`, NOT `items-end`** — the left cell has THREE rows (back 16–36, title 44–71, state 79–95), so bottom-aligning landed 25px low; centring lands within **2px** and spends **no constant at all**. ⚠ row read `19 / 6 / 1474`. ⚠ **A SIXTH SEAM WAS TAKEN 2026-08-20 — THE CANVAS CAME OFF THIS PAGE** and the centre is now `RunTranscript`, the run log. Row read `16 / 6 / 1329`, stale by 3 commits / 145 L before this change ran. ⚠ **NOTHING PASSES `runState` TO `WorkflowCanvas` ANYWHERE IN THE PRODUCT NOW**, so the canvas's RUN MODE has no mount: `BC-MR-01`'s payload label, the marching `live` connector and the run-tense connection states render nowhere. All three are COMPUTED and KEPT — re-open trigger: **branching becoming representable** (backlog foundation 2), the first time a graph of a run shows anything a list cannot. ⚠ **`useGroundingBundle` was REMOVED with it** (F7's fix had no other consumer here; it still reads verbatim from `WorkflowBuilderPage.tsx`). honoured by construction (**200**) — one of five seams TAKEN (195); **FOUR STILL REMAIN and none was taken here**, stated rather than left implied by `honoured`. ⚠ row read `15 / 5 / 1197`. ⚠ **THE PLAN'S OWN PREMISE WAS REFUTED BY MEASUREMENT:** it says the elapsed *"is anchored at component MOUNT … which is exactly why navigating away and back restarts it"* — F3/F6 had ALREADY anchored it on `claimed_at ?? created_at`, both SERVER timestamps. `BUG-260610-01`'s timer half is closed on BOTH figures and asserted on both; its **duplicate-avatar half is NOT taken and `status: open` must NOT be flipped**
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `25 / 8 / 1601` → `28 / 9 / 1670`.** T-214-11-04's rule at the render layer: one resolver, many renderers, so two surfaces cannot disagree about the same step at the same moment. Phase buckets gain `214`.
 
 ## `frontend/src/components/chat/OutputFileCard.tsx`
 
@@ -1895,6 +2068,9 @@ carries the verdict — ****the HOTTEST file in the repository** — ⚠ RE-DECL
 
 > **still the HOTTEST file in the repository.** ⚠ **THE 197 DECLINE'S RE-OPEN TRIGGER FIRED AT 200.2 — `getWorkflowRunPhaseCitations` is a RUNTIME export, not a type — so the decline is OWED AN ANSWER at the next phase that touches this file: take the extraction, or re-decline in writing with a fresh trigger.** Carrying the old *“it did not fire”* sentence forward is no longer available. ⚠ `196-08`'s mock-factory failure did not fire, and that is LUCK, not the trigger being satisfied. ⚠ The row's phase figure has now been mis-counted TWICE (read `103`, measures `102`) — **re-derive with the recipe, never increment the cell by hand**. Full derivation + the three superseded “decline holds” sections: detail file ⚠ **ANSWERED AT 204-03: RE-DECLINED IN WRITING**, with a trigger deliberately stronger than the one it replaces because that one was paid off twice — *the NEXT phase adding a runtime export here TAKES the split, or escalates it as a phase of its own; it may NOT re-decline.* ⚠ **204-03 spent the mock budget IN ADVANCE for the first time (11 factories, same commit), and a factory-SHAPE census is part of that budget: 3 of the 12 suites named did not match the assumed idiom and one needed nothing at all (`importActual` spread).**
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `182 / 105 / 412` → `187 / 110 / 422`.** ⚠ **This row does NOT cover `lib/api/*.ts`.** 214 added rows for the three modules it touched; the other nine remain absent from the scan list. Phase buckets gain `214`.
+
 ### `backend/app/config.py`
 
 **Re-derived 2026-08-18 (plan `196-09`): `71 commits / 42 phases / 1285 L`** · six-digit dated quick-task
@@ -1994,7 +2170,24 @@ carries the verdict — **⚠ absent at 56 phases (added 196)** — and this is 
 
 > ⚠ **was ABSENT at FIFTY-SIX phases** (196) — a union member added here owes a `SUBSTEP_META` entry in the same commit
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `70 / 56 / 1154` → `71 / 57 / 1203`.** 214 added the argument-source, launch-input and step-identity shapes here. Phase buckets gain `214`.
+
 ### `scripts/vitest-count-gate.cjs`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `124 / 24 / 4045` → `127 commits / 25 phases / 4189 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814`. Recorded beside every previous value, never over them. **Honoured by construction:** the edit adds one `TARGETS` line and re-baselines six BASELINE pins — **no logic, no threshold and no check changed.** Its standing finding — *absent at 16 phases, the file that ENFORCES the guardrails* — is NOT discharged by this and must not appear to be.
+
+⭐ **THE TWO-KNOB TRAP, MEASURED TWICE IN ONE PHASE WITH OPPOSITE ANSWERS.** `214.1` created two suites ten directories apart:
+- `DeclaredInputsEditor.test.tsx` printed `— 16 new` on a pre-pin run, so it was **already executing** under the `src/components/workflows` **directory** entry. It needed a pin ALONE; a TARGETS line would have been noise.
+- `WorkflowBuilderPage.declaredInputs.test.tsx` printed **no row whatsoever**, because `src/pages` is reached by **NAMED FILES ONLY** — there is no `src/pages` directory entry. It needed **BOTH** knobs; the pin alone would have guarded a file the gate never runs.
+
+**TARGETS decides what RUNS; BASELINE decides what is GUARDED**, and a suite can sit on the wrong side of exactly one of them. The check was made per file from the gate's own printed rows, never inferred from the sibling ten lines away.
+
+⚠ **SIX PINS WERE RE-BASELINED, NOT BUMPED, and the distinction is the point.** Every figure was read from the gate's own `actual` column on a pre-edit run: `PublishGauntlet.test.tsx` **46 → 83**, `builderStore.test.ts` **52 → 77**, `soulData.test.ts` **36 → 58**, `LaunchInputFields.test.tsx` **15 → 20**, `PublishRefusalList.test.tsx` **22 → 25**, plus `declaredInputs.test.ts` **adopted at 25**. `PublishGauntlet.test.tsx` was the worst: pinned at 46 against a file running 83 — and **stale by 32 BEFORE this phase started** — it left **thirty-seven cases on the publish surface deletable in silence.** A pin far below its actual is not a lightly-guarded file, it is very nearly an unguarded one.
+
+⚠ **THREE OF THE SIX WERE EDITED AT THEIR ORIGINAL LINES rather than re-declared in the new block.** A second entry for the same key in an object literal is a silent LAST-WINS override that reads as two facts and behaves as one; each now carries a pointer back to the block that explains it.
+
+⚠ **THE ARITHMETIC CLOSED WITH NO RESIDUAL, which is what distinguishes growth from drift.** Pinned total `5581 → 5707` = **+126**, attributed exactly: `25 + 9 + 37 + 25 + 22 + 5 + 3`. Grand total `6426 → 6435` = **+9**, exactly the new suite's nine cases. Verdict: `count gate OK — 135/135 pinned files present, no per-file decrease, 0 failing.`
 
 **⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `100 / 16 / 3215` → `101 commits / 17 phases / 3259 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814` — recorded beside the previous value, never over it. ⚠ **THIS ROW WENT STALE INSIDE THE PLAN THAT WROTE IT**: the figure was measured *after* 197's own gate commit landed, because a triple taken before it would have been wrong by one commit the moment the task finished. That is the self-staling this ledger documents about `WorkflowsPage.tsx`, `WorkflowCard.tsx` and `WorkflowBuilderPage.tsx`, now observed on the file that ENFORCES the guardrails.
 
@@ -2048,6 +2241,9 @@ the next phase touching this file owes a refactor recommendation FIRST.**
 carries the verdict — **⚠ absent at 16 phases (196) — the file that ENFORCES the guardrails** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at SIXTEEN phases — on the file that ENFORCES the guardrails** (196; row read `100 / 16 / 3215`). ⚠ Raising a pin necessarily deletes one line; a `grep -c '^-[^-]'` expecting 0 is WRONG — **but 197's edit was `+44 / -0`, because ADDING a pin is not RAISING one**. ⚠ **RE-DERIVED 2026-08-25 (206.1-03): this cell read `114 / 19 / 3797`, kept here beside the corrected figure.** Plan `206.1-01` measured `114 / 22 / 3797` at its base and `115 / 23 / 3845` after its own commit — ⚠ **both of those PHASE counts are WRONG, and the error is the instructive part: they did not subtract the THREE six-digit DATED QUICK-TASK buckets** (`260807` · `260808` · `260814`), which this file's own recipe requires. The shipped `19` HAD subtracted them correctly and was merely stale. The current figure is **20** — `23` buckets minus `3` dated. **Run the recipe; never increment a cell, and never quote a count that skipped the subtraction step**. ⚠ **RE-DERIVED AGAIN 2026-08-25 (`206.2-04`): `118 / 21 / 3909`**, one day after the `115 / 20 / 3845` above — this file moves on nearly every phase and its cell has now been corrected in **three consecutive** passes. ⚠ **`206.2-04` ADDED TWO PINS AND RAISED NONE, so its diff is `+38 / −0` — MEASURED, and the ZERO is the point**: raising a pin necessarily deletes one line, so a zero-deletion diff on this file is positive evidence that no existing baseline moved. ⚠ **`McpToolPicker.test.tsx` HAD NEVER BEEN PINNED SINCE PHASE 206** — `grep -n "Mcp" scripts/vitest-count-gate.cjs` returned **NOTHING** at 206.2's base while the printed column read `— 12 new`, so the entire MCP tool surface's suite could have been deleted with the gate green
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `118 / 21 / 3909` → `124 / 24 / 4045`.** This phase's close added twelve BASELINE keys taken from the gate's OWN printed `— N new` figures, never hand-derived. Phase buckets gain `214`.
 
 ### `backend/app/main.py`
 
@@ -2184,6 +2380,84 @@ genuinely second concern owes a refactor recommendation FIRST.**
 carries the verdict — **⚠ absent at 16 phases (added 196)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at SIXTEEN phases** (196) — SC#3's scope fence lives here (`verified_models` untouched)
+
+### `backend/app/services/multimodal_service.py`
+
+**Re-derived 2026-08-28 (SEED-227): `14 commits / 7 phases / 984 L`** · six-digit dated quick-task buckets:
+**checked, none exist** · **G-5 FIRES** (7 phases vs threshold 3) — **absent from this ledger for its entire
+life**, so the guardrail could never fire on it at any count.
+
+**What SEED-227 did:** added `_record_image_truncation` and one call to it, so a document whose image count
+exceeds `multimodal_max_vision_calls` records `metadata._images = {total, read}`.
+
+**Why G-5 is honoured by construction:** one new leaf helper and one guarded call at the point where the cap
+was already applied. No change to the vision loop, the size guard, the dedup, the chunking or the embed path.
+
+**⚠ WHAT BINDS THIS FILE:**
+
+1. ⚠ **The cap has truncated in TOTAL SILENCE since Phase 072.** `test_app_settings_max_vision_calls_read`
+   has pinned since then that a cap of 3 over 10 images produces 3 describe calls — it pinned the CAPPING and
+   nothing ever pinned the TELLING. The other 7 images were unreachable *and* unmentioned, on a document
+   reporting a clean ingestion. **A green suite proved the truncation worked; nothing asked whether anyone
+   was told.**
+2. ⚠ **`documents.metadata` must be READ-MERGE-WRITTEN, never overwritten.** It is one jsonb column and
+   **two GENERATED columns read from it** — `document_type_norm` from `document_type`, `date_typed` from
+   `date`. A bare overwrite blanks a classification and a date, and the generated columns follow silently.
+   `test_truncation_note_preserves_existing_metadata` is the fence, driven RED against a planted defect.
+3. **The stamp is `_`-prefixed by CONTRACT, not by taste.** `DocumentDetailPanel` documents that it "always
+   ignores `_`-prefixed keys" and never enumerates raw metadata — that is what keeps a system fact off the
+   user's editable field list, the same contract `_confidence`, `_source` and `_classification` rely on.
+4. **Absence is the signal.** `_images` is written ONLY on truncation, so the quiet path stays quiet; a note
+   written unconditionally would warn on every document in the library and train people to ignore it.
+5. **The whole function swallows every exception by design** ("never blocks ingestion"), and the new helper
+   carries its own try/except so a metadata write can never cost the image rows that follow it.
+   `test_a_failing_metadata_write_never_costs_the_image_rows` pins that.
+6. ⚠ **The tests in `test_multimodal_extraction.py` reach the real OpenAI embeddings endpoint** and log a
+   401 with the fake key. Pre-existing, harmless to the assertions, and noted so the next reader does not
+   read it as a new failure.
+
+**The named seam, if this file is next opened for extraction:** the vision-description loop
+(`describe_image` + downscale + per-image guards) is a separable unit from the storage/chunking half below
+it; SEED-226's full-page-vision path would want that seam rather than a third branch inside this function.
+
+⚠ **217.1-08 wrote `embedded_at` at TWO of its four write sites** — the table-chunk INSERT
+(`:423-432`) and the image-chunk INSERT (`:896-908`). Each chunk row now carries the honest
+"when the vector was written" timestamp (BE-1), using the same `datetime.now(timezone.utc).isoformat()`
+idiom as `documents.py:2296`. A future dims-change re-embed NULLs it via `resize_embedding_column`
+(mig 140). The `datetime` import added to this file is the only new dependency.
+
+---
+
+### `backend/app/api/documents.py`
+
+**Re-derived 2026-08-30 (Phase 217.1 close): `72 commits / 30 phases / 2535 L`** · six-digit dated
+quick-task buckets (`260328`, `260405`) present and subtracted (the recipe's own warning) · **G-5 FIRES
+HARD** (30 phases vs threshold 3) — ⚠ **absent from this ledger for its ENTIRE LIFE**, among the hottest
+files in the repository. Row added by 217.1-08, the first plan to structurally edit it this phase.
+
+**What 217.1-08 did:** added `"embedded_at": datetime.now(timezone.utc).isoformat()` to the main-ingest
+chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_service.py:423` and `:896`,
+`reembed_service.py:187` are the other three). No routing, handler or response-model change.
+
+**What binds this file:**
+
+1. ⚠ **It owns the `_upload_pipeline` and the RLS-scoped document/version/chunk reads.** 11 routes, not
+   one of which read the retrieval facts SC#4 needs — which is exactly why Phase 217 concluded **ZERO
+   backend** for the Library's index facts and why BE-2 (`GET /library/index-summary`, plan 09) lives in a
+   NEW `backend/app/api/library.py`, not here. Adding a cross-folder aggregate to this file is the wrong
+   direction (RESEARCH §G).
+2. ⚠ **`ingestion_step` is NEVER CLEARED on completion** (D-217-23) — it reads `"metadata"` by residue,
+   and `text_sanitize.py:9` diagnoses BUG-260825-01 by reading `status=failed / ingestion_step=embedding`.
+   `:1308` legitimately nulls it on reingest. Do not "fix" this.
+3. **The chunk INSERT is one of FOUR `document_chunks` write sites** — a future change to the chunk-row
+   shape must touch all four or the sites silently diverge (this is exactly the D-217.1-35 correction:
+   a two-site plan leaves table/image chunks NULL forever).
+
+**No seam is named yet** in the source material; state *"none proposed — owed to a future refactor phase"*
+rather than inventing one under 217.1-08's own budget. The 11-route surface and the `_upload_pipeline`
+are the obvious candidates for that future phase.
+
+---
 
 ### `backend/app/services/harness/validator_kinds.py`
 
@@ -2456,7 +2730,14 @@ Both files are present in `CLAUDE.md` and both fire G-5 — `MessageItem.tsx` at
 tenth was found by measuring the phase's real diff rather than trusting the plan's list**, and it
 fires G-5.
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 9 / 623` → `16 / 10 / 755`.** 214-11 fixed `BUG-260826-05`'s render half: the sentinel fires only when the DB-backed reason AND the wire reason are both empty (whitespace counts as empty). Phase buckets gain `214`.
+
 ### `frontend/src/components/workflows/soulData.ts`
+
+**⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `11 / 9 / 465` → `12 commits / 10 phases / 499 L`** · no dated quick-task buckets. Recorded beside the figures below, never over them. **G-5 fires at 10 phases and 214.1-01 honoured it by construction:** it added `RESERVED_LAUNCH_INPUT_KEYS`, the CLIENT MIRROR of the backend's `RESERVED_RUN_INPUT_KEYS` (`kickoff_prompt`, `folder_id`).
+
+⚠ **THE MIRROR IS ASSERTED BY ITERATING THE SHIPPED SET, NEVER BY RE-TYPING ITS MEMBERS**, so a third reserved key inherits the refusal with no edit here. That is the only property that makes a second spelling of a one-owner set acceptable: this one is an authoring-time REFUSAL that can be too strict but never too lax, and the server strips these values regardless. The authoritative half is `backend/app/models/message.py`; `workflow_authoring._declare_asked_arguments` (214.1-02) imports it rather than mirroring it, because a server-side derivation has no excuse for a copy.
 
 **Measured 2026-08-18 (plan `197-11`): `9 commits / 7 phases / 373 L`** · buckets: `124 · 127 · 183 ·
 184 · 189 · 193 · 197`, no dated tasks · **G-5 FIRES** (7 phases vs threshold 3).
@@ -2486,7 +2767,12 @@ carries the verdict — **⚠ absent at 7 phases (added 197)** — and this is t
 
 > ⚠ **was ABSENT at SEVEN phases** (added 197) — the plan's own nine-file list did not name it either; ⚠ `templateAdmission` has THREE states and `unknown` is not `does-not-admit` — a boolean cannot express D-20
 
-### `frontend/src/components/workflows/decisionsVocabulary.ts` — young (1 phase)
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `9 / 7 / 373` → `11 / 9 / 465`.** 214-09 read this file's shapes; no second concern entered. Phase buckets gain `214`.
+
+### `frontend/src/components/workflows/decisionsVocabulary.ts`
+
+> young (1 phase)
 
 **Measured 2026-08-18: `1 commit / 1 phase / 226 L`.** The ONE five-row decision vocabulary: the words
 each row shows, and which rows have a readiness arm at all.
@@ -2503,7 +2789,9 @@ carries the verdict — **young (197)** — and this is the cell it carried befo
 
 > young (197) — the ONE five-row decision vocabulary; a TRUE LEAF (it imports nothing). ⚠ **ONLY ROW 3 MAY CLAIM A PUBLISH REQUIREMENT** — its sentence arrives on the wire; the other four would be claiming a gate nothing enforces
 
-### `frontend/src/components/workflows/DecisionsList.tsx` — young (1 phase)
+### `frontend/src/components/workflows/DecisionsList.tsx`
+
+> young (1 phase)
 
 **Measured 2026-08-18: `1 commit / 1 phase / 329 L`.** The ONE renderer for the five decision rows.
 
@@ -2520,7 +2808,9 @@ carries the verdict — **young (197, 199)** — and this is the cell it carried
 
 > young (197, 199) — the ONE decisions renderer. ⚠ **THREE ARMS, NEVER TWO**: an ABSENT readiness renders nothing affirmative, which is not a green one; a boolean re-introduces "unknown reads as satisfied"
 
-### `frontend/src/components/workflows/DraftArrivalCard.tsx` — young (1 phase)
+### `frontend/src/components/workflows/DraftArrivalCard.tsx`
+
+> young (1 phase)
 
 **Measured 2026-08-18: `1 commit / 1 phase / 338 L`.** The ONE arrival receipt — it **composes**
 `SeedReceipt` rather than widening it, which is why `SeedReceipt.tsx` closes the phase at `0 0` on
@@ -2543,7 +2833,9 @@ carries the verdict — **young (197)** — and this is the cell it carried befo
 
 > young (197) — the ONE arrival receipt, composing `SeedReceipt` without widening it. ⚠ **the suppression list is LOAD-BEARING**: four frame/duplicate handles and NO content handle, or the fold silently BLANKS — and a blank fold is green in every geometry assertion
 
-### `frontend/src/components/workflows/useTemplateFirstDraft.ts` — young (2 phases)
+### `frontend/src/components/workflows/useTemplateFirstDraft.ts`
+
+> young (2 phases)
 
 **Measured 2026-08-18: `5 commits / 2 phases / 630 L`** · buckets `193.1 · 197`. The pre-draft template
 concern `193.1-05` cut out of `WorkflowBuilderPage.tsx`.
@@ -2592,6 +2884,9 @@ mid-phase); **`libraryFilter.ts` and `libraryRow.ts` were found by nobody until 
 exactly the state a row-scanning audit cannot see.** *"Present but only in prose"* is the condition
 `MessageInput.tsx` sat in for twelve phases inside two other rows' cells. Being mentioned is not being
 listed. They now have rows.
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `5 / 2 / 630` → `6 / 3 / 673`.** ⚠ **Its heading carried trailing prose, so the CLAUDE.md link `#frontendsrccomponentsworkflowsusetemplatefirstdraftts` resolved to nothing.** A row whose anchor is dead is the same failure as a row whose path is dead. Fixed here; four sibling headings had the same defect. Phase buckets gain `214`.
 
 ### `frontend/src/components/workflows/library/libraryVocabulary.ts`
 
@@ -3596,6 +3891,9 @@ carries the verdict — **⚠ absent from BOTH for its ENTIRE LIFE (added 200)**
 
 > ⚠ **was ABSENT from BOTH for its ENTIRE LIFE — invisible to its own guardrail at any count** (added 200, X-16); §6.6 measured `7 / 5 / 267` hours earlier in the same phase. ⚠ **SOLE mount `WorkspacePanel.tsx:542`, whose sole mount is `ChatLayout.tsx:673` — a change here LANDS IN CHAT FIRST and workflow-only UAT will miss it.** ⚠ **The frame re-read is LATEST-WINS BY SEQUENCE, and that was forced by measurement:** the obvious `[threadId, phaseSignature]` effect DROPPED ITS OWN RE-READ (the slice is itself fetch-derived, so a settling reconcile tore down the fetch it was awaiting — four reads issued, frame still on the first payload). **A starved read here is a STALE READING, not a blank.** Abort scoped to the THREAD
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `8 / 6 / 370` → `9 / 7 / 385`.** 214-11 asserted invariant #4 here per surface with runtime-assembled needles rather than literals. Phase buckets gain `214`.
+
 ## `frontend/src/components/panel/phaseStatusMeta.ts`
 
 **ADDED 2026-08-20 by plan `200-07` (X-16), and listed BELOW the G-5 threshold ON PURPOSE** — the
@@ -4030,7 +4328,12 @@ by *honoured by construction* — the file grew 147 lines and is now **1,830**, 
 the tree. The region itself is the obvious candidate at ~150 lines with its own copy block; its re-open
 trigger is unchanged. It inherits `24 / 7 / 1830`.
 
-### `frontend/src/components/workflows/RunTranscript.tsx` — `6 / 2 / 652`, unmounted in Phase 200.2, retained-as-tested
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `40 / 21 / 815` → `41 / 22 / 911`.** 214-12 added the chat launch moment as `ChatLaunchForm.tsx`, a separate file, and reused `LaunchInputFields` rather than growing a second renderer. Phase buckets gain `214`.
+
+### `frontend/src/components/workflows/RunTranscript.tsx`
+
+> `6 / 2 / 652`, unmounted in Phase 200.2, retained-as-tested
 
 The obligation carried from Phase 200.1 is DISCHARGED here. In Phase 200.2, `RunTranscript.tsx` was unmounted from `WorkflowRunPage.tsx` and replaced by `RunStepList.tsx` (the step-card process trace) and `RunHero.tsx` (the top deliverable card).
 
@@ -4445,6 +4748,9 @@ Hot service-role database module shared across routes and background engines.
 
 ---
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `6 / 2 / 652` → `7 / 3 / 652`.** ⚠ Its cell read `no (2 phases)` while measuring `7 / 3 / 652`. It is unmounted since 200.2 and retained-as-tested, so the fire is real and the file is unreachable at the same time. Phase buckets gain `214`.
+
 ## `frontend/src/components/settings/ConnectionsTab.tsx`
 
 **Re-derived at `206.1-03`'s own commit (2026-08-25): `8 commits / 3 phases / 1223 L` · ⚠ G-5 FIRES,
@@ -4509,6 +4815,9 @@ phase while the component itself gained an entire second interior.
 carries the verdict — **honoured by construction (206.1)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE — invisible to its own guardrail at any count** (added 206.1-03; `grep -c` over CLAUDE.md returned **0** for this path and for its four siblings below). ⚠ **AND IT WAS ALREADY NAMED INSIDE ANOTHER FILE'S SECTION WITH NO ROW OF ITS OWN** — `backend/app/db/workflows.py`'s section cites `ConnectionsTab.tsx:841` as a fourth consumer: the `useTemplateFirstDraft.ts` drift, which the same-commit sync rule exists to forbid. **Adding this row does NOT license removing that mention.** honoured by construction (206.1) — **next seam NAMED:** `ConnectionRow` + its two confirm sheets (`:495-775`, ~280 L) → `ConnectionRow.tsx`; ⚠ **206.1-02 DOUBLED this component's render logic** (a second row interior), so the case is stronger than when the phase opened. ⚠ **THE ⋯ MENU IS SHARED BUT THE CREDENTIAL CELL IS NOT** — `actionContent` is built once and placed by both shapes, while `credentialReadingOf` is called at **two** sites; a change to one that is not made to the other passes any test that renders only `renderTab`, which still defaults to WIDE. ⚠ ZERO `[title]` nodes, asserted with a menu AND a sheet open, so a tooltip is not available as a truncation fix. ⚠ The WIDE render is pinned BYTE-FOR-BYTE by an `outerHTML` capture — a diff there is a BEHAVIOUR CHANGE, not a test to update. ⚠ `connections-row-credential`'s textContent is asserted by EXACT EQUALITY, which is why the dense inline label is a SIBLING node
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 5 / 1414` → `17 / 7 / 1477`.** 214-08 moved `connectionMark` out from under `settings/`; this tab now imports the shared `lib/` map like every other surface. Phase buckets gain `214`.
 
 ## `frontend/src/components/settings/ConnectionFormPanel.tsx`
 
@@ -4658,8 +4967,7 @@ carries the verdict — **no seam proposed — the same verdict as its sibling**
 
 > ⚠ **was ABSENT FROM BOTH for its entire life** (added 206.1-03); it measured `2 / 2 / 531` at this phase's base. **No seam proposed**, the same verdict as its sibling. ⚠ **INVARIANT: ALL FOUR LADDERS END WITH A NEUTRAL TERMINAL RETURN AND EVERY ARM NAMES ITS OWN CONDITION** — 206.1-03 rewrote two here (`configFromDraft`, `destinationFooterOf`) and two in the panel (`typedHost`, `secretLabel`), each armed against a synthetic FIFTH shape **plus** the prototype-key set. ⚠ **`stringsOfModule()` WALKS `connectionRefusalCopy` ONLY**, so the nine-banned-terms and absolute-verb fences NEVER covered this module — 206.1-03 **EXTENDED the sweep**, with a non-vacuity control naming its seven new identifiers by identity. **Never let a future reader infer inherited coverage.** ⚠ `CAPABILITY_CHOICE_MCP_LABEL` is declared ABOVE `CAPABILITY_CHOICES` because a `const` is NOT hoisted for initialisation — reading it from the array literal first is a temporal-dead-zone `ReferenceError` at module load, which no type checker reports
 
-## `frontend/src/components/settings/connectionMark.tsx`
-
+## `frontend/src/lib/connectionMark.tsx`
 **Measured at `206.1-03`'s commit (2026-08-25): `1 commit / 1 phase / 232 L` · G-5 does not fire
 (1 phase).** Created by `206.1-01`.
 
@@ -4697,6 +5005,9 @@ character IS the blank mark D-206.1-10 forbids, wearing a disguise.
 carries the verdict — **young (206.1-01)** — and this is the cell it carried before the split:
 
 > young (206.1-01) — the ONE service→mark map, ⚠ **listed BELOW the threshold ON PURPOSE** (the `fileIcon.tsx` / `libraryRow.ts` precedent), because a file escapes G-5 for years purely by not being written down: `WorkflowsPage.tsx` for ten phases, `config.py` for its entire life. ⚠ Read through `hasOwnProperty.call`, **NEVER a coalesced bracket read**. ⚠ The MCP arm is resolved by `mcp_server_url`, **never by a missing capability** — the capability map holds THREE keys only, so a server-supplied `capability: "mcp"` cannot spoof MCP's mark. ⚠ A miss returns the NAMED NEUTRAL, never `null`. ⚠ **THE MCP MARK CARRIES `fill-current` BECAUSE ITS BODY HAS ZERO FILLS** and would otherwise ship INVISIBLE on Deep Midnight while every test stayed green — **measured in a real browser 2026-08-25: resolved `fill: rgb(107, 114, 128)` with `innerHTML` 1066 chars, against a brand mark's `rgb(0, 0, 0)` root fill, which is correct because a brand body carries its OWN path fills.** ⚠ A `fill-*` utility must NEVER touch a lucide glyph, whose `fill="none"` presentation attribute a CSS rule overrides
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 2 / 217` → `7 / 4 / 313`.** ⚠ **Its path changed in 214-08 and a row whose path no longer exists is invisible to the audit scan.** Re-keyed here, section moved with it, in the same commit. Re-derived with `git log --follow`: `4 / 2 / 217` → **`7 / 4 / 313`**. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/phaseVocabulary.ts`
 
@@ -4812,6 +5123,9 @@ carries the verdict — **honoured by construction (206.2)** — and this is the
 
 > ⚠ **was ABSENT from BOTH and it CROSSED the threshold inside this phase's own commits** — the `FlowEdge.tsx` / `phaseStatusMeta.ts` / `libraryRow.ts` state, the one where a missing row costs most: at 2 phases nobody was obliged to write it down, at 3 it fires, and a file with no row is permanently invisible to its own guardrail at any count. Honoured by construction (206.2). ⚠ **`bind()` WRITES EXACTLY `["connection_id"]`**, swept over every driven call and observed RED against a planted write — the multi-key clear lives at the SHAPE-CHOICE site, never here. ⚠ **THE GUARD IS ON THE EFFECT, NOT MERELY ON THE WRITE**, so a provider-less render opens no request and six shipped suites stay unaffected. ⚠ **THE MCP READ TAKES NO ARGUMENT AND THAT ONE LINE IS SEED-200**: the shipped read passed a capability, an MCP row's capability is NULL, so the `McpToolPicker` mount below was DEAD CODE behind a filter. **Driven in a real browser 2026-08-25:** `GET /connectors/connections` on the MCP shape beside `GET …?capability=send_email` on the capability shape. ⚠ Every arm of `destinationPartsOf` NAMES its own condition and the tail is NEUTRAL
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `5 / 3 / 651` → `7 / 5 / 888`.** ⚠ **The honest outlier of the phase.** +186 L is the largest single growth 214 put on a G-5-firing file, and the seam this row has named since 206.2 is untaken. Phase buckets gain `214`.
+
 ## `frontend/src/components/workflows/ExternalActionSection.tsx`
 
 **Measured at `206.2-04`'s commit (2026-08-25): `4 commits / 3 phases / 498 L` · G-5 **FIRES —
@@ -4887,6 +5201,9 @@ Its non-vacuity control (a step with NEITHER a capability NOR a tool still yield
 carries the verdict — **honoured by construction (206.2)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT from BOTH with ZERO mentions anywhere**, and it crossed the threshold in `206.2-03`. Honoured by construction (206.2) — a SECOND AXIS in its own group with its own words in a leaf module, and the shipped capability branch's DOM asserted byte-identical below the new control. ⚠ **EXACTLY THREE `external-action-option` / `role="radio"` CHILDREN, pinned at FIVE sites** — `206.2-03` PLANTED the capability testid onto a shape segment and watched 20+ cases go red, restoring md5-identical. ⚠ **THE SOURCE AUTHORS NO SENTENCE** and names only imported identifiers; no `useContext`/`useStore`/`useEffect`/`zustand`, no `title=` — which is precisely why the grant control's org read had to live in `McpToolPicker.tsx`. ⚠ **THIS IS THE ONE PLACE A CONFIG KEY IS CLEARED**, as a SET plus `connection_id`; ⚠ `key={phase.slug}` is what stops a pressed segment leaking across steps. **Seam NAMED:** the shape derivation plus the two clearing patches (~40 L) are the only DECISION in the file
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 3 / 498` → `8 / 5 / 179`.** A net deletion is the strongest form of the G-5 claim: the raw-JSON argument surface was removed and nothing replaced it. The seam this row names is nevertheless still owed. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/McpToolPicker.tsx`
 
@@ -4965,6 +5282,9 @@ approvable by a person instead of by a hand-edited database row.
 carries the verdict — **⚠ named inside Phase 206's section with no row of its own (added 206.2)** — and this is the cell it carried before the split:
 
 > ⚠ **NAMED INSIDE PHASE 206's SECTION WITH NO ROW OF ITS OWN — the `useTemplateFirstDraft.ts` drift the same-commit sync rule exists to forbid**, and the reason it gets a row two phases early. ⚠ **IT IS THE FIRST AND ONLY PRODUCTION CALLER `updateConnectorGrants` HAS EVER HAD** (measured `0` at 206.2's base), on a function that shipped in Phase 206 while the engine's gate is `tool_grants.get(tool_name) is True` — **a missing key DENIES**. ⚠ **THE WRITE SENDS THE FULL MERGED MAP FROM THE SERVER-OWNED PROP**; `{[tool]: next}` alone is a whole-column REPLACE that wipes every other grant AND TYPECHECKS PERFECTLY. **Proved at T4 2026-08-25:** granting a second tool put `{"read_wiki_structure":true,"read_wiki_contents":true}` on the wire. ⚠ **NO OPTIMISTIC FLIP** — the switch moves when the row it renders from changes. ⚠ **FOUR AUDIENCE ARMS, NOT THREE**, and the split of *unmeasured* into `no-provider` / `probing` is load-bearing in both directions
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `3 / 3 / 645` → `5 / 5 / 601`.** 214-07 removed more than it added here. The reachability case lives inside `ArgumentEditor.test.tsx`, already covered by the gate's `src/components/workflows` directory entry. Phase buckets gain `214`.
 
 ## `frontend/src/components/workflows/externalShapeVocabulary.ts`
 
@@ -5071,6 +5391,9 @@ carries the verdict — **young (206.2)** — and this is the cell it carried be
 
 ---
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `47 / 21 / 2664` → `50 / 23 / 2809`.** 214-01 re-pointed this file at the argument leaf (`backend/app/services/connectors/args.py`) for BOTH shapes, so the resolution logic left. ⚠ **An `upstream` argument source is INERT on native capability rows here** — see `SEED-217`. Phase buckets gain `214`.
+
 ## `backend/app/services/harness/publish_service.py`
 
 **Measured at `206.3-01`'s commit (2026-08-25): `21 commits / 11 phases / 1223 L` · G-5 FIRES (11 phases vs threshold 3).**
@@ -5102,6 +5425,9 @@ verbatim below, under its own heading, so the link now lands on something.
 carries the verdict — **⚠ absent at 7 phases (added 199)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT at SEVEN phases** (added 199) — the 8-stage gauntlet + the judge hard-wall. ⚠ **BOTH shipped "no override" guards were MEASURED BLIND by `199-03`:** with a live `<a href="/publish?force=1">Proceed to publish anyway</a>` planted inside `HardWall`, the `?raw` source regex AND the `queryAllByRole("button")` filter both passed GREEN — a source regex cannot see a control composed from a variable, and a button scan cannot see a link. Only a role-SET scan went red
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `14 / 7 / 1025` → `16 / 8 / 1245`.** 214-10 moved the refusal render out into its own component and vocabulary rather than growing the gauntlet's own body. Phase buckets gain `214`.
 
 ### `frontend/src/components/workflows/PhaseSpineGraph.tsx`
 
@@ -5148,6 +5474,9 @@ carries the verdict — **⚠ absent, on the boundary (added 199)** — and this
 
 > ⚠ **was ABSENT, on the boundary** (added 199) — the `libraryRow.ts` state where a missing row costs most. The two doors' ONE string home; `DESCRIBE_REFUSAL` (added `199-08`) is its 23rd governed id and is IMPORTED by `WorkflowBuilderPage.tsx`. ⚠ **That page is a SWEPT SOURCE of the D-24(a) copy fence — re-spelling a sentence there instead of importing it turns the fence RED**
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 3 / 341` → `6 / 4 / 540`.** ⚠ **`T-214-03-01` was REFUTED AS WRITTEN here.** A literal `dangerouslySetInnerHTML` count under `src/components/workflows` returns EIGHT, every one a docblock saying NEVER use it — the 187-24 trap. The shipped fence anchors on the `=` of the prop assignment. Phase buckets gain `214`.
+
 ### `frontend/src/components/workflows/StepTypePicker.tsx`
 
 `7 / 3 / 522` · G-5 ⚠ **FIRES — EXACTLY AT THRESHOLD**
@@ -5165,6 +5494,9 @@ carries the verdict — **honoured by construction (199) — ⚠ absent, on the 
 carries the verdict — **⚠ absent, on the boundary (added 199)** — and this is the cell it carried before the split:
 
 > ⚠ **was ABSENT, on the boundary** (added 199) — the run launch dialog, the LIGHTEST of the three library guard grades. ⚠ **No fabricated estimate may reach it**; the graded ladder (delete = victim-naming heaviest, fork = lightest) is a SAFETY grade, and removing text is this phase's premise while removing a grade is not
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 3 / 526` → `8 / 5 / 713`.** 214-09 built the fields here and 214-12 took the deferred seam: `LaunchInputFields.tsx` is now the single renderer three doors mount. Phase buckets gain `214`.
 
 ### `frontend/src/components/panel/PanelEmpty.tsx`
 
@@ -5319,6 +5651,9 @@ carries the verdict — **young (200, **200.2**)** — and this is the cell it c
 
 > young (200, **200.2**) — the run panel's own column, and the surface that carries the ANSWER CONTROL. ⚠ **Count sub-line removed in 200.2 (D-05 / A-02 load-bearing)**: the centre says WHAT was yielded; the spine says WHEN and HOW LONG. ⚠ **ITS HEADER STRIP IS GONE (2026-08-20) and its docblock's claim that the panel *"owns its header strip"* is corrected at source**: a strip here cannot match a height it cannot see, so the heading moved to the page's two-cell header BAND. ⚠ **THE ASK RENDERS INSIDE THE SPINE, AT THE STEP IT BELONGS TO** — a stack floating above the list says something is waiting and not WHICH thing. **VERIFIED BY DRIVING A REAL RUN 2026-08-20**, the first time this had ever been seen render: the card appears at its own step, in violet, with the STEP'S OWN AUTHORED CHOICES (never a fixed Approve/Send back), and answering it resumed the run. ⚠ The rail was `bg-border` = `rgb(33, 38, 49)` and effectively invisible on this panel; it is `bg-muted-foreground/40`. The sheet's accent progress SEGMENT is declined with a trigger
 
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `3 / 2 / 372` → `5 / 3 / 426`.** ⚠ It crossed 3 phases in the commit that this row records — the same self-staling this ledger has documented repeatedly. Phase buckets gain `214`.
+
 ### `frontend/src/components/workflows/NodeIconWell.tsx`
 
 `4 / 2 / 190` · G-5 no (2 phases)
@@ -5345,6 +5680,9 @@ carries the verdict — **young (200.2)** — and this is the cell it carried be
 carries the verdict — **young (200.2)** — and this is the cell it carried before the split:
 
 > young (200.2) — step-card process trace with declared count yield and lazy-loaded citations on click.
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `1 / 1 / 298` → `2 / 2 / 339`.** 214-11 mounted the shared identity here. Its suite ran under the gate's directory entry but was guarded by nothing until this phase's close pinned it at 17. Phase buckets gain `214`.
 
 ### `frontend/src/components/workflows/runColumnVocabulary.ts`
 
@@ -5444,3 +5782,1269 @@ carries the verdict — **young (192.1, 192.2)** — and this is the cell it car
 carries the verdict — **young (192.2)** — and this is the cell it carried before the split:
 
 > young (192.2) — ⚠ **listed because its entire 192.2 history is an ADD then a REMOVE**: it is byte-identical to its pre-sketch shape. The app has **no url router** (`SEED-185`), so a guarded pathname branch here is the throwaway-surface precedent **and** its teardown — a dev route that outlives its sketch becomes production surface by accident
+
+
+---
+
+## Phase 211 · 2026-08-27 — FIVE connector-surface files reach the G-5 threshold in ONE phase, and four had no row at all
+
+⚠ **Every triple below was RE-DERIVED FROM GIT in the worktree at Phase 211's wave 4**, using
+`CLAUDE.md`'s recipe verbatim, with six-digit dated quick-task buckets subtracted. **Nothing was
+copied forward from `211-MEASUREMENTS.md` §2**, and the reason is that the measurement pack was
+captured *before the phase began* — plans 211-01 and 211-02 then edited three of these files, so
+two of §2's four figures were already stale by the time the phase reached this plan:
+
+| File | `211-MEASUREMENTS.md` §2, captured pre-phase | **re-derived at wave 4** |
+|---|---|---|
+| `backend/app/models/connector.py` | `4 / 2 / 346` | **`5 / 3 / 450`** |
+| `backend/app/services/mcp_client.py` | `2 / 2 / 367` | **`3 / 3 / 400`** |
+
+**That is this ledger's own repeated finding arriving on schedule** — a figure written at a
+phase's open goes stale on the next commit that touches the file, sometimes within the same
+phase. The two rows moved from *below* the G-5 threshold to *at* it, which is the difference
+between a row a future auditor skips and a row that fires.
+
+### ⭐ THE HEADLINE: all five cross the threshold in THIS phase, and it is the same shape the
+### Settings surface hit at Phase 206.1 and `config.py` hit for the project's entire life
+
+Every one of the five has **exactly three** numeric phase buckets, and `211` is the third in
+every case:
+
+| File | commits / phases / lines | buckets |
+|---|---|---|
+| `backend/app/models/connector.py` | `5 / 3 / 450` | `190` · `206` · `211` |
+| `backend/app/services/mcp_client.py` | `3 / 3 / 400` | `206` · `209` · `211` |
+| `backend/app/api/connectors.py` | `6 / 3 / 734` | `190` · `206` · `211` (plus a non-numeric `connectors` bucket, correctly discarded) |
+| `backend/app/services/connector_service.py` | `7 / 3 / 1149` | `190` · `206` · `211` |
+| `frontend/src/components/workflows/McpToolPicker.tsx` | `3 / 3 / 645` | `206` · `206.2` · `211` |
+
+⚠ **FOUR OF THE FIVE HAD NO ROW IN `CLAUDE.md` AT ALL, so G-5 could never have fired on any of
+them at any count.** Measured before these rows were written:
+`grep -c "backend/app/models/connector.py" CLAUDE.md` → **0**, and the same for
+`mcp_client.py`, `api/connectors.py` and `connector_service.py`. Three of the four are the
+**entire backend connector surface** — the model that decides which shapes are representable,
+the route module that admits them, and the service that resolves credentials for them.
+
+⚠ **AND THE FIFTH HAD A ROW THAT WAS PRESENT AND WRONG, WHICH IS THE WORSE STATE.**
+`McpToolPicker.tsx`'s row read `2 / 2 / 570 | no (2 phases) | ⚠ named inside Phase 206's section
+with no row of its own (added 206.2)` — a disposition describing the moment *before* the row
+existed, attached to the row that fixed it, over a triple stale by one phase. A row that answers
+the auditor with *"no (2 phases)"* stops the audit; an absent row at least leaves the absence
+visible. **Plan `211-05`'s own task text inherited that stale cell** and instructed this plan to
+*add* a row for a file that already had one — recorded here rather than tidied away, because the
+plan being wrong in exactly the way the ledger predicts is the finding.
+
+⚠ **`connector_service.py` was in the third state again — NAMED IN ANOTHER FILE'S SECTION, with
+no row and a DEAD ANCHOR.** This document already carried
+`### backend/app/services/connector_service.py — Phase 206, honoured by construction` at `:4424`,
+nested under the Phase 206 narrative. That heading's anchor is
+`#backendappservicesconnector_servicepy--phase-206-honoured-by-construction`, so a `CLAUDE.md`
+link to `#backendappservicesconnector_servicepy` would have landed nowhere. The `##` section
+below is what makes the new row's link resolve — the `useTemplateFirstDraft.ts` drift, one more
+time, on the backend.
+
+---
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `22 / 9 / 1223` → `23 / 10 / 1567`.** The five new lint codes are minted through the same `LintError(` seam the file already owned. ⚠ `test_182`'s drift detector was structurally blind to expression-minted codes — `SEED-220`. Phase buckets gain `214`.
+
+## `backend/app/models/connector.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `5 commits / 3 phases / 450 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211`.
+
+**What it is.** The request/response trio for `public.connector_connections`, and — this is the
+part that matters — **the place where WHICH SHAPES EXIST is decided.** `ConnectorConnectionCreate`
+is the API's gate; the CHECK constraints in migration 127 are the gate for every writer that is
+not the API. The two must agree exactly (D-211-04): a model LAXER than the database yields a 500
+where a 422 belongs, and a model STRICTER than it refuses a row the database would have stored.
+
+**Phase 211's change, and why it is honoured by construction.** `_validate_connection_shape` gained
+an arm at each END and the two existing arms are byte-unchanged: FIRST a refusal of the AMBIGUOUS
+body (both a capability and an endpoint), LAST the SERVICE-ONLY shape, which **replaces** the old
+blanket refusal that demanded one of the two. `service_id` became REQUIRED on every shape.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE AMBIGUOUS ARM'S POSITION IS LOAD-BEARING.** The ambiguous body carries an
+  `mcp_server_url`, and the MCP branch RETURNS — so an arm placed after it would never run.
+- ⚠ **A WIDENED `config` UNION ONCE SWITCHED WR-05 OFF, AND IT WAS MEASURED, NOT REASONED ABOUT.**
+  `ConnectorConfig | dict[str, Any]` meant a raw dict satisfied the annotation outright, so
+  Pydantic's smart union stopped coercing a capability row's config into its bound model and the
+  deterministic capability↔config binding never ran on the wire path it exists to defend. Three
+  bodies were ACCEPTED that should not have been, including `send_email` with an empty config and
+  no secret. **The fix is to branch on the SHAPE and validate each on its own terms, never to
+  loosen the shared path.**
+- ⚠ **THE SERVICE-ONLY ARM DELIBERATELY DOES NOT INHERIT THE CAPABILITY ARM'S SECRET OR CONFIG
+  REQUIREMENTS.** An OAuth-authenticated service has neither until Phase 215, and demanding one
+  would make the shape unusable in the only case it exists for.
+- ⚠ **`ConnectorConnectionResponse` IS THE REAL T7 GATE** — no `secret_ciphertext` field, no
+  `secret` field, `extra='forbid'`. A column added to the table tomorrow cannot reach a client
+  unless somebody adds the field HERE, in a diff a reviewer reads.
+- ⚠ **`ConnectorCapability` IS THE THIRD SPELLING OF ONE CLOSED SET** and the agreement is a
+  module-scope assert, checked at import. Nothing here is remembered.
+
+**Seam NAMED, for the phase that needs it:** the three per-capability config models plus their
+binding are ~90 L of pure data-shape that has nothing to do with the request/response trio; a
+`models/connector_configs.py` leaf is the cut, and it becomes worth taking the moment a fourth
+service shape appears (Phase 212's catalog, or Phase 215's OAuth rows).
+
+---
+
+## `backend/app/services/mcp_client.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `3 commits / 3 phases / 400 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `206` · `209` · `211`.
+
+⚠ **ABSENT FROM BOTH DOCUMENTS FOR ITS ENTIRE LIFE** — and it is the module that performs the
+app's only live outbound MCP egress, so an audit that never sees it never sees the egress.
+
+**What it is.** The Model-Context-Protocol client: `list_tools` and the tool-call dispatch, the
+per-tool sanitizer, and the auth-header builder that deliberately returns headers with NO
+`Authorization` for a credential-less public server.
+
+**Phase 211's change.** The tool sanitizer's allow-list was widened by **exactly two keys** —
+`title` and `outputSchema` — and it remains an ALLOW-LIST. That is the whole edit.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE SANITIZER IS AN ALLOW-LIST AND MUST STAY ONE.** An off-list, server-controlled key is
+  DROPPED. **The load-bearing case is the DROP, not the carry** (D-211-09): a remote server
+  chooses these keys, and a deny-list cannot be made fail-closed by extension (the Phase 185
+  lesson, restated on a different surface).
+- ⚠ **`title` REACHING THE WIRE IS WHAT LETS A DESCRIPTOR CARRY ITS OWN WORDS.** Its first and
+  only consumer anywhere is `McpToolPicker`'s option label, which reads `t.title || t.name` —
+  `||` and not `??`, because the sanitizer omits the key for a blank but a `title: ""` arriving
+  by any other route must still fall through to the name.
+- ⚠ **AN ABSENT `readOnlyHint` STILL FAILS CLOSED** (D-211-10). Widening the allow-list did not
+  widen what is TRUSTED.
+- ⚠ **IT IS IMPORTED LAZILY, INSIDE FUNCTION BODIES.** A standing fence asserts that a cold
+  `import app.services.harness.phase_types` loads no vendor module until a send happens.
+
+**Seam NAMED:** the sanitizer (~60 L) is a pure function over an untrusted dict and shares nothing
+with the transport; it is the natural leaf, and the phase that adds a third MCP consumer should
+take it.
+
+---
+
+## `backend/app/api/connectors.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `6 commits / 3 phases / 734 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211` (a sixth commit carries a non-numeric `connectors` bucket, which
+the recipe correctly discards).
+
+**What it is.** Every route for `connector_connections`: list, get, create, update, delete, the
+credential check, `POST /connections/{id}/discover`, and `PATCH /connections/{id}/grants`.
+
+**Phase 211's change.** `discover_tools`'s docstring stopped being true — *"discover tools from a
+remote MCP server"* — because a first-party CAPABILITY connection now refreshes here too, with no
+network call at all. The route gained `ConnectorNothingToDiscover` and a 409 arm.
+
+### Invariants a future editor is bound by
+
+- ⚠ **THE EXCEPTION ORDER IS THE CONTRACT, NOT A STYLE.** `ConnectorNothingToDiscover` **IS** a
+  `ConnectorError`, so an arm placed below the generic clause would be dead code. Both must stay
+  above the bare `except Exception`.
+- ⚠ **THE 502 IS NARROWED TO THE ARM THAT CAN ACTUALLY MEET A GATEWAY.** A capability refresh
+  contacts nothing; reporting its failure as *bad gateway* misnames an internal fault as a remote
+  one and sends the reader hunting an outage. **This is not hypothetical** — the same shape was
+  measured in live UAT on 2026-08-25, when a caching write refused by a missing column grant
+  surfaced as a **502 "MCP tool discovery failed"** after the remote server had already answered
+  correctly.
+- ⚠ **`require_visible("live_connectors")` IS PER ENDPOINT, NEVER ON THE ROUTER** (D-26). A
+  router-level gate would silently cover routes added later, including read-only ones.
+- ⚠ **A CROSS-ORG ID AND A NONEXISTENT ID PRODUCE THE SAME RESPONSE.** Answering *"you may not
+  have this"* confirms the id names a real row in some other org.
+- ⚠ **`org_id` AND `created_by` ARE HARD-SET FROM THE CALLER.** There is no body field for either,
+  because that would be the D-14 tenant-selection leak with a friendlier name.
+
+**Seam NAMED:** the module has one shape worth cutting — the ~120 L of exception→HTTP mapping,
+which is pure and testable and currently interleaved with six handlers. A
+`api/connector_errors.py` leaf makes the ordering invariant above assertable in one place
+instead of at each call site.
+
+---
+
+## `backend/app/services/connector_service.py`
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `7 commits / 3 phases / 1149 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
+Phases: `190` · `206` · `211`.
+
+⚠ **IT HAD NO ROW AND A DEAD ANCHOR** — see this phase's headline above. The `###` heading at
+`:4424` (*"Phase 206, honoured by construction"*) is kept where it is; this `##` section is what
+makes `CLAUDE.md`'s link resolve, and the two are not in conflict.
+
+**What it is.** The credential resolver (`resolve_connection` — the headline security gate of
+Phase 190), the CRUD, the tool-discovery cache write, and the grant write.
+
+**Phase 211's change.** `discover_connection_tools` gained a second arm: a capability connection
+refreshes from `descriptors.static_descriptors_for_capability` with **no network call at all**, so
+ONE refresh path serves both reachable shapes and a stale action list self-heals in one click.
+`resolve_connection`'s credential-less relaxation gained its **second** scoped shape.
+
+### Invariants a future editor is bound by
+
+- ⚠ **`resolve_connection` TAKES `org_id` WITH NO DEFAULT, AND A TEST ASSERTS THAT MECHANICALLY**
+  via `inspect.signature`. An optional org scope is the id-only `SELECT` wearing a disguise: it
+  type-checks, it reads scoped, and it silently defaults to unscoped for every caller that
+  forgets. **The leak was reproduced in this module before it was closed** — org A's run received
+  org B's decrypted bot token.
+- ⚠ **THE SECOND GATE IS NOT REDUNDANT.** The storage layer is asked to scope, and the row it
+  returns is CHECKED to have obeyed. That term is what survives a future fetch seam whose SQL
+  drops the `org_id` predicate.
+- ⚠ **THE CREDENTIAL-LESS RELAXATION IS SCOPED TO THE TWO CREDENTIAL-LESS SHAPES AND NOWHERE
+  ELSE.** A CAPABILITY connection with no secret is still `ConnectorNotFound`, unchanged: an SMTP
+  host, a Jira instance and a Slack workspace each REQUIRE a credential, so a row without one is
+  absent *for the purpose of sending*. Phase 211 adds the SERVICE-ONLY shape for the same reason
+  the MCP shape was added, not by widening the rule.
+- ⚠ **`_project(...)` IS NOT OPTIONAL ON A WRITE THAT MAY RUN ON THE USER-JWT CLIENT.**
+  postgrest-py sends `return=representation` by default — `RETURNING *` — and migration 118 grants
+  `authenticated` SELECT column by column, omitting `secret_ciphertext`, so the star is refused
+  every single time. `discover_connection_tools` shipped without it and the failure was measured
+  in live UAT.
+- ⚠ **`_fetch_connection_row` IS THE ONE QUERY HERE THAT MAY STILL SAY `select("*")`**, because
+  migration 118 leaves `secret_ciphertext` readable by `service_role` alone and this is the only
+  caller that needs it.
+- ⚠ **`tool_grants` IS NEVER TOUCHED BY ANY DISCOVERY ARM.** A descriptor ADVERTISES an action; it
+  does not GRANT one, and the executor's gate denies on a missing grant key by design.
+- ⚠ **THE GRANT WRITE IS A WHOLE-COLUMN REPLACE**, so every client of it must send the full merged
+  map. It is a read-modify-write over a client snapshot with no version column; the honest
+  mitigation is the scope sentence, not a lock.
+
+**Seam NAMED:** the resolver plus its two gates (~150 L) is the security-bearing half and shares
+nothing with the CRUD half but a table name. `services/connector_credentials.py` is the cut, and
+the phase that adds OAuth (215) will be holding the knife anyway — a token-refresh lifecycle
+belongs beside the resolver, not beside `delete_connection`.
+
+---
+
+### `frontend/src/components/workflows/McpToolPicker.tsx` — Phase 211 update
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `3 commits / 3 phases / 645 L` · ⚠ G-5
+FIRES, EXACTLY AT THRESHOLD.** Phases: `206` · `206.2` · `211`. The file's main section is at
+[`McpToolPicker.tsx`](#frontendsrccomponentsworkflowsmcptoolpickertsx); this is the Phase 211
+addendum, and the row it corrects is described in this phase's headline above.
+
+**Honoured by construction (211).** ⭐ **THE CARD GATE WAS SPLIT INTO THE TWO DECISIONS IT WAS
+CONFLATING, NEVER RE-POINTED AT A DIFFERENT SINGLE FIELD.** What was there answered *should this
+card exist?* and *is there a list to show?* from ONE field — the connection's server URL — so a
+bound capability connection carrying a perfectly shaped `discovered_tools` rendered NOTHING.
+
+- **the CARD** gates on `!connection?.id` — *are we bound?*, the honest question, because the
+  component is only ever mounted after an author has chosen a connection;
+- **the TOOL LIST** gates on `tools.length === 0`, where it always did;
+- **the REFRESH control** gates on AUDIENCE ONLY. **No shape condition was added**, and that is
+  what makes 211-02's capability arm of `discover_connection_tools` reachable at all —
+  `handleDiscover` is that route's only caller in the entire product.
+
+⚠ **THE OBVIOUS REPLACEMENT IS A WORSE DEFECT, AND IT IS REFUSED IN WRITING AT THE SITE.**
+*"Render when `discovered_tools.length > 0`, else return null"* reads like the honest form of
+D-211-12 and closes a loop with no way out: empty list → card returns null → the Refresh control
+(which lives BELOW the gate) never renders → nothing can populate the list. It would ALSO regress
+the MCP path, where a brand-new connection legitimately starts at `[]`. **Revision iteration 1 of
+this phase caught exactly that gate being proposed.**
+
+⚠ **`grantsEnforced` IS A PROP, NOT A LOCAL READ, AND THAT IS THE WHOLE POINT.** D-211-12 forbids
+this component taking any rendering decision from the connection's endpoint — its own suite
+sweeps the live source for that field and finds zero occurrences. But the grant gate really IS
+endpoint-shaped on the server: `phase_types.py` reads `tool_grants` only inside its remote-server
+branch, so on the capability path a step is not refused by that map at all. Rendering *"Permission
+Not Granted — execution will be refused by policy at run time"* over a first-party connection
+would be a measured lie. **The caller — which is allowed to know a connection's shape — answers
+the question; this component renders the consequence.** The obligation was CREATED by this plan
+and DISCHARGED by it: before the card rendered for a bound capability row, the sentence could not
+appear on one.
+
+⚠ **VALUES CHANGED; NOT ONE IDENTIFIER AND NOT ONE `data-testid` DID.**
+`git diff … | grep -cE '^[-+]\s*data-testid='` → **0**. Five constants said *tools* / *discover* /
+*remote server*, which read as a remote-server act on a card that now also serves a first-party
+connection. `mcp-tool-picker`, `mcp-discover-btn`, `mcp-no-tools`, `mcp-tool-select` and the
+`mcp-grant-*` family are pinned across three suites and renaming them would be churn with no
+defect behind it.
+
+**Guarded by, as of `211-05`:** `connectionCardReachability.test.tsx` (10 cases, pinned in both
+count-gate knobs) drives the render gate through the PRODUCTION CHAIN against the four REAL row
+shapes and **constructs not one prop of this component**. It was observed RED against the
+pre-211-04 gate planted back into this file — **4 of 10 failing, with the MCP-empty case correctly
+still green**, which is what makes the RED discriminating rather than blanket.
+
+---
+
+### `backend/app/services/harness/phase_types.py` — Phase 211 (NOT EDITED, and that is the record)
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `46 commits / 21 phases / 2627 L` · G-5
+FIRES.** The row previously read `45 / 20 / 2621`; the movement is **Phase 210's**, not 211's.
+
+⚠ **THE ROADMAP FLAGS THIS PHASE AS THIS FILE'S REFACTOR, AND THE PHASE MODIFIED IT ZERO TIMES.
+THAT IS SAID PLAINLY HERE RATHER THAN WRITTEN AS `satisfied`** — a row that is present and wrong
+answers the auditor and stops the audit, which is worse than an absent row.
+
+**Evidence, run rather than asserted.** Across the WHOLE phase (base `5f2c7d8c` → wave 4):
+
+```
+git diff --numstat 5f2c7d8c HEAD -- backend/app/models/harness.py \
+    backend/app/services/harness/grounding.py backend/app/services/harness/phase_types.py
+```
+
+**prints nothing.**
+
+**Disposition: honoured by construction.** Phase 211's subject is *which shapes a connection may
+wear and how an author browses them* — a model, a migration, two frontend surfaces. The executor's
+branch on those shapes is untouched, deliberately: 211-04's must_have promises it stays untouched,
+and this is a G-5 hot file with no review cycle in the phase.
+
+⚠ **AND THE COST OF THAT DECISION IS RECORDED RATHER THAN ABSORBED.** The third shape this phase
+makes representable meets a line here that predates it:
+
+```python
+if not getattr(connection, "mcp_server_url", None) and getattr(connection, "capability", capability) != capability:
+```
+
+`getattr`'s DEFAULT fires only when the attribute is MISSING, never when its value is `None`, so a
+SERVICE-ONLY connection is recorded-and-not-sent with the sentence *"the bound connection is for a
+different capability"* — which is false: it is not a different capability, it is **no** capability.
+Filed as **`BUG-260827-01`** (`status: open`), recorded in `211-VALIDATION.md`, and given its RED
+in `backend/tests/integration/test_211_service_shape_seam.py` §7, which pins **today's** condition
+AND **today's** sentence separately so a fix that changes one without the other cannot pass. The
+operator closes it via `/gsd:fast` immediately after this phase — ~4 lines, one file, G-3
+territory.
+
+**Re-open trigger for this file's own G-5 obligation:** *the first phase whose `files_modified`
+names it* — which is the `/gsd:fast` above, and which should therefore read this section first.
+
+#### ✅ CLOSURE — 2026-08-27, `/gsd:fast` for `BUG-260827-01`. The section above is PRESERVED, not rewritten, because the prediction being right is the record.
+
+**The `/gsd:fast` this section predicted is the commit that carries this paragraph, and it read
+this section first — which is the re-open trigger working rather than being asserted.**
+
+**Re-derived at the fix's own commit: `47 commits / 21 phases / 2664 L` · G-5 still FIRES.**
+The phase count did NOT move: a `/gsd:fast` commit subject carries no `NNN` bucket, so the
+recipe's `^[0-9]+(\.[0-9]+)?$` filter correctly does not count it. **`21` is therefore not a
+stale figure that escaped a re-derivation — it is the re-derived one**, and the distinction
+matters because this ledger's own repeated finding is that a present-and-wrong row stops an audit.
+
+**What changed, and it is four lines of logic inside forty of comment:**
+
+```python
+if not getattr(connection, "mcp_server_url", None):
+    bound_capability = getattr(connection, "capability", capability)
+    if bound_capability is None:
+        return _record("the bound connection names a service but no way to reach it yet")
+    if bound_capability != capability:
+        ...                      # unchanged — the WR-03 terminal, verbatim
+```
+
+⚠ **THE `getattr` DEFAULT WAS KEPT, AND THAT IS THE LOAD-BEARING CHOICE.** Replacing it with
+`None` reads as a harmless tidy-up and would silently start refusing every caller whose connection
+object carries no `capability` **attribute at all** — a different population from the
+present-and-`None` rows this bug is about. Only present-and-`None` is split out. §7 pins that
+distinction with a dedicated `_RowWithNoCapabilityAttribute`, because a preserved default that
+nothing exercises is a preserved default nobody will preserve next time.
+
+⚠ **THE GUARD WAS NOT WIDENED.** A genuinely mismatched row (`post_message` against a
+`create_ticket` connection) is still refused with the sentence it was written for. The bug report
+named this explicitly as the way a careless fix would delete a real protection while closing a
+wording bug; §7 holds that line as its own assertion.
+
+**The RED fired, and it was measured rather than assumed.** `test_211_service_shape_seam.py` §7
+was authored to pin **today's wrong behaviour on purpose**. Run against the fixed source, the
+original section fails exactly where it was designed to:
+
+```
+>       assert 'getattr(connection, "capability", capability) != capability' in source
+tests\integration	est_211_service_shape_seam.py:684: AssertionError
+1 failed, 13 deselected
+```
+
+— and §7 was rewritten in the **same commit** to pin the two arms and both sentences, then
+`14 passed`. **A fix whose RED was never observed firing is an asserted fix**; this one was.
+
+⚠ **ONE ARM OF THE REPORT IS DELIBERATELY STILL OPEN AND MUST NOT BE READ AS CLOSED BY THIS
+COMMIT.** BUG-260827-01 measured **two** reachable paths and they are different failures. This fix
+closes **arm 2** — the definition/API-reachable state, where a step names a valid capability
+alongside a service-only connection and the run said something untrue. **Arm 1 — the
+UI-reachable state, where `ConnectionPicker.bind` clears the step's `capability` and the closed-set
+guard raises a bare `KeyError` at `phase_types.py:~2323` — is untouched**, and remains a
+stack-trace-shaped failure on the surface whose whole discipline is not over-claiming. It is kept
+asserted in §7's `test_the_ui_reachable_service_only_binding_hits_a_DIFFERENT_arm_first` so it
+cannot quietly disappear. **Re-open trigger: the first phase that gives a service-only connection
+a way to be reached (OAuth, Phase 215) or that touches the closed-set guard.**
+
+⚠ **THE G-5 OBLIGATION IS NOW OWED, NOT HONOURED.** The row above read *honoured by
+construction (211)* on the strength of an **empty diff** — the file was not edited, so there was
+nothing to review. **That diff is no longer empty.** This commit is a G-3 `/gsd:fast` with no
+review cycle, which is the correct instrument for four lines and the wrong one for a 2,664-line
+G-5 hot file's extraction. **The next phase whose `files_modified` names this file must produce a
+refactor recommendation as its FIRST option**, per the ledger scan rule — and must not read the
+`✅` in the row as discharge of anything but the bug.
+
+---
+
+### `backend/app/services/harness/grounding.py` — Phase 211 (NOT EDITED)
+
+**Re-derived at `211-05`'s own commit (2026-08-27): `19 commits / 6 phases / 1311 L` · G-5
+FIRES.** Identical to the figure the row already carried — **the one row in this pass that was
+NOT stale**, recorded because a re-derivation that only reports the rows it changed is not a
+re-derivation.
+
+**Disposition: honoured by construction (193.1, **211**).** `EXTERNAL_ACTION_CAPABILITIES` is the
+runtime home of the closed capability set, and Phase 211 changed **the connection's AXIS, never
+the capability set**. The set is still exactly three, still closed, still held in agreement with
+`harness.py`'s `Literal`, `models/connector.py`'s `ConnectorCapability`, migration 116's SQL
+`CHECK` and the client mirror in `ExternalActionSection.tsx` — five spellings, mechanically
+checked, none of them touched. Empty diff across the whole phase, by the command quoted above.
+
+⚠ **THE MIRROR AND ITS FENCE WERE KEPT WHILE THE CONTROL THAT CONSUMED THEM WAS DELETED**, and
+that is the phase's named anti-pattern avoided rather than committed: *optional* and *closed* are
+independent properties, and retiring a guard while demoting the thing it guards is how a closed
+set quietly stops being one.
+
+---
+
+## `frontend/src/components/settings/ConnectionsTab.tsx`
+
+**Re-derived 2026-08-27 (Phase 212):** `10 commits / 3 phases / 1153 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 206.1, 212.
+
+**Disposition: honoured by construction (212).** Adheres strictly to the unified density catalog layout from `.planning/sketches/203-the-catalog-at-density/index.html`. Column 1 carries Mark + Name + provenance chip (`ADDED BY URL` for uncurated custom MCP) with tagline on line 2 (truncating). Column 5 renders the state dot indicator. Characterized and pinned byte-for-byte in `ConnectionsTab.test.tsx` (77 tests green).
+
+---
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 5 / 1414` → `17 / 7 / 1477`.** 214-08 moved `connectionMark` out from under `settings/`; this tab now imports the shared `lib/` map like every other surface. Phase buckets gain `214`.
+
+## `frontend/src/components/settings/ConnectionFormPanel.tsx`
+
+**Re-derived 2026-08-27 (Phase 212):** `8 commits / 4 phases / 2010 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 211, 212.
+
+**Disposition: honoured by construction (212).** Extended to support `presetServiceId` for preselecting service identity on creation, interactive pre-save discovery probe (`probeMcpServer`), and per-tool grant toggling with persistence. All 144 unit tests green in `ConnectionFormPanel.test.tsx`.
+
+---
+
+## `frontend/src/components/settings/connectionsCopy.ts`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 4 phases / 573 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 206.2, 212.
+
+**Disposition: no seam proposed.** Vocabulary module doing one thing many times. Extended `connectionMatchesQuery` to inspect `service_id`.
+
+---
+
+## `frontend/src/components/settings/connectionFormCopy.ts`
+
+**Re-derived 2026-08-27 (Phase 212):** `6 commits / 4 phases / 968 L` · **G-5 FIRES (4 phases)**.
+Phases touched: 190, 206.1, 211, 212.
+
+**Disposition: no seam proposed.** Vocabulary module doing one thing many times. Added `custom_mcp` and `mcp` mappings to `SERVICE_TO_SHAPE`.
+
+---
+
+## `frontend/src/lib/connectionMark.tsx`
+**Re-derived 2026-08-27 (Phase 212):** `4 commits / 2 phases / 217 L` · **no (2 phases)** — young (206.1-01, 212).
+Phases touched: 206.1, 212.
+
+**Disposition: young.** Added `service_id` resolution order with fallbacks for standard and custom MCP icons. All 42 unit tests green in `connectionMark.test.tsx`.
+
+---
+
+
+**⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 2 / 217` → `7 / 4 / 313`.** ⚠ **Its path changed in 214-08 and a row whose path no longer exists is invisible to the audit scan.** Re-keyed here, section moved with it, in the same commit. Re-derived with `git log --follow`: `4 / 2 / 217` → **`7 / 4 / 313`**. Phase buckets gain `214`.
+
+## `backend/app/models/connector.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `6 commits / 3 phases / 468 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 211, 212.
+
+**Disposition: honoured by construction (212).** Added `McpDiscoverRequest` and `McpDiscoverResponse` models for pre-save interactive discovery.
+
+---
+
+## `backend/app/services/mcp_client.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `4 commits / 2 phases / 407 L` · **no (2 phases)** — young (211, 212).
+Phases touched: 211, 212.
+
+**Disposition: young.** Hardened egress boundary: off-event-loop DNS resolution with threadpool, TOCTOU IP pinning with Host/SNI restoration, `follow_redirects=False`, `trust_env=False`, 2MB response cap.
+
+---
+
+## `backend/app/api/connectors.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 3 phases / 781 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
+Phases touched: 190, 211, 212.
+
+**Disposition: honoured by construction (212).** Added `POST /api/connectors/discover-tools` pre-save probe endpoint gated with `require_visible("live_connectors")` and `require_org_manage`.
+
+**Re-derived 2026-09-03 (Phase 225):** `25 commits / 11 phases / 1678 L` · **G-5 FIRES**.
+Phases touched: 190, 206, 211, 212, 215, 221, 222, 225, etc.
+
+**Disposition: honoured by construction (225):** dual-mode state resolution inside the two functions it already owns (`create_oauth_authorize_url` and `oauth_callback`), plus redirect target path migration to `/app` (B-1). No new endpoints added.
+
+
+---
+
+## `backend/app/services/connector_service.py`
+
+**Re-derived 2026-08-27 (Phase 212):** `7 commits / 3 phases / 1149 L` · **G-5 FIRES (3 phases)**.
+Phases touched: 190, 206.1, 211.
+
+**Disposition: honoured by construction (211).** Connector persistence and decryption service.
+
+
+## frontend/src/pages/SettingsPage.tsx
+
+**Added 2026-08-27, at Phase 212's close, by the reviewer's driven check.** Measured **34 commits /
+21 phases / 1426 lines** — it FIRES G-5 and had **no row for the project's entire life**, so the
+guardrail could never fire on it at any count.
+
+**⚠ RE-DERIVED 2026-08-28 (SEED-227): `38 commits / 21 phases / 1500 L`** — `+4 commits / +74 L` in ONE
+DAY, while the phase count held at 21. **The re-open trigger this row armed at 212's close has now FIRED:**
+its wording was *"the next phase whose `files_modified` names either of them"*, and SEED-227's settings work
+names this file. Recorded as DISCHARGED rather than left armed, because a trigger that fires and is not
+written down is indistinguishable from one that never fired.
+
+**What SEED-227 did:** one `SectionCard` ("Images in documents") added beside the existing Retrieval card,
+plus the three lines every knob on this page already needs — a `useState`, a read in the loader, a key in the
+save payload. **Honoured by construction:** no branch, no effect, no fetch; it copies the shape
+`retrievalTopK` already uses four lines above it.
+
+⚠ **The card's `description` carries the CONSEQUENCE, and that is load-bearing rather than decorative.** A
+bare number is precisely what this setting already was in the database for the whole of its life; surfacing
+the figure without saying that anything past it goes unread would make the control visible and its effect
+still invisible.
+
+⚠ **Its recorded re-open trigger did NOT fire.** Phase 196's D-22 left this file *named-only by
+decision*, with the trigger *"the next phase whose `files_modified` names either of them"*. **Phase
+212 never named it.** `212-05-02`'s must_have nevertheless claimed to add a row for it, and the row
+was **not written** — measured at 212's close with a fixed-string match returning `0`. This row
+therefore closes a known blind spot; it does **not** discharge the trigger, and the next phase that
+actually modifies this file still owes the refactor recommendation G-5 asks for.
+
+**Seam, un-taken:** the file is the Settings shell that mounts every tab (`ConnectionsTab`,
+`ModelRegistryTab`, the model pickers). The obvious cut is tab registration out of the page.
+
+## frontend/src/components/settings/ModelPillRow.tsx
+
+**Added 2026-08-27, same pass, same reason.** Measured **4 commits / 3 phases / 141 lines** — fires
+G-5 exactly at threshold. The D-22 pair to `SettingsPage.tsx` above; the same "claimed but not
+written" note applies.
+
+## frontend/src/components/settings/servicesCatalog.ts
+
+Created by Phase 212 (`212-02`). **2 / 1 / 211.** The curated presentation lookup keyed on
+`service_id` — the one migration 127's `service_id` COMMENT names verbatim: *"The curated 'Popular'
+set (Phase 212) is a PRESENTATION LOOKUP keyed by this value (D-211-02) — a miss degrades to a
+generic mark, NEVER to a refusal and NEVER to a hidden row."*
+
+⚠ **The totality guarantee is the invariant.** `getServiceCatalogEntry` must never throw and never
+return null; an unknown `service_id` (including a bare hostname such as `mcp.deepwiki.com`) resolves
+to a dynamic fallback entry. A future change that narrows this to a closed set re-introduces
+migration 116's `capability` mistake on a nicer axis.
+
+## frontend/src/components/settings/catalogCopy.ts
+
+Created by Phase 212 (`212-02`). **1 / 1 / 22.** Catalog vocabulary — headings, the three state
+filter labels, search placeholder, empty states, and `PROVENANCE_ADDED_BY_URL`.
+
+⚠ **`PROVENANCE_ADDED_BY_URL` is load-bearing and belongs beside the NAME, never in the State
+cell.** Sketch 203 §3 exists because the Stitch pass rendered `Uncurated` *as a state*, which made a
+connected service unreadable as connected. Provenance and connection state are two axes.
+
+## frontend/src/components/settings/connectionRefusalCopy.ts
+
+**1 / 1 / 567** — one phase, but 567 lines, and it had no row from creation until 2026-08-27.
+Refusal vocabulary for the connections surface.
+
+### `backend/app/models/message.py`
+
+**Triple at Phase 214's close (2026-08-28): `15 / 8 / 120` — G-5: ⚠ **FIRES**.** ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16)
+
+On every chat send. Invisible to its own guardrail since the project began — the `config.py` (42 phases) and `ChatLayout.tsx` (21 phases) finding for the fourth time. 214-16 added one launch-inputs field.
+
+### `backend/app/models/user_settings.py`
+
+**Triple at Phase 214's close (2026-08-28): `46 / 30 / 1352` — G-5: ⚠ **FIRES**.** ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14)
+
+**The largest absence this ledger has recorded after `api.ts`.** 30 phases, 1352 lines, and `grep -c` in CLAUDE.md returned 0. 214-14 read the governed-feature defaults here and flipped `visual_workflow_canvas` to `everyone` at its COLD default while `live_connectors` stayed `off`.
+
+### `backend/app/services/connectors/args.py`
+
+**Triple at Phase 214's close (2026-08-28): `2 / 1 / 474` — G-5: no (1 phase).** young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor
+
+Created by 214-01. It is the single home of the argument predicate that `phase_types.py`, `publish_service.py` and the publish lint all now call. ⚠ Its `upstream` source is INERT on native capability rows — `SEED-217`.
+
+### `backend/app/services/harness/reachability.py`
+
+**Triple at Phase 214's close (2026-08-28): `4 / 4 / 463` — G-5: ⚠ **FIRES**.** ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate
+
+Measured by 214-05 at execute time and reported as owed. A safety-gate predicate that is invisible to G-5 is precisely the file a refactor recommendation should have been required for.
+
+### `backend/app/services/workflow_kickoff.py`
+
+**Triple at Phase 214's close (2026-08-28): `8 / 6 / 554` — G-5: ⚠ **FIRES**.** ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned
+
+⚠ **The clearest causal statement this ledger has been able to make about an absence.** It builds the LIVE run context; because no row existed, no plan in the phase's first set was told to own it, and the launch-inputs mirror had to be added late in 214-16.
+
+### `frontend/src/components/layout/ChatLaunchForm.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 157` — G-5: no (1 phase).** young (214-12) — chat collects declared inputs BEFORE it creates anything
+
+Mounts `LaunchInputFields`, the one renderer three doors share.
+
+### `frontend/src/components/workflows/ArgumentEditor.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 226` — G-5: no (1 phase).** young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden
+
+Owns the reachability case for `McpToolPicker`, which runs under the gate's `src/components/workflows` directory entry.
+
+### `frontend/src/components/workflows/ArgumentRow.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 362` — G-5: no (1 phase).** young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts
+
+The lane widens so a sourced and an unsourced row keep identical label offsets — G4-7 is the lived check.
+
+### `frontend/src/components/workflows/DescribeServicePicker.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `2 / 1 / 464` — G-5: no (1 phase).** young (214-13) — the describe door at the GRANT grain
+
+⚠ Its refusal reaches a screen showing the MACHINE CODE (`connection_not_allowed`) — `SEED-221`.
+
+### `frontend/src/components/workflows/LaunchInputFields.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 91` — G-5: no (1 phase).** young (214-09 / 214-12) — **the ONE declared-input renderer three doors mount**
+
+Library modal, chat launch form and schedule modal all render this. It is 214-09's deferred seam, taken by 214-12.
+
+**⚠ RE-DERIVED at Phase 214.1's close (2026-08-28): `2 / 2 / 152`** — `+61` lines in one plan. The figure above is kept rather than overwritten.
+
+⚠ **`required` NOW REACHES ALL THREE LAUNCHERS AS A MARK, AND IT IS NEVER A BLOCK.** `214.1-01` declined to gate any launcher's confirm control: three shipped doors would change contract, and the SMTP adapter plus the publish gate already fail closed on an empty required argument. **The re-open trigger is written into the component**: *the next phase that touches a launcher's confirm control takes the block.*
+
+⭐ **A REAL ACCESSIBILITY REGRESSION WAS CAUGHT HERE AND FIXED IN THE NEW CODE, NOT IN THE ASSERTION.** The mark was first placed INSIDE the `<label>`, which takes its whole text content as the input's **accessible name** — producing `"Recipient emailRequired"`. That is not a stale pin: the field's name would have stopped being the author's words, which is this component's entire contract. ⛔ `aria-hidden` on the mark was the cheaper fix and was **REFUSED** — it would keep the name clean by making requiredness a sighted-only signal, the same dishonesty the two-arm rule exists to prevent. The mark now sits **outside** the label, linked by `aria-describedby`.
+
+⚠ **`label === key` NOW MEANS ABSENCE DOWNSTREAM.** A future surface that wants to print a declared input's prose must not assume `label` is always present on `EntryInputField` — the launcher renders the key in the mono face instead of pretending a human wrote it. `workflow_authoring._declare_asked_arguments` (214.1-02) depends on this: it writes `label = key` precisely so a derived declaration reads as unnamed rather than fabricated.
+
+### `frontend/src/components/workflows/PublishRefusalList.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `2 / 1 / 178` — G-5: no (1 phase).** young (214-10) — the refusal renders as a CAUSE, not a status
+
+Five sentences, not one; the headline names the author's step name and the missing argument and never a gauntlet stage.
+
+### `frontend/src/components/workflows/StepIdentity.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 161` — G-5: no (1 phase).** young (214-08) — ONE element, four sizes, both names as props; it resolves nothing
+
+`service === null` renders the action alone and `Unknown service` greps to zero. An unmapped service takes the named neutral rather than borrowing a vendor's mark.
+
+### `frontend/src/components/workflows/WorkflowScheduleModal.tsx`
+
+**Triple at Phase 214's close (2026-08-28): `3 / 3 / 601` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close
+
+⚠ **Its suite was in `BASELINE` and, it was believed, in neither knob.** Measured at this close: it DOES run — the gate's `src/components/workflows` directory entry recurses into `__tests__/` — but it was unpinned, so it was executed and guarded by nothing. Pinned at 9 here.
+
+### `frontend/src/components/workflows/argumentModel.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 313` — G-5: no (1 phase).** young (214-07) — the three argument sources as data
+
+Rows derive from `inputSchema`; `cc` is a leftover, not a field.
+
+### `frontend/src/components/workflows/argumentVocabulary.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 254` — G-5: no (1 phase).** young (214-07) — every sentence the argument form says
+
+Pinned at 44 in the gate at this close.
+
+### `frontend/src/components/workflows/describeServiceMatch.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 188` — G-5: no (1 phase).** young (214-13) — the match rule the describe door refuses on
+
+Anchored only where it can be; the refusal must not fire at rest.
+
+### `frontend/src/components/workflows/nodePresentation.ts`
+
+**Triple at Phase 214's close (2026-08-28): `8 / 7 / 221` — G-5: ⚠ **FIRES**.** ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added 214
+
+Buckets: `184` `185` `188.1` `188.2` `189` `209` `214`. It has been the canvas node's presentation resolver across seven phases with no row and no section.
+
+### `frontend/src/components/workflows/publishRefusalEntry.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 87` — G-5: no (1 phase).** young (214-10)
+
+The refusal entry shape the list renders.
+
+### `frontend/src/components/workflows/publishRefusalVocabulary.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 290` — G-5: no (1 phase).** young (214-10) — pinned at 41
+
+The two refusals are DIFFERENT sentences: a missing source and an undeclared launch key are not the same failure.
+
+### `frontend/src/components/workflows/stepActionWords.ts`
+
+**Triple at Phase 214's close (2026-08-28): `2 / 1 / 91` — G-5: no (1 phase).** young (214) — the action half of a step's identity
+
+Says what the step does, from data rather than a guess.
+
+### `frontend/src/components/workflows/stepIdentityVocabulary.ts`
+
+**Triple at Phase 214's close (2026-08-28): `1 / 1 / 206` — G-5: no (1 phase).** young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`)
+
+⚠ **A shipped vocabulary with no consumer**, measured by 214-11: `ASK_PAUSED` count `0` in `PendingAskCard.tsx`, which still renders `Needs you`. This is Phase 213's recorded failure shape — a vocabulary shipped inert — caught this time at the close instead of by the operator.
+
+### `frontend/src/lib/api/knowledge.ts`
+
+**Triple at Phase 214's close (2026-08-28): `2 / 2 / 775` — G-5: no (2 phases).** young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL**
+
+One of the twelve domain modules the 207 split created. The barrel re-exports it; the barrel's row does not guard it.
+
+### `frontend/src/lib/api/threads.ts`
+
+**Triple at Phase 214's close (2026-08-28): `3 / 2 / 1600` — G-5: no (2 phases).** young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL**
+
+**1600 lines and no row for its entire life.** The 207 split moved the code and left the guardrail behind on the barrel.
+
+### `frontend/src/lib/api/workflows.ts`
+
+**Triple at Phase 214's close (2026-08-28): `3 / 3 / 1055` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules**
+
+Buckets `207` `210` `214`. It crossed the threshold with no row in place, so G-5 could not have fired on it at any count.
+
+**⚠ RE-DERIVED at Phase 214.1's close (2026-08-28, plan `214.1-02`): `4 / 4 / 1081`** — buckets `207` `210` `214` `214.1`, no quick-task buckets to subtract. The figure above is kept rather than overwritten, because the drift being visible is the finding: this row was written one afternoon and was stale the next.
+
+⚠ **`214.1-02`'s PLAN SAID THIS FILE HAD NO ROW AT ALL, AND THAT WAS FALSE — the plan's own staleness table was itself stale.** The row had already been added at Phase 214's close, three commits before the plan was written. It is recorded here rather than quietly corrected because it is the same defect one level up: *"a row that is present and WRONG answers the auditor with `satisfied` and stops the audit"* applies to a PLAN's table exactly as it applies to this one. Only re-deriving from git caught it — the plan named ten files as `stale` or `NO ROW`, and **four of those ten claims were wrong**: `PublishRefusalList.tsx`, `publishRefusalEntry.ts` and `LaunchInputFields.tsx` all had rows, and `PublishGauntlet.tsx`'s cell (`16 / 8 / 1245`) was already exactly right.
+
+⚠ **214.1 CHANGED NO BEHAVIOUR HERE.** `214.1-01` added a **docblock and nothing else** — 26 lines, 0 deleted — recording a measurement that refutes `BUG-260828-02`'s conclusion: `updateWorkflowDraft`'s body is `JSON.stringify(def)` with **no field whitelist**, so `inputs` ALREADY shipped and no whitelist was invented. The corollary the docblock records is the real hazard and belongs here too: because nothing filters, a stray key anywhere on `meta` reaches a model that forbids extras and the first autosave after it returns 422 — so **the fence lives at the MINTING site** (`declaredInputs.declaredInputFor`), never at the client.
+
+### `frontend/src/components/workflows/declaredInputs.ts`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 174` — G-5: no (1 phase).** young (214.1-01) — **the ONE minting site for `definition.inputs[]`**
+
+Every declared input an author creates passes through `declaredInputFor`, which is why the extras fence lives here rather than in `lib/api/workflows.ts` (see that file's section). It owns three refusals — reserved key, duplicate, empty — and `undeclaredAskKeys`, the OFFER derived from the definition's own `ask` steps.
+
+⚠ **`undeclaredAskKeys` RE-SPELLS ONE SERVER RULE** (`key = ask_key or name`, owned by `backend/app/services/connectors/args.py`). Accepted under T-214.1-01-03 because it is an OFFER and never a gate: a disagreement offers one key too many or too few, and can never admit a publish the server would refuse. ⚠ The server's own half of that rule is `_declare_asked_arguments` in `workflow_authoring.py` (214.1-02) — **three spellings of one rule now exist, and only the two server-side ones are load-bearing.**
+
+⚠ **THE STORED SHAPE IS EXACTLY `{key, label, type: "text", required}` AND MUST NOT GAIN `description`.** `InputFieldSpec` is `extra="forbid"` and its `type` has no default; both were re-measured at HEAD by `214.1-01` rather than inherited, and D-214.1-02's wording (`{key, label, required, description?}`) is **corrected by that measurement**. A `description` key would 422 the first autosave.
+
+### `frontend/src/components/workflows/declaredInputsVocabulary.ts`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 94` — G-5: no (1 phase).** young (214.1-01) — every word the declared-input door says
+
+Separate from its component because `react-refresh/only-export-components` is an ACTIVE error on this directory. Its title is `ARG_SOURCE_ASK` verbatim — *"Asked when this runs"* — so an author meets the same words on the argument row and on the door that satisfies it; that agreement is the fix, not decoration.
+
+### `frontend/src/components/workflows/DeclaredInputsEditor.tsx`
+
+**Triple at Phase 214.1's close (2026-08-28): `1 / 1 / 333` — G-5: no (1 phase).** young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist
+
+⚠ **G-2 IS OVERRIDDEN HERE, NOT SATISFIED (D-214.1-06).** No operator-approved sketch exists for this surface. Nothing visual was invented: the affordance copies `statefulAffordance`'s tokens, and the dialog copies `PublishGauntlet`'s shell exactly. **The two places to look first if the operator rejects it** are the per-row list and the offers block, where no shipped primitive covered the need.
+
+⭐ **THE WIRING SURVIVES A RE-SKIN UNTOUCHED**, and that is what makes the override cheap to reverse: every write goes through `setDeclaredInputs`, every refusal through `refuseDeclaredInputKey`, every offer through `undeclaredAskKeys`, every word through `declaredInputsVocabulary.ts`. A rejected visual changes this file's JSX and nothing else — not the store, not the save path, not the launch renderer, not the describe-door derivation.
+
+⚠ **ITS REACHABILITY IS PROVED SOMEWHERE ELSE, DELIBERATELY.** This component's own suite mounts it directly; `frontend/src/pages/WorkflowBuilderPage.declaredInputs.test.tsx` (214.1-02) is the one that walks an EMPTY builder to a PUBLISHED workflow through it while mocking neither the store nor any `@/lib/api` module. A component test can never answer *"could a person get here?"* — that is the whole lesson of the bug this file closes.
+
+
+
+---
+
+# The document space — rows added 2026-08-28 at the `SEED-224` sketch
+
+⚠ **All ten were absent from BOTH this file and CLAUDE.md's table, so a G-5 audit reported the
+entire document surface clean.** `BUS-026` predicted five of them; re-deriving from git found
+**ten**, and corrected one of BUS-026's own figures (`DocumentDetailPanel.tsx` measures **405**
+lines, not 393). Triples re-derived with the CLAUDE.md recipe, dated quick-task buckets excluded.
+
+### `frontend/src/components/ingestion/DocumentList.tsx`
+
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `24 / 13 / 294` — G-5: ⚠ FIRES.** ⚠ **Absent from both registers for its entire life at thirteen phases**, alongside `retrieval_service.py` at nine. That is the exact failure Phase 214's close found twenty-five further instances of.
+
+⚠ **THE COLUMN ORDER IS LOAD-BEARING AND IT IS ENFORCED FROM ANOTHER FILE.** The seven columns are fixed — `chevron · Filename · Type · Size · Chunks · Status · Actions` — because `LibraryPage.tsx` (renamed from `IngestionPage.tsx` at Phase 217) sheds columns 3–5 positionally (`[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`) when the 430px detail panel opens or the viewport drops below 768px. **Reordering these columns silently breaks a rule written in a file this one does not import.** Sketch 218 pins the order in `COPY.COLUMNS` and asserts it against this file.
+
+⭐ **It already renders `table_count` and `image_count` as bare counts** (*"3 tables"*, *"5 imgs"*) while `document_tables.headers`/`.rows` and `document_images.description` hold the real content. That is the largest single instance of the buried-capability finding.
+
+**The named seam:** the row is the extraction. Twelve phases of per-row affordances (status, stage, marks, actions, selection) live in one file; a `DocumentRow` with the table owning only ordering and shedding is the cut.
+
+✅ **THE SEAM WAS TAKEN (217.1-05)** — `DocumentRow.tsx` is extracted with the sketch's five affordances,
+and the table sheds its per-row branches. The `294 L` (down from `609`) is the extraction; the 7-column
+order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-child`.
+
+---
+
+### `frontend/src/pages/LibraryPage.tsx`
+
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `35 / 11 / 814` — G-5: ⚠ FIRES.** ⚠ **The 2026-08-29 close measured `28 / 10 / 724` and is preserved rather than overwritten — Phase 217.1's five-tab shell grew it `+90 L`.** Same-day staleness is this ledger's most-repeated finding; it has now been demonstrated three times on this one file. ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
+
+⚠ **RENAMED AT PHASE 217 (SC#1 / D-217-01): `IngestionPage.tsx` → `LibraryPage.tsx`, 2026-08-29.** It was a `git mv`, so **the history FOLLOWS the move** — but `git log --oneline -- frontend/src/pages/LibraryPage.tsx` without `--follow` reports **1**, not 27. A re-derive that reads `1 / 1 / 603` has measured the RENAME, not the file; use `git log --follow --oneline -- <file>` (and `--follow --format=%s` for the phase buckets) at this path and do not read the small number as a reset. The 2026-08-29 triple was derived by adding this commit to the old path's measured 26 commits / 9 phases (`03, 08, 29, 47, 111.1, 112, 114, 153, 165` — the six-digit buckets `260328` and `260405` are dated quick tasks and are subtracted).
+
+⭐ **IT IS ALREADY NAMED `Documents` EVERYWHERE THE USER CAN SEE.** `ActiveView` carries `"documents"` (there is no router), `nav-items.ts:37` labels it *Documents*, `ChatLayout.tsx:757` mounts it, and its own `<h1>` reads *Documents*. **Only the FILE NAME is stale** — which refutes `BUS-026`'s claim that renaming touches the route and the three-homes navigation contract. The rename `IngestionPage.tsx` → `LibraryPage.tsx` is a file move plus ~8 import sites.
+
+⚠ **THAT FINDING IS NOW SPENT, AND IT IS KEPT RATHER THAN DELETED BECAUSE IT WAS RIGHT.** Plan `217-04` measured the blast radius it predicted and found exactly **one import site** (`ChatLayout.tsx:8` + the element at `:758`), one nav label (`nav-items.ts:37`), one `<h1>` and one subtitle. The rename is done: the file is `LibraryPage.tsx`, the export is `LibraryPage`, the nav reads *Library* and the page reads *Library* over *"What the agent can read, and how well it reads it."* **`ActiveView` still carries `"documents"`** — it is a key and is never printed — and so does `SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"`, which is persisted state a rename would silently reset. Both, plus `ChatLayout.tsx:879`'s `<KnowledgeHealthPage />` trailing else, are now fenced from source by `frontend/src/__tests__/library/renameFence.test.ts` instead of by prose. **Twelve comment-only references to the old name survive** (`App.tsx:288,290` · `ClassificationRulesPage.tsx:29` · `FilterBar.test.tsx:127` · `DocumentDetailPanel.tsx:307` · `RelationshipsSection.tsx:9` · `citationNav.tsx:11,56,129` · `GovernancePage.tsx:95` · `types/index.ts:328`) — harmless residue for a later sweep, left deliberately because later plans in this phase own several of those files.
+
+**It is the host the five-tab Library shell lands in** (operator direction 2026-08-28: the page becomes `Library`; Library Health and Governance merge into it). It already owns the push/split grid (`minmax(0,1fr) 430px`), the 288px Folders+Views sidebar with its pinnable rail, and the column-shedding rule above. ⚠ **That rule is written HERE and enforced on a file this one does not import** — the selector is `[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden`, so reordering `DocumentList.tsx`'s seven columns silently breaks it. The `nth-child` positions are the invariant, not the header text.
+
+**The named seam:** the sidebar, the filter bar and the grid are three independent concerns in one component. With a tab shell arriving, extract the shell first and let each tab own its body — otherwise the tab bar becomes the tenth conditional branch.
+
+⚠ **THE SEAM WAS OWED AT `217-04` — that plan was a pure rename and said so. ✅ `217-09` TOOK IT.** The shell owns ONE selection reducer (`pages/librarySelection.ts`) and each tab body is a CHILD component (`library/IngestionTab.tsx`, `IndexingTab.tsx`, `ViewsTab.tsx`), so the tab bar did **not** become the tenth conditional branch — which was the seam's whole stated purpose. The `+121 L` above is shell, not branching. **Phase 217.1 added the fifth tab the same way** — `HealthTab.tsx` is another CHILD, and the `+90 L` is tab wiring, not a branch.
+
+✅ **AND THE GATE ADOPTION IS DISCHARGED (`217-12`).** This file's suite was in **NEITHER** count-gate knob for its entire life — which is exactly how `LibraryPage.test.tsx` sat **RED at HEAD** (an incomplete `@/lib/supabase` mock factory omitting `SUPABASE_CLIENT_REHYDRATED`, fixed in `217-04`) with nobody able to see it. It is now a TARGETS **file** entry and a BASELINE pin at **12**, both read from the gate's own printed `— 12 new` row.
+
+---
+
+### `backend/app/services/retrieval_service.py`
+
+**Triple re-derived 2026-08-28: `17 / 9 / 362` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
+
+⚠ **IT COMPUTES A PER-HIT SIMILARITY AND THROWS IT AWAY.** `search_documents` is typed `-> tuple[list[dict], float]`; the caller in `tool_dispatcher.py` writes an audit row carrying `{query_text, document_ids}` and **not the score**. So *"times retrieved"*, *"last question"* and *"last found"* are all answerable today while **"average relevance" is not** — the single gap in the Library's Retrieval section, and it is one key on an existing jsonb column rather than a migration.
+
+⚠ It is also the surface `BUG-260815-05` (folded into Phase 210) touches: the retrieval path **misreports embedding-provider failure**. A Health tab built before that lands would show *"0 searches"* during an outage — inheriting the exact lie it exists to prevent. **That is a sequencing constraint on the document stream, not a defect in it.**
+
+---
+
+### `frontend/src/components/metadata/DocumentDetailPanel.tsx`
+
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `9 / 6 / 496` — G-5: ⚠ FIRES.**
+
+⚠ **THE THIRD DRIFT ON THIS ONE ROW, AND ALL THREE FIGURES ARE KEPT.** `BUS-026` recorded `393` lines; the 2026-08-28 re-derivation measured **`6 / 5 / 405`**; this close measures **`9 / 6 / 496`** — `+3` commits, `+1` phase and `+91 L` in ONE DAY. **A row that is present and WRONG answers the auditor and stops the audit, which is worse than an absent row** — so the recipe is run, never the figure copied, and that instruction has now been vindicated three times on this file alone.
+
+⚠ **IT IS A CROSS-SURFACE SHELL, NOT A DOCUMENTS-ONLY COMPONENT.** It reuses `WorkspacePanel`'s sheet shape, which `ChatLayout` mounts — so the panel language already spans **chat, workflow and documents**, and a redesign here is judged against the chat surface too. `GovernancePage` also needs a FULL `Document` to open it, which is why that page holds its own fetch.
+
+Its width is not its own: the 430px track is set by the host grid. The mobile arm is a bottom-sheet rendered internally, so the desktop track is only meaningful ≥768px.
+
+**What sketch 218 adds to it:** a Retrieval section (three arms backed today, one that says *"not recorded yet"*), a read-only Chunks list, extracted tables rendered as tables, and image descriptions — none of which needs schema.
+
+✅ **PHASE 217 SHIPPED THAT, AND HONOURED G-5 BY CONSTRUCTION.** Plans `217-10` and `217-11` added **five** sections — Content, Chunks, Tables, Images, Found-by — and every one is a **CHILD component** (`DocumentContentSection` · `DocumentChunksSection` · `DocumentTablesSection` · `DocumentImagesSection` · `DocumentQueriesSection`), each fetching **on expand, never on mount** (D-217-04). No new conditional branch was added to this shell; the `+91 L` is mounting and prop-threading.
+
+⛔ **THE CROSS-SURFACE WARNING ABOVE IS NOW A LIVE, UNPAID OBLIGATION, not a caution.** Because this component reuses `WorkspacePanel`'s sheet, **Phase 217's five new sections land on the CHAT surface too — and chat UAT was never run.** `217-12` records that as a NEW owed G-4 row in `217-UAT.md` rather than leaving it implied. A phase whose UAT covers only the surface it was scoped for has not covered this file.
+
+✅ **Gate:** its `a11y` suite was in NEITHER knob for its entire life; `217-12` adopts it (TARGETS file entry + BASELINE pin **7**). `DocumentDetailPanel.images.test.tsx` was already adopted at SEED-227 and is unchanged at **3**.
+
+---
+
+### `frontend/src/components/ui/tabs.tsx`
+
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `3 / 3 / 78` — G-5: ⚠ FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **IT HAD NO ROW AT ALL, AND IT CROSSED THE THRESHOLD IN `217-06`'s OWN COMMIT.** Buckets: `043`, `48`, `217`. Before that commit it measured `2 / 2 / 53`, one phase below the line — so G-5 could not have fired on it at plan time, and would never have fired afterwards either, because **a file absent from CLAUDE.md's scan list is permanently invisible to its own guardrail.** This is the identical failure `WorkflowsPage.tsx` suffered for ten phases and `ChatArea.tsx` for twenty-eight. The row is added here for that reason — because it was ABSENT, not because it is new.
+
+⭐ **IT IS A SHARED CROSS-SURFACE PRIMITIVE WITH THREE MOUNTS, AND ONLY ONE OF THEM WAS IN SCOPE.** The Library's four-tab shell is the mount Phase 217 built; **Settings** and **Library Health** are the other two, and neither was touched. A token change here reaches all three at once. That is why `G4-8` exists as its own G-4 row — *"open Settings and Library Health afterwards"* — and why it is owed rather than assumed: no jsdom assertion can tell whether a tab bar on a page nobody re-opened still reads correctly.
+
+**What `217-06` changed, and what it deliberately did not.** It introduced `--tab-active` (declared in `index.css`, exposed through `tailwind.config.js`) so the active trigger is measurably **lighter than its track in BOTH themes** — D-217-20 / D-217-21. ⚠ **The token fence proves the ordering, never the perception:** `tabsContrast.test.ts` (14 cases, adopted into both gate knobs at `217-12`) reads the tokens and asserts `L(active) > L(track)`. Whether the chip reads as **raised** rather than merely *different* is `M-3` / `G4-7`, and it is **OWED**.
+
+⚠ **`--tab-active` is consumed as a Tailwind class, not as a raw CSS variable, inside this file.** A grep for the token name here returns a comment, not a use — the mention-vs-use trap, which fired five times across this phase. The producer is `index.css`; the bridge is `tailwind.config.js`; this file names the generated class.
+
+**No seam proposed.** At 78 lines it is a shadcn primitive doing one thing. The correct response to it firing G-5 is to notice that three surfaces share it, not to split it.
+
+---
+
+### `frontend/src/components/panel/CsvTablePreview.tsx`
+
+**Triple re-derived 2026-08-29 (Phase 217, plan `217-12`, at the phase's CLOSE): `3 / 3 / 134` — G-5: ⚠ FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **IT HAD NO ROW FOR ITS ENTIRE LIFE, across phases `087`, `088` and `217`, and it crossed the threshold in `217-11`'s own commit.** Recorded here because it was ABSENT, not because it is new.
+
+✅ **THE EXTRACTION WAS TAKEN, AND ITS PROOF IS A NUMBER THAT DID NOT MOVE.** `217-11` cut `DataTableView.tsx` (148 L, new) out of this file — **net −67 L here** — so the Library's Tables section and the chat panel's CSV preview now render through **one** table renderer with shared caps and one empty arm, instead of two that could drift. ⭐ **`CsvTablePreview.test.tsx` measures 8 cases BEFORE and 8 cases AFTER**, and that unchanged count is the extraction's own faithfulness proof: behaviour preserved, ownership moved.
+
+✅ **THE PANEL-DIRECTORY RESERVATION WAS CLAIMED, DELIBERATELY.** `scripts/vitest-count-gate.cjs` has carried a comment since Phase 188 reading: *"A later phase that wants CsvTablePreview / FilePreview / FilesSection / PendingAskCard / Seam / TodosSection / VersionDiff / WorkspacePanel{,.derived} inside the gate should adopt them deliberately, with its own measured number."* Phase 195 claimed `FilesSection.test.tsx` on the ground that it CONVERTED that file. **Phase 217 converts this one, so `217-12` claims this one on identical ground** — TARGETS file entry plus a BASELINE pin of **8**, read from the gate's own printed row. ⛔ **The other six panel suites stay DECLINED**, with the reason recorded in the script: 217 reads none of them, and adopting a suite makes the adopting phase the owner of its future rot in a gate that requires 0 failing forever.
+
+⛔ **WHAT NEITHER THE EXTRACTION NOR THE GATE CAN PROVE.** jsdom's `getBoundingClientRect` is **always zero**, so no test in this repository can establish that a wide table **scrolls** inside the 430px panel track rather than being clipped or pushing the panel. That is `G4-5`, it is **OWED**, and it is owed *structurally* — no amount of further test-writing would close it.
+
+---
+
+### `frontend/src/hooks/useDocuments.ts`
+
+**Triple re-derived 2026-08-28: `8 / 3 / 120` — G-5: ⚠ FIRES, exactly at threshold.** ⚠ Absent at three phases.
+
+⚠ **Realtime is a hint, never a source of truth** (D-v2.5-03): it subscribes to the `documents` table and **reconciles by fetch** on (re)connect. A design that assumes the socket delivered every transition will show a stale stage strip after a reconnect.
+
+`table_count`, `image_count` and `chunk_count` are **server-derived**, not computed here — so a client-side count is always a re-render of a server number, never an independent one.
+
+---
+
+### `frontend/src/pages/KnowledgeHealthPage.tsx`
+
+**Triple re-derived 2026-08-30 (Phase 217.1 close): `12 / 6 / 0` — the file is DELETED.** ✅ **RETIRED by 217.1-14** — the Library's Health tab absorbed its four signals. ⚠ Absent for its entire life (row added 2026-08-28 at `11 / 5 / 571`).
+
+⚠⚠ **IT WAS `ChatLayout`'s POSITIONAL FALLBACK, AND THE RETIREMENT HAD TO REPLACE THAT FIRST.** Before 217.1-14, `ChatLayout.tsx:879` rendered it as the trailing `else` of the view chain, and `App.tsx:98-101` stated the consequence in its own words: *"a union member with no branch **silently renders Knowledge Health**"*. The retirement shipped `UnknownViewFallback` (`ChatLayout.tsx:871`) in the SAME commit, so a mis-route degrades to the honest *unknown view* card rather than a blank screen — the replacement-fallback rule was honoured, not waived.
+
+⭐ **It already ships the four-tab shell the Library's Health tab absorbs** — `Most Retrieved · Never Retrieved · Stale · Low Confidence`, the last with a `By Document / By Query` sub-tab — plus four stat cards (`Total Docs · Coverage % · Retrieval Score · Active This Month`) and a Coverage Trend chart. It carries the app's **one shipped code-split**, which `WorkflowBuilderPage` mirrors.
+
+⚠ Its `Retrieval Score` tile is the one contested atom of the merge: a real number (derived from similarity thresholds) that **does not say what it measures**. Sketch 218 draws it both ways and leaves the ruling to the operator.
+
+---
+
+### `backend/app/api/knowledge_health.py`
+
+**Triple re-derived 2026-08-28: `10 / 5 / 713` — G-5: ⚠ FIRES.** ⚠ Absent at five phases.
+
+⭐ **IT REFUTES `BUS-026`'s CENTRAL COST CLAIM.** That bus item states *"nothing logs retrieval today"* and concludes a `retrieval_events` table is required. **Retrieval is already logged** — `tool_dispatcher.py:797` writes `audit_log` rows with `action_type="search.query"` — and this module already aggregates them into `most-retrieved` / `never-retrieved` / `retrieval-trend` / `coverage` / `low-confidence` over `WINDOW_DAYS = 30`. The grep in BUS-026 missed it because the table is not named `retrieval_*`.
+
+⚠ **`WINDOW_DAYS = 30` is the ONLY window that exists.** A document absent from a list is *"not retrieved in 30 days"*, never *"never retrieved"*, and any tile labelled with another window is fabricated.
+
+⚠ **Service-role by classified exception** (Phase 163 / TEN-02): `audit_log` RLS is INSERT-only for `authenticated`, so a user-JWT client would silently read an EMPTY audit set and the analytics would break. Every query stays owner-scoped in app code via `.eq("user_id", …)` — that filter is the sole gate, and it must survive any refactor.
+
+**The named seam:** five paginated metric helpers with near-identical shapes, plus a summary that re-invokes two of them. One windowed-aggregate helper parameterised by predicate is the cut.
+
+⚠ **217.1-11 (BE-4 / LIB-06) structurally edited `_fetch_retrieval_trend`** — it now branches into THREE series (`could_not_search` / `found_something` / `found_nothing`) while preserving `retrieval_count`'s meaning byte-for-byte (an error row is EXCLUDED from `retrieval_count`, so a provider outage can never make the shipped Coverage Trend chart rise). The characterization test in `test_2171_trend_segments.py` pinned the pre-edit meaning first (D-217.1-34) and re-proves it post-edit. Triple re-derived 2026-08-30 (Phase 217.1 close): **`11 / 6 / 737`**.
+
+---
+
+### `backend/app/services/agent_loop.py`
+
+**Triple derived 2026-08-31: `39 / 20 / 3154` — G-5: ⚠ FIRES.** ⚠ **Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE, at twenty phases** — the same failure `api.ts` (97 phases), `config.py` (42) and `ChatArea.tsx` (28) each suffered: a hot file with no row is permanently invisible to its own guardrail, and G-5 could never have fired on it at any count. Row added by the 2026-08-31 honest-refusal pass, the first change to touch its connector block since Phase 216.
+
+**What 2026-08-31 did:** the connector-tool wiring block no longer resolves the org itself. It calls `connectors/org_scope.resolve_connector_org` and, on an unresolved scope, raises the module-local `_NoConnectorScope` — caught in its OWN `except` arm, ahead of the broad one, so "you are in no org" is not logged as "Failed to wire connector tools". The `org_id = user_id_str` fallback is **deleted**, not moved.
+
+**What binds this file:**
+
+1. ⚠ **THE CONNECTOR BLOCK'S ONLY PRODUCTION CALL SITE OF `build_chat_tools_for_connectors` IS HERE**, which is why `test_216_connector_wiring_reachable.py` exists as an AST fence: commit `c0a09c728` moved the whole block inside an `except` arm and **6929 green tests could not see it**, because every Phase 216 test calls the helper directly. Any edit that changes this block's nesting must keep that fence green.
+2. **`_NoConnectorScope` is control flow, never a fault.** Folding it into the broad `except Exception` would restore the exact class of lie this change removed — a fact about the account reported as a failure of the wiring.
+3. **A chat turn carries no `X-Org-Id`.** The REST surface resolves the active org from that header (`get_active_org_id`); streaming chat cannot, so it takes the caller's OLDEST membership. An account in two orgs therefore sees only one org's connections in chat, silently. `OrgScope.membership_count` makes that legible; **choosing differently is a product decision and was not taken here.**
+
+**Named seam (recorded, not taken):** the B1 setup block — folder scope, prompt selection, skills/memory injection, disabled-tools, and now connector wiring — is five unrelated concerns assembling one system prompt. The connector wiring is the cleanest first extraction: it already has a leaf (`org_scope`) and a fence.
+
+---
+
+### `backend/app/services/tool_dispatcher.py`
+
+**Triple re-derived 2026-08-31: `72 / 29 / 4624` — G-5: ⚠ FIRES.** ⚠ The row read `67 / 28 / 4336` one day earlier; the file is being edited faster than its row is re-derived, which is this ledger's own recurring finding rather than a new one.
+
+**What 2026-08-31 did (the honest-refusal pass, `_handle_connector_chat_tool`):** `resolve_connector_org` replaces a swallowed `except: pass` + `org_id = str(user_id)`, and `except: conns = []` becomes a named `connector_lookup_failed`. Three faults that shared one innocent sentence now each say which they were. **Honoured by construction** — the org resolution EXTRACTED to `connectors/org_scope.py` (a new leaf, 124 L) rather than growing here; the net addition is two refusal literals. Guarded by `tests/unit/test_connector_org_scope_and_refusals.py`, **5 of whose 12 cases were driven RED against HEAD** before the fix.
+
+**Triple as of the 217.1 close: `67 / 28 / 4336` — G-5: ⚠ FIRES.** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-11, the first plan to structurally edit it this phase. (The `66 / 29` figure counts `260529`/`260705` as phases; the recipe subtracts six-digit quick-task buckets, so the corrected count is 28.)
+
+**What 217.1-11 did (BE-4 + BE-5):**
+1. **BE-4 — the error-path `search.query` audit write.** `_handle_search_documents`'s `except` block previously returned before any audit write, so a provider outage was indistinguishable from "your library had no answer" (BUG-260815-05's blast radius: embedding has no provider fallback, so a zero balance zeroes retrieval for the WHOLE KB). The error arm now writes `document_ids: []` + `retrieval_status: "provider_error"` — the classified literal, NEVER `str(exc)` (T-217.1-15b).
+2. **BE-5 — the `similarities` key on the SAME success-path dict literal.** The per-hit similarity `retrieval_service.py:173` returns (and `tool_dispatcher.py` already copies into every citation) is now persisted as `{document_id: max_similarity}` on `audit_log.metadata` — it was being thrown away before reaching the analytics, so `Average relevance` could only lie about a value the system has.
+
+**What binds this file:**
+
+1. ⚠ **A SECOND `search.query` writer exists** at `:952-966` (the view/filter resolve path, tagged `via:"view"`) with its own swallowing `try/except`. 217.1-11 **DECLINED** the error-path treatment there (recorded in the plan's summary): the view/filter path's failure mode is a caught-and-absorbed resolve error that does not represent a provider outage the way the main search's `search_documents` exception does. A future LIB-06 undercount should re-open this.
+2. **The `provider_error` literal is minted ONCE** — `:738-742`'s `retrieval_error.retrieval_status` and the new audit write share the exact string; a second spelling would silently break `knowledge_health.py`'s `is_error` branch.
+3. **`retrieval_count`'s meaning is a contract** pinned by `test_2171_trend_segments.py` (D-217.1-34): every non-error `search.query` row counts, error rows never do.
+
+**Named seam (recorded, not taken):** `_handle_search_documents` (~170 lines carrying provider-error conversion, folder-scope clipping, citation accumulation AND the audit write) — the audit write is the natural extraction leaf once it becomes a two-call-site concern (the success write AND the new error write).
+
+---
+
+### `backend/app/api/document_governance.py`
+
+**Triple re-derived 2026-08-28: `5 / 3 / 416` — G-5: ⚠ FIRES, exactly at threshold.** ⚠ Absent at three phases.
+
+⚠ **ITS "LOW CONFIDENCE" IS NOT `knowledge_health`'s "LOW CONFIDENCE", AND THE MERGE PUTS THEM SIDE BY SIDE.** This module's cutoff **is the `ConfidenceChip` TIER.MED low cutoff (0.5)** and measures how sure the *extractor* was about a metadata field. `knowledge_health.py`'s is `LOW_CONF_THRESHOLD = 0.38` and measures *average retrieval similarity*. **Two thresholds, two meanings, one pair of words.** Sketch 218 renames them apart — **Unsure metadata** and **Weak matches** — and its `COPY.SIGNAL_RENAMES` map is asserted total so a rename can never become a loss.
+
+It mirrors `_fetch_never_retrieved`'s SQL-level shape and caps its Python scan the same way, so the two modules share a performance profile as well as a vocabulary problem.
+
+---
+
+### `frontend/src/pages/GovernancePage.tsx`
+
+**Triple re-derived 2026-08-28: `4 / 1 / 355` — G-5: no (1 phase).** young (119) — ⚠ **the row exists because the page is being MERGED, not because it is hot.**
+
+**Operator direction 2026-08-28: it merges into the Library.** The evidence is stronger than its row count: its `<h1>` reads **"Document Governance"**, all three signals are document signals, its own docblock calls it *"Library Health, three different lists"*, and **every row is already a pure link-out into `DocumentDetailPanel`** — `this surface never mutates` (D-119-6).
+
+⚠ **IT IS FEATURE-GATED AND `Documents` IS NOT.** `nav-items.ts` gates it behind `governance_health`, and a governed entry **VANISHES** rather than rendering locked. Folding gated signals into an ungated tab **shows them to people the effective-features map currently hides them from**. The gate moves to the merged chips or the tab; **a merge that drops a permission is a leak, not a tidy-up.**
+
+⚠ Its three cards (`Broken relationships`, `Unclassified documents`, `Low-confidence metadata`) are the source of truth for the rename map above — measured from `CARD_META`, never transcribed.
+
+---
+
+### `frontend/src/components/ingestion/DocumentUpload.tsx`
+
+**Triple re-derived 2026-08-28: `10 / 1 / 144` — G-5: no (1 phase).** ⚠ Absent for its entire life.
+
+⛔ **IT REPORTS NO BYTE PROGRESS.** There is no `onUploadProgress` anywhere in the upload path — the component knows only *"Uploading N files…"* and a count. **So every per-file upload percentage in the reference redesign is a number this client cannot compute**, and sketch 218 draws stages instead. If real progress reporting is ever added, that constraint lifts and the fence in the sketch should be revisited rather than deleted.
+
+⚠ **The accepted formats are `.txt .md .pdf .docx .pptx .xlsx .csv .epub`** — measured from the `accept` attribute. **`.msg` is NOT among them**, although a real Outlook message has reached ingestion in this project and failed there on a NUL in the subject. A dropzone advertising a format the input rejects sends the user to a dead end; sketch 218 fences the advertised list against this attribute.
+
+⭐ Upload is currently a **small button in the top-right corner of a folder header** — the operator could not find it, which is what promoted it to a first-class surface in the sketch.
+
+---
+
+### `frontend/src/components/ingestion/ViewsGroup.tsx`
+
+**Triple re-derived 2026-08-29: `5 / 3 / 259` — G-5: ⚠ FIRES (at threshold).** ⚠ Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE — row added by 217.1-07, which is the first plan to structurally move the Views tab body off it.
+
+⭐ **It is the sidebar's saved-views list AND the lazy count-cache source.** The D-114-8 lazy+cached per-view count shape (`ViewsGroup.tsx:63-95` — a `counts` state, an `inFlight` ref, a `countsRef` mirror, a `fetchCount` with a pre-network gate) is the ONE pattern the library uses to answer "how many documents does this view match" without fanning out a request per view at mount (T-217-36). **217.1-07 lifts it into `ViewCardGrid.tsx`'s `useViewCounts` so the card grid and the sidebar share one cache rather than fetching twice** — one resolve per view serves both renderings. The sidebar mount itself stays alive beside the tab body (`LibraryPage`'s deliberate "they can never disagree" design), so the two renderings still read the SAME `selectedViewId`.
+
+⚠ **The tab-body mount MOVED off this component in 217.1-07** — the Views tab now renders `ViewCardGrid` (the sketch's 2-column card grid) instead of duplicating this list. The sidebar still mounts `ViewsGroup` unchanged; do not treat this file as orphaned.
+
+**Named seam for the next refactor:** the count-cache shape it owns is now shared with `ViewCardGrid.tsx` — if a third surface ever needs per-view counts, extract `useViewCounts` into a shared hook (`hooks/`) rather than copying the shape a third time.
+
+---
+
+### `frontend/src/components/workflows/verdictModel.ts`
+
+**Triple re-derived 2026-08-28 (`BUG-260828-09`): `6 / 3 / 355` — ⚠ G-5 FIRES, EXACTLY AT THRESHOLD.**
+
+⚠ **ABSENT FROM BOTH THE TABLE AND THIS FILE FOR ITS ENTIRE LIFE**, and it crossed the threshold before anyone counted. That is the `phaseStatusMeta.ts` / `FlowEdge.tsx` shape a third time: a file invisible to its own guardrail cannot be told it is due for a look, and this one is the **home of every word the publish surface says about a refusal** — the headline sentence map, the fallback, the degraded-check sentences and the resting-state line.
+
+⭐ **ITS `structural_gate` DOCBLOCK PREDICTED THIS BUG AND NAMED THE FIX, ELEVEN DAYS EARLY.** Written at `BUG-260815-06`, verbatim: *"The precise cause lives in `workflow_phases` / `harness_audit` against the `golden_run_id` the response already carries, and NOTHING joins them today — that is the report's requirements 1 and 2 and it is a SERVER change."* `BUG-260828-09` is that server change. **The paragraph is preserved and marked false rather than overwritten, because the prediction being RIGHT is the finding** — and because it records why the client half alone could not close it.
+
+⚠ **THE HEADLINE SENTENCE IS UNCHANGED, AND THAT IS A DECISION.** It is the arm that must still be correct when `blocked_step` is ABSENT — a pre-fix server, a `structural_gate` raised by the argument re-projection (which fails no phase and so names none), a crash before any phase failed. A headline that named a step would have to invent one on exactly those paths. The better-informed line now sits **above** it; nothing was replaced.
+
+**THE RED LINE THIS FILE DRAWS BINDS ITS NEIGHBOURS.** *"NO CODE TABLE. THIS IS THE RED LINE, NOT A PREFERENCE (D-182-06)"* — no severity derivation, no friendly-message map, no allow-list of finding identifiers. `publishBlockedStep.ts` was authored under that rule and carries no cause table either; its copy test sweeps its own static strings for validator names and stage tokens. **A future "helpful" map from `citations_required` to advice belongs on the server that mints the vocabulary, never here.**
+
+**Named seam, if one is ever taken:** the three sentence maps (`DEGRADED_SENTENCE`, `BLOCKED_SENTENCE`, the resting line) are vocabulary; `groupVerdicts` / `summaryLine` / `isCheckOutstanding` are projection. They are already the only two things in the file and they do not tangle — **so the honest verdict today is that a split would buy nothing**, and the row exists to make the file visible, not to schedule work on it.
+
+---
+
+### `frontend/src/components/workflows/publishBlockedStep.ts`
+
+**Triple at `BUG-260828-09`'s close (2026-08-28): `0 / 0 / 176` — G-5: no (new).** young — the step-face resolver and every word the blocked-step card says.
+
+⭐ **IT DERIVES NO SECOND NAME LADDER, AND THAT IS THE WHOLE POINT OF THE FILE.** The visible step face comes from calling the SHIPPED `phaseVocabulary.nodeTitle`, whose own stated floor is *"the SLUG NEVER appears in this string."* Report property (1) — *by the author's step name, never a slug or a stage index* — is therefore honoured **by construction** rather than by a rule somebody has to keep defending here.
+
+⚠ **WRITING `name ?? slug` IN THIS FILE IS THE ONE FORBIDDEN EDIT.** That exact fallback, one function over on the server (`_golden_run_argument_failures`), is why the shipped argument refusal emitted `"step_name": "act"` — a slug, in the field that promises an authored name, measured on a live `publish_blocked` receipt. `publishBlockedStep.test.ts` fences it with a definition whose slug is a token occurring nowhere else and asserts that token is absent from the output, plus a positive control that drives the forbidden shape through the same assertion so the fence is falsifiable rather than vacuous.
+
+**Four tiers, and none of them is the slug:** the definition phase through `nodeTitle` → the server's `step_name` (when the caller holds no definition) → the step's own ORDINAL as the canvas counts it (never a gauntlet stage index) → a generic noun, so a headline is never rendered around an empty pair of quotes.
+
+---
+
+### `frontend/src/components/workflows/PublishBlockedStepCard.tsx`
+
+**Triple at `BUG-260828-09`'s close (2026-08-28): `0 / 0 / 101` — G-5: no (new).** young — the card a failed publish leads with.
+
+⚠ **G-2 IS OVERRIDDEN, NOT SATISFIED.** No operator-approved sketch exists; the operator authorised the build with the visual veto retained. Recorded under `STATE.md → Guardrail overrides`. The frame is `PublishRefusalList`'s — same slot above the spine, same shell, same header register — because two cause blocks that looked like two different features would tell an author the surface has two kinds of refusal in it, when it has **one kind with two producers**. The wiring is design-independent: the server field, the resolver, the face ladder and the tests all survive a re-skin untouched.
+
+**THE TWO CAUSE BLOCKS CANNOT BOTH RENDER, and it is structural rather than guarded.** `PublishRefusalList` claims the argument-gap entries out of `named_failures` — a gap that blocks a run **before it starts**; this claims the step-level failure of a golden run that **started and then stopped**.
+
+⚠ **jsdom CANNOT PROVE WHAT THIS CARD IS FOR.** Every `getBoundingClientRect` is zero, so no test here can show that a person reading the result can name the failing step — the same blind spot the bug report names as the reason nothing caught the original, and the same one `BUG-260828-04` sits in. The suite proves the WIRING (the sentence arrives verbatim, the slug never does, the card is absent on every path that names no step); the READING is the operator's, in a browser.
+
+
+---
+
+### `frontend/src/components/settings/ConnectionGrantsList.tsx`
+
+**Triple at Phase 221's open (2026-08-31): `4 / 1 / 344` — G-5: no (1 phase).**
+
+⚠ **THE ROW WAS ABSENT FOR THIS FILE'S ENTIRE LIFE, and it is the file Phase 221 changes most.**
+That is the failure CLAUDE.md's completeness rule exists to prevent: a hot file missing from the scan
+list is permanently invisible to its own guardrail, at any count. Added at 221's open, BEFORE any
+feature code, rather than at its close.
+
+**It does not fire, and that is exactly why the seam had to be argued rather than triggered.** One
+phase old, 344 L — and a naive build of the six-application split roughly DOUBLES it, which is how
+every file in this ledger became hot. G-5 would have fired two phases too late.
+
+**Disposition: the seam is TAKEN BY CONSTRUCTION, inside 221 rather than deferred.** A later refactor
+phase would have had to undo a ~700-line component first. Four leaves are cut out at build time:
+`toolGroups.ts` (pure — grouping + the three-rung resolver, zero JSX) · `ApplicationGroup.tsx` ·
+`DirectionBand.tsx` · `ActionRow.tsx` (lifted verbatim from the existing `.map()` body). This file
+keeps the default-posture card, the search box and the composition, and owns **no row markup**.
+
+⚠ **THE ACCEPTANCE CRITERION IS A LINE COUNT, and it is falsifiable:** this file must measure
+**below 344 L** at 221's close. A summary reporting that it grew is reporting that this disposition
+was not honoured — not that the plan was bigger than expected.
+
+**The invariant it carries:** `DirectionBand.tsx` renders a label and a count and **nothing
+interactive**. The ROADMAP's rule is the reason — *"the run-time gate may key on direction; the
+grant-time gate must NOT"*, because a read is exactly where prompt injection enters. The reference
+design (Claude.ai's Rovo screen) puts a `Needs approval` control on its *Read-only tools · 22* group;
+copying that would set twenty-two grants in one click on the one axis the rule forbids.
+
+---
+
+### `frontend/src/lib/api/org.ts`
+
+**Triple at Phase 221's open (2026-08-31): `6 / 4 / 562` — ⚠ G-5 FIRES (4 phases).**
+
+⚠ **ABSENT FOR ITS ENTIRE LIFE, AND NOT COVERED BY `lib/api.ts`'s ROW — that row is the BARREL.**
+The Phase 207 split created twelve domain modules and gave rows to none of them; `knowledge.ts`,
+`threads.ts` and `workflows.ts` gained theirs at 214, and this one did not. It has been firing G-5
+unseen since.
+
+**What it holds:** the wire types a client is allowed to learn — `McpDiscoveredTool`,
+`ToolGrantPosture`, `ConnectorConnection`. Its own docblock records the standing danger: this type
+**must never declare a credential field**, because documentation naming a field the server never
+sends invites a component to render it.
+
+**Disposition: honoured by construction (221).** One optional `app` field on `McpDiscoveredTool`.
+⚠ It names a PRODUCT, never a route — see `service_tools.py`'s section for why that distinction is
+the whole of D-221-07.
+
+---
+
+### `backend/app/services/connectors/service_tools.py`
+
+**Triple at Phase 221's open (2026-08-31): `6 / 0 / 1456` — G-5: no (0 phases).**
+
+⚠ **ZERO PHASES AT 1456 LINES, and the zero is real rather than a counting error.** Every one of its
+six commits carries a DATED QUICK-TASK bucket (`260831`), which CLAUDE.md's recipe correctly
+subtracts. So G-5 structurally cannot fire on this file no matter how large it gets — a property
+worth recording, because the next reader will assume the `0` is a mistake and "fix" it.
+
+**What it holds:** `SERVICE_TOOL_SPECS` — the static advertisement + execution table for every
+capability-shaped service. Google alone is 15 specs across 6 egress keys.
+
+⚠ **THE STRIP AT `extra_descriptors_for_service` IS LOAD-BEARING AND 221 DOES NOT REVERSE IT.** Its
+docstring: *"The execution fields (`capability`, `http_method`, `path` / `api_method`, `writes`) are
+STRIPPED here rather than carried through. They are ours, they are not part of any tool contract."*
+The operator's brief for 221 assumed the grouping key already reached the browser; it does not, and
+un-stripping `capability` to make it would put URL paths in front of pickers and grant lists.
+
+**Disposition: honoured by construction (221).** A SEPARATE presentation-safe `app` key on each spec,
+emitted beside `title`. It carries no host, no path, no method — and a test asserts none of the five
+stripped keys appears on any emitted descriptor.
+
+---
+
+### `backend/app/services/connectors/grants.py`
+
+**Triple at Phase 221's open (2026-08-31): `1 / 1 / 92` — G-5: no (1 phase).**
+
+⚠ **ABSENT, AND IT IS THE GRANT-TIME GATE** — 92 lines deciding the posture of every connector call
+the product makes. Small is not the same as unimportant, and this ledger's scan list is the only
+thing that would have told anyone it was unwatched.
+
+**The invariant it carries: FAIL CLOSED AT EVERY ARM.** No connection, no tool name, an unrecognised
+value, an absent default — all return `deny`. Phase 213's own measurement is why: the previous
+`bool(v)` coercion turned a person's Deny into an Allow silently
+(`{"delete_repository": "deny"} → True`).
+
+**Disposition: honoured by construction (221).** One rung inserted between the two that exist —
+`action → app:<key> → connection default → deny` — keyed inside the existing `tool_grants` jsonb, so
+there is **no migration**.
+
+⚠ **AND ONE ASYMMETRY THAT IS NOT AN OVERSIGHT (D-221-06):** the application rung may resolve `ask`
+or `deny` for a write, but **never `allow`**. Only an explicit per-action grant can allow a write.
+Built and tested against a PLANTED write spec, because no Google write tool exists yet — the rule
+must exist before the first write does, not be retrofitted onto a shipped Allow that already
+cascades.
+
+---
+
+## `backend/app/services/google/availability.py`
+
+**0 / 0 / 277 · young (Phase 221 plan 02).** The per-application probe: given a connection and
+its stored scopes, one verdict per Google application.
+
+**Why it exists.** On 2026-08-31 three of six Google applications were switched off in the
+Cloud project and the connection panel said nothing about any of them; the only way to find out
+was to run a tool in chat and read the refusal.
+
+**The binding invariants.**
+
+- **THREE STATES BECAUSE THEIR REMEDIES ARE OPPOSITE.** `api_off` is a console visit where
+  reconnecting is useless; `scope_missing` is a re-consent where the console is useless.
+  Collapsing them reproduces the measured defect where an operator was told to re-consent
+  scopes that were already correct.
+- **NO SECOND PARSER.** `error_reason` and `activation_url` are imported from `_http`, never
+  reimplemented, and the substring predicate is the SAME one `_http._raise_for` uses — so the
+  panel and the refusal cannot disagree about one connection on one afternoon.
+- **`error.message` never travels.** Nothing here reads, returns or logs it. Proven live on
+  2026-09-01 against a real Google 403: the body carried a `message` field and the response
+  carried none.
+- **The scope arm makes NO network call**, and an application whose scope is absent is not
+  probed at all — a round trip that can only confirm what arithmetic already knows.
+- **A 401 IS `unknown`, NOT `ready`** — a considered narrowing of the plan's "any other 4xx is
+  ready". A rejected token means the application was never reached, so nothing about it was
+  measured.
+- **Operator-triggered only.** It runs on the existing Check action. Never on render, never on
+  load, never on a schedule (SEED-209/210/211/212).
+
+**The named seam.** If a second vendor gains applications, `APPLICATION_PROBES` and
+`classify_probe_response` split: the table stays per-vendor, the classifier becomes the shared
+leaf. Nothing should move before that second vendor exists.
+
+**ONE TABLE, NOT TWO.** An earlier shape split scope/service into `service_tools.py` and kept
+the URL here. Two tables that must agree is this repository's most-repeated defect; the
+invariant it was meant to buy is bought instead by `test_every_google_application_has_a_probe`,
+which walks `SERVICE_TOOL_SPECS` and fails by name on any application missing a probe.
+
+---
+
+## `backend/app/services/google/writes.py`
+
+**2 / 1 / 625 · absent from BOTH for its entire life — row added at Phase 221 plan 02.**
+Every Google write: Drive, Gmail, Sheets, Docs, Calendar, Contacts.
+
+**`create_event` SHIPPED BROKEN FOR THE COMMONEST INPUT THERE IS, and every gate was green.**
+Google's rule is *"a time zone offset is required unless a time zone is explicitly specified in
+timeZone"*. `_time_field` sent NEITHER for a naive datetime, so `2026-09-04T15:00:00` — exactly
+what a model writes for "Thursday at 3pm" — returned `HTTP 400 (required)` every time.
+
+**What made it invisible: two of the three input shapes worked.** Driven live against the
+operator's own calendar on 2026-09-01 — naive **FAILED**, the same instant with `Z` **OK**,
+all-day `date` **OK**. A test author reaching for an ISO string would naturally pick a working
+shape and prove the feature fine.
+
+**The fix, and why it costs a network call.** A naive time means *three in the afternoon where
+the person lives*, and the only place that fact exists is the calendar itself, so
+`_calendar_time_zone` reads it. **Defaulting to UTC would have made every arm pass while
+silently moving the operator's meetings by their offset** — a wrong answer wearing a right
+answer's clothes, which is worse than the 400 it replaces. An instant that already carries an
+offset is left completely alone; attaching a `timeZone` to it would invite Google to
+reinterpret a moment the caller had already pinned.
+
+**The invariants.**
+
+- The all-day arm short-circuits FIRST. Reordering makes a bare date a `dateTime` with a bogus
+  zone — a shape Google rejects. The test that asserts the order was **rewritten after the
+  first version was driven RED and could not fail**: the anchor on the offset pattern turns out
+  not to be reachable by any realistic input, so asserting it was decoration.
+- The time-zone lookup travels under `calendar_write`, the caller's OWN key. The egress key
+  selects an allow-list, not an HTTP verb; borrowing `calendar_read` would let a write tool
+  reach a surface its own key does not name.
+- A failed lookup returns `""` and never raises into the caller: it exists to IMPROVE a payload,
+  not to gate one.
+- **NO ATTENDEES FIELD**, deliberately — an attendee makes Google email somebody who never used
+  this product, from an action worded *"create an event"*.
+
+**`create_file` CAN MINT A NATIVE GOOGLE SHEET** (`mime_type:
+application/vnd.google-apps.spreadsheet`), proven live. So the recorded "no `create_spreadsheet`"
+gap is a **discoverability** gap, not a capability one — nothing tells a model that `create_file`
+does it. See `SEED-230`.
+
+---
+
+## `frontend/src/components/settings/applicationAvailability.ts`
+
+**0 / 0 / 152 · young (Phase 221 plan 02).** One application's server verdict, turned into a
+REMEDY.
+
+- **IT CLASSIFIES NOTHING, and that is a deliberate narrowing of the plan.** The plan's sketched
+  signature took raw scopes and a probe body and decided the state in the browser. That would be
+  a SECOND classifier, recreating exactly the defect `availability.py` refuses to create. The
+  server decides WHICH state; this file decides WHAT IT SAYS — the same split `check_connection`
+  already states for every other verdict on this surface.
+- **The remedy names the action, not the status.** *"Sheets: error"* is not a sentence anybody
+  can act on.
+- **The console URL is origin-whitelisted here too**, and not because the backend forgot: this is
+  the layer where the value becomes a live `href` a person clicks.
+- **`unknown` does not count as blocked.** Counting it would put `Partly ready` on a healthy
+  connection because someone's wifi dropped.
+- An unrecognised state degrades to `unknown`, **never** to `ready` — an old client must not read
+  a new server's fifth state as "everything is fine".
+
+---
+
+## `frontend/src/components/settings/AvailabilityLine.tsx`
+
+**0 / 0 / 74 · young (Phase 221 plan 02).** One line saying what will not work, and what to do.
+
+- **A `ready` APPLICATION RENDERS `null` — absent, not an empty element.** Silence is the healthy
+  state; the 2026-08-31 noise audit deleted twelve items that each said nothing, and six lines
+  reading "fine" would put them straight back. The suite asserts the element is ABSENT.
+- The link renders **only** where a destination helps: `api_off` gets the console,
+  `scope_missing` gets none, because the console cannot grant a scope.
+- **`unknown` never says "switched off".**
+- **IT MOUNTS OUTSIDE THE HEADER BUTTON.** Plan 01 left the slot INSIDE a `<button>`; interactive
+  content nested in a button is invalid HTML, the anchor is not reliably clickable, and a click
+  that reaches it also toggles the group. A test asserts no anchor has a button ancestor.
+
+---
+
+## `frontend/src/components/settings/grantsVocabulary.ts`
+
+**3 / 2 / 115 · absent for its entire life — row added at Phase 221 plan 02.** Every word the
+grants surface and the availability line say.
+
+- **There is deliberately NO `READY` string.** A constant for the healthy case is an invitation
+  to render one, and a working application must say nothing at all.
+- The `api_off` and `scope_missing` sentences are **not interchangeable** and say so in as many
+  words, because the measured failure was a refusal that named the wrong one.
+- `API_OFF_ACTION_NO_LINK` exists because a wrong console link is worse than none — it looks
+  authoritative.
+
+**No seam proposed.** A vocabulary doing one thing many times is the right shape.

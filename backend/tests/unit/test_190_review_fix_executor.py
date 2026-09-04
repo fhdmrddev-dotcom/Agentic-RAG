@@ -362,7 +362,17 @@ async def test_WR03_a_MATCHING_capability_still_sends_or_the_case_above_is_vacuo
         pass
 
     async def _resolve(*_a, **_kw):
-        return SimpleNamespace(capability="post_message", config={}, secret="x")
+        # ⚠ 213-06: a GRANTED capability. Gate 5.5 (Phase 213) now sits between the
+        # resolve and the dispatch, and a connection carrying no posture data at all
+        # resolves to `ask` — which, on an UNARMED drive like this one, fails closed.
+        # A real row cannot be in that state: migration 128 §3 backfills every capability
+        # row to `{capability: 'allow'}`. This fixture predates the column, so it is
+        # brought up to the shape a migrated row actually has. The property under test —
+        # that dispatch is REACHED — is unchanged.
+        return SimpleNamespace(
+            capability="post_message", config={}, secret="x",
+            tool_grants={"post_message": "allow"}, default_approval_posture="deny",
+        )
 
     def _get_adapter(_capability):
         raise _Stop("dispatch reached — that is the property")

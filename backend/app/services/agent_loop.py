@@ -112,6 +112,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _NoConnectorScope(Exception):
+    """This chat turn has no resolvable org, so no connector tool can be offered.
+
+    ⚠ A CONTROL-FLOW SIGNAL, NOT A FAULT — and it is caught SEPARATELY from the broad
+    handler below on purpose. Folded into that handler it would be logged as "Failed to
+    wire connector tools", which is the same kind of lie this whole change removes: not
+    being in an org is a fact about the account, not a failure of the wiring. The reason
+    is already logged, in words, at the raise site.
+    """
+
+
+
 # XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
 # DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
 # the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
@@ -1459,6 +1471,101 @@ async def run_agent_loop(
                 + "\n".join(f"- {t}" for t in disabled_tools)
             )
             active_system_prompt = active_system_prompt + disabled_note
+
+        # Phase 216 (CHAT-05 / D-216-04) — Connector tools in chat:
+        # Load active connector connections for the user's org and register their function tools
+        try:
+            from app.services.connector_service import list_connections
+            from app.services.connectors.chat_tools import build_chat_tools_for_connectors
+            from app.services.connectors.org_scope import resolve_connector_org
+            from app.services.openai_service import get_tools
+
+            # ⚠ NO `org_id = user_id` FALLBACK ANY MORE (2026-08-31). This block used to
+            # swallow the membership read's exception and then substitute the USER id for
+            # the ORG id — which matches no connection row, so a read failure and an
+            # org-less account both arrived as "this chat has no connected services".
+            # `resolve_connector_org` returns the fault AS a fault; the loop's answer to
+            # one is to offer the built-in tools and say why in the log, never to guess.
+            scope = await resolve_connector_org(current_user, supabase)
+            if not scope.ok:
+                logger.warning(
+                    "Connector tools are not offered in this chat: %s", scope.problem,
+                )
+                raise _NoConnectorScope(scope.problem or "no organisation scope")
+            org_id = scope.org_id
+
+            try:
+                conns = await list_connections(org_id=str(org_id), supabase=supabase)
+            except Exception:
+                # A read failure must be distinguishable in the log from "this org has
+                # no connections" — both leave `conns` empty, but only one is a fault.
+                logger.warning(
+                    "Failed to list connector connections for org %s — chat continues "
+                    "with built-in tools only", org_id, exc_info=True,
+                )
+                conns = []
+
+            # ⚠ THIS BLOCK MUST STAY OUT OF THE `except` ARM ABOVE. It lived inside it
+            # from c0a09c728 until this fix, which made every line below unreachable on
+            # the success path and vacuous on the failure path (`conns` is `[]` there),
+            # so `build_chat_tools_for_connectors` — whose ONLY production call site is
+            # here — never ran and chat never saw a connector tool. Every Phase 216 test
+            # calls that helper directly, so 6929 green tests could not see it.
+            # ── ⚠ THE COMPOSER'S OFF STATE USED TO MEAN "ALL", WHICH IS THE OPPOSITE ──
+            # This block had an `else` arm that, when `active_connector_ids` was absent,
+            # offered EVERY enabled connection in the org. The composer sends the field
+            # only when at least one chip is lit (`MessageInput.tsx`, `api/threads.ts`),
+            # and its initial state is an empty list — so selecting NOTHING sent nothing,
+            # and nothing meant everything. Measured by the operator: a chat about local
+            # files silently searched Google Drive on a connection they had not switched
+            # on, and every message ever sent from a fresh composer had the full connector
+            # set live.
+            #
+            # ⚠ IT FAILED OPEN ON A GRANT SURFACE, WHICH IS THE ONE PLACE THAT MUST NOT.
+            # The posture gate still held (an `ask` tool still paused), so nothing ran
+            # unwatched — but "which services is this conversation even allowed to touch"
+            # is a decision the person makes, and it was being made for them, in the
+            # permissive direction, by a falsy check.
+            #
+            # ABSENT AND EMPTY BOTH MEAN NONE, and they mean it HERE, at the boundary,
+            # rather than by agreement with a client we do not control. A caller that
+            # wants connector tools names them.
+            allowed_ids = {str(cid) for cid in (getattr(body, "active_connector_ids", None) or [])}
+            active_conns = [c for c in conns if str(c.id) in allowed_ids and c.is_enabled]
+            if not allowed_ids:
+                logger.debug(
+                    "chat run %s named no connector connections — offering built-in tools "
+                    "only (absent and empty both mean none)", run_id,
+                )
+
+            if active_conns:
+                connector_tools = build_chat_tools_for_connectors(active_conns)
+                if connector_tools:
+                    base_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
+                    active_tools = base_tools + connector_tools
+
+                    service_lines = []
+                    for c in active_conns:
+                        t_names = [t.get("name") for t in (c.discovered_tools or []) if isinstance(t, dict) and t.get("name")]
+                        if not t_names and c.capability:
+                            t_names = [c.capability]
+                        if t_names:
+                            service_lines.append(f"- **{c.name}** (service_id: `{c.service_id}`, tools: {', '.join(t_names[:10])}{'...' if len(t_names) > 10 else ''})")
+                    if service_lines:
+                        connector_note = (
+                            "\n\n## Connected Services & External Tools\n"
+                            "The following external services are connected and available in this chat. "
+                            "When the user asks to query, search, view, create, or act on these services (e.g. GitHub, Slack, Jira, Notion, Google), "
+                            "you MUST use their corresponding namespaced function tools:\n"
+                            + "\n".join(service_lines)
+                        )
+                        active_system_prompt = active_system_prompt + connector_note
+        except _NoConnectorScope:
+            # Already logged with its reason at the raise site. Chat continues with the
+            # built-in tools, which is the correct outcome — just not a silent one.
+            pass
+        except Exception:
+            logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
 
     messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
     # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature

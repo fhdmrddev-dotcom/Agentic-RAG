@@ -92,6 +92,8 @@ beforeEach(() => {
     governance_health: { audience: "everyone", roles: [] },
     // Phase 181 — the canvas master switch seeds Off (server truth mirrors the cold-default).
     visual_workflow_canvas: { audience: "off", roles: [] },
+    // Phase 210 — the live-connectors master switch seeds Off.
+    live_connectors: { audience: "off", roles: [] },
   })
 })
 

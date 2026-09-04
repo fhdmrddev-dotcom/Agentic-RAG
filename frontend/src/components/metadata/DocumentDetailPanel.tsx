@@ -30,6 +30,12 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "@/components/panel/PanelSection"
 import { RelationshipsSection } from "@/components/relationships/RelationshipsSection"
 import { ClassificationSection } from "@/components/classification/ClassificationSection"
+import { DocumentContentSection } from "./DocumentContentSection"
+import { DocumentChunksSection } from "./DocumentChunksSection"
+import { DocumentTablesSection } from "./DocumentTablesSection"
+import { DocumentImagesSection } from "./DocumentImagesSection"
+import { DocumentQueriesSection } from "./DocumentQueriesSection"
+import { TakeoffSection } from "./TakeoffSection"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
@@ -141,6 +147,15 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // The Classification section reads metadata._classification (no own fetch); it lifts
   // its pending-suggestion count up (1 when a "suggested" exists, else 0).
   const [classCount, setClassCount] = useState<number | null>(null)
+  // Phase 217 — the two new sections lift their totals the same way, so the accordion
+  // shows a count once (and only once) the section has actually been opened and read.
+  // `null` = never loaded → no badge, which is the honest state for a lazy section.
+  const [contentLines, setContentLines] = useState<number | null>(null)
+  const [chunkTotal, setChunkTotal] = useState<number | null>(null)
+  const [tableTotal, setTableTotal] = useState<number | null>(null)
+  const [imageTotal, setImageTotal] = useState<number | null>(null)
+  const [queryTotal, setQueryTotal] = useState<number | null>(null)
+  const [takeoffTotal, setTakeoffTotal] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -172,6 +187,17 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   useEffect(() => {
     setRelTotal(null)
     setClassCount(null)
+    setContentLines(null)
+    setChunkTotal(null)
+    // ⚠ CR-01 (217 review): plan 11 added Tables / Images / Found-by and did NOT extend this
+    // reset. The panel is never remounted (LibraryPage passes `doc` with no `key`) and a COLLAPSED
+    // PanelSection does not render its child, so a section opened on doc A kept its badge count
+    // forever after switching to doc B — including on a doc where the section does not apply.
+    // The open-section case self-corrected on re-fetch, which is why the existing test missed it.
+    setTableTotal(null)
+    setImageTotal(null)
+    setQueryTotal(null)
+    setTakeoffTotal(null)
   }, [doc.id])
 
   useEffect(
@@ -225,8 +251,22 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
         </button>
       </div>
 
-      {/* Sections — Metadata (112), then Relationships (117). 118 adds Classification. */}
+      {/* Sections, in the D-217-25a order: Details (112) · Text · Chunks (both 217-10)
+          · Tables · Images · Found by (217-11) · Relationships (117) · Classification
+          (118). The five 217 sections are INSERTED between Details and Relationships. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* SEED-227 — the images this document has that were never read. Rendered ONLY
+            when the backend stamped `_images`, which it does only on truncation, so the
+            quiet case stays quiet. ⚠ Says "were read", past tense, against the ceiling
+            that applied AT INGESTION: raising the setting now does not go back and read
+            the rest, and a present-tense sentence here would promise that it had. */}
+        {doc.metadata?._images && (
+          <div className="mx-4 mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            This document has {doc.metadata._images.total} images. The first{" "}
+            {doc.metadata._images.read} were read — the rest are not searchable. Re-upload
+            it after raising the limit in Settings to read them all.
+          </div>
+        )}
         <PanelSection
           // Phase 154 Plan 02 (LANG-01 / Surface B): plain "Details" by default,
           // "Metadata" under the reveal — via the single-source term-map (D-02).
@@ -246,6 +286,97 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
               />
             ))}
           </div>
+        </PanelSection>
+
+        {/* Phase 220 (TAKEOFF-04) — CAD Drawing Takeoff & Grounded Quantities BOQ */}
+        {(doc.filename.toLowerCase().endsWith(".dxf") || !!doc.metadata?._takeoff) && (
+          <PanelSection
+            title="Takeoff"
+            count={takeoffTotal ?? undefined}
+            defaultOpen
+          >
+            <div className="px-4 pt-1 pb-3">
+              <TakeoffSection
+                doc={doc}
+                onTotalChange={setTakeoffTotal}
+                onRefresh={onReconcile}
+              />
+            </div>
+          </PanelSection>
+        )}
+
+        {/* ── Phase 217 (LIB-04 / D-217-04 / D-217-25a) — the document's OWN content, ──
+            INSERTED between Details and Relationships, never appended after them. The
+            reading order is: what we know about it (Details) → what is IN it (Text,
+            Chunks) → how it relates to everything else (Relationships, Classification).
+            Appending would put the document's own text below two sections about OTHER
+            documents.
+
+            ⚠ The three shipped mounts MOVE DOWN and their PROPS DO NOT CHANGE. That is
+            the fence exactly: a relocation alters no prop.
+
+            ⛔ THE CLOSED-BY-DEFAULT PROP ON THE TWO MOUNTS BELOW IS THE ENTIRE LAZY
+            MECHANISM. `PanelSection.tsx:94` renders children only when open and
+            `PanelSection` has NO `onOpenChange` / `onToggle` prop, so a section that
+            fetches in a bare `useEffect` costs nothing until the accordion is clicked —
+            and costs a request on every document open the moment the prop is dropped.
+            `/content` can be megabytes.
+
+            ⚠ The prop's literal is deliberately NOT written in this comment: the fence
+            COUNTS occurrences file-wide and expects one per mount, so prose about the
+            rule would let the count pass on comments alone. Measured, not feared — this
+            paragraph originally spelled it and made the count read 3 for 2 mounts.
+
+            ⚠ D-217-25b — the title is `Text`, NOT `Details`: the shipped metadata
+            section's plain label is already `Details` (`termMap.ts:90`), and the same
+            word twice over two unrelated surfaces is how a vocabulary stops being one. */}
+        <PanelSection title="Text" count={contentLines ?? undefined} defaultOpen={false}>
+          <DocumentContentSection
+            docId={doc.id}
+            extractor={doc.extractor}
+            onTotalChange={setContentLines}
+          />
+        </PanelSection>
+
+        <PanelSection title="Chunks" count={chunkTotal ?? undefined} defaultOpen={false}>
+          <DocumentChunksSection docId={doc.id} onTotalChange={setChunkTotal} />
+        </PanelSection>
+
+        {/* -- Phase 217 Plan 11 (LIB-04 / D-217-25a) - the three that CLOSE the order. --
+            The final sequence is Details - Text - Chunks - Tables - Images - Found by -
+            Relationships - Classification: what we know about it, then what is IN it,
+            then how it is USED, then how it relates to other documents. These three go
+            directly after Chunks and BEFORE Relationships; Relationships and
+            Classification move down and their PROPS do not change, which is the fence
+            exactly - a relocation alters no prop.
+
+            D-217-25b - the titles are the literal strings below. `Found by`, never
+            `Queries` and never `Retrieval`: sketch 218's own SIGNAL_RENAMES already turns
+            `Most Retrieved` into `Most found`, and a third word for one concept is how a
+            vocabulary stops being one. And never `Details`, which is the shipped metadata
+            section's plain label (`termMap.ts:90`).
+
+            All three carry the closed-by-default prop, for the same reason the two above
+            do: `PanelSection.tsx:94` renders children only when open, so a section that
+            fetches in a bare `useEffect` costs nothing until it is clicked. The prop's
+            literal is deliberately absent from this comment - the fence COUNTS
+            occurrences file-wide, so prose about the rule would let the count pass on
+            comments alone (measured in 217-10).
+
+            The tables and images sections are handed the document row itself, not just
+            its id: they need `tables_stage_applies` / `table_count` to choose WHICH of
+            their three empty sentences is true, and those fields are already on the row
+            the panel holds - so it costs no extra request. */}
+        <PanelSection title="Tables" count={tableTotal ?? undefined} defaultOpen={false}>
+          <DocumentTablesSection docId={doc.id} doc={doc} onTotalChange={setTableTotal} />
+        </PanelSection>
+
+        <PanelSection title="Images" count={imageTotal ?? undefined} defaultOpen={false}>
+          <DocumentImagesSection docId={doc.id} doc={doc} onTotalChange={setImageTotal} />
+        </PanelSection>
+
+        <PanelSection title="Found by" count={queryTotal ?? undefined} defaultOpen={false}>
+          <DocumentQueriesSection docId={doc.id} onTotalChange={setQueryTotal} />
         </PanelSection>
 
         {/* Relationships (Phase 117 REL-02) — the section owns its own fetch +

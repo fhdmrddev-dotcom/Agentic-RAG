@@ -28,6 +28,8 @@ const ALL_EVERYONE: Record<GovernedFeature, FeatureAudience> = {
   governance_health: "everyone",
   // Phase 181 — the 5th governed key (its own Off|On control; "everyone" = On here).
   visual_workflow_canvas: "everyone",
+  // Phase 210 — the 6th governed key (Off|On control; "everyone" = On here).
+  live_connectors: "everyone",
 }
 
 const MIXED: Record<GovernedFeature, FeatureAudience> = {

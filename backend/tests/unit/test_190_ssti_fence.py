@@ -115,6 +115,16 @@ EVALUATED_MARKER = "49"
 _PRE_190_CONFIG_FIELDS = frozenset({"phase_type", "capability", "available_tools"})
 _ADDED_BY_190 = frozenset({"connection_id"})
 _ADDED_BY_206 = frozenset({"tool_name", "tool_args"})
+#: Phase 214 (D-214-01) — the per-argument SOURCE map. Recorded here as its own generation
+#: rather than folded into 206's, so the field set stays a re-derivable history.
+#:
+#: ⚠ IT IS A REFERENCE, NOT A PROGRAM, WHICH IS WHY THE SECOND ASSERTION BELOW STILL HOLDS.
+#: Each entry names ONE of three closed arms and, at most, the NAME of a run input or of a
+#: phase in this same workflow — validated against `^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$`, which
+#: structurally excludes a URL. It carries no expression, no template and no field mapping:
+#: D-214-02 chose a declared three-arm enum PRECISELY so that no expression language would be
+#: needed, and `args.resolve_arguments` interpolates nothing.
+_ADDED_BY_214 = frozenset({"arg_sources"})
 
 #: Field-NAME shapes that would mean an expression surface arrived. Checked as a property of
 #: the name so an unforeseen 5th field is caught by what it is FOR, not by whether someone
@@ -419,7 +429,7 @@ def test_no_expression_language_was_added_to_the_phase_config():
     from app.models.harness import ExternalActionPhaseConfig
 
     actual = set(ExternalActionPhaseConfig.model_fields)
-    expected = set(_PRE_190_CONFIG_FIELDS | _ADDED_BY_190 | _ADDED_BY_206)
+    expected = set(_PRE_190_CONFIG_FIELDS | _ADDED_BY_190 | _ADDED_BY_206 | _ADDED_BY_214)
     assert actual == expected, (
         f"D-32: ExternalActionPhaseConfig's field set is {sorted(actual)!r}, not "
         f"{sorted(expected)!r}."

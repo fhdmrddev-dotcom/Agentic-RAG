@@ -299,6 +299,17 @@ export interface TemplateFirstDraftArgs {
   /** Phase 187-26 (GAP A): the loose door's knowledge-base choice, made BEFORE the AI drafts. */
   initialProjectFolderId?: string
   /**
+   * 214-13 (STEP-06 / D-214-20): the connections the author ticked on the loose door, made
+   * BEFORE the AI drafts. The generator's whole vocabulary for `external_action` steps.
+   *
+   * ⚠ ABSENT AND `[]` ARE DIFFERENT FACTS AND THIS HOP MUST NOT COLLAPSE THEM. `undefined`
+   * is *no preference* — the field is omitted from the request and the server's unconstrained
+   * arm is reached, which is today's behaviour byte for byte. `[]` is the author's DECISION
+   * that no external step may be emitted, and it is SENT. The `onDraft` call site below
+   * therefore branches on `!== undefined`, never on truthiness or on `.length`.
+   */
+  initialAllowedConnectionIds?: string[]
+  /**
    * The OPEN/TWEAK definition's OWN binding, when the Builder booted on an existing definition.
    *
    * ⚠ Passed IN as a value rather than read off an `initial` prop, because a hook that took the
@@ -433,6 +444,7 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     initialDescribe,
     autoDraft,
     initialProjectFolderId,
+    initialAllowedConnectionIds,
     initialDefinitionFolderId,
     onDraftStarted,
     onDrafted,
@@ -491,12 +503,28 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
   // the row is created, which is strictly after the pick.
   const templateFileRef = useRef<File | null>(templateFile)
   const onTemplateBoundRef = useRef(onTemplateBound)
+  /**
+   * 214-13 — the ticked vocabulary, read at FIRE time through a ref.
+   *
+   * ⚠ IT IS NOT IN `onDraft`'s DEPENDENCY LIST, AND THE REASON IS THIS FILE'S OWN MEASURED
+   * ONE. An ARRAY prop has a new identity on every render unless its owner memoises it, and the
+   * auto-draft effect below depends on `onDraft`'s identity — so naming it there would re-create
+   * the callback on every render and re-run that effect, turning the one-shot hand-off into a
+   * loop that fires `/generate` repeatedly. Reading it at fire time is also the correct
+   * semantics: the draft is composed against whatever the author had ticked when they pressed.
+   *
+   * ⚠ `undefined` SURVIVES THIS HOP AS `undefined`. There is no `?? []` here — that one
+   * character would turn *no preference* into *forbid everything* for every caller that never
+   * supplied the prop, which is every shipped mount but the loose door's.
+   */
+  const allowedConnectionIdsRef = useRef<string[] | undefined>(initialAllowedConnectionIds)
   // Mirrored in an effect for the reason recorded on the two callback refs above, and safe
   // here for a stronger one: the ONLY reader is the async bind, which cannot run until a row
   // exists — long after every effect on the commit that held the pick has flushed.
   useEffect(() => {
     templateFileRef.current = templateFile
     onTemplateBoundRef.current = onTemplateBound
+    allowedConnectionIdsRef.current = initialAllowedConnectionIds
   })
 
   const [bindFailed, setBindFailed] = useState<{ filename: string } | null>(null)
@@ -554,6 +582,21 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         // all, which is why both live in this one callback's module.
         ...(templateRead.kind === "fields"
           ? { template_placeholders: templateRead.fields }
+          : {}),
+        // ── 214-13 (STEP-06 / D-214-20) — THE AUTHOR'S TICKED SERVICES, AS THE GENERATOR'S
+        //    VOCABULARY ─────────────────────────────────────────────────────────
+        //
+        // ⚠ THE SPREAD BRANCHES ON `!== undefined`, NOT ON TRUTHINESS, AND THAT IS THE WHOLE
+        // FIELD. `[]` is FALSY and it is the author's DECISION that no external step may be
+        // emitted — an `? :` on the array itself, or a `.length` test, would silently drop
+        // exactly that decision and send *no preference* instead, which reaches the server's
+        // UNCONSTRAINED arm. The two mean opposite things; see the field's own doc on
+        // `GenerateWorkflowBody` and the parameter's doc on `generate_workflow_definition`.
+        //
+        // ⚠ AND AN ABSENT PROP STAYS ABSENT FROM THE BODY. Every shipped mount but the loose
+        // door's supplies nothing, so the request they send is byte-identical to today's.
+        ...(allowedConnectionIdsRef.current !== undefined
+          ? { allowed_connection_ids: allowedConnectionIdsRef.current }
           : {}),
       })
       if (result.ok) {

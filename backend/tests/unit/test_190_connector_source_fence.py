@@ -74,6 +74,14 @@ _EXPECTED_MODULES = frozenset({
     "smtp_adapter.py",
     "jira_adapter.py",
     "slack_adapter.py",
+    # Phase 211 (CONN-04) — the static tool descriptors for a first-party capability
+    # connection. It opens nothing and sends nothing, but it joins the walk deliberately:
+    # a module under this package that the fence does not visit is a module D-05 does not
+    # cover, and "it only builds a dict today" is a property of today.
+    "descriptors.py",
+    "args.py",
+    "grants.py",
+    "chat_tools.py",
 })
 
 #: D-05 expressed as PROPERTIES. Each entry is ``name -> matcher``; the name is what a
@@ -570,7 +578,26 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # is the property; the number is re-derived here rather than inherited, and the fence
     # firing on a line move is the fence working — it is asserting an exact list, and an exact
     # list that tolerated drift would also tolerate a second importer arriving on a new line.
-    assert module_scope_importers == ["app/services/harness/phase_types.py:105"], (
+    #
+    # ⚠ AND IT MOVED AGAIN, 106 -> 107, at Phase 214 (D-214-00): the argument leaf's flat
+    # module-top import `from app.services.connectors.args import ...` was added one line
+    # above, on the `grants` precedent. THE IMPORTER SET IS UNCHANGED — `args.py` is a strict
+    # leaf whose only non-stdlib import is a DEFERRED `descriptors` inside one function, so it
+    # adds no module-scope registry importer and joins no cycle. The fence fired on the line
+    # move, exactly as the paragraph above says it should, and the number is re-derived here
+    # rather than inherited.
+    #
+    # ⚠ AND AGAIN, 107 -> 114, at Phase 214.1-03 (BUG-260828-03): `phase_types` gained a
+    # module-top `from app.services.harness.publish_service import _clean_label` — ONE
+    # scrubber, TWO callers, so a remote-server-advertised `tool_name` reaching a system
+    # prompt goes through the SHIPPED Unicode-category scrub + 72-char clamp rather than a
+    # second copy of one. THE IMPORTER SET IS UNCHANGED: `publish_service` has no app-level
+    # module-top imports AT ALL (logging, unicodedata, UUID — everything heavier is
+    # function-local) and the `harness` package `__init__` never loads it, so it adds no
+    # module-scope registry importer and closes no cycle. Proven by a real fresh import
+    # before the line was written. The fence fired on the line move; the number is
+    # re-derived, the property is not.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:114"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "
@@ -584,7 +611,15 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # pinned: a deferred import is cheap enough that "just add one" is a real temptation, and
     # every one is a module reaching across a seam it was not given.
     assert sorted({site.rsplit(":", 1)[0] for site in function_local_importers}) == [
+        # Phase 211 (CONN-04) — `descriptors.py` resolves the adapter to read its own
+        # INPUT_SCHEMA. Pinned here deliberately, in answer to this assertion's own
+        # instruction: the fence fired on the commit that added the import, which is the
+        # fence working. It is function-local for the reason stated below and in that
+        # module's "WHY LAZY IMPORT" block — a module-scope form would join the cycle.
         "app/api/connectors.py",
+        "app/services/connectors/descriptors.py",
+        # Phase 216 (CHAT-05 / D-216-04) — tool_dispatcher resolves first-party capability adapters at dispatch.
+        "app/services/tool_dispatcher.py",
     ], (
         f"the connector registry now has function-local importers in unexpected files: "
         f"{function_local_importers!r}. These do NOT open the import cycle (they run at call "

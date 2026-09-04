@@ -3,7 +3,8 @@ seed_id: SEED-206
 title: "A step that calls Slack wears SLACK'S mark — on the SPINE and the run surfaces too, not only the canvas. And 'any official application logo' has a measured hole: the operator's own example, ClickUp, is absent from the installed collection."
 created: 2026-08-26
 planted_during: conversation with the operator, 2026-08-26, while Gemini executed Phase 209
-status: planted
+status: folded            # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- SC#4's second half; see folded_into.
+folded_into: 214
 priority: medium
 surface: Agentic-RAG
 relates_to:
@@ -92,3 +93,28 @@ and it is the `destinationFactsOf` defect again — a positional resemblance sta
 This is NOT Phase 209. 209's SC#4 is satisfied by the canvas reusing the one map, and widening it
 mid-flight would be scope creep on a phase already executing. This seed is the follow-on: **one
 resolver, every step surface, and an honest answer for the 2110th service.**
+
+---
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — `status` stays `folded`, and why
+
+**Shipped by `214-08` and `214-11`.** `StepIdentity.tsx` is one element with four sizes taking
+both names as props; `connectionMark` **moved** from `frontend/src/components/settings/` to
+`frontend/src/lib/` so the run surfaces, the panel and the canvas import the SAME map rather than
+reaching into a settings module. Five surfaces mount it: `RunCard`, `PhaseCard`, `PhaseTimeline`,
+`RunSpine`/`RunStepList` and `PendingAskCard`.
+
+**This seed's own measured hole is closed by REFUSAL rather than by an icon.** ClickUp — the
+operator's own example, absent from the installed collection — takes the NAMED NEUTRAL mark, asserted
+at `frontend/src/components/workflows/StepIdentity.coverage.test.tsx:404`. Showing Slack's mark for a
+service that is not Slack is a claim the system cannot support, so no vendor's mark is borrowed and
+no icon package was added (`T-214-08-01`, `T-214-11-05`).
+
+⛔ **`status` stays `folded`, NOT closed, because G4-6 has not been driven.** The five mounts are
+asserted individually by tests; whether an operator LOOKING at a paused run sees the service named is
+the check, and it is un-run. Flip to `closed` when `214-UAT.md`'s G4-6 carries a driven verdict.
+
+⚠ **One measured gap inside this seed's own subject:** `214-11` found `stepIdentityVocabulary`'s six
+PAUSE sentences consumed by NOTHING — `ASK_PAUSED` count `0` in `PendingAskCard.tsx`, which still
+renders `Needs you`. **A shipped vocabulary with no consumer is Phase 213's failure shape.**
+Registered as `SEED-219`.

@@ -129,6 +129,10 @@ Then edit `./.env` and fill in:
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick
   it up.
+- **`VITE_DEMO_URL` & `VITE_APP_URL`** (Phase 226) — public landing page CTA destinations.
+  `VITE_DEMO_URL` points to your demo scheduling link (e.g. Google Calendar appointment page);
+  if empty, the "Book a demo" CTA defaults to `#start`. `VITE_APP_URL` is the base URL of the
+  application SPA (e.g. `https://app.example.com`); if empty, "Sign in" targets `/app`.
 
 The full annotated variable surface is
 [`../deploy/onebox.env.example`](../deploy/onebox.env.example) (layered on
@@ -195,6 +199,30 @@ SQL editor, in order:
    at rest (`enc:v1:` envelope) — the token is decrypted only at call time and never logged. Also
    set `SUPABASE_PROJECT_REF` in `./.env` (see Step 2). On **self-hosted** GoTrue
    (`SUPABASE_SELF_HOSTED=true`) skip this entirely — the `service_role` key is used instead.
+
+6. **Know what is already switched on — the feature-visibility cold defaults.** ⚠ There is
+   **nothing to paste here**; this table exists so a fresh operator can see what a brand-new box
+   shows before they touch anything. Feature visibility is an **audience enum**, never a boolean,
+   and the authoritative cold default lives in code (`_GOVERNED_FEATURES` in
+   `backend/app/models/user_settings.py`) — **not** in a seed row. An unseeded
+   `app_settings.feature_visibility` key falls through to it, so a fresh DB needs no insert for
+   any of these. The JSONB gains a key only when an operator flips it in `/admin` (an atomic
+   per-key merge, so flipping one never clobbers another).
+
+   | Governed feature | Cold default | What that means on a fresh box |
+   |---|---|---|
+   | `workflow_authoring` | `everyone` | Every signed-in user can author workflows. |
+   | `governance_health` | `everyone` | The governance-health page is visible to everyone. |
+   | `visual_workflow_canvas` | `everyone` | The visual workflow canvas + step surfaces render for everyone. ⚠ Changed 2026-08-28 (Phase 214) — it was `off` from Phase 181 through v3.7. To hide it, flip it to `off` in `/admin`. |
+   | `live_connectors` | `off` | ⚠ **Outbound sending is DISABLED.** An external-action step records what it *would* send and reads "Not sent — recorded". Flip this to `everyone` only when you intend real mail/messages to leave the box. |
+   | `skill_studio` | `operators` | Visible only to accounts listed in `OPERATOR_EMAILS`. |
+   | `model_management` | `operators` | Visible only to accounts listed in `OPERATOR_EMAILS`. |
+
+   ⚠ **This table is enforced by a unit test, not by the drift script.**
+   `scripts/check-deploy-drift.sh` reads env-var keys, migration filenames, the sandbox tag and the
+   compose file — it has never looked at `feature_visibility` and cannot tell you this table has
+   gone stale. `backend/tests/unit/test_214_flag_cold_default.py` is what fails when a governed
+   feature is added or a default changes without this table following in the same commit.
 
 > Migrations currently run to **124** (⚠ this line read `102` until 2026-08-24 and had been
 > stale for twenty-two migrations — re-derive it with `ls supabase/migrations | tail -1` rather

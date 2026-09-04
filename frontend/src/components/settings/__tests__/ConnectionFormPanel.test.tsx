@@ -55,7 +55,6 @@ import panelSource from "../ConnectionFormPanel?raw"
 import egressSource from "../../../../../backend/app/security/egress.py?raw"
 import phaseTypesSource from "../../../../../backend/app/services/harness/phase_types.py?raw"
 import {
-  CAPABILITY_LOCKED_NOTE,
   FIELD_COUNTS,
   FIELD_SLACK_CHANNEL_HELP,
   FIELD_SMTP_HOST_HELP,
@@ -74,6 +73,8 @@ import {
   SECRET_DOTS,
   SECRET_REPLACE_LABEL,
   SECRET_STORED_NOTE,
+  SERVICE_LABEL,
+  SERVICE_LOCKED_NOTE,
   SLACK_ENDPOINT,
   destinationFooterOf,
   orgSharedLine,
@@ -89,6 +90,8 @@ import {
 import * as FORM_COPY from "../connectionFormCopy"
 import * as CONNECTIONS_COPY from "../connectionsCopy"
 import * as REFUSAL_COPY from "../connectionRefusalCopy"
+import { GRANTS_COPY } from "../grantsVocabulary"
+import { connectionMark } from "@/lib/connectionMark"
 import {
   CHECK_FAILURE_SENTENCE,
   CHECK_INFLIGHT_BODY,
@@ -129,6 +132,7 @@ import {
   deleteSheetBody,
   disableSheetBody,
 } from "../connectionsCopy"
+import * as api from "@/lib/api"
 import { ConnectorApiError } from "@/lib/api"
 import type {
   ConnectorCapability,
@@ -146,6 +150,9 @@ function makeConnection(overrides: Partial<ConnectorConnection> = {}): Connector
     id: "conn-1",
     org_id: "org-1",
     capability: "send_email",
+    // ⚠ REQUIRED since 211-02 — migration 127 guarantees a non-blank identity on every
+    // row, so a fixture without one models a row the server cannot produce.
+    service_id: "smtp",
     name: "Ops mailbox",
     config: {
       host: "smtp.fastmail.com",
@@ -163,6 +170,30 @@ function makeConnection(overrides: Partial<ConnectorConnection> = {}): Connector
 }
 
 const noop = () => {}
+
+/**
+ * ⭐ THE ONE WAY THIS SUITE REACHES A SHAPE IN CREATE MODE (Phase 211 / SC#1).
+ *
+ * The three-verb chooser is GONE FROM THE SOURCE — not hidden — so every case that used to
+ * `selectOptions` a capability now types the SERVICE whose field set it wants. The identity
+ * is what the person supplies; the field set follows from it, through `SERVICE_TO_SHAPE`.
+ */
+async function chooseService(
+  user: ReturnType<typeof userEvent.setup>,
+  serviceId: string,
+) {
+  const field = screen.getByLabelText(SERVICE_LABEL)
+  await user.clear(field)
+  await user.type(field, serviceId)
+}
+
+/** The identity that resolves to each shipped capability's field set. Data, not a branch —
+ *  it mirrors `SERVICE_TO_SHAPE` and migration 127's own backfill. */
+const SERVICE_FOR_CAPABILITY: Record<ConnectorCapability, string> = {
+  send_email: "smtp",
+  create_ticket: "jira",
+  post_message: "slack",
+}
 
 function renderPanel(
   props: Partial<React.ComponentProps<typeof ConnectionFormPanel>> = {},
@@ -342,6 +373,30 @@ afterEach(() => {
 // 1 · THE FOCUS TRAP — §14's condition, inverted
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
+/**
+ * ⚠ THE TRAP'S OWN DEFINITION OF FOCUSABLE, MIRRORED RATHER THAN APPROXIMATED.
+ *
+ * `focusablesIn` (`ConnectionFormPanel.tsx`) excludes `[disabled]` and `aria-hidden` nodes.
+ * This helper used to spell a looser selector, which was harmless only while no DISABLED
+ * control could be last in DOM order. Phase 211 made one possible — Save is off on a create
+ * form that has not named a service yet — and the looser list then ended on a node the trap
+ * correctly skips, so the case failed for a reason it is not about. Mirroring the shipped
+ * selector is what keeps this assertion measuring the CONTRACT rather than a coincidence.
+ */
+function focusablesOf(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(",")
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(
+    (node) => node.getAttribute("aria-hidden") !== "true",
+  )
+}
+
 describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used)", () => {
   it("Tab from the LAST focusable control returns to the FIRST, and focus never leaves the panel", async () => {
     const user = userEvent.setup({ delay: null })
@@ -355,9 +410,7 @@ describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used
     renderPanel()
 
     const panel = screen.getByTestId("connection-form-panel")
-    const focusables = Array.from(
-      panel.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]"),
-    ).filter((n) => n.getAttribute("tabindex") !== "-1")
+    const focusables = focusablesOf(panel)
     expect(focusables.length).toBeGreaterThan(2)
 
     const last = focusables[focusables.length - 1]
@@ -382,9 +435,7 @@ describe("the focus trap (§3a / §12 — net-new, because `Dialog` was not used
     renderPanel()
 
     const panel = screen.getByTestId("connection-form-panel")
-    const focusables = Array.from(
-      panel.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]"),
-    ).filter((n) => n.getAttribute("tabindex") !== "-1")
+    const focusables = focusablesOf(panel)
 
     focusables[0].focus()
     await user.tab({ shift: true })
@@ -444,6 +495,11 @@ describe("the focus restore (§3a / §12)", () => {
     opener.focus()
 
     const view = renderPanel({ onClose, onCreate })
+    // ⚠ 211 — a create form saves once it has BOTH facts. Save is off before that, which is
+    // the point of the new reason node; this case is about the focus restore, so it supplies
+    // them rather than asserting the refusal a dedicated case already owns.
+    await chooseService(user, "my_custom_wiki")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
     await user.click(screen.getByTestId("connection-form-save"))
     expect(onCreate).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -513,8 +569,8 @@ describe("the push/split container (§3a / D-27)", () => {
     for (let node: HTMLElement | null = rows[0]; node; node = node.parentElement) {
       expect(node.getAttribute("aria-hidden")).not.toBe("true")
     }
-    // And the track really is the 400px split, not a full-width takeover.
-    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).toContain("400px")
+    // And the track really is the clamp(480px, 38%, 640px) split, not a full-width takeover.
+    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).toContain("clamp(480px, 38%, 640px)")
   })
 })
 
@@ -546,9 +602,9 @@ describe("375px (§3a / §12)", () => {
     )
 
     expect(screen.getByTestId("connection-form-panel").getAttribute("data-layout")).toBe("sheet")
-    // No 400px track beside a 375px viewport — that is the horizontal overflow, expressed
+    // No split track beside a 375px viewport — that is the horizontal overflow, expressed
     // as the thing that would CAUSE it rather than as a geometry jsdom cannot measure.
-    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).not.toContain("400px")
+    expect(screen.getByTestId("connections-split").style.gridTemplateColumns).not.toContain("clamp")
   })
 
   it("the tallest content — the OFF notice — sits inside the panel's scroll container, so it stays reachable", () => {
@@ -576,15 +632,132 @@ describe("the per-capability field sets (§3b / D-32 / T-190-17-SCOPE)", () => {
   it.each(cases)("%s renders exactly its bound number of fields and nothing beyond it", async (capability) => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
-    await user.selectOptions(screen.getByLabelText("What this connection does"), capability)
+    await chooseService(user, SERVICE_FOR_CAPABILITY[capability])
 
     expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[capability])
+  })
+
+  it("⭐ SC#1 — the three-verb chooser is ABSENT from the create flow, for every audience", () => {
+    // ⚠ ABSENCE OF THE CONTROL, asserted for each audience the suite parametrises. The
+    // source fence in section 25 is the other half: this one proves it does not RENDER,
+    // that one proves the panel no longer SPELLS it.
+    for (const props of [
+      {},
+      { isOrgAdmin: false },
+      { liveConnectorsOn: false },
+    ] as Array<Partial<React.ComponentProps<typeof ConnectionFormPanel>>>) {
+      renderPanel(props)
+      expect(screen.queryByTestId("connection-capability-chooser")).toBeNull()
+      expect(screen.queryByLabelText("What this connection does")).toBeNull()
+      cleanup()
+    }
+  })
+
+  it("⭐ SC#1 — the create flow's FIRST question is which service, and it is bound to the draft", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    const block = screen.getByTestId("connection-service-field")
+    expect(block).toBeInTheDocument()
+
+    const input = screen.getByLabelText(SERVICE_LABEL) as HTMLInputElement
+    expect(block).toContainElement(input)
+    await user.type(input, "notion")
+    // BOUND, not merely present: the value the person typed is the value the control holds.
+    expect(input.value).toBe("notion")
+  })
+
+  it("⭐ CONN-08 — a service NOBODY here has heard of binds Name and the Service, and nothing else", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseService(user, "a-service-nobody-here-has-heard-of")
+
+    // The service shape's bound count, read from the module rather than retyped.
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.service)
+    // ⚠ NO CREDENTIAL FIELD. An identified row with no reachable path has nothing to
+    // authenticate with until OAuth lands — offering a password box would be a lie.
+    expect(screen.queryByLabelText("App password")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Bot token")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("API token")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Jira site")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Channel")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-5 — curated Popular MCP services (github, notion) reveal MCP URL and Access token fields", async () => {
+    const user = userEvent.setup({ delay: null })
+    for (const serviceId of ["github", "notion"]) {
+      renderPanel()
+      await chooseService(user, serviceId)
+
+      expect(screen.getByLabelText("MCP server URL")).toBeInTheDocument()
+      expect(screen.getByTestId("connection-probe-mcp-btn")).toBeInTheDocument()
+      expect(screen.getByLabelText("Access token")).toBeInTheDocument()
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.mcp)
+      cleanup()
+    }
+  })
+
+  it("⭐ D-215 — curated OAuth services (google) reveal OAuth authorization card", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseService(user, "google")
+
+    expect(screen.getByText(/OAuth 2\.0 Authorization/i)).toBeInTheDocument()
+    expect(screen.getByTestId("connection-oauth-authorize-btn")).toBeInTheDocument()
+    expect(screen.getByText(/Connect with Google Workspace/i)).toBeInTheDocument()
+    cleanup()
+  })
+
+  it("⭐ D-5's NEGATIVE CONTROL — an UNCURATED identity still binds the service shape, so the catalog did not swallow CONN-08", async () => {
+    // ⚠ THIS CASE IS THE ONE THAT COULD HAVE BEEN GOT WRONG. `getServiceCatalogEntry` is TOTAL
+    // and synthesizes a fallback entry carrying `markKey: "mcp"`, so a shape derivation keyed
+    // on IT would turn every unknown `service_id` into an MCP row and delete the service-only
+    // shape outright. Without this control, that regression passes every other case in the file.
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await chooseService(user, "a-service-nobody-here-has-heard-of")
+
+    expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS.service)
+    expect(screen.queryByLabelText("MCP server URL")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("connection-probe-mcp-btn")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-5 — the three ADAPTER-BACKED identities are NOT swept into the MCP shape by the catalog arm", async () => {
+    // `slack`, `jira` and `smtp` are catalog entries too. They must keep their capability field
+    // sets — an adapter-backed row silently becoming an MCP row is a credential pointed at the
+    // wrong wire, which is why `SERVICE_TO_SHAPE` is read BEFORE the catalog.
+    const user = userEvent.setup({ delay: null })
+    for (const [serviceId, shape] of [
+      ["slack", "post_message"],
+      ["jira", "create_ticket"],
+      ["smtp", "send_email"],
+    ] as const) {
+      renderPanel()
+      await chooseService(user, serviceId)
+      expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[shape])
+      expect(screen.queryByLabelText("MCP server URL")).not.toBeInTheDocument()
+      cleanup()
+    }
+  })
+
+  it("⚠ the suggestion list is a SUGGESTION — its options are a `<datalist>`, never a closed control", () => {
+    const { container } = renderPanel()
+    const input = screen.getByLabelText(SERVICE_LABEL) as HTMLInputElement
+    // A `<select>` here would make the curated set a CONSTRAINT, which is the exact defect
+    // D-211-01 rejected: every unknown service invisible or squeezed into a known name.
+    expect(input.tagName).toBe("INPUT")
+    const listId = input.getAttribute("list")
+    expect(listId).toBeTruthy()
+    const list = container.querySelector(`#${CSS.escape(listId!)}`)
+    expect(list).not.toBeNull()
+    expect(list!.tagName).toBe("DATALIST")
+    expect(list!.querySelectorAll("option").length).toBe(FORM_COPY.SERVICE_SUGGESTIONS.length)
   })
 
   it("Slack says OUT LOUD that it has nothing to type, verbatim (D-02 told to the person)", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
-    await user.selectOptions(screen.getByLabelText("What this connection does"), "post_message")
+    await chooseService(user, "slack")
 
     expect(screen.getByText(FIELD_SLACK_CHANNEL_HELP)).toBeInTheDocument()
     expect(FIELD_SLACK_CHANNEL_HELP).toContain(
@@ -595,19 +768,26 @@ describe("the per-capability field sets (§3b / D-32 / T-190-17-SCOPE)", () => {
     expect(screen.queryByLabelText("SMTP host and port")).not.toBeInTheDocument()
   })
 
-  it("SMTP states the plaintext refusal BEFORE a person can trip it, verbatim", () => {
+  it("SMTP states the plaintext refusal BEFORE a person can trip it, verbatim", async () => {
+    const user = userEvent.setup({ delay: null })
     renderPanel()
+    await chooseService(user, "smtp")
     expect(screen.getByText(FIELD_SMTP_HOST_HELP)).toBeInTheDocument()
     expect(FIELD_SMTP_HOST_HELP).toContain(
       "Plain smtp:// is refused, including for addresses inside this network.",
     )
   })
 
-  it("on EDIT the capability is static text with a stated reason — never a control", () => {
+  it("on EDIT the SERVICE is static text with a stated reason — never a control", () => {
     renderPanel({ mode: "edit", connection: makeConnection() })
-    expect(screen.queryByLabelText("What this connection does")).not.toBeInTheDocument()
-    expect(screen.getByTestId("connection-capability-static")).toBeInTheDocument()
-    expect(screen.getByText(CAPABILITY_LOCKED_NOTE)).toBeInTheDocument()
+    expect(screen.queryByLabelText(SERVICE_LABEL)).not.toBeInTheDocument()
+    const staticBlock = screen.getByTestId("connection-capability-static")
+    expect(staticBlock).toBeInTheDocument()
+    // ⚠ It READS the identity and does not offer to change it: editing identity is CONN-07
+    // and Phase 212 owns it — 211-02 deliberately left `ConnectorConnectionUpdate` without
+    // the field, so a control here would compose a body the model discards.
+    expect(staticBlock).toHaveTextContent(FORM_COPY.serviceLabelOf("smtp"))
+    expect(screen.getByText(SERVICE_LOCKED_NOTE)).toBeInTheDocument()
   })
 })
 
@@ -628,6 +808,7 @@ describe("the always-on 🔒 destination footer (§3c / T-190-17-DEST)", () => {
   it("updates AS YOU TYPE — the host and the TLS-mode tag both move with the fields", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
+    await chooseService(user, "smtp")
 
     await user.type(screen.getByLabelText("SMTP host and port"), "smtp.fastmail.com")
     const portInput = screen
@@ -653,6 +834,7 @@ describe("the always-on 🔒 destination footer (§3c / T-190-17-DEST)", () => {
   it("a provably-refused destination is marked refused and carries the destructive border", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
+    await chooseService(user, "smtp")
     await user.type(screen.getByLabelText("SMTP host and port"), "smtp://10.0.0.4")
 
     const footer = screen.getByTestId("connection-destination-footer")
@@ -667,7 +849,7 @@ describe("the always-on 🔒 destination footer (§3c / T-190-17-DEST)", () => {
   it("Slack's destination is the real endpoint and is tagged as fixed in code (D-02)", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
-    await user.selectOptions(screen.getByLabelText("What this connection does"), "post_message")
+    await chooseService(user, "slack")
 
     expect(screen.getByTestId("connection-destination-value")).toHaveTextContent(SLACK_ENDPOINT)
     expect(
@@ -1611,6 +1793,7 @@ function draftOfShape(capability: string, over: Record<string, unknown> = {}): C
     ...EMPTY_DRAFT,
     capability,
     mcpServerUrl: "",
+    serviceId: "",
     ...over,
   } as unknown as ConnectionDraft
 }
@@ -1647,62 +1830,135 @@ const PROTOTYPE_KEYS = [
 
 const ACCEPTED_MCP_URL = "https://mcp.deepwiki.com/mcp"
 
-describe("206.1 · the MCP sentinel, the fourth choice and the field count (D-206.1-03)", () => {
-  it("`CAPABILITY_CHOICES` gains a FOURTH entry and `mcp` is LAST — the shipped three keep mig 116's order", () => {
-    const choices = FORM_COPY.CAPABILITY_CHOICES
-    expect(choices).toHaveLength(4)
-    expect(choices.map((c) => c.capability)).toEqual([
-      "send_email",
-      "create_ticket",
-      "post_message",
-      "mcp",
-    ])
-    expect(choices[3].label).toBe(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
+/**
+ * ⚠ THE RETIRED CHOOSER CONSTANT'S NAME, COMPOSED FROM FRAGMENTS AND NEVER SPELLED.
+ *
+ * Two fences below assert this identifier is absent — from the copy module's exports, and
+ * from the panel's source. The acceptance check for the same property is a `grep -r` over
+ * `frontend/src`, and a fence that spells its own needle is a fence that makes that count
+ * lie. This is `ownProperty.ts`'s recorded discipline ("both identifiers are left unspelled
+ * in this paragraph on purpose"), applied to a deletion instead of to a guard.
+ */
+const RETIRED_CHOOSER_CONSTANT = ["CAPABILITY", "CHOICES"].join("_")
+
+describe("211 · the service lookup replaces the chooser data (SC#1 / D-211-01 / D-211-02)", () => {
+  it("⭐ the three-verb option constant DOES NOT EXIST — the data is deleted, not hidden", () => {
+    // SC#1 names this constant. Deleting the DATA is what makes the source fence below
+    // meaningful: a hidden control is one prop away from coming back.
+    expect(RETIRED_CHOOSER_CONSTANT in FORM_COPY).toBe(false)
+    expect("capabilityLabelOf" in FORM_COPY).toBe(false)
+    expect("CAPABILITY_CHOICE_MCP_LABEL" in FORM_COPY).toBe(false)
   })
 
-  it("`capabilityLabelOf('mcp')` renders the LABEL, never the raw schema token", () => {
-    // `capabilityLabelOf` is `...?.label ?? capability`, so a missing choice does not throw —
-    // it renders the wire word to a person. That is the failure this case exists to catch.
-    expect(FORM_COPY.capabilityLabelOf("mcp")).toBe(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
-    expect(FORM_COPY.capabilityLabelOf("mcp")).not.toBe("mcp")
-    // POSITIVE CONTROL — the three shipped labels are untouched.
-    expect(FORM_COPY.capabilityLabelOf("send_email")).toBe("Send an email")
-  })
-
-  it("the MCP label names the CAPABILITY, and collides with no other field label", () => {
-    const label = FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL
-    expect(label.length).toBeGreaterThan(10)
-    // ⚠ Section 5 asserts both of these strings ABSENT on a non-matching shape. A chooser
-    // label containing either would make that case pass or fail for a reason it is not about.
-    expect(label).not.toContain("Jira site")
-    expect(label).not.toContain("SMTP host and port")
-    // The MCP URL field's own label is deliberately distinct from every shipped one, so the
-    // negative `queryByLabelText` cases stay meaningful.
-    for (const shipped of ["Jira site", "SMTP host and port", "Channel", "Send from", "Project key"]) {
-      expect(FORM_COPY.FIELD_MCP_URL_LABEL).not.toBe(shipped)
+  it("`SERVICE_SUGGESTIONS` covers migration 127's three backfilled identities plus a custom endpoint", () => {
+    const ids = FORM_COPY.SERVICE_SUGGESTIONS.map((s) => s.service_id)
+    for (const backfilled of ["slack", "jira", "smtp"]) {
+      expect(ids).toContain(backfilled)
+    }
+    // The one entry that opens the endpoint field — the zero-engineering custom door.
+    expect(ids).toContain("custom")
+    // Every entry carries a human label, and no label is the raw identifier wearing a hat.
+    for (const suggestion of FORM_COPY.SERVICE_SUGGESTIONS) {
+      expect(suggestion.label.length).toBeGreaterThan(2)
+      expect(suggestion.label).not.toBe(suggestion.service_id)
     }
   })
 
-  it("`FIELD_COUNTS` is TOTAL over all four shapes and binds MCP at exactly 3", () => {
+  it("⭐ `serviceLabelOf` degrades a MISS to the RAW IDENTIFIER — never a placeholder, never blank", () => {
+    expect(FORM_COPY.serviceLabelOf("slack")).toBe(
+      FORM_COPY.SERVICE_SUGGESTIONS.find((s) => s.service_id === "slack")!.label,
+    )
+    // Catalog services return their human labels
+    expect(FORM_COPY.serviceLabelOf("notion")).toBe("Notion")
+    expect(FORM_COPY.serviceLabelOf("github")).toBe("GitHub")
+    // D-211-02: a miss degrades. It is a SUGGESTION list, so an unknown identity reads back
+    // as itself rather than as "unknown", and never as a refusal.
+    expect(FORM_COPY.serviceLabelOf("a-service-nobody-here-has-heard-of")).toBe(
+      "a-service-nobody-here-has-heard-of",
+    )
+  })
+
+  it("⚠ `shapeForService` is TOTAL — catalog MCP services resolve to mcp, an unknown identity and PROTOTYPE keys resolve to service", () => {
+    expect(FORM_COPY.shapeForService("smtp", "")).toBe("send_email")
+    expect(FORM_COPY.shapeForService("jira", "")).toBe("create_ticket")
+    expect(FORM_COPY.shapeForService("slack", "")).toBe("post_message")
+    expect(FORM_COPY.shapeForService("custom", "")).toBe("mcp")
+    expect(FORM_COPY.shapeForService("notion", "")).toBe("mcp")
+    expect(FORM_COPY.shapeForService("github", "")).toBe("mcp")
+    expect(FORM_COPY.shapeForService("a-service-nobody-here-has-heard-of", "")).toBe("service")
+    expect(FORM_COPY.shapeForService("", "")).toBe("service")
+    // ⚠ T-211-15a — an inherited key is TRUTHY on a bracket read and would hand back a
+    // FUNCTION typed as `ConnectionShape`. The map must be read through `own(MAP, key)`.
+    for (const key of PROTOTYPE_KEYS) {
+      expect(FORM_COPY.shapeForService(key, "")).toBe("service")
+    }
+  })
+
+  it("⚠ SEED-215 — a vendor's own LOGO does not change its WIRE. The two are separate facts.", () => {
+    // THE REGRESSION THIS EXISTS FOR, and it is not hypothetical: it happened.
+    // `shapeForService` arm 2 used to read `curated?.markKey === "mcp"`, which worked only
+    // while every MCP-backed vendor happened to be drawing the generic MCP plug. Giving
+    // `github`, `notion` and `google` their OWN marks — a purely visual change, in another
+    // file — made all three miss that test and resolve to the `"service"` shape, whose field
+    // set is Name and NOTHING ELSE. The panel opened with nowhere to type a URL or a token:
+    // byte-for-byte Phase 212's D-5 defect, caused by a logo.
+    //
+    // The catalog now carries `shape` beside `markKey`, and this pins that they are read
+    // independently. It fails the moment someone keys a wire off a picture again.
+    for (const vendor of ["github", "notion", "figma", "linear", "sentry", "intercom", "miro"]) {
+      expect(FORM_COPY.shapeForService(vendor, "")).toBe("mcp")
+      expect(connectionMark({ service_id: vendor }).key).toBe(vendor)
+    }
+    for (const vendor of ["google", "microsoft"]) {
+      expect(FORM_COPY.shapeForService(vendor, "")).toBe("oauth")
+      expect(connectionMark({ service_id: vendor }).key).toBe(vendor)
+    }
+    // The adapter-backed three are untouched by any of it — arm 1 still answers first.
+    expect(FORM_COPY.shapeForService("slack", "")).toBe("post_message")
+    expect(connectionMark({ service_id: "slack" }).key).toBe("slack")
+  })
+
+  it("the ONE explicit override — an `https://` endpoint selects the remote-server shape", () => {
+    expect(FORM_COPY.shapeForService("mcp.deepwiki.com", ACCEPTED_MCP_URL)).toBe("mcp")
+    // And it is HTTPS-shaped, not merely non-empty: a plaintext address selects nothing.
+    expect(FORM_COPY.shapeForService("a-service-nobody-here-has-heard-of", "http://mcp.example.com/mcp")).toBe("service")
+  })
+
+  it("`FIELD_COUNTS` is TOTAL over all SIX shapes and binds MCP at exactly 3", () => {
     expect(FORM_COPY.FIELD_COUNTS.mcp).toBe(3)
-    // Total: the suite walks the same closed set the panel renders, so a fifth shape without
-    // a bound count fails here rather than silently rendering an unasserted field set.
-    for (const shape of ["send_email", "create_ticket", "post_message", "mcp"] as const) {
+    for (const shape of ["send_email", "create_ticket", "post_message", "mcp", "service", "oauth"] as const) {
       expect(typeof FORM_COPY.FIELD_COUNTS[shape]).toBe("number")
     }
     expect(Object.keys(FORM_COPY.FIELD_COUNTS).sort()).toEqual([
       "create_ticket",
       "mcp",
+      "oauth",
       "post_message",
       "send_email",
+      "service",
     ])
   })
 
-  it("`EMPTY_DRAFT` carries an empty `mcpServerUrl` — flat and all-string, like every other field", () => {
+  it("⭐ `EMPTY_DRAFT` starts in the SERVICE shape — the create form has NO capability default", () => {
     expect((EMPTY_DRAFT as unknown as Record<string, unknown>).mcpServerUrl).toBe("")
-    // The draft's default shape is UNCHANGED: a new member appended to the union does not
-    // move where the form starts.
-    expect(EMPTY_DRAFT.capability).toBe("send_email")
+    expect((EMPTY_DRAFT as unknown as Record<string, unknown>).serviceId).toBe("")
+    // ⚠ IT USED TO BE `send_email`. A default is not a way through a gate: a form that
+    // starts pointed at one of the three verbs is a form that can submit one nobody chose.
+    expect(EMPTY_DRAFT.capability).toBe("service")
+    expect(EMPTY_DRAFT.capability).not.toBe("send_email")
+  })
+
+  it("the validity arm — a service draft is savable on a name and an identity, with NO secret and NO config", () => {
+    const named = draftOfShape("service", { name: "The team wiki", serviceId: "my_custom_wiki" })
+    expect(FORM_COPY.draftIsSavable(named)).toBe(true)
+    // …and it composed nothing to authenticate with, which is what makes that true.
+    expect(FORM_COPY.configFromDraft(named)).toEqual({})
+    expect(named.secret).toBe("")
+    // Either half missing, and it is not savable — blank-but-present is what the server's
+    // `btrim` refuses, so a whitespace identity must fail here too.
+    expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "x", serviceId: "" }))).toBe(false)
+    expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "", serviceId: "my_custom_wiki" }))).toBe(false)
+    expect(FORM_COPY.draftIsSavable(draftOfShape("service", { name: "x", serviceId: "   " }))).toBe(false)
   })
 })
 
@@ -1757,6 +2013,18 @@ describe("206.1 · LADDER 1 — `configFromDraft` names its arms (SC#4)", () => 
       expect(config).not.toHaveProperty("host")
       expect(config).not.toHaveProperty("base_url")
     }
+  })
+
+  it("⭐ a `service` draft composes an EMPTY config and NO capability key (CONN-08 / D-211-02)", () => {
+    const config = FORM_COPY.configFromDraft(
+      draftOfShape("service", { serviceId: "my_custom_wiki", channel: "#ops", host: "smtp.fastmail.com" }),
+    ) as unknown as Record<string, unknown>
+    // ⚠ KEY SET. An identified row with no reachable path asserts NOTHING about a
+    // destination — and it must not inherit a neighbouring shape's facts on the way out.
+    expect(Object.keys(config)).toEqual([])
+    expect(config).not.toHaveProperty("default_channel")
+    expect(config).not.toHaveProperty("host")
+    expect(config).not.toHaveProperty("headers")
   })
 
   it("⚠ a prototype key as the shape is ALSO neutral — an inherited key is truthy on a bracket read", () => {
@@ -1814,6 +2082,16 @@ describe("206.1 · LADDER 2 — `destinationFooterOf` names its arms (SC#4)", ()
     expect(footer.destination).toBe("smtp.fastmail.com:587")
     expect(footer.tags).toEqual([FOOTER_TAG_STARTTLS])
     expect(footer.detail).toBe("· from ops@northwind.co")
+  })
+
+  it("a `service` draft's footer degrades to the WORD — it names no destination it does not have", () => {
+    const footer = FORM_COPY.destinationFooterOf(
+      draftOfShape("service", { serviceId: "my_custom_wiki", host: "smtp.fastmail.com", port: "465" }),
+    )
+    expect(footer.destination).toBe(FOOTER_NOTHING_YET)
+    expect(footer.tags).toEqual([])
+    expect(footer.detail).toBeNull()
+    expect(footer.refusedReason).toBeNull()
   })
 
   it("⚠ the SYNTHETIC FIFTH SHAPE gets a NEUTRAL footer — not the SMTP one", () => {
@@ -1882,6 +2160,26 @@ describe("206.1 · `draftFromConnection` — the EDIT shape (D-206.1-22, a live 
 
   it("an MCP draft still carries NO secret — there was never anything to copy", () => {
     expect(FORM_COPY.draftFromConnection(mcpConnection()).secret).toBe("")
+  })
+
+  it("⭐ 211 — the draft carries the ROW'S OWN service identity, verbatim", () => {
+    const draft = FORM_COPY.draftFromConnection(
+      makeConnection({ service_id: "smtp" }),
+    ) as unknown as Record<string, unknown>
+    expect(draft.serviceId).toBe("smtp")
+    // ⚠ NOT DERIVED FROM THE URL. D-211-01 rejected URL-derived identity outright; a row
+    // whose identity disagrees with its host still reads back its own stored value.
+    const odd = FORM_COPY.draftFromConnection(
+      mcpConnection({ service_id: "github" }),
+    ) as unknown as Record<string, unknown>
+    expect(odd.serviceId).toBe("github")
+  })
+
+  it("⚠ a capability-less row with NO url edits as the SERVICE shape — the third shape, read back", () => {
+    const draft = FORM_COPY.draftFromConnection(
+      makeConnection({ capability: null, mcp_server_url: null, service_id: "my_custom_wiki" }),
+    )
+    expect(draft.capability).toBe("service")
   })
 })
 
@@ -1998,7 +2296,10 @@ describe("206.1 · the banned-term and absolute-verb fences, extended to the pan
     // ⚠ NON-VACUITY FIRST. A walker that reached nothing would satisfy every absence claim
     // below forever — the `gutterTokens.fences.test.ts` lesson, one module over.
     for (const added of [
-      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      FORM_COPY.SERVICE_CUSTOM_ENDPOINT_LABEL,
+      FORM_COPY.SERVICE_LABEL,
+      FORM_COPY.SERVICE_HELP,
+      FORM_COPY.SERVICE_LOCKED_NOTE,
       FORM_COPY.FIELD_MCP_URL_LABEL,
       FORM_COPY.FIELD_MCP_URL_PLACEHOLDER,
       FORM_COPY.FIELD_MCP_URL_HELP,
@@ -2066,13 +2367,14 @@ describe("206.1 · the banned-term and absolute-verb fences, extended to the pan
 // form (D-206.1-22).
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-const CHOOSER_LABEL = "What this connection does"
-
-/** An MCP row as the server sends it: a URL, an `McpConfig`, and NO capability. */
+/** An MCP row as the server sends it: a URL, an `McpConfig`, and NO capability.
+ *  ⚠ Its identity is the one migration 127 backfilled onto the live row — the HOST, derived
+ *  ONCE at migration for rows that predate the column. Nothing downstream re-derives it. */
 function makeMcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
   return makeConnection({
     id: "conn-mcp",
     capability: null,
+    service_id: "mcp.deepwiki.com",
     name: "DeepWiki",
     config: { headers: {} },
     mcp_server_url: ACCEPTED_MCP_URL,
@@ -2109,29 +2411,20 @@ function makeUnknownShapeConnection(): ConnectorConnection {
     id: "conn-unknown",
     name: "Something new",
     capability: "not_a_capability" as unknown as ConnectorCapability,
+    // ⚠ An identity the suggestion list does not hold, so every "not the SMTP one" assertion
+    // below stays about the LADDER rather than about a lookup hit.
+    service_id: "something-new",
     mcp_server_url: null,
   })
 }
 
+/** The custom-endpoint door: the one suggestion whose identity opens the endpoint field. */
 async function chooseMcp(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "mcp")
+  await chooseService(user, "custom")
 }
 
-describe("206.1 · the fourth chooser option and the three-field MCP block (SC#1a)", () => {
-  it("the create chooser renders FOUR options and the MCP one is LAST", () => {
-    renderPanel()
-    const options = within(screen.getByLabelText(CHOOSER_LABEL)).getAllByRole("option")
-    expect(options).toHaveLength(4)
-    expect(options.map((o) => o.textContent)).toEqual([
-      "Send an email",
-      "Create a Jira ticket",
-      "Post a Slack message",
-      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
-    ])
-    expect((options[3] as HTMLOptionElement).value).toBe("mcp")
-  })
-
-  it("selecting MCP renders exactly `FIELD_COUNTS.mcp` fields — Name, the URL and the token", async () => {
+describe("211 · the custom-endpoint door and the three-field MCP block (SC#1a)", () => {
+  it("naming the custom endpoint renders exactly `FIELD_COUNTS.mcp` fields — Name, the URL and the token", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
     await chooseMcp(user)
@@ -2159,7 +2452,7 @@ describe("206.1 · the fourth chooser option and the three-field MCP block (SC#1
     const user = userEvent.setup({ delay: null })
     renderPanel()
     for (const capability of ["send_email", "create_ticket", "post_message"] as const) {
-      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      await chooseService(user, SERVICE_FOR_CAPABILITY[capability])
       expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
       expect(screen.getAllByTestId("connection-field")).toHaveLength(FIELD_COUNTS[capability])
     }
@@ -2194,7 +2487,7 @@ describe("206.1 · the fourth chooser option and the three-field MCP block (SC#1
   it("POSITIVE CONTROL — the note is absent for a capability shape, which still REQUIRES a secret", async () => {
     const user = userEvent.setup({ delay: null })
     renderPanel()
-    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    await chooseService(user, "slack")
     expect(screen.queryByText(FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE)).not.toBeInTheDocument()
   })
 })
@@ -2220,12 +2513,21 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     return onCreate.mock.calls[0][0] as Record<string, unknown>
   }
 
-  it("an MCP save sends EXACTLY `{name, mcp_server_url, config}` — the key set, not a subset match", async () => {
+  it("an MCP save sends EXACTLY `{config, mcp_server_url, name, service_id}` — the key set, not a subset match", async () => {
     const user = userEvent.setup({ delay: null })
     const body = await saveMcp(user, vi.fn().mockResolvedValue(undefined))
     // ⚠ `Object.keys(...).sort()`, NEVER `toMatchObject`: an extra key is a 422 the client's
     // own types cannot see, and a subset match would pass straight through it.
-    expect(Object.keys(body).sort()).toEqual(["config", "mcp_server_url", "name"])
+    // ⚠ `service_id` is REQUIRED on every shape since 211-02 — the model and migration 127's
+    // `connector_connections_has_a_service_identity` agree exactly.
+    expect(Object.keys(body).sort()).toEqual([
+      "config",
+      "default_approval_posture",
+      "mcp_server_url",
+      "name",
+      "service_id",
+    ])
+    expect(body.service_id).toBe("custom")
     expect(body.mcp_server_url).toBe(ACCEPTED_MCP_URL)
     expect(body.config).toEqual({ headers: {} })
   })
@@ -2244,7 +2546,14 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     const withSecret = await saveMcp(user, vi.fn().mockResolvedValue(undefined), {
       secret: "mcp-token-abc",
     })
-    expect(Object.keys(withSecret).sort()).toEqual(["config", "mcp_server_url", "name", "secret"])
+    expect(Object.keys(withSecret).sort()).toEqual([
+      "config",
+      "default_approval_posture",
+      "mcp_server_url",
+      "name",
+      "secret",
+      "service_id",
+    ])
     expect(withSecret.secret).toBe("mcp-token-abc")
     cleanup()
 
@@ -2255,11 +2564,11 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     expect("secret" in withoutSecret).toBe(false)
   })
 
-  it("POSITIVE CONTROL — a Slack save still sends `capability` and a channel config", async () => {
+  it("POSITIVE CONTROL — a Slack save still sends `capability` and a channel config (CONN-05)", async () => {
     const user = userEvent.setup({ delay: null })
     const onCreate = vi.fn().mockResolvedValue(undefined)
     renderPanel({ onCreate })
-    await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), "post_message")
+    await chooseService(user, "slack")
     await user.type(screen.getByLabelText("Name"), "#ops-alerts")
     await user.type(screen.getByLabelText("Channel"), "#ops-alerts")
     await user.type(screen.getByLabelText("Bot token"), "xoxb-real")
@@ -2267,9 +2576,66 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
 
     const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+    // ⚠ THE VERB SURVIVES AS AN ATTRIBUTE. CONN-05 is "keeps working unchanged": naming a
+    // service is how you REACH the capability, and the capability still travels.
     expect(body.capability).toBe("post_message")
+    expect(body.service_id).toBe("slack")
     expect(body.config).toEqual({ default_channel: "#ops-alerts" })
     expect("mcp_server_url" in body).toBe(false)
+  })
+
+  it("⭐ SC#4 / CONN-08 — a service nobody here has heard of SAVES, with NO `capability` key at all", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ onCreate })
+    await chooseService(user, "my_custom_wiki")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+
+    const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(["config", "name", "service_id"])
+    expect(body.service_id).toBe("my_custom_wiki")
+    // ⚠ KEY ABSENCE, never a value comparison — `capability: null` is a PRESENT value and a
+    // different thing from absence, and only absence is what the server's shape arm reads.
+    expect(body).not.toHaveProperty("capability")
+    expect(body).not.toHaveProperty("mcp_server_url")
+    expect(body).not.toHaveProperty("secret")
+  })
+
+  it("⭐ NEGATIVE CONTROL — no submit path produces a capability the person did not reach by naming a service", async () => {
+    const user = userEvent.setup({ delay: null })
+    // Four identities the lookup does not hold, including two one character from a real
+    // one, plus a prototype key — the shape a `MAP[key]` read would let through.
+    for (const identity of ["my_custom_wiki", "slac", "smtpx", "constructor"]) {
+      const onCreate = vi.fn().mockResolvedValue(undefined)
+      renderPanel({ onCreate })
+      await chooseService(user, identity)
+      await user.type(screen.getByLabelText("Name"), "Whatever it is")
+      await user.click(screen.getByTestId("connection-form-save"))
+      await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+      const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+      // ⚠ `send_email` is what a positional fallback would produce, and it is the exact
+      // defect `phase_types.py`'s preamble records: a default is not a way through a gate.
+      expect(body).not.toHaveProperty("capability")
+      expect(body.service_id).toBe(identity)
+      cleanup()
+    }
+  })
+
+  it("⚠ a body may never carry BOTH a capability and an endpoint — the DB refuses it by name", async () => {
+    // `connector_connections_shape_is_not_ambiguous` (migration 127) and 211-02's model arm
+    // both refuse such a row; the panel must not be the thing that discovers that.
+    const user = userEvent.setup({ delay: null })
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ onCreate })
+    await chooseMcp(user)
+    await user.type(screen.getByLabelText("Name"), "DeepWiki")
+    await user.type(screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL), ACCEPTED_MCP_URL)
+    await user.click(screen.getByTestId("connection-form-save"))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    const body = onCreate.mock.calls[0][0] as Record<string, unknown>
+    expect("mcp_server_url" in body && "capability" in body).toBe(false)
   })
 })
 
@@ -2351,6 +2717,57 @@ describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => 
     expect(edit.container.querySelectorAll("[title]")).toHaveLength(0)
   })
 
+  it("⭐ 211 — an UNNAMED service leaves Save off with its OWN reason, and its own id", async () => {
+    const user = userEvent.setup({ delay: null })
+    const { container } = renderPanel()
+
+    // Before a single keystroke: the shape is `service`, and neither fact is present yet.
+    const save = screen.getByTestId("connection-form-save")
+    expect(save).toBeDisabled()
+    const reason = screen.getByTestId("connection-service-save-disabled-reason")
+    expect(reason.textContent).toBe(FORM_COPY.SERVICE_SAVE_DISABLED_REASON)
+    // The wiring RESOLVES — an id pointing at nothing is the defect a `toBeDisabled()` plus
+    // a `getByText()` would both miss.
+    const describedBy = save.getAttribute("aria-describedby")!
+    expect(container.querySelector(`#${CSS.escape(describedBy)}`)!.textContent).toBe(
+      FORM_COPY.SERVICE_SAVE_DISABLED_REASON,
+    )
+    // ⚠ A THIRD DISTINCT ID — never the MCP one's, never the cipher one's.
+    expect(describedBy).toContain("service-save-disabled-reason")
+
+    // Both facts supplied, and the reason node is REMOVED rather than emptied.
+    await chooseService(user, "my_custom_wiki")
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
+    expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+    expect(
+      screen.queryByTestId("connection-service-save-disabled-reason"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("⚠ a BLANK identity is refused too — `'   '` is a present value the database's btrim declines", async () => {
+    const user = userEvent.setup({ delay: null })
+    renderPanel()
+    await user.type(screen.getByLabelText("Name"), "The team wiki")
+    await user.type(screen.getByLabelText(SERVICE_LABEL), "   ")
+    expect(screen.getByTestId("connection-form-save")).toBeDisabled()
+    expect(screen.getByTestId("connection-service-save-disabled-reason")).toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — the three capability shapes are UNGATED, byte-for-byte as shipped", async () => {
+    const user = userEvent.setup({ delay: null })
+    for (const capability of ["send_email", "create_ticket", "post_message"] as const) {
+      renderPanel()
+      await chooseService(user, SERVICE_FOR_CAPABILITY[capability])
+      // ⚠ NO completeness gate was added to them: that would be a behaviour change with no
+      // defect behind it, and their refusals already arrive through §4b with a readable cause.
+      expect(screen.getByTestId("connection-form-save")).not.toBeDisabled()
+      expect(
+        screen.queryByTestId("connection-service-save-disabled-reason"),
+      ).not.toBeInTheDocument()
+      cleanup()
+    }
+  })
+
   it("the Save button is DISABLED, not REMOVED — removal is reserved for a different fact", async () => {
     await renderMcpWithUrl("http://mcp.example.com/mcp")
     const save = screen.getByTestId("connection-form-save")
@@ -2360,12 +2777,14 @@ describe("206.1 · the disabled Save and its OWN reason id (D-206.1-05)", () => 
 })
 
 describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live defect, pinned)", () => {
-  it("an MCP row's panel names the MCP kind statically and seeds its own URL", () => {
+  it("an MCP row's panel names its SERVICE statically and seeds its own URL", () => {
     renderPanel({ mode: "edit", connection: makeMcpConnection() })
 
     const staticKind = screen.getByTestId("connection-capability-static")
-    expect(staticKind).toHaveTextContent(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)
-    expect(screen.getByText(CAPABILITY_LOCKED_NOTE)).toBeInTheDocument()
+    // ⚠ THE SERVICE, NOT THE VERB — and a miss degrades to the raw identifier rather than
+    // to a placeholder, which is what makes the curated set a suggestion (D-211-02).
+    expect(staticKind).toHaveTextContent("mcp.deepwiki.com")
+    expect(screen.getByText(SERVICE_LOCKED_NOTE)).toBeInTheDocument()
     expect(
       (screen.getByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL) as HTMLInputElement).value,
     ).toBe(ACCEPTED_MCP_URL)
@@ -2406,6 +2825,7 @@ describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live de
     const [, body] = onUpdate.mock.calls[0]
     expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
       "config",
+      "default_approval_posture",
       "mcp_server_url",
       "name",
     ])
@@ -2415,7 +2835,9 @@ describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live de
 
   it("POSITIVE CONTROL — editing a `send_email` row still renders the SMTP form unchanged", () => {
     renderPanel({ mode: "edit", connection: makeConnection() })
-    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent("Send an email")
+    expect(screen.getByTestId("connection-capability-static")).toHaveTextContent(
+      FORM_COPY.serviceLabelOf("smtp"),
+    )
     expect(screen.getByLabelText("SMTP host and port")).toBeInTheDocument()
     // ⚠ `getByText` — see the note above: on EDIT this label has no control to point at.
     expect(screen.getByText("App password")).toBeInTheDocument()
@@ -2443,7 +2865,7 @@ describe("206.1 · LADDERS 3 and 4, driven through the RENDER (SC#4 extended)", 
       ["create_ticket", "API token"],
       ["post_message", "Bot token"],
     ] as const) {
-      await user.selectOptions(screen.getByLabelText(CHOOSER_LABEL), capability)
+      await chooseService(user, SERVICE_FOR_CAPABILITY[capability])
       expect(screen.getByLabelText(label)).toBeInTheDocument()
     }
   })
@@ -2497,10 +2919,10 @@ describe("206.1 · LADDERS 3 and 4, driven through the RENDER (SC#4 extended)", 
 })
 
 describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-03-EL)", () => {
-  it("a non-admin gets no chooser, no MCP option and no Save", () => {
+  it("a non-admin gets no service field, no custom-endpoint door and no Save", () => {
     const { container } = renderPanel({ isOrgAdmin: false })
-    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
-    expect(screen.queryByText(FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(SERVICE_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByText(FORM_COPY.SERVICE_CUSTOM_ENDPOINT_LABEL)).not.toBeInTheDocument()
     expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
     // ⚠ ABSENCE, not `toBeDisabled()` — 190-16's plant C shipped the exact defect a disabled
     // assertion PASSES on.
@@ -2508,9 +2930,9 @@ describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-
     expect(screen.getByText(PANEL_NON_ADMIN_NOTE)).toBeInTheDocument()
   })
 
-  it("with `live_connectors` OFF the MCP option, its field block and Save are all gone", () => {
+  it("with `live_connectors` OFF the service field, the endpoint block and Save are all gone", () => {
     const { container } = renderPanel({ liveConnectorsOn: false })
-    expect(screen.queryByLabelText(CHOOSER_LABEL)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(SERVICE_LABEL)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(FORM_COPY.FIELD_MCP_URL_LABEL)).not.toBeInTheDocument()
     expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
     expect(screen.queryByTestId("connection-mcp-save-disabled-reason")).not.toBeInTheDocument()
@@ -2520,7 +2942,7 @@ describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-
   it("an MCP row opened while the kill-switch is off is READ-ONLY and still renders the MCP kind", () => {
     renderPanel({ mode: "edit", connection: makeMcpConnection(), liveConnectorsOn: false })
     expect(screen.getByTestId("connection-capability-static")).toHaveTextContent(
-      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      "mcp.deepwiki.com",
     )
     expect(screen.getByText(PANEL_OFF_HEADING)).toBeInTheDocument()
     expect(screen.queryByTestId("connection-form-save")).not.toBeInTheDocument()
@@ -2530,7 +2952,10 @@ describe("206.1 · the MCP write affordances are REMOVED, not disabled (T-206.1-
 describe("206.1 · the two shipped SOURCE fences still hold over the widened panel", () => {
   it("the panel still authors NO sentence of its own — every MCP string is an imported identifier", () => {
     for (const sentence of [
-      FORM_COPY.CAPABILITY_CHOICE_MCP_LABEL,
+      FORM_COPY.SERVICE_CUSTOM_ENDPOINT_LABEL,
+      FORM_COPY.SERVICE_LABEL,
+      FORM_COPY.SERVICE_HELP,
+      FORM_COPY.SERVICE_LOCKED_NOTE,
       FORM_COPY.FIELD_MCP_URL_LABEL,
       FORM_COPY.FIELD_MCP_URL_HELP,
       FORM_COPY.FIELD_MCP_SECRET_LABEL,
@@ -2542,6 +2967,15 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
     }
     // Positive control: the fence can see a string in this source at all.
     expect(panelSource).toContain("connection-mcp-save-disabled-reason")
+  })
+
+  it("⭐ SC#1 SOURCE FENCE — the panel no longer SPELLS the three-verb chooser anywhere", () => {
+    // ⚠ THE SOURCE, not the DOM. A control removed from a render is one prop away from
+    // returning; a control whose data and test id are gone from the file is not.
+    expect(panelSource).not.toContain("connection-capability-chooser")
+    expect(panelSource).not.toContain(RETIRED_CHOOSER_CONSTANT)
+    // POSITIVE CONTROL — the fence can see the id that REPLACED it, in this same source.
+    expect(panelSource).toContain("connection-service-field")
   })
 
   it("the panel still imports NOTHING from `PhaseFormPanel`, and spells no tooltip attribute", () => {
@@ -2559,5 +2993,366 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
     expect(importLines).toContain("connectionFormCopy")
     // The tooltip refusal IS satisfiable over the whole source, and measured 0 at base.
     expect(panelSource).not.toContain("title=")
+  })
+})
+
+describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
+  it("probes MCP server and renders discovered tools list with auto-populated name in create mode", async () => {
+    const user = userEvent.setup({ delay: null })
+    const mockProbe = vi.fn().mockResolvedValue({
+      server_url: "https://mcp.github.com",
+      tools: [
+        { name: "github_search", description: "Search repositories and code", inputSchema: {} },
+        { name: "github_issue", description: "Create issues", inputSchema: {} },
+      ],
+      count: 2,
+    })
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    renderPanel({ mode: "create", presetServiceId: "custom_mcp" })
+    const urlInput = screen.getByPlaceholderText(FORM_COPY.FIELD_MCP_URL_PLACEHOLDER)
+    await user.type(urlInput, "https://mcp.github.com/v1")
+
+    const probeBtn = screen.getByTestId("connection-probe-mcp-btn")
+    expect(probeBtn).toBeInTheDocument()
+    await user.click(probeBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    })
+    expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
+    expect(screen.getByText("github_search")).toBeInTheDocument()
+    expect(screen.getByText("github_issue")).toBeInTheDocument()
+    expect(mockProbe).toHaveBeenCalledWith({
+      mcp_server_url: "https://mcp.github.com/v1",
+      secret: undefined,
+    })
+  })
+
+  it("⭐ D-4 — in edit mode, Discover tools calls `discoverConnectorTools(connection.id)` to decrypt stored credential server-side", async () => {
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "add_issue_comment", description: "Add issue comment", inputSchema: {} },
+      { name: "create_pull_request", description: "Create PR", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    const connection = makeMcpConnection({ id: "conn_github_123", service_id: "github" })
+    renderPanel({ mode: "edit", connection })
+
+    const probeBtn = screen.getByTestId("connection-probe-mcp-btn")
+    expect(probeBtn).toBeInTheDocument()
+    await user.click(probeBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    })
+    expect(mockDiscover).toHaveBeenCalledWith("conn_github_123")
+    expect(mockProbe).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
+    expect(screen.getByText("add_issue_comment")).toBeInTheDocument()
+  })
+
+  it("⭐ D-4 — a TYPED secret does NOT send an existing row back to the probe: a saved row always reports on what is STORED", async () => {
+    // ⚠ THE FIRST DRAFT OF THE D-4 FIX GATED ON `!draft.secret.trim()`, so typing a replacement
+    // token sent an EXISTING connection back to `probeMcpServer`. That reports on a credential
+    // the row does not hold — a green result for a token Save might never write — and it is a
+    // different verdict from the one `Check credentials` gives for the same row one control
+    // over. Two controls on one row that can disagree about the same credential is the defect.
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "add_issue_comment", description: "Add issue comment", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    renderPanel({ mode: "edit", connection: makeMcpConnection({ id: "conn-mcp-typed" }) })
+
+    // Replace the stored secret, then discover WITHOUT saving.
+    await user.click(screen.getByTestId("connection-secret-replace"))
+    await user.type(screen.getByLabelText("Access token"), "ghp_a_freshly_typed_token")
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+
+    await waitFor(() => expect(mockDiscover).toHaveBeenCalledWith("conn-mcp-typed"))
+    expect(mockProbe).not.toHaveBeenCalled()
+  })
+
+  it("⭐ D-4b — a CAPABILITY row in edit mode offers `Refresh actions`, and it calls the SAVED-ROW endpoint", async () => {
+    // ⚠ THE OPERATOR FOUND THIS BY DRIVING, AFTER D-4 WAS ALREADY FIXED: "for the old
+    // connections like JIRA and email and slack it does not show discover tools, it is only
+    // showing check credentials." `discover_connection_tools` has served the capability shape
+    // since Phase 211 — from the adapter's static descriptor, with NO network call — and no
+    // control was ever rendered for it, so the arm was unreachable from the UI.
+    const user = userEvent.setup({ delay: null })
+    const mockDiscover = vi.fn().mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    const mockProbe = vi.fn()
+    vi.spyOn(api, "discoverConnectorTools").mockImplementation(mockDiscover)
+    vi.spyOn(api, "probeMcpServer").mockImplementation(mockProbe)
+
+    // The default fixture IS a capability row: `send_email`, no `mcp_server_url`.
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-1" }) })
+
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+
+    await waitFor(() => expect(mockDiscover).toHaveBeenCalledWith("conn-smtp-1"))
+    // ⚠ AND NOT THE PROBE. A capability row has an EMPTY `mcpServerUrl`, so the probe would
+    // have been a 422 about a field this shape does not have.
+    expect(mockProbe).not.toHaveBeenCalled()
+    expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
+    expect(screen.getByText("send_email")).toBeInTheDocument()
+  })
+
+  it("⭐ a capability row's actions ARE grantable — the D-4b absence is CLOSED, not preserved", async () => {
+    // ── SUPERSEDES Phase 212's D-4b assertion, 2026-08-28 ────────────────────────────────
+    // The test this replaces asserted an ABSENCE and a note explaining it:
+    //
+    //   "a capability row's actions render WITHOUT a Granted checkbox, because `handleSave`
+    //    would drop it … an affordance unable to act is REMOVED, never rendered inert."
+    //
+    // ⚠ THAT WAS THE HONEST RENDERING OF `BUG-260827-02`, NEVER A FIX FOR IT, and the bug
+    // report says so in as many words. The absence was correct only while `handleSave` and
+    // `grantsArePersisted` both gated on the `mcp` shape. Both gates are gone: the backend
+    // never required them (no shape guard on `PATCH /grants`, no shape branch in
+    // `update_connection_grants`, and `create_connection` already stores
+    // `static_descriptors_for_capability` into `discovered_tools`).
+    //
+    // So the property flips from "the control is absent" to "the control is present AND it
+    // persists". Asserting the old absence today would pin the defect in place.
+    const user = userEvent.setup({ delay: null })
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-2" }) })
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    // The three-arm posture control is REACHABLE and ENABLED on a capability row.
+    const row = screen.getByTestId("action-row-send_email")
+    const deny = within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY })
+    expect(deny).toBeEnabled()
+
+    // …and the note that explained the absence is GONE, because it now says the opposite of
+    // what the screen does.
+    expect(screen.queryByTestId("connection-actions-not-grantable")).toBeNull()
+  })
+
+  it("⭐ D-4b — a capability DRAFT offers NO refresh control, because there is no row to refresh from", () => {
+    // Removed rather than disabled: the endpoint reads a row by id, and a draft has none.
+    renderPanel({ mode: "create" })
+    expect(screen.queryByTestId("connection-refresh-actions-btn")).not.toBeInTheDocument()
+  })
+
+  it("⭐ D-4b — a discovery REFUSAL renders on a capability row, which it could not while the error node lived inside the `mcp` arm", async () => {
+    const user = userEvent.setup({ delay: null })
+    // The route's real worded 409 for a shape with nothing to reach — carried by the client
+    // since this phase, and previously replaced by the fixed string "Failed to discover tools".
+    vi.spyOn(api, "discoverConnectorTools").mockRejectedValue(
+      new api.ConnectorApiError(
+        "This connection names a service but no way to reach it yet, so there are no actions to list.",
+        409,
+        "nothing_to_discover_yet",
+      ),
+    )
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-3" }) })
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+
+    const node = await screen.findByTestId("connection-probe-error")
+    expect(node).toHaveTextContent("no way to reach it yet")
+  })
+
+  it("pre-fills form when opened with presetServiceId from catalog", () => {
+    renderPanel({ mode: "create", presetServiceId: "slack" })
+    expect(screen.getByDisplayValue("Slack")).toBeInTheDocument()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 213-07 · THE SAVE ORDERING — operator-driven, 2026-08-27
+//
+// Reported: *"when I change any permission for tools, it is not reflecting directly once I
+// click save. When I navigate to another connection and go back, changes are reflected."*
+//
+// CAUSE: `onUpdate` is `ConnectionsTab.handleUpdate`, which calls `reload()`. With the
+// grants write AFTER it, the refetch captured the row BEFORE the grants landed, so the
+// parent's list kept the old `tool_grants` and the panel re-seeded from that stale object.
+//
+// ⚠ HOW THIS PINS IT WITHOUT MOCKING THE API. `updateConnectorGrants` is the REAL function
+// here (this file mocks no modules) and there is no `fetch` in jsdom, so it REJECTS. That
+// makes the ordering observable through props alone: written FIRST, its rejection means
+// `onUpdate` is never reached. If a future edit puts it back after `onUpdate`, `onUpdate`
+// runs and this test goes red — which is the regression it exists to catch.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+describe("213-07 · a permission change is written BEFORE the parent reloads", () => {
+  const withTools = () =>
+    makeMcpConnection({
+      discovered_tools: [
+        { name: "search_code", description: "Search", readOnlyHint: true },
+        { name: "create_issue", description: "Create", readOnlyHint: false },
+      ],
+      tool_grants: { search_code: "allow" },
+    } as Partial<ConnectorConnection>)
+
+  it("writes the grants first, so a failed grant write never lets a stale reload run", async () => {
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: withTools(), onUpdate })
+
+    // Change a permission — `create_issue` from its inherited default to Deny.
+    const row = screen.getByTestId("action-row-create_issue")
+    await user.click(within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }))
+
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    // ⚠ THE ASSERTION IS ON ORDERING, NOT ON THE REFUSAL UI. `saveRefusalFrom` keys off the
+    // SERVER's own reason code, so a bare network rejection may carry none and render no
+    // banner — that is its documented behaviour, not a defect, and pinning the banner here
+    // would be testing the wrong thing. What must hold is that the grant write ran FIRST:
+    // it rejected, so `onUpdate` — and the `reload()` inside it — was never reached.
+    await waitFor(() => expect(screen.getByTestId("connection-form-save")).toBeEnabled())
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it("⭐ a CAPABILITY row's posture change is written too — no shape gate (BUG-260827-02)", async () => {
+    // The UI half of BUG-260827-02, pinned as a WRITE rather than as an enabled control.
+    // `handleSave` gated the grants write on `draft.capability === "mcp"`, so a Slack, Jira or
+    // SMTP posture was accepted by the screen and dropped on the floor — *"a switch Save
+    // drops is a lie"*.
+    //
+    // Same mechanism as the ordering test above: `updateConnectorGrants` is the REAL function
+    // and jsdom has no `fetch`, so it rejects. Reaching it at all is the property — under the
+    // old shape gate it was never called, `onUpdate` ran, and this would be green for the
+    // wrong reason. `onUpdate` NOT being called is what proves the write was attempted.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "send_email", description: "Send an email", inputSchema: {} },
+    ])
+    renderPanel({ mode: "edit", connection: makeConnection({ id: "conn-smtp-3" }), onUpdate })
+
+    await user.click(screen.getByTestId("connection-refresh-actions-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    const row = screen.getByTestId("action-row-send_email")
+    await user.click(within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }))
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    await waitFor(() => expect(screen.getByTestId("connection-form-save")).toBeEnabled())
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it("NEGATIVE CONTROL — an untouched permission set does not write grants at all", async () => {
+    // Without this, "grants are written first" would be satisfied by writing them on EVERY
+    // save — which is what the first draft of this fix did, and it let a refused grant write
+    // block a plain rename. Here nothing about the permissions changed, so the grant write
+    // must not happen and `onUpdate` must be reached normally.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderPanel({ mode: "edit", connection: withTools(), onUpdate })
+
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("connection-save-refusal")).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ BUG-260901-01 — DISCOVERY SEEDED A **BOOLEAN**, AND IT BROKE SAVE FOR EVERY CONNECTION
+//
+// OPERATOR, 2026-09-01, having just connected Notion over OAuth and pulled 41 tools:
+//   *"for all apps connected, when I try to save I see Couldn't save that — try again."*
+//
+// CAUSE, driven rather than reasoned. `handleDiscoverTools` seeded every newly-found tool
+// as `next[t.name] = true` — the LEGACY boolean spelling. `PATCH /grants` declares
+// `dict[str, ToolGrantPosture]` where the posture is `Literal["allow","ask","deny"]`, so
+// Pydantic refused the body at the FRAMEWORK boundary:
+//
+//     {"notion-search": true}  ->  literal_error | Input should be 'allow', 'ask' or 'deny'
+//
+// ⚠ AND THE GUARD THAT WAS BUILT FOR EXACTLY THIS NEVER GOT TO SPEAK. `_sanitize_tool_grants`
+// was hardened the same day the seeding landed (`4aa28090b`, 2026-08-27) to REFUSE rather
+// than coerce, precisely so a missed call site would go RED at the seam — and its refusal
+// names the offending value in plain words. The route's own annotation rejects first, so the
+// person got the generic "try again" and the sentence written for them was never rendered.
+//
+// ⚠ THE SECOND DEFECT IS THE ONE THAT MATTERS MORE, AND IT WAS INVISIBLE BEHIND THE FIRST.
+// `toolGroups.ts:235` maps `true -> "allow"`. An ABSENT key already inherits the connection
+// default through the three-rung ladder (`:225`, mirroring `grants.py`). So seeding did not
+// merely break the wire — it SILENTLY ESCALATED every newly-discovered action to Allow,
+// overriding a connection whose default is Deny. Had the save ever succeeded, discovering a
+// stranger's MCP server would have persisted allow-on-every-tool. **The broken save is what
+// stopped a fail-open from reaching the database.**
+//
+// THE FIX IS TO SEED NOTHING. Absence is already the correct expression of "inherits the
+// default", and it is the spelling both ends of the ladder agree on.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+describe("BUG-260901-01 · discovery must not seed a grant", () => {
+  it("⭐ a newly-discovered action INHERITS a Deny default — it is not seeded to Allow", async () => {
+    const user = userEvent.setup({ delay: null })
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "notion-search", description: "Search Notion", inputSchema: {} },
+    ])
+    renderPanel({
+      mode: "edit",
+      connection: makeMcpConnection({
+        default_approval_posture: "deny",
+        tool_grants: {},
+      } as Partial<ConnectorConnection>),
+    })
+
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+
+    const row = screen.getByTestId("action-row-notion-search")
+    // ⚠ THE ASSERTION IS ON THE RESOLVED POSTURE, WHICH IS THE ONLY OBSERVABLE `toolGrants`
+    // HAS. Seeded `true` resolves to "allow" at `toolGroups.ts:235`; an absent key resolves
+    // to the connection default. Deny is chosen for the fixture precisely because it is the
+    // value the escalation would overwrite — a fixture defaulting to "allow" could not tell
+    // the two apart and would be green for the wrong reason.
+    expect(
+      within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_DENY }),
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(
+      within(row).getByRole("button", { name: GRANTS_COPY.POSTURE_ALLOW }),
+    ).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("⭐ discovery ALONE is not a permission change, so Save writes no grants", async () => {
+    // The wire half of the same defect, pinned through the ordering mechanism the two tests
+    // above already rely on: `updateConnectorGrants` is the REAL function and jsdom has no
+    // `fetch`, so reaching it REJECTS and `onUpdate` is never called. Here nobody touched a
+    // posture, so the write must not be attempted at all — which means `onUpdate` DOES run.
+    // Under the seeding this was the reverse: discovery alone made the grants dirty and every
+    // save carried booleans, which is why it failed for every connection rather than for one.
+    const user = userEvent.setup({ delay: null })
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(api, "discoverConnectorTools").mockResolvedValue([
+      { name: "notion-search", description: "Search Notion", inputSchema: {} },
+    ])
+    renderPanel({
+      mode: "edit",
+      connection: makeMcpConnection({ default_approval_posture: "deny", tool_grants: {} } as Partial<ConnectorConnection>),
+      onUpdate,
+    })
+
+    await user.click(screen.getByTestId("connection-probe-mcp-btn"))
+    await waitFor(() =>
+      expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument(),
+    )
+    await user.click(screen.getByTestId("connection-form-save"))
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("connection-save-refusal")).toBeNull()
   })
 })

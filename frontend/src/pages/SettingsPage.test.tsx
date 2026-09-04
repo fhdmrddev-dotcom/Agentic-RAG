@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, within, waitFor, cleanup } from "@testing-library/react"
 import type { FullAppSettings } from "@/lib/api"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
 const { mockGetSettings, mockUpdateSettings, mockGetReembedProgress, mockGetAuditLogs } =
   vi.hoisted(() => ({
@@ -49,12 +50,32 @@ import { SettingsPage } from "./SettingsPage"
 // helper — mirrors the 154-01 ControlRoomPage.test fix). Default OFF (plain).
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
-function renderSettings() {
+/**
+ * ⚠ THE PROVIDER IS NOT DECORATION — IT IS THE PRECONDITION FOR THE TAB UNDER TEST.
+ *
+ * `SettingsPage` renders AI Model, Search and Integrations ONLY when the effective-features
+ * map resolves `model_management` true, because all three tabs are backed by endpoints
+ * carrying `require_visible("model_management")`. A NULL context is fail-closed by the
+ * contract App.tsx states at its provider mount, so an unwrapped render has NO AI Model tab
+ * and every assertion below would fail on an absence rather than on a defect.
+ *
+ * `model_management: true` therefore states what these cases have always assumed: an
+ * OPERATOR is looking at the page. `renderAsMember` below is the other half — without it,
+ * nothing would prove the gate does anything.
+ */
+function renderSettings(features: Record<string, boolean> = { model_management: true }) {
   return render(
-    <TechnicalNamesProvider>
-      <SettingsPage />
-    </TechnicalNamesProvider>,
+    <EffectiveFeaturesProvider value={{ features, loading: false, refetch: () => {} }}>
+      <TechnicalNamesProvider>
+        <SettingsPage />
+      </TechnicalNamesProvider>
+    </EffectiveFeaturesProvider>,
   )
+}
+
+/** A caller whose map does NOT carry `model_management` — the shape a member has. */
+function renderAsMember() {
+  return renderSettings({})
 }
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
@@ -83,6 +104,7 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     rerank_model: "",
     rerank_top_n: 5,
     rerank_has_api_key: false,
+    multimodal_max_vision_calls: 100,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,
@@ -197,5 +219,90 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
       expect(screen.getByLabelText(/skill-builder model/i)).toBeInTheDocument()
     })
     expect(screen.getAllByText(/claude-haiku-4-5/i).length).toBeGreaterThan(0)
+  })
+})
+
+describe("a member reaching Settings, and the retired Connections tab", () => {
+  /**
+   * ⚠ THE ORIGINAL DEFECT THIS BLOCK PINNED SHIPPED AND WAS FOUND BY THE OPERATOR, NOT BY
+   * A TEST — the note is kept because the history is what justifies the current shape.
+   *
+   * `nav-items.ts` tagged the Settings entry `model_management`, which is Operators-only
+   * (`api/features.py:21`), so `visibleNavItems` dropped it for every member — taking the
+   * whole connections surface Phases 211-216 shipped with it. The tag was correct when
+   * Settings held only model management and stopped being correct when it grew a per-user
+   * tab. Nothing failed, because no test had ever rendered this page AS a member.
+   *
+   * ⚠ THE FIX FOR THAT — an ungoverned rail entry mounting `<SettingsPage initialTab="5" />`
+   * — CREATED A SECOND DEFECT, also found by the operator and also invisible here: the pin
+   * rendered the whole tab strip anyway, so `Settings` and `Connections` were two rail
+   * entries onto ONE page. A member never saw it (their Settings entry vanishes); an
+   * operator saw both. Connections now has its own page and this block was rewritten
+   * around that, rather than deleted — the member arm below is the assertion that the
+   * FIRST defect has not silently come back while fixing the second.
+   */
+  it("shows Memory and Audit Log to a member, and no Connections tab", async () => {
+    renderAsMember()
+    expect(await screen.findByRole("tab", { name: /memory/i })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: /audit log/i })).toBeInTheDocument()
+    // Connections is a PAGE now (`pages/ConnectionsPage.tsx`), reached from its own
+    // ungoverned rail entry — never a tab here, for a member or an operator.
+    expect(screen.queryByRole("tab", { name: /connections/i })).toBeNull()
+  })
+
+  it("hides the three model_management tabs from a member", async () => {
+    renderAsMember()
+    await screen.findByRole("tab", { name: /memory/i })
+    // ABSENT, never disabled — the sketch-069-A vanish. A locked tab is a control whose
+    // every call would 403, which is what Phase 148 rejected.
+    expect(screen.queryByRole("tab", { name: /^ai model$/i })).toBeNull()
+    expect(screen.queryByRole("tab", { name: /integrations/i })).toBeNull()
+  })
+
+  it("does not call GET /settings for a member", async () => {
+    // The endpoint carries require_visible("model_management"): calling it would 403,
+    // and `if (error && !s)` would turn that into a full-page error.
+    renderAsMember()
+    await screen.findByRole("tab", { name: /memory/i })
+    expect(mockGetSettings).not.toHaveBeenCalled()
+  })
+
+  it("shows the model tabs to an operator, and still no Connections tab", async () => {
+    renderSettings()
+    expect(await screen.findByRole("tab", { name: /^ai model$/i })).toBeInTheDocument()
+    // ⚠ THIS IS THE DUPLICATE-DOOR ASSERTION. Before 2026-09-01 an operator saw a
+    // Connections tab here AND a Connections rail entry, both landing on this page.
+    expect(screen.queryByRole("tab", { name: /connections/i })).toBeNull()
+    expect(mockGetSettings).toHaveBeenCalled()
+  })
+
+  /**
+   * ⚠ A PERSISTED "5" OUTLIVES THE TAB IT NAMED. `settings_active_tab` is localStorage, so
+   * anyone who last used Connections still has "5" written down. Without the RETIRED_TABS
+   * redirect the Tabs root selects a value with no trigger and no content — a blank panel
+   * under a strip marking nothing active, which is the exact failure the pre-existing
+   * MODEL_TABS guard exists to prevent, one cause over.
+   *
+   * ⚠ AND IT MUST FIRE FOR AN OPERATOR TOO, which is why this is asserted on the operator
+   * render: the redirect is about a tab that no longer EXISTS, not about permission, so
+   * scoping it inside the `!canManageModels` arm would leave every operator who last
+   * clicked Connections staring at an empty page.
+   */
+  it("lands an operator with a persisted Connections tab on Memory, not a blank panel", async () => {
+    localStorage.setItem("settings_active_tab", "5")
+    renderSettings()
+    expect(await screen.findByRole("tab", { name: /memory/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+  })
+
+  it("lands a member with a persisted Connections tab on Memory", async () => {
+    localStorage.setItem("settings_active_tab", "5")
+    renderAsMember()
+    expect(await screen.findByRole("tab", { name: /memory/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
   })
 })

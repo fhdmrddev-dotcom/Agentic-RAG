@@ -669,6 +669,101 @@ A drag-and-drop visual authoring + non-technical live-run-observability layer on
 - Model mix: executor opus, verifier/checker sonnet (config `model_profile: quality`).
 - 151 plans / 18 days is the project's largest milestone by plan count and the second-longest by wall clock — **11.6 plans per phase, nearly double the prior high** (v3.3 at 6.8).
 
+## Milestone: v3.9 — Connections: Any Service, Any Tool
+
+**Shipped:** 2026-09-04
+**Phases:** 16 (210-217 CORE + inserts 214.1 / 217.1 + 220-227; 218 absorbed, **219 deferred**) | **Plans:** 111
+**Timeline:** 2026-08-26 → 2026-09-04 (9 days) | **Commits:** 695
+**Requirements:** 34 ✅ · 3 ⚠ partial · 2 ⛔ never-driven, of 39 | **Migrations:** 127-129 / 140-141 / 150-152
+
+### What Was Built
+
+A connection stopped being a verb we write code for. It became `{service identity, auth, discovered
+tools, per-tool grants}` — so adding a service adds **rows, not code**. Around that: a catalog with a
+Popular row and a paste-a-URL long tail; BYO OAuth with secrets encrypted at rest and, in a second
+pass, a handshake that carries no secret at all; per-tool grants with an approval moment that stops a
+real run and an audit receipt for every outbound call; connections usable **by name in chat** and as
+a **specific step** on the canvas; and the Library as one home for documents. Two phases outside the
+connection spine: a DXF-to-quantities spike that said honestly where its own limit is, and the public
+landing page.
+
+### What Worked
+
+- **Driving beats gating, and this milestone is the proof.** Both of its worst defects — 213's
+  approval moment and 216's chat wiring — passed every automated gate with the headline feature
+  ABSENT at HEAD. Neither was found by a suite. **Every requirement that got a real drive held up;
+  every one that did not is exactly where the carried risk now sits.**
+- **The zero-per-vendor thesis survived contact with the open internet.** Phase 222 drove four real
+  servers and observed all four `kind` values, including Notion's RFC 7591 dynamic registration —
+  41 tools, no developer console, no tool code. That is the architectural claim tested rather than
+  asserted.
+- **A rejected phase produced a better gate than a passing one would have.** 217 shipped 12/12 plans
+  and verified 5/5 of its own criteria; the operator looked at it and rejected it. The cause was
+  structural — the generated build contract carried 200 assertions about vocabulary and **zero about
+  composition** — so 217.1's SC#1 became *the gate itself*: a `sketchComposition` fence captured RED
+  at 40 failed / 7 passed, green at 47/47.
+- **Corrections were recorded beside their originals rather than overwriting them.** 213's summary
+  keeps the sentence that was false when written; 214.1's verification keeps the report the operator's
+  drive then refuted. Both are more useful than a tidy record would have been.
+
+### What Was Inefficient
+
+- **STEP-02 took three attempts because each fix revealed the next missing half.** 214 built the
+  consume side with nothing able to DECLARE an input; 214.1 built the declare side and hit a golden
+  run that supplies none. Three blocking bugs, one requirement. The tell was available early: nobody
+  had ever walked declare → publish → launch → run as one live sequence.
+- **`REQUIREMENTS.md` was stale from day one for the THIRD consecutive milestone** — 32 of 39 rows
+  read `Planned` while their phases were shipped and closed, and the close ARCHIVES that table. The
+  ROADMAP progress table was stale by four rows in exactly the same way. Both were repaired at the
+  close, which is the latest possible moment and the one where it is most expensive.
+- **Verification debt accumulated quietly across five phases** — 210's four undriven SC, 211's UAT,
+  214's eight-row roster and eight G-4 drives, 217's 16 rows, 225's ultra review. Each was an honest
+  per-phase decision; the aggregate was never anyone's decision.
+- **The backend unit baseline was quoted all milestone as `71` and is not sound.** Two collection
+  errors from missing optional deps abort collection unless `--continue-on-collection-errors` is
+  passed, so the number everyone repeated was measured over a different set than the one that runs.
+
+### Patterns Established
+
+- **A capability advertises a descriptor byte-compatible with a discovered tool** — one code path
+  serves the legacy shape and the MCP shape, so downstream surfaces never branch on which they see.
+- **Server decides the STATE, the client decides the WORDS** (`google/availability.py` ↔
+  `applicationAvailability.ts`) — the client classifies nothing.
+- **The opaque handle**: what leaves the process is a random identifier; the secret stays in Redis
+  under it, single-use, fail-closed on replay.
+- **One identity element, four sizes** (`StepIdentity`) — resolved once by the parent, rendered by
+  every child, so no two surfaces can disagree about what a step is called.
+- **Delete the surface you are replacing.** The raw-JSON argument editor was removed, not hidden
+  behind a flag — which is why STEP-01 has no second path to keep honest.
+
+### Key Lessons
+
+1. **A green gate is evidence about the gate, not about the feature.** Twice this milestone every
+   gate passed while the feature was absent. Ask what a gate would have to see to fail, and whether
+   anything makes it see that.
+2. **A register that is only updated at the audit is a register that is wrong when it is archived.**
+   Three consecutive milestones have now closed this way. The next one is worth a per-phase-close
+   gate rather than a fourth warning paragraph.
+3. **Moving a feature can be the right way to honour a security trigger.** Phase 219's SC#1 IS the
+   re-open trigger for four deferred security seeds. Building it to "finish the milestone" would have
+   fired the trigger; deferring it kept the seeds attached to the feature that needs them.
+4. **A build contract that asserts vocabulary and not composition will ship the wrong-looking thing
+   precisely.** 217 executed its contract faithfully; the contract was the wrong size.
+5. **One green sample of a flaky suite proves nothing** — and, symmetrically, one red run is not
+   automatically a flake. What separates them is the procedure: capture the failing filenames before
+   re-running anything, then check each against the actual diff.
+
+### Cost Observations
+
+- 111 plans across 16 phases (**6.9 plans/phase**) in 9 days — the second-densest milestone by plans
+  per phase, at roughly **12 plans/day**.
+- Split-agent execution throughout: Gemini built most phases, Claude reviewed and drove, per
+  `AGENTS.md` §3.1. The reviews that found real defects were the **driven** ones, not the re-reads.
+- ⚠ `/code-review ultra` was skipped once on cost (Phase 225) and is recorded as owed rather than
+  absorbed — re-open trigger: credits available before the v3.9 production push.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -691,9 +786,20 @@ A drag-and-drop visual authoring + non-technical live-run-observability layer on
 | v3.4 Multi-Tenancy & Org Access (CORE) | 10 | 56 | 5.6 | 4 days |
 | v3.5 UX Consolidation & Chat Polish (CORE) | 4 | 17 | 4.25 | 1 day |
 | **v3.6 Visual / No-Code Workflow Studio** | **13** | **151** | **11.6** | **18 days** |
+| v3.7 Workflow Product Completion | 17 | 145 | 8.5 | 15 days |
+| v3.8 Document Intelligence, Automations & Connectors | 12 | 17 | 1.4 | 3 days |
+| **v3.9 Connections: Any Service, Any Tool** | **16** | **111** | **6.9** | **9 days** |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan
 > count (151, +59% over v3.3's 95) and by plans-per-phase (11.6, +71% over the prior high).** Read
 > that alongside the note above: the whole of it ran **serially**, because worktree parallelism was
 > not enabled until the milestone was already over.
+
+> ⚠ **The v3.7 and v3.8 rows were also missing and were added at the v3.9 close** — the same omission
+> the note above records for v3.4 and v3.5, repeated for two more milestones. **Four of the last six
+> milestones shipped without a trends row**, which is the same class of failure as the stale
+> requirements register: a record that is only written when someone happens to remember.
+>
+> **v3.9 is the second-densest milestone by plans per phase (6.9) and the fastest by plans per day
+> (~12).** It ran with worktree parallelism ENABLED, unlike v3.6's 151 fully-serial plans.

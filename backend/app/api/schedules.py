@@ -256,7 +256,15 @@ async def trigger_schedule(
 
     from app.services.scheduler_service import launch_scheduled_run
 
-    run_id = await launch_scheduled_run(launch_row, pool=pool, redis=get_redis())
+    try:
+        run_id = await launch_scheduled_run(launch_row, pool=pool, redis=get_redis())
+    except Exception as exc:
+        logger.error("Failed to manually trigger schedule %s: %s", schedule_id, exc)
+        return ScheduleTriggerResult(
+            launched=False,
+            detail=f"Failed to launch schedule: {exc}",
+        )
+
     if run_id is None:
         return ScheduleTriggerResult(
             launched=False,

@@ -337,6 +337,45 @@ async def _request(method_name: str, *, token: str, json: Any | None = None) -> 
     )
 
 
+async def call_web_api(
+    api_method: str,
+    *,
+    http_method: str,
+    token: str,
+    params: dict[str, str] | None = None,
+    json: Any | None = None,
+) -> PinnedResponse:
+    """One Slack Web API exchange for an action OTHER than ``post_message``.
+
+    ⚠ **IT LIVES HERE RATHER THAN BESIDE THE TOOL LIST, AND THAT IS THE FENCE TALKING.**
+    ``service_tools.py`` owns WHICH actions this service advertises; this module owns HOW
+    a Slack request is made. Splitting them the other way would put the line
+    ``"Authorization": f"Bearer {token}"`` in a second file, and
+    ``test_190_connector_source_fence`` exempts exactly ONE file from the
+    credential-encoding ban — this one — because the vendor requires a bearer token in a
+    header and a tree-wide ban would have been RED on correct code from its first commit.
+    A second home for that string would either need a second exemption or would go red;
+    both are worse than one vendor owning its own auth.
+
+    It reuses ``_send``, so the destination is validated and PINNED by the same binder
+    ``post_message`` goes through, under the same ``post_message`` egress key whose
+    allow-list is ``slack.com``. No host is added by any caller of this function.
+
+    ⚠ It INTERPRETS NOTHING. The reply comes back whole, exactly as ``_request`` returns
+    it, because the split this module already documents is that transport classifies
+    EXCEPTIONS and each caller interprets its own REPLY.
+    """
+    return await _send(
+        http_method,
+        _endpoint(api_method),
+        json=json,
+        params=params,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
 async def _send(method: str, url: str, **kwargs) -> PinnedResponse:
     """The binder call, with transport failures named. Kept separate so ``_request`` reads as
     one statement and the exception classification has exactly one home."""

@@ -28,11 +28,10 @@
  *     list and the workspace panel all live inside the `activeView === "chat"` branch, so
  *     a view on the else side renders none of them. Asserted with a POSITIVE CONTROL, so
  *     the absence is a measurement of the branch split and not of a broken render.
- *  6. THE POSITIONAL-FALLBACK HAZARD. The trailing `<KnowledgeHealthPage />` is a
- *     positional fallback, NOT a `default:` that throws — a union member with no branch
- *     of its own renders Knowledge Health silently (the Phase-118 built-but-unreachable
- *     lesson). Asserted, with a positive control that proves the fallback really is
- *     positional.
+ *  6. THE POSITIONAL-FALLBACK REPLACEMENT (217.1-14). The trailing else now renders
+ *     `<UnknownViewFallback view={activeView as never} />` instead of KnowledgeHealthPage.
+ *     A stale or unknown ActiveView value renders visible self-identifying text rather than
+ *     a silently-wrong product page.
  *  7. THE FALLBACK DEGRADATION. A null anchor restores the shipped behaviour rather than
  *     navigating to a run surface that cannot resolve its run.
  *  8. A SOURCE FENCE over `ChatLayout.tsx` itself, because 5 and 6 are ORDERING facts
@@ -127,9 +126,6 @@ vi.mock("@/components/chat/ChatArea", () => ({
     </div>
   ),
 }))
-vi.mock("@/pages/KnowledgeHealthPage", () => ({
-  KnowledgeHealthPage: () => <div data-testid="knowledge-health-stub" />,
-}))
 vi.mock("@/pages/WorkflowRunPage", () => ({
   WorkflowRunPage: ({ runId }: { runId: string | null }) => (
     <div data-testid="run-page-stub">{runId ?? "no-run-id"}</div>
@@ -142,6 +138,27 @@ const launchOutcome: { error: unknown; resolved: boolean } = { error: null, reso
 /** The published def the stubbed launch button hands to `doRun`. */
 const DEF = { id: "pub-1", name: "Vendor-risk review" }
 
+// ── Phase 214-12 (STEP-02 / D-214-04) — A DEFINITION THAT ACTUALLY DECLARES INPUTS ──────
+//
+// ⚠ AUTHORED RATHER THAN BORROWED, AND THAT IS THE FINDING PLAN 214-09 MEASURED. Every
+// shipped fixture in this repo declares `inputs: [{ key: "kickoff_prompt" }]` and NOTHING
+// ELSE — and `kickoff_prompt` is in `RESERVED_RUN_INPUT_KEYS`, so `launchInputFields` filters
+// it out and the field list comes back EMPTY. A suite run against the existing fixtures alone
+// would be green while rendering not one field and exercising not one line of this plan.
+//
+// Two keys on purpose: one WITH an authored label and one WITHOUT, so the two-arm rule is
+// exercised through the real component rather than only in its own unit suite.
+const DEF_WITH_INPUTS = {
+  id: "pub-2",
+  name: "Send vendor summary",
+  definition: {
+    inputs: [{ key: "to", label: "Recipient address" }, { key: "subject" }],
+  },
+}
+
+/** The shape `WorkflowsPage.tsx:1351` produces after plan 214-09 — ALREADY COLLECTED. */
+const LIBRARY_COLLECTED = { to: "already@typed.test", subject: "Q3 numbers" }
+
 // WorkflowsPage is stubbed down to the ONE thing this suite needs from it: the
 // `onLaunch` prop, which IS `doRun`. Driving the prop directly keeps the fence on the
 // launch WIRING rather than on the library page's card chrome (which has its own suite).
@@ -150,32 +167,80 @@ vi.mock("@/pages/WorkflowsPage", () => ({
     onLaunch,
   }: {
     onLaunch: (
-      def: { id: string; name: string },
+      def: { id: string; name: string; definition?: unknown },
       kickoff: string,
-      opts?: { templateFile?: File | null; folderId?: string | null },
+      opts?: {
+        templateFile?: File | null
+        folderId?: string | null
+        inputs?: Record<string, string>
+      },
     ) => Promise<void>
-  }) => (
-    <div data-testid="workflows-stub">
-      <button
-        data-testid="drive-launch"
-        onClick={() => {
-          void onLaunch(DEF, "review Acme Corp")
-            .then(() => {
-              launchOutcome.resolved = true
-            })
-            .catch((e) => {
-              launchOutcome.error = e
-            })
-        }}
-      >
-        launch
-      </button>
-    </div>
-  ),
+  }) => {
+    const record = (p: Promise<void>) =>
+      void p
+        .then(() => {
+          launchOutcome.resolved = true
+        })
+        .catch((e) => {
+          launchOutcome.error = e
+        })
+    return (
+      <div data-testid="workflows-stub">
+        <button data-testid="drive-launch" onClick={() => record(onLaunch(DEF, "review Acme Corp"))}>
+          launch
+        </button>
+        {/* 214-12 — THE CHAT DOOR: declared inputs, and NO third argument at all. */}
+        <button
+          data-testid="drive-launch-declared"
+          onClick={() => record(onLaunch(DEF_WITH_INPUTS, "send it"))}
+        >
+          launch declared
+        </button>
+        {/* 214-12 — THE LIBRARY DOOR: `RunModal` already collected, so `opts.inputs` is
+            PRESENT. This is the double-prompt case's driver. */}
+        <button
+          data-testid="drive-launch-library"
+          onClick={() =>
+            record(onLaunch(DEF_WITH_INPUTS, "send it", { inputs: LIBRARY_COLLECTED }))
+          }
+        >
+          launch library
+        </button>
+        {/* 214-12 — the library door WITH a per-run KB-folder override alongside the declared
+            keys (T-214-12-04: the collected dict must not displace the override). */}
+        <button
+          data-testid="drive-launch-library-folder"
+          onClick={() =>
+            record(
+              onLaunch(DEF_WITH_INPUTS, "send it", {
+                folderId: "folder-9",
+                inputs: LIBRARY_COLLECTED,
+              }),
+            )
+          }
+        >
+          launch library with folder
+        </button>
+        {/* 214-12 — THE TEST RUN DOOR, `WorkflowsPage.tsx:909` verbatim in shape: two
+            arguments, an EMPTY kickoff, and no third argument. It collects nothing, so it
+            inherits the form for free — which is the argument for the gate living in `doRun`
+            rather than in each door. */}
+        <button
+          data-testid="drive-launch-testrun"
+          onClick={() => record(onLaunch(DEF_WITH_INPUTS, ""))}
+        >
+          test run
+        </button>
+      </div>
+    )
+  },
 }))
 
 import { ChatLayout } from "./ChatLayout"
 import chatLayoutSource from "./ChatLayout?raw"
+// 214-12: the launch form's own source, fenced below — D-214-04's rejected arm is enforced by
+// a measurement over this file, not by the paragraph inside it.
+import chatLaunchFormSource from "./ChatLaunchForm?raw"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { ActiveView } from "@/App"
 
@@ -395,20 +460,16 @@ describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)
     expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
   })
 
-  it("a stale workflow-run view renders the fallback, never the run surface, while off", () => {
-    // The Phase-181 note deferred exactly this assertion to "the first canvas ActiveView
-    // render branch". This is it. Falling through to the positional fallback IS the
-    // byte-identical answer: a view a never-built feature would not have had behaves like
-    // any other unknown member (the `library-health` positive control above).
+  it("a stale workflow-run view renders the UnknownViewFallback, never the run surface, while off", () => {
     render(withCanvas(false, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.queryByTestId("run-page-stub")).not.toBeInTheDocument()
-    expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
+    expect(screen.getByText(/This view has no screen/)).toBeInTheDocument()
   })
 
   it("POSITIVE CONTROL — the same view with the flag ON does render the run surface", () => {
     render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
-    expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
+    expect(screen.queryByText(/This view has no screen/)).not.toBeInTheDocument()
   })
 
   it("hands the panel NO run-receipt callback while off — the receipt cannot render", () => {
@@ -441,19 +502,11 @@ describe("ChatLayout — the run surface is on the non-chat side of the split", 
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
   })
 
-  it("is NOT the Knowledge-Health positional fallback (with the positive control)", () => {
+  it("is NOT the UnknownViewFallback — the run surface renders instead", () => {
     render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
-    expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
+    expect(screen.queryByText(/This view has no screen/)).not.toBeInTheDocument()
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
     screen.getByTestId("run-page-stub").remove()
-
-    // POSITIVE CONTROL: `library-health` is a union member with NO branch of its own, so
-    // it falls THROUGH to the trailing element. That proves two things at once — the stub
-    // can render, and the trailing element really is a POSITIONAL fallback rather than a
-    // `default:` that throws. A `workflow-run` branch placed after it would be dead code.
-    const health = render(withCanvas(true, <ChatLayout {...baseProps("library-health")} />))
-    expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
-    health.unmount()
   })
 })
 
@@ -491,9 +544,12 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
     expect(sample).toMatch(/const also = 2/)
   })
 
-  it("places the run-surface branch BEFORE the trailing positional fallback", () => {
+  it("places the run-surface branch BEFORE the trailing UnknownViewFallback", () => {
     const branch = CHAT_LAYOUT_CODE.indexOf(`activeView === "workflow-run"`)
-    const fallback = CHAT_LAYOUT_CODE.indexOf("<KnowledgeHealthPage")
+    // ⚠ Match the JSX TAG (with the `<`), not the bare identifier — the module's IMPORT
+    // also spells `UnknownViewFallback`, and indexOf would otherwise resolve to line 13's
+    // import rather than the trailing element this ordering assertion is about.
+    const fallback = CHAT_LAYOUT_CODE.indexOf("<UnknownViewFallback")
     expect(branch).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(-1)
     expect(branch).toBeLessThan(fallback)
@@ -516,7 +572,7 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
 
     // POSITIVE CONTROL — the "never again after it" probe really does find a tag that IS
     // present after the split point, so the -1 above is a measurement, not a tautology.
-    expect(CHAT_LAYOUT_CODE.indexOf("<KnowledgeHealthPage", elseBranch)).toBeGreaterThan(-1)
+    expect(CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
   })
 
   it("resolves the run id from the thread anchor, and names neither of the wrong-id tokens", () => {
@@ -530,5 +586,276 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
     // POSITIVE CONTROL — both assembled needles really do match the shapes they forbid.
     expect("import type { PostMessageResponse } from '@/lib/api'").toMatch(new RegExp(WRONG_TYPE))
     expect("setActiveRunId(res.run_id)").toMatch(new RegExp(WRONG_FIELD))
+  })
+})
+
+// ── 214-12 (STEP-02 / D-214-04). THE CHAT LAUNCH MOMENT ───────────────────────
+//
+// Chat had none. `BUG-260826-01` is that gap seen from the operator's side: a `send_email`
+// step launched from a thread received nothing and its recipient resolved to `None`.
+//
+// ⚠ THE DOM IS NOT THE PROOF, and that is this block's organising rule. A form that renders
+// and whose values never reach `create_workflow_run.inputs` fails IDENTICALLY to no form at
+// all — which is the bug's own shape one layer up. Every assertion that matters below is on
+// the argument object handed to `postMessage`, never on what appeared on screen.
+
+describe("ChatLayout — chat collects declared inputs BEFORE anything is created (D-214-04)", () => {
+  it("opens the form and creates NO thread until it is confirmed", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+
+    // The ask is up…
+    expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
+    // …and NOTHING has been created. The form resolves BEFORE createThread precisely so a
+    // launch nobody finished leaves no resource behind.
+    expect(mockCreateThread).not.toHaveBeenCalled()
+    expect(mockPostMessage).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+    await waitFor(() => expect(mockCreateThread).toHaveBeenCalledTimes(1))
+  })
+
+  it("renders a field per DECLARED key, through the SHARED renderer", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    const form = await screen.findByTestId("chat-launch-form")
+
+    // The testids come from `LaunchInputFields` — the same leaf the library modal renders,
+    // which is what makes "one field renderer serves all three launchers" observable here.
+    expect(screen.getByTestId("run-input-to")).toBeInTheDocument()
+    expect(screen.getByTestId("run-input-subject")).toBeInTheDocument()
+    // Two arms, never three: the authored label is prose, the bare key is the key.
+    expect(form).toHaveTextContent("Recipient address")
+    expect(form).toHaveTextContent("subject")
+  })
+
+  it("CANCEL creates nothing, cleans nothing up, and navigates nowhere", async () => {
+    const { onNavigate } = renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    await screen.findByTestId("chat-launch-form")
+
+    fireEvent.click(screen.getByTestId("chat-launch-cancel"))
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("chat-launch-form")).not.toBeInTheDocument(),
+    )
+    // ⚠ BOTH AT ZERO. The WR-04 orphan cleanup exists for a launch that FAILED; a launch the
+    // person chose not to start must never enter it, because nothing was created to clean.
+    expect(mockCreateThread).not.toHaveBeenCalled()
+    expect(mockDeleteThread).not.toHaveBeenCalled()
+    expect(mockPostMessage).not.toHaveBeenCalled()
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it("CONFIRM forwards the typed dict inside postMessage's `inputs` option", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    await screen.findByTestId("chat-launch-form")
+
+    fireEvent.change(screen.getByTestId("run-input-to"), {
+      target: { value: "vendor@example.test" },
+    })
+    fireEvent.change(screen.getByTestId("run-input-subject"), {
+      target: { value: "Q3 vendor summary" },
+    })
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+    // THE ARGUMENT OBJECT, not the DOM. This is the assertion `BUG-260826-01` is about.
+    expect(mockPostMessage).toHaveBeenCalledWith(THREAD_ID, "send it", {
+      workflowDefinitionId: "pub-2",
+      inputs: { to: "vendor@example.test", subject: "Q3 vendor summary" },
+    })
+  })
+
+  it("an untouched field sends an empty string — every declared key is PRESENT", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    await screen.findByTestId("chat-launch-form")
+    fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a@b.test" } })
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+    const sent = mockPostMessage.mock.calls[0][2] as { inputs: Record<string, string> }
+    // No required-ness is validated at any launcher (the publish gate already refuses an
+    // undeclared `ask` key). `""` is a real answer, and PRESENCE is asserted rather than the
+    // value alone: absent and empty are DIFFERENT facts on the wire.
+    expect(Object.prototype.hasOwnProperty.call(sent.inputs, "subject")).toBe(true)
+    expect(sent.inputs.subject).toBe("")
+  })
+})
+
+// ── ⭐ THE DOUBLE-PROMPT CASE, and the silent-drop case ────────────────────────
+//
+// These two are the failures this plan would have SHIPPED, not crashed on. `doRun` is the
+// launcher for three measured doors; gating the form on the declared list alone would open it
+// ON TOP OF a library Run that had just collected the same values — asking one person twice
+// for one launch. The silent-drop variant is worse: `WorkflowsPageProps.onLaunch` can carry
+// `inputs` while a narrower `doRun` stays assignable under parameter CONTRAVARIANCE, so the
+// key typechecks, is discarded, and every build stays green.
+
+describe("ChatLayout — ONE collection point per launch (the double-prompt fence)", () => {
+  it("does NOT ask again when the caller already collected (the library door)", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-library"))
+
+    // The launch runs straight through — no second ask on top of RunModal's.
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("chat-launch-form")).not.toBeInTheDocument()
+    // …and what the person already typed arrives INTACT rather than being discarded.
+    expect(mockPostMessage).toHaveBeenCalledWith(THREAD_ID, "send it", {
+      workflowDefinitionId: "pub-2",
+      inputs: LIBRARY_COLLECTED,
+    })
+  })
+
+  it("POSITIVE CONTROL — the SAME definition DOES open the form when `inputs` is absent", async () => {
+    // Without this the absence above is free: a form that never mounts for any input would
+    // pass it. Same def, same fields, only the third argument differs.
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
+  })
+
+  it("⭐ SILENT-DROP: the exact key/value handed to doRun reaches postMessage, at RUNTIME", async () => {
+    // ⚠ `tsc` CANNOT GIVE YOU THIS. Under contravariance a narrower `opts` parameter is still
+    // assignable to the widened prop, so the extra key would be silently discarded by a build
+    // that stayed green. Only a value read off the real call can tell.
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-library"))
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+
+    const sent = mockPostMessage.mock.calls[0][2] as { inputs?: Record<string, string> }
+    expect(Object.prototype.hasOwnProperty.call(sent, "inputs")).toBe(true)
+    for (const [k, v] of Object.entries(LIBRARY_COLLECTED)) {
+      expect(sent.inputs?.[k]).toBe(v)
+    }
+  })
+
+  it("T-214-12-04: the collected keys ride ALONGSIDE the KB-folder override, not over it", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-library-folder"))
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+
+    expect(mockPostMessage).toHaveBeenCalledWith(THREAD_ID, "send it", {
+      workflowDefinitionId: "pub-2",
+      folderId: "folder-9",
+      inputs: LIBRARY_COLLECTED,
+    })
+  })
+
+  it("the TEST RUN door — two arguments, empty kickoff — DOES open the form", async () => {
+    // `WorkflowBuilderPage` calls `onTestRun`; `WorkflowsPage.tsx:907-923` adapts it and
+    // invokes `onLaunch(def, "")` at `:909` with no third argument. It collects nothing, so it
+    // inherits the ask — which is why the gate lives in `doRun` and not in each door.
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-testrun"))
+    expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
+    expect(mockCreateThread).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+    expect(mockPostMessage.mock.calls[0][1]).toBe("")
+  })
+})
+
+// ── THE REAL REGRESSION FENCE: a definition declaring nothing is UNCHANGED ─────
+
+describe("ChatLayout — a workflow with no declared inputs launches exactly as today", () => {
+  it("mounts no form, adds no await, and posts the byte-identical body", async () => {
+    // `DEF` carries no `definition` at all, which is the shipped shape the six cases above
+    // drive. ⚠ Note what this asserts about the OPTIONS OBJECT: exactly one key. The `inputs`
+    // spread is CONDITIONAL for the same reason `workflow_definition_id` and `folder_id` are —
+    // an always-present key would change the request body of every launch in the product.
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch"))
+
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId("chat-launch-form")).not.toBeInTheDocument()
+    expect(mockPostMessage.mock.calls[0][2]).toEqual({ workflowDefinitionId: "pub-1" })
+  })
+
+  it("POSITIVE CONTROL — the probe really can find the form when one is owed", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
+  })
+})
+
+// ── ⛔ D-214-04's REJECTED ARM, enforced rather than noted ─────────────────────
+
+describe("ChatLaunchForm — the agent fills NOTHING (T-214-12-01)", () => {
+  const FORM_CODE = codeOf(chatLaunchFormSource)
+
+  it("the stripper really removed this file's prose — the fence is not reading comments", () => {
+    expect(FORM_CODE.length).toBeLessThan(chatLaunchFormSource.length)
+    const sample = codeOf(`const keep = 1 // drop-me-line\r\n/* drop-me-block */\r\nconst also = 2`)
+    expect(sample).not.toMatch(/drop-me-line/)
+    expect(sample).not.toMatch(/drop-me-block/)
+    expect(sample).toMatch(/const keep = 1/)
+  })
+
+  it("reads no conversation, no thread state and no model output", () => {
+    // Needles assembled from parts so this suite's own source cannot satisfy a grep run over
+    // the wider file set (the 187-24 lesson).
+    const CONVO = ["mess", "ages"].join("")
+    const ROLE = ["assist", "ant"].join("")
+    const LAST = ["last", "Message"].join("")
+    const GEN = ["gene", "rate"].join("")
+    for (const needle of [CONVO, ROLE, LAST, GEN]) {
+      expect(FORM_CODE).not.toContain(needle)
+    }
+    // POSITIVE CONTROL — every assembled needle really does match the shape it forbids.
+    // ⚠ LOWERCASE ON PURPOSE. The first draft of this line read `useMessages()`, whose capital
+    // M made the control FAIL against a lowercase needle — the control caught itself, which is
+    // the only reason a reader can trust the four absences above.
+    expect(`const m = props.mess${"ages"}.at(-1)`).toContain(CONVO)
+    expect(`if (m.role === "assist${"ant"}") {}`).toContain(ROLE)
+    expect(`const v = last${"Message"}.content`).toContain(LAST)
+    expect(`await gene${"rate"}Suggestion()`).toContain(GEN)
+  })
+
+  it("its ONLY value source is the `values` state it holds for the person", () => {
+    // The component is handed a name and a field list, and hands back a dict. That is the
+    // whole of its access — no hook into the thread, no client read.
+    expect(FORM_CODE).toContain("useState<Record<string, string>>({})")
+    const THREADS_HOOK = ["use", "Threads"].join("")
+    const API_MODULE = ["@/lib", "/api"].join("")
+    for (const forbidden of [THREADS_HOOK, API_MODULE]) {
+      expect(FORM_CODE).not.toContain(forbidden)
+    }
+    expect(`import { ${THREADS_HOOK} } from "@/hooks/useThreads"`).toContain(THREADS_HOOK)
+  })
+})
+
+// ── The source fence over the GATE ITSELF ─────────────────────────────────────
+
+describe("ChatLayout — source fence: the second gate term, and no bespoke route", () => {
+  it("gates on `opts?.inputs === undefined` in CODE, not only in a test", () => {
+    // The second term is what stops a library launch being prompted twice. A test that only
+    // drove the behaviour could be satisfied by a fixture; this reads the shipped source.
+    expect(CHAT_LAYOUT_CODE).toContain("opts?.inputs === undefined")
+    // POSITIVE CONTROL — the stripper leaves code, so a code-only needle is findable.
+    expect(CHAT_LAYOUT_CODE).toContain("const doRun = useCallback(")
+  })
+
+  it("adds NO bespoke run route — the kickoff path is the shipped one (D-103-CONF-1)", () => {
+    // ⚠ Read against STRIPPED code: this file's comments legitimately QUOTE the forbidden
+    // route shape while explaining why it is forbidden, and a raw scan would count the
+    // paragraph as the violation (the 187-24 lesson).
+    expect(CHAT_LAYOUT_CODE).not.toMatch(/workflows\/[^\s"']*\/run\b/)
+    // POSITIVE CONTROL — the pattern really does match the shape it forbids.
+    expect("/workflows/abc-123/run").toMatch(/workflows\/[^\s"']*\/run\b/)
+    // And the shipped kickoff pair is still what launches.
+    expect(CHAT_LAYOUT_CODE).toContain("createThread(def.name)")
+    expect(CHAT_LAYOUT_CODE).toContain("postMessage(thread.id, kickoff, {")
+  })
+
+  it("resolves the ask BEFORE createThread — an ordering a render cannot observe", () => {
+    const gate = CHAT_LAYOUT_CODE.indexOf("opts?.inputs === undefined")
+    const create = CHAT_LAYOUT_CODE.indexOf("createThread(def.name)")
+    expect(gate).toBeGreaterThan(-1)
+    expect(create).toBeGreaterThan(-1)
+    expect(gate).toBeLessThan(create)
   })
 })

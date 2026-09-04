@@ -713,13 +713,24 @@ async def test_declared_install_pip_timeout_surfaces_honest_reason(monkeypatch):
 # ⚠ THIS TEST WAS DRIVEN RED against the pre-fix handler (which let the exception
 # propagate, so the call raised instead of returning) before being trusted.
 
-def _fake_ctx():
+def _fake_ctx(spawned=None):
+    """A ToolContext built by `__new__`, so it carries EXACTLY the attributes named here.
+
+    That is the point of the fixture and also its hazard: a production line that starts
+    reading a new field fails with AttributeError rather than with a useful message. It
+    happened - 217.1-11 added `ctx.spawn(...)` to the search error path and these two
+    tests went red from inside the very except arm they exist to guard.
+
+    `spawn` is therefore named here, and `spawned` lets a test assert the audit row was
+    actually scheduled rather than merely not crashing.
+    """
     ctx = ToolContext.__new__(ToolContext)
     ctx.current_user = {"id": "u1"}
     ctx.supabase = object()
     ctx.user_settings = None
     ctx.folder_subtree_ids = None
     ctx.run_id = "r1"
+    ctx.spawn = (spawned.append if spawned is not None else (lambda coro: coro.close()))
     return ctx
 
 
@@ -746,6 +757,10 @@ def test_search_documents_provider_failure_is_not_reported_as_zero_results(monke
     # (`tool_dispatcher._handle_search_documents`), and the two must never collide.
     assert "no relevant documents" not in out.result.lower()
     assert out.citations == [] and out.source_refs == []
+    assert out.retrieval_error is not None
+    assert out.retrieval_error["provider"] == "openai"
+    assert out.retrieval_error["retrieval_status"] == "provider_error"
+    assert "insufficient_quota" in out.retrieval_error["detail"]
 
 
 def test_search_documents_provider_failure_does_not_raise_into_the_agent_loop(monkeypatch):

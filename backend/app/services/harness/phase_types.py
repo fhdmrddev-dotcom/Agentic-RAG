@@ -70,6 +70,13 @@ from app.services.harness.emitters import resolve_emitter
 from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 
+# 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
+# Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
+# awareness block below feeds it a REMOTE-SERVER-ADVERTISED ``tool_name``. Safe at module
+# top: ``publish_service`` has no app-level module-top imports at all (logging, unicodedata,
+# UUID) and the ``harness`` package ``__init__`` never loads it, so no cycle is closed.
+from app.services.harness.publish_service import _clean_label
+
 # BUG-260730-01 — the ONE home of the citation marker format, read here so the
 # instruction the producer sees and the pattern the gate compiles cannot drift. Safe at
 # module top: ``validator_kinds`` imports only ``harness.validators`` (import-light, and
@@ -101,6 +108,8 @@ from app.models.user_settings import (
 )
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
+from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
+from app.services.connectors.grants import resolve_effective_posture
 from app.services.connectors.protocol import AdapterError
 from app.services.connectors.registry import get_adapter
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
@@ -261,6 +270,97 @@ def _stateful_framing_block(ctx) -> str:
         "- `[UPDATED]` for items from the prior state whose status, details, or severity have changed.\n"
         "- `[RESOLVED]` or `[CLOSED]` for items from the prior state that are now resolved, completed, or no longer active.\n"
         "Preserve existing unchanged items to maintain continuity in the register."
+    )
+
+
+#: Phase 214.1-03 (``BUG-260828-03`` / D-214.1-05) — how many bound action names the
+#: awareness block will name before it stops. A workflow with more external steps than this
+#: has already told the model everything the sentence can usefully carry, and
+#: ``workflow_authoring``'s length-discipline note binds here: an over-long block is a NUDGE,
+#: and a nudge is not what a fact is for. Re-derived by the length case, never hand-counted.
+_WIRED_SERVICES_MAX_NAMES = 8
+
+
+def _wired_services_block(ctx) -> str:
+    """The services THIS WORKFLOW is wired to, handed over as a fact rather than guessed.
+
+    ``BUG-260828-03``: a ``write-summary`` step wrote *"The requested email could not be sent
+    because no email service is connected to this workspace"* into a delivered summary — while
+    the SMTP connection existed and the VERY NEXT step sent successfully. The false claim
+    reached a recipient AND sat inside the approval sentence a human was asked to approve.
+
+    ⚠ D-214.1-05 — THIS IS A LOOKUP, NOT A PROMPT ASKING THE MODEL TO BEHAVE. Prompting a
+    model not to speculate about system state is already measured insufficient one surface
+    over (STEP-06 enforces its vocabulary on the EMITTED definition rather than by asking).
+    What this function does is remove the occasion to speculate: the connected-service fact is
+    something the system holds, so the model is GIVEN it at the point it was inventing it.
+
+    ⚠ THE LIMIT THIS BUYS, STATED BECAUSE IT IS NARROWER THAN "THE WORKSPACE'S CONNECTIONS".
+    This block is derived PURELY from ``ctx.definition`` — the object the run already holds.
+    It tells the model what THIS WORKFLOW is bound to, which is exactly where the model
+    speculated: it denied a capability its own next step then exercised. It does NOT know
+    about a service no step names. **RE-OPEN TRIGGER**: the first phase that needs the model
+    to know about a connection NO step is bound to must add the connection read — and that
+    read is I/O, at a seam this function is deliberately not at.
+
+    ⛔ NO CONNECTION READ, NO ``connection_id``, NO I/O, NO NEW TRUST BOUNDARY, and therefore
+    no ``run_in_threadpool`` question. ⛔ AND NO POST-HOC CENSOR over generated text —
+    D-214.1-05's scope limit is binding: that is a bigger, more dangerous mechanism and it
+    needs the operator. This function appends a string to a system prompt and touches no
+    output path.
+
+    ⚠ BOTH BINDING ARMS ARE READ, and that is a correction to the plan's interface rather
+    than an embellishment. An ``external_action`` step names EITHER a native ``capability``
+    (the closed ``Literal`` of three — ``send_email`` / ``create_ticket`` / ``post_message``)
+    OR an MCP ``tool_name``. ``BUG-260828-03``'s own step was the NATIVE SMTP ``send_email``
+    arm, so a block reading ``tool_name`` alone would return ``""`` for the exact workflow the
+    bug was reported against.
+
+    ⚠ ``tool_name`` IS A REMOTE-SERVER-ADVERTISED STRING GOING INTO A SYSTEM PROMPT — the
+    prompt-injection class this tree has not faced before (T-214.1-03-01). Every name is put
+    through ``publish_service._clean_label``, the SHIPPED scrubber (Unicode-category scrub of
+    ``Cc``/``Cf``/``Cs``/``Co``/``Zl``/``Zp`` plus every whitespace run, then a 72-char clamp)
+    rather than a second copy of one. No import cycle exists to prevent it: ``publish_service``
+    has no app-level module-top imports and the ``harness`` package ``__init__`` does not load
+    it. A clamp is a BOUND, not immunity — so the block states a FACT and a RULE and grants
+    nothing.
+
+    Returns ``""`` for a ``ctx`` with no definition, a definition whose ``phases`` is not a
+    list, and any definition with no bound ``external_action`` step — so every other
+    workflow's system prompt is BYTE-IDENTICAL by construction rather than by review.
+    """
+    definition = getattr(ctx, "definition", None)
+    phases = getattr(definition, "phases", None)
+    if not isinstance(phases, list):
+        return ""
+
+    names: list[str] = []
+    for phase in phases:
+        config = getattr(phase, "config", None)
+        if getattr(config, "phase_type", None) != "external_action":
+            continue
+        # The MCP arm first: a step naming a tool is bound to THAT, and ``available_tools``
+        # derives from it. The native ``capability`` is the other arm of the same binding.
+        raw = getattr(config, "tool_name", None) or getattr(config, "capability", None)
+        cleaned = _clean_label(raw)
+        # ``_clean_label`` returns None for a missing name, a non-string and one that trims
+        # empty — all three are "this step binds nothing nameable", never a placeholder.
+        if cleaned and cleaned not in names:
+            names.append(cleaned)
+
+    if not names:
+        return ""
+
+    named = sorted(names)[:_WIRED_SERVICES_MAX_NAMES]
+    return (
+        "\n\n## What this workflow is connected to\n"
+        "This workflow is wired to connected services that perform: "
+        + ", ".join(named)
+        + ".\n"
+        "Do not state that a service is unavailable, unconnected, or missing from this "
+        "workspace — you cannot observe that, and a run has already delivered such a claim "
+        "to a real recipient when it was false. If you cannot complete something, say what "
+        "YOU were unable to do, never what the system lacks."
     )
 
 
@@ -704,6 +804,9 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx, with_files=False)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03): '' unless this workflow binds an external action, so
+        # every other run's prompt here is byte-identical.
+        + _wired_services_block(ctx)
         + _retry_suffix(ctx)
     )
     # F8 (092-07): first phase → the user's kickoff question; later phases → prior
@@ -780,6 +883,8 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03) — see llm_single. Same '' arm, same byte-identity.
+        + _wired_services_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -822,6 +927,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
         "similarity_scores": result.get("similarity_scores") or [],
+        "retrieval_error": result.get("retrieval_error"),
         # 200 (D-07) — DECLARED measure, site 1 of 3. The number is a fact this executor
         # already produced: how many grounding sources the sub-agent actually gathered.
         # ⚠ ZERO IS EMITTED, NOT SUPPRESSED: a sub-agent that searched and found nothing
@@ -876,6 +982,11 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         _raw_prompt
         + _skill_block(phase, ctx)
         + _stateful_framing_block(ctx)
+        # 214.1-03 (BUG-260828-03) — ⚠ A FOURTH SITE, and the comment eight lines above is
+        # the reason: `llm_batch_agents` carries the same `available_tools` as the single
+        # agent, so a fix on the single-agent path alone would leave every parallel branch
+        # free to invent the same false capability refusal. Same '' arm, same byte-identity.
+        + _wired_services_block(ctx)
         + _citation_instruction(phase)
         + _retry_suffix(ctx)
     )
@@ -937,12 +1048,17 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         batch_citations.extend(r.get("citations") or [])
         batch_similarity_scores.extend(r.get("similarity_scores") or [])
 
+    batch_retrieval_error = next(
+        (r.get("retrieval_error") for r in results if r.get("retrieval_error")),
+        None,
+    )
     return {
         "text": merged,
         "sub_run_ids": sub_run_ids,
         "source_refs": batch_source_refs,
         "citations": batch_citations,
         "similarity_scores": batch_similarity_scores,
+        "retrieval_error": batch_retrieval_error,
         # 200 (D-07) — DECLARED measure, site 2 of 3. How many parallel sub-agents this
         # phase actually fanned out to — one ``sub_run_id`` per branch that really ran, so
         # the number is the executor's own fact and not a re-derivation of the config's
@@ -1374,7 +1490,15 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
         # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
         # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
-        system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+        # 214.1-03 (BUG-260828-03): ⚠ THE EASIEST SITE TO MISS — this one composed only
+        # _skill_block + _retry_suffix, and the bug's own `write-summary` step is exactly
+        # this class. '' unless the workflow binds an external action.
+        system_prompt = (
+            phase.config.prompt
+            + _skill_block(phase, ctx, with_files=False)
+            + _wired_services_block(ctx)
+            + _retry_suffix(ctx)
+        )
         user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
         # 101.1-06: spotlight the retrieved evidence as <doc id=…> blocks so the model has
         # REAL source ids to cite; the SAME walk yields the gate's valid set below — one id
@@ -2115,7 +2239,7 @@ def _url_host(url: str) -> str:
     return without_scheme.split("/", 1)[0].split("@")[-1].split(":")[0]
 
 
-def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
+def _adapter_args(adapter, capability: str, resolved: dict, config=None, schema=None) -> dict:
     """Project the resolved inputs onto the adapter's DECLARED schema, and nothing more.
 
     Two rules, both fail-closed:
@@ -2129,23 +2253,59 @@ def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
     **No expression language, no templating surface** (D-09). This is a closed two-column
     lookup; where a field must be COMPOSED the shipped ``SandboxedEnvironment(autoescape=True)``
     path is the only one that may do it, and this phase composes nothing.
+
+    ── 214 (D-214-00) · THE BODY MOVED; THE NAME AND THE RULES DID NOT ────────────────────
+    The projection itself now lives in ``app.services.connectors.args.resolve_arguments``,
+    because the publish gate refuses at save time exactly what this resolves at run time, and
+    two copies of that logic in two files is a guaranteed drift — whose symptom is a workflow
+    that publishes and then fails at the send (``BUG-260826-02`` restated).
+
+    ⚠ **THE RE-EXPORT IS LOAD-BEARING** (``human_input.py``'s cut rule 2). This function keeps
+    its NAME, its module and the D-09 sentence above, because three shipped suites import
+    ``_adapter_args`` / the body-argument map from ``phase_types``. There is ONE projection,
+    not two; do not "tidy" this wrapper away.
+
+    ⚠ **THE PRODUCTION CALL SITE OBTAINS ``schema`` FROM THE ONE ACCESSOR** — GATE 7 below
+    passes the ONE schema accessor's answer, and it does NOT read ``adapter``'s own frozen
+    declaration even though ``adapter`` is right there one line above it. ``descriptor_for``
+    derives from exactly that attribute today, so the two are equal; reading the attribute at
+    the call site would silently stop being equal the moment either side gains a transform,
+    and the publish gate reads the descriptor. ``descriptors.py`` calls its own derivation
+    *"DERIVED from the adapter's own declaration — never retyped"* for precisely that reason.
+
+    ⚠ ``schema=None`` IS A COMPATIBILITY ARM FOR THE PRE-214 THREE-POSITIONAL SHAPE, NOT THE
+    PRODUCTION PATH. Three shipped suites call this with a stub adapter of their own and no
+    schema (``test_190_ssti_fence.py`` records at the seam with an adapter whose declaration
+    deliberately differs from Slack's), so the fallback reads the handed adapter's own
+    declaration and keeps their assertions character-identical — the re-import discipline
+    applied to a signature rather than to a name. A production caller that omits ``schema``
+    would be reading a schema for itself, which is the drift D-214-00 exists to prevent, so
+    ``test_214_args_leaf.py`` asserts the executor's call site passes it.
+
+    ``config`` is the phase config, carrying ``arg_sources`` and ``tool_args``. Also optional,
+    for the same reason; a ``None`` config is the pre-214 shape and resolves byte-identically
+    (D-214-12), which the characterization pins in ``test_214_args_leaf.py`` PROVE rather than
+    assert.
     """
-    declared = set(adapter.INPUT_SCHEMA.get("properties", {}))
-    args = {key: value for key, value in resolved.items() if key in declared}
-    body_arg = _BODY_ARG_FOR_CAPABILITY[capability]
-    if body_arg in declared and body_arg not in args and resolved.get("content"):
-        args[body_arg] = resolved["content"]
-    return args
+    if schema is None:
+        schema = adapter.INPUT_SCHEMA
+    return resolve_arguments(
+        config=config,
+        schema=schema,
+        upstream_outputs={},
+        run_inputs=resolved,
+        body_arg=_BODY_ARG_FOR_CAPABILITY[capability],
+    )
 
 
 async def _write_send_receipt(
-    ctx, phase, *, capability: str, connection_id: str, host: str, raw_status: int | None
+    ctx, phase, *, capability: str, connection_id: str, host: str, raw_status: int | None, tool_name: str | None = None
 ) -> None:
     """The ONE ``external_action_sent`` receipt (migration 117 — the literal it added).
 
-    ⚠ **WHAT IT MAY CARRY IS FIXED BY D-08**: the capability, the connection id and the
-    destination HOST. Never the credential, never the request body, never the recipient's
-    address. A receipt is a record that something left the app, not a copy of what left.
+    ⚠ **WHAT IT MAY CARRY IS FIXED BY D-08 / D-213-14**: the capability, the connection id,
+    the destination HOST, and tool_name. Never the credential, never the request body, never the
+    recipient's address. A receipt is a record that something left the app, not a copy of what left.
 
     Best-effort, deliberately: the send has ALREADY HAPPENED by the time this runs, and a
     failed receipt write must not turn a delivered message into a failed phase. It is logged
@@ -2156,19 +2316,22 @@ async def _write_send_receipt(
         return
     user_id = (getattr(ctx, "current_user", None) or {}).get("id")
     try:
+        metadata = {
+            "capability": capability,
+            "connection_id": str(connection_id),
+            "destination_host": host,
+            "raw_status": raw_status,
+            "phase": getattr(phase, "slug", None),
+            "phase_index": getattr(phase, "phase_index", None),
+        }
+        if tool_name is not None:
+            metadata["tool_name"] = str(tool_name)
         await write_audit(
             pool,
             getattr(ctx, "run_id", None),
             user_id=user_id,
             event_type="external_action_sent",
-            metadata={
-                "capability": capability,
-                "connection_id": str(connection_id),
-                "destination_host": host,
-                "raw_status": raw_status,
-                "phase": getattr(phase, "slug", None),
-                "phase_index": getattr(phase, "phase_index", None),
-            },
+            metadata=metadata,
         )
     except Exception:  # noqa: BLE001 — a receipt write must never undo a send that happened
         logger.warning(
@@ -2451,19 +2614,161 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         # change — the gate AND UI-SPEC §5b's sentence, in ONE commit — never this line alone.
         return _record("the bound connection is disabled (is_enabled is false — Gate 2)")
 
-    if not getattr(connection, "mcp_server_url", None) and getattr(connection, "capability", capability) != capability:
-        # A connection bound for another capability would send a bot token to a mail host,
-        # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
-        # the refusal: this used to raise a bare ``ValueError``, which is not an
-        # ``AdapterError``, so the handler below never caught it. The run died with no
-        # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
-        # stack-trace-shaped error on the surface whose whole discipline is not over-claiming.
+    if not getattr(connection, "mcp_server_url", None):
+        # ⚠ BUG-260827-01 — ``getattr(obj, name, default)`` returns the ATTRIBUTE whenever the
+        # attribute EXISTS, so the default below can never stand in for a stored ``None``.
+        # This gate was written in Phase 190, when a connection could only ever be one of TWO
+        # shapes and each carried a non-null discriminator. Phase 211 made a THIRD shape
+        # reachable — a SERVICE-ONLY row naming a service and neither a ``capability`` nor an
+        # ``mcp_server_url`` (migration 127's ``shape_is_not_ambiguous`` forbids BOTH being set
+        # and PERMITS both being NULL, by design — CONN-08). Such a row has ``capability``
+        # present-and-``None``, so it fell into the mismatch arm and the run said *"the bound
+        # connection is for a different capability"*. That is FALSE: it is not a DIFFERENT
+        # capability, it is NO capability — and on the one surface in this codebase whose
+        # entire stated discipline is not over-claiming, it sends a reader hunting a mismatch
+        # that does not exist.
+        #
+        # ⚠ THE DEFAULT IS KEPT ON PURPOSE. A connection object with no ``capability``
+        # ATTRIBUTE AT ALL still passes this gate exactly as it did before; only
+        # present-and-``None`` is split out. Widening the guard instead would delete a real
+        # protection — the genuinely-mismatched case below MUST stay refused.
+        bound_capability = getattr(connection, "capability", capability)
+
+        if bound_capability is None:
+            # The honest sentence is *"not yet"*, and it is the same one the refresh path
+            # already carries one module over (``connector_service.ConnectorNothingToDiscover``
+            # — read that class for why a worded refusal beats a generic one here). Nothing is
+            # broken and nothing is misconfigured: a service-only row simply has no way to be
+            # reached until OAuth (Phase 215) or an endpoint supplies one, so the step was
+            # never going to send. The behaviour was already right; only the words were wrong.
+            logger.info(
+                "211 BUG-260827-01: external_action phase %r is bound to a SERVICE-ONLY "
+                "connection (no capability, no mcp_server_url) — recording rather than "
+                "sending", slug,
+            )
+            return _record(
+                "the bound connection names a service but no way to reach it yet"
+            )
+
+        if bound_capability != capability:
+            # A connection bound for another capability would send a bot token to a mail host,
+            # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
+            # the refusal: this used to raise a bare ``ValueError``, which is not an
+            # ``AdapterError``, so the handler below never caught it. The run died with no
+            # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
+            # stack-trace-shaped error on the surface whose whole discipline is not
+            # over-claiming.
+            logger.warning(
+                "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
+                "recording rather than sending", slug,
+                bound_capability, capability,
+            )
+            return _record("the bound connection is for a different capability")
+
+    # ── GATE 5.5 · Tool Posture & Grants Check (Phase 213 / GRANT-02 / D-213-00 / SEC-1) ─
+    # Evaluated BEFORE the shape fork (Gate 6/7) to close BUG-260827-02.
+    effective_tool_name = getattr(phase.config, "tool_name", None) or capability
+    # Phase 221 (D-221-05 / D-221-06) — the APPLICATION rung. See the identical wire in
+    # `tool_dispatcher.py`: both gates must resolve the same pair, or a write capped in chat
+    # is armed on the canvas and nothing reports the difference.
+    from app.services.connectors.service_tools import tool_facet
+
+    _application, _is_write = tool_facet(
+        getattr(connection, "service_id", None), effective_tool_name
+    )
+    posture = resolve_effective_posture(
+        connection, effective_tool_name, application=_application, is_write=_is_write
+    )
+    grants = getattr(connection, "tool_grants", None) or {}
+    was_explicitly_set = isinstance(grants, dict) and effective_tool_name in grants
+
+    async def _refuse(reason: str, because: str):
+        """One refusal composer, three reasons (D-213-16 / GRANT-04, plan 213-06).
+
+        ⚠ THE WORDS MIRROR ``grantsVocabulary.ts`` §"The refusal (GRANT-04)" AND ARE NOT
+        IMPORTED FROM IT. D-213-15 chose two homes deliberately — the backend owns the run
+        sentence so it reaches chat, the run page, the panel AND the ledger without four
+        renderers agreeing, while the frontend vocabulary owns the settings screen. The
+        cost of two homes is drift, so ``test_213_approval_moment.py`` pins the two in
+        agreement rather than trusting this comment.
+
+        ⚠ ONE audit KIND, three ``reason`` VALUES. Adding a kind would need
+        ``_AUDIT_EVENT_TYPES`` and a migration CHECK edited in the SAME commit
+        (BUG-260731-02), and there is nothing here that ``tool_refused`` does not already
+        describe.
+        """
         logger.warning(
-            "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
-            "recording rather than sending", slug,
-            getattr(connection, "capability", None), capability,
+            "213 GRANT-04: tool %r refused on connection %s (%s; grants: %s, default: %s)",
+            effective_tool_name, connection_id, reason, grants,
+            getattr(connection, "default_approval_posture", None),
         )
-        return _record("the bound connection is for a different capability")
+        pool = getattr(ctx, "pool", None)
+        user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+        if pool is not None:
+            try:
+                await write_audit(
+                    pool,
+                    getattr(ctx, "run_id", None),
+                    user_id=user_id,
+                    event_type="tool_refused",
+                    metadata={
+                        "phase": slug,
+                        "connection_id": str(connection_id),
+                        "tool_name": effective_tool_name,
+                        "reason": reason,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("213: failed to write tool_refused audit event: %s", exc)
+
+        return {
+            # REFUSED_HEADLINE + (REFUSED_BECAUSE_DENIED | REFUSED_BECAUSE_UNGRANTED) +
+            # REFUSED_NEXT — the sketch's words, which name the grant that stopped this and
+            # the change that would let it through. The sentence this replaced said
+            # "is not granted permission on connection X": it named no grant and offered no
+            # next step, which is the BUG-260815-06 class GRANT-04 exists to close.
+            "text": (
+                f"{effective_tool_name} was refused. {because} "
+                f"Set it to Allow or Ask first to let this run continue."
+            ),
+            "failure": f"tool '{effective_tool_name}' refused: {reason}",
+        }
+
+    if posture == "deny":
+        if was_explicitly_set:
+            return await _refuse(
+                "posture_denied",
+                f"{effective_tool_name} is set to Deny on this connection.",
+            )
+        return await _refuse(
+            "not_granted",
+            f"{effective_tool_name} has never been allowed on this connection.",
+        )
+
+    if posture == "ask" and not getattr(phase, "action_risk_armed", False):
+        # ── SC#3 · "nothing leaves until they answer" — the FAIL-CLOSED half ─────────
+        #
+        # ⚠ THIS IS NOT A SECOND PAUSE, AND IT MUST NOT BECOME ONE. D-213-09 chose
+        # "two triggers, ONE pause" and rejected a distinct grant-approval pause by name,
+        # because an armed step whose tool is also "Ask first" would then ask twice.
+        #
+        # On a workflow `external_action` the armed checkpoint has ALREADY asked: the body
+        # runs only when `_resolve_failure_with_ask_user` returned None
+        # (`harness_engine.py:930`), i.e. a person approved. So `armed` ⇒ proceed, and this
+        # arm never fires there.
+        #
+        # It fires where NOTHING asked — the Phase 216 chat path, and any future unarmed
+        # caller. ⚠ Without it `ask` means SEND: Gate 5.5 refused only on `deny` and fell
+        # through otherwise, and migration 128 §1 makes `'ask'` the default for every NEW
+        # connection, so a row with no grant configured at all dispatched. Pre-213 that same
+        # row was REFUSED, because the Gate 6 check this replaced read
+        # `grants.get(tool) is True` — a MISSING KEY DENIES. This restores that property to
+        # the GATE rather than leaving it resting on a column default.
+        return await _refuse(
+            "approval_required",
+            f"{effective_tool_name} needs a person's approval on this connection, "
+            f"and nothing here can ask one.",
+        )
 
     # ── GATE 6 · MCP Tool Dispatch (Phase 206 / CONN-02 / D-206-06) ───────────────────
     if getattr(connection, "mcp_server_url", None):
@@ -2471,40 +2776,34 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         if not tool_name:
             return _record("no tool_name specified for MCP connection")
 
-        grants = getattr(connection, "tool_grants", {}) or {}
-        is_granted = grants.get(tool_name) is True
-
-        if not is_granted:
-            logger.warning(
-                "206 F-3: MCP tool %r is NOT granted on connection %s (grants: %s) — refusing",
-                tool_name, connection_id, grants,
+        # ⭐ 214 (D-214-00) — THE MCP SHAPE ROUTES THROUGH THE SAME RESOLVER AND THE SAME
+        # ACCESSOR AS THE NATIVE ONE, so the two shapes cannot drift. The snapshot is the one
+        # GATE 5 already resolved — ⚠ do NOT re-resolve the connection and do NOT add I/O to
+        # this path. It is the SAME `discovered_tools` column the publish gate reads.
+        #
+        # This replaced a raw `dict(tool_args)`: every key the author had ever stored went to
+        # the vendor, declared or not. The projection is now the schema's, which is what makes
+        # STEP-03's publish refusal and STEP-02's send agree about the argument object.
+        tool_schema = schema_for_bound_tool(
+            capability=None,
+            tool_name=tool_name,
+            discovered_tools=getattr(connection, "discovered_tools", None),
+        )
+        if tool_schema is None:
+            # ⛔ A `None` SCHEMA MUST NOT FALL BACK TO SENDING `tool_args` RAW. The gate
+            # refuses this same case as `shape_unknown`; an executor that SENDS where the
+            # gate REFUSES is the D-214-00 drift pointing the dangerous way — an unreviewed
+            # argument object reaching a vendor because nobody could say what it accepts.
+            return _record(
+                "the bound tool's argument shape is not knowable from this connection's "
+                "discovered tools"
             )
-            pool = getattr(ctx, "pool", None)
-            user_id = (getattr(ctx, "current_user", None) or {}).get("id")
-            if pool is not None:
-                try:
-                    await write_audit(
-                        pool,
-                        getattr(ctx, "run_id", None),
-                        user_id=user_id,
-                        event_type="tool_refused",
-                        metadata={
-                            "phase": slug,
-                            "connection_id": str(connection_id),
-                            "tool_name": tool_name,
-                            "reason": "permission_denied",
-                        },
-                    )
-                except Exception as exc:
-                    logger.warning("206: failed to write tool_refused audit event: %s", exc)
-
-            return {
-                "text": f"Tool execution refused: Tool '{tool_name}' is not granted permission on connection '{getattr(connection, 'name', connection_id)}'.",
-                "failure": f"tool '{tool_name}' refused: permission not granted",
-            }
-
-        tool_args = getattr(phase.config, "tool_args", None) or {}
-        final_args = dict(tool_args) if isinstance(tool_args, dict) else {}
+        final_args = resolve_arguments(
+            config=phase.config,
+            schema=tool_schema,
+            upstream_outputs=accumulated_outputs,
+            run_inputs=resolved,
+        )
 
         from app.services import mcp_client
         try:
@@ -2513,6 +2812,8 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
                 tool_name=tool_name,
                 arguments=final_args,
                 secret=connection.secret,
+                # Resolved, not guessed — see ResolvedConnection.auth_scheme.
+                auth_scheme=connection.auth_scheme,
             )
         except Exception as exc:
             logger.warning("206: MCP tool %r execution failed: %s", tool_name, exc)
@@ -2535,6 +2836,7 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
             connection_id=str(connection_id),
             host=connection.mcp_server_url,
             raw_status=200,
+            tool_name=tool_name,
         )
         logger.info(
             "206 CONN-02: external_action phase %r performed tool %r via connection %s",
@@ -2545,7 +2847,20 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # ── GATE 7 · dispatch legacy adapter ───────────────────────────────────────────────
     adapter = get_adapter(capability)
     config = dict(getattr(connection, "config", None) or {})
-    args = _adapter_args(adapter, capability, resolved)
+    # ⭐ 214 (D-214-00) — THE SCHEMA'S PROVENANCE, NAMED. It comes from the ONE accessor, so
+    # it is the SAME object the publish gate's `tool_schemas` builder obtains for this bound
+    # tool (`descriptor_for` is a pure function of the registry). ⚠ Do NOT substitute the
+    # adapter's own frozen declaration here: it is equal today and would stop being equal
+    # silently, and the gate reads the descriptor.
+    args = _adapter_args(
+        adapter,
+        capability,
+        resolved,
+        config=phase.config,
+        schema=schema_for_bound_tool(
+            capability=capability, tool_name=None, discovered_tools=None
+        ),
+    )
 
     try:
         result = await adapter.send(
@@ -2578,6 +2893,7 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         connection_id=str(connection_id),
         host=host,
         raw_status=getattr(result, "raw_status", None),
+        tool_name=capability,
     )
     logger.info(
         "190 CONN-02: external_action phase %r performed %r via connection %s (host=%s)",

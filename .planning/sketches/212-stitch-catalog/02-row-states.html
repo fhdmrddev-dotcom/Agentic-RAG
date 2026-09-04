@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Catalog Row States</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d4e4fa",
+                        "tertiary": "#ffd1aa",
+                        "on-primary-container": "#00574d",
+                        "on-primary": "#003731",
+                        "surface": "#0b1326",
+                        "on-primary-fixed-variant": "#005047",
+                        "error": "#ffb4ab",
+                        "on-surface-variant": "#bacac5",
+                        "outline-variant": "#3c4a46",
+                        "surface-dim": "#0b1326",
+                        "surface-container-high": "#222a3d",
+                        "on-tertiary": "#4b2800",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#060e20",
+                        "inverse-surface": "#dae2fd",
+                        "primary-container": "#2dd4bf",
+                        "tertiary-fixed": "#ffdcc0",
+                        "tertiary-fixed-dim": "#ffb875",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "on-secondary-fixed": "#0d1c2d",
+                        "on-secondary-container": "#a7b6cc",
+                        "inverse-primary": "#006b5f",
+                        "surface-container": "#171f33",
+                        "primary": "#57f1db",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed-dim": "#b9c8de",
+                        "outline": "#859490",
+                        "on-secondary": "#233143",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-container": "#744000",
+                        "on-tertiary-fixed": "#2d1600",
+                        "on-primary-fixed": "#00201c",
+                        "secondary-container": "#39485a",
+                        "surface-container-highest": "#2d3449",
+                        "surface-bright": "#31394d",
+                        "tertiary-container": "#ffac5a",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#283044",
+                        "on-tertiary-fixed-variant": "#6b3b00",
+                        "error-container": "#93000a",
+                        "surface-tint": "#3cddc7",
+                        "primary-fixed": "#62fae3",
+                        "on-surface": "#dae2fd",
+                        "surface-container-low": "#131b2e",
+                        "primary-fixed-dim": "#3cddc7",
+                        "background": "#0b1326",
+                        "secondary": "#b9c8de"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-sm": "0.5rem",
+                        "container-padding": "2rem",
+                        "stack-lg": "2rem",
+                        "unit": "4px",
+                        "stack-md": "1rem",
+                        "gutter": "1.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter", "sans-serif"],
+                        "display-lg": ["Inter", "sans-serif"],
+                        "body-sm": ["Inter", "sans-serif"],
+                        "label-caps": ["JetBrains Mono", "monospace"],
+                        "body-lg": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen text-on-surface p-container-padding font-body-lg text-body-lg">
+<div class="max-w-4xl mx-auto flex flex-col gap-stack-lg py-stack-lg">
+<!-- Header for Component States -->
+<div class="mb-stack-md">
+<h1 class="font-display-lg text-display-lg text-primary mb-unit">Catalog Row States</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Component state variations for service catalog items.</p>
+</div>
+<!-- 1. Not Connected -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Not Connected</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<!-- Brand Mark Placeholder (Slack) -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface text-[24px]">forum</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Slack</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="flex items-center">
+<button class="bg-primary text-on-primary font-label-caps text-label-caps px-4 py-2 rounded uppercase hover:bg-primary-fixed transition-colors">
+                        Connect
+                    </button>
+</div>
+</div>
+</div>
+<!-- 2. Connected -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Connected</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<!-- Brand Mark Placeholder (Slack) -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-primary text-[24px]">forum</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Slack</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary uppercase">Connected</span>
+</div>
+</div>
+</div>
+<!-- 3. Connected, Needs Attention -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Connected, Needs Attention</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200 bg-error-container/10">
+<div class="flex items-center gap-gutter">
+<!-- Brand Mark Placeholder (Jira) -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-error">
+<span class="material-symbols-outlined text-error text-[24px]">assignment</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Jira</span>
+<span class="font-body-sm text-body-sm text-error">Your login for this service has expired, and updates have stopped.</span>
+</div>
+</div>
+<div class="flex items-center">
+<button class="bg-transparent border border-error text-error font-label-caps text-label-caps px-4 py-2 rounded uppercase hover:bg-error/10 transition-colors">
+                        Reconnect
+                    </button>
+</div>
+</div>
+</div>
+<!-- 4. Uncurated -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Uncurated</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<!-- Generic Brand Mark (Geometric Icon) -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant">
+<span class="font-label-caps text-label-caps text-on-surface-variant">DE</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">deepwiki</span>
+<div class="flex flex-col gap-1 mt-1">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Shared internal knowledge base.</span>
+<span class="font-label-caps text-label-caps text-secondary uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">link</span> Added via URL
+                             </span>
+</div>
+</div>
+</div>
+<div class="flex items-center">
+<button class="bg-transparent border border-outline-variant text-on-surface font-label-caps text-label-caps px-4 py-2 rounded uppercase hover:bg-surface-container-highest transition-colors">
+                        Manage
+                    </button>
+</div>
+</div>
+</div>
+<!-- 5. Unknown Purpose -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Unknown Purpose</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200 opacity-60 hover:opacity-100">
+<div class="flex items-center gap-gutter">
+<!-- Generic Brand Mark -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant border-dashed">
+<span class="font-label-caps text-label-caps text-on-surface-variant">UN</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Unknown Service</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Unknown purpose</span>
+</div>
+</div>
+<div class="flex items-center">
+<button class="bg-transparent text-secondary font-label-caps text-label-caps px-4 py-2 rounded uppercase hover:bg-surface-container-highest transition-colors">
+                        Define
+                    </button>
+</div>
+</div>
+</div>
+<!-- 6. Writes Removed -->
+<div class="flex flex-col gap-unit">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-unit uppercase tracking-widest">Writes Removed</div>
+<div class="group flex items-center justify-between p-stack-md -mx-stack-md rounded-lg hover:bg-surface-container-high transition-colors duration-200">
+<div class="flex items-center gap-gutter">
+<!-- Brand Mark Placeholder (Slack) -->
+<div class="w-12 h-12 flex-shrink-0 bg-surface-container-highest rounded-lg flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[24px]">forum</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Slack</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Post updates and read channels in your workspace.</span>
+</div>
+</div>
+<!-- Empty action area intentionally -->
+</div>
+</div>
+</div>
+</body></html>

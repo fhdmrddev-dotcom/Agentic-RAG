@@ -31,6 +31,7 @@ export type {
   SkillImportResult,
   GovernedFeature,
   EffectiveFeatures,
+  FeaturesResponse,
 } from "./api/_core"
 
 // ── threads ─────────────────────────────────────────────────────────
@@ -86,6 +87,16 @@ export {
   renameFolder,
   deleteFolder,
   toggleFolderOrgShared,
+  // Phase 217 (LIB-04 / D-217-04) — the five document-detail reads. ⚠ These MUST be here:
+  // a symbol exported from `api/documents.ts` and forgotten in this barrel typechecks
+  // perfectly and is invisible to every consumer, because everything outside `lib/`
+  // imports `@/lib/api` (D-207-06). `apiBarrel.test.ts` now guards that mechanically for
+  // this module, so the omission reds instead of shipping silently.
+  getDocumentContent,
+  listDocumentChunks,
+  listDocumentTables,
+  listDocumentImages,
+  listDocumentQueries,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────
@@ -212,6 +223,10 @@ export type {
   GovLowConfidenceItem,
   WorkflowDefinitionJSON,
   PublishVerdict,
+  // Phase 214 (STEP-03) — added to its domain module AND to this list in the SAME commit,
+  // per this file's own rule above. TYPE-ONLY, so `196-08`'s mock-factory failure mode
+  // (a `vi.mock` factory missing a newly-added RUNTIME export) structurally cannot fire.
+  PublishNamedFailure,
   LintError,
   WorkflowDraftRow,
   WorkflowDraftWriteResult,
@@ -220,6 +235,21 @@ export type {
   GenerateWorkflowBody,
   PublishOutcome,
 } from "./api/knowledge"
+
+// ── library ─────────────────────────────────────────────────────────
+export {
+  getIndexSummary,
+  listCheckedQueries,
+  createCheckedQuery,
+  triggerCheck,
+  triggerCheckAll,
+  deleteCheckedQuery,
+} from "./api/library"
+export type {
+  IndexSummary,
+  FolderIndexRow,
+  CheckedQueryRow,
+} from "./api/library"
 
 // ── workflows ─────────────────────────────────────────────────────────
 export {
@@ -290,6 +320,7 @@ export type {
 export {
   getOperatorProbe,
   getEffectiveFeatures,
+  getEffectiveFeaturesPayload,
   getBackpressure,
   getOperatorAudit,
   getPlatformAudit,
@@ -382,6 +413,7 @@ export type {
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
+  ToolGrantPosture,
 } from "./api/org"
 
 // ── connectors ─────────────────────────────────────────────────────────
@@ -394,12 +426,33 @@ export {
   deleteConnectorConnection,
   checkConnectorConnection,
   discoverConnectorTools,
+  probeMcpServer,
   updateConnectorGrants,
+  createOAuthAuthorizeUrl,
+  getConnectionOAuthToken,
+  listCloudFiles,
+  importCloudFile,
+  probeMcpAuth,
+  createMcpOAuthAuthorizeUrl,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
+  ApplicationAvailabilityWire,
   ConnectorCheckResult,
+  McpProbeRequest,
+  McpProbeResponse,
+  OAuthProvider,
+  OAuthAuthorizeRequest,
+  OAuthAuthorizeResponse,
+  OAuthTokenResponse,
+  CloudFileItem,
+  CloudFileListResponse,
+  McpAuthKind,
+  McpProbeAuthResponse,
+  McpOAuthAuthorizeResponse,
 } from "./api/connectors"
+
+export { submitToolApproval } from "./api/threads"
 
 // ── schedules ─────────────────────────────────────────────────────────
 export {
@@ -410,3 +463,17 @@ export {
   deleteSchedule,
   triggerSchedule,
 } from "./api/schedules"
+
+// ── takeoff ───────────────────────────────────────────────────────────
+export {
+  fetchDocumentTakeoff,
+  matchDocumentTakeoff,
+  resolveDocumentTakeoffItem,
+} from "./api/takeoff"
+export type {
+  TakeoffCandidate,
+  TakeoffBOQItem,
+  TakeoffBOQ,
+  DocumentTakeoffPayload,
+} from "./api/takeoff"
+

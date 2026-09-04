@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from starlette.concurrency import run_in_threadpool
@@ -108,6 +109,7 @@ async def reembed_job(
     batch_size: int | None = None,
     *,
     org_id=None,
+    folder_ids: list[str] | None = None,
 ) -> dict:
     """Re-embed this user's stale chunks from their preserved `content`.
 
@@ -123,12 +125,35 @@ async def reembed_job(
     every read AND write is WIDENED with an `.eq("org_id")` predicate alongside the
     retained `.eq("user_id")` scope — belt-and-suspenders on the service-role (BYPASSRLS)
     batch path. `org_id=None` keeps the job byte-identical to pre-163.
+
+    Phase 217.1 (BE-3 / D-217.1-27): `folder_ids` narrows the scope to a caller-selected
+    set of folders. Resolved to `document_id`s ONCE before the loop, then ANDed onto (never
+    replacing) the stale model-mismatch predicate — a folder whose chunks are already
+    current selects zero rows, and the job reports `remaining: 0` with a distinguishable
+    "already current" marker rather than success indistinguishable from a real re-index.
+    `folder_ids=None` (the default) keeps the query byte-identical to pre-217.1.
     """
     limit = batch_size if batch_size is not None else BATCH
     current = _current_model(app_settings)
     dims = getattr(app_settings, "embedding_dimensions", None)
     if org_id is None:
         org_id = await _resolve_reembed_org_id(supabase, user_id)
+
+    # BE-3: resolve the folder scope to document ids once, before the loop. A folder id the
+    # caller cannot see resolves to zero documents (RLS-scoped read) — never another tenant's.
+    scoped_document_ids: list[str] | None = None
+    scope_marker: str | None = None
+    if folder_ids:
+        _q = supabase.table("documents").select("id").eq("user_id", user_id)
+        if org_id is not None:
+            _q = _q.eq("org_id", org_id)
+        _rows = (await run_in_threadpool(lambda: _q.in_("folder_id", folder_ids).execute())).data
+        scoped_document_ids = [r["id"] for r in (_rows or [])]
+        # A folder scope with zero documents at all (e.g. the Root/Uncategorized bucket with
+        # no docs) is a DIFFERENT case from "all already current" — distinguish it now.
+        if not scoped_document_ids:
+            scope_marker = "folder_empty"
+
     _set_status(user_id, "running", model=current, dims_changed=bool(dims_changed))
 
     try:
@@ -164,6 +189,9 @@ async def reembed_job(
                 )
                 if org_id is not None:
                     q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware read scope
+                if scoped_document_ids:
+                    # BE-3: AND the folder scope onto the stale predicate — never replace it.
+                    q = q.in_("document_id", scoped_document_ids)
                 return (
                     q.or_(f'embedding_model.is.null,embedding_model.neq."{current}"')
                     .limit(limit)
@@ -173,6 +201,11 @@ async def reembed_job(
             batch = await run_in_threadpool(_read_batch)
             rows = batch.data or []
             if not rows:
+                # BE-3: a folder scope that resolved documents but selected zero stale rows
+                # is the "already current" case — distinguishable from a real re-index that
+                # simply finished (and from a folder with no documents at all).
+                if scoped_document_ids and scope_marker is None:
+                    scope_marker = "already_current"
                 break
 
             # Re-embed from the PRESERVED content (never re-derive from a lost vector).
@@ -195,6 +228,10 @@ async def reembed_job(
                                 "embedding": vec,
                                 "embedding_model": current,
                                 "embedding_dimensions": dims,
+                                # BE-1 (217.1): the honest "when the vector was written"
+                                # timestamp — the re-embed path MOVES it, because a new
+                                # vector IS a new index time.
+                                "embedded_at": datetime.now(timezone.utc).isoformat(),
                             }
                         )
                         .eq("id", row["id"])
@@ -214,6 +251,11 @@ async def reembed_job(
         final = "complete" if progress["remaining"] == 0 else "partial"
         _set_status(user_id, final, processed=processed)
         progress["status"] = final
+        # BE-3: the distinguishable scope marker — `folder_empty` (no docs at all in the
+        # selected folders) vs `already_current` (docs exist, none stale). Absent for the
+        # unscoped default, so a real re-index is never confused with a no-op.
+        if scope_marker:
+            progress["scope"] = scope_marker
         return progress
 
     except Exception:  # noqa: BLE001 — a failed run must leave an HONEST, resumable state.
@@ -311,6 +353,7 @@ async def start_reembed(
     user_id: str,
     app_settings: "UserEffectiveSettings",
     dims_changed: bool,
+    folder_ids: list[str] | None = None,
 ) -> dict:
     """Entrypoint the settings kickoff (BackgroundTask) + the "Re-embed now" re-kick both
     call. Thin wrapper over `reembed_job` (runs to completion — no batch cap).
@@ -320,12 +363,16 @@ async def start_reembed(
     present, build the client via `get_service_role_supabase(org_id)` — which REFUSES to
     construct a BYPASSRLS client without an explicit org — so no bare, org-less service-role
     client survives on the re-embed path. A corpus with no chunks (org_id None) has nothing
-    to re-embed, so it falls through on the injected client unchanged."""
+    to re-embed, so it falls through on the injected client unchanged.
+
+    Phase 217.1 (BE-3 / D-217.1-27): `folder_ids` is threaded to `reembed_job` unchanged;
+    `None` keeps the kickoff byte-identical to pre-217.1."""
     org_id = await _resolve_reembed_org_id(supabase, user_id)
     if org_id:
         from app.dependencies import get_service_role_supabase  # function-local (avoid import cycle)
 
         supabase = get_service_role_supabase(org_id)
     return await reembed_job(
-        supabase, user_id, app_settings, dims_changed=dims_changed, org_id=org_id
+        supabase, user_id, app_settings, dims_changed=dims_changed,
+        org_id=org_id, folder_ids=folder_ids,
     )

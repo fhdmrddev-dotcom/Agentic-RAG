@@ -155,7 +155,7 @@ The platform runs entirely on local containers for development and switches to c
    npm install        # first time
    npm run dev
    ```
-   The app serves at http://localhost:5173/.
+   The app serves at http://localhost:5173/app (public landing page at http://localhost:5173/).
 
 9. **(Recommended) Build the sandbox image** so the code-execution tool has the data-science and document libraries pre-installed:
    ```bash
@@ -168,7 +168,7 @@ The platform runs entirely on local containers for development and switches to c
 venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 ```
 
-**Useful local URLs:** app http://localhost:5173 · API docs http://localhost:8000/docs · Supabase Studio http://127.0.0.1:54323 · Mailpit (local email) http://127.0.0.1:54324.
+**Useful local URLs:** app http://localhost:5173/app · landing http://localhost:5173 · API docs http://localhost:8000/docs · Supabase Studio http://127.0.0.1:54323 · Mailpit (local email) http://127.0.0.1:54324.
 
 > **Cloud switch.** To run against cloud, point `SUPABASE_URL` at a Supabase project and `REDIS_URL` at managed Redis (cloud Redis requires `rediss://` for TLS). Update `frontend/.env.local` to match, and restart the backend (env loads only at startup). Apply migrations to the cloud project with `supabase db push`, or bootstrap a greenfield project from `supabase/full-schema.sql` (note: that single-file artifact omits the auth trigger and storage buckets — create those manually). See `supabase/SETUP.md` and `REDIS-SETUP.md` for the full cloud story.
 

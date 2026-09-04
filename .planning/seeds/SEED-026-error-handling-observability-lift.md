@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-026
 title: Error handling, surfacing & observability lift — global handler + structured ErrorResponse + log sink + frontend toast + admin error inspector
-status: planted
+status: partially-folded
+folded_into: 210
 planted: 2026-05-18
 phase_origin: 074-seed-009-seed-011-polish-bundle (user-flagged 2026-05-18 between phases — "we need to give real error messages and handle errors more efficiently, user should see customized errors but admin should know exactly what is the error. also error logs should be monitored and recorded")
 related_seeds: [SEED-001, SEED-012, SEED-013, SEED-025, SEED-072, SEED-079]

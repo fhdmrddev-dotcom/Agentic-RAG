@@ -8,9 +8,10 @@
  * executed. An unpinned file is not lightly guarded — it is unguarded (188-12).
  *
  * FIVE THINGS THIS SUITE EXISTS TO CATCH, each a named threat:
- *  - T-190-12-T6 a key that is not `connection_id` reaching the definition JSONB. The
- *    sweep was OBSERVED RED against a planted `config["smtp_password"]` write in real
- *    production source, restored md5-identical (recorded in `190-12-SUMMARY.md`).
+ *  - T-190-12-T6 a key that is not the step's own reference or its own action reaching the
+ *    definition JSONB. The sweep was OBSERVED RED against a planted
+ *    `config["smtp_password"]` write in real production source, restored md5-identical
+ *    (recorded in `190-12-SUMMARY.md`).
  *  - T-190-12-U07a the picker binding a connection whose credential is failing, or its
  *    copy claiming an absolute for a guarantee only this client gate provides.
  *  - T-190-12-CRASH a provider-less render throwing — or, just as bad, quietly opening an
@@ -18,6 +19,27 @@
  *  - T-190-12-A11Y a select with no real label, or a refusal reason that lives only in an
  *    option's text.
  *  - the four-state honesty rule: populated ≠ empty ≠ loading ≠ error.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════
+ * ⚠ 211-04 — WHAT THIS FILE LOST, AND WHY EACH LOSS IS *OBSOLETE BY DESIGN* RATHER THAN
+ * *BROKEN*. Every deletion is named individually in `211-04-SUMMARY.md` beside the
+ * assertion that replaced it; the list is repeated here because a suite that shrank without
+ * saying so is indistinguishable from a suite somebody quietly stopped believing.
+ *
+ *  · the TWO-ARM cases (`shape="mcp"` vs a capability argument) — there is ONE read now,
+ *    issued with no argument at all, so a case pinning two different reads is asserting a
+ *    behaviour the component no longer has. Replaced by the zero-argument assertion plus the
+ *    same-list cross-shape case in §8.
+ *  · the D-206.2-08 BYTE-IDENTITY BASELINE (12 generated cases + 4 marker cases) — its own
+ *    re-open trigger was *"the first phase permitted to re-baseline the capability shape's
+ *    empty render"*, and this is that phase. Three independent, deliberate changes move
+ *    those bytes: the option label now names the SERVICE (SC#3), a bound capability row now
+ *    mounts the action card (D-211-12), and the empty node now carries `data-empty-reason`
+ *    on every shape (AR-04 discharged). Re-capturing it from the new code would turn a
+ *    baseline into a record of what the code currently does, which is a statement about
+ *    nothing — so it is retired, and §7 asserts the same claims STRUCTURALLY instead.
+ *  · the MCP-ONLY empty vocabulary — one list has one vocabulary.
+ * ═══════════════════════════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
@@ -39,19 +61,19 @@ vi.mock("@/lib/api", () => ({
 import connectionPickerSource from "./ConnectionPicker?raw"
 import {
   ConnectionPicker,
+  CONNECTION_PICKER_ALL_DISABLED,
   CONNECTION_PICKER_FAILING_REFUSAL,
   CONNECTION_PICKER_LABEL,
   CONNECTION_PICKER_LOADING,
-  CONNECTION_PICKER_MCP_ALL_DISABLED,
   CONNECTION_PICKER_NONE_OPTION,
   CONNECTION_PICKER_NOTHING_BOUND_FOOTER,
-  CONNECTION_PICKER_NO_MCP_NOTE,
   CONNECTION_PICKER_READ_FAILED,
   CONNECTION_STATE_FAILED,
   CONNECTION_STATE_NOT_CHECKED,
   SLACK_FIXED_DESTINATION,
   destinationPartsOf,
   noConnectionYetNote,
+  optionLabelOf,
 } from "./ConnectionPicker"
 import { BuilderStoreProvider } from "./BuilderStoreProvider"
 import { SelectedPhaseSlugProvider } from "./SelectedPhaseSlugContext"
@@ -60,12 +82,16 @@ import { createBuilderStore, type BuilderStore } from "./builderStore"
 const SLUG = "notify-owner"
 
 /** The shipped response shape, minus the credential — which is absent by construction:
- *  `ConnectorConnectionResponse` declares no secret field and never has (190-09 T7). */
+ *  `ConnectorConnectionResponse` declares no secret field and never has (190-09 T7).
+ *  ⚠ 211-02 made `service_id` REQUIRED on every row, and migration 127 guarantees it is
+ *  non-blank on every row on disk — so every fixture below carries one. A fixture without it
+ *  would be testing a shape the server cannot produce. */
 type Row = Record<string, unknown>
 
 const mailbox = (over: Row = {}): Row => ({
   id: "conn-ok",
   org_id: "org-1",
+  service_id: "smtp",
   capability: "send_email",
   name: "Ops mailbox",
   config: {
@@ -90,6 +116,7 @@ const DISABLED = mailbox({ id: "conn-disabled", name: "Retired mailbox", is_enab
 const JIRA: Row = {
   id: "conn-jira",
   org_id: "org-1",
+  service_id: "jira",
   capability: "create_ticket",
   name: "Northwind Jira",
   config: {
@@ -104,11 +131,29 @@ const JIRA: Row = {
 const SLACK: Row = {
   id: "conn-slack",
   org_id: "org-1",
+  service_id: "slack",
   capability: "post_message",
   name: "#ops-alerts",
   config: { default_channel: "ops-alerts" },
   is_enabled: true,
   last_check_verdict: "ok",
+  // ⚠ 211-04 — migration 127 §2b's BACKFILL, in the shape the live database now holds it
+  // (verified by direct query at this plan's dispatch: length 1 on BOTH capability rows).
+  // The descriptor's `name` IS the capability, which is what lets one action list serve both
+  // shapes without inventing a third concept.
+  discovered_tools: [
+    {
+      name: "post_message",
+      title: "Post message",
+      description: "Post one plain-text message to the channel configured on this connection.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text"],
+        properties: { text: { type: "string" } },
+      },
+    },
+  ],
 }
 
 /** A store already in the DRAFTED view — `patchConfig` bails otherwise, so a store built
@@ -127,9 +172,11 @@ function draftedStore(config: Record<string, unknown> = {}): BuilderStore {
   })
 }
 
+/** ⚠ 211-04 — NO `capability` AND NO `shape` OPTION, because the component takes neither
+ *  prop any more. One helper renders every case, which is itself the phase's claim: there is
+ *  no second arm to drive. */
 function renderPicker(
   opts: {
-    capability?: string
     config?: Record<string, unknown>
     rows?: Row[]
     reject?: boolean
@@ -144,7 +191,7 @@ function renderPicker(
   const view = render(
     <BuilderStoreProvider store={store}>
       <SelectedPhaseSlugProvider slug={SLUG}>
-        <ConnectionPicker capability={opts.capability ?? "send_email"} />
+        <ConnectionPicker />
       </SelectedPhaseSlugProvider>
     </BuilderStoreProvider>,
   )
@@ -153,6 +200,24 @@ function renderPicker(
 
 const select = (): HTMLSelectElement =>
   screen.getByTestId("connection-picker-select") as HTMLSelectElement
+
+/** The four keys `bind()` writes — the reference plus the three action fields it clears.
+ *  Declared once so a case cannot quietly assert a PARTIAL clear. */
+/** ⚠ 214-07 — THE DECLARED SET GREW TO FIVE, `arg_sources` JOINING IT, AND THE THREAT DID NOT
+ *  CHANGE. D-13 forbids a HOST, a port, an account or a token crossing into `definition`; the
+ *  new key is a step's OWN per-argument source map, cleared to `undefined` at the same moment
+ *  the other three are, because re-binding is a moment at which the step's whole action can
+ *  change. SET EQUALITY is kept — a superset would pass a patch carrying a SIXTH key, and a
+ *  sixth key is the defect this case exists to catch. Sorted, because `sweep` sorts. */
+const BIND_KEYS = ["arg_sources", "capability", "connection_id", "tool_args", "tool_name"]
+
+const bindPatch = (id: string | null) => ({
+  connection_id: id,
+  capability: undefined,
+  tool_name: undefined,
+  tool_args: undefined,
+  arg_sources: undefined,
+})
 
 beforeEach(() => {
   listMock.mockReset()
@@ -166,7 +231,7 @@ describe("ConnectionPicker — degrades, never throws", () => {
     // their subject standalone. A throw here would turn a shipped suite red for a reason
     // that has nothing to do with connections; an unguarded fetch would give it a network
     // call it never mocked. Both halves are asserted, because only the first is obvious.
-    expect(() => render(<ConnectionPicker capability="send_email" />)).not.toThrow()
+    expect(() => render(<ConnectionPicker />)).not.toThrow()
     expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "disconnected")
     expect(listMock).not.toHaveBeenCalled()
     // It still says something TRUE about the step rather than nothing.
@@ -187,23 +252,32 @@ describe("ConnectionPicker — the seven states are seven", () => {
     expect(screen.queryByTestId("connection-picker-select")).not.toBeInTheDocument()
   })
 
-  it("2 · NONE EXIST — the plain capability word, and NO link (there is no router here)", async () => {
-    for (const [capability, word] of [
-      ["send_email", "email"],
-      ["create_ticket", "ticket"],
-      ["post_message", "message"],
-    ]) {
-      const { unmount } = renderPicker({ capability, rows: [] })
-      await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-      const note = screen.getByTestId("connection-picker-empty")
-      // CHARACTER-IDENTITY against the exported identifier, then the word it interpolates.
-      expect(note.textContent).toBe(noConnectionYetNote(capability))
-      expect(note.textContent).toContain(`No ${word} connection yet`)
-      // TEXT ONLY, NO LINK — a leaf inside the Builder has no way to switch `ActiveView`,
-      // so naming the destination is honest and an anchor would be a dead one.
-      expect(note.querySelector("a")).toBeNull()
-      unmount()
-    }
+  it("2 · NONE EXIST — one shape-neutral sentence, and NO link (there is no router here)", async () => {
+    // ⚠ REPLACES the shipped three-capability loop (`No email/ticket/message connection
+    // yet`). That case pinned a CAPABILITY-SCOPED sentence, and the read is not
+    // capability-scoped any more: telling an author *"no email connection yet"* while their
+    // Slack row sits one query away is exactly the fold this vocabulary exists to avoid.
+    // The sentence is `noConnectionYetNote("")` — the shipped helper's own FALLBACK branch,
+    // which is now the LIVE path rather than a WR-04 safety net.
+    renderPicker({ rows: [] })
+    await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
+    const note = screen.getByTestId("connection-picker-empty")
+    expect(note.textContent).toBe(noConnectionYetNote(""))
+    expect(note.textContent).toContain("No external connection yet")
+    expect(note.getAttribute("data-empty-reason")).toBe("none")
+    // TEXT ONLY, NO LINK — a leaf inside the Builder has no way to switch `ActiveView`,
+    // so naming the destination is honest and an anchor would be a dead one.
+    expect(note.querySelector("a")).toBeNull()
+  })
+
+  it("2b · ROWS EXIST BUT ALL DISABLED — a DIFFERENT sentence and a different reason", async () => {
+    // Folding these two is the defect this tree has recorded five times: an author told
+    // "none yet" while one sits switched off goes and creates a duplicate.
+    renderPicker({ rows: [DISABLED] })
+    await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
+    const note = screen.getByTestId("connection-picker-empty")
+    expect(note.textContent).toBe(CONNECTION_PICKER_ALL_DISABLED)
+    expect(note.getAttribute("data-empty-reason")).toBe("all-disabled")
   })
 
   it("3 · NOTHING BOUND — the `— none —` option is selected and the footer says so", async () => {
@@ -229,7 +303,6 @@ describe("ConnectionPicker — the seven states are seven", () => {
 
   it("4b · the same 🔒 shape for a ticket and for Slack's code-constant host", async () => {
     const jira = renderPicker({
-      capability: "create_ticket",
       rows: [JIRA],
       config: { connection_id: "conn-jira" },
     })
@@ -243,7 +316,6 @@ describe("ConnectionPicker — the seven states are seven", () => {
     jira.unmount()
 
     renderPicker({
-      capability: "post_message",
       rows: [SLACK],
       config: { connection_id: "conn-slack" },
     })
@@ -263,7 +335,7 @@ describe("ConnectionPicker — the seven states are seven", () => {
     await waitFor(() => expect(select()).toBeInTheDocument())
     expect(select().value).toBe("conn-failing")
     expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "bound-failing")
-    expect(screen.getByRole("option", { name: `Stale mailbox ${CONNECTION_STATE_FAILED}` }))
+    expect(screen.getByRole("option", { name: `smtp · Stale mailbox ${CONNECTION_STATE_FAILED}` }))
       .toBeInTheDocument()
     expect(screen.getByTestId("connection-picker-refusal").textContent).toBe(
       CONNECTION_PICKER_FAILING_REFUSAL,
@@ -273,10 +345,12 @@ describe("ConnectionPicker — the seven states are seven", () => {
   it("6 · NOT CHECKED — marked, and SELECTABLE (an unchecked connection is not a failed one)", async () => {
     const { patch } = renderPicker({ rows: [UNCHECKED] })
     await waitFor(() => expect(select()).toBeInTheDocument())
-    const option = screen.getByRole("option", { name: `New mailbox ${CONNECTION_STATE_NOT_CHECKED}` })
+    const option = screen.getByRole("option", {
+      name: `smtp · New mailbox ${CONNECTION_STATE_NOT_CHECKED}`,
+    })
     expect(option).not.toHaveAttribute("aria-disabled")
     fireEvent.change(select(), { target: { value: "conn-unchecked" } })
-    expect(patch).toHaveBeenCalledWith(SLUG, { connection_id: "conn-unchecked" })
+    expect(patch).toHaveBeenCalledWith(SLUG, bindPatch("conn-unchecked"))
     expect(screen.queryByTestId("connection-picker-refusal")).not.toBeInTheDocument()
   })
 
@@ -293,7 +367,7 @@ describe("ConnectionPicker — the seven states are seven", () => {
     renderPicker({ rows: [mailbox(), DISABLED] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     const names = screen.getAllByTestId("connection-picker-option").map((o) => o.textContent)
-    expect(names).toEqual(["Ops mailbox"])
+    expect(names).toEqual(["smtp · Ops mailbox"])
     expect(names.join(" ")).not.toContain("Retired mailbox")
   })
 })
@@ -304,7 +378,9 @@ describe("ConnectionPicker — Gate 1", () => {
   it("a FAILING option is aria-disabled and choosing it writes NOTHING", async () => {
     const { patch } = renderPicker({ rows: [mailbox(), FAILING] })
     await waitFor(() => expect(select()).toBeInTheDocument())
-    const failing = screen.getByRole("option", { name: `Stale mailbox ${CONNECTION_STATE_FAILED}` })
+    const failing = screen.getByRole("option", {
+      name: `smtp · Stale mailbox ${CONNECTION_STATE_FAILED}`,
+    })
     expect(failing).toHaveAttribute("aria-disabled", "true")
 
     fireEvent.change(select(), { target: { value: "conn-failing" } })
@@ -323,31 +399,38 @@ describe("ConnectionPicker — Gate 1", () => {
     const { patch, store } = renderPicker({ rows: [mailbox(), FAILING] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     fireEvent.change(select(), { target: { value: "conn-ok" } })
-    expect(patch).toHaveBeenCalledWith(SLUG, { connection_id: "conn-ok" })
+    expect(patch).toHaveBeenCalledWith(SLUG, bindPatch("conn-ok"))
     expect(store.getState().phases[0].config.connection_id).toBe("conn-ok")
     expect(screen.queryByTestId("connection-picker-refusal")).not.toBeInTheDocument()
   })
 
-  it("unbinding is as reachable as binding, and writes the same ONE key", async () => {
+  it("unbinding is as reachable as binding, and writes the same key set", async () => {
     const { patch, store } = renderPicker({
       rows: [mailbox()],
       config: { connection_id: "conn-ok" },
     })
     await waitFor(() => expect(select()).toBeInTheDocument())
     fireEvent.change(select(), { target: { value: "" } })
-    expect(patch).toHaveBeenCalledWith(SLUG, { connection_id: null })
+    expect(patch).toHaveBeenCalledWith(SLUG, bindPatch(null))
     expect(store.getState().phases[0].config.connection_id).toBeNull()
   })
 })
 
-// ── 4. T6 — ONLY `connection_id` CROSSES INTO THE DEFINITION (D-13 / CONN-03 SC#4) ───
+// ── 4. T6 — ONLY THE STEP'S OWN REFERENCE AND ACTION CROSS INTO THE DEFINITION ───────
+//     (D-13 / CONN-03 SC#4, as amended by 211-04's CONN-05 clear)
 
 describe("ConnectionPicker — T6: a reference, and nothing else", () => {
   /** The names a credential or a destination fact would arrive under. */
   const FORBIDDEN = /secret|token|password|host|base_url/i
 
   const sweep = (patch: Record<string, unknown>) => {
-    expect(Object.keys(patch)).toEqual(["connection_id"])
+    // ⚠ 211-04 — THE DECLARED SET GREW BY THREE, AND THE THREAT DID NOT. D-13 forbids a
+    // HOST, a port, an account or a token crossing into `definition`; the three added keys
+    // are the step's OWN action fields, cleared to `undefined` because re-binding is now the
+    // only moment a step's shape can change (206.2's shape control, which used to own that
+    // clear, is deleted by this plan). SET EQUALITY is kept — a superset would pass a
+    // patch carrying a fifth key, and a fifth key is the defect.
+    expect(Object.keys(patch).sort()).toEqual(BIND_KEYS)
     for (const key of Object.keys(patch)) expect(key).not.toMatch(FORBIDDEN)
     // Nor may a VALUE smuggle one — the id is a uuid-shaped reference, never a host.
     for (const value of Object.values(patch)) {
@@ -355,7 +438,7 @@ describe("ConnectionPicker — T6: a reference, and nothing else", () => {
     }
   }
 
-  it("every write this component makes carries exactly the key `connection_id`", async () => {
+  it("every bind this component makes carries exactly the declared five keys", async () => {
     const { patch } = renderPicker({ rows: [mailbox(), UNCHECKED] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     fireEvent.change(select(), { target: { value: "conn-ok" } })
@@ -372,10 +455,12 @@ describe("ConnectionPicker — T6: a reference, and nothing else", () => {
   it("POSITIVE CONTROL — the sweep really fires on a leaking patch", () => {
     // A typo in the regex, or an `Object.keys` compared against the wrong thing, would
     // leave the case above green while checking nothing. This is the plant, in-line.
-    expect(() => sweep({ connection_id: "conn-ok", smtp_password: "hunter2" })).toThrow()
-    expect(() => sweep({ connection_id: "conn-ok", host: "smtp.evil.test" })).toThrow()
-    expect(() => sweep({ connection_id: "smtp.fastmail.com" })).toThrow()
-    expect(() => sweep({ connection_id: "conn-ok" })).not.toThrow()
+    expect(() => sweep({ ...bindPatch("conn-ok"), smtp_password: "hunter2" })).toThrow()
+    expect(() => sweep({ ...bindPatch("conn-ok"), host: "smtp.evil.test" })).toThrow()
+    expect(() => sweep(bindPatch("smtp.fastmail.com"))).toThrow()
+    // …and a PARTIAL clear fails too, which is the 211-04 half of the guard.
+    expect(() => sweep({ connection_id: "conn-ok", tool_name: undefined })).toThrow()
+    expect(() => sweep(bindPatch("conn-ok"))).not.toThrow()
   })
 })
 
@@ -433,28 +518,31 @@ describe("ConnectionPicker — source discipline", () => {
 })
 
 // ═════════════════════════════════════════════════════════════════════════════════════════
-// ⚠ ADDED, NEVER RE-BASELINED — every case above this banner is untouched by 206.2.
+// ⚠ 211-04 — THE VERB STOPS BEING AN AXIS (SC#3 / CONN-05 / SEED-207).
 //
-// Phase 206.2-02 tasks 1-3 (D-206.2-03 / D-206.2-08 / D-206.2-18 / D-206.2-20, UI-SPEC
-// § Surface 2). The picker gained a SECOND SHAPE. Everything above this line is the
-// capability shape's shipped proof and was neither edited nor re-ordered — the `shape` prop's
-// default is what makes that possible, and the byte-identity block immediately below is what
-// turns "makes that possible" into something a run is able to refute.
+// Everything below replaces 206.2's two-shape blocks. The claims are the SAME claims — the
+// read is right, the list is right, the empty facts are two, the footer names the right host,
+// the tool picker is reachable — asserted against a component that now has ONE arm.
 // ═════════════════════════════════════════════════════════════════════════════════════════
 
-/** The live fixture, from the row this phase was written for: a real remote MCP server.
+/** The live fixture, from the row this surface was written for: a real remote MCP server.
  *  ⚠ `capability` is NULL and `last_check_verdict` is null — 206.1 removed `Check credential`
  *  for MCP rows, so an MCP row renders `◌ not checked` and stays SELECTABLE. An unchecked
  *  connection is not a failed one. */
 const MCP: Row = {
   id: "conn-mcp",
   org_id: "org-1",
+  service_id: "mcp.deepwiki.com",
   capability: null,
   name: "DeepWiki",
   config: {},
   mcp_server_url: "https://mcp.deepwiki.com/mcp",
   is_enabled: true,
   last_check_verdict: null,
+  discovered_tools: [
+    { name: "read_wiki_structure", description: "List the pages of a repo's wiki" },
+    { name: "ask_question", description: "Ask a question about a repo" },
+  ],
 }
 
 /** A row that is NONE of the four shapes — no capability the closed set carries, and no
@@ -463,6 +551,7 @@ const MCP: Row = {
 const FIFTH_SHAPE: Row = {
   id: "conn-fifth",
   org_id: "org-1",
+  service_id: "treasury",
   capability: "wire_transfer",
   name: "Treasury",
   config: { iban: "NL00BANK0000000000" },
@@ -470,372 +559,174 @@ const FIFTH_SHAPE: Row = {
   last_check_verdict: "ok",
 }
 
-/** The MCP-shape render. A SEPARATE helper rather than an option on the shipped
- *  `renderPicker`, so not one shipped line moves. It passes NO `capability` at all, which is
- *  the production shape: an MCP step has none. */
-function renderMcpPicker(
-  opts: { config?: Record<string, unknown>; rows?: Row[]; reject?: boolean; pending?: boolean } = {},
-) {
-  const store = draftedStore(opts.config)
-  const patch = vi.spyOn(store.getState(), "patchConfig")
-  if (opts.pending) listMock.mockReturnValue(new Promise<Row[]>(() => {}))
-  else if (opts.reject) listMock.mockRejectedValue(new Error("read failed"))
-  else listMock.mockResolvedValue(opts.rows ?? [])
-  const view = render(
-    <BuilderStoreProvider store={store}>
-      <SelectedPhaseSlugProvider slug={SLUG}>
-        <ConnectionPicker shape="mcp" />
-      </SelectedPhaseSlugProvider>
-    </BuilderStoreProvider>,
-  )
-  return { store, patch, unmount: view.unmount, container: view.container }
-}
+// ── 7. THE PICKER'S SHIPPED SURFACE, ASSERTED STRUCTURALLY (replaces D-206.2-08) ─────
+//
+// ⚠ WHAT THIS BLOCK IS FOR. The retired baseline made THREE claims at once — the picker's
+// markup is stable, the option list says the right thing, and the empty node carries the
+// right attributes. Two of the three moved BY DESIGN in this plan, so the third is asserted
+// on its own rather than smuggled inside a string comparison that can no longer hold.
 
-// ── 7. THE CAPABILITY BRANCH IS BYTE-IDENTICAL (D-206.2-08 / SC#5) ───────────────────
+describe("ConnectionPicker — the shipped surface, per state", () => {
+  const FIXTURES: Record<string, { row: Row; id: string; label: string }> = {
+    SEND_EMAIL: { row: mailbox(), id: "conn-ok", label: "smtp · Ops mailbox" },
+    CREATE_TICKET: { row: JIRA, id: "conn-jira", label: "jira · Northwind Jira" },
+    POST_MESSAGE: { row: SLACK, id: "conn-slack", label: "slack · #ops-alerts" },
+    MCP: { row: MCP, id: "conn-mcp", label: `mcp.deepwiki.com · DeepWiki  ${CONNECTION_STATE_NOT_CHECKED}` },
+  }
 
-describe("ConnectionPicker — the capability shape renders what it rendered at 206.2-02's base", () => {
-  /**
-   * ⚠ THE ONE DECLARED NORMALIZATION — declared, and COUNTED, rather than done quietly.
-   *
-   * `ConnectionPicker` calls `useId()` TWICE (`selectId`, `refusalId`) and BOTH reach the DOM:
-   * `<label for>` + `<select id>`, and `<p id>` + `aria-describedby`. React's `useId` value is
-   * a function of how many components rendered before it, not of this component's own markup,
-   * so a case added ANYWHERE above this block moves those ids. A case added above is not a
-   * behaviour change in the picker and must not be able to redden this pin — so the id VALUE
-   * is normalized away.
-   *
-   * ⚠ THE ID FORM WAS READ OFF A REAL RENDER, NOT INHERITED. D-206.2-18 predicted React 19's
-   * `«r0»` form. MEASURED on this tree at 206.2-02's base, the emitted form is **`_r_0_`** —
-   * e.g. `for="_r_0_"`, `id="_r_2_"`, `aria-describedby="_r_3_"`. (Not the guillemet form, and
-   * emphatically not `radix-…`, which is the DropdownMenu form `ConnectionsTab.test.tsx`
-   * normalizes.) The needle below is written against what was PRINTED, which is the whole
-   * point of the rule: the measurement is the authority, never the inherited assumption.
-   *
-   * ⚠ AND THE NORMALIZATION IS ITSELF NON-VACUOUS: the substitution count is returned and
-   * asserted PER STATE — `unbound` 2, `bound` 2, `bound-failing` 4, `empty` 1, every one of
-   * them measured rather than reasoned about. A render that stopped emitting an id yields a
-   * lower count and goes RED, rather than quietly passing against a shorter string.
-   * Normalizing without counting is how a pin stops watching the thing it names.
-   */
-  const USE_ID = /"_r_[^"]*"/g
-  const USE_ID_NORMALIZED = '"_r_NORMALIZED_"'
-
-  function normalizeUseIds(html: string): { html: string; replaced: number } {
-    let replaced = 0
-    const out = html.replace(USE_ID, () => {
-      replaced += 1
-      return USE_ID_NORMALIZED
+  for (const key of Object.keys(FIXTURES)) {
+    it(`${key} · UNBOUND — the label, the — none — option, the row and the 🔒 footer`, async () => {
+      const f = FIXTURES[key]
+      renderPicker({ rows: [f.row] })
+      await waitFor(() => expect(select()).toBeInTheDocument())
+      expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "unbound")
+      expect(screen.getByText(CONNECTION_PICKER_LABEL)).toBeInTheDocument()
+      expect(screen.getByRole("option", { name: CONNECTION_PICKER_NONE_OPTION })).toBeInTheDocument()
+      const options = screen.getAllByTestId("connection-picker-option")
+      expect(options).toHaveLength(1)
+      expect(options[0].textContent).toBe(f.label)
+      expect(screen.getByTestId("connection-picker-footer").textContent).toBe(
+        CONNECTION_PICKER_NOTHING_BOUND_FOOTER,
+      )
+      // ⚠ THE ACTION CARD IS ABSENT UNTIL SOMETHING IS BOUND — the other half of the
+      // D-211-12 gate, and the reason the card gate is BOUNDNESS rather than *always*.
+      expect(screen.queryByTestId("mcp-tool-picker")).not.toBeInTheDocument()
     })
-    return { html: out, replaced }
-  }
 
-  /** ONE render, the picker's `outerHTML`, unmounted — shared by the capture and the
-   *  assertion so both read the DOM the same way (`ConnectionsTab.test.tsx:900-928`). */
-  async function pickerCapture(opts: {
-    capability: string
-    rows: Row[]
-    config?: Record<string, unknown>
-  }): Promise<{ html: string; replaced: number }> {
-    const view = renderPicker(opts)
-    await waitFor(() =>
-      expect(screen.getByTestId("connection-picker")).not.toHaveAttribute("data-state", "loading"),
-    )
-    const captured = normalizeUseIds(
-      view.container.querySelector('[data-testid="connection-picker"]')!.outerHTML,
-    )
-    view.unmount()
-    return captured
-  }
-
-  const CAPTURE_FIXTURES: Record<string, { capability: string; row: Row; id: string }> = {
-    SEND_EMAIL: { capability: "send_email", row: mailbox(), id: "conn-ok" },
-    CREATE_TICKET: { capability: "create_ticket", row: JIRA, id: "conn-jira" },
-    POST_MESSAGE: { capability: "post_message", row: SLACK, id: "conn-slack" },
-  }
-
-  /** MEASURED, one per state, on a real render — never counted by hand off the source. */
-  const EXPECTED_USE_IDS: Record<string, number> = {
-    unbound: 2,
-    bound: 2,
-    "bound-failing": 4,
-    empty: 1,
-  }
-
-  function optionsFor(
-    key: string,
-    state: string,
-  ): { capability: string; rows: Row[]; config?: Record<string, unknown> } {
-    const f = CAPTURE_FIXTURES[key]
-    if (state === "unbound") return { capability: f.capability, rows: [f.row] }
-    if (state === "bound") return { capability: f.capability, rows: [f.row], config: { connection_id: f.id } }
-    if (state === "bound-failing")
-      return {
-        capability: f.capability,
+    it(`${key} · BOUND-FAILING — aria-disabled, the refusal, and aria-describedby`, async () => {
+      const f = FIXTURES[key]
+      renderPicker({
         rows: [{ ...f.row, last_check_verdict: "failed" }],
         config: { connection_id: f.id },
-      }
-    return { capability: f.capability, rows: [] }
-  }
-
-  /**
-   * ⚠ THESE LITERALS ARE A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT of
-   * the rendered DOM of the component AS IT STOOD AT 206.2-02's BASE COMMIT (`c92c4af6`) —
-   * before the `shape` prop, before the MCP arm, before the destination repair — by running
-   * `pickerCapture` above through a throwaway harness and pasting what it printed. Not one
-   * attribute here was typed from the source, computed by hand, or reasoned about. That is the
-   * whole point: an expectation records what its author BELIEVED the markup to be, and a
-   * change that moved the markup to match that belief would pass it.
-   *
-   * OBSERVED TWICE on the unchanged tree before any edit, and the two runs agreed byte for
-   * byte — so it is a baseline rather than one sample of something that might vary.
-   *
-   * ⚠ NEVER RE-CAPTURED AFTERWARDS, and not one string below was hand-edited. Re-capturing
-   * from the new code turns a baseline into a record of what the code now does, which is a
-   * statement about nothing.
-   *
-   * A DIFF AGAINST THIS RECORD IS A BEHAVIOUR CHANGE IN THE CAPABILITY SHAPE — and NOT A TEST
-   * TO UPDATE. 206.2 is supposed to add a second shape, not move the first one. If this goes
-   * red, the new shape is wrong.
-   */
-  const PICKER_HTML_BASELINE: Record<string, Record<string, string>> = {
-  SEND_EMAIL: {
-    "unbound":
-      "<div data-testid=\"connection-picker\" data-state=\"unbound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-ok\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">Ops mailbox</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 nothing bound — this step will record, not send</p></div>",
-    "bound":
-      "<div data-testid=\"connection-picker\" data-state=\"bound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-ok\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">Ops mailbox</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 smtp.fastmail.com:465 · from ops@northwind.co</p></div>",
-    "bound-failing":
-      "<div data-testid=\"connection-picker\" data-state=\"bound-failing\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\" aria-describedby=\"_r_NORMALIZED_\"><option value=\"\">— none —</option><option value=\"conn-ok\" data-testid=\"connection-picker-option\" data-verdict=\"failed\" aria-disabled=\"true\">Ops mailbox  ✕ credential failed</option></select><p id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-refusal\" class=\"mt-1.5 text-[10.5px] leading-snug text-destructive\">This connection's credential is failing. Fix it in Settings → Connections, then pick it here.</p><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 smtp.fastmail.com:465 · from ops@northwind.co</p></div>",
-    "empty":
-      "<div data-testid=\"connection-picker\" data-state=\"empty\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><p data-testid=\"connection-picker-empty\" class=\"mt-1.5 text-[10.5px] leading-snug text-muted-foreground\">No email connection yet — add one in Settings → Connections.</p></div>",
-  },
-  CREATE_TICKET: {
-    "unbound":
-      "<div data-testid=\"connection-picker\" data-state=\"unbound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-jira\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">Northwind Jira</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 nothing bound — this step will record, not send</p></div>",
-    "bound":
-      "<div data-testid=\"connection-picker\" data-state=\"bound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-jira\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">Northwind Jira</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 northwind.atlassian.net · OPS</p></div>",
-    "bound-failing":
-      "<div data-testid=\"connection-picker\" data-state=\"bound-failing\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\" aria-describedby=\"_r_NORMALIZED_\"><option value=\"\">— none —</option><option value=\"conn-jira\" data-testid=\"connection-picker-option\" data-verdict=\"failed\" aria-disabled=\"true\">Northwind Jira  ✕ credential failed</option></select><p id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-refusal\" class=\"mt-1.5 text-[10.5px] leading-snug text-destructive\">This connection's credential is failing. Fix it in Settings → Connections, then pick it here.</p><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 northwind.atlassian.net · OPS</p></div>",
-    "empty":
-      "<div data-testid=\"connection-picker\" data-state=\"empty\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><p data-testid=\"connection-picker-empty\" class=\"mt-1.5 text-[10.5px] leading-snug text-muted-foreground\">No ticket connection yet — add one in Settings → Connections.</p></div>",
-  },
-  POST_MESSAGE: {
-    "unbound":
-      "<div data-testid=\"connection-picker\" data-state=\"unbound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-slack\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">#ops-alerts</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 nothing bound — this step will record, not send</p></div>",
-    "bound":
-      "<div data-testid=\"connection-picker\" data-state=\"bound\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\"><option value=\"\">— none —</option><option value=\"conn-slack\" data-testid=\"connection-picker-option\" data-verdict=\"ok\">#ops-alerts</option></select><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 slack.com/api · #ops-alerts</p></div>",
-    "bound-failing":
-      "<div data-testid=\"connection-picker\" data-state=\"bound-failing\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><select id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-select\" class=\"mt-1 h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary\" aria-describedby=\"_r_NORMALIZED_\"><option value=\"\">— none —</option><option value=\"conn-slack\" data-testid=\"connection-picker-option\" data-verdict=\"failed\" aria-disabled=\"true\">#ops-alerts  ✕ credential failed</option></select><p id=\"_r_NORMALIZED_\" data-testid=\"connection-picker-refusal\" class=\"mt-1.5 text-[10.5px] leading-snug text-destructive\">This connection's credential is failing. Fix it in Settings → Connections, then pick it here.</p><p data-testid=\"connection-picker-footer\" class=\"mt-1.5 truncate font-mono text-[10.5px] leading-snug text-muted-foreground\">🔒 slack.com/api · #ops-alerts</p></div>",
-    "empty":
-      "<div data-testid=\"connection-picker\" data-state=\"empty\" class=\"mt-2 border-t border-border/60 pt-2\"><label class=\"peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[11px] font-medium text-foreground\" for=\"_r_NORMALIZED_\">Where this sends</label><p data-testid=\"connection-picker-empty\" class=\"mt-1.5 text-[10.5px] leading-snug text-muted-foreground\">No message connection yet — add one in Settings → Connections.</p></div>",
-  },
-  }
-
-  for (const key of Object.keys(PICKER_HTML_BASELINE)) {
-    for (const state of Object.keys(EXPECTED_USE_IDS)) {
-      it(`the ${key} picker in state ${state} is byte-identical to 206.2-02's base`, async () => {
-        // ── NON-VACUITY FIRST. Byte-identity against an empty capture passes forever. ──
-        expect(PICKER_HTML_BASELINE[key][state].length).toBeGreaterThan(0)
-
-        const actual = await pickerCapture(optionsFor(key, state))
-        // The normalization is non-vacuous, and its count is the measured one for this state.
-        expect(actual.replaced).toBe(EXPECTED_USE_IDS[state])
-        expect(actual.html).toBe(PICKER_HTML_BASELINE[key][state])
       })
-    }
+      await waitFor(() => expect(select()).toBeInTheDocument())
+      expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "bound-failing")
+      expect(screen.getAllByTestId("connection-picker-option")[0]).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      )
+      expect(screen.getByTestId("connection-picker-refusal").textContent).toBe(
+        CONNECTION_PICKER_FAILING_REFUSAL,
+      )
+      expect(select().getAttribute("aria-describedby")).toBeTruthy()
+    })
   }
 
-  // ── THE MARKER ROWS ────────────────────────────────────────────────────────────────
-  // Byte-identity alone is compatible with a render that quietly stopped painting something:
-  // the non-vacuity lines above prove only that the string is non-empty. These say WHAT each
-  // capture CONTAINS, and they read the COMMITTED baseline strings, never a fresh render —
-  // the claim being pinned is about what was captured at the base commit.
-
-  it("every bound capture holds the label, the `— none —` option and the 🔒 footer", () => {
-    for (const key of Object.keys(PICKER_HTML_BASELINE)) {
-      const html = PICKER_HTML_BASELINE[key].bound
-      expect(html).toContain(CONNECTION_PICKER_LABEL)
-      expect(html).toContain(CONNECTION_PICKER_NONE_OPTION)
-      expect(html).toContain('data-testid="connection-picker-select"')
-      expect(html).toContain('data-testid="connection-picker-footer"')
-      expect(html).toContain("🔒")
+  it("⚠ NO RAW WIRE ID reaches the DOM as a VALUE, an ATTRIBUTE or a TEST ID — the capability", async () => {
+    // The D-20 boundary restated as an observable. `service_id` IS rendered — in the option
+    // LABEL, which is the one position the rule never covered — and the three capability ids
+    // are not, in any position, on a list holding all four shapes at once.
+    renderPicker({ rows: [mailbox(), JIRA, SLACK, MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    const html = screen.getByTestId("connection-picker").outerHTML
+    for (const capability of ["send_email", "create_ticket"]) {
+      expect(html, capability).not.toContain(capability)
     }
+    // NON-VACUITY — the rows really did render, and the services really are named.
+    expect(screen.getAllByTestId("connection-picker-option")).toHaveLength(4)
+    expect(html).toContain("smtp · Ops mailbox")
+    expect(html).toContain("mcp.deepwiki.com · DeepWiki")
   })
 
-  it("the POST_MESSAGE capture named Slack's code-constant host — the arm 206.2 made EXPLICIT", () => {
-    // ⚠ This is the arm that was a positional tail at the base commit. Its RENDERING is
-    // unchanged; what changed is that it now names its own condition (D-206.2-20).
-    expect(PICKER_HTML_BASELINE.POST_MESSAGE.bound).toContain(SLACK_FIXED_DESTINATION)
-    expect(PICKER_HTML_BASELINE.SEND_EMAIL.bound).not.toContain(SLACK_FIXED_DESTINATION)
-    expect(PICKER_HTML_BASELINE.CREATE_TICKET.bound).not.toContain(SLACK_FIXED_DESTINATION)
-  })
-
-  it("every bound-failing capture holds the refusal wired by aria-describedby", () => {
-    for (const key of Object.keys(PICKER_HTML_BASELINE)) {
-      const html = PICKER_HTML_BASELINE[key]["bound-failing"]
-      expect(html).toContain("aria-describedby")
-      expect(html).toContain(CONNECTION_PICKER_FAILING_REFUSAL)
-      expect(html).toContain('aria-disabled="true"')
-    }
-  })
-
-  it("⚠ NO capability capture carries `data-empty-reason` — AR-04's asymmetry, at the baseline", () => {
-    // The attribute is MCP-shape only, deliberately: adding it here would change the very
-    // bytes D-206.2-08 pins. The non-vacuity control for this claim is the live case in §9,
-    // which asserts the MCP shape's node HAS one.
-    for (const key of Object.keys(PICKER_HTML_BASELINE)) {
-      for (const state of Object.keys(EXPECTED_USE_IDS)) {
-        expect(PICKER_HTML_BASELINE[key][state]).not.toContain("data-empty-reason")
-      }
-    }
-    // …and the empty captures really are the empty state, so the sweep above is not vacuous.
-    for (const key of Object.keys(PICKER_HTML_BASELINE)) {
-      expect(PICKER_HTML_BASELINE[key].empty).toContain('data-state="empty"')
-    }
+  it("optionLabelOf names the SERVICE and the NAME, and the state word rides the option", () => {
+    expect(optionLabelOf(mailbox() as never)).toBe("smtp · Ops mailbox")
+    expect(optionLabelOf(UNCHECKED as never)).toBe(`smtp · New mailbox  ${CONNECTION_STATE_NOT_CHECKED}`)
+    expect(optionLabelOf(FAILING as never)).toBe(`smtp · Stale mailbox  ${CONNECTION_STATE_FAILED}`)
+    expect(optionLabelOf(MCP as never)).toBe(`mcp.deepwiki.com · DeepWiki  ${CONNECTION_STATE_NOT_CHECKED}`)
   })
 })
 
-// ── 8. THE MCP READ — the one line SEED-200 is about (SC#1a / SC#1b / SC#1c) ─────────
+// ── 8. ONE UNSCOPED READ — the axis this phase removes (SC#3) ────────────────────────
 
-describe("ConnectionPicker — the MCP shape reads unfiltered", () => {
-  it("SC#1a — the MCP shape calls listConnectorConnections() with ZERO arguments", async () => {
-    // The shipped read passes a capability. An MCP row's capability is NULL, so it was
-    // filtered out of every read this picker ever performed, `bound?.mcp_server_url` was
-    // unsatisfiable, and the `McpToolPicker` mount was dead. That single argument is SEED-200.
-    renderMcpPicker({ rows: [MCP] })
+describe("ConnectionPicker — one read, every shape", () => {
+  it("⭐ SC#3 — listConnectorConnections is called with ZERO arguments", async () => {
+    // ⚠ `toHaveBeenCalledWith()` with ZERO ARGUMENTS is not the same as not caring: a call
+    // carrying `undefined` explicitly, or carrying a capability, both fail it. That is the
+    // whole assertion — the verb has stopped being a term of the read.
+    renderPicker({ rows: [MCP] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     expect(listMock).toHaveBeenCalledWith()
     expect(listMock.mock.calls[0]).toEqual([])
   })
 
-  it("POSITIVE CONTROL — the capability shape still passes its capability", async () => {
-    // Without this, a picker that had simply stopped passing arguments at all would pass the
-    // case above while breaking every shipped surface.
-    renderPicker({ capability: "send_email", rows: [mailbox()] })
-    await waitFor(() => expect(select()).toBeInTheDocument())
-    expect(listMock).toHaveBeenCalledWith("send_email")
+  it("⭐ THERE IS NO SECOND ARM — every render issues the same zero-argument read", async () => {
+    // ⚠ REPLACES the shipped `POSITIVE CONTROL — the capability shape still passes its
+    // capability`, which is obsolete BY DESIGN: it pinned the two arms as different reads,
+    // and there is one arm now. The claim worth keeping is the one that could still be
+    // wrong — that no configuration of this component re-introduces an argument.
+    for (const config of [{}, { connection_id: "conn-slack" }, { capability: "post_message" }]) {
+      listMock.mockClear()
+      const view = renderPicker({ rows: [SLACK], config })
+      await waitFor(() => expect(listMock).toHaveBeenCalled())
+      for (const call of listMock.mock.calls) expect(call).toEqual([])
+      view.unmount()
+    }
   })
 
-  it("SC#1b — neither shape lists the other's rows, from ONE org holding both", async () => {
-    // ⚠ THE TWO HALVES ARE ENFORCED IN TWO DIFFERENT PLACES, AND SAYING SO IS THE POINT.
-    // The MCP half is a CLIENT filter and is asserted directly below: the response really does
-    // carry both rows, and the picker really does drop one. The capability half is the
-    // SERVER's `?capability=` predicate — the client owes only the ARGUMENT there — so the
-    // fake below applies that predicate exactly as `api.ts` builds it. A fake that ignored its
-    // argument would let this case claim a client filter that does not exist.
-    const ORG = [SLACK, MCP]
-    listMock.mockImplementation((capability?: string) =>
-      Promise.resolve(capability ? ORG.filter((row) => row.capability === capability) : ORG),
-    )
-
-    // Rendered directly rather than through either helper: both helpers set a fixed resolved
-    // value, which would replace the server-shaped fake this case depends on.
-    const mount = (node: React.ReactNode) =>
-      render(
-        <BuilderStoreProvider store={draftedStore()}>
-          <SelectedPhaseSlugProvider slug={SLUG}>{node}</SelectedPhaseSlugProvider>
-        </BuilderStoreProvider>,
-      )
-
-    const mcp = mount(<ConnectionPicker shape="mcp" />)
+  it("⭐ SC#3 — an MCP row and a capability row appear in the SAME list from ONE read", async () => {
+    // ⚠ REPLACES `SC#1b — neither shape lists the other's rows`. That case proved a
+    // SEPARATION this phase deliberately removes. One org, both shapes, one call, one list.
+    renderPicker({ rows: [SLACK, MCP] })
     await waitFor(() => expect(select()).toBeInTheDocument())
-    // The unfiltered read returned BOTH rows — the client is what narrowed them.
-    expect(listMock).toHaveBeenCalledWith()
-    await expect(listMock.mock.results[0].value).resolves.toHaveLength(2)
-    expect(screen.getAllByTestId("connection-picker-option").map((o) => o.getAttribute("value"))).toEqual([
-      "conn-mcp",
-    ])
-    mcp.unmount()
-
-    mount(<ConnectionPicker capability="post_message" />)
-    await waitFor(() => expect(select()).toBeInTheDocument())
-    expect(listMock).toHaveBeenLastCalledWith("post_message")
-    expect(screen.getAllByTestId("connection-picker-option").map((o) => o.getAttribute("value"))).toEqual([
-      "conn-slack",
-    ])
+    expect(listMock).toHaveBeenCalledTimes(1)
+    const values = screen.getAllByTestId("connection-picker-option").map((o) => o.getAttribute("value"))
+    expect(values).toEqual(["conn-slack", "conn-mcp"])
   })
 
-  it("SC#1c — a DISABLED MCP row is not a choice either; the rule is not laxer here", async () => {
-    renderMcpPicker({ rows: [{ ...MCP, is_enabled: false }] })
+  it("⭐ THE CLIENT-SIDE SHAPE FILTER IS GONE — a URL-less row is still OFFERED", async () => {
+    // ⚠ REPLACES `the capability shape's exclusion of an MCP row is the SERVER's`. The
+    // shipped MCP arm dropped every row without a server URL before building the list; that
+    // filter is what made a first-party connection unreachable from an MCP-shaped step and
+    // vice versa. Its absence is asserted here as a RENDER, not only as a source grep.
+    renderPicker({ rows: [{ ...MCP, mcp_server_url: null }] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    expect(screen.getAllByTestId("connection-picker-option")).toHaveLength(1)
+    expect(screen.queryByTestId("connection-picker-empty")).not.toBeInTheDocument()
+  })
+
+  it("SC#1c — a DISABLED MCP row is not a choice either; the rule is not laxer for any shape", async () => {
+    renderPicker({ rows: [{ ...MCP, is_enabled: false }] })
     await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
     expect(screen.queryByTestId("connection-picker-select")).not.toBeInTheDocument()
+    expect(screen.getByTestId("connection-picker-empty")).toHaveAttribute(
+      "data-empty-reason",
+      "all-disabled",
+    )
   })
 
-  it("a provider-less render opens NO request in the MCP shape either", () => {
-    expect(() => render(<ConnectionPicker shape="mcp" />)).not.toThrow()
-    expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "disconnected")
-    expect(listMock).not.toHaveBeenCalled()
-  })
-
-  it("the MCP shape keeps the read-failure reading — four facts stay four", async () => {
-    renderMcpPicker({ reject: true })
+  it("the read failure reading survives — four facts stay four", async () => {
+    renderPicker({ reject: true })
     await waitFor(() => expect(screen.getByTestId("connection-picker-error")).toBeInTheDocument())
     expect(screen.getByRole("alert").textContent).toBe(CONNECTION_PICKER_READ_FAILED)
     expect(screen.queryByTestId("connection-picker-empty")).not.toBeInTheDocument()
   })
 })
 
-// ── 9. THREE ABSENCES, THREE SENTENCES (UI-SPEC § Surface 2 / AR-04) ─────────────────
+// ── 9. TWO ABSENCES, TWO SENTENCES, ON ONE LIST (AR-04 discharged) ───────────────────
 
-describe("ConnectionPicker — the MCP shape's two empty facts are two", () => {
-  it('no MCP row at all ⇒ data-empty-reason="none" and its own sentence', async () => {
-    // A capability row in the response is not an MCP row, so this is genuinely "none exist".
-    renderMcpPicker({ rows: [SLACK] })
+describe("ConnectionPicker — the two empty facts stay two", () => {
+  it("the two sentences are really different, and both are distinguishable by reason", () => {
+    expect(noConnectionYetNote("")).not.toBe(CONNECTION_PICKER_ALL_DISABLED)
+    // A single collapsed reason would silently retire a diagnostic — so the VALUES are
+    // asserted as distinct, not merely the sentences.
+    expect("none").not.toBe("all-disabled")
+  })
+
+  it("⚠ THE COUNT IS TAKEN BEFORE THE FILTER — one disabled row is `all-disabled`, not `none`", async () => {
+    // ⚠ REPLACES `THE FILTER ORDER — a disabled SLACK row does NOT make the MCP shape say
+    // all-disabled`. That case defended an order between TWO filters; there is one filter
+    // now, so what is left to get wrong is counting AFTER it, which would report "none
+    // exist" for an org whose every connection is merely switched off.
+    renderPicker({ rows: [{ ...SLACK, is_enabled: false }] })
     await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-    const note = screen.getByTestId("connection-picker-empty")
-    expect(note.getAttribute("data-empty-reason")).toBe("none")
-    expect(note.textContent).toBe(CONNECTION_PICKER_NO_MCP_NOTE)
-    // TEXT ONLY, NO LINK — the shipped rule, for the shipped reason.
-    expect(note.querySelector("a")).toBeNull()
+    expect(screen.getByTestId("connection-picker-empty").getAttribute("data-empty-reason")).toBe(
+      "all-disabled",
+    )
   })
 
-  it("MCP rows exist but every one is switched off ⇒ a DIFFERENT sentence", async () => {
-    // ⚠ Folding these two is the defect this tree has recorded five times. An author told
-    // "none yet" while one sits disabled goes and creates a duplicate.
-    renderMcpPicker({ rows: [{ ...MCP, is_enabled: false }, SLACK] })
-    await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-    const note = screen.getByTestId("connection-picker-empty")
-    expect(note.getAttribute("data-empty-reason")).toBe("all-disabled")
-    expect(note.textContent).toBe(CONNECTION_PICKER_MCP_ALL_DISABLED)
-  })
-
-  it("the two sentences are really different, and neither is the capability sentence", () => {
-    expect(CONNECTION_PICKER_NO_MCP_NOTE).not.toBe(CONNECTION_PICKER_MCP_ALL_DISABLED)
-    expect(CONNECTION_PICKER_NO_MCP_NOTE).not.toBe(noConnectionYetNote(""))
-    expect(CONNECTION_PICKER_NO_MCP_NOTE).not.toBe(noConnectionYetNote("send_email"))
-  })
-
-  it("⚠ THE FILTER ORDER — a disabled SLACK row does NOT make the MCP shape say `all-disabled`", async () => {
-    // Counting before the shape filter would report "every MCP connection is switched off"
-    // whenever the only disabled row in the org was a capability connection. This is the case
-    // that makes the filter order load-bearing rather than incidental.
-    renderMcpPicker({ rows: [{ ...SLACK, is_enabled: false }] })
-    await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-    expect(screen.getByTestId("connection-picker-empty").getAttribute("data-empty-reason")).toBe("none")
-  })
-
-  it("NON-VACUITY CONTROL for AR-04 — the capability shape's empty node has NO such attribute", async () => {
-    renderPicker({ capability: "send_email", rows: [] })
-    await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-    const note = screen.getByTestId("connection-picker-empty")
-    expect(note.hasAttribute("data-empty-reason")).toBe(false)
-    expect(note.textContent).toBe(noConnectionYetNote("send_email"))
-  })
-
-  it("the WR-04 conversion changed no rendered word, and the inherited key now falls back", async () => {
-    for (const [capability, word] of [
-      ["send_email", "email"],
-      ["create_ticket", "ticket"],
-      ["post_message", "message"],
-    ]) {
-      const { unmount } = renderPicker({ capability, rows: [] })
-      await waitFor(() => expect(screen.getByTestId("connection-picker-empty")).toBeInTheDocument())
-      expect(screen.getByTestId("connection-picker-empty").textContent).toBe(
-        `No ${word} connection yet — add one in Settings → Connections.`,
-      )
-      unmount()
-    }
-    // …and the inherited-key read that made the conversion necessary now returns the FALLBACK
-    // rather than a stringified function. `constructor` is the canonical WR-04 needle.
+  it("the WR-04 inherited-key read still falls back rather than stringifying a function", () => {
+    // ⚠ `noConnectionYetNote`'s `own()` guard is now on the LIVE path — the empty state calls
+    // it with `""`. `constructor` is the canonical WR-04 needle, and it must still degrade.
     expect(noConnectionYetNote("constructor")).toBe(
       "No external connection yet — add one in Settings → Connections.",
     )
@@ -843,6 +734,10 @@ describe("ConnectionPicker — the MCP shape's two empty facts are two", () => {
     expect(noConnectionYetNote("__proto__")).toBe(
       "No external connection yet — add one in Settings → Connections.",
     )
+    // …and the three capability words still resolve, because CONN-05 keeps the attribute.
+    expect(noConnectionYetNote("send_email")).toContain("No email connection yet")
+    expect(noConnectionYetNote("create_ticket")).toContain("No ticket connection yet")
+    expect(noConnectionYetNote("post_message")).toContain("No message connection yet")
   })
 })
 
@@ -850,13 +745,13 @@ describe("ConnectionPicker — the MCP shape's two empty facts are two", () => {
 
 describe("ConnectionPicker — destinationPartsOf names the right host", () => {
   it("an MCP row's footer names its OWN host, and NOT the path segment", async () => {
-    renderMcpPicker({ rows: [MCP], config: { connection_id: "conn-mcp" } })
+    renderPicker({ rows: [MCP], config: { connection_id: "conn-mcp" } })
     await waitFor(() => expect(select()).toBeInTheDocument())
     const footer = screen.getByTestId("connection-picker-footer")
     expect(footer.textContent).toBe("🔒 mcp.deepwiki.com")
     // HOST ONLY — the path is the server's business.
     expect(footer.textContent).not.toContain("/mcp")
-    // ⚠ THE DEFECT, NAMED. At this plan's base this footer read `🔒 slack.com/api`.
+    // ⚠ THE DEFECT, NAMED. At 206.2's base this footer read `🔒 slack.com/api`.
     expect(footer.textContent).not.toContain(SLACK_FIXED_DESTINATION)
   })
 
@@ -889,56 +784,186 @@ describe("ConnectionPicker — destinationPartsOf names the right host", () => {
   })
 })
 
-// ── 11. THE MOUNT THAT WAS DEAD CODE AT THIS PLAN'S BASE ─────────────────────────────
+// ── 11. THE ACTION CARD — mounted for EVERY bound shape (D-211-12) ───────────────────
 
-describe("ConnectionPicker — the McpToolPicker mount becomes reachable", () => {
-  it("binding an MCP row through the picker's own <select> renders the tool picker", async () => {
-    // ⚠ THIS CASE IS **not SC#4's** EVIDENCE, AND THE LABEL IS THE POINT. It hands
-    // `ConnectionPicker` a `shape` prop BY HAND, and a test that constructs its own props is
-    // structurally unable to see that nothing constructs them in production — which is exactly
-    // what SEED-200 is about. The two-legged guard (D-206.2-07 / D-206.2-12) belongs to
-    // `206.2-04`, because its second leg must run through `ExternalActionSection` and
-    // construct no component prop at all.
-    const { patch } = renderMcpPicker({ rows: [MCP] })
+describe("ConnectionPicker — the action card follows the binding, not the endpoint", () => {
+  it("binding an MCP row through the picker's own <select> renders the action card", async () => {
+    const { patch } = renderPicker({ rows: [MCP] })
     await waitFor(() => expect(select()).toBeInTheDocument())
     expect(screen.queryByTestId("mcp-tool-picker")).not.toBeInTheDocument()
 
     fireEvent.change(select(), { target: { value: "conn-mcp" } })
 
-    expect(patch).toHaveBeenCalledWith(SLUG, { connection_id: "conn-mcp" })
+    expect(patch).toHaveBeenCalledWith(SLUG, bindPatch("conn-mcp"))
     await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
   })
 
-  it("an MCP row is SELECTABLE — a null verdict is `◌ not checked`, not a failure", async () => {
-    renderMcpPicker({ rows: [MCP] })
+  it("⭐ INVERTED — binding a CAPABILITY row NOW renders the card, over its own action list", async () => {
+    // ⚠ THIS CASE IS THE INVERSE OF `NEGATIVE CONTROL — a bound CAPABILITY row mounts no tool
+    // picker`, which shipped at 206.2 and asserted the DEFECT D-211-12 removes. It was true
+    // only because the mount was conditional on the row's own server URL rather than on
+    // having got this far. A control that stays green while the criterion is false is worse
+    // than no control, so it is INVERTED rather than deleted.
+    renderPicker({ rows: [SLACK] })
     await waitFor(() => expect(select()).toBeInTheDocument())
-    const option = screen.getByRole("option", { name: `DeepWiki ${CONNECTION_STATE_NOT_CHECKED}` })
+    fireEvent.change(select(), { target: { value: "conn-slack" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
+    const toolSelect = screen.getByTestId("mcp-tool-select") as HTMLSelectElement
+    expect(Array.from(toolSelect.options).map((o) => o.value)).toContain("post_message")
+    // The author reads the descriptor's own words, not the wire id.
+    expect(screen.getByText("Post message")).toBeInTheDocument()
+  })
+
+  it("⭐ A LEGACY ROW WITH AN EMPTY ACTION LIST still gets its card and its Refresh", async () => {
+    // T-211-22 through the PARENT: the loop cannot close from this side either.
+    renderPicker({ rows: [{ ...SLACK, discovered_tools: [] }] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    fireEvent.change(select(), { target: { value: "conn-slack" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
+    expect(screen.getByTestId("mcp-no-tools")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-discover-btn")).toBeEnabled()
+  })
+
+  it("an MCP row is SELECTABLE — a null verdict is `◌ not checked`, not a failure", async () => {
+    renderPicker({ rows: [MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    const option = screen.getByRole("option", {
+      name: `mcp.deepwiki.com · DeepWiki ${CONNECTION_STATE_NOT_CHECKED}`,
+    })
     expect(option).not.toHaveAttribute("aria-disabled")
   })
 
-  it("NEGATIVE CONTROL — a bound CAPABILITY row mounts no tool picker", async () => {
-    renderPicker({ capability: "send_email", rows: [mailbox()], config: { connection_id: "conn-ok" } })
-    await waitFor(() => expect(select()).toBeInTheDocument())
-    expect(screen.queryByTestId("mcp-tool-picker")).not.toBeInTheDocument()
+  it("⚠ THE GRANT SURFACE FOLLOWS THE SERVER'S GATE, not the card", async () => {
+    // The executor consults `tool_grants` only on the remote-server path, so the permission
+    // reading is rendered for an MCP row and withheld for a first-party one. Both arms, in
+    // one case, because either alone would pass against a component that had stopped
+    // rendering the grant surface entirely (or never stopped).
+    const mcp = renderPicker({ rows: [MCP], config: { connection_id: "conn-mcp", tool_name: "ask_question" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
+    expect(screen.getByTestId("mcp-grant-status")).toBeInTheDocument()
+    mcp.unmount()
+
+    renderPicker({ rows: [SLACK], config: { connection_id: "conn-slack", capability: "post_message" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
+    expect(screen.queryByTestId("mcp-grant-status")).not.toBeInTheDocument()
   })
 })
 
-// ── 12. THE NEW SOURCE FENCES ────────────────────────────────────────────────────────
+// ── 12. THE ACTION WRITE — exactly one of `capability` / `tool_name` (CONN-05) ────────
 
-describe("ConnectionPicker — 206.2 source discipline", () => {
-  it("`api.ts` is not consulted for a new export — the MCP read is the SHIPPED function", () => {
-    // The no-argument path already ships (`api.ts` builds an empty query string for a falsy
-    // argument), so this is a call-site change. Phase 207 owns that file.
+describe("ConnectionPicker — a step writes exactly ONE action field", () => {
+  it("⭐ an MCP row's action is written to `tool_name`, and `capability` is cleared", async () => {
+    const { patch } = renderPicker({ rows: [MCP], config: { connection_id: "conn-mcp" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    patch.mockClear()
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "ask_question" } })
+    expect(patch).toHaveBeenCalledTimes(1)
+    const written = patch.mock.calls[0][1] as Record<string, unknown>
+    expect(Object.keys(written).sort()).toEqual(["capability", "tool_name"])
+    expect(written.tool_name).toBe("ask_question")
+    expect(written.capability).toBeUndefined()
+  })
+
+  it("⭐ a CAPABILITY row's action is written to `capability`, and `tool_name` is cleared", async () => {
+    const { patch } = renderPicker({ rows: [SLACK], config: { connection_id: "conn-slack" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    patch.mockClear()
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "post_message" } })
+    expect(patch).toHaveBeenCalledTimes(1)
+    const written = patch.mock.calls[0][1] as Record<string, unknown>
+    // ⚠ SET EQUALITY, never `toMatchObject` — a superset passes a PARTIAL clear, and
+    // `tool_args` left behind is arguments for a tool that no longer exists.
+    //
+    // ⚠ 214-07 — `arg_sources` JOINS THE CLEAR, AND THE HAZARD IS THE SAME ONE ONE FIELD
+    // OVER: a source map naming arguments of an action that is no longer chosen would survive
+    // onto the next one and pre-decide things nobody chose.
+    expect(Object.keys(written).sort()).toEqual([
+      "arg_sources",
+      "capability",
+      "tool_args",
+      "tool_name",
+    ])
+    expect(written.capability).toBe("post_message")
+    expect(written.tool_name).toBeUndefined()
+    expect(written.tool_args).toBeUndefined()
+    expect(written.arg_sources).toBeUndefined()
+  })
+
+  it("⛔ NO DEFAULT — with nothing bound, NEITHER field is ever written", async () => {
+    // A default is not a way through a gate. With no connection chosen the action card is
+    // not rendered at all, so there is no control able to write either field.
+    const { patch } = renderPicker({ rows: [SLACK, MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    expect(screen.queryByTestId("mcp-tool-select")).not.toBeInTheDocument()
+    expect(patch).not.toHaveBeenCalled()
+  })
+
+  it("⭐ NEVER BOTH — the two writes and the bind, swept over one session", async () => {
+    // The invariant stated once over every patch this component can emit: no single write
+    // ever carries a non-undefined `capability` AND a non-undefined `tool_name`.
+    const { patch } = renderPicker({ rows: [SLACK, MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    fireEvent.change(select(), { target: { value: "conn-mcp" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "ask_question" } })
+    fireEvent.change(select(), { target: { value: "conn-slack" } })
+
+    expect(patch.mock.calls.length).toBeGreaterThan(2)
+    for (const call of patch.mock.calls) {
+      const written = call[1] as Record<string, unknown>
+      const both = written.capability !== undefined && written.tool_name !== undefined
+      expect(both, JSON.stringify(written)).toBe(false)
+    }
+  })
+
+  it("re-binding CLEARS a stale action — the AR-05 hazard, one control over", async () => {
+    // 206.2 put this clear on the shape control. That control is deleted, so re-binding is
+    // the only remaining moment a step's shape can change, and the obligation moved here
+    // rather than evaporating.
+    const { store } = renderPicker({
+      rows: [SLACK, MCP],
+      config: { connection_id: "conn-mcp", tool_name: "ask_question" },
+    })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    fireEvent.change(select(), { target: { value: "conn-slack" } })
+    const onTheWire = JSON.parse(JSON.stringify(store.getState().phases)) as Array<{
+      config: Record<string, unknown>
+    }>
+    expect(Object.keys(onTheWire[0].config)).not.toContain("tool_name")
+    expect(onTheWire[0].config).toHaveProperty("connection_id", "conn-slack")
+  })
+})
+
+// ── 13. THE NEW SOURCE FENCES ────────────────────────────────────────────────────────
+
+describe("ConnectionPicker — 211-04 source discipline", () => {
+  it("⭐ the read is UNSCOPED at source — no capability argument survives", () => {
+    // ⚠ REPLACES `api.ts is not consulted for a new export`, which asserted BOTH call forms
+    // were present. One survives. The `?capability=` parameter is deliberately KEPT in
+    // `api.ts`'s signature (211-02's decision); what ends is this file's use of it.
     expect(connectionPickerSource).toContain("listConnectorConnections()")
-    expect(connectionPickerSource).toContain("listConnectorConnections(capability)")
+    const scoped = "listConnectorConnections(" + "capability)"
+    expect(connectionPickerSource).not.toContain(scoped)
+    // POSITIVE CONTROL — the needle really matches the form it forbids.
+    expect("const r = listConnectorConnections(" + "capability)").toContain(scoped)
     expect(connectionPickerSource.length).toBeGreaterThan(1000)
+  })
+
+  it("⭐ the client-side SHAPE FILTER is gone at source", () => {
+    const live = connectionPickerSource
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n")
+    const filterNeedle = "row." + "mcp_server_url"
+    expect(live).not.toContain(filterNeedle)
+    // POSITIVE CONTROL — the needle really matches the filter it forbids.
+    expect("rows.filter((row) => Boolean(row." + "mcp_server_url))").toContain(filterNeedle)
   })
 
   it("the WR-04 sink is closed AT SOURCE — no bare bracket read survives", () => {
     expect(connectionPickerSource).toContain("own(CONNECTION_CAPABILITY_WORDS")
     // ⚠ The forbidden spelling is BUILT here rather than written out, because a fence whose
-    // own prose spells the token it forbids counts itself — the 187-24 trap, which has fired
-    // eleven times in this tree.
+    // own prose spells the token it forbids counts itself — the 187-24 trap.
     const forbidden = "CONNECTION_CAPABILITY_WORDS" + "["
     expect(connectionPickerSource).not.toContain(forbidden)
     // …and the needle is real: it matches the shape it names.
@@ -948,5 +973,110 @@ describe("ConnectionPicker — 206.2 source discipline", () => {
   it("the destination ladder's tail is NEUTRAL at source, and the Slack arm names itself", () => {
     expect(connectionPickerSource).toContain('connection.capability === "post_message"')
     expect(connectionPickerSource).toContain("if (connection.mcp_server_url)")
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ 214-07 — `arg_sources` IS A WRITE SEAM, AND IT CLEARS WITH ITS TWIN
+// ═════════════════════════════════════════════════════════════════════════════════════════
+
+describe("ConnectionPicker — 214-07 · the per-argument source map", () => {
+  it("⭐ `arg_sources` CLEARS WITH `tool_name` when a first-party action is chosen", async () => {
+    // ⚠ THE HAZARD IS `ExternalActionSection`'s AR-05 REASONING, ONE FIELD OVER: a source map
+    // naming arguments of an action nobody is bound to any more would survive onto the next
+    // one, be read against a schema that never declared those properties, and show the author
+    // a form that has silently decided things.
+    const { patch } = renderPicker({ rows: [SLACK], config: { connection_id: "conn-slack" } })
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    patch.mockClear()
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "post_message" } })
+    const written = patch.mock.calls[0][1] as Record<string, unknown>
+    expect(Object.keys(written)).toContain("arg_sources")
+    expect(written.arg_sources).toBeUndefined()
+  })
+
+  it("⭐ `arg_sources` CLEARS ON BIND, and on UNBIND — a re-bind changes the whole action", async () => {
+    const { patch } = renderPicker({ rows: [SLACK, MCP] })
+    await waitFor(() => expect(select()).toBeInTheDocument())
+    fireEvent.change(select(), { target: { value: "conn-mcp" } })
+    fireEvent.change(select(), { target: { value: "" } })
+    expect(patch).toHaveBeenCalledTimes(2)
+    for (const call of patch.mock.calls) {
+      const written = call[1] as Record<string, unknown>
+      expect(Object.keys(written), "arg_sources joins the bind clear").toContain("arg_sources")
+      expect(written.arg_sources).toBeUndefined()
+    }
+  })
+
+  it("⭐ the credential sweep covers `arg_sources` exactly as it covers `tool_args`", () => {
+    // T-214-07-02. The client half of two layers; plan `214-01`'s `ArgumentSourceSpec`
+    // validator is the other, at the model, because a client gate is bypassable.
+    const FORBIDDEN = /secret|token|password|host|base_url/i
+    const sweepSources = (sources: Record<string, unknown>) => {
+      for (const key of Object.keys(sources)) expect(key).not.toMatch(FORBIDDEN)
+      for (const spec of Object.values(sources)) {
+        for (const value of Object.values(spec as Record<string, unknown>)) {
+          if (typeof value === "string") {
+            expect(value).not.toMatch(FORBIDDEN)
+            expect(value).not.toContain("smtp.")
+            expect(value).not.toMatch(/^https?:\/\//)
+          }
+        }
+      }
+    }
+    // POSITIVE CONTROL FIRST — the sweep really fires on each shape it forbids.
+    expect(() => sweepSources({ smtp_password: { source: "fixed" } })).toThrow()
+    expect(() => sweepSources({ to: { source: "ask", ask_key: "smtp.evil.test" } })).toThrow()
+    expect(() => sweepSources({ to: { source: "upstream", upstream_slug: "https://x.test" } })).toThrow()
+    // …and a legitimate map passes.
+    expect(() =>
+      sweepSources({ text: { source: "upstream", upstream_slug: "draft-the-note" } }),
+    ).not.toThrow()
+  })
+
+  it("⭐ THE CROSS-LANGUAGE BODY-ARG MIRROR — the client map equals the backend's", async () => {
+    // ⚠ A MIRROR NEEDS A FENCE, NOT A PROMISE. `BODY_ARG_FOR_CAPABILITY` here is a client copy
+    // of `_BODY_ARG_FOR_CAPABILITY` in `phase_types.py`, which is where the executor decides
+    // which field an upstream step's text fills. A fourth capability, a rename or a reorder on
+    // one side alone would make the form pre-set a field the executor never fills — which is
+    // what `BUG-260826-01` looked like from the outside.
+    const phaseTypesSource = (
+      await import("../../../../backend/app/services/harness/phase_types.py?raw")
+    ).default as string
+    // NON-VACUITY: the backend source really loaded.
+    expect(phaseTypesSource.length).toBeGreaterThan(10000)
+
+    // CRLF-tolerant: these files check out with Windows line endings, and a `\n`-anchored
+    // terminator would silently never match and yield an empty map that compares equal to
+    // nothing at all.
+    const pyBlock = /_BODY_ARG_FOR_CAPABILITY:\s*dict\[str,\s*str\]\s*=\s*\{([\s\S]*?)\}/.exec(
+      phaseTypesSource,
+    )
+    expect(pyBlock, "the backend map was not found").not.toBeNull()
+    const pyPairs = [...(pyBlock?.[1] ?? "").matchAll(/"([^"]+)":\s*"([^"]+)"/g)].map(
+      (m) => `${m[1]}=${m[2]}`,
+    )
+
+    const tsBlock = /BODY_ARG_FOR_CAPABILITY:\s*Record<string,\s*string>\s*=\s*\{([\s\S]*?)\}/.exec(
+      connectionPickerSource,
+    )
+    expect(tsBlock, "the client map was not found").not.toBeNull()
+    const tsPairs = [...(tsBlock?.[1] ?? "").matchAll(/([A-Za-z0-9_]+):\s*"([^"]+)"/g)].map(
+      (m) => `${m[1]}=${m[2]}`,
+    )
+
+    // NON-VACUITY CONTROLS, BOTH SIDES, BEFORE THE EQUALITY — an empty extraction on either
+    // side would make the comparison free, which is how a fence reads as coverage.
+    expect(pyPairs.length, "python pairs extracted").toBe(3)
+    expect(tsPairs.length, "typescript pairs extracted").toBe(3)
+    expect([...tsPairs].sort()).toEqual([...pyPairs].sort())
+  })
+
+  it("the read is through `own()` — a prototype key cannot reach the pre-set (WR-04)", () => {
+    // The tenth sink of this class in this tree, closed by construction rather than found.
+    expect(connectionPickerSource).toContain("own(BODY_ARG_FOR_CAPABILITY")
+    const forbidden = "BODY_ARG_FOR_CAPABILITY" + "["
+    expect(connectionPickerSource).not.toContain(forbidden)
+    expect("x = BODY_ARG_FOR_CAPABILITY[k]").toContain(forbidden)
   })
 })

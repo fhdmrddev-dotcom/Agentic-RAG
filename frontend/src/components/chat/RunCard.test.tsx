@@ -222,7 +222,13 @@ describe("RunCard", () => {
       />,
     )
     const collapsed = screen.getByTestId("run-card-collapsed")
-    expect(collapsed.textContent).toMatch(/3 steps/)
+    // ⚠ NOISE AUDIT 2026-08-31 (operator, items A2 + A3). The row used to read
+    // `Run · 3 steps · ✗ failed · 12s` while sitting DIRECTLY BELOW a header already
+    // saying `Run · 3 steps` and the elapsed — the count three times, the duration twice.
+    // The count and duration stay in the HEADER (present in both states); this row is
+    // collapsed-only and keeps the one thing the header cannot carry: the VERDICT, which
+    // is also why a person would open it.
+    expect(collapsed.textContent).not.toMatch(/3 steps/)
     expect(collapsed.textContent).not.toMatch(/tool calls/)
     expect(collapsed.textContent).toMatch(/failed/)
   })
@@ -376,14 +382,24 @@ describe("RunCard — D-04 unified count agrees across all three sites", () => {
     // Collapsed by default (terminal + tools) → header strip + collapsed-row visible.
     const header = screen.getByTestId("run-card").querySelector("header")!
     expect(header.textContent).toMatch(/Run · 2 steps/) // header title
+    // ⚠ NOISE AUDIT 2026-08-31 (operator, item A4). `Step N` is PROGRESS, and progress is
+    // only information while something is progressing. On a TERMINAL run it restated a
+    // number already in the title, in the collapsed row, and beside every numbered step
+    // once expanded — four spellings of one integer. It is now gated on the activity verb,
+    // which is non-null exactly while the run is live, so this terminal card has none.
     const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
-    expect(headerStrip.textContent).toMatch(/Step 2/) // strip
-    expect(headerStrip.textContent).not.toMatch(/Step 7/) // never iterationCount
+    expect(headerStrip.textContent).not.toMatch(/Step 2/)
+    expect(headerStrip.textContent).not.toMatch(/Step 7/) // and never iterationCount
     const collapsed = screen.getByTestId("run-card-collapsed")
-    expect(collapsed.textContent).toMatch(/2 steps/) // collapsed-row
+    // A2: the collapsed row no longer restates the count — the header owns it, and two
+    // sites that always agreed cannot disagree once there is only one.
+    expect(collapsed.textContent).not.toMatch(/2 steps/)
   })
 
-  it("DB-loaded message WITHOUT iterationCount still shows a Step number (next-day reopen fix)", () => {
+  it("DB-loaded message WITHOUT iterationCount still resolves the step COUNT (next-day reopen fix)", () => {
+    // ⚠ A4: the count is no longer spelled `Step N` on a terminal card. What this case
+    // guards is that `unifiedStepCount` still works from persisted tool_calls alone —
+    // read from the header title, which is where the count now lives once.
     // Simulate a reloaded historical message: no iterationCount field at all,
     // but the persisted tool_calls survive → unifiedStepCount still works.
     const reloaded = makeMessage({
@@ -397,8 +413,8 @@ describe("RunCard — D-04 unified count agrees across all three sites", () => {
     delete (reloaded as { iterationCount?: number }).iterationCount
     render(<RunCard message={reloaded} isStreaming={false} />)
     const header = screen.getByTestId("run-card").querySelector("header")!
-    const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
-    expect(headerStrip.textContent).toMatch(/Step 2/)
+    // The count survives a reload with no iterationCount — read where it now lives once.
+    expect(header.textContent).toMatch(/Run · 2 steps/)
   })
 })
 
@@ -466,14 +482,20 @@ describe("RunCard — Plan 095.1-07 GAP-2 run-sub turn reconciliation (live == r
   // Helper: extract the run-sub subline text (the font-mono row UNDER the title,
   // BEFORE the RunStatusStrip) so the live-vs-reload guard compares the exact
   // string both states render.
+  // ⚠ NOISE AUDIT 2026-08-31 (operator, item A5). The run-sub's VISIBLE text is now
+  // the model alone; the full `{provider} · {model} · turn N` moved to the element's
+  // `title`. The property these cases exist for — live and reload describe the same run
+  // identically — is UNCHANGED and is now read from the title, which is where the whole
+  // string lives. Nothing became unknowable; a 45-character monospace line stopped being
+  // the widest thing on a card whose subject is the run.
   function runSubText(host: HTMLElement): string {
-    // The run-sub is the LEAF div whose text is exactly `... turn N` (the
-    // font-mono subline). Prefer the div with NO child element (the leaf) so we
-    // don't grab the title-column wrapper that concatenates title + sub + strip.
+    // The run-sub is the leaf div carrying the attribution. Its `title` holds the full
+    // `{provider} · {model} · turn N`; its text holds the model. Read the title, so the
+    // live-vs-reload comparison still covers every part of the identity.
     const candidates = Array.from(host.querySelectorAll("div")).filter(
-      (d) => /turn \d+/.test(d.textContent ?? "") && d.querySelector("div") === null,
+      (d) => /turn \d+/.test(d.getAttribute("title") ?? "") && d.querySelector("div") === null,
     )
-    return candidates[0]?.textContent ?? ""
+    return candidates[0]?.getAttribute("title") ?? ""
   }
 
   // RETARGETED (095.1-07): the run-sub turn is reconciled to a stable `1` — it no
@@ -496,8 +518,9 @@ describe("RunCard — Plan 095.1-07 GAP-2 run-sub turn reconciliation (live == r
       />,
     )
     const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
-    expect(header.textContent).toMatch(/openai · gpt-5\.4-mini · turn 1/)
-    expect(header.textContent).not.toMatch(/turn 6/)
+    // A5: the identity lives on the run-sub's `title` now; `runSubText` reads it.
+    expect(runSubText(header)).toMatch(/openai · gpt-5\.4-mini · turn 1/)
+    expect(runSubText(header)).not.toMatch(/turn 6/)
   })
 
   // RETARGETED (095.1-07): changing iterationCount no longer changes the run-sub

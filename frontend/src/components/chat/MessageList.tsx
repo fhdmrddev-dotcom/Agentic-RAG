@@ -74,7 +74,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   // viewport lookup the BL-05 listener attaches to.
   const getViewport = () =>
     (containerRef.current?.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null) ?? null
-  const { isPinned, showJumpToLive, jumpToLive, onScroll, beginProgrammaticScroll } =
+  const { isPinned, isPinnedNow, showJumpToLive, jumpToLive, onScroll, beginProgrammaticScroll, noteUserGesture } =
     useFollowScroll(getViewport, isStreaming)
 
   // BL-05 fix: useLayoutEffect + retry — the Radix ScrollArea viewport may
@@ -95,9 +95,31 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
         return
       }
       el.addEventListener("scroll", onScroll, { passive: true })
+      // BUG-260904-02: the gesture listeners are what make the release trustworthy. A scroll
+      // event alone cannot say WHO scrolled, and our own smooth auto-follow emits them for
+      // hundreds of ms — so the hook re-arms only after a real input. These four cover the
+      // ways a person moves this list: wheel, touch drag, scrollbar drag (pointerdown) and
+      // the keyboard (PageUp/Home/arrows). ⚠ Without them the pin would never re-arm and
+      // "↓ Jump to live" would be the only way back, which is the same bug wearing a mask.
+      // The direction is carried where the event actually knows it. A wheel-down at the live
+      // edge is someone following along and must not flash the chip; a wheel-UP is the release.
+      const UP_KEYS = new Set(["PageUp", "ArrowUp", "Home"])
+      const DOWN_KEYS = new Set(["PageDown", "ArrowDown", "End"])
+      const onGesture = (e: Event) => {
+        if (e instanceof WheelEvent) return noteUserGesture(e.deltaY < 0 ? "up" : "down")
+        if (e instanceof KeyboardEvent) {
+          if (UP_KEYS.has(e.key)) return noteUserGesture("up")
+          if (DOWN_KEYS.has(e.key)) return noteUserGesture("down")
+          return
+        }
+        noteUserGesture("unknown")
+      }
+      const gestures = ["wheel", "touchmove", "pointerdown", "keydown"] as const
+      for (const g of gestures) el.addEventListener(g, onGesture, { passive: true })
       scrollListenerAttachedRef.current = true
       cleanup = () => {
         el.removeEventListener("scroll", onScroll)
+        for (const g of gestures) el.removeEventListener(g, onGesture)
         scrollListenerAttachedRef.current = false
       }
     }
@@ -133,10 +155,13 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
     if (newCount > prevCountRef.current) {
       prevCountRef.current = newCount
       // Only follow while pinned. A user scrolled up mid-stream is left in place.
-      if (isPinned) {
+      // ⚠ `isPinnedNow()` (the ref), not `isPinned` (state): a release that happened during
+      // this very frame has not reached the render yet, and one extra scroll after the user
+      // starts the wheel is exactly what "it drags me back down" feels like.
+      if (isPinnedNow()) {
         scrollToTarget(isStreaming ? "instant" : "smooth")
       }
-    } else if (isStreaming && isPinned) {
+    } else if (isStreaming && isPinnedNow()) {
       // token-delta cadence: the messages ref changes per token; follow the edge.
       const preparingEl = containerRef.current?.querySelector(
         '[data-tool-status="preparing"]'
@@ -148,7 +173,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
         bottomRef.current?.scrollIntoView({ behavior: "instant" })
       }
     }
-  }, [messages, isStreaming, isPinned, beginProgrammaticScroll])
+  }, [messages, isStreaming, isPinned, isPinnedNow, beginProgrammaticScroll])
 
   // Phase 095 Plan 04 — the floating chip's status: derive the real step count +
   // elapsed from the live-streaming assistant message (the last assistant bubble

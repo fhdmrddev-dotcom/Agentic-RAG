@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Plus, X } from "lucide-react"
 import { EMPTY_FILTER } from "@/types"
-import type { MetadataFieldDef, SavedView, ViewCondition, ViewConditionOp, ViewFilter } from "@/types"
+import type { MetadataFieldDef, SavedView, ViewCondition, ViewFilter } from "@/types"
 import { ConditionPopover } from "./ConditionPopover"
 import { createView, updateView, resolveFilterCount } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { CHIP_OP_LABEL, chipSummary } from "./viewRuleWords"
+
+export { CHIP_OP_LABEL, chipSummary }
 
 /**
  * FilterBar — the no-DSL inline chip-strip filter/view builder (Phase 114, sketch
@@ -26,33 +29,6 @@ import { cn } from "@/lib/utils"
  * Terminology is "saved filters," never "query" (sketch 029-A). All field-
  * whitelist validation + value binding stays server-side (T-114-05-01).
  */
-
-/** Plain-language operator labels for the chip summary (sans, never jargon). */
-const CHIP_OP_LABEL: Record<ViewConditionOp, string> = {
-  eq: "is",
-  one_of: "is one of",
-  contains: "contains",
-  is_empty: "is empty",
-  gte: "≥",
-  lte: "≤",
-  between: "between",
-  within_next: "within next",
-  older_than: "older than",
-  before: "before",
-  after: "after",
-}
-
-/** Render a single condition as a plain-language chip summary. */
-function chipSummary(c: ViewCondition): string {
-  const op = CHIP_OP_LABEL[c.op]
-  if (c.op === "is_empty") return `${c.field} ${op}`
-  if (c.op === "one_of") return `${c.field} ${op} ${(c.values ?? []).join(", ")}`
-  if (c.op === "between") return `${c.field} ${op} ${c.value} – ${c.value2}`
-  if (c.op === "within_next" || c.op === "older_than") {
-    return `${c.field} ${op} ${c.value} ${c.unit ?? "days"}`
-  }
-  return `${c.field} ${op} ${c.value}`
-}
 
 export interface FilterBarProps {
   /** The enabled custom field defs (merged with built-ins in ConditionPopover). */

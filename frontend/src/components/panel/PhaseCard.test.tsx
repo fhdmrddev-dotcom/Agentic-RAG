@@ -13,14 +13,65 @@
  * populates emitSubStep/emitFailure is the deferred run-legibility path — this is the
  * RENDER contract: PhaseCard renders the sub-events when present).
  */
-import { describe, it, expect, afterEach } from "vitest"
-import { render, screen, cleanup } from "@testing-library/react"
+import { describe, it, expect, afterEach, vi } from "vitest"
+import { render, screen, cleanup, renderHook, waitFor } from "@testing-library/react"
+import type { ReactNode } from "react"
 import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 import { PhaseCard } from "./PhaseCard"
+
+// ── Phase 214-11 — the module stubs the SEAM case at the bottom of this file needs, and
+//    NOTHING ELSE IN THIS SUITE TOUCHES THEM. Mounting the real `StreamsProvider` evaluates
+//    its auth path and fires its panel reconciles, so both are stubbed to keep every case off
+//    the network — the `PhaseReconcile.test.tsx:55-100` posture, copied because it is the
+//    shipped way to reach a module-private mapper in this tree.
+//    ⛔ `reconcilePhases` is deliberately absent from every mock below: stubbing the thing
+//    under test would leave the seam case proving only that the test agrees with itself.
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
+}))
+
+const { seamGetThreadWorkflow } = vi.hoisted(() => ({ seamGetThreadWorkflow: vi.fn() }))
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
+  return {
+    ...actual,
+    getThreadWorkflow: seamGetThreadWorkflow,
+    getThreadTodos: vi.fn().mockResolvedValue([]),
+    getThreadWorkspaceFiles: vi.fn().mockResolvedValue([]),
+    getThreadPendingAsks: vi.fn().mockResolvedValue([]),
+    getThreadTasks: vi.fn().mockResolvedValue([]),
+    getSnapshot: vi.fn().mockResolvedValue({ messages: [], active_runs: [] }),
+    getMessages: vi.fn().mockResolvedValue([]),
+    getActiveRuns: vi.fn().mockResolvedValue([]),
+  }
+})
+
+// The REAL provider module. `importActual` is memoised per path, so this is the same instance
+// (and the same zustand singleton) the seam case's hook reads through.
+const RealStreamsForSeam =
+  await vi.importActual<typeof import("@/providers/StreamsProvider")>(
+    "@/providers/StreamsProvider",
+  )
 // Phase 200-07 — the ONE resolver, driven for real rather than stubbed. Its own import line
 // rather than a widening of the one above: the `canvasModel.purity.test.ts:18-21` rule, so
 // this plan's diff reads as ADDED lines.
 import { phaseRunFacts, type PhaseTimingRow } from "@/components/workflows/phaseDuration"
+// Phase 214-11 — the sentinel and the failure label, IMPORTED rather than retyped.
+// `stepIdentityVocabulary.test.ts` reads `PhaseCard.tsx` through `?raw` and pins
+// `FAILED_REASON_UNKNOWN` character-identical to the shipped sentence, so importing it makes
+// this suite ride that binding instead of adding a third copy that could drift from both.
+import {
+  FAILED_REASON_UNKNOWN,
+  FAILED_REASON_LABEL,
+} from "@/components/workflows/stepIdentityVocabulary"
 
 afterEach(() => cleanup())
 
@@ -740,5 +791,235 @@ describe("PhaseCard — D-07's count (RS-MR-01 / RS-MNR-03)  [owner: 200-07]", (
 
     expect(pairWith).toStrictEqual(pairWithout)
     expect(pairWith).toStrictEqual(["✓", "Complete"])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Phase 214-11 Task 1 (STEP-04 / STEP-05 · D-214-23 / D-214-16 · sketch 216 #12 / #13)
+//
+// THE SENTINEL'S CONDITION NARROWS; ITS WORDS DO NOT. `BUG-260826-05` was the panel saying
+// the sentinel's sentence while the reason had been in `workflow_phases.output._failure_reason`
+// the whole time — `classifyFailure` read the LIVE SSE `error` only, which is empty on every
+// reconciled or reloaded run (D-v2.5-03).
+//
+// ⚠ THE LAST CASE IN THIS FILE IS THE ONLY ONE THAT TESTS THE SEAM, and the distinction is
+// mechanical rather than stylistic. Every other case seeds a `Phase` LITERAL — and a literal
+// supplies exactly the hop that was broken at 200-02 and again in this phase's first plan set,
+// because `reconcilePhases` builds each `Phase` field by field, so a widened type propagates
+// nothing while typechecking cleanly. That case runs the REAL `reconcilePhases` over a
+// wire-shaped payload and renders the object it produced. ⛔ It is not stubbed and not mocked.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+/** A failed external-action step. Every field below is one the wire really ships (214-02). */
+function failedExternal(overrides: Partial<Phase> = {}): Phase {
+  return {
+    slug: "notify",
+    phaseIndex: 0,
+    phaseType: "external_action",
+    status: "failed",
+    subAgents: [],
+    pendingAsk: null,
+    capability: "post_message",
+    toolName: "post_message",
+    serviceName: "Acme Slack (production)",
+    ...overrides,
+  }
+}
+
+const ADAPTER_SENTENCE =
+  "Channel #urgent-feedback-escalations not found or bot lacks permission to post."
+
+describe("PhaseCard — the sentinel fires only when BOTH sources are empty  [owner: 214-11]", () => {
+  it("#12 — a DB-backed failureReason renders verbatim and the sentinel does NOT fire", () => {
+    // The `BUG-260826-05` shape exactly: a reconciled run, so `error` is absent and the reason
+    // arrived on the fetch. Before this plan this rendered the sentinel over a known reason.
+    render(
+      <PhaseCard
+        phase={failedExternal({ error: undefined, failureReason: ADAPTER_SENTENCE })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    expect(alert.textContent).toContain(ADAPTER_SENTENCE)
+    // ⚠ COUNTED, not merely "not present" — the sentinel appearing ANYWHERE on this card
+    // beside a known reason is the defect, including inside a second block.
+    const body = document.body.textContent ?? ""
+    expect(body.split(FAILED_REASON_UNKNOWN).length - 1).toBe(0)
+  })
+
+  it("#13 — with BOTH sources empty the sentinel fires, exactly once, byte-identical", () => {
+    render(<PhaseCard phase={failedExternal({ error: undefined, failureReason: null })} position={0} />)
+    const body = document.body.textContent ?? ""
+    expect(body.split(FAILED_REASON_UNKNOWN).length - 1).toBe(1)
+  })
+
+  it("a whitespace-only failureReason is NOT a reason — the sentinel still fires", () => {
+    // The server normalises whitespace to `null`, so this models a client that got it wrong
+    // rather than a shape the wire produces. `.trim()` is what makes the sentinel total over it.
+    render(<PhaseCard phase={failedExternal({ error: undefined, failureReason: "   " })} position={0} />)
+    expect((document.body.textContent ?? "").includes(FAILED_REASON_UNKNOWN)).toBe(true)
+  })
+
+  it("with BOTH set, the LIVE `error` wins — a mid-stream reading is never stale", () => {
+    // Order is the whole of the change. `error` is the SSE value and is the freshest during a
+    // stream; `failureReason` is the durable one. Reversing them would show the DB's lagging
+    // copy while the event already carried the text.
+    render(
+      <PhaseCard
+        phase={failedExternal({ error: "wall_clock_timeout after 90s", failureReason: ADAPTER_SENTENCE })}
+        position={0}
+      />,
+    )
+    const alert = screen.getByRole("alert")
+    expect(alert.textContent).toContain("wall-clock budget")
+    expect(alert.textContent).not.toContain(ADAPTER_SENTENCE)
+  })
+
+  it("the `where` diagnostic names BOTH places we looked, never only one", () => {
+    render(<PhaseCard phase={failedExternal({ error: undefined, failureReason: null })} position={0} />)
+    const alert = screen.getByRole("alert")
+    // The decision recorded in `PhaseCard.tsx`: the SENTENCE is untouched, the mono diagnostic
+    // under it is re-worded, because naming one field became false when a second was read.
+    expect(alert.textContent).toContain("error field and failure reason were both empty")
+  })
+
+  it("the failure block carries the vocabulary's label over the reason", () => {
+    render(<PhaseCard phase={failedExternal({ failureReason: ADAPTER_SENTENCE })} position={0} />)
+    expect(screen.getByTestId("phase-card-failure-label").textContent).toBe(FAILED_REASON_LABEL)
+  })
+})
+
+describe("PhaseCard — the shared step identity, on the panel surface  [owner: 214-11]", () => {
+  it("an external_action phase renders the ONE element, with the action and the service", () => {
+    render(<PhaseCard phase={failedExternal()} position={0} />)
+    const id = document.querySelector("[data-step-identity]")
+    expect(id).toBeInTheDocument()
+    expect(id?.getAttribute("data-size")).toBe("row")
+    expect(id?.getAttribute("data-service-resolved")).toBe("true")
+    expect(document.querySelector("[data-step-identity-action]")?.textContent).toBe("Posts a message")
+    expect(document.querySelector("[data-step-identity-service]")?.textContent).toBe(
+      "Acme Slack (production)",
+    )
+  })
+
+  it("a `llm_single` phase renders NO identity — the panel is unchanged for every other type", () => {
+    render(<PhaseCard phase={fillPhase({ phaseType: "llm_single", status: "done" })} position={0} />)
+    expect(document.querySelector("[data-step-identity]")).toBeNull()
+  })
+
+  it("a null serviceName renders the ACTION ALONE — no placeholder, no separator", () => {
+    // `null` is a LEGITIMATE wire value (the connection was deleted, or is another org's).
+    // The honest render is the action by itself — never "Unknown service", never the id.
+    render(<PhaseCard phase={failedExternal({ serviceName: null })} position={0} />)
+    const id = document.querySelector("[data-step-identity]")
+    expect(id?.getAttribute("data-service-resolved")).toBe("false")
+    expect(document.querySelector("[data-step-identity-separator]")).toBeNull()
+    expect(document.querySelector("[data-step-identity-service]")).toBeNull()
+    expect(id?.textContent).toBe("Posts a message")
+  })
+
+  it("no wire id reaches the panel — the capability is translated, never printed", () => {
+    // Sketch 216 invariant #4. ⚠ The needles are ASSEMBLED AT RUNTIME so this file's own source
+    // does not contain them — a grep-based fence over `src/` would otherwise count these lines
+    // (the 187-24 trap, which has fired six times in this tree).
+    const { container } = render(<PhaseCard phase={failedExternal()} position={0} />)
+    const markup = container.innerHTML
+    const needles = [
+      ["post", "message"],
+      ["send", "email"],
+      ["create", "ticket"],
+      ["external", "action"],
+      ["ask", "question"],
+    ]
+    for (const parts of needles) expect(markup).not.toContain(parts.join("_"))
+    // POSITIVE CONTROL — the sweep above is worthless if nothing rendered.
+    expect(markup).toContain("Posts a message")
+  })
+
+  it("an UNMAPPED capability renders no identity rather than an id-shaped face", () => {
+    // PATTERNS §4d's floor: a name is never fabricated, and an id-shaped face is worse than a
+    // generic one. An MCP step (capability `null`, a tool id) lands here too.
+    render(<PhaseCard phase={failedExternal({ capability: "clickup_create_task" })} position={0} />)
+    expect(document.querySelector("[data-step-identity]")).toBeNull()
+    expect(document.body.textContent).not.toContain("clickup_create_task")
+  })
+
+  it("a prototype key as the capability derives NOTHING (WR-04)", () => {
+    // `capability` is author-supplied JSONB on the wire. A bracket read would return the
+    // inherited `Object.prototype.constructor` — a function, never nullish — and React refuses
+    // a function child outright, so the identity would render as nothing at all.
+    render(<PhaseCard phase={failedExternal({ capability: "constructor" })} position={0} />)
+    expect(document.querySelector("[data-step-identity]")).toBeNull()
+  })
+
+  it("a third-party failure sentence renders as TEXT, never as markup (T-214-11-01)", () => {
+    // The reason may originate on an MCP server we do not control. React escapes text children;
+    // this proves the panel never reaches for the raw-HTML escape hatch on that path.
+    const hostile = '<img src=x onerror="alert(1)"> & <script>bad()</script>'
+    const { container } = render(
+      <PhaseCard phase={failedExternal({ error: undefined, failureReason: hostile })} position={0} />,
+    )
+    expect(container.querySelector("img")).toBeNull()
+    expect(container.querySelector("script")).toBeNull()
+    expect(screen.getByRole("alert").textContent).toContain(hostile)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ THE SEAM, NOT THE RENDER — the one case whose `Phase` is NOT hand-written.
+//
+// `reconcilePhases` is module-PRIVATE and its only reachable door is the real `usePhases`
+// (`PhaseReconcile.test.tsx:106-113` records the same finding). So this drives the REAL
+// provider over a REAL `GET /threads/{id}/workflow` payload and renders `PhaseCard` with the
+// object that came out. ⛔ `reconcilePhases` is neither stubbed nor named in any `vi.mock`
+// here — mocking it would leave this case proving only that the test is self-consistent, which
+// is Phase 212's D-1/D-2 lesson and 213's carried-forward warning.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+describe("PhaseCard × the REAL reconcile seam  [owner: 214-11]", () => {
+  it("a wire payload's failure_reason reaches the rendered card, and the sentinel stays silent", async () => {
+    seamGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: true, // TERMINAL → the historical `wf.phases` branch, i.e. a reloaded run
+      definition_name: "Escalation",
+      run_status: "failed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [
+        {
+          slug: "notify",
+          phase_index: 0,
+          status: "failed",
+          phase_type: "external_action",
+          // ⚠ SNAKE_CASE — the server's own spelling. If the mapper drops any of these, the
+          // camelCase `Phase` field is `undefined` and the sentinel fires over a known reason,
+          // which is `BUG-260826-05` reproduced end to end.
+          failure_reason: ADAPTER_SENTENCE,
+          tool_name: "post_message",
+          capability: "post_message",
+          service_name: "Acme Slack (production)",
+        },
+      ],
+    })
+
+    const { result } = renderHook(() => RealStreamsForSeam.usePhases("thread-214-11-seam"), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <RealStreamsForSeam.StreamsProvider>{children}</RealStreamsForSeam.StreamsProvider>
+      ),
+    })
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+
+    // NON-VACUITY — the payload really did travel the mapper rather than arriving as a literal.
+    const reconciled = result.current.data[0]
+    expect(reconciled.slug).toBe("notify")
+
+    render(<PhaseCard phase={reconciled} position={0} />)
+    expect(screen.getByRole("alert").textContent).toContain(ADAPTER_SENTENCE)
+    expect((document.body.textContent ?? "").includes(FAILED_REASON_UNKNOWN)).toBe(false)
+    // …and the identity travelled the same hop.
+    expect(document.querySelector("[data-step-identity-action]")?.textContent).toBe("Posts a message")
+    expect(document.querySelector("[data-step-identity-service]")?.textContent).toBe(
+      "Acme Slack (production)",
+    )
   })
 })

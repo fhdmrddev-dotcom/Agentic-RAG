@@ -76,6 +76,7 @@ that omits it — NL generation, ``/validate``, the palette route — is byte-id
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -1205,7 +1206,13 @@ def grounding_cause(phase) -> str | None:
 # sentence still has exactly one author.
 
 
-def _approval_sentence(phase, total_phases: int) -> str:
+def _approval_sentence(
+    phase,
+    total_phases: int,
+    *,
+    service_name: str | None = None,
+    resolved_args: Mapping[str, Any] | None = None,
+) -> str:
     """The D-185-14 engine-generated approval prompt for an ARMED step.
 
     There is NO new authored-message field. The sentence is composed here so it has
@@ -1229,13 +1236,109 @@ def _approval_sentence(phase, total_phases: int) -> str:
 
     Pure; no I/O. ``phase.name or phase.slug`` is the author-facing label (``name`` is
     the Phase-103 optional display name; the slug is the always-present fallback).
+
+    ── 214 (D-214-14 / D-214-15) — TWO KEYWORD-ONLY PASS-THROUGHS ────────────────────
+    ``service_name`` and ``resolved_args`` are FORWARDED unchanged to
+    ``_external_action_clause`` and are read nowhere else. Both default to ``None``, so
+    every call site that predates this phase composes a byte-identical sentence — which
+    is what lets the change be additive rather than a rewrite, and what keeps the shipped
+    character-identity assertions on the honesty rules passing untouched.
     """
     label = getattr(phase, "name", None) or phase.slug
-    return (
+    sentence = (
         f'Step {phase.phase_index + 1} of {total_phases}, "{label}", is about to run. '
         f"This step is marked as needing your approval first. "
         f"The run is waiting here and will not continue until you answer."
     )
+    return sentence + _external_action_clause(
+        phase, service_name=service_name, resolved_args=resolved_args
+    )
+
+
+def _external_action_clause(
+    phase,
+    *,
+    service_name: str | None = None,
+    resolved_args: Mapping[str, Any] | None = None,
+) -> str:
+    """Phase 213 (SC#3 / GRANT-03, plan 213-06) — what the step will actually SEND.
+
+    SC#3 requires the pause to show a person *"the service, the tool and the exact
+    arguments"*. The sentence above states POSITION, IDENTITY and CONSEQUENCE and names
+    none of the three, so a person was being asked to approve a step without being told
+    what it would do.
+
+    ⚠ APPENDED, NEVER PREPENDED. The shipped 185 assertions read the sentence with
+    ``.startswith(...)`` (``test_185_engine_attachment.py:249``, ``:525``); prepending
+    would break both. ``test_the_clause_is_APPENDED_...`` pins the ordering rather than
+    trusting this note.
+
+    ⚠ COMPOSED FROM ``phase.config`` ALONE, so this function stays PURE — no pool, no
+    clock, no connection lookup. The engine calls it before Gate 5 has resolved anything,
+    and making the engine resolve a connection early would duplicate that gate and add I/O
+    to a composer whose purity the module header asserts.
+
+    ⚠ NAME ONLY WHAT IS KNOWN. An MCP row carries ``capability = None``, so the service is
+    simply not named rather than rendered as ``None`` or guessed from the tool's spelling.
+    Same rule that keeps an SMTP connection on the neutral mark instead of borrowing
+    Gmail's: *never draw a name the system cannot know*.
+
+    ── 214 · D-214-14 — THE SERVICE ARRIVES FROM THE CALLER, AND A STORED COPY WAS REFUSED ──
+    ``BUG-260828-01`` measured this slot filled from ``config.capability`` — *the same value
+    already in the tool slot* — so a capability row read the tautology
+    ``It will run "post_message" through post_message.`` and an MCP row (``capability is
+    None``) dropped the clause entirely. **The service a person actually needs lives on the
+    CONNECTION row, which this function must never read**, so it now arrives as
+    ``service_name``. ⛔ There is deliberately NO fallback to ``config.capability``: a
+    fallback that is "usually right" re-creates the tautology on exactly the rows where it
+    was measured, and *NAME ONLY WHAT IS KNOWN* exists to refuse precisely that. When the
+    caller could not resolve a name, ``service_name`` is ``None``, the ``where`` fragment is
+    empty and the clause reads ``It will run "<tool>".`` — never ``Unknown service``, never a
+    guess. ⚠ **Storing the name on the step config was REJECTED (D-213-02 — computed never
+    stored):** a copy of a derived fact goes stale the moment the connection is renamed.
+
+    ⚠ THE ARGUMENTS ARE SHOWN HERE AND RECORDED NOWHERE. D-213-14 settled that asymmetry —
+    ``_write_send_receipt``'s D-08 metadata carries the capability, the connection id, the
+    host and (213) the tool name, and never the request body. Showing a person what is
+    about to leave, once, in the moment, is the whole point of the pause; writing it into a
+    queryable ledger forever is a different act. This function must never become the source
+    of an audit field.
+
+    ⚠ 214 · D-214-15 — WHAT IS SHOWN IS WHAT WILL LEAVE. ``resolved_args``, when the caller
+    supplies it, is the object ``args.resolve_arguments`` produced — the SAME function the
+    executor calls. ``config.tool_args`` holds only the ``fixed`` values under D-214-01, so
+    rendering it would name the constants and **silently omit exactly the arguments that
+    vary** (an ``Ask at launch`` or ``From an earlier step`` value), which on an approval
+    surface is worse than showing nothing. A caller that supplies nothing keeps the pre-214
+    rendering of ``config.tool_args``. There is ONE rendering path either way — the source is
+    substituted, the sorted-key rendering below is not duplicated.
+
+    The honesty rules are unchanged: it says nothing about the quality of what is about to
+    happen, and never the words *approved*, *safe* or *proven*.
+    """
+    config = getattr(phase, "config", None)
+    if getattr(config, "phase_type", None) != "external_action":
+        return ""
+
+    tool = getattr(config, "tool_name", None) or getattr(config, "capability", None)
+    if not tool:
+        return ""
+
+    # D-214-14. ``service_name`` ONLY — see the docblock. ``config.capability`` is the
+    # tautology ``BUG-260828-01`` measured and is deliberately not consulted here.
+    service = service_name
+    where = f" through {service}" if service else ""
+    clause = f' It will run "{tool}"{where}.'
+
+    # D-214-15. The resolved object when the caller resolved one, the stored fixed values
+    # otherwise — ONE source substitution, feeding the ONE rendering path below.
+    args = resolved_args if resolved_args is not None else getattr(config, "tool_args", None)
+    if isinstance(args, Mapping) and args:
+        # Sorted so the sentence is stable across runs — an approval prompt that reorders
+        # itself between a restart and its re-subscribe would read as a different request.
+        rendered = ", ".join(f"{k}: {args[k]}" for k in sorted(args))
+        clause += f" What it will send — {rendered}."
+    return clause
 
 
 def effective_phase(phase, *, total_phases: int):

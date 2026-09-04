@@ -218,6 +218,23 @@ export interface Message {
    * Render-only, no persistence, no migration — the 403 authz stays server-side; this only
    * makes the refusal honest instead of a blank workflow card. Sibling of `modelFallbackNotice`. */
   blockedNotice?: { message: string }
+  /** Phase 216 (GRANT-03 / CHAT-07): tool approval request requiring human decision in chat. */
+  toolApproval?: {
+    callId: string
+    /** The connection the paused call belongs to — what "Always allow" changes. Optional:
+     *  a run paused before 2026-08-31 carries no such field. */
+    connectionId?: string
+    serviceId: string
+    serviceName: string
+    toolName: string
+    args: Record<string, any>
+    expiresAt?: string
+    timeoutSeconds?: number
+    decision?: "allow" | "reject" | "always"
+  }
+  /** Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): active connector connection IDs armed when this message was sent.
+   *  Present on user messages. Distinguishes [] (explicitly cleared) from undefined (legacy / absent). */
+  activeConnectorIds?: string[]
 }
 
 export interface DocumentMetadata {
@@ -244,6 +261,12 @@ export interface DocumentMetadata {
    *  `status === "suggested"`; the panel section renders the accepted receipt +
    *  Undo. `undefined`/absent once the suggestion is dismissed. */
   _classification?: ClassificationSuggestion
+  /** SEED-227 — stamped by `multimodal_service._record_image_truncation` ONLY when a
+   *  document held more images than the per-document ceiling, so absent is the normal
+   *  case and means "nothing was left unread". `read` is the ceiling that applied at
+   *  ingestion time, NOT the current setting — raising the setting later does not
+   *  retroactively read the rest, and the panel must not imply that it did. */
+  _images?: { total: number; read: number }
   /** Custom (user-defined) field_keys read through. The panel renders the union of
    *  built-ins + enabled custom defs (`MetadataFieldDef`), never raw keys. */
   [key: string]: unknown
@@ -489,8 +512,45 @@ export interface Document {
   mime_type: string
   status: "pending" | "processing" | "completed" | "failed"
   error_message: string | null
-  /** Phase 56 D-10/D-11: granular sub-status while status='processing'. One of: 'extracting', 'chunking', 'embedding', 'metadata'. Backend sets via Realtime UPDATE; frontend renders via DocumentStatusBadge. */
+  /** Phase 56 D-10/D-11 · corrected Phase 217 (D-217-09/D-217-23): the granular sub-status the
+   *  ingestion pipeline last entered. SIX steps, not four — in the order `backend/app/api/documents.py`
+   *  actually writes them:
+   *  `'extracting'` → `'chunking'` → `'embedding'` → `'extracting_tables'` → `'extracting_images'`
+   *  → `'metadata'`. (The two `extracting_*` steps are CONDITIONAL — they are written only inside the
+   *  single `if raw and mime_type:` block, so a file with neither tables nor images never reaches them.)
+   *
+   *  ⚠ THE COLUMN IS NEVER CLEARED on completion. The terminal update writes status, chunk_count,
+   *  metadata, the extracted markdown and extractor, and leaves this field alone — so on a
+   *  `completed` document it reads `"metadata"` by RESIDUE, not by observation.
+   *  (⚠ The markdown column is named literally rather than spelled here on purpose: sketch fence
+   *  `D4` measures that it has ZERO non-test frontend references, and a mention in a comment reds
+   *  it. That fence is a real finding about a buried capability, not noise to route around.)
+   *  The only honest read is the PAIR
+   *  (`status`, `ingestion_step`) — `backend/app/services/text_sanitize.py:9` diagnoses BUG-260825-01
+   *  exactly that way. Consult this field ONLY while `status === "processing"` (the guard
+   *  `DocumentStatusBadge.tsx:27-32` already applies) or as the failure POINT while `status === "failed"`.
+   *  The one legitimate `null` write is the reingest reset (`documents.py:1543`).
+   *
+   *  Reaches the client BOTH ways: it rides the Supabase Realtime `payload.new` (a real column) AND
+   *  is serialized on every `DocumentResponse` route since Phase 217 plan 01 (D-217-10). */
   ingestion_step?: string | null
+  /** Phase 217 (D-217-08) — the ingestion engine that produced this document ("docling", "legacy", …).
+   *  A real `documents` column, so it rides `payload.new`. Optional: five backend routes build their
+   *  response from a narrow select. */
+  extractor?: string | null
+  /** Phase 217 (D-217-24) — SERVER-DERIVED from `mime_type` (a pydantic `@computed_field` on
+   *  `DocumentResponse`, NOT a stored column). True when the pipeline's table pass would run for this
+   *  file type at all.
+   *
+   *  ⚠ OPTIONAL BY NECESSITY, not by taste. It is derived, so it does NOT ride the Realtime
+   *  `payload.new` — exactly like `table_count`. The hook's UPDATE arm spread-merges and therefore
+   *  preserves it; the INSERT arm (`useDocuments.ts:63-68`) casts `payload.new` with no merge, so a
+   *  document uploaded in ANOTHER TAB arrives with this `undefined`. `undefined` means UNKNOWN and must
+   *  render as pending — never as skipped. */
+  tables_stage_applies?: boolean
+  /** Phase 217 (D-217-24) — the image half of the pair above. Same derivation, same optionality, same
+   *  `undefined`-means-unknown rule. */
+  images_stage_applies?: boolean
   chunk_count: number | null
   content_hash: string | null
   version_number?: number
@@ -500,6 +560,77 @@ export interface Document {
   updated_at: string
   table_count?: number
   image_count?: number
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Phase 217 — the document DETAIL row types.
+//
+// Each mirrors a Pydantic model FIELD FOR FIELD, so plans 10 and 11 consume one shape
+// rather than re-deriving it per surface. Sources:
+//   `DocumentChunkRow` / `DocumentTableRow` / `DocumentImageRow` / `DocumentContentResponse`
+//     → backend/app/models/document.py:102-140
+//   `DocumentQueryRow`
+//     → backend/app/api/document_queries.py:42-56 (deliberately NOT in models/document.py —
+//        it exists only because of that module's service-role carve-out)
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+/** One indexed chunk of a document. `embedding_model` / `embedding_dimensions` are the
+ *  lineage of the CHUNK, not of the document (D-217-08). */
+export interface DocumentChunkRow {
+  id: string
+  chunk_index: number
+  content: string
+  embedding_model?: string | null
+  embedding_dimensions?: number | null
+}
+
+/** One extracted table. `page` is null for formats without pagination (csv/xlsx). */
+export interface DocumentTableRow {
+  id: string
+  page?: number | null
+  table_index: number
+  headers: string[]
+  rows: string[][]
+  extractor?: string | null
+}
+
+/** One extracted image.
+ *  ⚠ THERE IS NO IMAGE HERE AND THERE NEVER CAN BE. `document_images` stores no bytes —
+ *  the encoded PNG is handed to the vision model and DISCARDED, so the `description` IS the
+ *  image on this wire. A `thumbnail` / `url` / `b64` field would promise a thing that does
+ *  not exist (backend/app/models/document.py:124-129). */
+export interface DocumentImageRow {
+  id: string
+  page?: number | null
+  image_index: number
+  description: string
+}
+
+/** One search that returned this document, within the backend's rolling window.
+ *  ⚠ `query_text` is null on rows written by the D-115-10 view/filter path, which records a
+ *  `via` and no question text. Render an honest sentence for that case — never a placeholder
+ *  question, never the string "undefined".
+ *  ⚠ `similarity` is null on historic rows that predate BE-5 (Phase 217.1). Rendering the
+ *  average over only non-null values is the correct measurement; zero rows → "not recorded yet". */
+export interface DocumentQueryRow {
+  query_text?: string | null
+  asked_at: string
+  via?: string | null
+  /** BE-5 (Phase 217.1-11): max per-hit similarity for THIS document on THIS search.
+   *  Null for historic rows predating the key — render "not recorded yet", never 0. */
+  similarity?: number | null
+}
+
+/** The document's extracted text, paged. Shape-mirrors `app.models.kb.ReadResponse` plus
+ *  `has_more`. */
+export interface DocumentContentResponse {
+  document_id: string
+  filename: string
+  total_lines: number
+  content: string
+  start_line?: number | null
+  end_line?: number | null
+  has_more: boolean
 }
 
 /** Phase 123-06 (TRIG-03) — one save-time description-lint warning, mirroring the
@@ -1070,6 +1201,20 @@ export interface Phase {
     | "unknown"
     | "cancelled"
   attempt?: number
+  /** The live-SSE terminal error text — `gate_failed.error` / `run_failed.reason`,
+   *  set by the demux as events arrive.
+   *
+   *  ⚠ **Only available for live-streamed runs (not backfilled from DB).** That sentence is
+   *  kept VERBATIM because it is still true of THIS field — and Phase 214 makes it no longer
+   *  the whole truth, so the correction sits beside it rather than replacing it.
+   *
+   *  ⚠ **PREFER `failureReason` BELOW.** A reconciled or reloaded run has no SSE history, so
+   *  this is empty on every run a person re-opens — while the reason itself has been in the
+   *  row the whole time (`workflow_phases.output._failure_reason`). Reading only this field is
+   *  what fired `PhaseCard`'s `reason_unknown` sentinel on a failure whose reason was known
+   *  (`BUG-260826-05`), and it is **D-v2.5-03** exactly: Realtime is a best-effort HINT, the
+   *  fetch is the source of truth. Read `error ?? failureReason` — live first, then the
+   *  reconciled fact — and treat BOTH being empty as the only honest "not recorded". */
   error?: string
   subAgents: TaskRunIndexItem[]
   pendingAsk: string | null
@@ -1079,6 +1224,41 @@ export interface Phase {
   /** GAP-C (D-11) — the terminal emit failure value (the `phase_substep` failure field).
    *  Renders failed-as-failed via the closed taxonomy. Undefined unless an emit failed. */
   emitFailure?: EmitFailure
+  /** Phase 214 (STEP-05 / D-214-23) — the DB-BACKED failure reason: this step's own
+   *  `workflow_phases.output["_failure_reason"]`, written by `fail_phase` on EVERY failure and
+   *  projected onto both wire models.
+   *
+   *  ⚠ **THE SIBLING OF `error` ABOVE, AND THE ONE THAT SURVIVES A RELOAD.** `error` comes from
+   *  SSE and is empty on any reconciled run; this comes from the fetch. That is why the field
+   *  exists rather than the doc simply being corrected: the existing union member could not
+   *  express a fact the wire had never carried.
+   *
+   *  ⚠ **`undefined` / `null` MEANS NOT RECORDED, AND AN EMPTY STRING IS NEVER SENT.** The
+   *  server normalises a whitespace-only reason to `null` precisely so absence keeps ONE
+   *  spelling. **Never coalesce this field to an empty string** — the forbidden form is
+   *  deliberately NOT spelled here, because the fence that forbids it sweeps `src/` and a
+   *  docblock quoting it would count its own prose (the 187-24 trap, which fired on this exact
+   *  surface while this plan was being written). Collapsing them costs `PhaseCard`'s
+   *  `reason_unknown` sentinel its meaning, which is the `0`-vs-`null` family of defect
+   *  `WorkflowRunPhase.step_count` already documents one wire over. A fence in
+   *  `lib/apiRunFields.fences.test.ts` sweeps `src/` for that collapse at zero occurrences. */
+  failureReason?: string | null
+  /** Phase 214 (STEP-04 / D-214-16) — the ACTION this step runs, by its wire name, derived
+   *  server-side from the definition that executed. `undefined` / `null` on every phase type
+   *  that is not `external_action`. */
+  toolName?: string | null
+  /** Phase 214 (STEP-04) — the native capability (`send_email` | `create_ticket` |
+   *  `post_message`). `null` on an MCP step, which carries a `toolName` and no capability. */
+  capability?: string | null
+  /** Phase 214 (STEP-04 / D-214-14 / D-213-02) — the SERVICE a person would name: the bound
+   *  connection's display name, resolved server-side at READ time and **computed, never
+   *  stored** (a stored copy goes stale on rename).
+   *
+   *  ⚠ **`null` IS A LEGITIMATE VALUE** — the connection was deleted, belongs to another org,
+   *  or none is bound — and the shared identity element renders the ACTION ALONE for it.
+   *  Never substitute a string of your own: never "Unknown service", never the capability id,
+   *  never the connection id. Never draw a name the system cannot know. */
+  serviceName?: string | null
 }
 
 // ────────────────────────────────────────────────────────────────────────────

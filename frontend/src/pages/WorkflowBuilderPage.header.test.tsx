@@ -1326,6 +1326,16 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
       "✎",
       "○",
       "Living Register",
+      // ⚠ Phase 214.1-01 (STEP-02) — THE FOURTH READING INSIDE `identityGroup`, and this pin
+      // is re-baselined DELIBERATELY rather than silently: forcing exactly this
+      // acknowledgement is what the literal list is FOR, and 205's Living Register toggle
+      // three lines above landed the same way. The declared-input door adds three atoms and
+      // no fourth band — `headerBandsAbove` still returns exactly one, so D-184.1-01 is
+      // untouched, and the flag-OFF pin above did NOT move because the node lives inside the
+      // same `canvasEnabled ? (…) : null` its two siblings do.
+      "✎",
+      "Asked when this runs",
+      "0",
       STRIP_BACK,
       STRIP_LABEL_GOVERN,
       "🔒",

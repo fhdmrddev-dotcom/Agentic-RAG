@@ -5,6 +5,28 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+# Phase 214 D-214-04 (STEP-02) — the RUN-SCAFFOLDING keys a launcher may not supply.
+#
+# ⚠ THIS EXISTS BECAUSE "THE RESERVED KEYS ARE SPREAD LAST SO THEY WIN" IS ONLY TRUE WHEN
+# THEY ARE PRESENT, AND `folder_id` IS SPREAD CONDITIONALLY. Measured, not reasoned about:
+# a POST with no `folder_id` and `inputs={"folder_id": "1111..."}` stored
+# `{'folder_id': '1111...', 'kickoff_prompt': ...}` — the launcher's value survived intact,
+# because there was no reserved value to overwrite it. `workflow_runs.inputs["folder_id"]`
+# is read back as the per-run retrieval override on the resume/Continue path, so the
+# precedence rule has to hold in BOTH arms or it is not a rule.
+#
+# The exposure is BOUNDED rather than absent — `harness.scope.resolve_run_scope_root`
+# re-validates the override against `fetch_visible_folders(owner)` on every read, so an
+# unreachable id is dropped and no cross-user scope is possible. It is stripped anyway:
+# defence in depth costs one dict comprehension, and a value that reaches the durable jsonb
+# without passing `MessageCreate.folder_id`'s UUID validation is a second door into a gated
+# field. `kickoff_prompt` is stripped for the same one-rule reason.
+#
+# ONE frozenset, imported by BOTH merge sites (api/threads.py and services/workflow_kickoff.py)
+# — this plan's whole complaint is a fact living in two places, so it does not add a third.
+RESERVED_RUN_INPUT_KEYS: frozenset[str] = frozenset({"kickoff_prompt", "folder_id"})
+
+
 class MessageCreate(BaseModel):
     content: str
     model: str | None = None
@@ -22,6 +44,36 @@ class MessageCreate(BaseModel):
     # definition's project_folder_id author default (D-03). None = today's behavior
     # (whole-KB / author default — D-06). A malformed UUID → FastAPI 422 for free (V5).
     folder_id: UUID | None = None
+    # Phase 214 D-214-04 (STEP-02): the DECLARED input values a launcher collected for
+    # this kickoff — the Run modal's fields, the chat launch form, Test Run. Merged
+    # server-side into create_workflow_run.inputs (api/threads.py) AND into the live
+    # ctx.inputs mirror (services/workflow_kickoff.py) in the same commit, beside
+    # kickoff_prompt and folder_id. Those two are RESERVED and win: a launcher key
+    # spelled `folder_id` must not be able to impersonate the owner-gated override
+    # (D-05), and one spelled `kickoff_prompt` could never have reached an adapter
+    # argument anyway (_NON_ACTION_RUN_INPUTS excludes it by NAME). None = today's
+    # behavior — the run's inputs dict is byte-identical to the pre-214 literal.
+    # dict[str, str], never dict[str, Any]: the launchers collect text fields, and the
+    # flat-path guarantee is what a permissive value type would quietly give away. A
+    # non-string value → FastAPI 422 for free, exactly as folder_id's malformed UUID.
+    #
+    # ── D-103-CONF-1 IS AMENDED HERE, DELIBERATELY AND IN WRITING ──────────────────
+    # The shipped constraint reads "reuses the EXISTING kickoff path — createThread +
+    # sendMessage(workflow_definition_id) — NEVER a bespoke /workflows/{id}/run route
+    # (D-103-CONF-1; threads.py byte-identical)". Its PURPOSE is that there is exactly
+    # ONE kickoff path with one governance story; "threads.py byte-identical" is how
+    # Phase 103 achieved that at the time, not the thing being protected.
+    #   * WHAT IS AMENDED: this one additive request field, plus one dict merge in each
+    #     of the two kickoff literals.
+    #   * WHY SC#2 CANNOT BE MET WITHOUT IT: the declared values have no other channel,
+    #     and a second route is the thing D-103-CONF-1 actually forbids.
+    #   * THE NEW BOUNDARY: no new route, no new key on the POST *response*, no change
+    #     to the two-rows model, the create-before-spawn ordering, the template-upload
+    #     sequencing or the orphan cleanup. The amendment is exactly one request field
+    #     and one dict literal (twice).
+    # Phase 216 (CHAT-05 / CHAT-06): active connector connection IDs for this message / thread turn.
+    active_connector_ids: list[UUID] | None = None
+    inputs: dict[str, str] | None = None
 
 
 class MessageResponse(BaseModel):
@@ -68,3 +120,5 @@ class MessageResponse(BaseModel):
     provider: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
+    active_connector_ids: list[UUID] | None = None

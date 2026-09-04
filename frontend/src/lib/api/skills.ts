@@ -572,6 +572,8 @@ export interface FullAppSettings {
   rerank_model: string
   rerank_top_n: number
   rerank_has_api_key: boolean
+  /** SEED-227 — per-document ceiling on images read by the vision model. */
+  multimodal_max_vision_calls: number
   retrieval_top_k: number
   retrieval_match_threshold: number
   hybrid_search_enabled: boolean
@@ -665,6 +667,7 @@ export interface SettingsUpdate {
   rerank_api_key?: string
   rerank_model?: string
   rerank_top_n?: number
+  multimodal_max_vision_calls?: number
   retrieval_top_k?: number
   retrieval_match_threshold?: number
   hybrid_search_enabled?: boolean

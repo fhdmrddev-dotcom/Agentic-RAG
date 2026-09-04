@@ -56,7 +56,7 @@ export function OrgBand({
 }: OrgBandProps) {
   return (
     <header className="border-b border-primary/25 bg-gradient-to-b from-primary/[0.07] to-transparent px-6 py-3.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="mx-auto flex max-w-6xl w-full flex-wrap items-center gap-x-3 gap-y-2">
         {/* Zone identity: plain Shield (indigo — the org's own home, NOT the operator zone). */}
         <div className="flex items-center gap-2.5 font-headline text-lg font-extrabold text-foreground">
           <Shield className="h-[18px] w-[18px] text-primary" aria-hidden="true" />

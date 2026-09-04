@@ -324,3 +324,123 @@ describe-to-build stays honest at that scale, and what OAuth costs — **before 
 scoped.** Scoping it now would be scoping from three screenshots and one example.
 
 Full statement, verbatim: `.planning/seeds/SEED-202-the-operators-vision-read-and-write-across-systems.md`
+
+---
+
+## ⭐ APPENDED 2026-08-26 — THE INTERACTION-MODE AXIS, AND THE INGESTION-TARGET QUESTION THIS DOCUMENT NEVER ASKED
+
+**Appended, never edited in place** — this file's own convention. Nothing above is retracted.
+
+Operator, 2026-08-26:
+
+> "we planned also to use connectors in threads and chats similar to what you do as claude ai but we
+> never thought about specific cases that are outside workflows and threads like for example
+> connecting to one drive, or google drive or emails or teams … etc to ingest documents as they are
+> uploaded or maybe ingest meeting transcript and so on."
+
+> "we have to think about how to ingest once this connection is established. for example, if a file
+> is uploaded into onedrive, where it will be stored? this should be similar to document management
+> system like m-files which we already define the rules, classes and structure."
+
+### Why this is an addition rather than a restatement
+
+Everything above organises by **provider × capability** (Google → Gmail / Drive / Calendar / Sheets).
+That axis is correct and is what makes the OAuth-family sequencing work. But it has no vocabulary for
+**who initiates, and where the data lands** — and that is the axis on which the unplanned cases sit.
+
+### The seven interaction modes
+
+| # | Mode | Example | Status before 2026-08-26 |
+|---|---|---|---|
+| **A** | Agent pulls, mid-chat | *"what's the status of DMT-114?"* | planned — §2 reads, §5 surfaces, SEED-202 |
+| **B** | Agent writes, mid-chat | *"email Hajer the summary"* | planned — §6 approval model is a HARD prerequisite |
+| **C** | **Human attaches from a connected source** | *"add file from Drive"* in the composer | ⚠ **named nowhere** → **SEED-213** |
+| **D** | Continuous background sync → KB | a OneDrive folder auto-ingests | SEED-142 half 2 |
+| **E** | **Event-triggered ingest** | meeting ends → transcript ingests | implied, never specified → **SEED-212** |
+| **F** | Scheduled outbound | the Monday status email | scheduler shipped (Phase 204) ⚠ see BUG-260826-06/07 |
+| **G** | Us as MCP server | Claude Desktop queries our KB | SEED-013 |
+
+**Mode C is the cheap one, and it should be sequenced FIRST.** Six of the seven hard problems below do
+not apply to it, structurally rather than luckily: a person who picks a file has already proven they
+can read it, and a point-in-time copy has no ongoing relationship to keep consistent. It also builds
+the OAuth connection, the provenance fields and the source-identity key that every other mode needs —
+on a path where a failure is one visible error rather than a silent gap in a corpus. **SEED-213.**
+
+### The ingestion-target question — and the finding that most of the answer is already built
+
+*"If a file is uploaded into OneDrive, where will it be stored?"* is the question this scope section
+never asked, and the M-Files framing is the right one — because **the M-Files primitives already exist
+in this codebase**, measured 2026-08-26:
+
+| M-Files concept | This app | Where |
+|---|---|---|
+| Property definitions | custom field definitions — the filter whitelist is *built-ins ∪ enabled custom fields* | `document_view_resolver.py:128-150` |
+| Classes / auto-classification | classification rules with a validated `match_expr` AST | `api/classification_rules.py` (Phase 118) |
+| Dynamic views | saved document views — filters, never folders | `api/document_views.py` (Phase 114) |
+| Permission from metadata | ❌ **nothing** | → SEED-210 / SEED-211 |
+
+And the rules already fire at the right moment — `classification_rules.py:6-7`: *"a rule is evaluated
+**on upload by the ingest splice**, not resolved on demand."*
+
+**So the connector work needs no routing engine. It needs two things, and they are binding on any
+sync phase:**
+
+1. **Connector ingest MUST enter through the same splice as a manual upload.** Otherwise classification
+   rules silently do not apply to synced files — and the failure is invisible, because the documents
+   *do* appear, merely unclassified. Every DMS guarantee would hold for the handful of manual uploads
+   and quietly not for the ten thousand files that arrived automatically.
+2. **Source facts must become first-class filterable fields** — site, library, path, owner, sender,
+   participants, channel, and the SharePoint columns themselves. Without them the rule everyone
+   actually wants (*"anything from the DMT SharePoint library → class: Programme Doc"*) cannot be
+   written. The extension is a MAPPING into the custom-field system that ships today, not a new
+   subsystem.
+
+Placement proposal, argued in full in **SEED-209**: bytes to the same bucket · a source-identity key
+so re-sync updates rather than duplicates · mirror the source tree as **metadata, not folders** ·
+rules **suggest, never move** (reusing Phase 118's shipped grain) · unmatched goes to a review queue,
+never silent default filing.
+
+### ⚠ THE INBOUND SECURITY ENVELOPE DOES NOT EXIST, AND IT IS A PREREQUISITE
+
+Phase 189/190 spent a milestone on what **leaves** — unconditional egress guard, armed checkpoint,
+at-most-once, receipts that carry no recipient, a kill switch requiring a positive `"everyone"`.
+Grepped 2026-08-26 across the seeds register, this document and `docs/CONNECTOR-ARCHITECTURE.md`:
+**zero hits** for permission-aware indexing, source ACLs or permission mirroring.
+
+- **Synced documents flatten their source permissions.** Every user who can query the KB could
+  retrieve content they cannot open at the source — and retrieval is worse than a listing, because a
+  synthesised answer leaks a document's substance without ever surfacing its name. **SEED-210.**
+- **Source deletions never propagate.** Deleted, unshared, moved, or the connection disconnected —
+  today nothing happens and the chunks keep answering. **SEED-210.**
+- ⚠ **The standing manual-upload rule was load-bearing for SECURITY in a way its wording never
+  claimed:** every document was placed by a person who could already read it, which is what made
+  ownership-based RLS adequate. **Whoever retires that rule (SEED-142 requires it be retired in the
+  same commit as the first sync connector) is also retiring the reason our permission model was
+  sufficient.**
+- The candidate mechanism — permissions **derived from metadata**, the M-Files model, which would make
+  ACL mirroring a *rule* rather than a subsystem — is a genuine architectural fork with a strong case
+  both ways, written up with a recommended middle path in **SEED-211**. Cheap before auto-ingest,
+  expensive after.
+
+**Consequence for sequencing: a v1 answer for SEED-210 is required before ANY mode-D or mode-E
+connector ships.** Connection-scoped visibility is a legitimate v1; silence is not — a connector that
+ingests broadly and says nothing about visibility has made the one choice with no defence.
+
+### Meeting transcripts are a SOURCE SHAPE, not a provider capability
+
+Teams appears above only as a Microsoft surface. A transcript is not a document that arrived from
+Teams: it is an **event** (organiser, participants, series), its value is **decisions and
+commitments** rather than prose, its retrievable unit is a **topic segment of speaker turns** rather
+than a page, and it arrives **continuously and unprompted** — which makes it the primary case for
+mode E. It is also plausibly the highest-value source this product has: the DMT briefing workflow read
+20-30 sources on 2026-08-26 and still opened *"Latest recorded evidence: 8 Jul 2026"*. **SEED-212.**
+
+⚠ **Transcripts are also where SEED-210's flattening problem does its worst damage** — a private 1:1
+landing in a shared knowledge base is candid, personal, and about people who never chose to publish
+it. If transcripts ship before SEED-210 is answered, that is where the incident happens.
+
+### New seeds from this session
+
+`SEED-209` (ingest splice + source facts) · `SEED-210` (inbound permission & lifecycle envelope) ·
+`SEED-211` (permissions from metadata — the fork) · `SEED-212` (meeting transcripts) ·
+`SEED-213` (human-initiated attach — mode C).

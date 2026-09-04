@@ -891,6 +891,58 @@ async def resolve_active_org_soft(
     return active
 
 
+async def resolve_active_org_or_none(
+    request: Request, current_user: dict
+) -> str | None:
+    """The caller's VALIDATED active org, or ``None`` when there isn't one to have.
+
+    ── ⚠ WHY THIS EXISTS BESIDE `get_active_org_id` (2026-08-31) ────────────────────────
+    `get_active_org_id` is a GATE: absent header + two memberships is a 400, zero
+    memberships is a 403. That is right for `/org/*` and `/connectors/*`, where operating
+    on the wrong org is the whole danger and refusing is the safe answer.
+
+    It is WRONG for a chat turn. A person sending a message has not asked to operate on an
+    org, and answering 400 because their account happens to belong to two would break
+    chat outright. But the org still MATTERS there — it decides which connectors the turn
+    may use and which knowledge it can see — so "ignore it" is not right either.
+
+    So: same validation, softer failure. A header that names an org the caller is not a
+    member of returns ``None`` and is never trusted; an absent header returns ``None`` and
+    the caller falls back to its own default.
+
+    ⚠ THE MEMBERSHIP CHECK IS NOT OPTIONAL AND MUST NEVER BE SKIPPED FOR SPEED. The header
+    is client-supplied. Without the check, any caller could read another org's connections
+    by typing its id — which is precisely the hole `get_active_org_id` was built to close.
+    It runs on the caller's own RLS connection, so `auth.uid()` is the caller.
+    """
+    header_org = request.headers.get("X-Org-Id") if request is not None else None
+    if not header_org:
+        return None
+    org_uuid = _to_uuid(header_org)
+    if org_uuid is None:
+        return None
+    try:
+        async with get_user_pg_connection(request, current_user) as conn:
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+    except Exception:  # noqa: BLE001 — a DB boundary; an unresolved org is not fatal here
+        logger.warning(
+            "could not validate the X-Org-Id header for user %s — falling back to the "
+            "caller's default org", current_user.get("id"), exc_info=True,
+        )
+        return None
+    if row is None:
+        # Not a member. Silent fallback rather than a 403: this is a chat message, and the
+        # header is a hint the server re-validates, exactly as admin.py:876 describes it.
+        logger.warning(
+            "X-Org-Id named an org the caller is not a member of — ignoring the header",
+        )
+        return None
+    return str(org_uuid)
+
+
 async def require_org_manage(
     request: Request,
     current_user: dict = Depends(get_current_user),

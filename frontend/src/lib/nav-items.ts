@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Activity, Zap, Settings, Workflow, Wand2, ShieldCheck } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -34,24 +34,46 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // it stays visible to all today; a future operator tighten makes it vanish for
   // non-operators automatically (the map, not a hardcode).
   { view: "workflows", icon: Workflow, label: "Workflows", feature: "workflow_authoring" },
-  { view: "documents", icon: FileText, label: "Documents" },
+  { view: "documents", icon: FileText, label: "Library" },
   // Phase 118 gap-closure (CLASS-01 reachability): the classification-rules
   // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
   // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.
   { view: "classification-rules", icon: Wand2, label: "Classification" },
-  { view: "library-health", icon: Activity, label: "Library Health" },
-  // Phase 119 (DGOV-01/02): the Governance top-level home — a peer to Library
-  // Health, distinct glyph (ShieldCheck — NOT Wand2=Classification, NOT
-  // Activity=Library Health) + label distinct from "Library Health" (D-119-1).
-  // Deliberately NOT gated behind DMF-03 / document_management_enabled: 113-118
-  // all left their DM surfaces ungated (the flag is dormant at every DM surface);
-  // gating Governance alone would be the lone inconsistent surface (A8).
-  // Phase 148 (VIS-01): governed by `governance_health` (Everyone on the day-one map).
-  { view: "governance", icon: ShieldCheck, label: "Governance", feature: "governance_health" },
-  // Phase 148 (VIS-01): governed by `skill_studio` (Operators-only on the day-one
-  // map) — vanishes for a non-operator; the Studio's evals/triggering/versions are
-  // API-gated (148-05), so hiding the entry avoids a dead-click.
-  { view: "skills", icon: Zap, label: "Skills", feature: "skill_studio" },
+  // ⚠ UNGOVERNED, AND DELIBERATELY SO — this entry exists because the Settings one
+  // below CANNOT carry Connections. `Settings` is tagged `model_management`, which
+  // `backend/app/api/features.py:21` classifies Operators-only, so `visibleNavItems`
+  // dropped it for every member — and with it the whole connections surface Phases
+  // 211-216 shipped. That tag was CORRECT when Settings held only model management;
+  // it stopped being correct when Settings grew a per-user tab.
+  //
+  // Un-tagging Settings was the other candidate and is the WRONG fix: `GET /settings`
+  // and `PUT /settings` themselves carry `require_visible("model_management")`
+  // (`api/settings.py:331,341`), so a member reaching the page would meet a 403 on
+  // mount. This entry opens the SAME page pinned to the Connections tab, which fetches
+  // its own rows through `listConnectorConnections()` and needs neither endpoint.
+  //
+  // ⚠ It is ungoverned by DESIGN, not by omission: a connection is a per-user asset,
+  // like a thread. If connections ever need governing they get their OWN feature key —
+  // never `model_management`, whose audience is about models.
+  { view: "connections", icon: Plug, label: "Connections" },
+  // ⚠ UNGOVERNED SINCE 2026-08-31, AND THE TAG IT LOST WAS GATING THE WRONG THING.
+  //
+  // The note this replaces is preserved because its reasoning was sound and its SCOPE was
+  // not: *"governed by `skill_studio` (Operators-only) — the Studio's evals/triggering/
+  // versions are API-gated, so hiding the entry avoids a dead-click."* True of the STUDIO.
+  // But `skill_studio` gates `api/evals.py`, `api/skill_test_cases.py` and
+  // `api/skill_tuner.py` — and `api/skills.py`, all TWELVE routes of it, is UNGATED. So
+  // creating, uploading and editing a skill has always been open to a member at the API
+  // while the only door to it was hidden from them.
+  //
+  // The operator put it plainly: *"skills, we should have it absent? At least to upload a
+  // skill or create a skill."* Same shape as the Settings entry two lines down: one
+  // feature key gating a whole HOME whose scope grew past the feature.
+  //
+  // ⚠ The Studio itself stays gated where it already is — at its own API, and at the
+  // entry point on `SkillsPage` (`onOpenStudio`), which is a separate `ActiveView` and is
+  // deliberately NOT in this array.
+  { view: "skills", icon: Zap, label: "Skills" },
   // Phase 148 (VIS-01): governed by `model_management` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the chat model picker (GET /settings/providers)
   // is an ungated Run carve-out (148-05), so chat/run never breaks by hiding Settings.

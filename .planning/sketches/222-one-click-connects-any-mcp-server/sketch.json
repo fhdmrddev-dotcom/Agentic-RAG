@@ -1,0 +1,14 @@
+{
+  "sketch_id": "222-one-click-connects-any-mcp-server",
+  "phase": 222,
+  "title": "One-Click Connects Any MCP Server — The 5 Door States",
+  "states": [
+    { "id": "probing", "description": "Inline polling indicator while discovering server metadata" },
+    { "id": "open", "description": "Kind: open. Direct connect button for servers requiring no credentials" },
+    { "id": "oauth_dcr", "description": "Kind: oauth (registration_required: false). 1-click Sign in with host" },
+    { "id": "oauth_byo", "description": "Kind: oauth (registration_required: true). Client ID/Secret form" },
+    { "id": "token_fallback", "description": "Kind: token. Static token input with verbatim detail copy" },
+    { "id": "policy_refusal", "description": "HTTP 422 security egress refusal with structured reason code" }
+  ],
+  "design_tokens": "frontend/src/index.css"
+}

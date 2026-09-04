@@ -30,6 +30,8 @@ import type { PhaseSpecJSON } from "./phaseVocabulary"
 // so `git diff` on this file shows added lines only.
 import { toCanvas } from "./canvasModel"
 import { CANVAS_NODE_TYPES } from "./canvasModel"
+// Plan 214.1-01, as SEPARATE statements for the same reason: added lines only.
+import { declaredInputFor, type DeclaredInput } from "./declaredInputs"
 
 /**
  * The whole-suite network tripwire. D-184-03 says an undo NEVER writes to the server, so
@@ -1003,6 +1005,139 @@ describe("builderStore — setIsStateful sets is_stateful and arms dirty (Phase 
     // Steps are undone, meta.is_stateful is preserved
     expect(store.getState().phases).toHaveLength(3)
     expect(store.getState().meta.is_stateful).toBe(true)
+  })
+})
+
+// ── 16. Phase 214.1-01 (STEP-02 · D-214.1-01 · D-214.1-02) — setDeclaredInputs ──────
+//
+// APPENDED, and — like sections 12, 13 and 14 above — deliberately still ABOVE the whole-suite
+// network tripwire so the "exactly 0 calls" claim covers these too.
+//
+// WHY THIS SECTION EXISTS. `setDeclaredInputs` is the SIXTH structural mirror of the shipped
+// `meta` writers and the ONE write path for `definition.inputs[]`. It inherits the same five
+// properties, and each is driven as its own case rather than assumed from the family
+// resemblance — a sixth sibling that merely LOOKS like the other five is exactly how one of
+// the five silently goes missing.
+//
+// ⭐ THE LOAD-BEARING CASE IS THE KEY-SET ONE. `InputFieldSpec` is `extra="forbid"` and
+// `selectDefinition` spreads `meta` STRAIGHT into the autosave PATCH body, so a stray key on
+// an entry — `description`, say — is a 422 that destroys the very first write.
+
+describe("builderStore — setDeclaredInputs writes meta.inputs (Phase 214.1)", () => {
+  it("writes the array verbatim onto meta.inputs", () => {
+    const store = createBuilderStore(draft())
+    expect(store.getState().meta.inputs).toBeUndefined()
+
+    store.getState().setDeclaredInputs([declaredInputFor("recipient")])
+
+    expect(store.getState().meta.inputs).toEqual([
+      { key: "recipient", label: "recipient", type: "text", required: true },
+    ])
+  })
+
+  it("adds exactly ONE key to the PATCH body, and every entry carries exactly four", () => {
+    const store = createBuilderStore(draft())
+    const keysBefore = Object.keys(selectDefinition(store.getState()))
+
+    store.getState().setDeclaredInputs([declaredInputFor("recipient"), declaredInputFor("subject")])
+
+    // Asserted over what actually SHIPS, not over `meta`: `selectDefinition` is what the
+    // autosave PATCH body is built from, and the endpoint's model forbids extra keys.
+    const after = selectDefinition(store.getState())
+    expect(addedKeys(keysBefore, Object.keys(after))).toEqual(["inputs"])
+
+    // ⭐ THE 422 FENCE, asserted on the shipped payload rather than on the minting function.
+    const shipped = after.inputs as Array<Record<string, unknown>>
+    expect(shipped).toHaveLength(2)
+    for (const entry of shipped) {
+      expect(Object.keys(entry).sort()).toEqual(["key", "label", "required", "type"])
+    }
+
+    // POSITIVE CONTROL: the key-set comparison really does catch a stray key.
+    expect(Object.keys({ ...shipped[0], description: "nope" }).sort()).not.toEqual([
+      "key",
+      "label",
+      "required",
+      "type",
+    ])
+  })
+
+  it("arms dirty in the SAME act, on a store whose phases reference did not change", () => {
+    const store = createBuilderStore(draft())
+    const phasesBefore = store.getState().phases
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setDeclaredInputs([declaredInputFor("recipient")])
+
+    // This is the case that would fail if the action leaned on the `phases` subscription:
+    // that subscription arms `dirty` on a change to the phases REFERENCE and nothing else.
+    expect(store.getState().phases).toBe(phasesBefore)
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("a non-drafted builder is a NO-OP — meta unchanged by reference, still clean", () => {
+    const store = createBuilderStore(null)
+    expect(store.getState().builderPhase).toBe("empty")
+    const metaBefore = store.getState().meta
+
+    store.getState().setDeclaredInputs([declaredInputFor("recipient")])
+
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().meta.inputs).toBeUndefined()
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("is UNTRACKED — an undo restores STEPS and never the declared inputs", () => {
+    const store = createBuilderStore(draft())
+    const depthBefore = past(store).length
+
+    store.getState().setDeclaredInputs([declaredInputFor("a")])
+    store.getState().setDeclaredInputs([declaredInputFor("a"), declaredInputFor("b")])
+
+    expect(past(store)).toHaveLength(depthBefore)
+
+    // The POSITIVE CONTROL: without it the assertion above would pass just as happily on a
+    // store where NOTHING is tracked at all.
+    store.getState().addPhaseOfType("llm_single")
+    expect(past(store)).toHaveLength(depthBefore + 1)
+
+    store.temporal.getState().undo()
+
+    expect(store.getState().phases).toHaveLength(3)
+    expect(store.getState().meta.inputs).toHaveLength(2)
+  })
+
+  it("removes an entry when handed the shorter array, and empties to []", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setDeclaredInputs([declaredInputFor("a"), declaredInputFor("b")])
+
+    store.getState().setDeclaredInputs([declaredInputFor("b")])
+    expect((store.getState().meta.inputs as DeclaredInput[]).map((i) => i.key)).toEqual(["b"])
+
+    store.getState().setDeclaredInputs([])
+    expect(store.getState().meta.inputs).toEqual([])
+  })
+
+  it("carries no other meta field away with it", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setDeclaredInputs([declaredInputFor("recipient")])
+
+    const meta = store.getState().meta
+    expect(meta.slug).toBe("risk-register")
+    expect(meta.version).toBe(1)
+    expect(meta.business_requirement).toBe("Summarise the week's risks.")
+    expect(meta.project_folder_id).toBeNull()
+  })
+
+  it("never writes input_keys — that key would SHADOW every declared input", () => {
+    // `entryInputFields` gives bare `input_keys` precedence over `inputs[]`, and
+    // `WorkflowDefinition` does not declare `input_keys` at all. A definition carrying both
+    // would render the wrong form; this door never mints one.
+    const store = createBuilderStore(draft())
+    store.getState().setDeclaredInputs([declaredInputFor("recipient")])
+
+    expect(selectDefinition(store.getState())).not.toHaveProperty("input_keys")
   })
 })
 

@@ -8,11 +8,33 @@
       "Bash(powershell -Command \"\n\\\\$procId = \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess\nWrite-Host 'Listening PID:' \\\\$procId\nStop-Process -Id \\\\$procId -Force -ErrorAction SilentlyContinue\nStart-Sleep 2\n\\\\$after = \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess\nWrite-Host 'After kill:' \\\\$after\n\" 2>&1)",
       "Bash(curl -s http://127.0.0.1:8000/health)",
       "Bash(tasklist)",
-      "Bash(tasklist /FI \"PID eq 23604\")"
+      "Bash(tasklist /FI \"PID eq 23604\")",
+      "Bash(gsd-sdk query *)",
+      "Bash(git worktree *)",
+      "Bash(git branch *)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__performance_start_trace",
+      "mcp__chrome-devtools__list_pages",
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(./backend/venv/Scripts/python.exe -m pytest backend/tests/unit/test_extraction_service.py --tb=no -q)",
+      "Bash(./venv/Scripts/python.exe -c \"import subprocess, pathlib, json, sys; raw = pathlib.Path\\('tests/fixtures/extraction/reference.pdf'\\).read_bytes\\(\\); r = subprocess.run\\([sys.executable, '-m', 'extractors.pymupdf_isolated', '--mime', 'application/pdf'], input=raw, capture_output=True, timeout=60, check=False\\); print\\('rc:', r.returncode\\); print\\('stderr:', r.stderr.decode\\('utf-8','replace'\\)[:500] if r.stderr else '\\(none\\)'\\); p = json.loads\\(r.stdout\\) if r.returncode == 0 else None; print\\('text len:' if p else 'no payload:', len\\(p['text']\\) if p else r.returncode\\); print\\('engine:', p['extractor_name'] if p else 'N/A'\\)\")",
+      "Bash(./venv/Scripts/python.exe -c \"from app.services.extractors.pymupdf import PyMuPDFExtractor; e = PyMuPDFExtractor\\(\\); print\\('supports pdf:', e.supports\\('application/pdf'\\)\\); print\\('supports docx:', e.supports\\('application/vnd.openxmlformats-officedocument.wordprocessingml.document'\\)\\)\")",
+      "Bash(./venv/Scripts/python.exe -c \"import importlib, sys; importlib.import_module\\('app.services.extraction_service'\\); importlib.import_module\\('app.services.extractors.pymupdf'\\); forbidden = {'fitz', 'pymupdf', 'PyMuPDF'} & set\\(sys.modules\\); print\\('AGPL fence:', 'OK' if not forbidden else f'VIOLATED \\({forbidden}\\)'\\)\")",
+      "Bash(grep -cE 'child_env|env=\\\\\\\\{\\\\\"PATH\\\\\":' app/services/extractors/pymupdf.py)",
+      "Bash(echo \"env scrubbing \\(PATH only\\): $\\(grep -cE 'child_env|env=\\\\\\\\{\\\\\"PATH\\\\\":' app/services/extractors/pymupdf.py\\)\")",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/integration/test_documents.py::TestUploadDocument::test_upload_with_valid_folder_id_returns_201 -x --tb=short)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Format-List LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess\")",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/integration/test_documents.py::TestReextractDocument tests/integration/test_docling_extractor.py tests/integration/test_pymupdf_fence.py tests/integration/test_pdf_extractor_docling_compat.py -p no:cacheprovider --tb=line -q)",
+      "mcp__chrome-devtools__fill_form"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "supabase-local"
-  ]
+  ],
+  "outputStyle": "Concise"
 }

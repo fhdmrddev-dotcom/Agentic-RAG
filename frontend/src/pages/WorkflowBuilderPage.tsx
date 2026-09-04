@@ -22,9 +22,12 @@
  * broken draft (the G-6 silent-invalid-draft guard at the UI seam, T-103-04-01).
  *
  * Refinement is FORM-LED on a READ-ONLY vertical spine (no drag-canvas, no
- * router): the read-only `PhaseSpineGraph` + the 400px push `PhaseFormPanel`,
- * wired exactly like the app's existing ChatLayout push grid
- * (`gridTemplateColumns: minmax(0,1fr) <44px|400px>`).
+ * router): the read-only `PhaseSpineGraph` + the `clamp(480px, 38%, 640px)` push
+ * `PhaseFormPanel`, wired exactly like the app's existing ChatLayout push grid
+ * (`gridTemplateColumns: minmax(0,1fr) <44px|clamp(480px, 38%, 640px)>`).
+ * ⚠ D-214-22 (2026-08-28) widened the open track off its old fixed pixel value onto the
+ * SAME clamp Settings has used since Phase 213 (`ConnectionsTab.tsx`) — the two authoring
+ * panels are ONE track, not two. The 44px collapsed strip is deliberately unchanged.
  *
  * ── Phase 183-07 (CANVAS-01, D-183-01 … D-183-05) — the Canvas door ─────────────
  *
@@ -57,7 +60,7 @@
  * stylesheet still loads eagerly from `index.css` — the documented plan 183-01 trade.)
  *
  * ONE SELECTION CONTRACT, TWO VIEWS (D-183-05). Both views receive the identical
- * `onSelectNode` callback, so the shipped 400px `PhaseFormPanel` opens on the clicked
+ * `onSelectNode` callback, so the shipped `clamp(480px, 38%, 640px)` `PhaseFormPanel` opens on the clicked
  * phase with zero net-new panel work and the toggle-off-on-reclick semantics stay
  * here, on the page, rather than being re-implemented inside either graph.
  *
@@ -180,6 +183,9 @@ import {
   type TemplateAssetDescriptor,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+// Phase 214.1-01 (STEP-02) — the definition-level declared-input door. ONE import, ONE
+// gated node, no page state; see `declaredInputsAffordance` below.
+import { DeclaredInputsEditor } from "@/components/workflows/DeclaredInputsEditor"
 import { classifyTemplateNames } from "@/components/workflows/templateNameBuckets"
 import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
@@ -673,6 +679,20 @@ export interface WorkflowBuilderPageProps {
    *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
   initialProjectFolderId?: string
   /**
+   * 214-13 (STEP-06 / D-214-20): the connections the author ticked on the LOOSE door, made
+   * BEFORE the AI drafts. Straight through to the generate call, which is the only thing that
+   * can spend them.
+   *
+   * ⚠ THE PRECEDENT IS `initialProjectFolderId` DIRECTLY ABOVE — the same mechanism, for the
+   * same kind of pre-draft choice: no store, no context, no global.
+   *
+   * ⚠ ABSENT AND `[]` ARE DIFFERENT AND MUST NOT COLLAPSE. `undefined` is *no preference* and
+   * reaches the server's unconstrained arm, which is today's behaviour byte for byte; `[]` is
+   * the author's decision that no external step may be emitted. Every hop on this path branches
+   * on `=== undefined` rather than on truthiness.
+   */
+  initialAllowedConnectionIds?: string[]
+  /**
    * 193.1-08 (D-24) — the document the author supplied on the LOOSE door, and its
    * ALREADY-COMPLETED reading, carried across the hand-off.
    *
@@ -733,6 +753,7 @@ export function WorkflowBuilderPage({
   initialDescribe,
   autoDraft,
   initialProjectFolderId,
+  initialAllowedConnectionIds,
   initialTemplateFile,
   initialTemplateRead,
   registerCanLeave,
@@ -908,6 +929,10 @@ export function WorkflowBuilderPage({
     initialDescribe,
     autoDraft,
     initialProjectFolderId,
+    // 214-13 (STEP-06) — straight through to the hook, which is the only holder of the
+    // generate call. `undefined` on every mount that supplies nothing, which is every shipped
+    // call site but the loose door's.
+    initialAllowedConnectionIds,
     // 193.1-08 (D-24) — straight through to the hook, which SEEDS its reading with them.
     // Undefined on every mount that supplies nothing, which is every shipped call site but
     // the loose door's.
@@ -955,7 +980,8 @@ export function WorkflowBuilderPage({
   const activeGraphView = canvasEnabled ? graphView : "spine"
 
   // D-183-05 — ONE selection contract, shared by BOTH views, owned by the page. Click
-  // a node to anchor the 400px form panel; click the same node again to close it.
+  // a node to anchor the `clamp(480px, 38%, 640px)` form panel; click the same node
+  // again to close it.
   const handleSelectNode = useCallback((slug: string) => {
     setSelectedSlug((cur) => (cur === slug ? null : slug))
   }, [])
@@ -2178,7 +2204,8 @@ export function WorkflowBuilderPage({
     )
   }
 
-  // ── DRAFTED: the read-only spine graph (left) + the 400px push form panel (right). ──
+  // ── DRAFTED: the read-only spine graph (left) + the `clamp(480px, 38%, 640px)` push
+  // form panel (right). ──
   // The push grid mirrors the app's existing ChatLayout 2-state track exactly.
 
   // The graph column's CHILD — one view or the other, never both, both fed the same
@@ -2606,6 +2633,23 @@ export function WorkflowBuilderPage({
   ) : null
 
   /**
+   * Phase 214.1-01 (STEP-02 · D-214.1-01) — the declared-input door.
+   *
+   * ⚠ ONE GATED NODE, INSIDE THE SAME `canvasEnabled ? (…) : null` SHAPE ITS TWO SIBLINGS
+   * USE, and never a new node in `identityGroup` reached by a second condition. That
+   * placement is not tidiness: band 3 of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting
+   * `identityGroup`, a literal that has been re-captured twice and whose own note says no
+   * third is expected. Living inside the gate is what makes the flag-off header unable to
+   * see this node at all — structural, rather than careful.
+   *
+   * ⚠ THE PAGE GAINS NO STATE. The dialog's open flag, the pending key and the refusal all
+   * live inside `DeclaredInputsEditor`, which reads the store through the provider this page
+   * already mounts. That is the measurable form of "honoured by construction" for a file
+   * that fires G-5 at 22 phases: one import, one node, zero `useState`, zero deleted lines.
+   */
+  const declaredInputsAffordance = canvasEnabled ? <DeclaredInputsEditor /> : null
+
+  /**
    * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
    * the slug when it does not, the shipped fallback when it has neither.
    *
@@ -2670,6 +2714,7 @@ export function WorkflowBuilderPage({
       {kbAffordance}
       {requirementAffordance}
       {statefulAffordance}
+      {declaredInputsAffordance}
     </>
   )
 
@@ -2803,18 +2848,23 @@ export function WorkflowBuilderPage({
           ⚠ IT IS A MOCKUP FOCUS DEVICE, WHICH IS A REAL CLASS ON THIS SHEET RATHER THAN AN
           EXCUSE. The sheet draws its plane as ten static illustrative nodes, and the audit's
           own next row records a second divergence in the same layout: the sheet shows an open
-          400px panel AND the 44px collapsed strip simultaneously, which in the product is the
+          `clamp(480px, 38%, 640px)` panel AND the 44px collapsed strip simultaneously, which in the product is the
           same grid track and therefore an unreachable state. A sheet may draw an arrangement
           the live surface cannot hold; where it does, the live surface is the constraint.
 
           ⚠ RE-OPEN TRIGGER, so this is dated rather than permanent: a step panel that becomes
           MODAL — one the author cannot navigate past — would make the dim honest, because the
           plane behind it really would be unreachable and saying so would be a statement rather
-          than a suggestion. The grid below is what makes that false today. */}
+          than a suggestion. The grid below is what makes that false today.
+
+          ⚠ D-214-22 (2026-08-28) — the OPEN track below is the SAME clamp Settings ships at
+          `ConnectionsTab.tsx` (`clamp(480px, 38%, 640px)`), spelled byte-identically so the
+          two authoring panels are one track rather than two. The `44px` collapsed strip is
+          explicitly NOT part of that decision and does not change. */}
       <div
         data-testid="builder-grid"
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
-        style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "400px" : "44px") }}
+        style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "clamp(480px, 38%, 640px)" : "44px") }}
       >
         {graphColumn}
         <PhaseFormPanel

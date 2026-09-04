@@ -38,6 +38,7 @@ from app.dependencies import (
     get_redis,
     get_user_pg_connection,
     get_user_supabase_client,
+    resolve_active_org_or_none,
 )
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
@@ -46,9 +47,15 @@ import redis.asyncio as aioredis
 # buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
 # RedisError subclass, so the specific branch is handled BEFORE the broad except.
 from redis.exceptions import RedisError, ResponseError
-from app.models.message import MessageCreate, MessageResponse
+from app.models.message import RESERVED_RUN_INPUT_KEYS, MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
-from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
+from app.models.thread import (
+    ThreadCreate,
+    ThreadResponse,
+    ThreadSnapshotResponse,
+    ThreadUpdate,
+    ToolApprovalDecisionRequest,
+)
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
@@ -99,6 +106,8 @@ from app.models.thread import (
     ThreadWorkflowState,
     WorkflowPhaseState,
     declared_phase_measure,
+    phase_output_object,
+    step_identity,
 )
 from app.models.user_settings import (
     load_all_model_overrides,
@@ -733,6 +742,35 @@ async def send_message(
     service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
+    # ── ⚠ THE ORG THIS TURN BELONGS TO, DECIDED HERE AND CARRIED, NOT GUESSED LATER ────
+    #
+    # Chat used to resolve its org by taking the caller's OLDEST `org_members` row, while
+    # every other surface in the app honoured the validated `X-Org-Id` the org switcher
+    # sets. For anyone in exactly one org those agree and nothing was visibly wrong. For
+    # anyone in two they disagree permanently, and MEASURED on this install the disagreement
+    # produced four separate faults that all looked like different bugs:
+    #   · connectors in the active org were invisible in chat, so grants "did nothing";
+    #   · "Always allow" refused for an account that IS an org-admin of the active org;
+    #   · the folder scope picker never rendered — the fallback org has no folders;
+    #   · and the knowledge base looked empty, because the documents are in the other one.
+    #
+    # ⚠ THE FIX IS NOT A BETTER GUESS. `X-Org-Id` is already sent by the client on every
+    # request and already re-validated against `org_members` server-side; chat simply was
+    # not reading it. `resolve_active_org_or_none` is `get_active_org_id`'s validation with
+    # a soft failure, because a chat message must not 400 for a person who belongs to two
+    # organisations.
+    #
+    # ⚠ IT IS STAMPED ONTO `current_user` BECAUSE THAT DICT ALREADY GOES EVERYWHERE this
+    # decision is needed — RunContext, ToolContext, and `resolve_connector_org`, whose
+    # "an org resolved upstream wins" branch was written for exactly this and had no
+    # supplier until now. A new parameter would have to be threaded through the producer,
+    # the loop and the dispatcher to reach the same three readers. A COPY is made rather
+    # than mutating in place: the dependency-cached dict belongs to the request, and the
+    # detached producer outlives it.
+    active_org_id = await resolve_active_org_or_none(request, current_user)
+    if active_org_id:
+        current_user = {**current_user, "org_id": active_org_id}
+
     thread_resp = await aexec(
         supabase.table("threads")
         .select("id, active_workflow_run_id")
@@ -778,13 +816,19 @@ async def send_message(
     # INSERT) — is to call `.insert(row)` alone; PostgREST returns the inserted
     # row(s) under `.data` as a list (Prefer: return=representation is the
     # supabase-py default). Read the id from `.data[0]["id"]`.
+    _user_msg_row = {
+        "thread_id": thread_id,
+        "user_id": current_user["id"],
+        "role": "user",
+        "content": body.content,
+    }
+    # Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): Durably record armed connector IDs
+    # Distinction: None -> SQL NULL (absent / not supplied); [] -> '[]'::jsonb (explicitly cleared)
+    if body.active_connector_ids is not None:
+        _user_msg_row["active_connector_ids"] = [str(c) for c in body.active_connector_ids]
+
     _user_msg_resp = await aexec(
-        supabase.table("messages").insert({
-            "thread_id": thread_id,
-            "user_id": current_user["id"],
-            "role": "user",
-            "content": body.content,
-        })
+        supabase.table("messages").insert(_user_msg_row)
     )
     _user_msg_data = _user_msg_resp.data if _user_msg_resp is not None else None
     # Real-PostgREST path: list[dict]; some test mocks hand back a single dict.
@@ -914,7 +958,47 @@ async def send_message(
             ),
             definition=_kickoff_definition,
             # SEED-047 kickoff_prompt + 152 WFIN-02: persist the per-run folder override (D-01, no migration) so resume/Continue read it back (Pitfall 5).
-            inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
+            #
+            # ── Phase 214 (STEP-02 / D-214-04) — THE LAUNCHER'S DECLARED INPUTS, MERGED ──
+            # body.inputs is the ONE channel a launcher (RunModal, the chat launch form,
+            # Test Run) has for the values an `ask` argument resolves from; without this
+            # merge a declared `to` recipient dies at the fetch body and BUG-260826-01
+            # cannot close. The schedule door already behaves this way
+            # (scheduler_service.py:150 spreads **raw_inputs) — this makes the other doors
+            # match it; that file is deliberately untouched.
+            #
+            # ⚠ PRECEDENCE: THE RESERVED KEYS ARE LAST AND THEREFORE WIN. That is the
+            # decision, not an accident of spread order, and it is written here because a
+            # reader who sees only the order will "fix" it.
+            #   * kickoff_prompt — _NON_ACTION_RUN_INPUTS (phase_types.py) excludes it from
+            #     action inputs BY NAME, so a declared key spelled that way could never have
+            #     reached an adapter argument; letting it overwrite the run's real kickoff
+            #     would break _exec_programmatic and the first phase's user turn for no gain.
+            #   * folder_id — owner-reachability-gated server-side (D-05). A launcher-supplied
+            #     string must not be able to impersonate it and route around that gate.
+            #
+            # ⚠ THIS LITERAL HAS A TWIN: workflow_kickoff.build_harness_run_context builds
+            # the SAME dict for the LIVE ctx.inputs. Widening only one would mean a
+            # workflow's FIRST run sees no declared values while a RESUMED run (which reads
+            # this persisted jsonb back — runs.py:1052-1119) sees them all. The two are
+            # asserted EQUAL by a driven case, not by these comments:
+            # tests/integration/test_214_launch_inputs_wire.py::test_MIRROR_*.
+            #
+            # ── D-103-CONF-1 AMENDED, DELIBERATELY (full text: models/message.py) ──────
+            # The constraint is ONE kickoff path, not a frozen file. ⛔ No new route, ⛔ no
+            # new key on the POST *response*, ⛔ no change to the two-rows model, the
+            # create-before-spawn ordering, the template-upload sequencing or the orphan
+            # cleanup. The amendment is exactly one request field and one dict literal (twice).
+            # ⚠ STRIPPED, not merely out-ranked: `folder_id` is spread CONDITIONALLY below,
+            # so "the reserved keys win" was false whenever the request carried none — the
+            # launcher's value then survived (measured). RESERVED_RUN_INPUT_KEYS is the ONE
+            # frozenset, imported here and by the twin literal.
+            inputs={
+                **{k: v for k, v in (body.inputs or {}).items()
+                   if k not in RESERVED_RUN_INPUT_KEYS},
+                "kickoff_prompt": body.content,
+                **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
+            },
             model=_resolved_model,                      # SEED-047
             # Phase 092-05 F1: persist the run-owner so harness_audit writes
             # (NOT NULL user_id) and the resume path resolve a real user.
@@ -1212,6 +1296,12 @@ async def get_thread_workflow(
             # timeline can render the correct 3D icon for completed/historical runs
             # (the workflow_phases table doesn't store phase_type).
             slug_to_type: dict[str, str] = {}
+            # 214 (D-214-16) — HOISTED so the SHARED step-identity derivation can read the
+            # SAME already-fetched definition. It was bound only inside the `try` below; the
+            # alternative to hoisting it is a SECOND `_rls_fetchrow` for a row this handler
+            # already holds, which is a duplicate round trip bought with nothing. The
+            # `slug_to_type` loop below is deliberately byte-unchanged.
+            defn: object = None
             def_row = await _rls_fetchrow(
                 "SELECT wd.definition FROM workflow_runs wr "
                 "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
@@ -1231,9 +1321,68 @@ async def get_thread_workflow(
                             slug_to_type[slug] = ptype
                 except Exception:
                     pass
+            # ── 214 (D-214-16) — THE SHARED DERIVATION, consumed here and in
+            #    `api/workflow_runs.py`. ONE definition walk lives in `models/thread.py`; the
+            #    two shipped `slug -> phase_type` loops are left alone on purpose.
+            identity_by_slug = step_identity(defn)
+            # ── 214 (D-214-14 / D-213-02) — the service NAME, resolved ONCE PER RUN.
+            #
+            # ⚠ COMPUTED, NEVER STORED. The step config carries a `connection_id`; the name a
+            # person recognises ("Slack") lives on the connection row and would go stale the
+            # moment it were copied onto the step.
+            #
+            # ⚠ RESOLVED BEFORE THE LOOP, NEVER INSIDE IT. A run has typically 1-3 distinct
+            # connections across all its steps; a per-row lookup would issue one query per
+            # phase for the same handful of ids.
+            #
+            # ⚠ ONLY `name` CROSSES (T-214-02-01). `GET /threads/{id}/workflow` carries NO
+            # canvas gate, so this is the narrower door and the projection is named
+            # column-by-column: never `config`, never `mcp_server_url`, never
+            # `secret_ciphertext`. ⚠ Migration 118 grants SELECT on this table COLUMN BY
+            # COLUMN, so naming a column it does not grant fails with `42501` rather than
+            # silently narrowing — which is the intended, visible failure.
+            #
+            # ⚠ NO `run_in_threadpool` HERE, and that is not an omission: `_rls_fetch` is the
+            # asyncpg user-JWT path and is already async (D-v2.5-01 concerns the BLOCKING
+            # supabase-py client — which is what the sibling builder in `api/workflow_runs.py`
+            # uses, and it goes through `aexec`, which wraps it).
+            conn_names: dict[str, str] = {}
+            conn_ids: list[UUID] = []
+            for _t, _c, _cid in identity_by_slug.values():
+                if not _cid:
+                    continue
+                try:
+                    parsed_cid = UUID(_cid)
+                except (ValueError, AttributeError, TypeError):
+                    # A malformed id resolves to no name, which renders the ACTION ALONE.
+                    continue
+                if parsed_cid not in conn_ids:
+                    conn_ids.append(parsed_cid)
+            if conn_ids:
+                conn_rows = await _rls_fetch(
+                    "SELECT id, name FROM connector_connections WHERE id = ANY($1::uuid[])",
+                    conn_ids,
+                )
+                for cr in conn_rows or []:
+                    _name = cr["name"]
+                    if isinstance(_name, str) and _name.strip():
+                        conn_names[str(cr["id"])] = _name
             phases_list = []
             for r in phase_rows:
-                _count, _noun = declared_phase_measure(r["output"])
+                # 200.1 / 214 — ONE parse per row, feeding BOTH reads. `declared_phase_measure`
+                # calls the same helper on a dict, so handing it `_obj` changes no behaviour
+                # and keeps the parse count at one. (It read the RAW value until Phase 214.)
+                _obj = phase_output_object(r["output"])
+                _count, _noun = declared_phase_measure(_obj)
+                # ⚠ 38 of 43 failed rows store `output` as a jsonb STRING SCALAR, so this MUST
+                # read off the unwrapped object. Whitespace-only / non-`str` normalise to
+                # `None`: ABSENT and EMPTY stay different facts, or the panel's
+                # `reason_unknown` sentinel stops meaning "not recorded".
+                _raw_reason = _obj.get("_failure_reason") if isinstance(_obj, dict) else None
+                _reason = (
+                    _raw_reason if isinstance(_raw_reason, str) and _raw_reason.strip() else None
+                )
+                _tool, _cap, _cid = identity_by_slug.get(r["slug"], (None, None, None))
                 phases_list.append(
                     WorkflowPhaseState(
                         slug=r["slug"],
@@ -1244,6 +1393,14 @@ async def get_thread_workflow(
                         completed_at=r["completed_at"],
                         step_count=_count,
                         step_noun=_noun,
+                        failure_reason=_reason,
+                        tool_name=_tool,
+                        capability=_cap,
+                        # ⚠ An unresolvable connection yields `None`, and that is CORRECT, not
+                        # a gap to fill. Never "Unknown service", never the capability id,
+                        # never the connection id — `grounding.py`'s shipped rule: never draw
+                        # a name the system cannot know.
+                        service_name=conn_names.get(_cid) if _cid else None,
                     )
                 )
 
@@ -1291,3 +1448,143 @@ async def get_thread_workflow(
         last_run_updated_at=last_run_updated_at,
         phases=phases_list,
     )
+
+
+@router.post("/{thread_id}/tool-approval")
+async def handle_tool_approval(
+    thread_id: UUID,
+    payload: ToolApprovalDecisionRequest,
+    # ⚠ TAKEN AS A PLAIN ARG, NOT `Depends(get_active_org_id)`. As a dependency the org
+    # would be resolved on EVERY approval, so a person in no org could not click Allow on
+    # a run that never needed an org — a 403 on the ordinary path to serve the rare one.
+    # `always` resolves it lazily, inside its own branch.
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Phase 216 (GRANT-03 / CHAT-07 / D-216-04): Publish human approval decision for paused tool call."""
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    if not (thread_resp and thread_resp.data):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    # ── "Always" is TWO acts, and the second one may legitimately fail ────────────────
+    #
+    # ⚠ THE ORDER IS DELIBERATE: the grant is written BEFORE the run is released. Released
+    # first, the loop can reach its NEXT `ask` on the same tool while the write is still in
+    # flight, and pause again on a setting the person has already changed — which reads as
+    # the button not working.
+    #
+    # ⚠ AND A FAILED WRITE MUST NOT STRAND THE RUN. Approving a call needs only that the
+    # thread is yours; changing a grant needs `org:manage`. A member who clicks Always is
+    # entitled to the first and not the second, so the call is released either way and the
+    # response says which half happened. Reporting "ok" for a setting that did not change
+    # would be the same class of lie as the `Executed …` string the dispatcher used to
+    # return for every failed send.
+    grant_persisted = False
+    grant_problem: str | None = None
+    if payload.decision == "always":
+        if not payload.connection_id or not payload.tool_name:
+            grant_problem = (
+                "this approval did not carry the connection and action it belongs to, so "
+                "the setting could not be changed"
+            )
+        else:
+            try:
+                from app.dependencies import _has_org_permission
+                from app.services import connector_service
+                from app.services.connectors.org_scope import resolve_connector_org
+
+                # ⚠ NOT `get_active_org_id` — MEASURED, NOT REASONED ABOUT. That dependency
+                # reads the `X-Org-Id` header and, when it is absent, 400s any caller with
+                # more than one membership. A chat turn carries no such header, so the
+                # FIRST live drive of this button failed for an account that is an
+                # org-admin — and reported "needs an organisation admin", which is the
+                # exact species of misdiagnosis this session has spent its time deleting.
+                #
+                # The right org is the one the chat turn is already scoped to: the same
+                # leaf that decided which connections could be OFFERED decides which org
+                # the grant belongs to. Anything else and the card could change a setting
+                # on a connection the conversation cannot even see.
+                scope = await resolve_connector_org(current_user, supabase)
+                if not scope.ok:
+                    grant_problem = (
+                        f"this action was allowed once, but the setting was not changed: "
+                        f"{scope.problem}"
+                    )
+                # ⚠ THE PERMISSION CHECK IS EXPLICIT, because this route does NOT carry
+                # `require_org_manage` — it cannot: approving a call needs only that the
+                # thread is yours, and hanging an org gate on the whole endpoint would 403
+                # every ordinary Allow. So the gate sits on the WRITE, using the same
+                # predicate the settings route uses, against the org resolved above.
+                elif not await _has_org_permission(
+                    request, current_user, str(scope.org_id), "org:manage"
+                ):
+                    grant_problem = (
+                        "this action was allowed once, but the setting was not changed — "
+                        "changing what a connection may do needs an organisation admin"
+                    )
+                else:
+                    await connector_service.grant_one_tool(
+                        str(payload.connection_id),
+                        org_id=str(scope.org_id),
+                        tool_name=payload.tool_name,
+                        posture="allow",
+                        supabase=supabase,
+                    )
+                    grant_persisted = True
+                    # Phase 223 (GRANT-05 / SC#1a / D-223-01 / D-223-05): Audit permanent grant via chat card Always allow
+                    try:
+                        actor_user_id = current_user.get("id") or current_user.get("sub")
+                        if actor_user_id:
+                            await write_audit_entry(
+                                user_id=actor_user_id,
+                                action_type="connector.grant",
+                                metadata={
+                                    "connection_id": str(payload.connection_id),
+                                    "tool_name": payload.tool_name,
+                                    "posture": "allow",
+                                    "source": "chat_card",
+                                },
+                                supabase=supabase,
+                                org_id=str(scope.org_id),
+                            )
+                    except Exception:  # noqa: BLE001 - audit write failure must not abort approval flow
+                        logger.warning("tool approval: failed to record connector.grant audit entry", exc_info=True)
+            except Exception as exc:  # noqa: BLE001 — a permission/RLS boundary
+                logger.warning(
+                    "tool approval: could not persist an always-allow grant for "
+                    "connection %s tool %s", payload.connection_id, payload.tool_name,
+                    exc_info=True,
+                )
+                grant_problem = (
+                    "this action was allowed once, but the setting was not changed "
+                    f"({exc.__class__.__name__})"
+                )
+
+    # `always` releases the run as an ordinary allow: the pubsub contract is the RUN's,
+    # and it has exactly two outcomes. Widening it would make every waiter learn a word
+    # that means the same thing to them.
+    approval_channel = f"tool_approval:{thread_id}:{payload.call_id}"
+    await redis.publish(
+        approval_channel,
+        json.dumps({
+            "call_id": payload.call_id,
+            "decision": "allow" if payload.decision == "always" else payload.decision,
+            "user_id": current_user["id"],
+        }),
+    )
+    return {
+        "status": "ok",
+        "call_id": payload.call_id,
+        "decision": payload.decision,
+        "grant_persisted": grant_persisted,
+        "grant_problem": grant_problem,
+    }
+

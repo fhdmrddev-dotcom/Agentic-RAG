@@ -109,7 +109,7 @@ export function AcceptInvitePage({ user, onSignIn, onSignUp }: Props) {
         setState({ kind: result.joined ? "joined" : "already" })
         // Redirect to the app root so OrgProvider re-probes on a fresh mount and the 166
         // switcher renders both orgs (D-167-01). A brief pause lets the invitee see the confirm.
-        window.setTimeout(() => window.location.assign("/"), 1500)
+        window.setTimeout(() => window.location.assign("/app"), 1500)
       } catch (err) {
         // Honest, user-facing messages — never a raw error string.
         let message =
@@ -128,7 +128,7 @@ export function AcceptInvitePage({ user, onSignIn, onSignUp }: Props) {
     })()
   }, [user, token])
 
-  const goToApp = () => window.location.assign("/")
+  const goToApp = () => window.location.assign("/app")
 
   // The state-specific sub-headline + card body. The brand shell is shared below.
   let subhead = ""

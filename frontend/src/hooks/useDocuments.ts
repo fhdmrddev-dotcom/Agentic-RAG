@@ -54,6 +54,33 @@ export function useDocuments(): UseDocuments {
               // terminal-state transitions refetch the list to surface fresh
               // counts (BUG-260516-01 follow-up: user reported "counts don't
               // reflect real-time" after status badge started updating).
+              //
+              // ── Phase 217: WHICH SIDE OF THAT LINE THE FOUR NEW FIELDS FALL ON ──
+              // The ingestion strip (components/ingestion/IngestionStrip.tsx) reads
+              // all four, so the rule is stated here rather than inferred there:
+              //
+              //   REAL COLUMNS — ride payload.new, arrive on every UPDATE:
+              //     `ingestion_step`  (the stage the pipeline last entered)
+              //     `extractor`       (D-217-08 lineage)
+              //     `chunk_count`     (a real column too, despite the note above)
+              //
+              //   SERVER-DERIVED — NOT in payload.new, behave exactly like table_count:
+              //     `tables_stage_applies`  \ pydantic @computed_field off mime_type
+              //     `images_stage_applies`  / (D-217-24) — no such DB column exists
+              //
+              // The spread-merge below is what preserves the derived pair across an
+              // UPDATE: `{ ...d, ...newDoc }` keeps the previously-fetched value
+              // because the incoming row has no key for it. ⚠ THE INSERT ARM BELOW
+              // HAS NO MERGE — a document inserted in another tab arrives with both
+              // flags `undefined`, which is why they are OPTIONAL on the Document type
+              // and why the strip must render `undefined` applicability as PENDING
+              // (unknown), never as skipped.
+              //
+              // ⚠ Realtime stays a HINT, not a source of truth (D-v2.5-03): a socket
+              // that missed a transition leaves a stale stage here, and only the cold
+              // fetch reconciles it. That is why plan 01 put `ingestion_step` on the
+              // DocumentResponse wire (D-217-10) — the list load, not this callback,
+              // is what makes a mid-ingest file honest when the Library first opens.
               setDocuments((prev) =>
                 prev.map((d) => (d.id === newDoc.id ? { ...d, ...newDoc } : d)),
               )

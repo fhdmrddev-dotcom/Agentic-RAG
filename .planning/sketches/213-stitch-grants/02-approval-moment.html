@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Approval</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#0b0664",
+                        "secondary-fixed": "#e9ddff",
+                        "background": "#0e131e",
+                        "error": "#ffb4ab",
+                        "on-surface": "#dee2f1",
+                        "surface-container": "#1b202a",
+                        "primary-container": "#a3a5ff",
+                        "on-secondary": "#3b0091",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0e131e",
+                        "secondary": "#d0bcff",
+                        "tertiary": "#4ee478",
+                        "tertiary-fixed-dim": "#4be176",
+                        "surface-container-low": "#171c26",
+                        "surface-bright": "#343945",
+                        "inverse-primary": "#5355a9",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "tertiary-container": "#26c760",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-variant": "#303540",
+                        "surface-dim": "#0e131e",
+                        "on-tertiary-fixed": "#002109",
+                        "surface-tint": "#c1c1ff",
+                        "surface-container-high": "#252a35",
+                        "outline": "#918f9c",
+                        "on-surface-variant": "#c7c5d3",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-secondary-container": "#c3abff",
+                        "error-container": "#93000a",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "tertiary-fixed": "#6bfe8f",
+                        "outline-variant": "#464651",
+                        "on-tertiary-container": "#004c1e",
+                        "on-background": "#dee2f1",
+                        "surface-container-highest": "#303540",
+                        "primary": "#c3c4ff",
+                        "secondary-container": "#571ac2",
+                        "on-primary": "#242478",
+                        "inverse-surface": "#dee2f1",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "on-primary-container": "#353789",
+                        "primary-fixed": "#e1e0ff",
+                        "surface-container-lowest": "#090e18",
+                        "on-secondary-fixed": "#23005c",
+                        "on-tertiary": "#003915",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#2b303c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #dee2f1;
+        }
+        .border-divider {
+            border-color: #212631;
+        }
+        .card-fill {
+            background-color: #0D1117;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 md:p-8 font-body antialiased">
+<main class="w-full max-w-3xl">
+<!-- Approval Card -->
+<div class="card-fill border border-divider rounded-lg overflow-hidden flex flex-col">
+<!-- Header Section -->
+<div class="p-6 md:p-8 border-b border-divider flex flex-col gap-6">
+<!-- Status Notice -->
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-xl" style="font-variation-settings: 'FILL' 1;">pause_circle</span>
+<p class="text-sm text-on-surface-variant font-medium uppercase tracking-wide">
+                        PAUSED: Awaiting human consent. No data has been sent.
+                    </p>
+</div>
+<!-- Service Context & Action -->
+<div class="flex items-start justify-between gap-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded bg-surface-container-low flex items-center justify-center border border-divider">
+<!-- Minimal GitHub Logo Placeholder (SVG) -->
+<svg class="w-6 h-6 text-on-surface" fill="currentColor" viewbox="0 0 24 24">
+<path clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.699-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.03-2.682-.103-.253-.447-1.27.098-2.646 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.376.202 2.394.1 2.646.64.699 1.026 1.591 1.026 2.682 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<div>
+<h2 class="font-headline font-semibold text-lg text-on-surface">GitHub</h2>
+<p class="text-on-surface-variant text-sm mt-1">
+                                Action: <span class="font-mono bg-surface-container-low px-1.5 py-0.5 rounded text-xs border border-divider">create_pull_request</span>
+</p>
+</div>
+</div>
+</div>
+<p class="text-on-surface-variant text-sm">
+                    Creates a new pull request in your repository.
+                </p>
+</div>
+<!-- Arguments Section (The Heart) -->
+<div class="p-6 md:p-8 bg-surface-container-lowest flex flex-col gap-8">
+<!-- Field: Repository -->
+<div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
+<span class="text-sm font-medium text-outline w-32 shrink-0">Repository</span>
+<span class="font-mono text-sm text-on-surface break-all">aether-intelligence/core-engine</span>
+</div>
+<!-- Field: Branch -->
+<div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
+<span class="text-sm font-medium text-outline w-32 shrink-0">Branch</span>
+<span class="font-mono text-sm text-on-surface break-all">release/v2.4.0</span>
+</div>
+<!-- Field: Title -->
+<div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
+<span class="text-sm font-medium text-outline w-32 shrink-0">Title</span>
+<span class="text-sm text-on-surface">Weekly Release Notes: v2.4.0 Performance &amp; Risk Modules</span>
+</div>
+<!-- Field: Body (Markdown Snippet) -->
+<div class="flex flex-col gap-3">
+<span class="text-sm font-medium text-outline">Body</span>
+<div class="relative bg-surface-container-low border border-divider rounded p-4 font-mono text-xs text-on-surface leading-relaxed max-h-48 overflow-hidden" id="body-content">
+<!-- Fade out effect for truncation -->
+<div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-surface-container-low to-transparent" id="body-fade"></div>
+<p># v2.4.0 Release Highlights</p>
+<br/>
+<p>## Bug Fixes (12)</p>
+<p>- Fixed race condition in async workflow execution runner.</p>
+<p>- Resolved memory leak in the token counter module during large document ingestion.</p>
+<p>- Corrected timestamp parsing error for ISO8601 strict formats.</p>
+<p>... (9 more fixes detailed in commit log)</p>
+<br/>
+<p>## Security Patches (3)</p>
+<p>- Updated lib-crypto dependency to address CVE-2024-XXXXX.</p>
+<p>- Enforced strict origin validation on webhook endpoints.</p>
+<p>- Rotated internal signing keys for audit logs.</p>
+<br/>
+<p>## Risk Assessment Logic Updates (2)</p>
+<p>- Introduced heuristic model for identifying PII in raw text payloads prior to LLM transmission.</p>
+<p>- Adjusted severity scoring weights for automated deployment triggers based on recent anomaly data.</p>
+</div>
+<button class="text-xs text-primary-container hover:text-primary-fixed transition-colors self-start flex items-center gap-1" id="toggle-body">
+<span>See full body</span>
+<span class="material-symbols-outlined text-[14px]">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Decision Footer -->
+<div class="p-6 md:p-8 border-t border-divider flex flex-col sm:flex-row items-center justify-between gap-6">
+<!-- Settings Option -->
+<label class="flex items-center gap-3 cursor-pointer group w-full sm:w-auto order-2 sm:order-1">
+<div class="w-4 h-4 rounded border border-outline group-hover:border-primary-container flex items-center justify-center transition-colors">
+<!-- Custom Checkbox (Unchecked state) -->
+</div>
+<span class="text-sm text-on-surface-variant group-hover:text-on-surface transition-colors">Always allow <span class="font-mono text-xs">create_pull_request</span> on this connection</span>
+</label>
+<!-- Action Buttons -->
+<div class="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+<button class="flex-1 sm:flex-none px-6 py-2.5 rounded border border-divider text-on-surface hover:bg-surface-variant transition-colors text-sm font-medium">
+                        Deny
+                    </button>
+<button class="flex-1 sm:flex-none px-6 py-2.5 rounded bg-primary-container text-on-primary font-medium hover:bg-primary transition-colors text-sm">
+                        Approve once
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple JS for the "See full body" toggle
+        const toggleBtn = document.getElementById('toggle-body');
+        const bodyContent = document.getElementById('body-content');
+        const bodyFade = document.getElementById('body-fade');
+        let isExpanded = false;
+
+        toggleBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                bodyContent.classList.remove('max-h-48');
+                bodyContent.classList.add('max-h-none');
+                bodyFade.style.display = 'none';
+                toggleBtn.innerHTML = `<span>Show less</span><span class="material-symbols-outlined text-[14px]">expand_less</span>`;
+            } else {
+                bodyContent.classList.remove('max-h-none');
+                bodyContent.classList.add('max-h-48');
+                bodyFade.style.display = 'block';
+                toggleBtn.innerHTML = `<span>See full body</span><span class="material-symbols-outlined text-[14px]">expand_more</span>`;
+            }
+        });
+
+        // Simple JS for custom checkbox interaction
+        const checkboxLabel = document.querySelector('label');
+        const checkboxVisual = checkboxLabel.querySelector('div');
+        let isChecked = false;
+
+        checkboxLabel.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default label click behavior for custom impl
+            isChecked = !isChecked;
+            if (isChecked) {
+                checkboxVisual.classList.remove('border-outline');
+                checkboxVisual.classList.add('bg-primary-container', 'border-primary-container');
+                checkboxVisual.innerHTML = `<span class="material-symbols-outlined text-on-primary text-[12px] font-bold">check</span>`;
+            } else {
+                checkboxVisual.classList.add('border-outline');
+                checkboxVisual.classList.remove('bg-primary-container', 'border-primary-container');
+                checkboxVisual.innerHTML = '';
+            }
+        });
+    </script>
+</body></html>

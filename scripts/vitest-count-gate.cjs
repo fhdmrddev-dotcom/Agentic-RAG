@@ -120,6 +120,12 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  "Seam.test.tsx": 8,
+  "TodosSection.test.tsx": 12,
+  "CitationList.test.tsx": 11,
+  "RunCard.test.tsx": 29,
+  "RunCard.timer.test.tsx": 7,
+  "ChatArea.approval.test.tsx": 3,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -211,6 +217,19 @@ const BASELINE = {
   //     branch coverage lives in the hook suite and not here.
   "useComposerModel.test.ts": 17,
   "ChatArea.model.test.tsx": 2,
+  // Phase 226 — src/landing (pinned at the merge commit; pre-flight F-6 kept the phase off this file while 224-05 edited it)
+  "landingBundleFence.test.ts": 2,
+  "facts.test.ts": 5,
+  "cssClasses.test.ts": 1,
+  "scenes.test.tsx": 9,
+  "LandingPage.test.tsx": 7,
+  "MessageInput.connectors.test.tsx": 5,
+  // SEED-235 (2026-09-01): 15 -> 19. Four cases for the SECOND approval in one run —
+  // three for the defect (a stale decision rendered the next question as already answered
+  // and blocked its submit) and one COUNTERWEIGHT proving a settled card does not flicker
+  // back into a question. Read from the gate's own printed column.
+  "ToolApproval.test.tsx": 19,
+  "MessageInputDrafts.test.tsx": 5,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -375,7 +394,11 @@ const BASELINE = {
   // and compared as a RECORD, so a failure names the offending type and the eighth type
   // joins the coverage without anyone remembering to extend a list.
   "canvasModel.test.ts": 52,
-  "PublishGauntlet.test.tsx": 46,
+  // 214.1-02 RE-BASELINE 46 -> 83. ⚠ NOT A BUMP: this pin was stale by 32 BEFORE Phase 214.1
+  // began (the file ran 78 at wave 1's start), so it was leaving 37 cases deletable in
+  // silence on the gauntlet — the publish surface. Reasons + the full six-pin table live in
+  // the 214.1-02 block beside `declaredInputs.test.ts`.
+  "PublishGauntlet.test.tsx": 83,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
@@ -640,7 +663,9 @@ const BASELINE = {
   // both reported `expected 'does-not-admit' to be 'unknown'` — with the source restored
   // md5-identical), and the jsonb STRING SCALAR that 194 of 223 live rows actually carry,
   // which nothing pinned before despite being the dominant shape (WR-07).
-  "soulData.test.ts": 36,
+  // 214.1-02 RE-BASELINE 36 -> 58 (214.1-01's RESERVED-key mirror cases). See the 214.1-02
+  // block beside `declaredInputs.test.ts` for the measured six-pin table.
+  "soulData.test.ts": 58,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with
@@ -1450,6 +1475,17 @@ const BASELINE = {
   // cases were observed RED; the fifth is the flag-ON positive control. This also
   // discharges the render-guard assertion `revertByteIdentical.test.tsx` deferred in 181.
   "ChatLayout.launch.test.tsx": 17,
+  // ⚠ ADOPTED 2026-09-01, pinned at the gate's OWN printed `new` column (13), never counted
+  // by hand — `221-CARRY-FORWARD.md` §E2 records the session where a hand-split pin was
+  // caught doing exactly that. TARGETS was added in the same commit; a suite in one knob
+  // and not the other either runs unguarded or is guarded without running.
+  //
+  // ⚠ RECORDED WHILE ADOPTING IT, AND DELIBERATELY NOT FIXED HERE: the neighbour above
+  // measures 35 and is pinned at 17. That pin is stale-LOW, so 18 of its tests could be
+  // deleted without the gate noticing — the gate only fails on a decrease BELOW the pin.
+  // Its test file is byte-unchanged by this commit (last touched 2026-08-30, 217.1-18), so
+  // re-baselining it here would bury someone else's drift inside a nav refactor.
+  "SettingsPage.test.tsx": 13,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -1488,7 +1524,9 @@ const BASELINE = {
   // reproduced the report's own measurement exactly (`got position function Object() {
   // [native code] }`). Read from a full-file run: 65 passed.
   "WorkflowCanvas.editing.test.tsx": 65,
-  "builderStore.test.ts": 52,
+  // 214.1-02 RE-BASELINE 52 -> 77 (214.1-01's `setDeclaredInputs` cases — the ONE write path
+  // for `definition.inputs[]`). See the 214.1-02 block beside `declaredInputs.test.ts`.
+  "builderStore.test.ts": 77,
   "phaseVocabulary.corpus.test.ts": 45,
   // 189-12: 43 → 46. The 7th row — one case pinning it is offered LAST (a bare count
   // passes an insert), one pinning its title comes from the resolver rather than from a
@@ -1692,7 +1730,37 @@ const BASELINE = {
   // a pin necessarily deletes a line — which this file's own ledger row names as the thing
   // that makes a `-0` deletion check wrong. ADDING a pin is not RAISING one; this edit is
   // additions only.
-  "connectionMark.test.tsx": 39,
+  // ⚠ RE-BASELINED 39 -> 75 in Phase 221. The old floor was 36 cases below the actual
+  // count, so this file could have LOST half its assertions and the gate would have said
+  // OK. The rise is not this phase's work — 221 adds exactly one case (the "one home"
+  // repo scan); it is 36 cases of drift the stale pin was hiding.
+  "connectionMark.test.tsx": 75,
+  // ── 214-08 (STEP-04 / SC#4 / D-214-16) — the shared step-identity element's own suite, ──
+  // ── pinned in the commit that creates it, because a `BASELINE` key naming a path that ──
+  // ── does not yet exist makes this gate ERROR (exit 2) rather than fail. ──────────────
+  //
+  // ⚠ IT NEEDS ONLY THIS KNOB, AND THAT WAS CHECKED RATHER THAN ASSUMED: the file sits
+  // under `src/components/workflows`, which is the ONE directory-level entry in `TARGETS`,
+  // so it RAN the moment it existed. Contrast its sibling in the same commit —
+  // `connectionMark.test.tsx` moved to `src/lib`, which has NO directory entry anywhere in
+  // this script, and so needed its `TARGETS` PATH repointed while its BASENAME pin above
+  // resolved untouched. Same commit, two files, two different answers.
+  //
+  // ⚠ THE NUMBER IS A SCOPED-RUN MEASUREMENT, NOT THIS GATE'S OWN `actual` COLUMN, and the
+  // difference is recorded rather than glossed. Phase 214's wave-2 executors run under an
+  // orchestrator rule forbidding a full gate run (two sibling agents were active; `count
+  // gate OK` is not reliably reachable on demand — SEED-171). `41` is what
+  // `npx vitest run src/components/workflows/StepIdentity.test.tsx` reported on FOUR
+  // separate invocations at `GSD_VITEST_MAX_WORKERS=2`, three of them the green runs
+  // bracketing four planted-defect RED drives. Plan `214-15` re-derives it at the phase
+  // close. ⚠ Never a hand count of `it(` literals — unsound under the three `it.each`
+  // blocks this suite uses.
+  //
+  // What would be unguarded without it: the three properties sketch 216 #6 says the import
+  // fence STRUCTURALLY CANNOT catch (resolved-but-EMPTY / -IDENTICAL / -INVISIBLE), the
+  // null-service arm that must render the action ALONE, and the wire-id sweep. Each was
+  // driven RED against a planted defect before this line was written.
+  "StepIdentity.test.tsx": 41,
   // ── 190-17: the add/edit panel's own suite, pinned in the commit that creates it. ──
   // Number read from THIS SCRIPT'S OWN `actual` column across two agreeing runs — never a
   // hand count of `it(` literals, which is unsound under the `it.each` this suite uses for
@@ -2704,6 +2772,376 @@ const BASELINE = {
   //     unless this file is pinned.
   "McpToolPicker.test.tsx": 29,
   "McpToolPicker.reachability.test.tsx": 11,
+  // ── 211-05 Task 1(c) · the phase's TWO new suites, pinned in the commit that creates
+  //    them. TARGETS decides what RUNS, BASELINE decides what is PINNED, and a file can sit
+  //    outside BOTH by default. An unpinned file is not lightly guarded — it is UNGUARDED.
+  //
+  // ⚠ THEY NEEDED DIFFERENT KNOBS, AND WHICH ONE WAS **MEASURED, NOT ASSUMED**. The gate was
+  // run from the repo root with both files on disk and green, BEFORE either line below was
+  // written, and its own `actual` column was read:
+  //
+  //     connectionCardReachability.test.tsx           —      10     new
+  //     (connectionVerbFence.test.ts: ABSENT from the printed list entirely)
+  //     total 5808  ·  failed 0  ·  pinned total 5180
+  //   count gate OK — 114/114 pinned files present, no per-file decrease, 0 failing.
+  //
+  //   · `connectionCardReachability.test.tsx` lives under `src/components/workflows`, which is
+  //     already a DIRECTORY entry in TARGETS, so it RAN the moment it existed. **NO `TARGETS`
+  //     EDIT ACCOMPANIES IT** — the 189-14 block above refuses a redundant file-level entry
+  //     beside a directory that already covers it, because it would state a dependency that is
+  //     not real. Only the pin was missing.
+  //   · `connectionVerbFence.test.ts` lives under `src/components/settings`, whose three
+  //     existing entries are FILE-LEVEL, so a FOURTH file there is reached by none of them. It
+  //     therefore takes BOTH knobs, and its TARGETS line lands in this same commit. A
+  //     falsification that does not run has falsified nothing (verification truth 14).
+  //
+  // Both numbers are read from THIS SCRIPT'S OWN `actual` column across two agreeing runs —
+  // never a hand count of `it(` literals, which is unsound under the two `it.each` blocks the
+  // fence suite uses for its MUST-FIRE / MUST-NOT-FIRE controls.
+  //
+  // ⚠ ADDITIONS ONLY — NOT ONE EXISTING PIN IS RAISED OR LOWERED BY THIS PHASE. Raising a pin
+  // necessarily deletes a line, which is the thing that makes a `-0` deletion check wrong; and
+  // a LOWERING is permitted only when the deleted cases are named in a summary, which this
+  // phase has no occasion for (211-03 and 211-04 already re-baselined their own files).
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THEM:
+  //
+  //   · `connectionVerbFence.test.ts` (21) — SC#3 IN ITS ENTIRETY. It is a pure ABSENCE fence
+  //     over BOTH surface trees, and an absence assertion is the easiest kind to delete
+  //     unnoticed. Eleven of its cases are the matcher's own falsification (five MUST-FIRE
+  //     shapes of the deleted chooser, six MUST-NOT-FIRE shapes of prose this tree
+  //     legitimately ships), three are non-vacuity floors, and one asserts the single
+  //     exemption is LOAD-BEARING. Three plants were applied to real production source —
+  //     a category chip in `connectionsCopy.ts`, a `role="radio"` segment in
+  //     `ExternalActionSection.tsx`, a native `<option>` in `ConnectionFormPanel.tsx` — each
+  //     observed RED naming `file:line`, and each file restored md5-identical.
+  //
+  //   · `connectionCardReachability.test.tsx` (10) — ⭐ THE RENDER HALF OF THE SEAM, which no
+  //     backend test can see. Its case 1 (a legacy row with an EMPTY action list still
+  //     rendering its card, its in-words empty state and a pressable Refresh) is the closed
+  //     loop revision iteration 1 of this phase caught, and it was observed RED against the
+  //     pre-211-04 gate planted back into `McpToolPicker.tsx` — 4 of 10 failing, with case 3
+  //     (MCP + empty) correctly still passing, which is what makes the RED discriminating
+  //     rather than blanket. Restored md5-identical.
+  "connectionVerbFence.test.ts": 21,
+  "connectionCardReachability.test.tsx": 10,
+  // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
+  "servicesCatalog.test.ts": 3,
+  // ⚠ RE-BASELINED `3 -> 5` at Phase 217's close (plan `217-12`), edited HERE rather
+  // than re-declared in the 217 block below — a second entry for the same key is a
+  // silent LAST-WINS override. 217-10 extended this barrel guard to `api/documents.ts`
+  // (it covered `connectors.ts` only); the `+2` is exactly its two new `it` blocks, read
+  // from this gate's own printed `3 -> 5 +2` row, with no residual.
+  "apiBarrel.test.ts": 5,
+  // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
+  "ConnectionGrantsList.test.tsx": 8,
+  // ── Added in Phase 221 (221-01 / T7), every value read from THIS script's own printed
+  // ── `— N new` column in the same run that adopted them. Not booked ahead: an unpinned
+  // ── file is not lightly guarded, it is UNGUARDED — its count can fall to 1 and the gate
+  // ── still reports OK.
+  //
+  // ⚠ `ConnectionFormPanel.oauth.test.tsx` is a FIND, not a new file. It has shipped since
+  // Phase 215 and sat in NEITHER knob, so the gate never ran it and nothing guarded it —
+  // the sixth suite found in that state inside a week. TARGETS decides what RUNS and
+  // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one.
+  "ConnectionFormPanel.oauth.test.tsx": 8,
+  "toolGroups.test.ts": 21,
+  // Step 2 (2026-09-01): +3 — the two band cases for a mixed-direction application and
+  // the D-221-06 rendering case. Read from the gate's own printed column.
+  "ConnectionGrantsList.grouping.test.tsx": 18,
+  // Plan 02 (2026-09-01): 14 -> 19. `partly` was UNREACHABLE BY CONSTRUCTION until this
+  // plan — `blockedApplicationCount` was the literal 0 — so these five cases had nothing
+  // to assert before it. Read from the gate's own printed column, not counted by hand.
+  "connectionRowVerdict.test.ts": 22,
+  // ── Added in Phase 221 plan 02, in the SAME COMMIT that creates the files ───────────
+  // ⚠ BOTH KNOBS, TOGETHER. Every suite found orphaned in the last week was orphaned
+  // because one knob was edited and the other was not; `src/components/settings/` entries
+  // in TARGETS are FILE-LEVEL, so a new file there is invisible until its name is typed.
+  "applicationAvailability.test.ts": 18,
+  "ApplicationGroup.availability.test.tsx": 10,
+  "statusWord.honesty.test.ts": 5,
+  // ⚠ FOUND UNPINNED 2026-09-01 while fixing the ask-card defect: the gate RUNS this
+  // suite (a directory TARGETS entry reaches it) and guarded NOTHING. It could have lost
+  // every case and the gate would still have said OK. The twelfth suite found in this
+  // state in a week — see SEED-229, which proposes the gate self-check that would end it.
+  "PendingAskCard.test.tsx": 45,
+  // SEED-227 — pinned at 3 in the SAME COMMIT that creates the file and its TARGETS line,
+  // from this script's own printed `actual` column (`— 3 new`), not booked ahead. An
+  // unpinned file is not a lightly-guarded one, it is an UNGUARDED one: the count could
+  // fall to 1 and the gate would report OK. The load-bearing case is the ABSENCE one —
+  // `_images` is stamped only on truncation — and an absence assertion is the easiest kind
+  // to delete without anyone noticing.
+  "DocumentDetailPanel.images.test.tsx": 3,
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
+  // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
+  // ERROR (exit 2) rather than fail, which is why sixteen plans' pins land in one
+  // commit instead of sixteen.
+  //
+  // ⚠ EVERY FIGURE BELOW IS THE GATE'S OWN PRINTED `— N new`, read off the run
+  // recorded verbatim in `214-15-SUMMARY.md` (`total 6355 · failed 0 · pinned total
+  // 5266 · 120/120`). NOT ONE IS HAND-DERIVED. A hand-derived pin is a number the
+  // gate has never agreed with.
+  //
+  // ⚠ TARGETS vs BASELINE was CHECKED HERE, NOT ASSUMED — and the check refuted the
+  // plan's own belief. `WorkflowScheduleModal.test.tsx` was recorded at plan time as
+  // being in NEITHER knob. It is in `src/components/workflows/__tests__/`, and the
+  // `src/components/workflows` entry in TARGETS below is a DIRECTORY entry, which
+  // recurses. So the gate had been EXECUTING it and GUARDING nothing — the worse of
+  // the two halves, because a green gate read as covering a launch-critical surface.
+  // No TARGETS edit is needed for it; the pin below is the whole fix.
+  //   · plan `214-16` creates no frontend suite at all — it extends
+  //     `src/lib/apiRunFields.fences.test.ts`, already a TARGETS **file** entry.
+  //   · plan `214-07`'s reachability case lives inside `ArgumentEditor.test.tsx`,
+  //     under the `src/components/workflows` **directory** entry.
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // ⛔ BACKEND SUITES ARE NOT PINNED HERE AND CANNOT BE — this gate is vitest-only.
+  // `backend/tests/integration/test_214_launch_inputs_wire.py` (214-16) and
+  // `backend/tests/integration/test_214_argument_seams.py` (214-14) are guarded by
+  // their plans' own pytest criteria and by the backend failure-count baseline (68).
+  // Recorded as a DECISION rather than a silence, so nobody later reads this gate's
+  // green as covering them.
+  // Phase 214.1-01 (STEP-02) — the declared-input door's suite.
+  //
+  // ⚠ TARGETS vs BASELINE WAS CHECKED FROM THE GATE'S OWN PRINTED ROWS, NOT ASSUMED, and
+  // the check is the whole reason no TARGETS line accompanies this pin: the pre-pin run
+  // printed `DeclaredInputsEditor.test.tsx — 16 new`, so the file was ALREADY EXECUTING
+  // under the `src/components/workflows` **directory** entry the moment it existed. It was
+  // running and guarding nothing; the pin below is the entire fix.
+  //
+  // ⚠ AND A SECOND NEW SUITE IS NAMED RATHER THAN LEFT SILENT. The same run printed
+  // `declaredInputs.test.ts — 25 new`. It is likewise executing and likewise unguarded, and
+  // it is NOT pinned here because plan `214.1-02` owns this phase's registry edits and a
+  // wave-1 worktree must not race a shared artifact for a second line. An unpinned suite is
+  // not a lightly-guarded one, it is an UNGUARDED one — recorded so the adoption is owed
+  // rather than forgotten. Its measured count at this commit is **25**.
+  "DeclaredInputsEditor.test.tsx": 16,
+  "ArgumentEditor.test.tsx": 33,
+  "DescribeServicePicker.test.tsx": 20,
+
+  // ══ Phase 214.1-02 (STEP-02) — THE PHASE'S REGISTRY DEBTS, PAID IN ONE PLACE ═══════════
+  //
+  // Plan `214.1-02` owns EVERY shared-registry edit of this phase, because a shared artifact
+  // must not be written from two parallel worktrees. Six pins move below and one suite is
+  // adopted, and EVERY figure is read from the gate's OWN `actual` column on a pre-edit run
+  // — never hand-counted, and never carried over from a plan's prose. The dispatch note for
+  // this plan named three of these; the gate's own output named six.
+  //
+  // ⚠ THE DISTINCTION THAT MATTERS: these are RE-BASELINES, not bumps. A pin sitting far
+  // below its file's real count guards almost nothing — `PublishGauntlet.test.tsx` pinned at
+  // 46 against a file running 83 left THIRTY-SEVEN cases deletable in silence, which is the
+  // failure mode this whole register exists to prevent. Raising each pin to the measured
+  // actual is what re-arms it.
+  //
+  //   file                            was  ->  now   attribution
+  //   PublishGauntlet.test.tsx         46  ->   83   +37; stale BEFORE this phase (it read
+  //                                                  78 at wave 1's start), plus 214.1-03's
+  //                                                  five BUG-260828-04 diagnosis cases
+  //   builderStore.test.ts             52  ->   77   +25; 214.1-01's setDeclaredInputs cases
+  //   soulData.test.ts                 36  ->   58   +22; 214.1-01's RESERVED-key mirror
+  //   PublishRefusalList.test.tsx      22  ->   25    +3; 214.1-03
+  //   LaunchInputFields.test.tsx       15  ->   20    +5; 214.1-01's `required` mark
+  //   declaredInputs.test.ts            —  ->   25   ADOPTED — see below
+  //
+  // ⭐ THE ADOPTION `214.1-01` EXPLICITLY OWED THIS PLAN. That plan's own note reads: *"an
+  // unpinned suite is not a lightly-guarded one, it is an UNGUARDED one"*. `declaredInputs.ts`
+  // is the ONE minting site every declared input passes through — its three refusals and its
+  // ask-key derivation — and its 25 cases have been executing under the
+  // `src/components/workflows` directory entry while guarded by nothing.
+  // ⚠ THREE OF THE SIX ARE EDITED AT THEIR ORIGINAL LINES, NOT RE-DECLARED HERE.
+  // `PublishGauntlet.test.tsx`, `builderStore.test.ts` and `soulData.test.ts` already have
+  // entries far above; a second entry for the same key is a silent LAST-WINS override that
+  // reads as two facts and behaves as one. Each carries a pointer back to this block.
+  "declaredInputs.test.ts": 25,
+  "LaunchInputFields.test.tsx": 20,
+  "PublishRefusalList.test.tsx": 25,
+
+  // ⭐ THE REACHABILITY PROPERTY (214.1-02 Task 2), AND IT NEEDS BOTH KNOBS.
+  //
+  // ⚠ CHECKED FROM THE GATE'S OWN PRINTED ROWS RATHER THAN ASSUMED, and the answer differs
+  // from its wave-1 sibling directly above: the pre-edit run's file list contains **no row
+  // at all** for `WorkflowBuilderPage.declaredInputs.test.tsx`, because `src/pages` is
+  // reached by NAMED FILES ONLY — there is no `src/pages` directory entry. So this file was
+  // neither running nor guarded, and the pin alone would have guarded a file the gate never
+  // executes. A `TARGETS` line is added beside it.
+  //
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED. This suite needed both;
+  // `DeclaredInputsEditor.test.tsx` needed only the second. The two sit ten lines apart and
+  // took opposite answers, which is why the check is made per file and never inferred.
+  "WorkflowBuilderPage.declaredInputs.test.tsx": 9,
+  "StepIdentity.coverage.test.tsx": 23,
+  "WorkflowScheduleModal.test.tsx": 9,
+  "argumentModel.test.ts": 26,
+  "argumentVocabulary.test.ts": 44,
+  "describeServiceMatch.test.ts": 15,
+  "publishRefusalVocabulary.test.ts": 41,
+  "stepIdentityVocabulary.test.ts": 34,
+
+  // ── BUG-260828-09 — BOTH NEEDED ONLY THE SECOND KNOB, AND THAT IS MEASURED ──────────
+  // The gate's own pre-pin run printed both as `— N new` rows, which is proof they were
+  // already EXECUTING: they live under `src/components/workflows`, a DIRECTORY entry in
+  // `TARGETS` below, so no `TARGETS` line is owed. TARGETS decides what RUNS; BASELINE
+  // decides what is GUARDED, and a suite can sit on the wrong side of exactly one of them
+  // — the `WorkflowBuilderPage.declaredInputs.test.tsx` note above is the case that took
+  // the opposite answer ten lines up, which is why this is checked per file and never
+  // inferred from a sibling.
+  //
+  // Counts read from that run's printed rows, not predicted: 13 and 8.
+  "publishBlockedStep.test.ts": 13,
+
+  // BUG-260829-01 — same check as the pair above and the same answer: it lives under
+  // `src/components/workflows`, already a DIRECTORY entry in `TARGETS`, so it RAN the moment it
+  // was created and needs BASELINE only. Count read from the gate's printed row, not predicted.
+  "cronPlain.test.ts": 15,
+  "PublishBlockedStepCard.test.tsx": 8,
+  // ⭐ ADOPTED rather than created. `RunStepList.tsx` IS in this phase's diff
+  // (214-11 mounted the shared step identity in it) and its only suite was
+  // unpinned — executed by the directory entry, guarded by nothing. An unpinned
+  // suite is not a lightly-guarded one, it is an unguarded one.
+  "RunStepList.test.tsx": 17,
+  // ⚠ FIVE MORE SUITES REMAIN UNPINNED AND ARE NAMED RATHER THAN LEFT SILENT:
+  // `PromptVariableChips.test.tsx` (3), `RunHero.test.tsx` (18),
+  // `automationFacts.test.ts` (11), `nodeEffectBanner.test.ts` (8),
+  // `toolReadOnlyMap.test.ts` (7). None guards a file in Phase 214's diff, so
+  // adopting them here would fold unrelated drift into a commit that did not cause
+  // it — the same reason twelve consecutive plans declined the pre-existing four.
+  // Registered as `SEED-222` with a concrete re-open trigger, because a decision
+  // recorded only in a comment is invisible to every sweep.
+
+  // ══ Phase 217 (plan `217-12`, the phase's CLOSING plan) — THE DOCUMENT SPACE ═════════
+  //
+  // The GUARDED half of the two-knob pair whose RUNS half is the matching `TARGETS` block
+  // below (search `Phase 217`). The full reasoning — why the pins land in one closing plan
+  // rather than in fourteen creating commits, why every entry is file-level, and which five
+  // directories this gate reaches by nothing — is recorded ONCE there and is not duplicated
+  // here, because two copies of a reason drift.
+  //
+  // ⛔ EVERY FIGURE BELOW IS THIS GATE'S OWN PRINTED `— N new` COLUMN, read off the run made
+  // AFTER the TARGETS lines existed and BEFORE these pins were written. NOT ONE IS
+  // HAND-DERIVED. A hand-derived pin is a number the gate has never agreed with, and a pin
+  // guessed high fails every run afterwards.
+  //
+  // ⭐ THE ARITHMETIC CLOSES WITH ZERO RESIDUAL, and that is what distinguishes GROWTH from
+  // DRIFT. Adopting the TARGETS entries moved the grand total `6482 → 6664` = **+182**, and
+  // the fourteen rows below sum to exactly 182. An unexplained `+n` is the thing to worry
+  // about; a bigger number that adds up is this gate WORKING.
+  //
+  // ⚠ `DocumentList.test.tsx` and `DocumentList.moveToFolder.test.tsx` are the two halves of
+  // the resolved bare-name collision. They are COMPLEMENTS (Phase 118 classification chip /
+  // Phase 114 move-to-folder row action), so BOTH are pinned and NEITHER is excluded — an
+  // undocumented exclusion is how a suite becomes invisible.
+  "renameFence.test.ts": 15,
+  "acceptFormats.test.ts": 19,
+  "IngestionStrip.test.tsx": 25,
+  "DetailSections.lazy.test.tsx": 14,
+  "CR01.reset.test.tsx": 2,
+  "DetailSections.tables.test.tsx": 15,
+  "tabsContrast.test.ts": 14,
+  "LibraryPage.test.tsx": 12,
+  "librarySelection.test.ts": 25,
+  "useDocuments.test.ts": 7,
+  "DocumentList.test.tsx": 7,
+  "DocumentList.moveToFolder.test.tsx": 4,
+  "ViewsGroup.test.tsx": 10,
+  "DocumentDetailPanel.a11y.test.tsx": 7,
+  "CsvTablePreview.test.tsx": 8,
+  //
+  // ⚠ ONE RE-BASELINE, NOT A NEW PIN, AND IT IS EDITED AT ITS ORIGINAL LINE rather than
+  // re-declared here — a second entry for the same key is a silent LAST-WINS override that
+  // reads as two facts and behaves as one. `apiBarrel.test.ts` moves `3 -> 5`: plan 217-10
+  // extended it to cover `api/documents.ts` (it guarded `connectors.ts` only), and the `+2`
+  // is exactly its two new `it` blocks, with no residual. See the pointer at its own entry.
+  //
+  // ── DECLINED, each with its reason, so a decline can never read as an oversight ───────
+  //  · The five `SEED-222` suites named directly above (`PromptVariableChips`, `RunHero`,
+  //    `automationFacts`, `nodeEffectBanner`, `toolReadOnlyMap`) — STILL unpinned. 217 reads
+  //    none of them and none guards a file in this phase's diff; adopting them here would
+  //    fold unrelated drift into a commit that did not cause it. Their measured counts at
+  //    this commit are unchanged from Phase 214's note: 3 / 18 / 11 / 8 / 7.
+  //  · The six other `src/components/panel/__tests__` suites (`FilePreview`,
+  //    `PendingAskCard`, `Seam`, `TodosSection`, `VersionDiff`, `WorkspacePanel.derived`) —
+  //    217 converts only `CsvTablePreview.tsx`, so only its suite is claimed.
+  //  · `DocumentStatusBadge.test.tsx`, `FilterBar.test.tsx` and
+  //    `DocumentStatusBadge.a11y.test.tsx` — DECLINED by 217 (it modified neither
+  //    `DocumentStatusBadge.tsx` nor `FilterBar.tsx`), then ADOPTED by 217.1-18, which
+  //    owns the document space. See the pins at the tail of this map.
+  //
+  // ⛔ BACKEND SUITES ARE NOT PINNED HERE AND CANNOT BE — this gate is vitest-only.
+  // `backend/tests/test_217_document_response_fields.py`,
+  // `backend/tests/test_217_document_detail_routes.py` and
+  // `backend/tests/test_217_document_queries.py` are guarded by their plans' own pytest
+  // criteria and by the backend failure-count baseline. Recorded as a DECISION rather than
+  // a silence, so nobody later reads this gate's green as covering them.
+
+  // ── THE PHASE 217.1 SUITES — ADOPTED BY 217.1-18 AT ITS OWN CLOSE ────────────────────
+  // Pinned at the gate's OWN printed `actual` on the same run that this phase's closeout
+  // verified green, never while red. Two knobs: each has a named-file `TARGETS` entry above
+  // (TARGETS decides what RUNS) and a pin here (BASELINE decides what is GUARDED). The three
+  // trailing orphans close 217's deferred-§3 re-open trigger.
+  "sketchComposition.test.tsx": 47,
+  "ingestionFailureCopy.test.ts": 22,
+  "IngestionTab.test.tsx": 38,
+  "pipelineGroups.test.ts": 7,
+  "LibraryStatTiles.test.tsx": 13,
+  "viewRulePhrase.test.ts": 4,
+  "ViewCardGrid.test.tsx": 14,
+  "IndexFoldersTable.test.tsx": 6,
+  "IndexingTab.gate.test.tsx": 6,
+  "HealthTiles.test.tsx": 6,
+  "HealthSignalChips.test.tsx": 13,
+  "CheckedQueriesSection.test.tsx": 11,
+  "ChatLayout.fallback.test.tsx": 4,
+  "DocumentQueriesSection.test.tsx": 8,
+  "FilterBar.test.tsx": 10,
+  "DocumentStatusBadge.test.tsx": 19,
+  "DocumentStatusBadge.a11y.test.tsx": 19,
+  // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
+  "connectors.mcp_auth.test.ts": 8,
+  "connectionFormCopy.mcp.test.ts": 6,
+  "McpAuthDoor.test.tsx": 9,
+  "McpAuthDoor.byo.test.tsx": 3,
+  "scrollAreaViewportWidth.test.tsx": 2,
+  // ── BUG-260904-02 (2026-09-04) — the follow-but-release scroll machine ───────────────
+  // ⚠ FOUND IN NEITHER KNOB while carrying the entire scroll discipline of the chat: the gate
+  // has never executed it and nothing guarded its count. Adopted here, in the commit that fixes
+  // the defect it failed to catch.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT: the three fences that keep a streaming run from dragging a
+  // reader who scrolled away — the smooth-scroll TAIL must not re-arm the pin, a gesture must
+  // cancel our claim for the purpose of letting go but NEVER for taking hold again, and an
+  // upward gesture must release synchronously rather than a commit later. Each was driven RED,
+  // and two of them only after a REAL mouse wheel refuted a synthetic one that measured clean.
+  "useFollowScroll.test.ts": 10,
+  // ── BUG-260904-01 (2026-09-04) — the Continue button's ONLY behavioural guard ──────────
+  // Pinned in the SAME COMMIT that creates it (a BASELINE key naming a path that does not yet
+  // exist makes this gate ERROR at exit 2, not fail). Bare name confirmed unique tree-wide.
+  //
+  // ⚠ WHAT IS UNGUARDED WITHOUT IT, and why an existing fence did not cover it: the call
+  // `continueRun(workflowLock.runId)` was ALREADY asserted by `WorkspacePanel.test.tsx:1218`
+  // — as SOURCE TEXT. That fence passed for as long as the symbol was unimported and the click
+  // threw `ReferenceError`. A fence on the SHAPE of a call cannot see whether the call resolves;
+  // only rendering the card and clicking the button can, which is what this suite does. Driven
+  // RED against the unfixed component first.
+  "MessageItem.continueButton.test.tsx": 2,
+  // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
+  "MessageItem.cancelledRun.test.tsx": 8,
+  "MessageItem.blockedNotice.test.tsx": 4,
+  "MessageItem.harnessBanner.test.tsx": 11,
+  "ChatAreaBanner.test.tsx": 7,
+  "ChatAreaMode.test.tsx": 5,
+  "RunCard.characterization.test.tsx": 8,
+  "MessageItem.test.tsx": 24,
+  "MessageItem.clamp.test.tsx": 5,
+  "MessageItem.fallbackNotice.test.tsx": 3,
+  "MessageItem.memo.test.tsx": 3,
+  "MessageItem.sticky.test.tsx": 4,
+  "RunCard.logo.test.tsx": 6,
+  "ToolCallPanel.test.tsx": 16,
+  "MessageList.test.tsx": 30,
+  "MessageList.dedup.test.tsx": 7,
+  "MessageList.runline.baseline.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3075,6 +3513,8 @@ const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
+  // Phase 226 (merge commit) — the public landing page: fence, facts, CSS-class lint, scenes, page.
+  "src/landing",
   "src/components/workflows",
   "src/pages/WorkflowBuilderPage.test.tsx",
   "src/pages/WorkflowBuilderPage.canvas.test.tsx",
@@ -3117,6 +3557,35 @@ const TARGETS = [
   // to it. Half of those rows are ABSENCE assertions, which is the easiest kind of case to
   // delete unnoticed.
   "src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx",
+  // Phase 224-05 — THE CHAT/PANEL RUN SURFACE, ADOPTED. Measured 2026-09-03: the gate
+  // RAN none of these and GUARDED none of them, so 224-05's own acceptance criterion
+  // would have passed whether or not four of the phase's five plans worked. The Phase
+  // 214 shape again: TARGETS decides what RUNS, BASELINE what is GUARDED, and these sat
+  // outside BOTH. All six were green BEFORE adoption, so adoption cannot red the gate;
+  // every count was read from a real run AFTER the edits landed, never guessed.
+  "src/components/panel/__tests__/Seam.test.tsx",
+  "src/components/panel/__tests__/TodosSection.test.tsx",
+  "src/components/chat/__tests__/CitationList.test.tsx",
+  "src/components/chat/RunCard.test.tsx",
+  "src/components/chat/RunCard.timer.test.tsx",
+  "src/components/chat/__tests__/ChatArea.approval.test.tsx",
+  // ⭐ Added in 214.1-02 — THE SECOND KNOB for this phase's headline artefact, and it was
+  // MEASURED to be needed rather than added by habit: the pre-edit gate run printed no row
+  // whatsoever for this file, because `src/pages` is reached by NAMED FILES ONLY and there
+  // is no `src/pages` directory entry. Contrast its wave-1 sibling
+  // `DeclaredInputsEditor.test.tsx`, which was ALREADY executing under the
+  // `src/components/workflows` directory entry and needed a pin alone. Two suites in one
+  // phase, opposite answers — which is why the check is per file and never inferred.
+  //
+  // What would be unguarded without it: the ONLY test in this repository that walks an
+  // EMPTY builder to a PUBLISHED workflow with a non-empty `definition.inputs[]` while
+  // mocking NEITHER the store NOR any `@/lib/api` module. `BUG-260828-02` shipped through a
+  // sixteen-plan phase with green gates precisely because every other test built
+  // `definition.inputs[]` by hand, so this file is the phase's whole answer to *"could a
+  // person actually do it?"* — plus three `?raw` self-fences (each with a positive control,
+  // all three driven RED against planted defects) and a non-vacuity control. A reachability
+  // proof the gate never executes has proved nothing.
+  "src/pages/WorkflowBuilderPage.declaredInputs.test.tsx",
   // Added in 188-01 (Wave 0), for the same two-knob reason spelled out directly above and
   // for one more: `src/components/panel/__tests__/` lands outside BOTH knobs by default —
   // the directory entries above cover only `src/components/workflows` and three named
@@ -3211,6 +3680,15 @@ const TARGETS = [
   // count was still growing; PINNED at 12 by 188-12 from this script's printed `actual`
   // column across two agreeing runs.
   "src/components/layout/ChatLayout.launch.test.tsx",
+  // ⚠ ADOPTED 2026-09-01 — it was in NEITHER knob, and the change that found it is the
+  // kind the gate exists to watch: Connections moved out of Settings into its own page,
+  // which deleted a tab, retired a routing key and re-pointed the persisted-tab fallback.
+  // Four existing tests went RED and two new guards were driven RED against a planted
+  // empty `RETIRED_TABS` — and NONE of that was visible to the gate, because this suite
+  // has never been run by it. Same pattern BUS-040 recorded for three chat suites, one of
+  // which had been red for hours unseen.
+  // ⚠ No bareName collision: the sibling is `SettingsPage.a11y.test.tsx`, a distinct key.
+  "src/pages/SettingsPage.test.tsx",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured
@@ -3337,7 +3815,44 @@ const TARGETS = [
   // blob), and `capability: null` alone never resolving MCP. Each is the kind that deletes
   // unnoticed, and three of them guard properties that exist NOWHERE else in the tree: the
   // ink contract, the wordmark refusal, and the MCP arm's own-condition rule.
-  "src/components/settings/__tests__/connectionMark.test.tsx",
+  //
+  // ⚠ REPOINTED IN 214-08 — A PATH KNOB, MOVED WITH ITS FILE. `connectionMark.tsx` and its
+  // suite moved from `components/settings/` to `src/lib/` (D-214-17: the mark is a REUSE, and
+  // its consumer set went from one surface to six). This entry is a PATH, so it does not
+  // follow a `git mv` on its own — and a pinned file the gate cannot FIND fails
+  // `N/N pinned files present`, which reads as a test failure and is a path edit.
+  //
+  // ⚠ THE `BASELINE` KEY NEEDED NO EDIT AND THAT WAS CHECKED RATHER THAN ASSUMED: baseline
+  // keys are BASENAMES (`connectionMark.test.tsx`), matched against the report's own file
+  // names, so the pin of 39 still resolves after the move. TWO knobs, only ONE of which is
+  // location-sensitive — the asymmetry the blocks above describe, seen from the other side.
+  //
+  // ⚠ AND `src/lib` HAS NO DIRECTORY ENTRY ANYWHERE IN THIS ARRAY, so the suite would have
+  // gone UNRUN rather than merely unpinned had this line been deleted instead of repointed.
+  "src/lib/__tests__/connectionMark.test.tsx",
+  // ── Added in 211-05 (Task 1(c), SC#3) — the FOURTH entry on `src/components/settings/`,
+  //    for the identical reason the three above give: every one of them is FILE-LEVEL, so a
+  //    fourth file in that directory is reached by none of them.
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN rather than assumed. The gate was run from the repo
+  // root with the suite already on disk and green (21 passing), and its printed file list did
+  // NOT contain `connectionVerbFence.test.ts` at all — while its sibling
+  // `connectionCardReachability.test.tsx` DID appear, as `— 10 new`, because that one sits
+  // under the `src/components/workflows` DIRECTORY entry above and so ran the moment it
+  // existed. That contrast is the measurement: same phase, same commit, two new files, and
+  // only ONE of them needed this knob. A falsification that does not run has falsified
+  // nothing (verification truth 14).
+  //
+  // ⚠ THE TIMING IS NOT COSMETIC: an entry pointing at a path that does not yet exist makes
+  // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
+  // the file — never before, never after.
+  //
+  // What would be unguarded without it: the whole of SC#3 — *"browsing, filtering and picking
+  // never offer Message / Ticket / Email as a category"*. The suite is a SOURCE fence over
+  // BOTH `src/components/settings/**` and `src/components/workflows/**`, so it is the only
+  // artifact in the tree that proves that absence anywhere other than on a surface some test
+  // happened to mount.
+  "src/components/settings/__tests__/connectionVerbFence.test.ts",
   // ── Added in 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ──────────────
   // The EIGHTH occurrence of the two-knob trap, and the first one that lands on the very
   // file the phase exists to rewrite. Stated as the rule rather than as an incident, for a
@@ -3665,6 +4180,22 @@ const TARGETS = [
   // Phase 196 the owner of their future rot in a gate that requires 0 failing forever.
   "src/hooks/__tests__/useComposerModel.test.ts",
   "src/components/chat/__tests__/ChatArea.model.test.tsx",
+  // ⚠ ADOPTED 2026-08-31 — it was in NEITHER knob, so the gate neither ran it nor guarded
+  // it, on the suite that now fences the composer's connector selection. That selection
+  // shipped a defect where an EMPTY choice meant EVERY connection; a fence the gate does
+  // not execute would not have caught its return. TARGETS decides what runs, BASELINE
+  // decides what is guarded, and this file was on the wrong side of both.
+  "src/components/chat/__tests__/MessageInput.connectors.test.tsx",
+  // ⚠ ADOPTED 2026-08-31, for the same reason and on the same day: the approval card is
+  // the ONE surface where a person grants an external action, and its suite was in
+  // neither knob. The three-button card writes a real grant; a fence the gate does not
+  // execute would not notice that button losing its wiring.
+  "src/components/chat/__tests__/ToolApproval.test.tsx",
+  // ⚠ ADOPTED 2026-08-31 (noise audit). Found RED for hours after the connector-toggle
+  // fix changed `onSend`'s second argument from `undefined` to `[]` — and nobody saw it,
+  // because this suite was in NEITHER knob. The THIRD chat suite found in that state on
+  // one day. TARGETS decides what runs; BASELINE decides what is guarded.
+  "src/components/chat/__tests__/MessageInputDrafts.test.tsx",
   // ── Added in 192.2-10 (WR-02), in the SAME COMMIT as its BASELINE pin above ─────────
   //
   // The ELEVENTH occurrence of the two-knob trap this script documents. `src/lib/` is reached
@@ -3686,6 +4217,195 @@ const TARGETS = [
   // path was `ls`-confirmed and the bare filename confirmed unique tree-wide (the BASELINE key
   // space is global) before this line was written.
   "src/lib/apiRunFields.fences.test.ts",
+  // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
+  "src/components/settings/__tests__/servicesCatalog.test.ts",
+  "src/lib/__tests__/apiBarrel.test.ts",
+  // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
+  "src/components/settings/__tests__/ConnectionGrantsList.test.tsx",
+  // ── Added in Phase 221 (221-01 / T7) — the six-application split ─────────────
+  // ⚠ FOUR lines, and the fourth is a FIND rather than a new file:
+  // `ConnectionFormPanel.oauth.test.tsx` has shipped since Phase 215 and was in
+  // NEITHER knob — the gate has never executed it and nothing guarded its count.
+  // That is the sixth suite found in this state inside a week (three chat suites on
+  // 2026-08-31, one of them RED for hours unseen), and the cause is structural: the
+  // `src/components/settings/` entries here are FILE-LEVEL by deliberate choice, so
+  // every new file under it is invisible until somebody types its name.
+  "src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx",
+  "src/components/settings/toolGroups.test.ts",
+  "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
+  "src/components/settings/connectionRowVerdict.test.ts",
+  // ── Added in Phase 221 plan 02 (the availability line) — BOTH knobs, same commit ────
+  "src/components/settings/applicationAvailability.test.ts",
+  "src/components/settings/ApplicationGroup.availability.test.tsx",
+  // Added 2026-09-01 with the two honest-failure fixes the operator drove out.
+  "src/components/chat/__tests__/statusWord.honesty.test.ts",
+  // ⚠ FOUND IN NEITHER KNOB 2026-09-01 — the gate never RAN it and nothing guarded it,
+  // on the suite covering the APPROVAL CARD, which is the product's trust boundary. The
+  // panel __tests__ entries here are FILE-LEVEL, so this file was invisible until its
+  // name was typed. Twelfth such suite in a week; SEED-229 has the structural fix.
+  "src/components/panel/__tests__/PendingAskCard.test.tsx",
+  // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
+  // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
+  // ── whole script returned NOTHING before this line was written. `src/components/metadata`
+  // ── is covered by no directory entry, so the gate has never EXECUTED a suite there —
+  // ── including the shipped `DocumentDetailPanel.a11y.test.tsx`.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory: adopting `src/components/metadata`
+  // would pull in the a11y and InlineEdit suites and make this change the owner of their
+  // future rot, which is the same reasoning already recorded for `src/pages` and
+  // `src/components/layout` above. Phase 218 owns the document space and can adopt the
+  // directory deliberately, with its own measured number.
+  //
+  // What would be unguarded without it: the ONLY fence on the truncation notice, whose
+  // load-bearing case is an ABSENCE — `_images` is stamped only when images were skipped,
+  // so a notice rendered unconditionally would warn on every document in the library. Both
+  // positive cases were driven RED against a planted `{false && …}` (2 failed, absence
+  // control correctly green) before this entry was written.
+  "src/components/metadata/DocumentDetailPanel.images.test.tsx",
+
+  // ══ Phase 217 (plan `217-12`, the phase's CLOSING plan) — THE DOCUMENT SPACE ═════════
+  //
+  // ⚠ MEASURED BEFORE THIS BLOCK WAS WRITTEN, never assumed: of the thirteen suites Phase
+  // 217 wrote, converted or inherited, exactly ONE doc-space suite sat in BOTH knobs —
+  // `DocumentDetailPanel.images.test.tsx`, adopted for SEED-227 one phase earlier. The
+  // gate's grand total did not move at all across this phase's second wave, because it
+  // never executed any of them.
+  //
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED, and a suite can sit on
+  // the wrong side of exactly one. Checked PER FILE from this gate's own printed rows and
+  // never inferred from a sibling — the `WorkflowBuilderPage.declaredInputs` note above
+  // records taking the OPPOSITE answer to its neighbour ten lines away, which is why the
+  // check is made file by file.
+  //
+  // ⚠ WHY THE PINS LAND HERE RATHER THAN IN EACH CREATING COMMIT — a deliberate planning
+  // decision, recorded so it is auditable rather than discovered later. A BASELINE key
+  // naming a file that does not yet exist makes this gate ERROR (exit 2), so pinning ahead
+  // is impossible; pinning per plan would have made this script a shared artifact across
+  // six parallel worktrees and forced the whole phase serial. The cost is real and is
+  // stated rather than hidden: every suite below was UNGUARDED for the length of the
+  // phase. The mitigation is that the adoption list was derived mechanically —
+  // `git diff --name-only --diff-filter=A 9a3808697..HEAD -- 'frontend/src/**/*.test.ts*'`
+  // — and not from memory. Phase 214 left six suites unpinned by doing this from memory.
+  //
+  // ⚠ A BARE-NAME COLLISION BLOCKED ONE ADOPTION AND WAS RESOLVED, NOT WORKED AROUND.
+  // `bareName()` makes the BASELINE key space GLOBAL, and `DocumentList.test.tsx` existed
+  // at TWO paths. Both were read before either was touched, and they are COMPLEMENTS, not
+  // duplicates: the colocated `src/components/ingestion/` one covers the Phase 118
+  // classification chip; the `src/__tests__/components/` one covers the Phase 114
+  // move-to-folder row action. So neither is dropped and neither is excluded — the latter
+  // was `git mv`d to `DocumentList.moveToFolder.test.tsx` (history follows) and both are
+  // adopted below.
+  //
+  // ⚠ FIVE DIRECTORIES REACHED BY NOTHING, NAMED rather than left silent, because an
+  // unnamed absence is exactly how a suite becomes permanently invisible:
+  //   · `src/pages` — reached by NAMED FILES ONLY; there is no directory entry, so
+  //     `src/pages/__tests__/` was reached by nothing at all before this block.
+  //   · `src/components/ingestion`, `src/components/ui`, `src/__tests__/library` and
+  //     `src/__tests__/hooks` — likewise unreached by any entry in this file.
+  //   · `src/components/metadata` — STILL covered by no DIRECTORY entry after this block.
+  //     217 adopts it FILE BY FILE, verbatim the reasoning SEED-227 recorded one phase
+  //     earlier. ⭐ Phase 218 owns the document space and can adopt the directory
+  //     deliberately, with its own measured number.
+  //
+  // ⚠ FILE-LEVEL EVERYWHERE, deliberately NOT bare directories. A directory entry RECURSES
+  // into `__tests__/` — that is precisely how `WorkflowScheduleModal.test.tsx` ended up
+  // RUNNING while guarding nothing at Phase 214 — and adopting a directory here would make
+  // Phase 217 the owner of the future rot of suites it never read, in a gate that requires
+  // 0 failing forever.
+
+  // ── The eight suites Phase 217 CREATED ──────────────────────────────────────────────
+  "src/__tests__/library/renameFence.test.ts",
+  "src/components/ingestion/__tests__/acceptFormats.test.ts",
+  "src/components/ingestion/__tests__/IngestionStrip.test.tsx",
+  "src/components/metadata/__tests__/DetailSections.lazy.test.tsx",
+  "src/components/metadata/__tests__/CR01.reset.test.tsx",
+  "src/components/metadata/__tests__/DetailSections.tables.test.tsx",
+  "src/components/ui/__tests__/tabsContrast.test.ts",
+  "src/pages/__tests__/LibraryPage.test.tsx",
+  "src/pages/__tests__/librarySelection.test.ts",
+
+  // ── The four pre-existing doc-space ORPHANS this gate had NEVER executed ─────────────
+  // Adopted rather than created. Each guards a file inside Phase 217's blast radius:
+  // `useDocuments.ts` carries the reconcile that the `ingestion_step` field flows through,
+  // `DocumentList.tsx` is the strip's host row, `DocumentDetailPanel.tsx` gained five
+  // sections, and `ViewsGroup.tsx` is the sidebar half of the one selection truth.
+  // ⚠ 217 does NOT modify `DocumentList.tsx` itself — the strips live on the Ingestion tab
+  // — so its G-5 obligation is not triggered by a code change here. What changes is that
+  // its two suites stop being invisible to this gate.
+  "src/__tests__/hooks/useDocuments.test.ts",
+  "src/__tests__/components/DocumentList.moveToFolder.test.tsx",
+  "src/components/ingestion/DocumentList.test.tsx",
+  "src/components/ingestion/ViewsGroup.test.tsx",
+  "src/components/metadata/DocumentDetailPanel.a11y.test.tsx",
+
+  // ── ⭐ THE PANEL-DIRECTORY RESERVATION, CLAIMED ──────────────────────────────────────
+  // The comment at the panel entries far above reads, verbatim: *"A later phase that wants
+  // CsvTablePreview / FilePreview / FilesSection / PendingAskCard / Seam / TodosSection /
+  // VersionDiff / WorkspacePanel{,.derived} inside the gate should adopt them deliberately,
+  // with its own measured number."* Phase 217 CONVERTS `CsvTablePreview.tsx` — 217-11
+  // extracted `DataTableView` out of it — so this is that deliberate adoption, on exactly
+  // the ground Phase 195 claimed `FilesSection.test.tsx`. ⭐ Its count is UNCHANGED by the
+  // extraction, which is 217-11's own proof that the extraction was faithful.
+  // The other six panel suites stay DECLINED for their already-recorded reason: 217 reads
+  // none of them, and a decline must never read as an oversight.
+  "src/components/panel/__tests__/CsvTablePreview.test.tsx",
+
+  // ── ⭐ THE PHASE 217.1 SUITES — ADOPTED BY 217.1-18, AT ITS OWN CLOSE ─────────────────
+  // Every suite this phase created or adopted. `src/components/library` and the metadata
+  // `__tests__/` dir have NO directory entry, so each is a NAMED FILE here (the two-knob
+  // rule: TARGETS decides what RUNS, BASELINE decides what is GUARDED). The three
+  // DocumentStatusBadge / FilterBar entries close 217's deferred-§3 re-open trigger. Pins
+  // were captured by 217.1-18 at the gate's own printed `-- N new`, never while red.
+  "src/components/library/__tests__/sketchComposition.test.tsx",
+  "src/components/library/__tests__/ingestionFailureCopy.test.ts",
+  "src/components/library/__tests__/IngestionTab.test.tsx",
+  "src/components/library/ingestion/__tests__/pipelineGroups.test.ts",
+  "src/components/library/__tests__/LibraryStatTiles.test.tsx",
+  "src/components/library/__tests__/viewRulePhrase.test.ts",
+  "src/components/library/__tests__/ViewCardGrid.test.tsx",
+  "src/components/library/__tests__/IndexFoldersTable.test.tsx",
+  "src/components/library/__tests__/IndexingTab.gate.test.tsx",
+  "src/components/library/__tests__/HealthTiles.test.tsx",
+  "src/components/library/__tests__/HealthSignalChips.test.tsx",
+  "src/components/library/__tests__/CheckedQueriesSection.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.fallback.test.tsx",
+  "src/components/metadata/__tests__/DocumentQueriesSection.test.tsx",
+  "src/components/ingestion/FilterBar.test.tsx",
+  // ⚠ This path was repointed at 217.1-18 — the file lives at `src/__tests__/components/`
+  // (the `src/components/ingestion/__tests__/` path is DEAD, which is why it never printed
+  // as `new`). The `.a11y` sibling below is genuinely under `src/components/ingestion/__tests__/`.
+  "src/__tests__/components/DocumentStatusBadge.test.tsx",
+  "src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx",
+  // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
+  "src/lib/api/__tests__/connectors.mcp_auth.test.ts",
+  "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
+  "src/components/settings/McpAuthDoor.test.tsx",
+  "src/components/settings/McpAuthDoor.byo.test.tsx",
+  "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
+  // ── BUG-260904-02 — see the matching BASELINE entry. `src/__tests__/hooks` is reached by no
+  // ── directory entry in this file, so this suite needed BOTH knobs. ───────────────────
+  "src/__tests__/hooks/useFollowScroll.test.ts",
+  // ── BUG-260904-01 — see the matching BASELINE entry for what it guards. FILE-LEVEL,
+  // ── deliberately not the bare directory `src/components/chat/__tests__`, verbatim the
+  // ── reasoning this script already records for its neighbours. ────────────────────────
+  "src/components/chat/__tests__/MessageItem.continueButton.test.tsx",
+  // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
+  "src/components/chat/__tests__/MessageItem.cancelledRun.test.tsx",
+  "src/components/chat/__tests__/MessageItem.blockedNotice.test.tsx",
+  "src/components/chat/__tests__/MessageItem.harnessBanner.test.tsx",
+  "src/components/chat/__tests__/ChatAreaBanner.test.tsx",
+  "src/components/chat/__tests__/ChatAreaMode.test.tsx",
+  "src/components/chat/__tests__/RunCard.characterization.test.tsx",
+  "src/__tests__/components/MessageItem.test.tsx",
+  "src/__tests__/components/MessageItem.clamp.test.tsx",
+  "src/__tests__/components/MessageItem.fallbackNotice.test.tsx",
+  "src/__tests__/components/MessageItem.memo.test.tsx",
+  "src/__tests__/components/MessageItem.sticky.test.tsx",
+  "src/__tests__/components/RunCard.logo.test.tsx",
+  "src/__tests__/components/ToolCallPanel.test.tsx",
+  "src/__tests__/components/chat/MessageList.test.tsx",
+  "src/__tests__/components/chat/MessageList.dedup.test.tsx",
+  "src/__tests__/components/chat/MessageList.runline.baseline.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

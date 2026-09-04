@@ -1373,6 +1373,27 @@ async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
 
     RUN-KEYED read → ``workflow_run_id`` (NOT ``run_id`` — that column does not
     exist on workflow_phases; would raise Postgres 42703).
+
+    ── 214 (D-214-23) — WHAT ``output`` CARRIES ON A ``failed`` ROW, AND HOW TO READ IT ──
+    ``fail_phase`` (below, ``:1835``) writes ``{**(output or {}), "_failure_reason": reason}``
+    on EVERY failure, so the adapter's or gate's own sentence is already in this projection.
+    ``BUG-260826-05`` was not a missing write and not a missing column — **there is no
+    ``error`` column on this table at all** (measured 2026-08-28; the D-214-18 binary was
+    posed against one that does not exist). The reason simply reached no consumer.
+
+    ⚠ **THE SELECT IS DELIBERATELY BYTE-UNCHANGED, AND THAT IS THE POINT.** ``output`` was
+    ALREADY selected here and on both API readers, so the gap is PROJECTION, never SELECTION.
+    A consumer that needs the reason parses it at the point of consumption through
+    ``app.models.thread.phase_output_object`` — the ONE read-side unwrap — and never by
+    widening this statement. ``tests/unit/test_214_failure_reason_seam.py`` pins the literal
+    against the plan's base commit.
+
+    ⚠ **AND NEVER AS ``output["_failure_reason"]``.** 38 of the 43 ``failed`` rows on the live
+    database store this column as a jsonb STRING SCALAR; a dict-only reader finds the reason
+    on 2 of 43 and reads empty on the rest, with no error and an honest-looking absent arm.
+    ⚠ The weaker inline unwrap in ``get_latest_completed_workflow_run`` below (bare
+    ``except Exception``, a ``{"text": raw_output}`` fallback) is a SECOND copy of that read
+    and is a KNOWN DIVERGENCE — do not copy it and do not extend it.
     """
     rows = await pool.fetch(
         """

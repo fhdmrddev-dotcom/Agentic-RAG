@@ -3,7 +3,8 @@ seed_id: SEED-208
 title: "Let the author pick the connections/tools a workflow needs AT THE DESCRIBE DOOR, before the AI drafts — the generator's vocabulary becomes the connected services and their granted tools, and a named-but-absent service produces a stated REFUSAL, never a step that fails at 03:00."
 created: 2026-08-26
 planted_during: conversation with the operator, 2026-08-26, while Gemini executed Phase 209 — offered as "just an idea… for you to assess"
-status: planted
+status: folded            # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- STEP-06 / D-214-20 / D-214-21. SEED-207 gate discharged by Phase 211.
+folded_into: 214
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -100,3 +101,28 @@ knows how to refuse in a governed vocabulary; this is the same control with a ne
 2. ⚠ **Sequence after `SEED-207`.** While a native capability connection and an MCP connection are
    different shapes, this picker would have to render both — inheriting the very branch that
    unification exists to remove, on a brand-new surface.
+
+---
+
+## Phase 214 close (plan `214-15`, 2026-08-28) — `status` stays `folded`, and why
+
+**Shipped by `214-13`.** `DescribeServicePicker.tsx` puts the picker at the **GRANT grain** (not the
+connection grain), `describeServiceMatch.ts` carries the match rule, and the vocabulary constraint is
+**ENFORCED on the emitted definition** rather than merely asked for in the prompt — which is the half
+that makes a named-but-absent service a stated refusal instead of a step that fails at 03:00.
+`SEED-207`'s sequencing gate was discharged by Phase 211, as this seed required.
+
+⛔ **`status` stays `folded`, NOT closed, because G4-8 has not been driven.** The check has four
+distinct failure shapes the suites cannot all see at once: a Slack step drafted for an author with no
+Slack connection; a refusal with no next action; a refusal that fires **at rest** before anything is
+typed; and an anchor on the wrong word.
+
+⚠ **TWO measured defects sit on this seed's own surface and are registered, not folded silently:**
+
+1. **The refusal reaches a screen showing the MACHINE CODE** — *"Couldn't generate —
+   `connection_not_allowed`"*. `214-13` owns the code and `214-04` owns the page; **neither owns the
+   translation**, which is why it shipped. → `SEED-221`.
+2. **`onOpenSettings` is UNWIRED** — the refusal's *connect* button is a no-op. The owner was named
+   as `frontend/src/pages/WorkflowsPage.tsx` and the prop is threaded to nothing. → `SEED-218`.
+
+**A refusal that names the service and then offers a dead button is half of this seed, not all of it.**

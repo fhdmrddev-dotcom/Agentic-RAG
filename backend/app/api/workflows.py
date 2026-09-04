@@ -786,9 +786,32 @@ class GroundingBundleResponse(BaseModel):
 # fixed — the known set DERIVES from the modules that OWN the codes, and the unknown branch
 # fails LOUD (see ``_severity``). The composition, one row per owner:
 #
-#   ``reachability.LINT_CODES``           — the 5 structural codes ``lint_workflow`` emits
+#   ``reachability.LINT_CODES``           — the 10 codes ``lint_workflow`` emits: the 5
+#                                           STRUCTURAL ones, plus Phase 214's 5
+#                                           ARGUMENT-GAP ones (``reachability.ARGUMENT_GAP_CODES``
+#                                           — ``no_source`` / ``ask_undeclared`` /
+#                                           ``upstream_unreachable`` / ``shape_unknown`` /
+#                                           ``unrenderable``). Their OWNER is
+#                                           ``args.unsatisfiable_arguments``, which MINTS the
+#                                           kind; ``reachability`` carries it and publishes it.
 #   ``grounding.GROUNDING_VERDICT_CODES`` — the 3 fidelity codes ``grounding_verdicts`` emits
 #   ``_ROUTE_ASSIGNED_CODES``             — the 3 codes THIS route mints itself
+#
+# ⚠ PHASE 214 · THE FIVE ARGUMENT-GAP CODES ARE ``error``, AND THEY JOIN THAT BUCKET BY
+# COMPOSITION RATHER THAN BY A LITERAL. ``_ERROR_CODES`` is DERIVED
+# (``_KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES``), so widening ``LINT_CODES``
+# drops them into the error bucket automatically — which is the REQUIRED classification: a
+# step whose required argument nothing can supply is BROKEN, not "still building". The author
+# has already bound an action; the workflow cannot perform it. Painting the soft
+# ``incomplete`` here would tell them "keep going" and then hard-block the publish, which is
+# exactly the WR-05 posture this block exists to prevent.
+#
+# ⚠ AND ``/validate`` SEES ONLY THE NATIVE HALF, ON PURPOSE. ``lint_workflow``'s MCP arm needs
+# a ``tool_schemas`` map that only a connection read can build, and this route is called on
+# every canvas keystroke — so it passes none, and the MCP arm is skipped for it. That is this
+# module's shipped division of labour, not a gap: ``/validate`` is the live ADVISORY surface
+# and PUBLISH is the ENFORCING gate (``publish_service``'s own docblock says so). The publish
+# gate ALWAYS supplies the map. See ``reachability``'s module docblock for the full argument.
 #
 # ``tests/unit/test_182_severity_codes.py`` SCANS the two owning modules' emit sites and
 # fails if a published set drifts from what its functions can really emit. That guard is
@@ -1214,6 +1237,38 @@ class PublishRequest(BaseModel):
     golden_input: str
 
 
+class BlockedStep(BaseModel):
+    """WHICH step of the AUTHOR'S OWN workflow stopped a publish, and why (BUG-260828-09).
+
+    ── WHY THIS IS A FIELD OF ITS OWN AND NOT ANOTHER ``named_failures`` ENTRY ────────────
+    ``named_failures`` is POLYMORPHIC across the gauntlet's stages and its consumers are
+    required to detect shape PER ENTRY, never to switch on ``blocked_stage``
+    (``PublishGauntlet.tsx`` docblock rule 4). Adding a sixth shape to that array would make
+    every consumer's detection set grow, and a refusal that leads the surface is exactly the
+    thing that must not be reachable only by a successful shape guess. So the array is
+    UNTOUCHED — every existing entry renders byte-for-byte as it did — and the step identity
+    rides its own optional field.
+
+    ⚠ **``step_name`` IS ``None`` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.**
+    That is property (1) of the report — *by the author's step name, never a slug or a stage
+    index* — enforced at the producer rather than trusted at the consumer. The client resolves
+    the visible face through ``phaseVocabulary.nodeTitle``, the shipped four-tier ladder whose
+    stated floor is that the slug never appears in its output. ``step_slug`` and ``step_index``
+    are carried for correlation (a run link, a canvas focus), NOT for display.
+
+    ⚠ **``cause`` LEADS AND ``reason`` IS DEMOTED — BOTH ARE SENT.** ``reason`` is the engine's
+    verbatim sentence including its ``Phase {n} ({slug}) …:`` prefix; ``cause`` is that sentence
+    with the prefix removed. When the prefix does not match, ``cause`` IS ``reason``, so a
+    surface leading with ``cause`` can never render empty.
+    """
+
+    step_slug: str | None = None
+    step_index: int | None = None
+    step_name: str | None = None
+    reason: str | None = None
+    cause: str | None = None
+
+
 class PublishVerdict(BaseModel):
     """The D-08 structured verdict. A block names the stage + the failures + the
     golden run id (a real, browsable run); a success carries the published version.
@@ -1224,6 +1279,17 @@ class PublishVerdict(BaseModel):
     golden_run_id: UUID | None = None
     blocked_stage: str | None = None
     named_failures: list = Field(default_factory=list)
+    # ── BUG-260828-09 — THE JOIN NOTHING PERFORMED ───────────────────────────────────────
+    # ``verdictModel.ts``'s ``structural_gate`` docblock records the gap from the client side
+    # verbatim: *"The precise cause lives in `workflow_phases` / `harness_audit` against the
+    # `golden_run_id` the response already carries, and NOTHING joins them today — that is the
+    # report's requirements 1 and 2 and it is a SERVER change."* This field is that change, and
+    # that paragraph is corrected in the same commit.
+    #
+    # ⚠ OPTIONAL, and every stage that cannot name a step sends ``None`` — a lint block, a
+    # judge block, a crash before any phase ran. A ``None`` renders as the surface that
+    # shipped, so no stage gains an empty card it has nothing to put in.
+    blocked_step: BlockedStep | None = None
 
 
 @router.post(
@@ -1775,6 +1841,21 @@ class GenerateRequest(BaseModel):
     project_folder_id: UUID | None = None
     template_asset_id: UUID | None = None
     template_placeholders: list[str] | None = None
+    # Phase 214 (STEP-06 / D-214-20) — the connections the AUTHOR ticked on the describe door,
+    # which become the generator's whole vocabulary for `external_action` steps.
+    #
+    # ⚠ ABSENT AND EMPTY ARE DIFFERENT FACTS AND MUST NEVER COLLAPSE. `None` is today's
+    # UNCONSTRAINED behaviour (the author expressed no preference); `[]` is the author's
+    # DECISION that no external step may be emitted at all. `list[str] | None = None` carries
+    # both; a `Field(default_factory=list)` here would erase the distinction at the boundary
+    # and no amount of care downstream could get it back. The full semantics are stated where
+    # the service parameter is declared (`workflow_authoring.generate_workflow_definition`).
+    #
+    # ⚠ `str`, NOT `UUID`, and deliberately: `connector_connections.id` reaches the client as a
+    # string and is re-scoped by org at every read (D-14). A `UUID` here would 422 a whole
+    # generation on a malformed id the ENFORCEMENT below would otherwise simply refuse to
+    # honour — an unrecognised id constrains, it never widens.
+    allowed_connection_ids: list[str] | None = None
 
 
 @router.post(
@@ -1811,6 +1892,10 @@ async def generate_workflow(
         project_folder_id=body.project_folder_id,
         template_asset_id=body.template_asset_id,
         template_placeholders=body.template_placeholders,
+        # ⚠ FORWARDED VERBATIM — no `or None`, no `or []`, no `if body.allowed_connection_ids`.
+        # Every one of those collapses the absent arm into the empty one or the reverse, and
+        # the two mean opposite things (see the field's own declaration above).
+        allowed_connection_ids=body.allowed_connection_ids,
     )
     return result
 

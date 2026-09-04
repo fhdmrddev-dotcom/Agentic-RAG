@@ -1,0 +1,262 @@
+{
+  "documents": {
+    "blocks": [
+      {
+        "kind": "pagehead",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tabslist",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "sidebar",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "stat-tiles",
+        "heading": null,
+        "atoms": [
+          "Chunks",
+          "Vectors",
+          "Found by a search"
+        ]
+      },
+      {
+        "kind": "doclist",
+        "heading": null,
+        "atoms": [
+          "Filename",
+          "Type",
+          "Size",
+          "Chunks",
+          "Status",
+          "Actions"
+        ]
+      },
+      {
+        "kind": "tfoot",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": []
+  },
+  "views": {
+    "blocks": [
+      {
+        "kind": "pagehead",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tabslist",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "vgrid",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": [
+      "New view"
+    ]
+  },
+  "ingestion": {
+    "blocks": [
+      {
+        "kind": "pagehead",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tabslist",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "subnav",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "dropbig",
+        "heading": "Drop files here",
+        "atoms": [
+          "Drop files here",
+          "PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB"
+        ]
+      },
+      {
+        "kind": "folder-picker",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "stagecards",
+        "heading": null,
+        "atoms": [
+          "Reading",
+          "Splitting",
+          "Indexing",
+          "Labelling"
+        ]
+      },
+      {
+        "kind": "queue",
+        "heading": null,
+        "atoms": [
+          "File",
+          "Stage",
+          "Folder",
+          "Size",
+          "Actions"
+        ]
+      },
+      {
+        "kind": "needs-attention",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": [
+      "Choose files",
+      "Try again"
+    ]
+  },
+  "indexing": {
+    "blocks": [
+      {
+        "kind": "pagehead",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tabslist",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "vector-store-card",
+        "heading": "Vector store",
+        "atoms": [
+          "Vectors",
+          "Chunks indexed",
+          "Documents with no vectors",
+          "Last indexed"
+        ]
+      },
+      {
+        "kind": "embedding-model-card",
+        "heading": "Embedding model",
+        "atoms": [
+          "Model",
+          "Dimensions",
+          "Provider"
+        ]
+      },
+      {
+        "kind": "folders-table",
+        "heading": "Folders",
+        "atoms": [
+          "Folder",
+          "Documents",
+          "Chunks",
+          "Vectors",
+          "Last indexed",
+          "Actions"
+        ]
+      }
+    ],
+    "buttons": [
+      "Change model",
+      "Re-index everything",
+      "Re-index selected"
+    ]
+  },
+  "health": {
+    "blocks": [
+      {
+        "kind": "pagehead",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tabslist",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "coverage-ring",
+        "heading": "Coverage",
+        "atoms": []
+      },
+      {
+        "kind": "searches-chart",
+        "heading": "Searches over time",
+        "atoms": []
+      },
+      {
+        "kind": "stat-tiles",
+        "heading": null,
+        "atoms": [
+          "Documents",
+          "Searches",
+          "Never found",
+          "Checked queries"
+        ]
+      },
+      {
+        "kind": "chipgroup-being-used",
+        "heading": "Being used",
+        "atoms": [
+          "Being used",
+          "Most found",
+          "Never found",
+          "Weak matches"
+        ]
+      },
+      {
+        "kind": "chipgroup-in-good-shape",
+        "heading": "In good shape",
+        "atoms": [
+          "In good shape",
+          "Stale",
+          "Unclassified",
+          "Broken links",
+          "Unsure metadata"
+        ]
+      },
+      {
+        "kind": "document-bars",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "checks",
+        "heading": "Checked queries",
+        "atoms": [
+          "Question",
+          "Should find",
+          "Rank",
+          "Verdict"
+        ]
+      },
+      {
+        "kind": "match-strength-tile",
+        "heading": null,
+        "atoms": [
+          "Match strength"
+        ]
+      }
+    ],
+    "buttons": [
+      "Add a check"
+    ]
+  }
+}

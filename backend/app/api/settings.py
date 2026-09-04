@@ -65,6 +65,10 @@ class FullSettingsResponse(BaseModel):
     rerank_model: str
     rerank_top_n: int
     rerank_has_api_key: bool
+    # Multimodal (SEED-227) — migration 044's column, reachable from the product at last.
+    # It had a DB column, a loader and a live reader in multimodal_service, and NO route
+    # to any surface: `api:0 ui:0` when measured 2026-08-28.
+    multimodal_max_vision_calls: int
     # Retrieval
     retrieval_top_k: int
     retrieval_match_threshold: float
@@ -161,6 +165,8 @@ class SettingsUpdate(BaseModel):
     rerank_api_key: str | None = None      # "***" = keep; "" = clear; real = save
     rerank_model: str | None = None
     rerank_top_n: int | None = None
+    # Multimodal (SEED-227)
+    multimodal_max_vision_calls: int | None = None
     # Retrieval
     retrieval_top_k: int | None = None
     retrieval_match_threshold: float | None = None
@@ -236,6 +242,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         rerank_model=s.rerank_model,
         rerank_top_n=s.rerank_top_n,
         rerank_has_api_key=bool(s.rerank_api_key),
+        multimodal_max_vision_calls=s.multimodal_max_vision_calls,
         retrieval_top_k=s.retrieval_top_k,
         retrieval_match_threshold=s.retrieval_match_threshold,
         hybrid_search_enabled=s.hybrid_search_enabled,
@@ -403,6 +410,22 @@ async def update_settings(
     if body.rerank_top_n is not None:
         updates["rerank_top_n"] = body.rerank_top_n
 
+    # SEED-227 — the per-document ceiling on paid vision calls. BOUNDED ON WRITE, because
+    # the two ends fail in opposite and equally silent ways: 0 disables image description
+    # for the whole install while every ingestion still reports success, and an unbounded
+    # value turns one upload into an unbounded spend. Neither end announces itself, so the
+    # refusal is the only thing that can.
+    if body.multimodal_max_vision_calls is not None:
+        if not 1 <= body.multimodal_max_vision_calls <= 1000:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Images read per document must be between 1 and 1000. "
+                    "0 would silently stop every image from being read."
+                ),
+            )
+        updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
+
     if body.retrieval_top_k is not None:
         updates["retrieval_top_k"] = body.retrieval_top_k
     if body.retrieval_match_threshold is not None:
@@ -551,24 +574,42 @@ async def get_reembed_progress(
     return await reembed_progress(supabase, current_user["id"], s)
 
 
+class ReembedKickBody(BaseModel):
+    """BE-3 (217.1): optional folder scope for `POST /settings/reembed`.
+
+    `folder_ids` narrows the re-embed to a caller-selected set of folders, ANDed onto the
+    stale predicate. `None`/absent keeps the kickoff byte-identical to pre-217.1.
+    """
+    folder_ids: list[str] | None = None
+
+
 @router.post(
     "/reembed",
     response_model=ReembedProgressResponse,
     dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
 )
 async def rekick_reembed(
-    background_tasks: BackgroundTasks,
+    body: ReembedKickBody | None = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),  # service-role: app-level settings (app_settings RLS-off) + audit/re-embed writers (plan 09)
 ):
     """Manual "Re-embed now" re-kick for a failed/partial run (D-05). Re-runs against the
     same stale predicate, so it resumes from wherever the last run stopped. dims_changed
     is False here — a manual re-kick re-embeds the still-stale chunks, never re-resizes
-    (a dims change always flows through the settings save kickoff above)."""
+    (a dims change always flows through the settings save kickoff above).
+
+    BE-3 (217.1): an optional `folder_ids` body narrows the scope. The returned progress
+    carries a `scope` marker when the scope selected zero rows — `folder_empty` (no docs at
+    all in the selected folders) vs `already_current` (docs exist, none stale) — so the
+    frontend can render "Already indexed with the current model." rather than a silent no-op."""
     from app.services.reembed_service import reembed_progress, start_reembed
 
     s = await load_app_settings_async()
-    background_tasks.add_task(start_reembed, supabase, current_user["id"], s, False)
+    background_tasks.add_task(
+        start_reembed, supabase, current_user["id"], s, False,
+        body.folder_ids if body else None,
+    )
     # Return the CURRENT (pre-run) progress snapshot so the card can show "running".
     return await reembed_progress(supabase, current_user["id"], s)
 

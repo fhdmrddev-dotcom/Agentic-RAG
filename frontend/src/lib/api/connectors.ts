@@ -11,7 +11,7 @@
  */
 
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
-import type { ConnectorConnection, ConnectorConnectionCreate, ConnectorConnectionUpdate, McpDiscoveredTool } from "./org"
+import type { ConnectorConnection, ConnectorConnectionCreate, ConnectorConnectionUpdate, McpDiscoveredTool, ToolGrantPosture } from "./org"
 export class ConnectorApiError extends ApiError {
   readonly reasonCode: string | null
   constructor(message: string, status: number, reasonCode: string | null) {
@@ -28,6 +28,34 @@ export class ConnectorApiError extends ApiError {
  *  and a plain string `detail` for the ones that do not. A body carrying no code yields
  *  `null`, which the component renders as its generic branch — never as a fabricated code
  *  that would key into the closed §4c map and print the wrong sentence. */
+/** One parse of the error body, yielding BOTH the keyable reason code and a human message.
+ *
+ *  FastAPI's `detail` is either a plain string (`raise HTTPException(detail="…")`, which is
+ *  what `POST /connectors/discover-tools` uses for its 422 and 502) or an object carrying
+ *  `reason_code` + `message` (the connector CRUD refusals). Only the second shape was ever
+ *  read, so every string detail was silently dropped — see `probeMcpServer`. */
+async function readConnectorFailure(
+  res: Response,
+): Promise<{ reasonCode: string | null; message: string | null }> {
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    const detail = body?.detail
+    if (typeof detail === "string" && detail.trim()) {
+      return { reasonCode: null, message: detail.trim() }
+    }
+    if (detail && typeof detail === "object") {
+      const d = detail as { reason_code?: unknown; message?: unknown }
+      return {
+        reasonCode: typeof d.reason_code === "string" ? d.reason_code : null,
+        message: typeof d.message === "string" && d.message.trim() ? d.message.trim() : null,
+      }
+    }
+  } catch {
+    // A non-JSON body (a proxy's HTML 502, an empty 204) carries neither.
+  }
+  return { reasonCode: null, message: null }
+}
+
 async function readConnectorReasonCode(res: Response): Promise<string | null> {
   try {
     const body = (await res.json()) as { detail?: unknown }
@@ -91,10 +119,11 @@ export async function createConnectorConnection(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to create the connection",
+      failure.message || "Failed to create the connection",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json() as Promise<ConnectorConnection>
@@ -114,10 +143,11 @@ export async function updateConnectorConnection(
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to update the connection",
+      failure.message || "Failed to update the connection",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json() as Promise<ConnectorConnection>
@@ -156,6 +186,18 @@ export async function deleteConnectorConnection(id: string): Promise<void> {
  *  of three is a compile error away from becoming a boolean. Do not widen it to a string. */
 export type ConnectorCheckBucket = "refused" | "unreachable" | "rejected"
 
+/** Phase 221 plan 02 — one application's availability, exactly as the server sends it.
+ *
+ *  ⚠ THE STATE IS THE SERVER'S DECISION AND IS NOT RE-DERIVED IN THE BROWSER. The backend
+ *  classifier shares its predicate with the refusal site so a panel and a refusal cannot
+ *  disagree; a second classifier here would undo that. `applicationAvailability()` turns
+ *  this into words and decides nothing about the state. */
+export interface ApplicationAvailabilityWire {
+  app: string
+  state: "ready" | "api_off" | "scope_missing" | "unknown"
+  console_url?: string | null
+}
+
 /** The result of one credential check (`POST /connectors/connections/{id}/check`).
  *
  *  ⚠ A CHECK RETURNS A VERDICT — never the credential, in either form. The enforcing gate is
@@ -182,6 +224,14 @@ export interface ConnectorCheckResult {
   provider_message: string
   /** The guard's own `egress.REFUSAL_REASONS` code on a `refused` bucket, else `null`. */
   reason_code: string | null
+  /** Phase 221 plan 02 — one verdict per application, for a connection that HAS
+   *  applications (Google today).
+   *
+   *  ⚠ AN EMPTY ARRAY MEANS "NOTHING WAS MEASURED", NEVER "everything is fine". Every
+   *  non-OAuth shape returns `[]`, and so does an OAuth row whose token could not be
+   *  renewed — six 401s would restate the credential verdict six times in the wrong
+   *  words. A reader that treats `[]` as six greens has invented a fact. */
+  application_availability?: ApplicationAvailabilityWire[]
 }
 
 /** `POST /connectors/connections/{id}/check` — org admins only, enforced SERVER-side (U-02).
@@ -215,7 +265,17 @@ export async function checkConnectorConnection(id: string): Promise<ConnectorChe
   return res.json() as Promise<ConnectorCheckResult>
 }
 
-/** Phase 206 (D-206-05) — Discover tools from a remote MCP server connection. */
+/** Phase 206 (D-206-05) / Phase 211 — Refresh a SAVED connection's action list, whatever its
+ *  shape. The route serves all three arms: an MCP row is asked over the network, a capability
+ *  row is re-read from its adapter's static descriptor with NO network call, and a
+ *  service-only row answers `409 nothing_to_discover_yet`.
+ *
+ *  ⚠ IT SENDS NO BODY, AND THAT IS THE SECURITY PROPERTY — the same one
+ *  `checkConnectorConnection` carries. The server decrypts the STORED secret itself, so no
+ *  plaintext credential crosses the wire. This is why it, and not `probeMcpServer`, is the
+ *  path an EXISTING connection must use: a saved row renders its token MASKED and
+ *  `draft.secret` is empty by design, so the probe could never authenticate for one.
+ */
 export async function discoverConnectorTools(id: string): Promise<McpDiscoveredTool[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/connectors/connections/${id}/discover`, {
@@ -223,19 +283,60 @@ export async function discoverConnectorTools(id: string): Promise<McpDiscoveredT
     headers,
   })
   if (!res.ok) {
-    throw new ConnectorApiError(
-      "Failed to discover tools",
-      res.status,
-      await readConnectorReasonCode(res),
-    )
+    // ⚠ CARRY THE SERVER'S OWN WORDS — the identical defect `probeMcpServer` carried until
+    // 2026-08-27, still standing here one function later because that fix was applied to the
+    // call site that had been driven rather than to the family. This route computes THREE
+    // distinct worded reasons — `nothing_to_discover_yet`, `cannot_refresh_actions`, and the
+    // remote arm's `MCP tool discovery failed: <what the host said>` — and every one of them
+    // was replaced by the fixed string "Failed to discover tools", which names nothing and
+    // sends the reader looking for an outage that may not exist.
+    // ⚠ The body can be read ONCE, so the code and the message come from a single parse.
+    const { reasonCode, message } = await readConnectorFailure(res)
+    throw new ConnectorApiError(message ?? "Failed to discover tools", res.status, reasonCode)
   }
   return res.json() as Promise<McpDiscoveredTool[]>
 }
 
-/** Phase 206 (F-1 / D-206-06) — Update boolean per-tool grants on an MCP connection. */
+export interface McpProbeRequest {
+  mcp_server_url: string
+  secret?: string | null
+  timeout?: number
+}
+
+export interface McpProbeResponse {
+  server_url: string
+  tools: McpDiscoveredTool[]
+  count: number
+}
+
+/** Phase 212 (CONN-06 / S-1) — Probe an arbitrary remote MCP server URL before saving. */
+export async function probeMcpServer(payload: McpProbeRequest): Promise<McpProbeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/discover-tools`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    // ⚠ CARRY THE SERVER'S OWN WORDS. This threw a hardcoded "Failed to probe MCP server"
+    // until 2026-08-27 and DISCARDED the detail, so a real refusal from the remote server
+    // reached the operator as a fixed string that named nothing. Measured during the
+    // operator's own GitHub attempt: the route answered `502` with
+    // `MCP tool discovery failed: MCP server responded with HTTP 401: ...` — the precise,
+    // actionable half was computed, sent, and thrown away one line before it was rendered.
+    // `ConnectionFormPanel` renders `err.message`, so this is the whole fix.
+    // Same family as `BUG-260815-06`. ⚠ The body can only be read ONCE, so the reason code
+    // and the message come from a single parse rather than two.
+    const { reasonCode, message } = await readConnectorFailure(res)
+    throw new ConnectorApiError(message ?? "Failed to probe MCP server", res.status, reasonCode)
+  }
+  return res.json() as Promise<McpProbeResponse>
+}
+
+/** Phase 213 (GRANT-01) — Update per-tool approval posture grants on a connection. */
 export async function updateConnectorGrants(
   id: string,
-  grants: Record<string, boolean>,
+  grants: Record<string, ToolGrantPosture | boolean>,
 ): Promise<ConnectorConnection> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/connectors/connections/${id}/grants`, {
@@ -253,30 +354,199 @@ export async function updateConnectorGrants(
   return res.json() as Promise<ConnectorConnection>
 }
 
-// ── Phase 204 (SCHED-01 / D-204-11) — the workflow-schedule client ────────────────────────
-//
-// ⚠ THE 197 G-5 DECLINE ON THIS FILE IS RE-DECLINED HERE, IN WRITING, WITH A FRESH TRIGGER.
-// The old trigger — *"the next phase that adds a RUNTIME export to this file, or a second
-// concern to it"* — FIRED at Phase 200.2 (`getWorkflowRunPhaseCitations`) and was never
-// answered; these six functions are its SECOND firing. Carrying the old "it did not fire"
-// sentence forward was not available, so:
-//
-//   RE-DECLINED. The named seam (a per-domain split under `lib/api/` behind a re-exporting
-//   barrel) is NOT taken by 204-03, because this plan's frontend share is six additive
-//   functions and a modal, and a 6,600-line module split is a phase rather than a task —
-//   taking it here would put a refactor of the app's single hottest file into the same commit
-//   as a net-new feature, which is the shape that makes a bisect useless.
-//
-//   FRESH TRIGGER, deliberately stronger than the one it replaces because the old one fired
-//   twice without consequence: **the NEXT phase that adds a runtime export here takes the
-//   split, or escalates it to the operator as a phase of its own. It may not re-decline.**
-//
-// ⚠ AND THE MEASURED BUDGET IS SPENT IN THIS SAME COMMIT. A new RUNTIME export throws at
-// MOUNT — not at call — in every suite that stubs `@/lib/api` with an explicit whole-module
-// factory. `196-08` cost 249 red tests that way. Twelve suites mount `WorkflowsPage` and mock
-// this module; all twelve gained the six names alongside this change.
-//
-// The six share `getAuthHeaders` + `ApiError` with every other call here; none invents a
-// transport of its own.
+// ── Phase 215 (OAUTH-01..03) — OAuth authorization & token status clients ───────
 
-/** Every schedule the caller owns, across every workflow (carries `workflow_name`). */
+export type OAuthProvider = "google" | "microsoft" | "github"
+
+export interface OAuthAuthorizeRequest {
+  provider: OAuthProvider
+  connection_id?: string | null
+  custom_client_id?: string | null
+  custom_client_secret?: string | null
+  custom_scopes?: string[]
+}
+
+export interface OAuthAuthorizeResponse {
+  authorization_url: string
+  state: string
+}
+
+export interface OAuthTokenResponse {
+  id: string
+  connection_id: string
+  account_email?: string | null
+  account_name?: string | null
+  token_type: string
+  scopes: string[]
+  expires_at: string
+  status: string
+}
+
+/** Generate an OAuth authorization URL with PKCE and signed state. */
+export async function createOAuthAuthorizeUrl(
+  payload: OAuthAuthorizeRequest,
+): Promise<OAuthAuthorizeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/oauth/authorize`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || "Failed to start OAuth authorization",
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<OAuthAuthorizeResponse>
+}
+
+/** Get public token status and expiration info for an OAuth connection. */
+export async function getConnectionOAuthToken(
+  connectionId: string,
+): Promise<OAuthTokenResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/oauth/token`,
+    { headers },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to get OAuth token status",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<OAuthTokenResponse>
+}
+
+export interface CloudFileItem {
+  id: string
+  name: string
+  mime_type?: string | null
+  size?: number | null
+  modified_at?: string | null
+  icon_url?: string | null
+  web_view_url?: string | null
+}
+
+export interface CloudFileListResponse {
+  files: CloudFileItem[]
+  next_page_token?: string | null
+}
+
+/** Phase 216 (ATTACH-01): Browse files in cloud storage connection. */
+export async function listCloudFiles(
+  connectionId: string,
+  query?: string,
+  pageToken?: string,
+): Promise<CloudFileListResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (query) params.set("query", query)
+  if (pageToken) params.set("page_token", pageToken)
+  const qs = params.toString() ? `?${params.toString()}` : ""
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/files${qs}`,
+    { headers },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to list cloud files",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<CloudFileListResponse>
+}
+
+/** Phase 216 (ATTACH-01): Import one named file from connected cloud storage. */
+export async function importCloudFile(
+  connectionId: string,
+  fileId: string,
+): Promise<{ id: string; filename: string; mime_type: string; file_size: number; status: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${connectionId}/files/${fileId}/import`,
+    {
+      method: "POST",
+      headers,
+    },
+  )
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to import cloud file",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json()
+}
+
+export type McpAuthKind = "open" | "oauth" | "token" | "unreachable"
+
+export interface McpProbeAuthResponse {
+  kind: McpAuthKind
+  authorization_host?: string | null
+  registration_required?: boolean
+  code_challenge_methods?: string[]
+  detail?: string | null
+  resource_status?: number | null
+}
+
+export interface McpOAuthAuthorizeResponse {
+  authorize_url: string
+  authorization_host: string
+}
+
+/** Phase 222: Probe an MCP server's authentication requirements. */
+export async function probeMcpAuth(
+  serverUrl: string,
+): Promise<McpProbeAuthResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/mcp/probe-auth`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ server_url: serverUrl }),
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || `MCP auth probe failed with status ${res.status}`,
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<McpProbeAuthResponse>
+}
+
+/** Phase 222: Generate OAuth authorize URL for an MCP connection. */
+export async function createMcpOAuthAuthorizeUrl(
+  connectionId: string,
+): Promise<McpOAuthAuthorizeResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/mcp/oauth/authorize`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ connection_id: connectionId }),
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || `Failed to initiate MCP OAuth authorization`,
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<McpOAuthAuthorizeResponse>
+}
+
+

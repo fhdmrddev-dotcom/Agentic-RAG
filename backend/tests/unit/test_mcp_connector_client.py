@@ -139,7 +139,7 @@ async def test_mcp_client_list_tools(monkeypatch):
 
     seen_methods: list[str] = []
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         seen_methods.append(json["method"])
         if json["method"] == "initialize":
             return httpx.Response(
@@ -187,7 +187,7 @@ async def test_mcp_client_call_tool(monkeypatch):
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         # WARNING - THIS ASSERTED `json["method"] == "tools/call"` ON EVERY POST, WHICH IS
         # WHY ADDING THE SPEC-REQUIRED HANDSHAKE TURNED IT RED. The fixture modelled a server
         # that needs no `initialize`; no such MCP server exists. Routing by method is what
@@ -232,7 +232,7 @@ async def test_mcp_client_protocol_error(monkeypatch):
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200, json={"jsonrpc": "2.0", "id": 0, "result": {}},
@@ -283,7 +283,7 @@ async def test_mcp_client_reads_the_streamable_http_sse_transport(monkeypatch):
         "\n"
     )
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         assert "text/event-stream" in headers.get("Accept", ""), (
             "the client must ASK for the transport it can read"
         )
@@ -318,7 +318,7 @@ async def test_mcp_client_refuses_an_event_stream_with_no_json_frame(monkeypatch
     every real server."""
     monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200, json={"jsonrpc": "2.0", "id": 0, "result": {}},
@@ -347,13 +347,21 @@ def test_connector_connection_create_mcp_model():
     """ConnectorConnectionCreate accepts mcp_server_url and tool_grants."""
     req = ConnectorConnectionCreate(
         name="GitHub MCP",
+        # Phase 211 (D-211-01) — required on every shape, the MCP one included. ⚠ It is NOT
+        # derived from the URL: D-211-01 rejected URL-derived identity outright, because two
+        # connections can reach the same service (a prod and a sandbox Jira) and a generic
+        # host names no service at all. Migration 127 §2 derives it ONCE, for rows that
+        # predate the column, and nothing downstream ever re-derives it.
+        service_id="github",
         mcp_server_url="https://api.github.com/mcp",
-        tool_grants={"github_create_issue": True, "github_delete_repo": False},
+        default_approval_posture="ask",
+        tool_grants={"github_create_issue": "allow", "github_delete_repo": "deny"},
         secret="ghp_test123",
     )
     assert req.mcp_server_url == "https://api.github.com/mcp"
-    assert req.tool_grants["github_create_issue"] is True
-    assert req.tool_grants["github_delete_repo"] is False
+    assert req.default_approval_posture == "ask"
+    assert req.tool_grants["github_create_issue"] == "allow"
+    assert req.tool_grants["github_delete_repo"] == "deny"
 
 
 def test_external_action_phase_config_mcp_fields():
@@ -389,6 +397,19 @@ async def test_exec_external_action_mcp_granted(monkeypatch):
         secret_ciphertext="enc:v1:fake",
         mcp_server_url="https://mcp.atlassian.com/v1",
         tool_grants={"jira_create_issue": True},
+        # ⚠ ADDED at Phase 214 (D-214-00). The MCP arm now projects its argument object onto
+        # the bound tool's DECLARED schema, obtained through the ONE accessor the publish gate
+        # also uses, so a connection carrying no snapshot has an unknowable argument shape and
+        # RECORDS rather than sending. That refusal is intended — an executor that sends where
+        # the gate refuses is the drift pointing the dangerous way — and a real MCP connection
+        # always carries the snapshot `discover_tools` wrote. Declaring it restores this case
+        # to the DISPATCH it is about; the no-snapshot refusal is covered by
+        # `test_214_args_leaf.py`.
+        discovered_tools=[{
+            "name": "jira_create_issue",
+            "inputSchema": {"type": "object", "required": ["summary"],
+                            "properties": {"summary": {"type": "string"}}},
+        }],
     )
 
     monkeypatch.setattr(
@@ -489,14 +510,19 @@ async def test_exec_external_action_mcp_permission_denied_emits_audit(monkeypatc
 
     result = await _exec_external_action(phase, {}, ctx)
     assert "failure" in result
-    assert "refused: permission not granted" in result["failure"]
+    # ⚠ AMENDED by plan 213-06 (GRANT-04 / D-213-16). This drive sets an EXPLICIT deny,
+    # so the reason is `posture_denied` — distinguishable in the ledger from a tool nobody
+    # ever granted (`not_granted`) and from one needing an approval nothing could ask for
+    # (`approval_required`). The old single `permission_denied` collapsed all three.
+    assert "refused: posture_denied" in result["failure"], result["failure"]
+    assert "is set to Deny on this connection" in result["text"], result["text"]
 
     # Verify F-3: Outbound permission refusal emitted tool_refused audit event
     assert mock_audit.called
     call_kwargs = mock_audit.call_args.kwargs
     assert call_kwargs["event_type"] == "tool_refused"
     assert call_kwargs["metadata"]["tool_name"] == "jira_create_issue"
-    assert call_kwargs["metadata"]["reason"] == "permission_denied"
+    assert call_kwargs["metadata"]["reason"] == "posture_denied"
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
@@ -545,6 +571,11 @@ def _grants_row(**overrides) -> dict:
         "id": _GRANTS_CONN_ID,
         "org_id": _GRANTS_ORG_ID,
         "capability": None,
+        # Phase 211 — `ConnectorConnectionResponse.service_id` is REQUIRED, so a stored row
+        # without it fails `_to_response` outright rather than passing a None through. That
+        # strictness is deliberate: after migration 127 the database guarantees a non-blank
+        # value on every row, so a None here would mean the row is broken.
+        "service_id": "deepwiki",
         "name": "DeepWiki (MCP)",
         "config": {"headers": {}},
         "mcp_server_url": "https://mcp.deepwiki.com/mcp",
@@ -644,67 +675,46 @@ async def _drive_grant_write(sent: dict, *, rows: list[dict] | None = None):
 async def test_update_connection_grants_REPLACES_the_whole_tool_grants_column():
     """D-206.2-16 — **the headline. The endpoint REPLACES; it does not merge.**
 
-    Seeded with a stored `{"a": True}` and sent `{"b": True}`, the payload handed to
-    `.update()` carries `tool_grants` == `{"b": True}` — **`"a"` IS GONE**. Asserted by SET
+    Seeded with a stored `{"a": "allow"}` and sent `{"b": "allow"}`, the payload handed to
+    `.update()` carries `tool_grants` == `{"b": "allow"}` — **`"a"` IS GONE**. Asserted by SET
     EQUALITY on the payload's keys, so a partial fix that happened to keep one key cannot
     pass.
-
-    This is the measurement the UI's obligation rests on: a per-tool toggle that sends
-    `{[tool]: next}` alone silently revokes every other tool on the connection, and because
-    `phase_types.py` GATE 6 reads `grants.get(tool_name) is True` — a MISSING KEY DENIES —
-    the revocation surfaces later as a `tool_refused` on a workflow nobody edited.
     """
     result, rec = await _drive_grant_write(
-        {"b": True}, rows=[_grants_row(tool_grants={"a": True})]
+        {"b": "allow"}, rows=[_grants_row(tool_grants={"a": "allow"})]
     )
     payload = rec.updates[0]
 
     assert set(payload["tool_grants"].keys()) == {"b"}, (
         f"D-206.2-16: the grant write is a whole-column REPLACE and the payload is "
         f"{payload['tool_grants']!r}. A `{{[tool]: next}}` payload from the UI WIPES every "
-        f"other grant on the connection — the stored {{'a': True}} is not merged, it is "
+        f"other grant on the connection — the stored {{'a': 'allow'}} is not merged, it is "
         f"gone. The UI must send the FULL MERGED MAP derived from the server-owned value."
     )
     # And the response the UI would refresh from carries the replaced column, not the old one.
-    assert result.tool_grants == {"b": True}, result.tool_grants
+    assert result.tool_grants == {"b": "allow"}, result.tool_grants
 
 
 @pytest.mark.asyncio
-async def test_update_connection_grants_coerces_every_value_to_a_real_boolean():
-    """F-1 — `bool(v)` on the way in, asserted with `is True` / `is False`, never truthiness.
+async def test_update_connection_grants_refuses_every_value_that_is_not_a_legal_posture():
+    """F-1 / D-213-05 — only a value in {'allow', 'ask', 'deny'} reaches the column."""
+    from app.services import connector_service
 
-    This matters because the two ends of the grant disagree about what "granted" means:
-    `phase_types.py` GATE 6 requires `grants.get(tool_name) is True`, while the client's
-    `isToolGranted` (`McpToolPicker.tsx`) accepts any truthy value. **The sanitizer is what
-    makes them agree** — without it, a stored `1` or `"yes"` reads GRANTED in the UI and
-    DENIED at run time, which is the worst of both.
-
-    All three coercions in ONE drive, as a table, so a partial fix cannot pass.
-    """
-    _, rec = await _drive_grant_write({"t_int": 1, "t_str": "yes", "t_zero": 0})
-    grants = rec.updates[0]["tool_grants"]
-
-    for tool, expected in (("t_int", True), ("t_str", True), ("t_zero", False)):
-        value = grants[tool]
-        assert value is expected, (
-            f"F-1: {tool!r} reached the column as {value!r} ({type(value).__name__}), not "
-            f"the boolean {expected!r}. GATE 6 compares with `is True`, so a truthy "
-            f"non-boolean reads GRANTED in the UI and DENIED at run time."
+    for tool, value in (("t_int", 1), ("t_str", "yes"), ("t_zero", 0), ("t_bool_true", True), ("t_bool_false", False)):
+        with pytest.raises(ValueError) as excinfo:
+            await _drive_grant_write({tool: value})
+        message = str(excinfo.value)
+        assert tool in message and repr(value) in message, (
+            f"F-1/S-1: {tool!r}={value!r} must be REFUSED by name and by value. Got: {message!r}"
         )
-    assert set(grants) == {"t_int", "t_str", "t_zero"}, grants
 
 
 @pytest.mark.asyncio
 async def test_update_connection_grants_is_scoped_by_both_id_and_org_id():
     """D-15 — the write is filtered by `id` AND `org_id`. A write scoped by id alone is a
     CROSS-ORG write.
-
-    Asserted by COLUMN NAME off the recording fake, not by counting `.eq()` calls: two
-    filters on the same column would satisfy a count and would still be a cross-org write.
-    RLS is the second layer and is deliberately NOT simulated here — a test that mocked the
-    policy would prove the mock.
     """
-    _, rec = await _drive_grant_write({"ask_question": True})
+    _, rec = await _drive_grant_write({"ask_question": "allow"})
     columns = [column for column, _ in rec.eqs]
 
     assert "id" in columns and "org_id" in columns, (
@@ -731,7 +741,7 @@ async def test_update_connection_grants_raises_connector_not_found_when_nothing_
 
     with pytest.raises(connector_service.ConnectorNotFound) as exc_info:
         await connector_service.update_connection_grants(
-            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"ask_question": True}, supabase=client
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"ask_question": "allow"}, supabase=client
         )
 
     assert rec.updates, (
@@ -846,7 +856,7 @@ async def test_list_tools_forwards_annotations_and_omits_them_when_absent(monkey
         },
     }
 
-    async def mock_post(url, json=None, headers=None):
+    async def mock_post(url, json=None, headers=None, **_kwargs):
         if json["method"] == "initialize":
             return httpx.Response(
                 200,
@@ -881,3 +891,387 @@ async def test_list_tools_forwards_annotations_and_omits_them_when_absent(monkey
     assert "annotations" not in by_name["ask_question"], (
         "a non-dict `annotations` must be dropped, never forwarded for the client to index into"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# 8 · PHASE 211 (D-211-09) — THE ALLOW-LIST IS WIDENED BY TWO KEYS AND IS STILL AN
+#     ALLOW-LIST
+#
+# ⚠ **THE LOAD-BEARING CASE IS THE DROP, NOT THE CARRY.** Anyone can see that `title` now
+# arrives; the property worth a test is that widening the list did not turn it into a
+# deny-list. `test_the_sanitizer_drops_every_key_nobody_named` is therefore asserted on the
+# WHOLE KEY SET rather than on three individual absences — a fourth invented key would slip
+# past `assert "_meta" not in tool` forever, and "a deny-list cannot be made fail-closed" is
+# the measured v3.6 finding this function exists to honour.
+#
+# **Driven RED before the widening landed** — the observed failure is recorded verbatim in
+# `211-01-SUMMARY.md`.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+
+def _tools_list_transport(raw_tools: list, session_id: str = "sess-211"):
+    """Return a `mock_post` that answers the handshake and then serves ``raw_tools``.
+
+    Factored out because the cases below need the identical three-step conversation and a
+    copy of it in each would drift.
+    """
+
+    async def mock_post(url, json=None, headers=None, **_kwargs):
+        if json["method"] == "initialize":
+            return httpx.Response(
+                200,
+                json={"jsonrpc": "2.0", "id": 0, "result": {"protocolVersion": "2025-06-18"}},
+                headers={"Mcp-Session-Id": session_id},
+                request=httpx.Request("POST", url),
+            )
+        if json["method"].startswith("notifications/"):
+            return httpx.Response(202, request=httpx.Request("POST", url))
+        return httpx.Response(
+            200,
+            json={"jsonrpc": "2.0", "id": 1, "result": {"tools": raw_tools}},
+            request=httpx.Request("POST", url),
+        )
+
+    return mock_post
+
+
+async def _sanitize(raw_tools: list) -> list[dict]:
+    client = McpClient()
+    with patch("httpx.AsyncClient.post", side_effect=_tools_list_transport(raw_tools)):
+        return await client.list_tools("https://mcp.example.invalid/mcp")
+
+
+@pytest.mark.asyncio
+async def test_the_sanitizer_drops_every_key_nobody_named(monkeypatch):
+    """⭐ THE NEGATIVE CONTROL — a server-controlled key that is not on the list is DROPPED.
+
+    `_meta` is a reserved key in the Model Context Protocol, `execute` is the shape of a
+    plausible-looking instruction, and `__proto__` is the one whose presence in a JSON object
+    that crosses into a JavaScript client is a known prototype-pollution vector. None of the
+    three is named by the sanitizer, so none of the three may reach `discovered_tools` — and
+    from there a `jsonb` column and a React render.
+
+    Asserted on the KEY SET so an invented FOURTH key is caught by the same assertion.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {
+            "name": "t",
+            "title": "T",
+            "description": "d",
+            "inputSchema": {"type": "object", "properties": {}},
+            "outputSchema": {"type": "object"},
+            "_meta": 1,
+            "execute": "x",
+            "__proto__": {},
+            "annotations": "not-a-dict",
+        }
+    ])
+
+    assert len(tools) == 1
+    assert set(tools[0]) == {"name", "description", "inputSchema", "title", "outputSchema"}, (
+        f"the sanitizer emitted {sorted(tools[0])!r}. The emitted object is an explicit "
+        "per-key dict literal and must stay one: widening it to a spread minus a deny-list "
+        "would carry every key a server invents, and the whole value of this function is "
+        "that a key nobody named cannot reach jsonb"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_maximal_input_yields_exactly_the_six_possible_keys(monkeypatch):
+    """The upper bound on the emitted shape: six keys, and no seventh is reachable.
+
+    Pins that the emitted object is still built key by key. A refactor to a set
+    comprehension over `item` would make this number a function of the SERVER's input rather
+    than of our source, which is precisely the property being fenced.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {
+            "name": "maximal",
+            "title": "Maximal",
+            "description": "everything the spec allows, at once",
+            "inputSchema": {"type": "object", "properties": {"a": {"type": "string"}}},
+            "outputSchema": {"type": "object", "properties": {"b": {"type": "number"}}},
+            "annotations": {"readOnlyHint": True},
+            "somethingElseEntirely": {"nested": ["values"]},
+        }
+    ])
+
+    assert set(tools[0]) == {
+        "name",
+        "title",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "annotations",
+    }, f"the maximal sanitized object carries {sorted(tools[0])!r}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_title,expected",
+    [
+        ("Weather Data Retriever", "Weather Data Retriever"),
+        ("  Padded Title  ", "Padded Title"),  # stripped, like `name` and `description`
+    ],
+)
+async def test_a_real_title_survives_stripped(monkeypatch, raw_title, expected):
+    """`title` is the spec's optional human-readable display name (2025-06-18 § Tool).
+
+    Coerced with the SAME discipline the existing keys receive — `str(...).strip()` — rather
+    than read bare off the item, which is what RESEARCH §G item 2 asks for.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "get_weather_data", "title": raw_title, "inputSchema": {"type": "object"}}
+    ])
+    assert tools[0]["title"] == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_title,label",
+    [
+        (None, "absent-as-null"),
+        ("", "empty string"),
+        ("   ", "whitespace only"),
+        (42, "a number"),
+        (["Title"], "a list"),
+        ({"text": "Title"}, "an object"),
+    ],
+)
+async def test_a_blank_or_non_string_title_contributes_no_key(monkeypatch, raw_title, label):
+    """⚠ ABSENCE MUST STAY MEANINGFUL — no key at all, never `""`.
+
+    The same rule `annotations` carries, and for the same reason from the other side of the
+    language boundary: a fabricated empty `title` would claim the server named this tool
+    when it did not, and a catalog would render a blank label instead of falling back to the
+    tool's `name`.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "t", "title": raw_title, "inputSchema": {"type": "object"}}
+    ])
+    assert "title" not in tools[0], (
+        f"a {label} title produced a `title` key ({tools[0].get('title')!r}); absence must "
+        "stay meaningful"
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_entirely_absent_title_contributes_no_key(monkeypatch):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([{"name": "t", "inputSchema": {"type": "object"}}])
+    assert "title" not in tools[0]
+
+
+@pytest.mark.asyncio
+async def test_a_dict_output_schema_survives_verbatim(monkeypatch):
+    """`outputSchema` is optional in the spec while `inputSchema` is mandatory — so it is
+    forwarded when it is a dict and is NEVER coerced to a default.
+
+    An absent output schema is a FACT ABOUT THE SERVER ("this tool makes no structural
+    promise about its result"), and defaulting it to `{"type": "object"}` would invent a
+    promise the server never made — the same fabrication the `annotations` arm refuses.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    schema = {
+        "type": "object",
+        "properties": {"temperature": {"type": "number"}, "conditions": {"type": "string"}},
+        "required": ["temperature", "conditions"],
+    }
+    tools = await _sanitize([
+        {"name": "get_weather_data", "inputSchema": {"type": "object"}, "outputSchema": schema}
+    ])
+    assert tools[0]["outputSchema"] == schema
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_output_schema,label",
+    [
+        (None, "null"),
+        ("object", "a string"),
+        ([{"type": "object"}], "a list"),
+        (0, "a number"),
+        (True, "a boolean"),
+    ],
+)
+async def test_a_non_dict_output_schema_contributes_no_key(
+    monkeypatch, raw_output_schema, label
+):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([
+        {"name": "t", "inputSchema": {"type": "object"}, "outputSchema": raw_output_schema}
+    ])
+    assert "outputSchema" not in tools[0], (
+        f"{label} produced an `outputSchema` key; it is optional in the spec and must be "
+        "absent rather than defaulted — unlike `inputSchema`, which is mandatory"
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_absent_output_schema_contributes_no_key(monkeypatch):
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+    tools = await _sanitize([{"name": "t", "inputSchema": {"type": "object"}}])
+    assert "outputSchema" not in tools[0]
+
+
+@pytest.mark.asyncio
+async def test_the_four_pre_existing_keys_behave_exactly_as_before(monkeypatch):
+    """The regression half of D-211-09: widening changed nothing that already worked.
+
+    Four properties, all pre-211, restated here so a change to any of them shows up in the
+    plan that made it rather than three phases later:
+      * a blank / non-string / absent `name` DROPS THE WHOLE TOOL;
+      * `description` defaults to `""` (never `None`);
+      * `inputSchema` defaults to the empty object schema (it is mandatory in the spec);
+      * `annotations` is forwarded only when it is a dict.
+    """
+    monkeypatch.setattr("app.services.mcp_client.validate_mcp_destination", lambda url: None)
+
+    tools = await _sanitize([
+        {"name": "   ", "title": "Blank name"},           # dropped
+        {"name": None, "title": "Null name"},             # dropped
+        {"title": "No name at all"},                      # dropped
+        "not-even-a-dict",                                # dropped
+        {"name": "survivor"},                             # every optional key absent
+        {"name": "annotated", "annotations": {"readOnlyHint": True}},
+        {"name": "mis-annotated", "annotations": ["readOnlyHint"]},
+    ])
+
+    by_name = {t["name"]: t for t in tools}
+    assert set(by_name) == {"survivor", "annotated", "mis-annotated"}, (
+        f"the sanitizer emitted {sorted(by_name)!r}; a tool with no usable `name` must be "
+        "dropped entirely — the name is the grant key, and a nameless tool cannot be granted"
+    )
+
+    assert by_name["survivor"]["description"] == ""
+    assert by_name["survivor"]["inputSchema"] == {"type": "object", "properties": {}}
+    assert set(by_name["survivor"]) == {"name", "description", "inputSchema"}
+
+    assert by_name["annotated"]["annotations"] == {"readOnlyHint": True}
+    assert "annotations" not in by_name["mis-annotated"]
+
+
+def test_the_sanitizer_source_is_an_allow_list_and_not_a_deny_list():
+    """⚠ D-211-09's actual instruction: WIDEN THE LIST, NEVER REMOVE IT.
+
+    A source-level fence, because the behavioural cases above can only test the keys someone
+    thought to invent. Asserted as a PROPERTY: the emitted object is built from named string
+    keys, and no deny/blocklist vocabulary appears anywhere in the module.
+
+    ⚠ Falsified on synthetic input first — a matcher that never fires would pass forever.
+    """
+    import re
+    from pathlib import Path
+
+    import app.services.mcp_client as mcp_client_module
+
+    source = Path(mcp_client_module.__file__).read_text(encoding="utf-8")
+
+    # ⚠ THE FIRST DRAFT OF THIS MATCHER WAS `\b(deny|denylist|blocklist|blacklist)\b` AND
+    # ITS OWN CONTROL FALSIFIED IT — `_` is a word character, so `\b` never occurs between
+    # `_` and `DENY`, and `_DENYLIST` (the single most likely spelling of the thing being
+    # fenced) did not match. The control is kept exactly as it was; only the matcher moved.
+    banned = re.compile(r"(?i)(deny.{0,2}list|blocklist|blacklist)")
+    assert banned.search("_DENYLIST = {'_meta'}"), (
+        "the deny-list matcher does not fire on a real deny-list declaration, so the walk "
+        "below would report green against the very refactor it exists to catch"
+    )
+    assert not banned.search("    # forwarded only when present and a dict"), (
+        "the deny-list matcher fires on ordinary prose"
+    )
+    offenders = [
+        f"{lineno}: {line.strip()}"
+        for lineno, line in enumerate(source.splitlines(), start=1)
+        if banned.search(line)
+    ]
+    assert offenders == [], (
+        "mcp_client.py now carries deny-list vocabulary:\n" + "\n".join(offenders) + "\n"
+        "A deny-list cannot be made fail-closed (the measured v3.6 finding). Every key the "
+        "sanitizer emits must be named in source."
+    )
+
+    # And each of the six possible keys is named as a literal in the module.
+    for key in ("name", "description", "inputSchema", "title", "outputSchema", "annotations"):
+        assert f'"{key}"' in source, (
+            f"`{key}` is no longer a named string key in mcp_client.py — the emitted object "
+            "must stay an explicit per-key dict literal"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 213 pre-flight (S-1) — the sanitizer must REFUSE what it cannot express, never
+# coerce it onto the permissive value.
+#
+# ⚠ READ THE TEST ABOVE FIRST. `bool(v)` is NOT a careless line: F-1 added it because the
+# two ends of the grant disagree — GATE 6 wants `is True`, `isToolGranted` accepts any
+# truthy value — and coercion is what made them agree. The property it defends is
+# **"only a value the gate can read ever reaches the column."**
+#
+# What changes here is the DISPOSITION of a value the sanitizer cannot express, not that
+# property. `bool("deny") is True`, so under D-213-05's posture map — where the legal
+# values become "allow" / "ask" / "deny" — a Deny a person set would be stored as an ALLOW,
+# silently, with no error anywhere. Coercion is safe only while every input is already
+# boolean-shaped; the moment a THIRD state exists it becomes a fail-OPEN.
+#
+# So the sanitizer refuses instead. When Phase 213 widens the value type and forgets these
+# two call sites, the write goes RED at the seam rather than writing `True` — which is the
+# Phase 204 defect class (`inputs` vs `metadata`, read failed open, 106 tests green).
+# ══════════════════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("posture", ["deny", "ask", "allow"])
+async def test_update_connection_grants_accepts_posture_strings(posture):
+    """Phase 213 (D-213-05) — grants accept posture strings 'allow', 'ask', and 'deny'."""
+    _, rec = await _drive_grant_write({"delete_repository": posture})
+    grants = rec.updates[0]["tool_grants"]
+    assert grants["delete_repository"] == posture, grants
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_refusal_writes_NOTHING():
+    """S-1 — the refusal happens BEFORE the write, so a bad value cannot land partially."""
+    from app.services import connector_service
+
+    rec = _GrantsRecorder()
+    client = _FakeGrantsClient(rec, [_grants_row(tool_grants={"a": "allow"})])
+
+    with pytest.raises(ValueError):
+        await connector_service.update_connection_grants(
+            _GRANTS_CONN_ID, _GRANTS_ORG_ID, {"a": "allow", "b": "invalid_posture"}, supabase=client
+        )
+
+    assert rec.updates == [], (
+        f"S-1: the refusal must precede the write, but `.update()` was called with "
+        f"{rec.updates!r} — a whole-column REPLACE already ran with a corrupted value."
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_connection_still_REFUSES_invalid_posture_on_the_patch_path():
+    """S-1 — the sanitizer on the PATCH path carries the same rule."""
+    from app.services import connector_service
+
+    assert connector_service._sanitize_tool_grants is not None
+    with pytest.raises(ValueError) as excinfo:
+        connector_service._sanitize_tool_grants({"send_email": "invalid_posture"})
+    assert "send_email" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_update_connection_grants_accepts_all_legal_postures_together():
+    """D-213-05 — all three legal postures can be updated in a single payload."""
+    _, rec = await _drive_grant_write({"search_code": "allow", "delete_repository": "deny", "send_email": "ask"})
+    grants = rec.updates[0]["tool_grants"]
+    assert grants["search_code"] == "allow", grants
+    assert grants["delete_repository"] == "deny", grants
+    assert grants["send_email"] == "ask", grants

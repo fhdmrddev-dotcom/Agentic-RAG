@@ -36,6 +36,9 @@ import {
 } from "./stepCardSectionContext"
 // 200-04 — the ONE tool-phrase home, so the fence asserts what a person reads against the
 // same reader the panel uses rather than against a second copy of the phrases.
+// SEED-230 — the sentence whose 87 characters ARE the density delta below. Imported from its
+// declaring home so the arithmetic reads the shipped string, never a second copy of it.
+import { GROUNDING_PUBLISH_CONSEQUENCE } from "@/components/workflows/definitionOps"
 import { toolName } from "./toolNames"
 import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./fieldGuidanceContext"
 import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
@@ -1281,6 +1284,37 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
    * Every character is attributed to a NAMED constant below, so a future drift of one
    * character fails with a computable cause rather than with a bigger number.
    */
+  /**
+   * ⚠ SEED-230 (2026-08-29) — THE FOURTH READING, AND THE PORT FIGURES ABOVE ARE PRESERVED
+   * RATHER THAN OVERWRITTEN, exactly as the port preserved 200-04's and 200-04 preserved
+   * 199-06's.
+   *
+   * ⚠ READ WHY THIS MOVED BEFORE READING THE NUMBERS. The operator scrolled past the whole
+   * governance section and then spent FOUR FAILED PUBLISHES discovering the rule by
+   * experiment. Every sentence that section carried described a STATE — "held strictly", "a
+   * check runs on this step" — and none named a CONSEQUENCE, so it read as a quality setting
+   * rather than as a gate. `GROUNDING_PUBLISH_CONSEQUENCE` is the one sentence that says what
+   * the state does. It is 87 characters, and it is the ENTIRE delta.
+   *
+   * ⚠ WHAT THE PIN ACTUALLY GUARDS IS UNTOUCHED, AND THAT IS THE LOAD-BEARING HALF.
+   * `helpLines` and `helpChars` still read an EXACT `0` collapsed and an exact `5 / 234` open
+   * — byte-identical to 199-06's, 200-04's and the port's. **199-06's SUBTRACTION is proven
+   * un-reversed: this added a SENTENCE to an existing section, and re-opened no helper.**
+   *
+   * ⚠ AND `llm_emit` IS UNMOVED AT `1506`, WHICH IS THE PROPERTY WORTH HAVING. The sentence
+   * renders on the `detected` arm of the grounding dial, and `GROUNDING_DIAL_TYPES` is
+   * `llm_agent` / `llm_batch_agents` only — so a type that carries no dial gains nothing. A
+   * change that moved `emit` too would mean the sentence had escaped its arm.
+   *
+   *     llm_agent  1508 → 1595   (+87)  =  GROUNDING_PUBLISH_CONSEQUENCE
+   *     llm_emit   1506 → 1506   (  0)  =  no dial, no sentence
+   *     open       1745 → 1832   (+87)  =  the agent reading, identical
+   *
+   * No residual, per type — which is what distinguishes this from a pin relaxed to make red
+   * go green, the failure mode the block above names in as many words.
+   */
+  const SEED_230_CONSEQUENCE_CHARS = GROUNDING_PUBLISH_CONSEQUENCE.length
+
   const PORT_WHAT_IT_DOES_CHARS = STEP_CARD_WHAT_IT_DOES_TITLE.length
   const PORT_NO_SOURCE_ADD_CHARS = STEP_CARD_NO_SOURCE_ADD.length
   const PORT_DELIVERS_CHARS = STEP_CARD_DELIVERS_TITLE.length
@@ -1293,7 +1327,7 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking these literals, never by loosening them
     // to a range — a range is what turns a characterization pin into a decoration.
     expect({ agent, emit }).toEqual({
-      agent: { helpLines: 0, helpChars: 0, proseChars: 1508 },
+      agent: { helpLines: 0, helpChars: 0, proseChars: 1595 },
       emit: { helpLines: 0, helpChars: 0, proseChars: 1506 },
     })
     // ⚠ 200-04 — THE SUBTRACTION 199-06 PROVED IS UNTOUCHED, asserted rather than asserted-about.
@@ -1303,7 +1337,7 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     // one honest refusal. No residual, on either type — the 200-04 accounting, carried
     // forward and extended rather than replaced.
     expect(agent.proseChars - DENSITY_AT_199_06.agent.proseChars).toBe(
-      CARD_TITLE_CHARS + PORT_SHARED_CHARS,
+      CARD_TITLE_CHARS + PORT_SHARED_CHARS + SEED_230_CONSEQUENCE_CHARS,
     )
     expect(emit.proseChars - DENSITY_AT_199_06.emit.proseChars).toBe(
       CARD_TITLE_CHARS + PORT_SHARED_CHARS + PORT_DELIVERS_CHARS,
@@ -1367,11 +1401,11 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     // port added no GUIDANCE and the two readings therefore diverge by exactly the helpers.
     // `helpLines` and `helpChars` are UNMOVED at `5 / 234` across all three phases, which is
     // what proves each of them added SECTIONS and none quietly re-opened a helper 199-06 folded.
-    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1745 })
+    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1832 })
     expect(open.helpLines).toBe(DENSITY_AT_199_06.open.helpLines)
     expect(open.helpChars).toBe(DENSITY_AT_199_06.open.helpChars)
     expect(open.proseChars - DENSITY_AT_199_06.open.proseChars).toBe(
-      CARD_TITLE_CHARS + PORT_SHARED_CHARS,
+      CARD_TITLE_CHARS + PORT_SHARED_CHARS + SEED_230_CONSEQUENCE_CHARS,
     )
     // Fully open is the DENSEST this panel can now be, and it is still quieter than the
     // panel that shipped — the model helper is gone outright and the whitelist refusal

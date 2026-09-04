@@ -1,7 +1,8 @@
 ---
 id: SEED-057
 title: Google 429 credit-depletion now reads as "rate limited — retry" — a deliberate Phase 095.1 trade-off that can under-warn on genuine Google billing exhaustion
-status: planted
+status: partially-folded
+folded_into: 210
 planted: 2026-06-06
 planted_by: orchestrator (095.1 verify-work — found real historical Google 429 "prepayment credits are depleted" runs in the live DB while validating PROVIDER-ERR D-03)
 trigger_when: a user reports a genuine Google credit/billing exhaustion that the app told them to "retry in a moment" (so they kept retrying instead of topping up), OR Google exposes a structured signal that distinguishes RESOURCE_EXHAUSTED rate-limit vs credit-depletion, OR a support/UX review wants the rate-limit copy to also hint "if this persists, check billing"

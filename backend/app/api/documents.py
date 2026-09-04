@@ -15,12 +15,22 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
+from app.api.kb import read_path
 from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
-from app.models.document import DocumentMetadata, DocumentMoveRequest, DocumentResponse
+from app.models.document import (
+    DocumentChunkRow,
+    DocumentContentResponse,
+    DocumentImageRow,
+    DocumentMetadata,
+    DocumentMoveRequest,
+    DocumentResponse,
+    DocumentTableRow,
+)
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
 from app.services.extraction_service import ExtractedDocument
+from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
 
@@ -103,6 +113,9 @@ ALLOWED_MIME_TYPES = {
     "message/rfc822",
     "application/vnd.ms-outlook",
     "application/x-msg",
+    "application/dxf",
+    "image/vnd.dxf",
+    "application/x-dxf",
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -114,6 +127,7 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".epub": "application/epub+zip",
     ".eml":  "message/rfc822",
     ".msg":  "application/vnd.ms-outlook",
+    ".dxf":  "application/dxf",
     # ⚠ BUG-260825-01 — `.docx` and `.pdf` WERE ABSENT, AND THAT IS THE OBSERVED SPLIT.
     #   Measured 2026-08-25 against the real endpoint: a `.docx` announced as
     #   `application/octet-stream`, `application/zip`, `application/msword` or with NO
@@ -499,6 +513,14 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             parsed_email = parse_msg_bytes(raw)
         return format_email_text_for_retrieval(parsed_email)
 
+    if mime_type in ("application/dxf", "image/vnd.dxf", "application/x-dxf"):
+        from app.services.extractors.aspects.dxf import extract_dxf_takeoff  # noqa: PLC0415
+        try:
+            takeoff = extract_dxf_takeoff(raw)
+            return takeoff.get("text_summary", "")
+        except Exception as exc:
+            return f"CAD Drawing (unparsed DXF: {exc})"
+
     # plain text, markdown — decode as UTF-8
     decoded = raw.decode("utf-8")
 
@@ -555,7 +577,12 @@ async def upload_document(
     if mime_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported file type: {mime_type}. Allowed: PDF, DOCX, Markdown, plain text.",
+            # D-217-18 class of lie: the prose list named four formats while
+            # ALLOWED_MIME_TYPES (:91) holds fifteen. Derive it, never re-type it.
+            detail=(
+                f"Unsupported file type: {mime_type}. "
+                f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}."
+            ),
         )
 
     raw = await file.read()
@@ -798,6 +825,226 @@ async def list_document_versions(
         .execute()
     )
     return result.data or []
+
+
+# ── Phase 217 · LIB-04 — the four buried facts, put on the wire ───────────────────────
+#
+# The parsed text, the chunks, the tables and the images have been in Postgres since
+# migration 002 and no route ever read any of them. All four are user-JWT + RLS, all four
+# 404 before they read, and every query goes through `aexec` (D-v2.5-01) — the two nearest
+# neighbours above run the sync builder bare inside an `async def` and are the OUTLIERS, not
+# the house style (`run_in_threadpool` is used 55 times elsewhere in this file).
+# ⚠ The literal token is deliberately not written here: the fence that proves no new bare
+# call was added counts occurrences file-wide, so a comment naming it would dilute it.
+
+# T-217-07 — the paging bound, chosen from a MEASURED worst case rather than a round
+# number. Local DB, 2026-08-29: 64 documents / 61 with text; MAX 266,773 chars and MAX
+# 6,402 lines in a single document; mean 14,684 chars / 201 lines.
+CONTENT_PAGE_LINES = 500   # default page when `end_line` is omitted — one request covers
+                           # the mean document (201 lines) whole.
+CONTENT_MAX_LINES = 2000   # hard cap on ANY explicitly requested span, so a caller cannot
+                           # ask for an unbounded body. The measured worst case needs 4
+                           # requests; `has_more` tells the client there is more.
+
+
+async def _assert_document_visible(document_id: str, user_id: str, supabase: Client) -> dict:
+    """Shared 404-before-read gate for the four Phase 217 detail routes.
+
+    Mirrors `list_documents`' visibility rule — OWNER **or** a globally-visible folder —
+    so the detail panel cannot 404 a document the list just rendered. Returns the parent
+    row; raises 404 with the shipped `detail` string when the caller cannot see it.
+
+    T-217-04 / T-217-05: `document_id` is never trusted as an authorization claim. It
+    selects a row the ownership filter must ALSO match, and an invisible document is a
+    404 — never an empty 200, which would confirm the id exists.
+    """
+    try:
+        res = await aexec(
+            supabase.table("documents")
+            .select("id, filename, user_id, folder_id")
+            .eq("id", document_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+        )
+    except Exception:
+        log.debug("visibility check raised on the owner arm for document %s", document_id)
+        res = None
+    if res is not None and getattr(res, "data", None):
+        return res.data
+
+    global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
+    if global_folder_ids:
+        try:
+            res = await aexec(
+                supabase.table("documents")
+                .select("id, filename, user_id, folder_id")
+                .eq("id", document_id)
+                .in_("folder_id", global_folder_ids)
+                .maybe_single()
+            )
+        except Exception:
+            log.debug("visibility check failed for document %s (global-folder arm)", document_id)
+            res = None
+        if res is not None and getattr(res, "data", None):
+            return res.data
+
+    raise HTTPException(status_code=404, detail="Document not found")
+
+
+@router.get("/{document_id}/content", response_model=DocumentContentResponse)
+async def get_document_content(
+    document_id: str,
+    start_line: int = Query(1, ge=1, description="First line to return (1-based, inclusive)"),
+    end_line: int | None = Query(
+        None, ge=1,
+        description="Last line to return (1-based, inclusive). Omitted = one page of 500 lines.",
+    ),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The document's parsed text, sliced to a line range, WITHOUT line numbers.
+
+    Three deliberate divergences from `GET /kb/read`, each of which is the point:
+
+    1. `numbered=False` — `read_path` glues `42: ` onto every line for the AGENT, which
+       needs addressable lines to cite. A PERSON reading their own document must not get
+       that, and it breaks Markdown rendering outright (D-217-05).
+    2. An EMPTY document is `200` with `content=""` / `total_lines=0`. `kb.py`'s route
+       folds "No content available for this document." into a 404; an empty-text document
+       is not a MISSING document, and the Library section renders its own empty arm.
+    3. The envelope carries `has_more`, so the client's "Load more" condition is
+       unambiguous rather than re-derived.
+
+    A document that genuinely is not visible to the caller is still 404 with the shipped
+    `detail="Document not found"`.
+    """
+    # 1. 404 before read — the shared gate, not a per-route variant.
+    doc = await _assert_document_visible(document_id, current_user["id"], supabase)
+
+    # 2. Bound the slice (T-217-07). An omitted end_line is ONE page, not the whole
+    #    document; an explicit span is capped, so no request can be unbounded.
+    requested_end = end_line if end_line is not None else start_line + CONTENT_PAGE_LINES - 1
+    requested_end = max(requested_end, start_line)
+    effective_end = min(requested_end, start_line + CONTENT_MAX_LINES - 1)
+
+    # 3. ONE slicer, two callers (D-217-05).
+    result = await read_path(
+        document_id, current_user["id"], supabase, start_line, effective_end, numbered=False
+    )
+
+    if "error" in result:
+        if result.get("error_kind") == "not_found":
+            # Defence in depth — the gate above already answered this.
+            raise HTTPException(status_code=404, detail="Document not found")
+        # "empty" (no parsed text at all) and "range" (a page that starts past the end)
+        # are BOTH honest 200s. Only an invisible document is a 404.
+        return DocumentContentResponse(
+            document_id=document_id,
+            filename=result.get("filename") or doc["filename"],
+            total_lines=result.get("total_lines", 0),
+            content="",
+            start_line=None,
+            end_line=None,
+            has_more=False,
+        )
+
+    total_lines = result["total_lines"]
+    served_end = result["end_line"]
+    return DocumentContentResponse(
+        document_id=document_id,
+        filename=result["filename"],
+        total_lines=total_lines,
+        content=result["content"],
+        start_line=result["start_line"],
+        end_line=served_end,
+        has_more=served_end < total_lines,
+    )
+
+
+@router.get("/{document_id}/chunks", response_model=list[DocumentChunkRow])
+async def list_document_chunks(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The chunks this document was split into, in index order.
+
+    `embedding_model` / `embedding_dimensions` ride this route because their PER-CHUNK
+    variation mid-re-embed is the whole point (D-217-08): a half-re-embedded document is
+    a fact the Library can show and nothing else can.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the chunks — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_chunks")
+        .select("id, chunk_index, content, embedding_model, embedding_dimensions")
+        .eq("document_id", document_id)
+        .order("chunk_index")
+    )
+    return res.data or []
+
+
+# ⚠ THE RLS ASYMMETRY BELOW IS CORRECT BEHAVIOUR, NOT A DEFECT — encode it, do not "fix" it.
+#
+# `document_chunks` SELECT was WIDENED to owner-OR-globally-visible-folder by migration
+# 110 (`110_secdef_org_scope_audit.sql:215-223`, PRAG-01 / D-164-07). `document_tables` and
+# `document_images` were left owner-only by migration 108
+# (`108_rls_membership_rewrite.sql:180-189` — a single `FOR ALL` policy, `user_id = auth.uid()`,
+# with no folder branch).
+#
+# So a document visible only through SOMEONE ELSE'S globally-visible folder returns text and
+# chunks, and an EMPTY LIST of tables and images. The panel does not lie about it: the shipped
+# `table_count` / `image_count` aggregate in `list_documents` is computed through the same
+# user-JWT client, so the row's count badge already reads 0 and the section agrees with it.
+# Widening those two policies is a migration and a security decision — out of this phase.
+
+
+@router.get("/{document_id}/tables", response_model=list[DocumentTableRow])
+async def list_document_tables(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The tables extracted from this document, in extraction order.
+
+    Owner-only by migration 108 — see the asymmetry note above. An empty list is a normal
+    200: this document has no tables, or the caller reaches it through a shared folder.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the tables — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_tables")
+        .select("id, page, table_index, headers, rows, extractor")
+        .eq("document_id", document_id)
+        .order("table_index")
+    )
+    return res.data or []
+
+
+@router.get("/{document_id}/images", response_model=list[DocumentImageRow])
+async def list_document_images(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The image DESCRIPTIONS extracted from this document, in extraction order.
+
+    ⚠ The table stores no picture — the encoded PNG is handed to the vision model and
+    discarded — so the description IS the image here and the select names only the columns
+    that exist. Owner-only by migration 108, same asymmetry note as tables.
+    """
+    # 1. Verify doc exists and user has access
+    await _assert_document_visible(document_id, current_user["id"], supabase)
+    # 2. Fetch the image descriptions — an empty result is 200 + [], never a 404.
+    res = await aexec(
+        supabase.table("document_images")
+        .select("id, page, image_index, description")
+        .eq("document_id", document_id)
+        .order("image_index")
+    )
+    return res.data or []
 
 
 @router.post("/{document_id}/restore", response_model=DocumentResponse)
@@ -1960,6 +2207,21 @@ def ingest_document(
             except Exception as em_exc:
                 log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
 
+        # Phase 220 (TAKEOFF-01): DXF Takeoff extraction for CAD drawings
+        if (
+            mime_type in ("application/dxf", "image/vnd.dxf", "application/x-dxf")
+            or (filename and filename.lower().endswith(".dxf"))
+        ):
+            try:
+                from app.services.extractors.aspects.dxf import extract_dxf_takeoff  # noqa: PLC0415
+                takeoff_payload = extract_dxf_takeoff(raw, filename=filename)
+                metadata_dict = metadata_dict or {}
+                metadata_dict["_takeoff"] = takeoff_payload
+                if not metadata_dict.get("document_type"):
+                    metadata_dict["document_type"] = "cad_drawing"
+            except Exception as dxf_exc:
+                log.warning("DXF takeoff extraction warning for %s: %s", document_id, dxf_exc)
+
         # Normalize case-sensitive filter fields for consistent retrieval.
         # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
         # is NEVER touched here, and is NEVER promoted to a flat filter field.
@@ -2066,6 +2328,10 @@ def ingest_document(
                 "embedding": embedding,  # computed from context_header + chunk
                 "embedding_model": _chunk_embedding_model,           # D-10 per-chunk tag
                 "embedding_dimensions": _chunk_embedding_dimensions,  # D-10
+                # BE-1 (217.1): the honest "when the vector was written" timestamp.
+                # created_at is the CHUNKING time and never moves on a re-embed —
+                # printing it as "last indexed" would be a lie after the first re-index.
+                "embedded_at": datetime.now(timezone.utc).isoformat(),
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]

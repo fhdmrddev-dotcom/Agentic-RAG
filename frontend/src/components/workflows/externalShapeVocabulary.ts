@@ -55,55 +55,26 @@
 export type ExternalActionShape = "capability" | "mcp"
 
 /* ─────────────────────────────────────────────────────────────────────────────────────
- * 206.2-03 — THE SHAPE CONTROL'S THREE STRINGS.
+ * ⚠ 211-04 (SC#3 / CONN-05 / SEED-207) — THE THREE SHAPE-CONTROL STRINGS ARE DELETED,
+ * BECAUSE THE CONTROL THEY NAMED IS DELETED. They were, verbatim, the AXIS stated in words —
+ * the group's accessible name asked *"How this step reaches outside"*, its first segment read
+ * *"One of these three actions"* and its second *"A tool on an MCP server"*.
  *
- * They land BELOW the type and ABOVE nothing, which satisfies §(c)'s declaration-order
- * rule trivially: this module still declares no array and no object literal, so no scalar
- * can be read before it is initialised. The rule is restated rather than assumed, because
- * the temporal-dead-zone error 206.1 measured is invisible to the type checker.
+ * ⚠ THE THREE IDENTIFIERS ARE NOT SPELLED HERE, and that is mechanical rather than coy: this
+ * plan's acceptance sweep greps all of `src` for them and a docblock naming them would count
+ * itself — the 187-24 trap. The VALUES are quoted instead, which is the part a reader needs.
  *
- * ⚠ THIS MODULE STILL SPELLS NO CAPABILITY ID and still imports nothing. Both are
- * asserted, not intended.
+ * SC#3's wording is *"a user browsing or picking a connection is never offered Message /
+ * Ticket / Email as a category"*, and a segmented control whose first position reads *"One of
+ * these three actions"* is precisely that offer — made before the author has been shown a
+ * single connection.
+ *
+ * ⚠ WHAT DID **NOT** CHANGE, AND MUST NOT BE READ AS HAVING CHANGED. §(a) above is about the
+ * capability set being CLOSED, in four independent places, one of them the database. That
+ * argument stands untouched: this phase demotes the verb from an ORGANISING AXIS to an
+ * ATTRIBUTE, and *optional* / *closed* are independent properties. Nothing here opens the set.
+ *
+ * The TYPE survives because the two shapes still exist — the executor branches on them, and
+ * `ExternalActionSection` still READS a step's stored config to say which one it is. What
+ * ended is asking a person to answer it first.
  * ───────────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * The accessible name of the shape radiogroup.
- *
- * ⚠ IT MUST NOT EQUAL THE SECTION HEADING, and that is a mechanical constraint rather than
- * an editorial preference. `ExternalActionSection.test.tsx:171` resolves the shipped
- * capability group with `getByRole("radiogroup", { name: <the section heading> })` — an
- * EXACT accessible-name match. A second radiogroup carrying a DIFFERENT name leaves that
- * query unambiguous and the pin green; a second radiogroup carrying the SAME name makes it
- * match two elements and the shipped assertion throws.
- *
- * It also asks a different question from the heading, which is why two names are honest
- * rather than merely convenient: the heading says what the step does, this says how it
- * gets there.
- */
-export const EXTERNAL_SHAPE_GROUP_LABEL = "How this step reaches outside"
-
-/**
- * Segment A — the closed first-party set.
- *
- * It names the SCOPE, not an act. The three acts are the rows immediately below it, so a
- * label that re-stated a verb would be a fourth copy of sentences that already have exactly
- * one home. ⚠ It names no capability id, which a shipped fence sweeps the whole step
- * panel's HTML for.
- *
- * The word *three* cannot drift: the set is CHECK-constrained in the database, mirrored by
- * a module-scope assertion that fails at IMPORT, and pinned by assertions on both sides of
- * the language boundary. If it ever became four, this string is the least of what breaks.
- */
-export const EXTERNAL_SHAPE_CAPABILITY_LABEL = "One of these three actions"
-
-/**
- * Segment B — a named tool on a remote MCP server.
- *
- * A parallel NOUN PHRASE, so the two segments answer one question in one grammar.
- *
- * ⚠ IT DELIBERATELY DOES NOT SAY WHAT THE TOOL DOES. The wire carries no read/write hint —
- * measured: the live `tools/list` payload cached in the database has no `annotations` key at
- * all — so any verb here would be fabricated. Re-open trigger: *the wire gaining that hint*,
- * which is the only thing that would make a stronger sentence true rather than generic.
- */
-export const EXTERNAL_SHAPE_MCP_LABEL = "A tool on an MCP server"

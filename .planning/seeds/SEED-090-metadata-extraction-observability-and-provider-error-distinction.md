@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-090
 title: Metadata-extraction failure observability — surface "extraction failed" vs "no metadata found", and distinguish provider_error (transport/down) from model_failed_to_emit (honest decline)
-status: planted
+status: partially-folded
+folded_into: 210
 planted: 2026-06-17
 phase_origin: "Phase 111.1 verify-work — operator ingested a Word doc, saw NO metadata, no UI signal. Root cause was an OpenAI strict-400; the doc still completed with metadata=None, indistinguishable from a doc that legitimately has no metadata. The ultracode end-to-end integrity workflow (wf_bcee7c86) confirmed the gap at code + live-DB + UI layers and the adversarial pass upheld it."
 category: Ingestion observability — additive status/telemetry surface over the existing best-effort degrade; does NOT change the degrade contract (a failing model still never breaks ingestion)

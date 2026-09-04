@@ -364,7 +364,12 @@ describe("WorkflowBuilderPage canvas door — one selection contract (D-183-05)"
     await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
   }
 
-  it("clicking a canvas node opens the shipped 400px form panel on THAT phase", async () => {
+  // D-214-22 — RENAMED, NOT RE-BASELINED. This case's assertions are on panel PRESENCE
+  // and on which phase it opened for; none of them ever touched the panel's width, so
+  // widening the track to the shared `clamp(480px, 38%, 640px)` changes nothing here
+  // except the sentence. The old title named the previous fixed pixel width and was the
+  // only thing here that rotted.
+  it("clicking a canvas node opens the shipped clamp(480px, 38%, 640px) form panel on THAT phase", async () => {
     renderBuilder(on)
     await openCanvas()
     // At rest the panel is the collapsed rail.

@@ -919,3 +919,184 @@ def test_extract_and_store_tables_unsupported_mime_noop():
         supabase=mock_supabase,
     )
     mock_supabase.table.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# SEED-227: the cap TRUNCATES, and it must say so.
+#
+# The cap itself has been tested since Phase 072 (test_app_settings_max_vision_calls_read
+# above proves 3 of 10 images are described). What NOTHING tested is that the other 7
+# vanish without a word — the document reports a clean ingestion and no surface carries
+# the fact. These tests pin the telling, not the capping.
+# ---------------------------------------------------------------------------
+
+def _chained_supabase():
+    """A supabase mock whose builder returns itself for every chained call.
+
+    The module's default fixture only wires `.insert`, so `.select`/`.eq`/`.limit`/
+    `.update` would each hand back a FRESH auto-MagicMock and the read-merge-write
+    would silently assert nothing.
+    """
+    mock_supabase = MagicMock()
+    b = MagicMock()
+    mock_supabase.table.return_value = b
+    for method in ("insert", "select", "eq", "limit", "update", "order"):
+        getattr(b, method).return_value = b
+    b.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
+    return mock_supabase, b
+
+
+def _vision_settings(cap: int):
+    s = MagicMock()
+    s.llm_model = "openai/gpt-4o"
+    s.llm_api_key = "test-key"
+    s.llm_base_url = ""
+    s.multimodal_max_vision_calls = cap
+    s.multimodal_max_b64_bytes_kb = 4096
+    s.embedding_model = "openai/text-embedding-3-small"
+    return s
+
+
+def _metadata_updates(builder):
+    """Every `update()` payload that carried a metadata key."""
+    return [
+        call[0][0]["metadata"]
+        for call in builder.update.call_args_list
+        if call[0] and isinstance(call[0][0], dict) and "metadata" in call[0][0]
+    ]
+
+
+def test_truncation_is_recorded_on_the_document():
+    """10 images with a cap of 3 → the document records total=10, read=3.
+
+    Without this the other 7 are unreachable AND unmentioned, which is the exact
+    shape of a silent failure: every gate green, the answer quietly incomplete.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase, builder = _chained_supabase()
+    ten = [
+        {"page": 1, "image_index": i, "b64_png": "a" * 16, "width": 100, "height": 100}
+        for i in range(10)
+    ]
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = ten
+        mock_desc.return_value = "fake description"
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-seed227-t1",
+            user_id="user-seed227-t1",
+            supabase=mock_supabase,
+            app_settings=_vision_settings(3),
+        )
+
+    stamped = _metadata_updates(builder)
+    assert stamped, "truncation happened and NOTHING was written to documents.metadata"
+    assert stamped[-1]["_images"] == {"total": 10, "read": 3}
+
+
+def test_no_truncation_note_when_everything_was_read():
+    """2 images under a cap of 100 → absolutely nothing is stamped.
+
+    Absence is the signal the panel keys on, so a note written on the quiet path
+    would put a warning on every document in the library.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase, builder = _chained_supabase()
+    two = [
+        {"page": 1, "image_index": i, "b64_png": "a" * 16, "width": 100, "height": 100}
+        for i in range(2)
+    ]
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = two
+        mock_desc.return_value = "fake description"
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-seed227-t2",
+            user_id="user-seed227-t2",
+            supabase=mock_supabase,
+            app_settings=_vision_settings(100),
+        )
+
+    assert _metadata_updates(builder) == []
+
+
+def test_truncation_note_preserves_existing_metadata():
+    """⚠ The regression this guards is DATA LOSS, not a missing label.
+
+    `documents.metadata` is one jsonb column and TWO GENERATED COLUMNS read from it
+    (`document_type_norm`, `date_typed`). A bare overwrite would blank a document's
+    classification and date, and the generated columns would follow — silently.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase, builder = _chained_supabase()
+    builder.execute.return_value = MagicMock(
+        data=[{
+            "chunk_index": 0,
+            "metadata": {"document_type": "invoice", "date": "2026-01-01"},
+        }]
+    )
+    five = [
+        {"page": 1, "image_index": i, "b64_png": "a" * 16, "width": 100, "height": 100}
+        for i in range(5)
+    ]
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = five
+        mock_desc.return_value = "fake description"
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-seed227-t3",
+            user_id="user-seed227-t3",
+            supabase=mock_supabase,
+            app_settings=_vision_settings(2),
+        )
+
+    stamped = _metadata_updates(builder)
+    assert stamped, "expected a truncation stamp"
+    written = stamped[-1]
+    assert written["document_type"] == "invoice", "classification was clobbered"
+    assert written["date"] == "2026-01-01", "date was clobbered"
+    assert written["_images"] == {"total": 5, "read": 2}
+
+
+def test_a_failing_metadata_write_never_costs_the_image_rows():
+    """The note is best-effort. If recording it raises, the images still land.
+
+    A document losing its image descriptions because a *note about truncation*
+    failed would be strictly worse than the silence this seed set out to fix.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase, builder = _chained_supabase()
+    builder.select.side_effect = RuntimeError("metadata read exploded")
+    four = [
+        {"page": 1, "image_index": i, "b64_png": "a" * 16, "width": 100, "height": 100}
+        for i in range(4)
+    ]
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = four
+        mock_desc.return_value = "fake description"
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-seed227-t4",
+            user_id="user-seed227-t4",
+            supabase=mock_supabase,
+            app_settings=_vision_settings(2),
+        )
+
+    assert mock_desc.call_count == 2, "the cap still applied"
+    mock_supabase.table.assert_any_call("document_images")

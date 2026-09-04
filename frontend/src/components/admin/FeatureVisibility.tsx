@@ -30,6 +30,7 @@
 import { useState, type ReactNode } from "react"
 import {
   Check,
+  Plug,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -153,6 +154,19 @@ const FEATURES: readonly FeatureDef[] = [
     refusedApi:
       "Canvas view + validate/save/canvas routes (existing Describe & run / Author & govern stay open).",
     routePrefixes: "/canvas routes (flag-gated 404)",
+  },
+  // Phase 210 (CONN-09 / BUG-260826-04) — the live external connectors kill-switch.
+  // Like visual_workflow_canvas, this key renders a clean Off | On binary control
+  // (On writes audience "everyone", Off writes "off"). Cold-default Off disables live sends.
+  {
+    key: "live_connectors",
+    name: "Live connectors",
+    desc: "Controls live external network calls and integration dispatches across all workflows. When off, external calls run in dry-run/mock mode.",
+    livesOn: "Workflows & Settings",
+    glyph: Plug,
+    uiSurface: "External action steps and connector dispatches in workflows.",
+    refusedApi: "Outbound connector integration and live action endpoints.",
+    routePrefixes: "/connectors (live dispatch endpoints)",
   },
 ]
 
@@ -308,7 +322,7 @@ function FeatureCard({
             audience={audience}
             busy={busy}
             onFlip={flipTo}
-            offOn={def.key === "visual_workflow_canvas"}
+            offOn={def.key === "visual_workflow_canvas" || def.key === "live_connectors"}
           />
         </div>
       </div>

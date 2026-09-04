@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Connections States</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#31394d",
+                        "on-surface": "#dae2fd",
+                        "on-tertiary-container": "#744000",
+                        "on-secondary": "#233143",
+                        "tertiary-fixed": "#ffdcc0",
+                        "outline": "#859490",
+                        "outline-variant": "#3c4a46",
+                        "surface-tint": "#3cddc7",
+                        "secondary-fixed-dim": "#b9c8de",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "tertiary-container": "#ffac5a",
+                        "primary-container": "#2dd4bf",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed": "#2d1600",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary-fixed": "#0d1c2d",
+                        "tertiary": "#ffd1aa",
+                        "inverse-on-surface": "#283044",
+                        "secondary": "#b9c8de",
+                        "primary-fixed": "#62fae3",
+                        "on-primary-fixed-variant": "#005047",
+                        "on-tertiary": "#4b2800",
+                        "inverse-surface": "#dae2fd",
+                        "tertiary-fixed-dim": "#ffb875",
+                        "secondary-container": "#39485a",
+                        "on-primary-fixed": "#00201c",
+                        "on-primary-container": "#00574d",
+                        "on-surface-variant": "#bacac5",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#d4e4fa",
+                        "on-background": "#dae2fd",
+                        "primary": "#57f1db",
+                        "on-secondary-container": "#a7b6cc",
+                        "inverse-primary": "#006b5f",
+                        "surface": "#0b1326",
+                        "background": "#0b1326",
+                        "on-tertiary-fixed-variant": "#6b3b00",
+                        "surface-container-low": "#131b2e",
+                        "surface-container-lowest": "#060e20",
+                        "surface-container-high": "#222a3d",
+                        "error": "#ffb4ab",
+                        "surface-dim": "#0b1326",
+                        "on-error-container": "#ffdad6",
+                        "on-primary": "#003731",
+                        "surface-container": "#171f33",
+                        "primary-fixed-dim": "#3cddc7"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "1.5rem",
+                        "stack-md": "1rem",
+                        "container-padding": "2rem",
+                        "stack-lg": "2rem",
+                        "unit": "4px",
+                        "stack-sm": "0.5rem"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "display-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "1.5", "letterSpacing": "0em", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen p-container-padding space-y-stack-lg">
+<!-- STATE 1: POPULATED -->
+<div class="bg-surface-container rounded-lg p-stack-md flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md">Connections (Populated)</h2>
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-label-caps text-label-caps">Add a service</button>
+</div>
+<div class="flex gap-stack-sm items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border-b border-surface-container-high focus:border-primary text-on-surface pl-8 pr-3 py-1 outline-none font-body-sm text-body-sm rounded-t" placeholder="Search..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-high text-on-surface px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2 border border-primary">All <span class="w-1.5 h-1.5 rounded-full bg-primary block"></span></button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">Connected</button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">Not connected</button>
+</div>
+</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant mt-4">Popular</div>
+<div class="flex flex-col">
+<!-- Row 1 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">SL</div>
+<div>
+<div class="font-body-lg text-body-lg">Slack</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Team communication</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-primary block"></span> Connected</span>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary">more_vert</button>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">GH</div>
+<div>
+<div class="font-body-lg text-body-lg">GitHub</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Code repository</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest block border border-outline"></span> Not connected</span>
+<button class="text-primary font-body-sm text-body-sm px-3 py-1 border border-outline rounded hover:bg-surface-container-high transition-colors">Connect</button>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">NT</div>
+<div>
+<div class="font-body-lg text-body-lg">Notion</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Workspace notes</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-primary block"></span> Connected</span>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary">more_vert</button>
+</div>
+</div>
+</div>
+</div>
+<!-- STATE 2: SPARSE -->
+<div class="bg-surface-container rounded-lg p-stack-md flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md">Connections (Sparse)</h2>
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-label-caps text-label-caps">Add a service</button>
+</div>
+<div class="flex gap-stack-sm items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border-b border-surface-container-high focus:border-primary text-on-surface pl-8 pr-3 py-1 outline-none font-body-sm text-body-sm rounded-t" placeholder="Search..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">All</button>
+<button class="bg-surface-container-high text-on-surface px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2 border border-primary">Connected <span class="w-1.5 h-1.5 rounded-full bg-primary block"></span></button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">Not connected</button>
+</div>
+</div>
+<div class="flex flex-col mt-4">
+<!-- Row 1 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">SL</div>
+<div>
+<div class="font-body-lg text-body-lg">Slack</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Team communication</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-primary block"></span> Connected</span>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary">more_vert</button>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">JR</div>
+<div>
+<div class="font-body-lg text-body-lg">Jira</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Issue tracking</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-primary block"></span> Connected</span>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary">more_vert</button>
+</div>
+</div>
+<!-- Row 3 - deepwiki -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded bg-gradient-to-br from-surface-tint to-primary-container flex items-center justify-center">
+<svg fill="none" height="16" viewbox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg">
+<path class="text-on-primary-container" d="M12 2L2 7l10 5 10-5-10-5z" fill="currentColor"></path>
+<path class="text-on-primary-container" d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div>
+<div class="font-body-lg text-body-lg">deepwiki</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Shared internal knowledge base</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-primary block"></span> Connected</span>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary">more_vert</button>
+</div>
+</div>
+</div>
+</div>
+<!-- STATE 3: EMPTY -->
+<div class="bg-surface-container rounded-lg p-stack-md flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md">Connections (Empty)</h2>
+<button class="bg-primary text-on-primary px-4 py-2 rounded font-label-caps text-label-caps">Add a service</button>
+</div>
+<div class="flex gap-stack-sm items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border-b border-surface-container-high focus:border-primary text-on-surface pl-8 pr-3 py-1 outline-none font-body-sm text-body-sm rounded-t" placeholder="Search..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">All</button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2">Connected</button>
+<button class="bg-surface-container-high text-on-surface px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2 border border-primary">Not connected <span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest block border border-outline"></span></button>
+</div>
+</div>
+<div class="flex flex-col mt-4">
+<!-- Row 1 -->
+<div class="flex items-center justify-between py-3 group hover:bg-surface-container-high transition-colors -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">SL</div>
+<div>
+<div class="font-body-lg text-body-lg">Slack</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Team communication</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest block border border-outline"></span> Not connected</span>
+<button class="text-primary font-body-sm text-body-sm px-3 py-1 border border-outline rounded hover:bg-surface-container-high transition-colors">Connect</button>
+</div>
+</div>
+</div>
+</div>
+<!-- STATE 4: TURNED OFF -->
+<div class="bg-surface-container rounded-lg p-stack-md flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md">Connections (Disabled)</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Connections are currently disabled for this workspace.</p>
+<div class="flex gap-stack-sm items-center opacity-50 pointer-events-none">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border-b border-surface-container-high text-on-surface pl-8 pr-3 py-1 outline-none font-body-sm text-body-sm rounded-t" disabled="" placeholder="Search..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-high text-on-surface px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2 border border-outline" disabled="">All</button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2" disabled="">Connected</button>
+<button class="bg-surface-container-low text-on-surface-variant px-3 py-1 rounded-full font-body-sm text-body-sm flex items-center gap-2" disabled="">Not connected</button>
+</div>
+</div>
+<div class="flex flex-col mt-4 opacity-75">
+<!-- Row 1 -->
+<div class="flex items-center justify-between py-3 -mx-4 px-4 rounded">
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 bg-surface-container-high rounded flex items-center justify-center font-label-caps text-label-caps text-on-surface">SL</div>
+<div>
+<div class="font-body-lg text-body-lg">Slack</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Team communication</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest block border border-outline"></span> Unavailable</span>
+</div>
+</div>
+</div>
+</div>
+</body></html>

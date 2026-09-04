@@ -551,13 +551,36 @@ def test_the_capability_keys_agree_with_the_shipped_closed_set():
     """D-04 — the allow-list is keyed off the SAME closed capability set the rest of the app
     uses. Two spellings are unavoidable (egress.py must not import a service); the agreement
     is therefore MECHANICAL rather than remembered — the `models/harness.py:229-235` rule."""
+    from app.security.egress import _HOST_MATCH, _TLS_SCHEMES
     from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 
-    assert set(ALLOWED_HOST_SUFFIXES) == set(EXTERNAL_ACTION_CAPABILITIES), (
-        f"egress allow-list keys {sorted(ALLOWED_HOST_SUFFIXES)} != capabilities "
-        f"{sorted(EXTERNAL_ACTION_CAPABILITIES)} — a capability with no allow-list entry is a "
-        "capability whose destination is unchecked"
+    # ⚠ THE LOAD-BEARING DIRECTION, AND IT IS THE ONE THIS TEST'S OWN MESSAGE NAMES:
+    # "a capability with no allow-list entry is a capability whose destination is
+    # unchecked". Every capability MUST have an entry. That has not changed.
+    missing = set(EXTERNAL_ACTION_CAPABILITIES) - set(ALLOWED_HOST_SUFFIXES)
+    assert missing == set(), (
+        f"capabilities with no allow-list entry: {sorted(missing)} — their destination is "
+        "unchecked"
     )
+
+    # ⚠ THE REVERSE USED TO BE ASSERTED TOO, AND IT WAS TRUE ONLY WHILE EVERY OUTBOUND CALL
+    # BELONGED TO A CAPABILITY VERB. It stopped being true on 2026-08-31, when the Google
+    # Drive read moved off a RAW `httpx.AsyncClient` — validated by nothing — and onto this
+    # binder under `drive_read`. That destination belongs to a SERVICE reached with an OAuth
+    # token, not to any verb, and the closed capability set must NOT grow to accommodate it
+    # (the ROADMAP's standing instruction is "do not add a fifth verb": four spellings, two
+    # module-scope asserts and a database CHECK hang off that set).
+    #
+    # So an extra key is allowed — and it must be WHOLLY wired, because a key present here
+    # and missing from either table below is a `KeyError` at the socket rather than a
+    # refusal, which fails OPEN in the sense that matters: no answer instead of a clear no.
+    for key in set(ALLOWED_HOST_SUFFIXES) - set(EXTERNAL_ACTION_CAPABILITIES):
+        assert key in _HOST_MATCH, f"{key} has hosts but no match MODE"
+        assert key in _TLS_SCHEMES, f"{key} has hosts but no permitted SCHEME"
+        assert ALLOWED_HOST_SUFFIXES[key], (
+            f"{key} is a non-capability key with an EMPTY host tuple; only the caller-supplied"
+            " arm (send_email) may be empty, and this key has no such arm"
+        )
 
 
 def test_an_unknown_capability_fails_CLOSED():

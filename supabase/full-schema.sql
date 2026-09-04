@@ -412,9 +412,12 @@ CREATE FUNCTION public.resize_embedding_column(new_dim integer) RETURNS void
 BEGIN
   -- Drop the HNSW index
   DROP INDEX IF EXISTS public.document_chunks_embedding_idx;
-  -- Alter column type (NULLs out existing embeddings — incompatible dimensions)
+  -- Alter column type (NULLs out existing embeddings + their embedded_at — incompatible
+  -- dimensions mean the vector no longer exists, so "last indexed" is a lie)
   EXECUTE format(
-    'ALTER TABLE public.document_chunks ALTER COLUMN embedding TYPE vector(%s) USING NULL',
+    'ALTER TABLE public.document_chunks
+       ALTER COLUMN embedding TYPE vector(%s) USING NULL,
+       ALTER COLUMN embedded_at TYPE timestamptz USING NULL',
     new_dim
   );
   -- Recreate HNSW index
@@ -677,7 +680,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text])))
 );
 
 
@@ -686,6 +689,59 @@ CREATE TABLE public.audit_log (
 --
 
 COMMENT ON COLUMN public.audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: checked_queries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.checked_queries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    question text NOT NULL,
+    expected_document_id uuid NOT NULL,
+    last_rank integer,
+    previous_rank integer,
+    checked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN checked_queries.question; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.question IS 'The question to evaluate against the user''s corpus.';
+
+
+--
+-- Name: COLUMN checked_queries.expected_document_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.expected_document_id IS 'The document that SHOULD be among the top hits for this question. Validated for ownership on write.';
+
+
+--
+-- Name: COLUMN checked_queries.last_rank; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.last_rank IS 'The 1-indexed rank of expected_document_id at the most recent check. NULL = checked but the document was not found in the top N results (never 0).';
+
+
+--
+-- Name: COLUMN checked_queries.previous_rank; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.previous_rank IS 'The last_rank from the check BEFORE the most recent one, so Holding/Slipped can be derived.';
+
+
+--
+-- Name: COLUMN checked_queries.checked_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.checked_queries.checked_at IS 'When the most recent evaluation finished. NULL = not yet checked (a fresh create that awaits triggerCheck).';
 
 
 --
@@ -755,10 +811,20 @@ CREATE TABLE public.connector_connections (
     mcp_server_url text,
     tool_grants jsonb DEFAULT '{}'::jsonb NOT NULL,
     discovered_tools jsonb DEFAULT '[]'::jsonb NOT NULL,
+    service_id text,
+    default_approval_posture text DEFAULT 'ask'::text NOT NULL,
+    auth_type text DEFAULT 'static_key'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    error_message text,
+    oauth_client_secret_ciphertext text,
+    CONSTRAINT connector_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['static_key'::text, 'oauth_byo'::text, 'mcp'::text]))),
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_default_posture_check CHECK ((default_approval_posture = ANY (ARRAY['allow'::text, 'ask'::text, 'deny'::text]))),
+    CONSTRAINT connector_connections_has_a_service_identity CHECK (((service_id IS NOT NULL) AND (length(btrim(service_id)) > 0))),
     CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
     CONSTRAINT connector_connections_mcp_url_is_https CHECK (((mcp_server_url IS NULL) OR (mcp_server_url ~~ 'https://%'::text))),
-    CONSTRAINT connector_connections_shape_is_one_of_two CHECK (((capability IS NOT NULL) OR (mcp_server_url IS NOT NULL)))
+    CONSTRAINT connector_connections_shape_is_not_ambiguous CHECK ((NOT ((capability IS NOT NULL) AND (mcp_server_url IS NOT NULL)))),
+    CONSTRAINT connector_connections_status_check CHECK ((status = ANY (ARRAY['active'::text, 'revoked'::text, 'error'::text])))
 );
 
 
@@ -802,6 +868,89 @@ COMMENT ON COLUMN public.connector_connections.tool_grants IS 'Phase 206 (F-1 / 
 --
 
 COMMENT ON COLUMN public.connector_connections.discovered_tools IS 'Phase 206 (D-206-05): JSONB array of tool schemas discovered from the remote MCP server via tools/list.';
+
+
+--
+-- Name: COLUMN connector_connections.service_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.service_id IS 'Phase 211 (D-211-01): the SERVICE this connection reaches — ''slack'', ''jira'', ''smtp'', ''notion'', anything. FREE TEXT. It is NOT a foreign key, it is NEVER CHECK-constrained against a closed list, and no migration may later close it: a closed set here is migration 116''s `capability` mistake moved to a nicer axis, where every unknown service again becomes invisible or has to squeeze into a known name (SEED-207). The curated "Popular" set (Phase 212) is a PRESENTATION LOOKUP keyed by this value (D-211-02) — a miss degrades to a generic mark, NEVER to a refusal and NEVER to a hidden row, which is what makes adding a service cost a presentation row instead of a migration. The only constraint this column carries is the one in §3: present and non-blank.';
+
+
+--
+-- Name: COLUMN connector_connections.default_approval_posture; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.default_approval_posture IS 'Phase 213 (D-213-06, D-213-08): The connection-level default approval posture (''allow'', ''ask'', ''deny''). Newly discovered or unconfigured tools inherit this posture until explicitly overridden in tool_grants.';
+
+
+--
+-- Name: COLUMN connector_connections.auth_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.auth_type IS 'Phase 215 (D-215-01): The authentication mechanism used by the connection (static_key, oauth_byo, mcp).';
+
+
+--
+-- Name: COLUMN connector_connections.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.status IS 'Phase 215 (D-215-05): Connection operational status (active, revoked, error).';
+
+
+--
+-- Name: COLUMN connector_connections.oauth_client_secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.oauth_client_secret_ciphertext IS 'Phase 215 follow-up (2026-08-31): the customer-registered OAuth application secret, encrypted (enc:v1: AES-256-GCM) exactly as secret_ciphertext is. NEVER granted SELECT to authenticated or anon — it is deliberately absent from the GRANT below and from _SELECTABLE_COLUMNS. It previously lived in config.custom_client_secret as PLAINTEXT, in a column every org member can read.';
+
+
+--
+-- Name: connector_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    account_email text,
+    account_name text,
+    access_token_ciphertext text NOT NULL,
+    refresh_token_ciphertext text,
+    token_type text DEFAULT 'Bearer'::text NOT NULL,
+    scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    refresh_claimed_until timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE connector_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.connector_tokens IS 'Phase 215 (OAUTH-01..03): Encrypted OAuth tokens and claim-based refresh leases. Phase 222/SEED-233: RLS was enabled at 129 with NO policy, which is deny-all and made 129 §4''s column grants unreachable; connector_tokens_select scopes reads through the parent connection''s org. Writes stay on the service client by design — see §2.';
+
+
+--
+-- Name: COLUMN connector_tokens.access_token_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.access_token_ciphertext IS 'Phase 215 (SEC-1): Encrypted access token envelope (enc:v1: AES-256-GCM). Must NEVER be granted SELECT to authenticated or anon.';
+
+
+--
+-- Name: COLUMN connector_tokens.refresh_token_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.refresh_token_ciphertext IS 'Phase 215 (SEC-1): Encrypted refresh token envelope (enc:v1: AES-256-GCM). Must NEVER be granted SELECT to authenticated or anon.';
+
+
+--
+-- Name: COLUMN connector_tokens.refresh_claimed_until; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_tokens.refresh_claimed_until IS 'Phase 215 (D-215-04): Timestamp lease for multi-worker atomic refresh locking (WORKER_COUNT=2).';
 
 
 --
@@ -851,7 +1000,8 @@ CREATE TABLE public.document_chunks (
     search_vector tsvector,
     embedding_model text,
     embedding_dimensions integer,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    embedded_at timestamp with time zone
 );
 
 
@@ -860,6 +1010,13 @@ CREATE TABLE public.document_chunks (
 --
 
 COMMENT ON COLUMN public.document_chunks.org_id IS 'TEN-04 (Phase 163): denormalized from documents.org_id via document_id. NOT NULL. RLS (mig 108) + Phase-164 SECDEF filter this directly — never a per-row join to documents (CONCUR-01).';
+
+
+--
+-- Name: COLUMN document_chunks.embedded_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_chunks.embedded_at IS 'Phase 217.1 (BE-1 / LIB-01): the instant THIS chunk''s vector was written, set at all FOUR document_chunks write sites — main ingest (backend/app/api/documents.py:2296), table chunks (backend/app/services/multimodal_service.py:423), image chunks (multimodal_service.py:896) and the re-embed UPDATE (backend/app/services/reembed_service.py:187). NULLABLE and NOT BACKFILLED (D-217.1-13): a pre-140 chunk keeps NULL forever, which reads "never indexed" — distinct from "time not recorded". created_at is the CHUNKING time and does not move on a re-embed; using it would print a lie after the first re-index. resize_embedding_column NULLs it alongside the vector on a dims change.';
 
 
 --
@@ -1245,6 +1402,7 @@ CREATE TABLE public.messages (
     reasoning_content text,
     origin text DEFAULT 'deep'::text NOT NULL,
     org_id uuid NOT NULL,
+    active_connector_ids jsonb,
     CONSTRAINT messages_origin_check CHECK ((origin = ANY (ARRAY['deep'::text, 'harness'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
@@ -1264,6 +1422,13 @@ COMMENT ON COLUMN public.messages.tool_calls IS 'JSONB array. For role=system ro
 --
 
 COMMENT ON COLUMN public.messages.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: COLUMN messages.active_connector_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.messages.active_connector_ids IS 'Phase 223 (BUG-260902-03 / D-223-06): Array of armed connector UUIDs active when message was sent. NULL means absent/legacy; ''[]''::jsonb means explicitly cleared/none.';
 
 
 --
@@ -2274,6 +2439,14 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: checked_queries checked_queries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: classification_rules classification_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2295,6 +2468,22 @@ ALTER TABLE ONLY public.code_executions
 
 ALTER TABLE ONLY public.connector_connections
     ADD CONSTRAINT connector_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connector_tokens connector_tokens_connection_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_connection_id_key UNIQUE (connection_id);
+
+
+--
+-- Name: connector_tokens connector_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -2889,6 +3078,20 @@ CREATE INDEX idx_audit_log_org_id ON public.audit_log USING btree (org_id);
 
 
 --
+-- Name: idx_checked_queries_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_checked_queries_org_user ON public.checked_queries USING btree (org_id, user_id);
+
+
+--
+-- Name: idx_checked_queries_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_checked_queries_user ON public.checked_queries USING btree (user_id);
+
+
+--
 -- Name: idx_classification_rules_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2928,6 +3131,27 @@ CREATE INDEX idx_connector_connections_org_capability ON public.connector_connec
 --
 
 CREATE INDEX idx_connector_connections_org_id ON public.connector_connections USING btree (org_id);
+
+
+--
+-- Name: idx_connector_connections_org_service; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_service ON public.connector_connections USING btree (org_id, service_id);
+
+
+--
+-- Name: idx_connector_tokens_connection_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_tokens_connection_id ON public.connector_tokens USING btree (connection_id);
+
+
+--
+-- Name: idx_connector_tokens_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_tokens_expires_at ON public.connector_tokens USING btree (connection_id, expires_at);
 
 
 --
@@ -3575,6 +3799,20 @@ CREATE TRIGGER audit_log_autofill_org_id BEFORE INSERT ON public.audit_log FOR E
 
 
 --
+-- Name: checked_queries checked_queries_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER checked_queries_autofill_org_id BEFORE INSERT ON public.checked_queries FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: checked_queries checked_queries_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER checked_queries_set_updated_at BEFORE UPDATE ON public.checked_queries FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: classification_rules classification_rules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3989,6 +4227,30 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: checked_queries checked_queries_expected_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_expected_document_id_fkey FOREIGN KEY (expected_document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: checked_queries checked_queries_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: checked_queries checked_queries_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.checked_queries
+    ADD CONSTRAINT checked_queries_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: classification_rules classification_rules_suggest_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4034,6 +4296,14 @@ ALTER TABLE ONLY public.connector_connections
 
 ALTER TABLE ONLY public.connector_connections
     ADD CONSTRAINT connector_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_tokens connector_tokens_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_tokens
+    ADD CONSTRAINT connector_tokens_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.connector_connections(id) ON DELETE CASCADE;
 
 
 --
@@ -5272,6 +5542,40 @@ CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tune
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: checked_queries; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.checked_queries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: checked_queries checked_queries_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_delete ON public.checked_queries FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_insert ON public.checked_queries FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_select ON public.checked_queries FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: checked_queries checked_queries_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY checked_queries_update ON public.checked_queries FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
 -- Name: classification_rules; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -5315,6 +5619,21 @@ CREATE POLICY connector_connections_select ON public.connector_connections FOR S
 --
 
 CREATE POLICY connector_connections_update ON public.connector_connections FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: connector_tokens; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_tokens ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_tokens connector_tokens_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_tokens_select ON public.connector_tokens FOR SELECT TO authenticated USING ((connection_id IN ( SELECT c.id
+   FROM public.connector_connections c
+  WHERE (c.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
 
 
 --
@@ -6222,6 +6541,23 @@ REVOKE ALL ON public.connector_connections FROM authenticated;
 
 -- One column per line so the OMISSION is visible in a diff. The column that is not
 -- here is `secret_ciphertext`.
+-- ⚠ MEASURED DRIFT, 2026-08-26 (Phase 211). This list had fallen FOUR COLUMNS behind the
+--    live table, and the failure it ships is TOTAL rather than partial. `_SELECTABLE_COLUMNS`
+--    (connector_service.py) is DERIVED from `ConnectorConnectionResponse`'s keys, so every
+--    read projects every response field by name. A greenfield project bootstrapped from
+--    full-schema.sql would therefore name four columns `authenticated` has no grant on and
+--    PostgREST answers `42501 permission denied for table connector_connections` — on EVERY
+--    connector read, including a pre-existing row that has nothing to do with the new column.
+--    It looks like an outage, not a permissions bug. That is migration 118's own lesson,
+--    recorded in this very file, recurring because the mirror is manual.
+--
+--    Three of the four (`mcp_server_url`, `tool_grants`, `discovered_tools`) drifted in at
+--    Phase 206 and were latent for the whole milestone; `service_id` is migration 127's.
+--    Derived from the live table, not retyped:
+--      select column_name from information_schema.column_privileges
+--       where table_name='connector_connections' and grantee='authenticated'
+--         and privilege_type='SELECT';
+--    Compare that set against this block whenever a migration adds a column here.
 GRANT SELECT (
     id,
     org_id,
@@ -6233,7 +6569,11 @@ GRANT SELECT (
     last_checked_at,
     last_check_verdict,
     created_at,
-    updated_at
+    updated_at,
+    mcp_server_url,
+    tool_grants,
+    discovered_tools,
+    service_id
 ) ON public.connector_connections TO authenticated;
 
 -- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Live Workflow Run</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#571ac2",
+                        "on-surface-variant": "#c7c5d3",
+                        "error-container": "#93000a",
+                        "on-background": "#dee2f1",
+                        "surface-container-lowest": "#090e18",
+                        "tertiary-container": "#26c760",
+                        "tertiary-fixed-dim": "#4be176",
+                        "inverse-surface": "#dee2f1",
+                        "on-tertiary-container": "#004c1e",
+                        "inverse-on-surface": "#2b303c",
+                        "background": "#0e131e",
+                        "on-secondary-container": "#c3abff",
+                        "inverse-primary": "#5355a9",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "on-tertiary": "#003915",
+                        "surface-container-highest": "#303540",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#353789",
+                        "on-secondary-fixed": "#23005c",
+                        "secondary-fixed": "#e9ddff",
+                        "outline": "#918f9c",
+                        "on-error": "#690005",
+                        "surface-container-low": "#171c26",
+                        "on-secondary": "#3b0091",
+                        "surface": "#0e131e",
+                        "surface-bright": "#343945",
+                        "primary-fixed": "#e1e0ff",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "tertiary": "#4ee478",
+                        "on-tertiary-fixed": "#002109",
+                        "on-primary": "#242478",
+                        "surface-container": "#1b202a",
+                        "primary": "#c3c4ff",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "outline-variant": "#464651",
+                        "primary-container": "#a3a5ff",
+                        "surface-container-high": "#252a35",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-tint": "#c1c1ff",
+                        "tertiary-fixed": "#6bfe8f",
+                        "surface-dim": "#0e131e",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "on-error-container": "#ffdad6",
+                        "on-surface": "#dee2f1",
+                        "surface-variant": "#303540",
+                        "secondary": "#d0bcff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .step-line {
+            position: absolute;
+            left: 23px; /* Center of the 48px circle (24px - 1px border) */
+            top: 48px;
+            bottom: -16px;
+            width: 1px;
+            background-color: #212631;
+            z-index: 0;
+        }
+        .step-line.last {
+            display: none;
+        }
+        .step-circle {
+            position: relative;
+            z-index: 1;
+        }
+        @keyframes subtlePulse {
+            0% { box-shadow: 0 0 0 0 rgba(195, 196, 255, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(195, 196, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(195, 196, 255, 0); }
+        }
+        .running-pulse {
+            animation: subtlePulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-[#060A0F] text-on-surface font-body antialiased flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="w-64 h-screen border-r border-[#212631]/50 bg-[#080B11] flex flex-col fixed left-0 top-0 py-6 hidden md:flex shrink-0">
+<div class="px-6 mb-8">
+<h1 class="font-headline font-bold text-[#F4F6FE] text-2xl tracking-tight">Aether</h1>
+<p class="text-[12px] text-on-surface-variant font-label mt-1">v1.0.42</p>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full bg-primary text-on-primary font-label font-semibold py-2 px-4 rounded hover:bg-primary-fixed-dim transition-colors duration-200 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 18px;">add</span>
+                New Workflow
+            </button>
+</div>
+<ul class="flex flex-col gap-1 px-3">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded bg-[#A3A5FF]/15 text-[#A3A5FF] font-medium border-r-2 border-[#635BFF] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">account_tree</span>
+<span class="font-body text-[14px] tracking-tight">Workflows</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">folder_open</span>
+<span class="font-body text-[14px] tracking-tight">Library</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">psychology</span>
+<span class="font-body text-[14px] tracking-tight">Intelligence</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-[#9AA3B5] hover:text-[#F4F6FE] hover:bg-[#151B24] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">settings</span>
+<span class="font-body text-[14px] tracking-tight">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-0 md:ml-64 flex flex-col h-full bg-[#060A0F]">
+<!-- TopNavBar -->
+<header class="w-full h-14 border-b border-[#212631]/50 bg-[#060A0F] flex justify-between items-center px-6 sticky top-0 z-50 shrink-0">
+<div class="flex items-center gap-4">
+<span class="font-headline text-[#F4F6FE] font-bold tracking-tight text-lg md:hidden">Aether</span>
+<div class="hidden md:flex items-center text-on-surface-variant font-label text-sm gap-2">
+<span class="material-symbols-outlined text-[#9AA3B5]" style="font-size: 16px;">arrow_back</span>
+<span class="hover:text-primary cursor-pointer transition-colors">Customer Insights Pipeline</span>
+<span class="text-[#212631]">/</span>
+<span class="text-on-surface">Run #8492</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-[#9AA3B5] hover:bg-[#151B24] p-2 rounded-full transition-colors duration-200 active:scale-[0.98]">
+<span class="material-symbols-outlined" style="font-size: 20px;">notifications</span>
+</button>
+<button class="text-[#9AA3B5] hover:bg-[#151B24] p-2 rounded-full transition-colors duration-200 active:scale-[0.98]">
+<span class="material-symbols-outlined" style="font-size: 20px;">help</span>
+</button>
+<button class="text-[#9AA3B5] hover:bg-[#151B24] p-2 rounded-full transition-colors duration-200 active:scale-[0.98]">
+<span class="material-symbols-outlined" style="font-size: 20px;">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-[#212631] overflow-hidden ml-2 flex-shrink-0">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="A small user avatar image featuring a highly detailed, abstract geometric pattern in deep indigo and subtle silver tones. The design is sleek, modern, and perfectly suited for a dark-mode enterprise software interface. The overall mood is professional and minimalist." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSM5DV1qGa8yMuFoOVfRd_U8elvdI7FKDwdmN6i_SHuEChxVpxAID__w89z69w7xJp5_mFy-N5zV6-G4IK37oPFxdviH7-vhPZ2ilu32fukv1yVMEq2eq17pRfOt5loZhwpokGXZveJLN-Z5fYpWiLMYrpvctufaqHGnomoPoKYmVxpv6Xy5UyLPhd8x0vvnIZnH4NsrA0s7saoC9PId7wCA-JuQPbAyhbBYbC8GB9yKYE22WB56XXmlsM0Nz5xpEC3NEvSpTzC3co"/>
+</div>
+</div>
+</header>
+<!-- Header Row Context -->
+<div class="px-8 py-6 border-b border-[#212631]/50 bg-[#080B11] shrink-0">
+<div class="max-w-5xl mx-auto flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
+<h2 class="font-headline text-on-surface text-lg font-medium">Analyzing customer sentiment and escalating critical feedback to the team.</h2>
+</div>
+</div>
+<!-- Split Layout -->
+<div class="flex-1 overflow-hidden flex max-w-7xl w-full mx-auto">
+<!-- Spine (Left) -->
+<div class="w-1/3 border-r border-[#212631]/50 overflow-y-auto p-8 custom-scrollbar">
+<!-- Step 1: Finished -->
+<div class="relative pb-8 group cursor-pointer">
+<div class="step-line"></div>
+<div class="flex items-start gap-4">
+<div class="step-circle w-12 h-12 rounded-full border border-[#212631] bg-[#0D1117] flex items-center justify-center flex-shrink-0 text-tertiary-fixed-dim transition-colors group-hover:border-tertiary-fixed-dim/50">
+<span class="material-symbols-outlined" style="font-size: 20px;">check</span>
+</div>
+<div class="pt-3">
+<h3 class="font-body text-on-surface-variant text-sm font-medium">Retrieve Feedback</h3>
+</div>
+</div>
+</div>
+<!-- Step 2: Failed (Selected) -->
+<div class="relative pb-8 group cursor-pointer">
+<div class="step-line"></div>
+<div class="flex items-start gap-4">
+<!-- Active/Failed State styling -->
+<div class="step-circle w-12 h-12 rounded-full border border-error bg-[#1A0A0B] flex items-center justify-center flex-shrink-0 text-error">
+<img alt="Slack" class="w-5 h-5 opacity-80 filter brightness-200 sepia-100 hue-rotate-300 saturate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvLDWZTKq7RfkzXxR0xCFIwZpNLNW1Trt8iNqZJFxJ_VMZSHDAFR9aU0UZKgVmYob50TI2zlkT2PFlDqJLBER3LVPJWHYZxbQE20ErCIfGS2xGvfj3Nh5UGTSY2A-I4Hao8M2P7tJtm70-gyzlL52L33KzhWT_P3hlc9-8a94yOoTKtQ9tZ30f5MvZEmzI0dy6Z4GhN98XSyIenIGF09y_gjncpE6dIzH7Oa7p5PW_gYiy7654ABi66JFAhJgP-qLxcO5x3nVjkPnl"/>
+</div>
+<div class="pt-1 flex-1">
+<h3 class="font-headline text-error text-base font-bold">Post to Slack</h3>
+<p class="font-body text-on-surface-variant text-xs mt-1">Post a message</p>
+<!-- Inline Error -->
+<div class="mt-3 p-3 bg-error-container/10 border border-error/20 rounded-lg">
+<div class="flex gap-2 items-start text-error text-xs font-medium">
+<span class="material-symbols-outlined flex-shrink-0" style="font-size: 16px;">error</span>
+<span>Channel #urgent-alerts not found</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 3: Finished -->
+<div class="relative pb-8 group cursor-pointer">
+<div class="step-line"></div>
+<div class="flex items-start gap-4">
+<div class="step-circle w-12 h-12 rounded-full border border-[#212631] bg-[#0D1117] flex items-center justify-center flex-shrink-0 text-tertiary-fixed-dim transition-colors group-hover:border-tertiary-fixed-dim/50">
+<span class="material-symbols-outlined" style="font-size: 20px;">check</span>
+</div>
+<div class="pt-3">
+<h3 class="font-body text-on-surface-variant text-sm font-medium">Analyze Sentiment</h3>
+</div>
+</div>
+</div>
+<!-- Step 4: Running -->
+<div class="relative pb-8 group cursor-pointer">
+<div class="step-line"></div>
+<div class="flex items-start gap-4">
+<div class="step-circle w-12 h-12 rounded-full border border-primary/50 bg-[#0D1117] flex items-center justify-center flex-shrink-0 text-primary running-pulse">
+<!-- Placeholder Jira-ish icon using material symbol for aesthetic -->
+<span class="material-symbols-outlined" style="font-size: 20px;">bug_report</span>
+</div>
+<div class="pt-3 flex-1 flex justify-between items-center">
+<h3 class="font-body text-primary text-sm font-medium">Create Jira Issue</h3>
+<span class="material-symbols-outlined text-primary/70 animate-spin" style="font-size: 16px;">progress_activity</span>
+</div>
+</div>
+</div>
+<!-- Step 5: Not Started -->
+<div class="relative pb-8 group cursor-pointer">
+<div class="step-line"></div>
+<div class="flex items-start gap-4">
+<div class="step-circle w-12 h-12 rounded-full border border-[#212631]/50 bg-[#080B11] flex items-center justify-center flex-shrink-0 text-[#212631]">
+<span class="material-symbols-outlined" style="font-size: 20px;">database</span>
+</div>
+<div class="pt-3">
+<h3 class="font-body text-[#464651] text-sm font-medium">Update Database</h3>
+</div>
+</div>
+</div>
+<!-- Step 6: Not Started -->
+<div class="relative group cursor-pointer">
+<div class="step-line last"></div>
+<div class="flex items-start gap-4">
+<div class="step-circle w-12 h-12 rounded-full border border-[#212631]/50 bg-[#080B11] flex items-center justify-center flex-shrink-0 text-[#212631]">
+<span class="material-symbols-outlined" style="font-size: 16px;">more_horiz</span>
+</div>
+<div class="pt-3">
+<h3 class="font-body text-[#464651] text-sm font-medium">Send Summary</h3>
+</div>
+</div>
+</div>
+</div>
+<!-- Detail Panel (Right) -->
+<div class="w-2/3 bg-[#060A0F] overflow-y-auto p-8 relative">
+<!-- Breadcrumb / Context -->
+<div class="flex items-center gap-2 mb-6">
+<div class="w-8 h-8 rounded border border-[#212631] bg-[#0D1117] flex items-center justify-center">
+<img alt="Slack" class="w-4 h-4 opacity-70 grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5XsyQ5j4gN5waW2tD_Wm61hQOQImAnsEmhZ2vYbkk3_RNwDueBU73kNDT_P9FGGIUrjRCIYcnvBnYFgVDtvtiWK6FADglJMvZ4biEzr130r1ohMts5x8ci_tRYM1RWxoXGhuqGiE6WFVXwy7IUGie10a8DVs8-18zdPKB4YvUbVqUi6IYFTh-oJD27uCdrRRVPnv5hQlZJu6kGKfmhFAoqlkY7aJa_fv5jecbDPEAO8BvyslLyTNdFREm92FJ7tyrTckvGZJjqzje"/>
+</div>
+<div>
+<h2 class="font-headline text-xl font-bold text-on-surface">Post to Slack</h2>
+<p class="font-body text-sm text-on-surface-variant">Action: Post a message</p>
+</div>
+</div>
+<!-- Major Error Block -->
+<div class="border border-error/30 bg-error-container/5 rounded-lg p-6 mb-8 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-error mt-1" style="font-size: 24px;">report</span>
+<div>
+<h3 class="font-headline text-error text-lg font-bold mb-2">Authorization Failure</h3>
+<p class="font-body text-error/80 text-sm leading-relaxed">
+                                Channel <span class="font-mono bg-error/10 px-1 py-0.5 rounded">#urgent-alerts</span> could not be resolved in the connected workspace. Ensure the app is invited to the channel or that the channel name is correct.
+                            </p>
+</div>
+</div>
+</div>
+<!-- Payload Block -->
+<div class="mb-8">
+<h4 class="font-headline text-sm font-bold text-on-surface-variant mb-4 uppercase tracking-wider text-xs">Attempted Payload</h4>
+<div class="bg-[#0D1117] border border-[#212631] rounded-lg p-4">
+<pre class="font-mono text-xs text-on-surface-variant leading-relaxed">{
+  <span class="text-primary-fixed-dim">"channel"</span>: <span class="text-tertiary-fixed-dim">"#urgent-alerts"</span>,
+  <span class="text-primary-fixed-dim">"text"</span>: <span class="text-tertiary-fixed-dim">"Critical feedback received from User XYZ regarding payment failure. Escalating for immediate review."</span>,
+  <span class="text-primary-fixed-dim">"blocks"</span>: [
+    {
+      <span class="text-primary-fixed-dim">"type"</span>: <span class="text-tertiary-fixed-dim">"section"</span>,
+      <span class="text-primary-fixed-dim">"text"</span>: {
+        <span class="text-primary-fixed-dim">"type"</span>: <span class="text-tertiary-fixed-dim">"mrkdwn"</span>,
+        <span class="text-primary-fixed-dim">"text"</span>: <span class="text-tertiary-fixed-dim">"*Priority:* High\n*Sentiment:* Negative"</span>
+      }
+    }
+  ]
+}</pre>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-4 pt-4 border-t border-[#212631]/50">
+<button class="px-6 py-2.5 bg-primary text-on-primary font-label font-bold rounded hover:bg-primary-fixed-dim transition-colors duration-200">
+                        Retry Step
+                    </button>
+<button class="px-6 py-2.5 border border-[#212631] text-on-surface font-label font-medium rounded hover:bg-[#151B24] transition-colors duration-200">
+                        Skip Step
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #212631;
+            border-radius: 4px;
+        }
+    </style>
+</body></html>

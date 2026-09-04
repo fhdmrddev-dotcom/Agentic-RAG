@@ -94,6 +94,10 @@ STORED_ROW = {
     "org_id": ACTIVE_ORG,
     "created_by": CALLER_ID,
     "capability": "post_message",
+    # Phase 211 — `ConnectorConnectionResponse.service_id` is REQUIRED, so a stored row
+    # without it is a `ValidationError` at `_to_response` rather than a missing key. Migration
+    # 127 guarantees every real row carries one.
+    "service_id": "slack",
     "name": "#ops-alerts",
     "config": {"default_channel": "#ops-alerts"},
     "secret_ciphertext": SENTINEL_CIPHERTEXT,
@@ -384,6 +388,15 @@ async def test_a_FAILED_verdict_does_NOT_block_a_RUN(monkeypatch):
         # The stale verdict rides along on the resolved object too, so an executor that
         # wanted to consult it would not even need a second read.
         last_check_verdict="failed",
+        # ⚠ 213-06: a GRANTED capability. Gate 5.5 (Phase 213) now sits between the
+        # resolve and the dispatch, and a connection carrying no posture data at all
+        # resolves to `ask` — which, on an UNARMED drive like this one, fails closed.
+        # A real row cannot be in that state: migration 128 §3 backfills every capability
+        # row to `{capability: 'allow'}`. This fixture predates the column, so it is
+        # brought up to the shape a migrated row actually has. The property under test —
+        # that dispatch is REACHED — is unchanged.
+        tool_grants={"post_message": "allow"},
+        default_approval_posture="deny",
     )
 
     async def _resolver(*_a, **_kw):
@@ -842,3 +855,205 @@ class _RecordingSupabase:
     def execute(self):
         data = self._results.pop(0) if self._results else []
         return SimpleNamespace(data=data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 211 (T-211-13) · the THIRD shape reaches this route, and it must be NAMED
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def test_check_refuses_a_service_only_connection_by_name_never_by_raising(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """A SERVICE-ONLY row (CONN-08) has no adapter, so there is nothing to check.
+
+    ⚠ THIS ROUTE ALREADY HAS THIS EXACT HISTORY, ONE SHAPE OVER, AND THAT IS WHY THE CASE
+    EXISTS BEFORE THE 500 RATHER THAN AFTER IT. An MCP row's NULL ``capability`` reached
+    ``registry.get_adapter``, which raises a BARE ``KeyError`` for anything outside its closed
+    three-member set — a ``KeyError`` absent from this route's ``except`` ladder, so it escaped
+    as an unhandled **HTTP 500** on a control the shipped UI offered. Migration 127 introduces
+    a THIRD shape that arrives at the same two calls (``_check_destination`` then
+    ``get_adapter``) by the same door, with a NULL capability of its own.
+
+    ⚠ THE ADAPTER SEAM IS BOOBY-TRAPPED ON PURPOSE. ``get_adapter`` is patched to something
+    that EXPLODES if it is called at all, so this case cannot pass merely because an adapter
+    happened to tolerate the shape — it passes only if the refusal happens BEFORE the adapter
+    is reached. A 409 obtained after ``get_adapter`` ran would be the same status for a
+    different, worse reason.
+
+    ⚠ IT MUST NOT BE A 404. The row IS in the caller's org and IS listed in their table, so
+    "not found" would be a sentence that is not true about a row they can see — the identical
+    defect measured on the MCP shape in live UAT on 2026-08-25. Naming its STATE discloses
+    nothing across the tenant boundary, which is why 409 is the honest status.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    # No capability, no mcp_server_url, no secret — a row that names a service and nothing
+    # else. It is stored EXACTLY like this: migration 127 drops the shape CHECK that used to
+    # refuse it and requires only a non-blank `service_id` in its place.
+    async def _service_only_fetch(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "notion",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _service_only_fetch)
+
+    def _must_not_be_reached(_capability):
+        raise AssertionError(
+            "T-211-13: the check reached registry.get_adapter for a SERVICE-ONLY row. That "
+            "call raises a bare KeyError on a NULL capability and this route does not catch "
+            "it — the refusal must happen before it, not by surviving it."
+        )
+
+    monkeypatch.setattr("app.services.connectors.registry.get_adapter", _must_not_be_reached)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 409, (
+        f"a service-only row must be refused by NAME, got {res.status_code}: {res.text}"
+    )
+    detail = res.json()["detail"]
+    assert detail["reason_code"] == "nothing_to_check_yet", detail
+    # ⚠ SEPARATELY FALSIFIABLE FROM THE MCP ARM. Two shapes, two reason codes: an arm that
+    # absorbed both would make the two refusals indistinguishable to a client that has to word
+    # them differently, and would hide a regression in either.
+    assert detail["reason_code"] != "check_not_available_for_mcp", detail
+    # The row never had a server URL, so naming one would be a lie about its shape.
+    assert "mcp_server_url" not in res.text.lower(), res.text
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 221 plan 02 · the FOURTH shape — an OAuth row, whose credential is a TOKEN
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def test_check_reaches_the_oauth_arm_instead_of_refusing_a_connected_google_row(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """⭐ MEASURED 2026-09-01: this route REFUSED a working Google connection.
+
+    Every `oauth_byo` row in the database carries `capability = NULL` and
+    `mcp_server_url = NULL`, so a Google connection with a live, refreshable token fell into
+    the service-only refusal above and answered **409 "no way to reach it yet, so there is
+    no credential to check"** — about a connection that had just performed twenty-six tools.
+    The refusal's wording predates OAuth; the credential simply lives in `connector_tokens`
+    rather than in `secret_ciphertext`.
+
+    ⚠ THE DISCRIMINATOR IS THE PRESENCE OF A TOKEN ROW, not `auth_type` — which
+    `ResolvedConnection` does not even carry. A genuinely service-only row (the test above)
+    must keep its 409, and it does; the two cases are separately falsifiable on purpose.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    async def _google_oauth_row(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "google",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _google_oauth_row)
+
+    async def _token_status(connection_id, org_id, supabase=None):
+        return {
+            "account_email": "someone@example.com",
+            "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+        }
+
+    monkeypatch.setattr(connector_service, "get_oauth_token_status", _token_status)
+
+    async def _fresh(_connection_id):
+        return "ya29.fake"
+
+    # ⚠ PATCH THE ALIAS, NOT THE FUNCTION IT ALIASES. `oauth_refresh_service` binds
+    # `get_fresh_access_token = get_valid_oauth_token` at module scope, so patching the
+    # latter leaves the alias pointing at the real implementation — the first cut did that
+    # and made a REAL network call, which the route then correctly reported as
+    # `unreachable`. A patch that misses is worse than no patch: the test still ran green
+    # on the 200 and would have measured nothing about the happy path.
+    monkeypatch.setattr(
+        "app.services.oauth_refresh_service.get_fresh_access_token", _fresh, raising=False
+    )
+
+    async def _probe(_connection_id, _scopes):
+        return [
+            {"app": "drive", "state": "ready", "console_url": None},
+            {"app": "sheets", "state": "api_off", "console_url": "https://console.cloud.google.com/x"},
+        ]
+
+    monkeypatch.setattr(
+        "app.services.google.availability.probe_google_applications", _probe, raising=False
+    )
+
+    async def _record(connection_id, org_id, verdict, supabase=None):
+        return SimpleNamespace(last_checked_at="2026-09-01T00:00:00Z")
+
+    monkeypatch.setattr(connector_service, "record_check_verdict", _record)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 200, f"an OAuth row must be CHECKED, not refused: {res.text}"
+    body = res.json()
+    assert body["ok"] is True, body
+    assert body["identity"] == "someone@example.com", body
+    # ⚠ The per-application verdicts TRAVEL. Without this the arm could return a bare green
+    # check and the availability line would have nothing to render.
+    apps = {v["app"]: v["state"] for v in body["application_availability"]}
+    assert apps == {"drive": "ready", "sheets": "api_off"}, body
+
+
+def test_an_oauth_token_lookup_that_raises_still_refuses_by_name(
+    monkeypatch, mock_asyncpg_pool, mock_execute_result, router_client
+):
+    """⚠ THE REGRESSION THE SUITE ABOVE CAUGHT, PINNED AS ITS OWN CASE.
+
+    `get_oauth_token_status` performs its OWN org-scoped read and RAISES
+    `ConnectorNotFound` when that read comes back empty — it does not merely return `None`.
+    The first cut of the OAuth arm called it unguarded, which turned this route's honest 409
+    into an unhandled 500 for every row whose token read failed.
+
+    The rule this route is built on is in the neighbouring test's own name: it refuses **by
+    name, never by raising**. That property is one `try` away from being lost again, so it
+    gets a test rather than a comment.
+    """
+    _as_org_admin(monkeypatch, mock_asyncpg_pool)
+    _install_feature(monkeypatch, "everyone")
+
+    async def _service_only(connection_id: str, org_id: str):
+        return {
+            **STORED_ROW,
+            "org_id": org_id,
+            "capability": None,
+            "service_id": "notion",
+            "mcp_server_url": None,
+            "secret_ciphertext": None,
+            "config": {},
+        }
+
+    monkeypatch.setattr(connector_service, "_fetch_connection_row", _service_only)
+
+    async def _raises(connection_id, org_id, supabase=None):
+        raise connector_service.ConnectorNotFound("no connection")
+
+    monkeypatch.setattr(connector_service, "get_oauth_token_status", _raises)
+
+    res = router_client.post(
+        f"/connectors/connections/{CONNECTION_ID}/check", headers=_org_headers()
+    )
+
+    assert res.status_code == 409, (
+        f"a raising token lookup must still refuse by NAME, got {res.status_code}: {res.text}"
+    )
+    assert res.json()["detail"]["reason_code"] == "nothing_to_check_yet", res.text

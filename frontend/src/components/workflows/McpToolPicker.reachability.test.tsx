@@ -1,5 +1,6 @@
 /**
  * Phase 206.2-04 (SEED-200 / D-206.2-07 / D-206.2-12) — THE TWO-LEGGED REACHABILITY GUARD.
+ * Phase 211-04 (D-211-12 / T-211-23) — RE-POINTED AT THE NEW CHAIN, NEVER DELETED.
  *
  * ── THE TIER DISCIPLINE THIS FILE EXISTS TO ENFORCE ──
  *
@@ -12,7 +13,7 @@
  *
  *  T2 — LEG (a) below: an import-graph sweep. It proves an import EDGE exists and cannot
  *       prove anything about the PROPS that travel it.
- *       ⚠ AND IT WAS GREEN AT THIS PHASE'S BASE, AGAINST THE DEFECT — `ConnectionPicker.tsx`
+ *       ⚠ AND IT WAS GREEN AT 206.2's BASE, AGAINST THE DEFECT — `ConnectionPicker.tsx`
  *       already imported and already mounted the component while the feature was
  *       unreachable. *A guard satisfied by the defect it was written to catch is worse than
  *       no guard, because it reads as coverage.* Leg (a) is the cheap third leg, never the
@@ -21,11 +22,41 @@
  *  T3 — LEG (b) below: the data path. The PRODUCTION parent, a real store, only `@/lib/api`
  *       mocked, and NOT ONE `McpToolPicker` PROP CONSTRUCTED ANYWHERE IN THIS FILE. The only
  *       thing supplied is the WIRE RESPONSE. ⚠ THIS IS THE LEG THAT WOULD HAVE FAILED BEFORE
- *       THIS PHASE, and it was OBSERVED RED against the pre-phase read before being trusted
- *       (the counterfactual and its md5 restoration are recorded in `206.2-04-SUMMARY.md`).
+ *       206.2, and it was OBSERVED RED against the pre-phase read before being trusted.
  *
  * ⚠ A FUTURE EDITOR WHO DELETES LEG (b) HAS DELETED THE GUARD. Leg (a) alone is vacuous, and
  * it will keep saying so in green.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════
+ * ⚠ 211-04 — FOUR MECHANICAL CONSEQUENCES, EACH HANDLED BY NAME RATHER THAN BY DELETION.
+ *
+ *  1. `pressMcpShape()` STOPPED WORKING. It pressed the SECOND of exactly two shape segments
+ *     and asserted there were two; there are none. Replaced by `bindRow()`, which drives the
+ *     NEW chain: render, wait for the ONE unscoped read, then bind a row on
+ *     `connection-picker-select`. The file's defining property is preserved — NOT ONE
+ *     `McpToolPicker` PROP IS CONSTRUCTED HERE, still asserted mechanically against this
+ *     file's own `?raw` source. ⚠ The deleted control's test id is spelled NOWHERE in this
+ *     file, which is itself an acceptance sweep of this plan.
+ *
+ *  2. ⭐ "POSITIVE CONTROL 2" IS **INVERTED**. It asserted that a bound CAPABILITY row mounts
+ *     NO tool picker — which was true only because the mount was conditional on the row's own
+ *     server URL rather than on having got this far. THAT IS THE DEFECT THIS PHASE REMOVES,
+ *     and a control that stays green while the criterion is false is worse than no control.
+ *     Its old and new assertions are both quoted in `211-04-SUMMARY.md`.
+ *
+ *  3. "POSITIVE CONTROL" NEEDED A NEW FALSIFICATION. It stripped `mcp_server_url` from
+ *     `MCP_ROW` and asserted the row was never OFFERED — which relied on the client-side
+ *     shape filter 211-04 deletes, so under the new model that row IS offered and the old
+ *     form became UNFALSIFIABLE. Re-pointed at an EMPTY wire response, which still yields
+ *     `connection-picker-empty` with its reason and no `mcp-tool-select`. ⚠ Deleting it
+ *     instead would have left leg (b) without a falsification, i.e. the vacuous leg (a) this
+ *     file warns about.
+ *
+ *  4. THE TWO CAPABILITY-ARM CASES asserted the read carries a capability, and that the
+ *     capability shape's exclusion of an MCP row is the SERVER's. Both are obsolete BY
+ *     DESIGN — there is one unscoped read and no exclusion. Replaced by the single
+ *     zero-argument assertion plus the same-list cross-shape case.
+ * ═══════════════════════════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
@@ -56,10 +87,13 @@ import { createBuilderStore, type BuilderStore } from "./builderStore"
 const SLUG = "notify-owner"
 
 /** The WIRE shape of an MCP row, exactly as `GET /connectors/connections` returns it —
- *  `capability` is NULL, which is the single fact that made this whole surface unreachable. */
+ *  `capability` is NULL, which is the single fact that made this whole surface unreachable
+ *  before 206.2. ⚠ `service_id` is REQUIRED since 211-02, and migration 127 guarantees a
+ *  non-blank value on every row on disk. */
 const MCP_ROW: Record<string, unknown> = {
   id: "conn-deepwiki",
   org_id: "org-1",
+  service_id: "mcp.deepwiki.com",
   capability: null,
   name: "DeepWiki",
   config: {},
@@ -73,15 +107,52 @@ const MCP_ROW: Record<string, unknown> = {
   ],
 }
 
-/** A capability row, for the cross-shape negatives. */
+/**
+ * A capability row — and ⚠ 211-04 GAVE IT A `discovered_tools` OF ONE ELEMENT, IN THE
+ * DESCRIPTOR'S REAL SHAPE. This is what migration 127 §2b writes and what the live local
+ * database was verified to hold at this plan's dispatch (length 1 on BOTH capability rows).
+ * The descriptor's `name` IS the capability, which is what lets ONE action list serve both
+ * shapes without inventing a third concept.
+ */
 const SLACK_ROW: Record<string, unknown> = {
   id: "conn-slack",
   org_id: "org-1",
+  service_id: "slack",
   capability: "post_message",
   name: "#ops-alerts",
   config: { default_channel: "ops-alerts" },
   is_enabled: true,
   last_check_verdict: "ok",
+  tool_grants: {},
+  discovered_tools: [
+    {
+      name: "post_message",
+      title: "Post message",
+      description: "Post one plain-text message to the channel configured on this connection.",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text"],
+        properties: { text: { type: "string" } },
+      },
+    },
+  ],
+}
+
+/**
+ * ⭐ 211-04 · VALIDATION.md's WAVE-0 FIXTURE OBLIGATION — the LEGACY row that did not exist
+ * anywhere in this phase's fixtures until now: a capability set, NO server URL, and an EMPTY
+ * action list. It is the shape a row carried BEFORE migration 127 §2b, and the shape a failed
+ * descriptor write still produces. Reached through the production chain like every other row
+ * in this file.
+ */
+const LEGACY_EMPTY_ROW: Record<string, unknown> = {
+  ...SLACK_ROW,
+  id: "conn-jira-legacy",
+  service_id: "jira",
+  capability: "create_ticket",
+  name: "Northwind Jira",
+  discovered_tools: [],
 }
 
 function draftedStore(config: Record<string, unknown> = {}): BuilderStore {
@@ -102,7 +173,7 @@ function draftedStore(config: Record<string, unknown> = {}): BuilderStore {
  * THE PRODUCTION CHAIN, ASSEMBLED THE WAY THE PANEL ASSEMBLES IT.
  *
  * ⚠ The section is mounted, never the picker and never the tool picker. Everything below the
- * section is reached the way an author reaches it: by pressing a control.
+ * section is reached the way an author reaches it: by operating a control.
  */
 function renderChain(rows: Record<string, unknown>[], capability = "") {
   const store = draftedStore()
@@ -110,28 +181,29 @@ function renderChain(rows: Record<string, unknown>[], capability = "") {
   const view = render(
     <BuilderStoreProvider store={store}>
       <SelectedPhaseSlugProvider slug={SLUG}>
-        <ExternalActionSection
-          capability={capability}
-          toolName=""
-          onChange={(value) => {
-            store.getState().patchConfig(SLUG, { capability: value })
-          }}
-          onChangeShape={(patch) => {
-            store.getState().patchConfig(SLUG, patch)
-          }}
-          onPersist={() => store.getState().flushHistory()}
-        />
+        {/* ⚠ 214-07 — THREE PROPS CAME OFF THIS CALL and their handlers went with them. They
+            had been dead since 211-04 (the section calls none of them; `ConnectionPicker`
+            owns every write on this surface), so what this chain renders is unchanged. The
+            handlers are NOT re-created as no-ops: a stub for a seam that no longer exists
+            would be a fiction this file would then carry forward. */}
+        <ExternalActionSection capability={capability} toolName="" />
       </SelectedPhaseSlugProvider>
     </BuilderStoreProvider>,
   )
   return { store, ...view }
 }
 
-/** Press the SECOND shape segment — *a tool on an MCP server*. */
-function pressMcpShape() {
-  const segments = screen.getAllByTestId("external-action-shape-option")
-  expect(segments).toHaveLength(2)
-  fireEvent.click(segments[1])
+/**
+ * ⭐ 211-04 — THE REPLACEMENT FOR `pressMcpShape()`. The author's route to the action card is
+ * now: the section renders the picker unconditionally → the ONE unscoped read settles → a row
+ * is bound on the picker's own `<select>`. No shape is pressed, because there is no shape
+ * question. Nothing is CONSTRUCTED here either — the id handed to the select comes from the
+ * WIRE RESPONSE, which is the only thing this file supplies.
+ */
+async function bindRow(id: string) {
+  const select = (await screen.findByTestId("connection-picker-select")) as HTMLSelectElement
+  fireEvent.change(select, { target: { value: id } })
+  return select
 }
 
 beforeEach(() => {
@@ -143,27 +215,24 @@ beforeEach(() => {
 // LEG (b) — THE DATA PATH. The one that would have failed.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
-describe("LEG (b) · the MCP tool picker is reachable through the PRODUCTION chain", () => {
-  it("⭐ the MCP read is issued with NO ARGUMENT — the single line SEED-200 is about", async () => {
+describe("LEG (b) · the action card is reachable through the PRODUCTION chain", () => {
+  it("⭐ the read is issued with NO ARGUMENT — SEED-200's line, now on the ONLY arm", async () => {
     // ⚠ THIS ASSERTION IS THE PHASE. The shipped read passed a capability; an MCP row's
     // capability is NULL; so an MCP connection was filtered out of every read this picker
-    // ever performed, the `bound?.mcp_server_url` mount could never be true, and every green
-    // test above tier 3 was describing a component nothing could reach.
+    // ever performed. 206.2 fixed that for ONE of two arms; 211-04 removes the second arm
+    // entirely, so there is no configuration in which an argument is passed.
     //
     // `toHaveBeenCalledWith()` with ZERO ARGUMENTS is not the same as not caring: a call
     // carrying `undefined` explicitly, or carrying a capability, both fail it.
     renderChain([MCP_ROW, SLACK_ROW])
-    pressMcpShape()
     await waitFor(() => expect(listMock).toHaveBeenCalled())
     expect(listMock).toHaveBeenCalledWith()
+    for (const call of listMock.mock.calls) expect(call).toEqual([])
   })
 
-  it("⭐ …and the tool picker REACHES THE DOM, mounted by nothing this file wrote", async () => {
+  it("⭐ …and the action card REACHES THE DOM, mounted by nothing this file wrote", async () => {
     renderChain([MCP_ROW])
-    pressMcpShape()
-    const select = (await screen.findByTestId("connection-picker-select")) as HTMLSelectElement
-    // Binding is the author's act, driven as the author drives it.
-    fireEvent.change(select, { target: { value: "conn-deepwiki" } })
+    await bindRow("conn-deepwiki")
     await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
     const toolSelect = screen.getByTestId("mcp-tool-select") as HTMLSelectElement
     const options = Array.from(toolSelect.options).map((o) => o.value)
@@ -171,69 +240,100 @@ describe("LEG (b) · the MCP tool picker is reachable through the PRODUCTION cha
     expect(options).toContain("ask_question")
   })
 
-  it("POSITIVE CONTROL — strip the server URL from the WIRE ROW and the whole surface disappears", async () => {
-    // A real falsification, not a regex smoke test: the same chain, the same press, ONE field
-    // changed on the response. If this were green too, the case above would be proving that a
-    // div exists rather than that a data path produces it.
-    //
-    // ⚠ AND THE FIRST DRAFT OF THIS CONTROL WAS WRONG, WHICH IS WHY IT IS WORDED THIS WAY. It
-    // tried to bind the stripped row and assert the tool picker was absent; the row is never
-    // OFFERED, because the MCP arm's own shape filter drops it before the list is built. The
-    // observable consequence is one step earlier — the field reads EMPTY, and names the
-    // absence rather than showing a bindable choice.
-    renderChain([{ ...MCP_ROW, mcp_server_url: null }])
-    pressMcpShape()
+  it("POSITIVE CONTROL — an EMPTY wire response yields the empty reading and no card", async () => {
+    // ⚠ RE-FALSIFIED BY 211-04. The shipped form stripped the server URL from `MCP_ROW` and
+    // asserted the row was never OFFERED — which relied on the MCP arm's client-side shape
+    // filter dropping it before the list was built. That filter is deleted, so a URL-less row
+    // IS offered now and the old assertion became unfalsifiable rather than merely wrong.
+    // What is still real: with nothing in the response there is nothing to bind, so the field
+    // names the absence and no card can appear.
+    renderChain([])
     const empty = await screen.findByTestId("connection-picker-empty")
     expect(empty).toHaveAttribute("data-empty-reason", "none")
     expect(screen.queryByTestId("connection-picker-select")).not.toBeInTheDocument()
     expect(screen.queryByTestId("mcp-tool-picker")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("mcp-tool-select")).not.toBeInTheDocument()
   })
 
-  it("POSITIVE CONTROL 2 — on the CAPABILITY shape a bound row mounts NO tool picker", async () => {
-    // The other half of the same falsification: the chain reaches a BOUND connection and the
-    // tool picker still does not appear, because the mount is conditional on the row's own
-    // server URL rather than on having got this far.
+  it("⭐ POSITIVE CONTROL 2 (INVERTED) — a bound CAPABILITY row DOES mount the card", async () => {
+    // ⚠ THIS CASE USED TO ASSERT THE OPPOSITE, AND IT USED TO PASS. Its shipped text was
+    // *"on the CAPABILITY shape a bound row mounts NO tool picker"*, justified as *"the mount
+    // is conditional on the row's own server URL rather than on having got this far"*. THAT
+    // CONDITION IS THE DEFECT D-211-12 removes: it is why plan 211-01's descriptors and plan
+    // 211-02's backfill had no surface able to display them.
+    //
+    // A control that stays green while the criterion is false is worse than no control, so it
+    // is INVERTED rather than deleted — it now fails if the defect returns.
     renderChain([SLACK_ROW], "post_message")
-    const select = (await screen.findByTestId("connection-picker-select")) as HTMLSelectElement
-    fireEvent.change(select, { target: { value: "conn-slack" } })
+    await bindRow("conn-slack")
     await waitFor(() =>
       expect(screen.getByTestId("connection-picker")).toHaveAttribute("data-state", "bound"),
     )
-    expect(screen.queryByTestId("mcp-tool-picker")).not.toBeInTheDocument()
+    expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument()
+    const toolSelect = screen.getByTestId("mcp-tool-select") as HTMLSelectElement
+    // …and it lists the row's OWN action, by the descriptor's own words.
+    expect(Array.from(toolSelect.options).map((o) => o.value)).toContain("post_message")
+    expect(screen.getByText("Post message")).toBeInTheDocument()
   })
 
-  it("the CAPABILITY shape still calls the read WITH its capability — both arms, one file", async () => {
-    // The counterpart assertion, in the same file on purpose: the no-argument call above is
-    // only meaningful beside a call that DOES carry one. A single arm proves the read fires;
-    // two arms prove the read fires DIFFERENTLY, which is the change wave 2 made.
-    renderChain([SLACK_ROW], "post_message")
-    await waitFor(() => expect(listMock).toHaveBeenCalledWith("post_message"))
-    expect(listMock).not.toHaveBeenCalledWith()
+  it("⭐ THE LEGACY-EMPTY ROW — card, sentence and Refresh, through the production chain", async () => {
+    // ⭐ VALIDATION.md's Wave-0 fixture obligation, and T-211-22's parent-side proof: the
+    // state whose only remedy would have been a control that state hid. Reached the way an
+    // author reaches it, with nothing constructed.
+    renderChain([LEGACY_EMPTY_ROW])
+    await bindRow("conn-jira-legacy")
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-picker")).toBeInTheDocument())
+    expect(screen.getByTestId("mcp-no-tools")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-discover-btn")).toBeEnabled()
+    expect(screen.queryByTestId("mcp-tool-select")).not.toBeInTheDocument()
   })
 
-  it("CROSS-SHAPE NEGATIVE — the MCP shape lists no capability row", async () => {
-    renderChain([MCP_ROW, SLACK_ROW])
-    pressMcpShape()
-    const select = (await screen.findByTestId("connection-picker-select")) as HTMLSelectElement
-    const labels = Array.from(select.options).map((o) => o.textContent ?? "")
+  it("⭐ CROSS-SHAPE — both shapes are in the SAME list, from ONE read", async () => {
+    // ⚠ REPLACES `CROSS-SHAPE NEGATIVE — the MCP shape lists no capability row`, which
+    // asserted a SEPARATION this phase deliberately removes, and the two capability-arm cases
+    // that pinned the read as carrying a capability. One list, one read, every shape.
+    renderChain([MCP_ROW, SLACK_ROW, LEGACY_EMPTY_ROW])
+    await screen.findByTestId("connection-picker-select")
+    const labels = screen
+      .getAllByTestId("connection-picker-option")
+      .map((o) => o.textContent ?? "")
     expect(labels.some((l) => l.includes("DeepWiki"))).toBe(true)
-    expect(labels.some((l) => l.includes("#ops-alerts"))).toBe(false)
+    expect(labels.some((l) => l.includes("#ops-alerts"))).toBe(true)
+    expect(labels.some((l) => l.includes("Northwind Jira"))).toBe(true)
+    expect(listMock).toHaveBeenCalledTimes(1)
   })
 
-  it("⚠ the capability shape's exclusion of an MCP row is the SERVER's, and that is stated not assumed", async () => {
-    // ⚠ THE OBVIOUS NEGATIVE HERE IS UNSATISFIABLE AND SAYING SO IS THE HONEST MOVE. The
-    // capability arm applies exactly ONE client-side filter (`is_enabled`) and relies on the
-    // server's `?capability=` query for the rest — so feeding an MCP row into the response
-    // and then asserting it is not listed would be measuring a filter that does not exist,
-    // and it would fail. What CAN be measured on this side is the argument that makes the
-    // server exclude it, plus the shape switch that re-issues the read.
-    renderChain([SLACK_ROW], "post_message")
-    await waitFor(() => expect(listMock).toHaveBeenCalledWith("post_message"))
-    const select = (await screen.findByTestId("connection-picker-select")) as HTMLSelectElement
-    expect(Array.from(select.options).some((o) => (o.textContent ?? "").includes("#ops-alerts"))).toBe(true)
-    // …and pressing the MCP segment re-asks WITHOUT the capability, which is the client half.
-    pressMcpShape()
-    await waitFor(() => expect(listMock).toHaveBeenCalledWith())
+  it("⭐ THE ACTION WRITE LANDS IN THE FIELD THE EXECUTOR READS, through the chain", async () => {
+    // Two shapes, two fields, never both — driven end to end rather than at the leaf.
+    const capability = renderChain([SLACK_ROW])
+    await bindRow("conn-slack")
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "post_message" } })
+    const capConfig = capability.store.getState().phases[0].config as unknown as Record<string, unknown>
+    expect(capConfig.capability).toBe("post_message")
+    expect(capConfig.tool_name).toBeUndefined()
+    capability.unmount()
+
+    const mcp = renderChain([MCP_ROW])
+    await bindRow("conn-deepwiki")
+    await waitFor(() => expect(screen.getByTestId("mcp-tool-select")).toBeInTheDocument())
+    fireEvent.change(screen.getByTestId("mcp-tool-select"), { target: { value: "ask_question" } })
+    const mcpConfig = mcp.store.getState().phases[0].config as unknown as Record<string, unknown>
+    expect(mcpConfig.tool_name).toBe("ask_question")
+    expect(mcpConfig.capability).toBeUndefined()
+  })
+
+  it("⭐ NO VERB IS OFFERED AS A CATEGORY ANYWHERE IN THE CHAIN (SC#3)", async () => {
+    // The section's own suite asserts this against the leaf. Here it is asserted against the
+    // ASSEMBLED surface, because a category could in principle be reintroduced by a child.
+    renderChain([MCP_ROW, SLACK_ROW])
+    await screen.findByTestId("connection-picker-select")
+    // ⚠ ASSERTED BY ROLE, NEVER BY THE DELETED TEST IDS. The ids are swept out of this file
+    // entirely (see the docblock); what must not come back is the QUESTION, and a future
+    // control could reintroduce it under any id at all. `ExternalActionSection.test.tsx`
+    // keeps the id-level negative against the leaf.
+    expect(screen.queryAllByRole("radiogroup")).toHaveLength(0)
+    expect(screen.queryAllByRole("radio")).toHaveLength(0)
   })
 
   it("⚠ NO COMPONENT PROP IS CONSTRUCTED IN THIS FILE — leg (b)'s defining property", async () => {
@@ -244,16 +344,32 @@ describe("LEG (b) · the MCP tool picker is reachable through the PRODUCTION cha
     expect(self.length).toBeGreaterThan(2000)
     // ⚠ THE NEEDLE IS ASSEMBLED AT RUNTIME. Spelling it whole would make this file contain
     // the very token it counts and the assertion would fail against itself — the 187-24 trap,
-    // which has now fired thirteen times in this tree.
+    // which has now fired fourteen times in this tree.
     const propNeedle = "connection" + "={"
     expect(self.split(propNeedle).length - 1).toBe(0)
     // A POSITIVE CONTROL for the needle, so a typo cannot pass as a clean sweep.
     expect(("<X " + propNeedle + "row} />").split(propNeedle).length - 1).toBe(1)
   })
+
+  it("⚠ THE OLD SHAPE HELPER CANNOT COME BACK — its id is swept out of this file entirely", () => {
+    // `pressMcpShape()` pressed a control that no longer exists, and this file's whole
+    // account of the old chain has been rewritten rather than left describing it.
+    //
+    // ⚠ BOTH NEEDLES ARE ASSEMBLED AT RUNTIME, AND BOTH HAD TO BE: a `?raw` self-read makes
+    // any spelled-out literal part of the very source being swept, so each arm of this case
+    // fired the 187-24 trap in turn on its first run before being narrowed. The first draft
+    // even kept the id in a NEGATIVE query and in the docblock, and the sweep counted both.
+    const idNeedle = "external-action-" + "shape-option"
+    expect(selfSource).not.toContain(idNeedle)
+    expect(selfSource).not.toMatch(/function\s+pressMcpShape/)
+    // POSITIVE CONTROLS — both needles really can match.
+    expect('data-testid="external-action-' + 'shape-option"').toContain(idNeedle)
+    expect("function " + "pressMcpShape() {}").toMatch(/function\s+pressMcpShape/)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
-// LEG (a) — THE IMPORT GRAPH. The cheap third leg. ⚠ GREEN AT THIS PHASE'S BASE.
+// LEG (a) — THE IMPORT GRAPH. The cheap third leg. ⚠ GREEN AT 206.2's BASE.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
 /** Production source only — a fence that swept its own test files would red on itself.
