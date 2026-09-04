@@ -37,11 +37,48 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 230 — The Durable Ingestion Queue (PLANNED 2026-09-05, ready for Claude pre-flight) · 229 complete
+Phase: 230 — The Durable Ingestion Queue (EXECUTED by Gemini, reviewer verdict **REVISE**) · 229 complete
 Prior: 229 — The One Ingest Splice
-Plan: 230-01..05 planned; 230-SEAM-AUDIT.md, 230-VALIDATION.md ready for reviewer pre-flight (BUS-109 answered; BUS-110 opened for G-2 sketch)
-Status: 🟡 IN PROGRESS — discuss + plan complete across 5 plans (230-01..05), cross-plan seam audit with mechanical field derivation table committed, validation matrix ready.
-Last activity: 2026-09-05 — Phase 230 discussed and planned (Gemini). Awaiting Claude pre-flight.
+Plan: 230-01..05 all executed (`010bc2f71`). `230-VERIFICATION.md` written by the reviewer — Gemini shipped none.
+Status: 🔴 REVISE — 2 blocking, 2 corrections owed. Posted to Gemini on **BUS-113**; inherited fence to operator on **BUS-114**.
+Last activity: 2026-09-05 — Phase 230 verified by DRIVING (Claude). See `230-VERIFICATION.md`.
+
+### Phase 230 reviewer verdict (2026-09-05, Claude — DRIVEN, not read)
+
+✅ **Passes, all re-measured:** backend **71 failed / 3526 passed / 0 collection errors** (at the
+ceiling, **+29 passing**) · 230's own 5 suites **28/28** · **migration 153 is LIVE** (table, RLS,
+4 indexes incl. `idx_ingestion_jobs_stale`, 0 job rows, 77 completed docs) · drift **0** ·
+CLAUDE.md **107,501**.
+
+⭐ **Pre-flight G-1 is genuinely closed** — the finding that mattered. `run_stale_sweep()` is called
+**before** `start()` in the `main.py` lifespan, so `claimed_at` is now READ, not merely written.
+
+⛔ **BLOCKING 1 — the paused strip renders nothing, in the exact state this phase introduces.**
+230 widened `Document["status"]` with `"paused"`; `segmentState()` (`IngestionStrip.tsx:90`) is an
+exhaustive switch with **no paused arm and no default** → TS2366 → `SEGMENT_CLASS[undefined]` → every
+segment renders with no state class and no `data-state`. Mounted at `DocumentRow.tsx:394`.
+⚠ `IngestionStrip.tsx` is **byte-unchanged** by 230 — the break is REMOTE, caused by the widening.
+
+⛔ **BLOCKING 2 — count gate red (`failed 3`), one NEW.** Filenames taken from the gate's persisted
+JSON **before** any re-run, then each classified by running it in a worktree at `e243a0142`:
+`LibraryPage.test.tsx` **passes at base, fails at HEAD** (the batch lane repeats the filename of the
+row beneath it) = 230's. The two `IngestionStrip` fence failures **fail identically at base** =
+inherited. ⚠ **None is a SEED-171 flake; the cap was neither adjusted nor needed.**
+
+⚠ **Corrections owed:** `tsc` **66 → 68** — the baseline was **re-measured in a worktree**, not read
+from the doc, and both new errors are 230's · **SC#2's "max 3 concurrent" is a per-process
+`asyncio.Semaphore` against `WORKER_COUNT=2`, so the shipped global cap is 6.** The code comment says
+"per worker" honestly; the criterion and its test do not.
+
+⏸ **SC#1's behavioural half is NOT driven** and `230-VERIFICATION.md` does not claim it is. Conditions
+are ideal now (**77 completed / 0 jobs**) — any row left in `processing` after a drive is provably
+this phase's. Needs operator go-ahead to kill the running backend mid-batch.
+
+ℹ️ **`IngestionStrip`'s ordered fence has been RED since before Phase 229** (`documents.py` has **7**
+distinct `ingestion_step` writes; the fence asserts exactly 6). ⚠ **The miss has a reusable cause:**
+`229-VERIFICATION.md` reasoned *"frontend untouched, so the vitest gate cannot be affected"* — and that
+is **unsound here**, because the suite imports `backend/app/api/documents.py?raw`. A backend-only diff
+CAN red the frontend gate. Routed to the operator on **BUS-114**.
 
 
 
