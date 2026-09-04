@@ -37,11 +37,29 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 228 — v3.9 Closeout: The Debt Gets a Number (complete)
-Plan: 228-01..04
+Phase: 229 — The One Ingest Splice (STARTED 2026-09-05, briefed to Gemini on BUS-106)
+Plan: 228-01..04 complete; 229 not yet planned
 Status: ✅ **COMPLETE** — executed, reviewer-verified, both corrections APPLIED (`7199fc144`). ⚠ **4 passed / 1 BLOCKED** — `DEBT-03` is not closed and must not be read as closed.
 Last activity: 2026-09-04 — Phase 228 executed and independently verified (Gemini built, Claude pre-flighted + verified). Full schema regenerated, verification debt audited in 228-VERIFICATION.md, resume/continue resolved, subdomain routing configured, and backend unit baseline gate enforced.
 
+
+
+### Phase 229 — pre-planning obligation DISCHARGED (2026-09-05, Claude)
+
+The roadmap required *"Drive `import_connection_file` ONCE before planning — the schema mismatch is
+verified but the runtime error mode is not, and *'this route currently does nothing'* is an ASSUMPTION
+until it is driven."* **Driven.** The exact `doc_row` dict from `connectors.py:1705-1716` was replayed
+through the real `supabase-py` client:
+
+```
+PGRST204 — "Could not find the 'storage_path' column of 'documents' in the schema cache"
+```
+
+⭐ **PostgREST rejects at the FIRST unknown key**, so the `file_path NOT NULL` violation (`23502`) is
+**never reached** — the two candidate error modes were not equally likely, and it is the column one.
+Because `aexec` raises at `:1718`, `background_tasks.add_task(_upload_pipeline, ...)` at `:1722`
+**never runs**. ✅ **CONFIRMED: ATTACH-01 has never imported a single file; the caller gets a 500.**
+So Phase 229's SC#1 is a real user-visible fix, not a theoretical one. **Gemini must not re-derive this.**
 
 ### Phase 228 verification (2026-09-04, Claude — RE-RUN, not read)
 
