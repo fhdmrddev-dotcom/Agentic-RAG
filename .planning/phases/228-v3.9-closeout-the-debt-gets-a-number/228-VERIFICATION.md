@@ -2,8 +2,8 @@
 phase: 228-v3.9-closeout-the-debt-gets-a-number
 artifact: VERIFICATION
 date: 2026-09-04
-status: passed
-score: 5/5 DEBT requirements verified
+status: passed_with_blocked
+score: 4 passed / 1 blocked
 independent_verifier_absent_for: ["DEBT-03 /code-review ultra (blocked on operator)"]
 ---
 
@@ -23,8 +23,8 @@ independent_verifier_absent_for: ["DEBT-03 /code-review ultra (blocked on operat
 | Requirement | Description | Status | Evidence Summary |
 |---|---|---|---|
 | **DEBT-01** | Owed v3.9 verification reconciliation & schema regeneration | ✅ **PASS** | `supabase/full-schema.sql` regenerated (6582 lines, clean). All owed rows across Phases 210, 211, 214, 217 accounted for with concrete verdicts (`PASS`, `⛔ BLOCKED`, or `RE-DEFERRED`). Zero rows omitted. |
-| **DEBT-02** | Resume vs Continue UX & State Recovery | ✅ **PASS** | `BUG-260818-01`, `-02`, `-03`, and `BUG-260823-02` resolved and verified clean. `BUG-260823-03` and `-04` re-deferred with explicit triggers. Covered by `MessageItem.retry.test.tsx`, `MessageItem.capPaused.test.tsx`, and `test_228_cap_paused_reconcile.py`. |
-| **DEBT-03** | OAuth state rework review disposition & Redis outage resilience | ✅ **PASS** | Redis outage wrapped with 307 redirect to `/app?connections=1&oauth_error=redis_unavailable` (`test_228_oauth_redis_resilience.py` 10/10 passed). `/code-review ultra` recorded as operator-blocked. |
+| **DEBT-02** | Resume vs Continue UX & State Recovery | ✅ **PASS** | `BUG-260818-01`, `-02`, `-03`, and `BUG-260823-02` resolved and verified clean. `BUG-260823-03` and `-04` re-deferred with explicit triggers. Covered by `MessageItem.retry.test.tsx`, `MessageItem.capPaused.test.tsx`, and `test_228_cap_paused_reconcile.py`. (See note re: 0 live DB cap_paused rows). |
+| **DEBT-03** | OAuth state rework review disposition & Redis outage resilience | ⛔ **BLOCKED** | **Operator review (`/code-review ultra review-base-225`) never ran** (user-triggered, billed). Re-open trigger: credits available before v3.9 production push. Redis outage callback hardening delivered (`test_228_oauth_redis_resilience.py` 10/10 passed). |
 | **DEBT-04** | Subdomain routing (`app.<domain>`), CORS, and deployment config | ✅ **PASS** | `frontend/vercel.json` host-scoped rewrites, non-looping 308 redirects, backend `primary_frontend_origin()`, `docker-compose.prod.yml`, `docs/OPERATOR.md`. 6/6 tests passed in `vercelRouting.test.ts`. `check-deploy-drift.sh` passes with 0 drift. |
 | **DEBT-05** | Canonical backend unit test baseline gate | ✅ **PASS** | `scripts/check-backend-unit-baseline.cjs` strictly enforces `failed <= 71`, `errors == 0`. Canonical run reproduces exactly `71 failed, 3497 passed, 0 collection errors`. |
 
@@ -129,24 +129,26 @@ independent_verifier_absent_for: ["DEBT-03 /code-review ultra (blocked on operat
 5. **`BUG-260823-03` (KB search pronoun self-containment):** 🔄 **RE-DEFERRED**. *Trigger: Evaluated during canvas graph node interactions in Phase 231.*
 6. **`BUG-260823-04` (runAnswer picks llm_emit status line):** 🔄 **RE-DEFERRED**. *Trigger: Investigated during harness output formatting sweep in Phase 234.*
 
-### 3.2 Automated Suite Coverage
+### 3.2 Automated Suite Coverage & Honesty Disclosure
 - `frontend/src/components/chat/__tests__/MessageItem.retry.test.tsx` (4 tests): Verified "Retry turn" rendering and callback invocations.
 - `frontend/src/components/chat/__tests__/MessageItem.capPaused.test.tsx` (5 tests): Verified `cap_paused` Continue card render, continue count cap, and workflow lock.
 - `backend/tests/test_228_cap_paused_reconcile.py` (G-9 integration test): Verified real serializer serialization of `cap_paused` thread state with `latest_producer_run_id`.
+- ⚠ **Honesty Disclosure (Reconcile Execution):** The reconcile branch has never executed against real data — the local development database holds zero `cap_paused` rows (status distribution: completed 1274 / failed 161 / cancelled 56 / timed_out 7 / streaming 1). The G-9 serializer test (`test_228_cap_paused_reconcile.py`) proves the wire contract, and component suites prove UI state restoration, but no end-to-end run has actually cap-paused live.
 
 ---
 
 ## 4. DEBT-03: OAuth State Rework & Resilience
 
-### 4.1 Redis Outage Hardening
+### 4.1 Verdict: ⛔ BLOCKED (operator — /code-review ultra never ran)
+- **Requirement:** `/code-review ultra review-base-225 runs` on the OAuth state rework.
+- **Status:** ⛔ **BLOCKED ON OPERATOR**.
+- **Reason:** `/code-review ultra` is a user-triggered, cloud-billed multi-agent review that cannot be launched autonomously by an agent.
+- **Re-open Trigger:** *Trigger: Operator runs `/code-review ultra` when credits are available before the v3.9 production push.*
+
+### 4.2 Redis Outage Hardening (Delivered Work)
 - **Implementation:** Wrapped Redis state lookups in `backend/app/api/connectors.py::oauth_callback` with try/except catching `redis.exceptions.RedisError`, `redis.exceptions.ConnectionError`, and `TimeoutError`.
 - **User Experience:** Upon Redis outage during OAuth callback, redirects with HTTP 307 to `{primary_origin}/app?connections=1&oauth_error=redis_unavailable` rather than throwing an unhandled 500 error.
-- **Verification:** Authored `backend/tests/test_228_oauth_redis_resilience.py` (10/10 passing), validating both standard OAuth failure redirects and Redis outage redirects.
-
-### 4.2 Operator Gate: `/code-review ultra review-base-225`
-- **Status:** ⛔ **BLOCKED ON OPERATOR**.
-- **Reason:** `/code-review ultra` is a multi-agent cloud review triggered and billed by the operator.
-- **Trigger:** *Trigger: Operator runs /code-review ultra before final production release.*
+- **Verification:** Authored `backend/tests/test_228_oauth_redis_resilience.py` (10/10 passing), validating both standard OAuth failure redirects and Redis outage redirects. Note: This hardening is delivered engineering work, but does not substitute for DEBT-03's independent security review requirement.
 
 ---
 
@@ -196,13 +198,19 @@ All repository mechanical gates have been independently re-derived and verified:
 | Gate | Target / Baseline | Measured Result | Verdict |
 |---|---|---|---|
 | **Backend Unit Baseline** | `failed <= 71`, `errors == 0` | 71 failed, 3497 passed, 0 errors (74.03s) | ✅ **PASS** |
-| **Frontend Vitest Count Gate** | 0 failing, pinned >= 7428 | Pinned present, 0 failing | ✅ **PASS** |
+| **Frontend Vitest Count Gate** | 0 failing (single sample), pinned >= 7428 | Pinned 220 present; green on single sample (7434 passed, 0 failed); reviewer measured 3 known-flaky failures (SEED-171) on untouched files | ✅ **PASS (with SEED-171 flakiness noted)** |
 | **Frontend Typecheck** | `tsc -p tsconfig.app.json` <= 66 | 66 errors (0 new from Phase 228) | ✅ **PASS** |
 | **CLAUDE.md Size Gate** | < 120,000 characters | 107,418 characters (42,582 headroom) | ✅ **PASS** |
 | **Deploy Drift Gate** | 0 drift against compose/env | 0 drift | ✅ **PASS** |
+
+⚠ **Count Gate Flakiness Note (SEED-171):** The count gate achieved 0 failures on the builder's sample (total 7434, pinned total 6702, 0 failing across 220 suites). However, 0 failing is a single-sample observation rather than a permanent property: the reviewer's independent re-run on the exact same tree measured 3 failures:
+- `src/pages/WorkflowBuilderPage.session.test.tsx` — `AssertionError: expected 1 to be +0`
+- `src/pages/WorkflowsPage.test.tsx` — ×2 `STACK_TRACE_ERROR`
+
+Both files reside in SEED-171's five known cap-independent flaky suites, and `git diff --numstat 7a5207dfd^..HEAD` confirms both files are byte-unchanged by Phase 228. Per SEED-171, green is not reliably reachable on demand across these suites.
 
 ---
 
 ## 8. Conclusion
 
-Milestone v3.9 closeout criteria are satisfied in full. Every owed verification item is accounted for, the resume/continue distinction is clear and durable, OAuth error handling is resilient, subdomain deployment routing is verified, and the backend test baseline is pinned by an automated gate. Phase 228 is **COMPLETE**.
+Milestone v3.9 closeout criteria are satisfied across 4 passed requirements and 1 operator-blocked security review (`DEBT-03`). Every owed verification item is accounted for with an unambiguous verdict, the resume/continue distinction is clear and durable, OAuth error handling is resilient against Redis outages, subdomain deployment routing is verified, and the backend test baseline is pinned by an automated gate. Phase 228 is **COMPLETE**.
