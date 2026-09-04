@@ -1,16 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v3.9
-milestone_name: "Connections: Any Service, Any Tool — ACTIVE"
-status: executing
-last_updated: "2026-09-04T06:40:00.000Z"
+milestone_name: "Connections: Any Service, Any Tool — SHIPPED 2026-09-04"
+status: complete
+last_updated: "2026-09-04T09:30:00.000Z"
 last_activity: 2026-09-04
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 83
-  completed_plans: 94
-  # + SEED-235 fixed out-of-phase (chat approval card)
+  total_phases: 16
+  completed_phases: 16
+  total_plans: 111
+  completed_plans: 111
   percent: 100
 ---
 
@@ -28,40 +27,85 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-08-26)
+See: `.planning/PROJECT.md` (updated 2026-09-04)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 227 — The Run Frame Has One Owner EXECUTED, VERIFIED & CLOSED (2026-09-04). SC#2 discharged in real browser (227-VALIDATION.md).
-Phase numbering continues at **210**.
+**Current focus:** **No milestone active.** v3.9 archived 2026-09-04. Next: `/gsd:new-milestone`.
+Phase numbering continues at **228**.
 
 ## Current Position
 
-⭐ **OPERATOR DECISION 2026-09-04 — PHASE 219 DEFERRED TO THE CONNECTED KNOWLEDGE MILESTONE, and
-v3.9 IS READY TO CLOSE.** Taken at the close audit (`.planning/v3.9-MILESTONE-AUDIT.md`, now
-`gaps_resolved`).
+✅ **MILESTONE v3.9 — Connections: Any Service, Any Tool — COMPLETE AND ARCHIVED (2026-09-04).**
+16 phases · 111 plans · 695 commits · 9 days · migrations 127-129 / 140-141 / 150-152 · git tag `v3.9`.
+**34 ✅ delivered · 3 ⚠ partial · 2 ⛔ shipped-but-never-driven, of 39 requirements.**
 
-**Why 219 could not simply be finished:** its SC#1 — *"watched on a schedule"* — is an AUTOMATIC
-background sync, which is word for word v3.9's own binding re-open trigger for
-`SEED-209/210/211/212`. v3.9's scope section states that shipping auto-ingest without them *"is not
-a gap, it is a security defect"* (`SEED-210` measures that synced documents flatten source ACLs and
-that source deletions never propagate). **So the phase and its four seeds move together.** The
-trigger did NOT fire — it was kept from firing by moving the feature. `LIB-08/09/10` travel with
-them, and ⚠ they are still absent from `REQUIREMENTS.md`, which must be fixed when that milestone
-is defined. Phase 216's ATTACH-01 (a human picking ONE file) stays shipped and is unaffected — no
-ACL mirroring, no deletion propagation, no sync loop, which is why `SEED-213` stayed in v3.9.
+Archive: `.planning/milestones/v3.9-ROADMAP.md` · `v3.9-REQUIREMENTS.md` · `v3.9-MILESTONE-AUDIT.md` ·
+`v3.9-phases/`. Milestone entry: `.planning/MILESTONES.md`. Retrospective: `.planning/RETROSPECTIVE.md`.
 
-**Also applied at the close audit:** the ROADMAP progress table was stale by four rows (223, 225 and
-227 all read not-started or planned while closed) and is corrected — the close ARCHIVES that table,
-so it would have been wrong exactly when it became permanent. `BUG-260902-07` was verified fixed
-against shipped code and closed. ⚠ **Owed and stated rather than absorbed:** 210's four undriven
-SC, 211's UAT + schema regen, 214's eight-row cross-provider roster and eight G-4 drives, 217's 16
-UAT rows, and `/code-review ultra review-base-225`.
+⭐ **What shipped, in one sentence:** a connection became `{service identity, auth, discovered tools,
+per-tool grants}`, so adding a service adds **rows, not code** — Notion connects by OAuth with no
+developer console and returns 41 tools for zero lines of tool code, and six Google applications sit
+under one token with 11/11 live writes.
 
-**NEXT: `/gsd:complete-milestone 3.9`** — the audit gate its step 0 requires now exists and passes.
+### ⚠ Carried into the next milestone — stated, never absorbed
 
+- **Phase 219 is DEFERRED, not shipped** (operator, 2026-09-04), travelling to **Connected Knowledge**
+  with `LIB-08/09/10` and `SEED-209/210/211/212`. Its SC#1 — *"watched on a schedule"* — is word for
+  word v3.9's own binding re-open trigger for those four security seeds, whose scope text reads:
+  shipping auto-ingest without them *"is not a gap, it is a security defect."* **The trigger did not
+  fire; it was kept from firing by moving the feature.** Phase 216's ATTACH-01 (a human picking ONE
+  file) is unaffected — no ACL mirroring, no deletion propagation, no sync loop.
+- ⚠ **`LIB-08 / LIB-09 / LIB-10` have never existed outside a roadmap heading.** Write them into the
+  next milestone's `REQUIREMENTS.md` at scoping time.
+- ⛔ **Owed verification — the milestone's real risk.** 210: 4 of 5 SC never driven (CONN-10 / CONN-11
+  are structurally undrivable on this install). 211: UAT rows + schema regeneration. 214: SC#10's
+  eight-row cross-provider roster, the other three SC#10 axes, and **eight G-4 operator drives**.
+  217: **16 UAT rows**. 225: `/code-review ultra review-base-225`, skipped on credits —
+  **re-open trigger: credits available before the v3.9 production push.**
+- ⚠ **Three requirements are narrower than their wording**: `CAT-05` (the cloud half of
+  Add-a-connection was never verified), `GRANT-03` (the pause names the tool and arguments but never
+  the service), `CHAT-06` (the armed connector set is stored nowhere and F5 silently disarms it).
+- ⚠ **`SEED-242` is armed** — the product moves to `app.<domain>` at the next production push, seven
+  steps across Vercel / Coolify / Supabase Auth / CORS. Verify on a preview before promoting.
+- ⚠ **23 reported bugs remain open on `surface: Agentic-RAG`**; six are probably one root cause in the
+  resume path (`BUG-260818-01/02/03`, `BUG-260823-02/03/04`). Twenty were deliberately not swept blind
+  at the close.
+- ⚠ **The backend unit baseline needs one honest re-derivation before it can gate anything.**
+  `pytest tests/unit -q --continue-on-collection-errors` reads **95 failed / 3394 passed / 2 errors**;
+  the `71` quoted all milestone was measured over a different set (two collection errors from missing
+  `ezdxf` / `reportlab` abort collection without that flag). Nothing failing names oauth, connector,
+  mcp or chat.
 
+### ⚠ Found at the close, and fixed there rather than earlier
+
+**`REQUIREMENTS.md` was stale by 32 of 39 rows** — every CONN / CAT / OAUTH / GRANT / CHAT / STEP /
+ATTACH / RAG row still read `Planned` while its phase was shipped and closed. The close ARCHIVES that
+table, so it would have been permanently wrong at the exact moment it became permanent. Every Status
+cell was re-derived against phase `VERIFICATION.md` / `SUMMARY.md` artifacts and the reported-bugs
+register before archiving, and `LIB-05..07` — which had traceability rows but **no requirement entry**
+— were added. **This is the THIRD consecutive milestone to close on a stale register**; the ROADMAP
+progress table was stale by four rows in the same way and was corrected at the audit. A per-phase-close
+gate is worth more than a fourth warning paragraph.
+
+## Deferred Items
+
+Acknowledged and deferred at the v3.9 milestone close on 2026-09-04 (`gsd-sdk query audit-open` →
+**47 open items**). None is engineering; the verification debt above is the part that matters.
+
+| Category | Count | Detail |
+|---|---|---|
+| quick_tasks | 28 | 27 `missing` + 1 `unknown` — historical records whose files no longer exist |
+| seeds | 14 | all `dormant`: 003, 004, 040, 041, 042, 043, 045, 046, 084, 127, 163, 164, 165, 166 |
+| todos | 1 | `spike-nl-workflow-authoring.md` — largely satisfied by the Phase 097 spike answer |
+| uat_gaps | 2 | 214 (`unknown`), 217 (`awaiting-operator`) |
+| verification_gaps | 2 | 214 (`gaps_found`), 217 (`human_needed`) |
+| debug_sessions / threads / context_questions | 0 | clear |
+
+---
+
+## Phase records — v3.9 (preserved verbatim below)
 
 ✅ **PHASE 227: The Run Frame Has One Owner — EXECUTED (Gemini), VERIFIED & DRIVEN IN REAL BROWSER (Claude + Operator, 2026-09-04) — `227-VALIDATION.md`.**
 ⭐ SC#2 DISCHARGED: driven across all eight run states in a real browser comparing normalized rendered DOM against pre-227 worktree (commit `74b8385e1`). All states byte-identical.

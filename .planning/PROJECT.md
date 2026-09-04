@@ -8,7 +8,19 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: v3.9 Connections — Any Service, Any Tool
+## Last Shipped: v3.9 Connections — Any Service, Any Tool
+
+**Shipped:** 2026-09-04 — 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed**
+into 217.1; **219 deferred**), **111 plans**, 695 commits, migrations **127-129 / 140-141 / 150-152**,
+git tag `v3.9`. **34 ✅ delivered · 3 ⚠ partial · 2 ⛔ shipped-but-never-driven, of 39 requirements.**
+Full record: `.planning/MILESTONES.md` · archive: `.planning/milestones/v3.9-*`.
+
+⚠ **Phase 219 (`A Connected Source Feeds the Library`) is DEFERRED to the Connected Knowledge
+milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` (operator, 2026-09-04). Its SC#1 —
+*“watched on a schedule”* — is word for word v3.9's own binding re-open trigger for those four
+security seeds. **The trigger did not fire; it was kept from firing by moving the feature.**
+
+**The goal it was measured against, and met:**
 
 **Goal:** A person connects a *service* — not a protocol — sees every tool it offers, grants each
 one individually, and then uses it by name in chat and as a specific step on the canvas.
@@ -265,6 +277,15 @@ been scheduled.** This milestone schedules them.
 
 ## Current State
 
+**Shipped:** **v3.9 Connections: Any Service, Any Tool** — 2026-09-04 (16 phases, **111 plans**, 695 commits, 9 days; git tag `v3.9`). A connection became `{service identity, auth, discovered tools, per-tool grants}`, so **adding a service adds rows, not code** — Notion connects by OAuth with no developer console and returns 41 tools for zero lines of tool code; six Google applications sit under one token with 11/11 live writes. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. 34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven. Migrations 127-129 / 140-141 / 150-152.
+
+**Current:** **no milestone active.** Next: `/gsd:new-milestone` — the sequenced next slot is **Connected Knowledge**, which carries deferred Phase 219, `LIB-08/09/10` and `SEED-209/210/211/212` together. ⚠ Write `LIB-08/09/10` into that milestone's `REQUIREMENTS.md`; they have never existed anywhere but a roadmap heading.
+
+⚠ **Armed for the next production push:** `SEED-242` moves the product to `app.<domain>` (seven steps across Vercel / Coolify / Supabase Auth / CORS — verify on a preview before promoting), and `/code-review ultra review-base-225` is owed on the OAuth state rework, skipped at Phase 225 only because credits were exhausted.
+
+<details>
+<summary>Prior Current State entry (v3.6-era, preserved)</summary>
+
 **Shipped:** **v3.6 Visual / No-Code Workflow Studio** — 2026-08-09 (13 phases [181-190 + inserts 184.1/188.1/188.2], **151 plans**, 1,064 commits; git tag `v3.6`). Drag-and-drop visual authoring + non-technical live-run observability over the existing governed harness engine, with **graded per-node governance** as the category differentiator. 20/24 requirements satisfied; CORE 19/21 with **zero unsatisfied**. STRETCH 191 deferred (`.planning/v3.6-STRETCH-CARRYFORWARD.md`). Migrations 114-118. Prior: v3.5 — 2026-07-23 (14/14 CORE); v3.4 Multi-Tenancy — 2026-07-22 (22/22 CORE); v3.3 Operator UX — 2026-07-18 (20/20).
 
 **Current:** **v3.7 Workflow Product Completion — opened 2026-08-10** (see the Current Milestone section above).
@@ -308,6 +329,8 @@ Also open at close: v3.4 STRETCH (169-173) and v3.5 STRETCH (178-180, with **180
 - Carry-forward seeds: SEED-009 (claude-haiku max_tokens cap), SEED-010 (OpenRouter synthetic-timeout protocol), SEED-011 (test_059 fixture-teardown bug)
 - Forward-looking seeds for next-milestone selection: SEED-002, SEED-012, SEED-013, SEED-014
 - **Docling integration shipped stability, not quality (2026-05-15).** Phase 071.1 retry on the thesis pair confirmed Docling produces zero improvement in stored `document_tables` / `document_images` counts vs `pypdf-legacy` (same 4 tables / 2 images on PDF, same 39 / 0 on DOCX). PDF chunk count dropped 95% under Docling (~400 → 19) — suspected text-extraction regression. Docling is 25-100× slower on PDFs (~125s vs 1-5s legacy) and loads ~600 MB models + RapidOCR even when `do_ocr=False`. **`EXTRACTOR_PRIMARY=legacy` reverted in `backend/.env` 2026-05-15** for new uploads + `/reingest`; Docling/PyMuPDF remain opt-in per-doc via `/reextract`. 10 open investigations captured in `.planning/phases/071.1-.../071.1-CARRY-FORWARDS.md`; SEED-006 (multimodal extraction quality) retested + addendum added confirming the storage-layer bottleneck is unchanged since 2026-05-02. v2.6 PRD's "Docling-first" thesis is informally reversed pending Phase 071.2 wiring diagnostics + Phase 072 / SEED-006 multimodal lift.
+
+</details>
 
 ## Requirements
 
@@ -598,9 +621,47 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 > ⚠ **Known drift in this section, recorded rather than silently patched:** there is no `### Validated (v3.4 …)` or `### Validated (v3.5 …)` block — both milestones shipped without one, so the Validated list jumps v3.3 → v3.6. Their requirements are archived in `.planning/milestones/v3.4-REQUIREMENTS.md` and `v3.5-REQUIREMENTS.md`. Backfilling them was out of scope for the v3.6 close.
 
+### Validated (v3.9 — Connections: Any Service, Any Tool)
+
+- ✓ A connection is created against a **service**, its actions coming from that service's own advertised tools — CONN-04, v3.9 (Phase 211)
+- ✓ The three legacy capability verbs keep working as one shape among many, organising no surface — CONN-05, v3.9 (Phase 211)
+- ✓ A service is added by **pasting its MCP URL**, tools discovered and grantable with zero engineering — CONN-06, v3.9 (Phases 212 / 222; driven against four real servers)
+- ✓ A connection's identity, auth and endpoint are editable without losing per-tool grants — CONN-07, v3.9 (Phase 212)
+- ✓ An OAuth-authenticated service row is accepted by the database — CONN-08, v3.9 (Phase 211, migration 127)
+- ✓ Connections browse as a searchable **catalog of services**, with a Popular row, filtered on connection STATE — CAT-01 / CAT-02 / CAT-03, v3.9 (Phase 212)
+- ✓ A connected service shows starter prompt suggestions — CAT-04, v3.9 (Phase 216)
+- ✓ OAuth authorization-code with a customer-registered client id/secret; silent lease-locked refresh; secrets and refresh tokens encrypted at rest and org-scoped — OAUTH-01 / OAUTH-02 / OAUTH-03, v3.9 (Phases 215 / 225)
+- ✓ Each tool granted or denied individually with a connection-level default it inherits — GRANT-01 / GRANT-02, v3.9 (Phase 213, driven)
+- ✓ A denied or ungranted tool is refused, naming the grant that would allow it — GRANT-04, v3.9 (Phase 213, both reasons and both shapes driven)
+- ✓ Every outbound call writes an audit receipt, and a connection leaves a readable record — GRANT-05, v3.9 (Phases 213 / 223)
+- ✓ Any connected service is added to a thread by name and the agent picks a granted tool; a chat tool call renders the service's mark and the tool's real name — CHAT-05 / CHAT-07, v3.9 (Phases 216 / 224)
+- ✓ A step picks a service then a named action — no URL, no hand-written JSON (the raw-JSON surface was deleted) — STEP-01, v3.9 (Phase 214)
+- ✓ Required arguments are author-fillable from every launch path, and a run supplies them — STEP-02, v3.9 (Phases 214 / 214.1, **operator-driven**)
+- ✓ Publish refuses an unsatisfiable step, naming the step and the missing argument — STEP-03, v3.9 (Phase 214)
+- ✓ Service mark + action name on the run spine and run surfaces; a failed external step reports its own reason; the describe door is bound to connected services and granted tools — STEP-04 / STEP-05 / STEP-06, v3.9 (Phase 214)
+- ✓ One specific file is picked from a connected source and attached or ingested — ATTACH-01, v3.9 (Phase 216)
+- ✓ The `live_connectors` kill-switch is visible and controllable in the Control Room — CONN-09, v3.9 (Phase 210, driven in-browser)
+- ✓ An embedding-provider failure is reported as a provider failure, naming it — RAG-09, v3.9 (Phase 210; the roster failed 5 of 18 rows first, was fixed, and re-drove 18/18 honest)
+- ✓ The document space is the **Library**: a real upload front door, the six stages the pipeline actually writes, and a detail panel showing text, tables, images, chunks and the queries that found it — LIB-01 / LIB-02 / LIB-03 / LIB-04, v3.9 (Phases 217 / 217.1)
+- ✓ Library Health and Governance retired into the Library's Health tab with nothing lost; a search that **could not run** is its own analytics segment; per-hit relevance is recorded — LIB-05 / LIB-06 / LIB-07, v3.9 (Phase 217.1)
+
+⚠ **Carried, not validated** — three requirements are narrower than their wording and two shipped without ever being driven:
+
+- ⚠ `CAT-05` — Add-a-connection on a **cloud** install was never verified (`BUG-260810-01`, re-open trigger: the v3.9 production push)
+- ⚠ `GRANT-03` — the run pauses and names the tool and arguments, but **never the service**
+- ⚠ `CHAT-06` — the armed connector set is stored nowhere and does not survive a reload (`BUG-260902-03`)
+- ⛔ `CONN-10` / `CONN-11` — code shipped, structurally undrivable on this install (0 schedule rows; the door gates on published provenance)
+
 ### Active (current milestone)
 
+*v3.9 Connections: Any Service, Any Tool SHIPPED (2026-09-04; git tag `v3.9`). **No milestone active.** Next: `/gsd:new-milestone` — the sequenced next slot is **Connected Knowledge**, carrying deferred **Phase 219**, `LIB-08/09/10` and `SEED-209/210/211/212` as one unit, because 219's* "watched on a schedule" *IS the security seeds' own re-open trigger. ⚠ `LIB-08/09/10` have never existed outside a roadmap heading and must be written into that milestone's `REQUIREMENTS.md`. Also carried: the five owed-verification sets (210's four undriven SC, 211's UAT + schema regen, 214's eight-row cross-provider roster and eight G-4 drives, 217's 16 UAT rows, `/code-review ultra review-base-225`); `SEED-242` armed for the next production push; 23 open reported bugs, six of which are probably one root cause in the resume path; 14 dormant seeds; and one honest re-derivation owed on the backend unit baseline before it can gate anything.*
+
+<details>
+<summary>Superseded Active note (v3.6-era, preserved)</summary>
+
 *v3.6 Visual / No-Code Workflow Studio SHIPPED (2026-08-09; git tag `v3.6`). **No milestone active.** Next: `/gsd:new-milestone`. The sequenced next slot is the **connections / integrations** milestone — read **`SEED-146`** first (umbrella), with `SEED-144` (provider-shaped), `SEED-145` (usable in chat), `SEED-142` (two-way / auto-ingest) and the concrete unfinished edge `D-190-DEF-17` as its inputs. ⚠ Every capability shipped so far is a WRITE — no read/search/list exists — and **no outbound capability may join `_TOOL_REGISTRY` before the approval model exists**. Also carried forward: v3.4 STRETCH 169-173; v3.5 STRETCH 178-180 (**180 agent-loop honesty = priority revive**); 11 dormant seeds; v3.6's verification-documentation debt (three `VERIFICATION.md` files carrying nine requirements).*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v3.3-era, preserved)</summary>
@@ -802,4 +863,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-26 — **milestone v3.9 Connections: Any Service, Any Tool STARTED** via /gsd:new-milestone. Phase numbering continues at **210** (v3.8 ended at 209). Scoped against SEED-202/204/205/207/208/206 in that order, plus the 142/144/145/146/177 foundation and SEED-213. Four operator decisions taken at scoping: OAuth **BYO-first** (we-own-the-app is a named later slice, because our redirect URI would exclude self-hosted); the **chat surface IS in scope** with the per-tool approval model as its hard prerequisite; **inbound Open Platform is its own later milestone** (hence the name drops "& Open Platform"); and nine open bugs fold in, two of them BLOCKING. SEED-209/210/211/212 (connector→KB ingestion) DEFERRED to a Connected Knowledge milestone — re-open trigger: the first automatic or background sync from a connected source. Prior entry: 2026-08-09 after v3.6 COMPLETE.*
+*Last updated: 2026-09-04 — **milestone v3.9 Connections: Any Service, Any Tool COMPLETE** via /gsd:complete-milestone. 16 phases, 111 plans, 695 commits, 9 days, git tag `v3.9`; **34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven**. Phase numbering continues at **228**. ⚠ **Phase 219 DEFERRED** to the Connected Knowledge milestone with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS those seeds' binding re-open trigger, so the feature moved rather than the trigger firing. ⚠ At the close, `REQUIREMENTS.md` was found stale by **32 of 39 rows** for the THIRD consecutive milestone and every Status cell was re-derived against phase artifacts before archiving. Prior entry: 2026-08-26 when v3.9 started.*
