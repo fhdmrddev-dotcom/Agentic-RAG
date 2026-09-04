@@ -46,6 +46,47 @@ Last activity: 2026-09-05 — Phase 229 planned (4 plans authored, seam audit co
 
 
 
+
+### ⭐ Phase 231 must consider DEPARTMENT-LEVEL ACCESS (operator, 2026-09-05)
+
+**Direction:** *"consider … one big company needs to manage its knowledge base with different access
+needs, different departments, different types of documents."* Nested organisations are **explicitly
+de-prioritised** — one flat company org, departments inside it.
+
+✅ **Nested orgs were never built, so nothing needs unwinding:** `organizations` has **no `parent_id`**.
+`departments` **does** have `parent_id`, so sub-departments are already tree-capable.
+
+⚠ **BUT DEPARTMENTS ARE A PLACEHOLDER, NOT A FEATURE — measured live 2026-09-05:**
+
+| | |
+|---|---|
+| tables carrying `org_id` | **46** |
+| tables carrying `dept_id` | **1** — `dept_members` itself |
+| `dept_members` rows | **0** |
+| departments with a `parent_id` | **0** |
+| department API routes | **none exist** |
+
+`dept-admin` is a real role with exactly one permission (`dept:manage`) and **nothing dept-scoped to
+manage**. So today the product has exactly **TWO** access levels: *mine*, and *everyone in the org's*
+(via `folder_is_org_shared()`, which walks the folder tree). There is no *"Finance can see this, Legal
+cannot."*
+
+⚠ **Also measured:** every user is auto-provisioned their OWN org (`create_org_with_default_dept`, the
+migration-105 personal-org backfill) — 26 users, 26 member orgs, 26 org-admins. So "org" today means
+*one person's private space*, not *a company*. Multi-org membership IS supported
+(`current_user_org_ids()` returns a SETOF).
+
+⭐ **WHY THIS BINDS PHASE 231 SPECIFICALLY.** 231 writes the visibility predicate at **four RLS sites**
+(the `documents` and `document_chunks` policies plus the BODIES of `match_document_chunks` and
+`keyword_search_chunks`). A second scope added after that predicate is set is a **re-ingest, not a
+migration** — the identical logic `SEED-210` records for source ACLs. **231 does not have to BUILD
+department access; it has to not FORECLOSE it.**
+
+⚠ Note the collision already found at Phase 229 pre-flight (G-1): the flat `folders.is_org_shared`
+column and the recursive `folder_is_org_shared()` function are **two definitions of one word**. 231 owns
+resolving that too — adding a department dimension on top of an unresolved org-shared predicate would
+compound it.
+
 ### Phase 229 — pre-planning obligation DISCHARGED (2026-09-05, Claude)
 
 The roadmap required *"Drive `import_connection_file` ONCE before planning — the schema mismatch is
@@ -127,6 +168,7 @@ instrument for a Deep pause.
 
 | Phase | Decision |
 |---|---|
+| **231** | ⭐ **DEPARTMENT-LEVEL ACCESS — operator direction 2026-09-05: *"keep department access in mind for phase 231."*** See the note below. |
 | 235 | `SURF-03`'s home surface (three options tabled; recommendation app-shell signal + Health-tab row) |
 | 240 | Confirm-or-flip the message-vs-thread boundary — D-3 decided it, but two research files disagree |
 | 241 | Verify local↔cloud pgvector parity LIVE before `hnsw.iterative_scan` is planned as the `SEED-076` remedy |
