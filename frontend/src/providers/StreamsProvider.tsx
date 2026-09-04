@@ -71,7 +71,6 @@ import {
   getMessages,
   postMessage,
   subscribeToRun,
-  getActiveRuns,
   getSnapshot,
   cancelRun,
   getThreadTodos,
@@ -990,7 +989,7 @@ export function makeStreamCallbacks(opts: {
     onTaskDone: (subRunId, status, summary) =>
       useStreamsStore
         .getState()
-        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
+        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary ?? ""),
     // Phase 092 (CONT-01 / D-07 — SC#3): live cap_paused SSE → set the OWNING
     // thread's lock to capPaused so the inline Continue card appears out-of-band
     // (the durable carrier row is filtered from /messages — BUG-260528-01).
