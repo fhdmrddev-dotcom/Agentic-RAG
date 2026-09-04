@@ -138,9 +138,25 @@ regeneration — all five v3.9 objects were already in it.
   `service_id` onto, rendering correctly.
 
 ⭐ **`CAT-05`'s cloud half — archived hours earlier as ⚠ Partial because it "was never verified" — is
-now verified.** ⚠ **`BUG-260810-01` still does NOT close:** its own bar is TWO things and only one was
-driven; **connecting a Popular service on cloud is still undriven**, and the trigger is narrowed to
-exactly that. Closing on half the evidence is the habit this register exists to prevent.
+now verified.** ✅ **`BUG-260810-01` is now CLOSED — the second half was driven within the hour.** The operator
+connected **Slack** (`slack.com/api · #C0BNK1QCF8F`, **`checked just now`**, Ready; the Popular strip
+flipped to *"1 connection / Manage"*) and **Google Workspace** (`OAuth connected`, Ready,
+`fhdmrd@gmail.com`, posture **Ask first**) on `superrag.cloud`. Both conjuncts of the report's own bar
+— the Add affordance on cloud AND a Popular service connecting there — are satisfied.
+
+⭐ **The OAuth chain is proven end to end on production.** The reviewer registered
+`https://api.superrag.cloud/connectors/oauth/callback` as a SECOND redirect URI on the `Agentic RAG`
+client (`877112366454-1se0oiff…`, project `gen-lang-client-0884630674`), leaving the localhost entry
+untouched so both environments share one client id/secret; the connect completed against it. This is
+what `BACKEND_PUBLIC_URL` exists for — each environment sends its own matching redirect.
+
+⚠ **What is NOT proven, stated rather than absorbed:** no Slack SEND and no Drive READ has been driven
+on cloud. The connections exist, hold credentials and report Ready — that is all. **A first outbound
+call on cloud remains undriven**, and this milestone twice shipped a phase whose feature was absent
+while every gate was green, so "connected" is not "works".
+⚠ The `Agentic RAG` Google client carries **TWO enabled secrets** (`****OAZN` 30 Aug, `****DaXy`
+31 Aug) and Google flags the risk. Only one is in Coolify; disable and delete the other once a connect
+is confirmed stable.
 
 ⚠ **Still unverified on cloud and worth an early look:** `SECRETS_ENCRYPTION_KEY` was never confirmed
 present in Coolify. Migs 129/150 store OAuth tokens as `enc:v1:` ciphertext and that path **fails soft
