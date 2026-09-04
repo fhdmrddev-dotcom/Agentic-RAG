@@ -215,30 +215,63 @@ async def async_mint_document_row(
     )
 
 
-def splice_document(
+async def splice_document(
     *,
     document_id: str,
-    raw: bytes,
-    mime_type: str,
-    filename: str,
-    user_id: str,
-    storage_path: str,
-    supabase: Client,
+    raw: bytes | None = None,
+    mime_type: str | None = None,
+    filename: str | None = None,
+    user_id: str | None = None,
+    storage_path: str | None = None,
+    supabase: Client | None = None,
     engines_dict: dict[str, str] | None = None,
+    job_id: str | Any | None = None,
+    initial_progress: dict[str, Any] | None = None,
+    progress: dict[str, Any] | None = None,
+    pool: Any | None = None,
 ) -> None:
     """Executes the post-minting extraction, embedding, and chunking pipeline.
 
-    Follows the pinned status/ingestion_step sequence:
-    1. Storage upload (if storage_path provided; non-blocking swallow-log on failure).
-    2. Set status='processing', ingestion_step='extracting'.
-    3. Wall-clock bounded Layer 2 extraction (130s timeout).
-       On failure: sets status='failed', ingestion_step='failed', error_message.
-    4. Delegates to ingest_document for embedding ('embedding'), table/image
-       multimodal chunks ('extracting_tables', 'extracting_images'), and completion
-       ('completed').
+    Phase 230 (QUEUE-01 / QUEUE-04 / SC#1 / SC#4):
+    - Supports durable queue execution with checkpointed resumption (progress.chunk_offset).
+    - When job_id is provided, updates ingestion_jobs.progress after each chunk batch and stage.
+    - Resumes chunk embedding from progress.chunk_offset without re-embedding prior chunks.
+    - If stage == "tables_embedded", skips table extraction and embedding.
+    - Authoritative recount of document_chunks on completion.
     """
-    # Step 1: Storage upload
-    if storage_path:
+    from datetime import datetime, timezone  # noqa: PLC0415
+    from uuid import UUID  # noqa: PLC0415
+
+    if supabase is None:
+        from app.dependencies import get_supabase  # noqa: PLC0415
+        supabase = get_supabase()
+
+    # Resolve document row if metadata fields missing
+    doc: dict[str, Any] = {}
+    if not (filename and mime_type and user_id and storage_path):
+        try:
+            res = supabase.table("documents").select("*").eq("id", document_id).maybe_single().execute()
+            doc = res.data or {}
+        except Exception as e:
+            log.warning("Could not fetch document %s row: %s", document_id, e)
+        filename = filename or doc.get("filename", "")
+        mime_type = mime_type or doc.get("mime_type", "")
+        user_id = user_id or doc.get("user_id", "")
+        storage_path = storage_path or doc.get("file_path", "")
+
+    # Resolve raw bytes if missing
+    if raw is None or len(raw) == 0:
+        if storage_path:
+            try:
+                raw = supabase.storage.from_("documents").download(storage_path)
+            except Exception as dl_exc:
+                log.warning("Storage download failed for %s (%s): %s", document_id, storage_path, dl_exc)
+                raw = b""
+        else:
+            raw = b""
+
+    # Step 1: Storage upload (if raw & storage_path provided and not already uploaded)
+    if storage_path and raw:
         try:
             supabase.storage.from_("documents").upload(
                 path=storage_path,
@@ -246,12 +279,17 @@ def splice_document(
                 file_options={"content-type": mime_type},
             )
         except Exception as up_exc:
-            log.warning(
-                "Storage upload failed for %s (%s): %s — proceeding to extraction",
+            log.debug(
+                "Storage upload non-blocking notice for %s (%s): %s",
                 document_id,
                 storage_path,
                 up_exc,
             )
+
+    prog = progress or initial_progress or {}
+    chunk_offset = int(prog.get("chunk_offset", 0))
+    stage = prog.get("stage")
+    job_uuid = UUID(str(job_id)) if job_id else None
 
     # Step 2: Extraction with status progression and wall-clock fail-safe
     extract_start = time.perf_counter()
@@ -268,52 +306,187 @@ def splice_document(
     except Exception:
         pass
 
-    try:
-        from app.services.extraction_service import (  # noqa: PLC0415
-            DOCX_MIME as _DOCX,
-            PDF_MIME as _PDF,
-            extract_composable,
-        )
-        from app.api.documents import extract_text  # noqa: PLC0415
-
-        if mime_type not in (_PDF, _DOCX):
-            text = extract_text(raw, mime_type)
-        else:
-            async def _run_with_timeout() -> ExtractedDocument:
-                return await asyncio.wait_for(
-                    run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
-                    timeout=wall_clock_s,
-                )
-
-            extracted_doc = asyncio.run(_run_with_timeout())
-            text = extracted_doc.text
-            engine_used = extracted_doc.extractor_name or None
-    except Exception as exc:
-        log.warning("splice_document extraction failed for %s: %s", document_id, exc)
+    if pool and job_uuid and not stage:
         try:
-            supabase.table("documents").update({
-                "status": "failed",
-                "ingestion_step": "failed",
-                "error_message": str(exc)[:500],
-            }).eq("id", document_id).execute()
-        except Exception:
-            pass
-        return
+            from app.db.ingestion_jobs import update_job_progress  # noqa: PLC0415
+            await update_job_progress(pool, job_uuid, stage="extracting", progress_patch={"chunk_offset": chunk_offset})
+        except Exception as p_exc:
+            log.warning("Failed updating progress to extracting: %s", p_exc)
+
+    # Re-use already extracted full_markdown if available
+    if not text and doc.get("full_markdown"):
+        text = doc["full_markdown"]
+
+    if not text:
+        try:
+            from app.services.extraction_service import (  # noqa: PLC0415
+                DOCX_MIME as _DOCX,
+                PDF_MIME as _PDF,
+                extract_composable,
+            )
+            from app.api.documents import extract_text  # noqa: PLC0415
+
+            if mime_type not in (_PDF, _DOCX):
+                text = extract_text(raw, mime_type)
+            else:
+                async def _run_with_timeout() -> ExtractedDocument:
+                    return await asyncio.wait_for(
+                        run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
+                        timeout=wall_clock_s,
+                    )
+
+                extracted_doc = await _run_with_timeout()
+                text = extracted_doc.text
+                engine_used = extracted_doc.extractor_name or None
+        except Exception as exc:
+            log.warning("splice_document extraction failed for %s: %s", document_id, exc)
+            try:
+                supabase.table("documents").update({
+                    "status": "failed",
+                    "ingestion_step": "failed",
+                    "error_message": str(exc)[:500],
+                }).eq("id", document_id).execute()
+            except Exception:
+                pass
+            if job_uuid:
+                raise exc
+            return
 
     extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
 
-    # Step 3: Delegate to ingest_document
-    from app.api.documents import ingest_document  # noqa: PLC0415
+    # Step 3: When job_id is not provided, delegate directly to legacy ingest_document
+    if not job_uuid:
+        from app.api.documents import ingest_document  # noqa: PLC0415
 
-    ingest_document(
-        document_id=document_id,
-        text=text,
-        user_id=user_id,
-        supabase=supabase,
-        raw=raw,
-        mime_type=mime_type,
-        filename=filename,
-        engine_override=engine_used,
-        extracted_doc=extracted_doc,
-        extract_duration_ms=extract_duration_ms,
-    )
+        ingest_document(
+            document_id=document_id,
+            text=text,
+            user_id=user_id,
+            supabase=supabase,
+            raw=raw,
+            mime_type=mime_type,
+            filename=filename,
+            engine_override=engine_used,
+            extracted_doc=extracted_doc,
+            extract_duration_ms=extract_duration_ms,
+        )
+        return
+
+    from app.services.text_sanitize import scrub_text  # noqa: PLC0415
+    from app.services.embedding_service import chunk_text, embed_chunks  # noqa: PLC0415
+    from app.models.user_settings import load_app_settings  # noqa: PLC0415
+    from app.db.ingestion_jobs import update_job_progress  # noqa: PLC0415
+
+    # 4a. Multi-modal table extraction (skip if tables_embedded / chunks_embedded)
+    if raw and mime_type:
+        if stage in ("tables_embedded", "chunks_embedded"):
+            log.info("Document %s: skipping table extraction (already at stage=%s)", document_id, stage)
+        else:
+            try:
+                supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute()
+                from app.services.multimodal_service import extract_and_store_tables  # noqa: PLC0415
+                await run_in_threadpool(
+                    extract_and_store_tables,
+                    raw, mime_type, document_id, user_id, supabase,
+                    extracted_doc=extracted_doc,
+                )
+                if pool and job_uuid:
+                    await update_job_progress(
+                        pool, job_uuid, stage="tables_embedded", progress_patch={"chunk_offset": chunk_offset}
+                    )
+            except Exception as tbl_err:
+                log.warning("Table extraction warning for %s: %s", document_id, tbl_err)
+
+    # 4b. Chunking and Checkpointed Embedding
+    clean_text = scrub_text(text)
+    chunks = chunk_text(clean_text)
+    total_chunks = len(chunks)
+
+    app_settings = load_app_settings()
+    _chunk_embedding_model = app_settings.embedding_model or "text-embedding-3-small"
+    _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
+
+    try:
+        supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
+    except Exception:
+        pass
+
+    BATCH_SIZE = 50
+    # SC#4: Resume from chunk_offset without re-embedding prior chunks
+    for batch_start in range(chunk_offset, total_chunks, BATCH_SIZE):
+        batch_chunks = chunks[batch_start : batch_start + BATCH_SIZE]
+        if not batch_chunks:
+            continue
+
+        # Embed batch (transparent batcher in embed_texts handles <= 200k tokens / 512 chunks)
+        embeddings = await run_in_threadpool(
+            embed_chunks,
+            batch_chunks,
+            model=_chunk_embedding_model,
+            user_settings=app_settings,
+        )
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        chunk_rows = [
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "content": c,
+                "chunk_index": batch_start + i,
+                "embedding": emb,
+                "embedding_model": _chunk_embedding_model,
+                "embedding_dimensions": _chunk_embedding_dimensions,
+                "embedded_at": now_iso,
+            }
+            for i, (c, emb) in enumerate(zip(batch_chunks, embeddings))
+        ]
+        supabase.table("document_chunks").insert(chunk_rows).execute()
+
+        current_offset = batch_start + len(batch_chunks)
+        if pool and job_uuid:
+            await update_job_progress(
+                pool,
+                job_uuid,
+                stage="chunks_embedded",
+                progress_patch={"chunk_offset": current_offset},
+            )
+
+    # 4c. Multi-modal image extraction
+    if raw and mime_type:
+        try:
+            supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute()
+            from app.services.multimodal_service import extract_and_store_images  # noqa: PLC0415
+            await run_in_threadpool(
+                extract_and_store_images,
+                raw, mime_type, document_id, user_id, supabase, app_settings,
+                extracted_doc=extracted_doc,
+            )
+        except Exception as img_err:
+            log.warning("Image extraction warning for %s: %s", document_id, img_err)
+
+    # 4d. Finalize & Authoritative Recount
+    try:
+        count_resp = (
+            supabase.table("document_chunks")
+            .select("id", count="exact", head=True)
+            .eq("document_id", document_id)
+            .execute()
+        )
+        total_recounted = count_resp.count if count_resp.count is not None else total_chunks
+    except Exception:
+        total_recounted = total_chunks
+
+    supabase.table("documents").update({
+        "status": "completed",
+        "chunk_count": total_recounted,
+        "full_markdown": text,
+        "extractor": engine_used or "legacy",
+    }).eq("id", document_id).execute()
+
+    if pool and job_uuid:
+        await update_job_progress(
+            pool,
+            job_uuid,
+            stage="completed",
+            progress_patch={"chunk_offset": total_chunks},
+        )

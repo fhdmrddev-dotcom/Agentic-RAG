@@ -236,7 +236,7 @@ def _write_extraction_run_row(
         )
 
 
-def _upload_pipeline(
+async def _upload_pipeline(
     document_id: str,
     raw: bytes,
     mime_type: str,
@@ -249,7 +249,7 @@ def _upload_pipeline(
     """Phase 229 (TRUST-01) — delegates to unified splice_document pipeline."""
     from app.services.ingest_splice import splice_document  # noqa: PLC0415
 
-    splice_document(
+    await splice_document(
         document_id=document_id,
         raw=raw,
         mime_type=mime_type,
@@ -521,18 +521,79 @@ async def upload_document(
         response.status_code = status.HTTP_200_OK
         return doc
 
-    engines_dict = _parse_engines_hint(engines)
-    background_tasks.add_task(
-        _upload_pipeline,
-        doc["id"],
-        raw,
-        mime_type,
-        filename,
-        current_user["id"],
-        mint_result.storage_path,
-        service_supabase,
-        engines_dict,
-    )
+    # Phase 230 (QUEUE-01 / H-3): Cut over /documents/upload to durable ingestion_jobs
+    # 1. Store raw uploaded bytes durably in Supabase Storage immediately
+    try:
+        service_supabase.storage.from_("documents").upload(
+            path=mint_result.storage_path,
+            file=raw,
+            file_options={"content-type": mime_type},
+        )
+    except Exception as up_exc:
+        log.warning(
+            "Storage upload during /upload failed for %s (%s): %s",
+            doc["id"],
+            mint_result.storage_path,
+            up_exc,
+        )
+
+    # 2. Enqueue durable job into ingestion_jobs
+    from app.db.ingestion_jobs import insert_ingestion_job  # noqa: PLC0415
+    from uuid import UUID  # noqa: PLC0415
+    from app.config import settings  # noqa: PLC0415
+
+    raw_user_id = current_user.get("id")
+    raw_org_id = current_user.get("org_id")
+    user_uuid = UUID(str(raw_user_id)) if raw_user_id else None
+    org_uuid = UUID(str(raw_org_id)) if raw_org_id else None
+    doc_uuid = UUID(str(doc["id"]))
+
+    try:
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        pool = await get_pg_pool()
+        if user_uuid is not None:
+            await insert_ingestion_job(
+                pool,
+                document_id=doc_uuid,
+                user_id=user_uuid,
+                org_id=org_uuid,
+            )
+        else:
+            raise ValueError("user_uuid is None")
+    except Exception as q_exc:
+        log.warning(
+            "Asyncpg enqueue failed for %s (%s); inserting via service_supabase",
+            doc["id"],
+            q_exc,
+        )
+        try:
+            service_supabase.table("ingestion_jobs").insert({
+                "document_id": str(doc_uuid),
+                "user_id": str(user_uuid) if user_uuid else str(raw_user_id),
+                "org_id": str(org_uuid) if org_uuid else None,
+                "status": "pending",
+                "stage": "pending",
+                "progress": {},
+                "max_retries": 3,
+            }).execute()
+        except Exception as sb_exc:
+            log.error("Failed to insert ingestion_job via supabase: %s", sb_exc)
+
+    # 3. Fallback to BackgroundTask ONLY if ingest_worker_enabled is explicitly False
+    if not getattr(settings, "ingest_worker_enabled", True):
+        engines_dict = _parse_engines_hint(engines)
+        background_tasks.add_task(
+            _upload_pipeline,
+            doc["id"],
+            raw,
+            mime_type,
+            filename,
+            current_user["id"],
+            mint_result.storage_path,
+            service_supabase,
+            engines_dict,
+        )
+
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],

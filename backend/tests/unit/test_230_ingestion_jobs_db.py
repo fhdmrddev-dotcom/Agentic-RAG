@@ -181,13 +181,17 @@ async def test_update_job_progress_mock():
         progress_patch={"chunk_offset": 50, "total_chunks": 100},
     )
 
+    import json
     assert con.execute.called
     q, j_id, stage, patch = con.execute.call_args[0]
     assert "stage = $2" in q
     assert "progress = progress || $3" in q
     assert j_id == job_id
     assert stage == "chunks_embedded"
-    assert patch == {"chunk_offset": 50, "total_chunks": 100}
+    if isinstance(patch, str):
+        assert json.loads(patch) == {"chunk_offset": 50, "total_chunks": 100}
+    else:
+        assert patch == {"chunk_offset": 50, "total_chunks": 100}
 
 
 @pytest.mark.asyncio

@@ -305,14 +305,14 @@ async def test_async_mint_document_row_wrapper():
     assert res.document["id"] == DOC_ID_1
 
 
-def test_splice_document_pipeline_success():
+async def test_splice_document_pipeline_success():
     """splice_document runs storage upload, updates status='processing'/'extracting', and delegates to ingest_document."""
     supabase = _build_mock_supabase()
     storage_path = f"{USER_ID}/{DOC_ID_1}/{FILENAME}"
 
     with patch("app.api.documents.extract_text", return_value="extracted text content") as mock_extract, \
          patch("app.api.documents.ingest_document") as mock_ingest:
-        splice_document(
+        await splice_document(
             document_id=DOC_ID_1,
             raw=b"plain text content",
             mime_type="text/plain",
@@ -331,7 +331,7 @@ def test_splice_document_pipeline_success():
         assert kwargs["user_id"] == USER_ID
 
 
-def test_splice_document_storage_failure_nonblocking():
+async def test_splice_document_storage_failure_nonblocking():
     """Storage upload failure is logged and non-blocking; extraction and ingestion still proceed."""
     supabase = _build_mock_supabase()
     supabase.storage.from_().upload.side_effect = Exception("Storage bucket timeout")
@@ -339,7 +339,7 @@ def test_splice_document_storage_failure_nonblocking():
 
     with patch("app.api.documents.extract_text", return_value="text") as mock_extract, \
          patch("app.api.documents.ingest_document") as mock_ingest:
-        splice_document(
+        await splice_document(
             document_id=DOC_ID_1,
             raw=b"text",
             mime_type="text/plain",
@@ -353,13 +353,13 @@ def test_splice_document_storage_failure_nonblocking():
         mock_ingest.assert_called_once()
 
 
-def test_splice_document_extraction_failure_marks_failed():
+async def test_splice_document_extraction_failure_marks_failed():
     """Extraction failure catches exception and marks documents row status='failed', ingestion_step='failed'."""
     supabase = _build_mock_supabase()
 
     with patch("app.api.documents.extract_text", side_effect=ValueError("Corrupt document stream")), \
          patch("app.api.documents.ingest_document") as mock_ingest:
-        splice_document(
+        await splice_document(
             document_id=DOC_ID_1,
             raw=b"bad bytes",
             mime_type="text/plain",

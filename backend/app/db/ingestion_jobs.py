@@ -168,19 +168,22 @@ async def update_job_progress(
     progress_patch: dict[str, Any] | None = None,
 ) -> None:
     """Merge stage and batch offset progress into ingestion_jobs.progress."""
+    import json  # noqa: PLC0415
+    patch_json = json.dumps(progress_patch) if progress_patch is not None else None
+
     async with pool.acquire() as con:
-        if stage is not None and progress_patch is not None:
+        if stage is not None and patch_json is not None:
             await con.execute(
                 """
                 UPDATE ingestion_jobs
                 SET stage = $2,
-                    progress = progress || $3,
+                    progress = progress || $3::jsonb,
                     updated_at = now()
                 WHERE id = $1
                 """,
                 job_id,
                 stage,
-                progress_patch,
+                patch_json,
             )
         elif stage is not None:
             await con.execute(
@@ -193,16 +196,16 @@ async def update_job_progress(
                 job_id,
                 stage,
             )
-        elif progress_patch is not None:
+        elif patch_json is not None:
             await con.execute(
                 """
                 UPDATE ingestion_jobs
-                SET progress = progress || $2,
+                SET progress = progress || $2::jsonb,
                     updated_at = now()
                 WHERE id = $1
                 """,
                 job_id,
-                progress_patch,
+                patch_json,
             )
 
 
