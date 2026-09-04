@@ -112,6 +112,7 @@ environment. When a change touches the left column, do the right column **in clo
 | **A model / provider** | The cloud provider **key** (env) must serve the chosen model. Local and cloud keys can differ — a model that works locally can 404 on cloud (this caused the metadata-extraction bug: extraction defaulted to `gpt-4o`, which the cloud key couldn't serve). Pin known-good models. |
 | **The code sandbox** | Cloud needs the Docker socket mounted into the backend container **and** the sandbox image built **on the VPS host** (`agentic-rag-sandbox:<tag>`). Local just uses your laptop's Docker. **⚠️ Coolify's Docker cleanup prunes the host-built image** (it did on 2026-07-12 — sandbox 404'd right after a routine push): the image must stay pinned by the `sandbox-image-keeper` container (`docker create --name sandbox-image-keeper agentic-rag-sandbox:<tag>`). After ANY production push, a 30-second smoke test of code execution in a NEW chat is cheap insurance; if the tag ever bumps, rebuild on the host + `docker rm sandbox-image-keeper` + recreate the keeper on the new tag (full recipe: `DEPLOYMENT-LESSONS.md` B2). |
 | **CORS / allowed origins** | `FRONTEND_URL` (Coolify) must list every live frontend origin, comma-separated. |
+| **Subdomain routing (`app.<domain>`)** | Attach `app.<domain>` to Vercel project, set `VITE_APP_URL=https://app.<domain>`, add to Coolify `FRONTEND_URL`, and update Cloud Supabase Auth Site URL & redirect allowlist (full 7-step runbook in `docs/OPERATOR.md`). |
 
 **Settings drift is the #1 cloud gotcha.** Many settings columns exist in the DB but some are
 still env/hardcoded; the planned admin-panel milestone moves everything to DB control. Until
@@ -132,6 +133,7 @@ Before `master → production`:
 - [ ] Cross-provider: the change works across providers, not just the one you tested
       (provider-specific handling stays at the service boundary, never breaks the shared path).
 - [ ] Watched the Coolify + Vercel deploy logs go ✅ after pushing.
+- [ ] Preview verification: verify root `/` serves landing, root `/app` 308-redirects to `https://app.<domain>/app`, and subdomain `/` mounts the SPA.
 - [ ] Smoke-tested the live app (login, chat stream, a doc ingest) on the real domain.
 
 ---

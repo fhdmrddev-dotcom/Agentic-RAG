@@ -3145,6 +3145,8 @@ const BASELINE = {
   // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
   "MessageItem.retry.test.tsx": 4,
   "MessageItem.capPaused.test.tsx": 5,
+  // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
+  "vercelRouting.test.ts": 6,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4412,6 +4414,8 @@ const TARGETS = [
   // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
   "src/components/chat/__tests__/MessageItem.retry.test.tsx",
   "src/components/chat/__tests__/MessageItem.capPaused.test.tsx",
+  // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
+  "src/__tests__/routing/vercelRouting.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -83,3 +83,25 @@ def test_get_redis_invocation_outage_graceful_redirect(client: TestClient):
         r2 = client.get(f"/connectors/mcp/oauth/callback?code=code123&state={state_handle}")
         assert r2.status_code == 307
         assert r2.headers.get("location") == f"{frontend_url}/app?connections=1&oauth_error=redis_unavailable"
+
+
+def test_primary_frontend_origin_prefers_app_subdomain():
+    """DEBT-04: Ensure primary_frontend_origin resolves app.<domain> regardless of comma list ordering."""
+    from app.config import settings
+
+    # Case 1: app.<domain> is second in comma-separated list
+    with patch.object(settings, "frontend_url", "https://superrag.cloud, https://app.superrag.cloud"):
+        assert primary_frontend_origin() == "https://app.superrag.cloud"
+
+    # Case 2: app.<domain> is first
+    with patch.object(settings, "frontend_url", "https://app.superrag.cloud, https://superrag.cloud"):
+        assert primary_frontend_origin() == "https://app.superrag.cloud"
+
+    # Case 3: no app subdomain present -> first entry wins
+    with patch.object(settings, "frontend_url", "https://example.com, https://backup.example.com"):
+        assert primary_frontend_origin() == "https://example.com"
+
+    # Case 4: single origin with trailing slash
+    with patch.object(settings, "frontend_url", "https://app.example.com/"):
+        assert primary_frontend_origin() == "https://app.example.com"
+

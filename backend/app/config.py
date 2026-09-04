@@ -1404,5 +1404,12 @@ def primary_frontend_origin() -> str:
     alternates that exist for CORS. Never use this for CORS — that must keep the full list.
     """
     raw = getattr(settings, "frontend_url", "") or "http://localhost:5173"
-    first = next((part.strip() for part in raw.split(",") if part.strip()), "")
-    return (first or "http://localhost:5173").rstrip("/")
+    parts = [part.strip().rstrip("/") for part in raw.split(",") if part.strip()]
+    if not parts:
+        return "http://localhost:5173"
+    # If an app subdomain origin exists (e.g. https://app.superrag.cloud), prefer it as the canonical
+    # product home for redirects, else fall back to the first configured origin (SEED-242 / DEBT-04).
+    app_origin = next((p for p in parts if "://app." in p), None)
+    if app_origin:
+        return app_origin
+    return parts[0]

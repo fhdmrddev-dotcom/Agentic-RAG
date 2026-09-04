@@ -440,6 +440,35 @@ air-gapped buyer exists to validate it. This section is the pointer; nothing is 
 
 ---
 
+## Production Subdomain Routing (`app.<domain>`) — SEED-242 / DEBT-04
+
+For cloud production serving the marketing landing page at `https://<domain>` and the application SPA at `https://app.<domain>`, follow these 7 cutover steps:
+
+1. **Host-scoped Routing (`frontend/vercel.json`):**
+   - Host match `app.*` rewrites all paths `/(.*)` to `/app.html`.
+   - Root domain 308-redirects `/app`, `/setup`, and `/invite` to `https://app.:host/...`.
+   - Filesystem precedence preserves `/` serving `index.html` (landing page) on the root domain.
+2. **Vercel Build Environment (Landing):**
+   - Set `VITE_APP_URL=https://app.<domain>` so "Sign in" and "Get Started" CTAs direct users to the application subdomain.
+3. **Coolify / Backend Runtime Environment:**
+   - Set `FRONTEND_URL=https://app.<domain>,https://<domain>`.
+   - `primary_frontend_origin()` prefers `https://app.<domain>` for server-side redirects (OAuth callbacks, emails) while permitting both origins for CORS.
+4. **Cloud Supabase Auth Configuration:**
+   - In Supabase Dashboard → Authentication → URL Configuration:
+     - Update **Site URL** to `https://app.<domain>`.
+     - Add `https://app.<domain>/**` and `https://<domain>/**` to **Redirect URLs**.
+5. **CORS & Redirect Verification:**
+   - Ensure backend `FRONTEND_URL` comma-separated list contains both origins.
+6. **Deploy Parity Check:**
+   - Run `bash scripts/check-deploy-drift.sh` to confirm zero deployment artifact drift.
+7. **Pre-Promotion Preview Verification Checklist:**
+   - [ ] Root `https://<preview-domain>/` serves landing page (HTTP 200, `index.html`).
+   - [ ] Root `https://<preview-domain>/app` issues HTTP 308 redirect to `https://app.<domain>/app`.
+   - [ ] Subdomain `https://app.<domain>/` mounts application SPA with `div id="root"`.
+   - [ ] OAuth connect flow returns to `https://app.<domain>/app?connections=1&oauth_connected=1` and displays connected service.
+
+---
+
 ## Verification checklist (run on a real box)
 
 After `docker compose -f docker-compose.prod.yml up -d --build`, confirm:
