@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-04T22:24:40.460Z",
+  "phase": "230",
+  "phase_name": "The Durable Ingestion Queue",
+  "phase_dir": ".planning/phases/230-the-durable-ingestion-queue",
+  "plan": null,
+  "task": null,
+  "total_tasks": 5,
+  "status": "paused",
+  "role_note": "Claude is REVIEWER on this phase, not builder. Gemini plans and executes; Claude pre-flights before execution and verifies after. Ratified 2026-08-24, re-affirmed by the operator this session.",
+  "completed_tasks": [
+    {"id": 1, "name": "Milestone v4.0 Connected Knowledge started (PROJECT.md, STATE.md, research x5, REQUIREMENTS.md 38 reqs, ROADMAP.md 14 phases 228-241)", "status": "done", "commit": "722467ff8"},
+    {"id": 2, "name": "Phase 228 v3.9 Closeout — executed by Gemini, pre-flighted and verified by Claude; 2 corrections applied", "status": "done", "commit": "7199fc144"},
+    {"id": 3, "name": "Phase 229 The One Ingest Splice — executed by Gemini, verified PASS by driving; no corrections owed", "status": "done", "commit": "bec877152"},
+    {"id": 4, "name": "Phase 230 planned by Gemini (5 plans + seam audit); Claude pre-flight written = REVISE, 3 blocking gaps", "status": "done", "commit": "986c9fec2"},
+    {"id": 5, "name": "Sketch 227 authored, driven in Chrome, LOCKED as variant B, sent to Gemini on BUS-111", "status": "done", "commit": "e0fdaa8d1"}
+  ],
+  "remaining_tasks": [
+    {"id": 6, "name": "Gemini closes pre-flight G-1 (stale-claim sweeper — SC#1 has no mechanism)", "status": "not_started", "owner": "gemini"},
+    {"id": 7, "name": "Gemini closes G-3 (recall harness collected by no gate) and G-4 (ledger update in wrong wave)", "status": "not_started", "owner": "gemini"},
+    {"id": 8, "name": "Gemini fixes 230-05 paths + builds the locked variant B lane in Ingestion > In progress", "status": "not_started", "owner": "gemini"},
+    {"id": 9, "name": "Gemini executes waves 1-4 and posts to the bus", "status": "not_started", "owner": "gemini"},
+    {"id": 10, "name": "Claude verifies Phase 230 by DRIVING — including actually killing the backend mid-batch", "status": "not_started", "owner": "claude"}
+  ],
+  "blockers": [
+    {"description": "Phase 230 verdict is REVISE, not execute. Three blocking pre-flight gaps must close before execution.", "type": "technical", "workaround": "Detail in .planning/phases/230-the-durable-ingestion-queue/230-PREFLIGHT.md; sent on BUS-107/BUS-111."},
+    {"description": "DEBT-03 (/code-review ultra review-base-225) is BLOCKED ON OPERATOR — user-triggered and billed, no agent can launch it.", "type": "human_action", "workaround": "Recorded as blocked with a credits trigger in 228-VERIFICATION.md. Phase 228 scores 4 passed / 1 blocked, not 5/5."}
+  ],
+  "human_actions_pending": [
+    {"action": "Run /code-review ultra review-base-225 when credits allow", "context": "DEBT-03, owed since Phase 225; must run before the v3.9 production push", "blocking": false},
+    {"action": "Decide: does a PAUSED batch appear under Ingestion > In progress or > Needs attention?", "context": "Sketch 227 open decision; reviewer recommends In progress because the refusal says 'nothing for you to do'", "blocking": false},
+    {"action": "Test the cap_paused Continue-after-reload fix from Phase 228", "context": "The dev DB has ZERO cap_paused rows, so that path has never fired against real data. Needs a run that burns 15 tool calls.", "blocking": false},
+    {"action": "app.<domain> production move (SEED-242 / DEBT-04)", "context": "Config written and drift-clean, but not live; verify on a preview before promoting", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Milestone v4.0 = Connected Knowledge, 14 phases 228-241, 38 requirements", "rationale": "Phase 219 was deferred from v3.9 because its SC#1 was the binding re-open trigger for SEED-209/210/211/212", "phase": "milestone"},
+    {"decision": "SEED-210 permission fork answered as Option 3 — connection-scoped visibility; SEED-211's M-Files model decided-and-recorded, NOT built", "rationale": "Caps the access-control surface so the sync ships; retrofit is a re-ingest not a migration, so the DECISION could not wait even though the BUILD can", "phase": "milestone"},
+    {"decision": "D-1: the preview cannot claim a content_hash match from a list-only pass -> two-tier identity + a fourth 'can't tell' bucket", "rationale": "documents.py:620 hashes raw bytes; Drive has no hash for native Docs; Graph guarantees only quickXorHash", "phase": "233"},
+    {"decision": "D-2: NO automatic cross-provider embedding substitution, ever", "rationale": "One global vector(N); matching the dimension does not make vector SPACES compatible — silently degraded recall with green status everywhere", "phase": "230"},
+    {"decision": "D-3: email = one message = one document, thread_key groups; mail sequenced LAST", "rationale": "~80% already ships (strip_quoted_replies, attachments-as-children, one parse_eml_bytes). The intake 'second shape' warning was SOFTENED by measurement, not withdrawn.", "phase": "240"},
+    {"decision": "D-4: disconnect FREEZES a connection's documents (excluded from retrieval) with named Purge now + Reconnect", "rationale": "SEED-210's explicitly undecided row; Microsoft ships the freeze shape as precedent; never destroys knowledge on an accidental disconnect", "phase": "231"},
+    {"decision": "Sketch 227 winner = variant B (the batch lane); variant A's 3D orb NOT built", "rationale": "Operator pick 2026-09-05 after asking whether it contradicts the shipped Library", "phase": "230"},
+    {"decision": "The sketch's ETA was CUT; the determinate bar over FILES survives", "rationale": "D-217-19 forbids percentages/ETAs because uploadDocument has no onUploadProgress. But ingestion_jobs rows are discrete and countable — upload bytes are not. Same rule, correctly scoped.", "phase": "230"},
+    {"decision": "Department-level access must be CONSIDERED at Phase 231 — not built, not foreclosed", "rationale": "Operator direction 2026-09-05. 46 tables carry org_id, ONE carries dept_id (0 rows). A second scope added after the RLS predicate is set is a re-ingest, not a migration.", "phase": "231"}
+  ],
+  "uncommitted_files": [
+    "samples/takeoff/sample_master_rate_sheet.xlsx (PRE-EXISTING, not this session)",
+    "screenshots/* deletions (PRE-EXISTING, not this session)",
+    "graphify-out/converted/* untracked (PRE-EXISTING, not this session)"
+  ],
+  "next_action": "Wait for Gemini to post Phase 230 execution on the agent bus, then verify by DRIVING — the headline check is killing the backend mid-batch and confirming every file still finishes (SC#1), because that is the criterion the pre-flight found had no mechanism.",
+  "context_notes": "This session's working pattern is the ratified pipeline: Gemini plans + executes, Claude pre-flights before execution and verifies after by DRIVING rather than reading. That pattern earned its keep three times this session — the ATTACH-01 PGRST204 error mode, the cap_paused reconcile, and the mint_document_row insert were all settled by running code, not reading it. Two of the session's most valuable findings came from the OPERATOR testing manually (the inverted ingestion doors, BUG-260905-01) and from measuring a number the docs asserted (the backend baseline was 71, not the 95 I had written). Working files: .planning/phases/230-the-durable-ingestion-queue/230-PREFLIGHT.md and .planning/sketches/227-the-paused-queue-and-its-refusal/."
+}
