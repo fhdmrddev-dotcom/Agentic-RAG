@@ -8,6 +8,91 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
+## Current Milestone: v4.0 Connected Knowledge
+
+**Goal:** The knowledge base stops depending on somebody remembering to upload — a person connects a
+source **once**, sees exactly what it would bring in **before** it brings anything, and the Library
+keeps reading it on a schedule, safely and at a customer's scale.
+
+**Started:** 2026-09-04. Phase numbering continues at **228**.
+
+**Target features:**
+- **The watch loop** — connect a source, map an external folder to a Library folder, watched on the
+  **shipped** scheduler (never a new one). The preview splits three ways: *will be added* /
+  *already here* (a `content_hash` lookup, not a guess) / *type not supported*, and **nothing is
+  ingested until a person says so**. A source that has stopped reading says so, says when, and
+  offers the one action that fixes it. (`LIB-08` / `LIB-09` / `LIB-10` — written into
+  `REQUIREMENTS.md` for the FIRST time; they have lived only in a roadmap heading until now.)
+- **Four source families as ADAPTERS over ONE contract** — Google Drive (proven OAuth at 215/221) ·
+  OneDrive / SharePoint (Microsoft Graph) · any MCP server exposing a file surface · email / mailbox.
+- **The inbound permission envelope** — **connection-scoped visibility** as the shipped v1, stated
+  plainly in the UI; every source lifecycle event answered explicitly (deleted / unshared / moved /
+  modified / source-disconnected).
+- **Ingest at scale** — a durable ingestion job queue with cap, retry and resume; embed batching;
+  embedding-provider fallback; filtered-vector recall at corpus scale.
+- **Inbound content is untrusted** — the written anti-prompt-injection discipline actually attacked;
+  PII/DLP over the ingested corpus; erasure and purge-on-disconnect.
+- **One rule engine, not two** — the folder-watch rules and the classification splice designed
+  together.
+- **v3.9 closeout, first** — the owed UAT rows and G-4 operator drives, the resume-path bug cluster,
+  `/code-review ultra` on the OAuth state rework, and the `app.<domain>` production move.
+
+**Decisions taken at scoping (2026-09-04, operator):**
+- ⭐ **The permission fork is ANSWERED: `SEED-210` Option 3 — connection-scoped visibility.**
+  Everything from one connection inherits ONE visibility, and **the UI says so plainly**.
+  `SEED-211`'s metadata-derived (M-Files) model is **DECIDED AND RECORDED with a migration path,
+  NOT BUILT** this milestone. This satisfies `SEED-210`/`SEED-211`'s "must be decided together"
+  requirement while capping the access-control surface so the sync actually ships. ⚠ The seed's own
+  warning stands: *"Option 3 or 4 is a legitimate v1 — silence is not."* Silence is the one option
+  with no defence, and it is now foreclosed.
+- **All four source families are IN**, on the binding constraint below.
+- **Meeting transcripts (`SEED-212`) are OUT**, trigger intact — they are EVENT-shaped, a source
+  *shape* rather than a source *provider*.
+- **v3.9's debt gets a phase number**, not a bullet in `STATE.md` — that is precisely how it survived
+  the last close.
+
+**Binding constraints (not aspirations):**
+- ⭐ **A watched source must be DATA, not code** — the v3.9 lesson applied inbound. One generic
+  `list → read → hash → splice` contract with Drive / Graph / MCP / mail as **thin adapters**. If each
+  source family grows its own ingest path, this is four milestones wearing one name.
+- ⚠ **THIS MILESTONE RETIRES A STANDING `CLAUDE.md` RULE** — *"Ingestion is manual file upload only
+  — no connectors or automated pipelines"*, marked *dated, not permanent*, must be changed **in the
+  same commit** as the first sync connector (`SEED-142`). ⭐ **And that same commit retires the reason
+  our permission model was adequate**: every document in the corpus was until now deliberately placed
+  by a person who could already read it, which is what made ownership-based RLS sound.
+- ⚠ **Threat model MANDATORY** on the sync phase — untrusted external content enters the corpus the
+  agent answers from, and a new credential scope is added.
+- ⚠ **The screen says "checked every N minutes"** — never *"instantly"* or *"on change"*. There is no
+  delta cursor and no webhook; when one lands, the sentence changes in the same commit.
+- ⚠ **A file removed at the source is NOT removed from the Library** unless explicitly asked for. A
+  revoked share must never silently delete knowledge the agent depends on.
+- ⚠ **Write and delete grants are OFF by default** — they inherit Phase 213's approval model and
+  invent nothing.
+
+**Known shape-risk, stated at scoping rather than discovered later:** **email is a second SHAPE
+smuggled in as a fourth provider.** Drive, OneDrive and MCP-file are all one shape — a file with a
+path and a hash. A mailbox is threads, quoting, and attachments-as-children, with no stable document
+boundary — the same class of problem as `SEED-212`, which this milestone deliberately deferred.
+Expect it to behave like a shape decision, not an adapter.
+
+**Depends on shipped work:** Phase 215 (OAuth — HARD) and Phase 216 (`ATTACH-01`, the deliberate
+one-file pull this generalises into a standing sync). ⭐ **`ATTACH-01` stays shipped and is
+deliberately unaffected** — a human picking ONE file dodges ACL mirroring, deletion propagation and
+the sync loop entirely, which is why `SEED-213` was kept in v3.9 while its four siblings were deferred.
+
+**Seeds folded (18):** `209` `210` `211` `142` (the carried foundation) · `077` `197` `076` `048`
+(ingest at scale — ⭐ `076` and `077` each name *"the next milestone"* as their hard prerequisite in
+their own text) · `188` `079` `072` (inbound content is untrusted) · `243` (one rule engine — the
+deferred phase text says the two surfaces *"should be designed together rather than growing two rule
+engines"*) · `014` `239` `060` `224` (loop reliability + surface) · `213` `242`.
+
+**Deferred with triggers intact:** `SEED-212` (transcripts — re-open on any transcription connector
+or a "what was decided in the meeting" query) · `SEED-013` / `SEED-195` (inbound / Open Platform —
+its own milestone) · `SEED-211`'s BUILD (re-open when connection-scoped visibility is measured
+insufficient by a real tenant).
+
+---
+
 ## Last Shipped: v3.9 Connections — Any Service, Any Tool
 
 **Shipped:** 2026-09-04 — 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed**
@@ -279,7 +364,7 @@ been scheduled.** This milestone schedules them.
 
 **Shipped:** **v3.9 Connections: Any Service, Any Tool** — 2026-09-04 (16 phases, **111 plans**, 695 commits, 9 days; git tag `v3.9`). A connection became `{service identity, auth, discovered tools, per-tool grants}`, so **adding a service adds rows, not code** — Notion connects by OAuth with no developer console and returns 41 tools for zero lines of tool code; six Google applications sit under one token with 11/11 live writes. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. 34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven. Migrations 127-129 / 140-141 / 150-152.
 
-**Current:** **no milestone active.** Next: `/gsd:new-milestone` — the sequenced next slot is **Connected Knowledge**, which carries deferred Phase 219, `LIB-08/09/10` and `SEED-209/210/211/212` together. ⚠ Write `LIB-08/09/10` into that milestone's `REQUIREMENTS.md`; they have never existed anywhere but a roadmap heading.
+**Current:** **milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering continues at **228**. The knowledge base stops depending on somebody remembering to upload: a source is connected once, previewed before it brings anything, and then watched on the shipped scheduler. Four source families (Google Drive · OneDrive/SharePoint · any MCP file surface · email) as **thin adapters over ONE `list → read → hash → splice` contract** — a watched source must be data, not code. ⭐ **The `SEED-210` permission fork is answered: connection-scoped visibility, stated plainly in the UI**; the M-Files metadata-derived model (`SEED-211`) is decided and recorded with a migration path, not built. ⚠ This milestone **retires the standing manual-upload-only `CLAUDE.md` rule in the same commit as the first sync connector** — and that same commit retires the reason ownership-based RLS was adequate. 18 seeds folded; `SEED-212` (transcripts) deferred with its trigger intact.
 
 ⚠ **Armed for the next production push:** `SEED-242` moves the product to `app.<domain>` (seven steps across Vercel / Coolify / Supabase Auth / CORS — verify on a preview before promoting), and `/code-review ultra review-base-225` is owed on the OAuth state rework, skipped at Phase 225 only because credits were exhausted.
 
@@ -863,4 +948,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-04 — **milestone v3.9 Connections: Any Service, Any Tool COMPLETE** via /gsd:complete-milestone. 16 phases, 111 plans, 695 commits, 9 days, git tag `v3.9`; **34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven**. Phase numbering continues at **228**. ⚠ **Phase 219 DEFERRED** to the Connected Knowledge milestone with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS those seeds' binding re-open trigger, so the feature moved rather than the trigger firing. ⚠ At the close, `REQUIREMENTS.md` was found stale by **32 of 39 rows** for the THIRD consecutive milestone and every Status cell was re-derived against phase artifacts before archiving. Prior entry: 2026-08-26 when v3.9 started.*
+*Last updated: 2026-09-04 — **milestone v4.0 Connected Knowledge STARTED** via /gsd:new-milestone. Scope set by operator at intake: `SEED-210` Option 3 (connection-scoped visibility) ships and `SEED-211`'s M-Files fork is decided-not-built; all four source families in; `SEED-212` transcripts out with trigger intact; v3.9's owed verification gets its own closeout phase rather than a `STATE.md` bullet. 18 seeds folded. Phase numbering continues at **228**. ⚠ `LIB-08/09/10` must be written into `REQUIREMENTS.md` — they have never existed outside a roadmap heading. Prior entry: 2026-09-04 when v3.9 completed.*
