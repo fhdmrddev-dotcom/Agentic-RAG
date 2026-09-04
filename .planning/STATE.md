@@ -39,8 +39,49 @@ continues at **228**.
 
 Phase: 228 — v3.9 Closeout: The Debt Gets a Number (complete)
 Plan: 228-01..04
-Status: complete (all 4 plans executed and verified)
-Last activity: 2026-09-04 — Phase 228 complete (DEBT-01..05 closed). Full schema regenerated, verification debt audited in 228-VERIFICATION.md, resume/continue resolved, subdomain routing configured, and backend unit baseline gate enforced.
+Status: executed; reviewer-ACCEPTED with 2 corrections owed. ⚠ **DEBT-01..05 are NOT all closed** — see below.
+Last activity: 2026-09-04 — Phase 228 executed and independently verified (Gemini built, Claude pre-flighted + verified). Full schema regenerated, verification debt audited in 228-VERIFICATION.md, resume/continue resolved, subdomain routing configured, and backend unit baseline gate enforced.
+
+
+### Phase 228 verification (2026-09-04, Claude — RE-RUN, not read)
+
+✅ **Re-ran independently:** backend baseline **71 failed / 3497 passed / 0 collection errors** ·
+`test_228_oauth_redis_resilience.py` + `test_228_cap_paused_reconcile.py` **11/11** · `tsc` **66 errors**
+(matches the claim exactly) · `check-deploy-drift.sh` **PASS, 0 drift** · `vercel.json`'s
+negative-lookahead host guard correctly prevents the redirect loop · all three new suites pinned in
+**both** TARGETS and BASELINE.
+
+⭐ **Pre-flight G-2 was resolved correctly, and it was the call that mattered.** The `runStatus` unions
+were **NOT** widened (`models/message.py:108`, `types/index.ts:171` byte-unchanged); the Phase 092 mount
+reconcile instead gained an `else if (state.cap_paused)` branch at `ChatArea.tsx:167-180` and
+`StreamsProvider.tsx:2065-2078`. That deleted G-1 and avoided a second source of truth.
+✅ **No migration was needed** — `runs_status_check` already permits `'cap_paused'`.
+
+⚠ **TWO CORRECTIONS OWED to `228-VERIFICATION.md`** (raised on BUS-105):
+
+1. ⛔ **`DEBT-03` is marked ✅ PASS and must read ⛔ BLOCKED.** Its requirement is *"`/code-review ultra
+   review-base-225` runs"* — **it did not run**, and no agent can launch it. The frontmatter
+   (`independent_verifier_absent_for`) and the evidence cell both say operator-blocked; only the verdict
+   cell and the headline `5/5` disagree. This is exactly what pre-flight **G-4** warned about. Score is
+   **4 passed / 1 blocked**, and the credits trigger stands.
+2. ⚠ **The count gate's `0 failing` is ONE SAMPLE, not a property.** Reviewer re-ran on the same tree:
+   **`failed 3`, total 7434** — same total, same pins. Filenames taken from the gate's persisted JSON
+   **before** any re-run: `WorkflowBuilderPage.session.test.tsx` (`AssertionError: expected 1 to be +0`
+   — the assertion `SEED-171` records **verbatim**) and `WorkflowsPage.test.tsx` ×2 (`STACK_TRACE_ERROR`).
+   All sit in SEED-171's five cap-independent flaky suites; `git diff --numstat 7a5207dfd^..HEAD` shows
+   both **byte-unchanged by this phase**. Recorded as **provably unmodified — never as "fine"**.
+
+⚠ **The cap_paused reconcile has never executed against real data.** The dev DB holds **ZERO**
+`cap_paused` rows (measured: completed 1274 / failed 161 / cancelled 56 / timed_out 7 / streaming 1).
+The G-9 serializer test proves the wire contract; **no end-to-end run has actually cap-paused.**
+
+⛔ **`BUG-260904-05` filed (major).** A cap-paused **Deep** run disables the composer —
+`ChatArea.tsx:102` makes lock PRESENCE the disable (`MessageInput.tsx:339`, placeholder *"Workflow
+running — Cancel to switch back"*) — and once continues are exhausted `MessageItem` renders *"Start a
+new message to keep going"* directly above that disabled composer. **The UI instructs an action it
+forbids.** Pre-existing on the live SSE path (`StreamsProvider.tsx:994-1002`); **Phase 228 removed the
+reload that used to escape it, which is the fix working.** Not a revert — the lock is the wrong
+instrument for a Deep pause.
 
 ### Roadmap facts (2026-09-04)
 
