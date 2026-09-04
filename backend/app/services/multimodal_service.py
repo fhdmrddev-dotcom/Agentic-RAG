@@ -411,6 +411,10 @@ def embed_and_store_table_chunks(
         pass
 
     embeddings = embed_texts(all_table_chunks, user_settings=app_settings)
+    if len(embeddings) != len(all_table_chunks):
+        raise ValueError(
+            f"Mismatched table embedding count: expected {len(all_table_chunks)}, got {len(embeddings)}"
+        )
     _tbl_embedding_model = (
         getattr(app_settings, "embedding_model", None) or "text-embedding-3-small"
     )
@@ -886,6 +890,10 @@ def extract_and_store_images(
             if descriptions:
                 texts = [d[1] for d in descriptions]
                 embeddings = embed_texts(texts, user_settings=app_settings)
+                if len(embeddings) != len(texts):
+                    raise ValueError(
+                        f"Mismatched image embedding count: expected {len(texts)}, got {len(embeddings)}"
+                    )
                 # D-10 parity with the text-chunk path (documents.py): tag image
                 # chunks with the embedding model + dims they were produced under.
                 # Without this they land with embedding_model=NULL, which (a) strands

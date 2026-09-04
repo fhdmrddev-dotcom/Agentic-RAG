@@ -2126,15 +2126,82 @@ def _create_with_openrouter_routing_retry(client, kwargs: dict, provider: str):
         return client.chat.completions.create(**retry)
 
 
+EMBED_MAX_TOKENS_PER_BATCH = 200_000
+EMBED_MAX_INPUTS_PER_BATCH = 512
+
+
+def estimate_embedding_tokens(text: str) -> int:
+    """Estimate token count for a text string using cl100k_base or a safe char ratio."""
+    if not text:
+        return 0
+    try:
+        from app.services.context_window import _get_cl100k
+        encoder = _get_cl100k()
+        if encoder is not None:
+            return len(encoder.encode(text, disallowed_special=()))
+    except Exception:
+        pass
+    return int(len(text) / 3.5) + 4
+
+
+def partition_texts_for_embedding(
+    texts: list[str],
+    max_tokens: int = EMBED_MAX_TOKENS_PER_BATCH,
+    max_inputs: int = EMBED_MAX_INPUTS_PER_BATCH,
+) -> list[list[str]]:
+    """Partition texts into batches bounded by max_tokens and max_inputs (QUEUE-04 / SEED-197)."""
+    if not texts:
+        return []
+    batches: list[list[str]] = []
+    current_batch: list[str] = []
+    current_tokens = 0
+
+    for text in texts:
+        tokens = estimate_embedding_tokens(text)
+        if current_batch and (current_tokens + tokens > max_tokens or len(current_batch) >= max_inputs):
+            batches.append(current_batch)
+            current_batch = [text]
+            current_tokens = tokens
+        else:
+            current_batch.append(text)
+            current_tokens += tokens
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
+
 def embed_texts(
     texts: list[str],
     model: str | None = None,
     user_settings: UserEffectiveSettings | None = None,
 ) -> list[list[float]]:
+    """Generate vector embeddings for a list of texts, transparently batching large payloads.
+
+    Guarantees requests stay strictly below OpenAI's 300,000 token request ceiling and 2,048 input limit
+    (using conservative defaults: 200k tokens, 512 chunks). Preserves input ordering and asserts
+    len(all_embeddings) == len(texts) (QUEUE-04 / SEED-197).
+    """
+    if not texts:
+        return []
+
     client = get_embedding_client(user_settings)
     effective_model = model or (user_settings.embedding_model if user_settings else None) or settings.embedding_model
-    response = client.embeddings.create(
-        model=effective_model,
-        input=texts,
-    )
-    return [item.embedding for item in response.data]
+
+    batches = partition_texts_for_embedding(texts)
+    all_embeddings: list[list[float]] = []
+
+    for batch in batches:
+        response = client.embeddings.create(
+            model=effective_model,
+            input=batch,
+        )
+        for item in response.data:
+            all_embeddings.append(item.embedding)
+
+    if len(all_embeddings) != len(texts):
+        raise ValueError(
+            f"Mismatched embedding count: got {len(all_embeddings)} embeddings for {len(texts)} texts"
+        )
+    return all_embeddings

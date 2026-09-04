@@ -1359,6 +1359,53 @@ COMMENT ON COLUMN public.harness_audit.org_id IS 'Forward-compat (D-PRD-02/D-11)
 
 
 --
+-- Name: ingestion_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ingestion_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid,
+    status text DEFAULT 'pending'::text NOT NULL,
+    stage text DEFAULT 'pending'::text NOT NULL,
+    progress jsonb DEFAULT '{}'::jsonb NOT NULL,
+    retry_count integer DEFAULT 0 NOT NULL,
+    max_retries integer DEFAULT 3 NOT NULL,
+    last_error text,
+    error_details jsonb,
+    next_run_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
+    claimed_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ingestion_jobs_stage_check CHECK ((stage = ANY (ARRAY['pending'::text, 'extracting'::text, 'tables_embedded'::text, 'chunks_embedded'::text, 'completed'::text, 'failed'::text]))),
+    CONSTRAINT ingestion_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'paused'::text, 'retry_queued'::text])))
+);
+
+
+--
+-- Name: TABLE ingestion_jobs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ingestion_jobs IS 'Phase 230: Durable queue table for asynchronous, restart-resilient document ingestion (QUEUE-01).';
+
+
+--
+-- Name: COLUMN ingestion_jobs.progress; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ingestion_jobs.progress IS 'Checkpoint JSONB containing chunk_offset, total_chunks, and stage metadata for granular resumption (SC#4).';
+
+
+--
+-- Name: COLUMN ingestion_jobs.claimed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ingestion_jobs.claimed_at IS 'Timestamp when worker claimed row via FOR UPDATE SKIP LOCKED. Read by reclaim_stale_ingestion_claims to rescue stranded jobs (G-1 / SC#1).';
+
+
+--
 -- Name: message_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2607,6 +2654,14 @@ ALTER TABLE ONLY public.harness_audit
 
 
 --
+-- Name: ingestion_jobs ingestion_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingestion_jobs
+    ADD CONSTRAINT ingestion_jobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: message_feedback message_feedback_message_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3362,6 +3417,34 @@ CREATE INDEX idx_harness_audit_run ON public.harness_audit USING btree (run_id) 
 --
 
 CREATE INDEX idx_harness_audit_user_created ON public.harness_audit USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_ingestion_jobs_claim; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ingestion_jobs_claim ON public.ingestion_jobs USING btree (status, next_run_at) WHERE (status = ANY (ARRAY['pending'::text, 'retry_queued'::text]));
+
+
+--
+-- Name: idx_ingestion_jobs_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ingestion_jobs_document_id ON public.ingestion_jobs USING btree (document_id);
+
+
+--
+-- Name: idx_ingestion_jobs_stale; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ingestion_jobs_stale ON public.ingestion_jobs USING btree (status, claimed_at) WHERE (status = 'processing'::text);
+
+
+--
+-- Name: idx_ingestion_jobs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ingestion_jobs_user_id ON public.ingestion_jobs USING btree (user_id);
 
 
 --
@@ -4539,6 +4622,30 @@ ALTER TABLE ONLY public.harness_audit
 
 
 --
+-- Name: ingestion_jobs ingestion_jobs_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingestion_jobs
+    ADD CONSTRAINT ingestion_jobs_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ingestion_jobs ingestion_jobs_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingestion_jobs
+    ADD CONSTRAINT ingestion_jobs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+
+--
+-- Name: ingestion_jobs ingestion_jobs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingestion_jobs
+    ADD CONSTRAINT ingestion_jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: message_feedback message_feedback_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5446,6 +5553,13 @@ CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SEL
 
 
 --
+-- Name: ingestion_jobs Users can view own ingestion jobs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own ingestion jobs" ON public.ingestion_jobs FOR SELECT TO authenticated USING ((auth.uid() = user_id));
+
+
+--
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -5769,6 +5883,12 @@ ALTER TABLE public.folders ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.harness_audit ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: ingestion_jobs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ingestion_jobs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: message_feedback; Type: ROW SECURITY; Schema: public; Owner: -
