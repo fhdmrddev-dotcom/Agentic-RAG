@@ -74,7 +74,14 @@ export function RunStatusStrip({
         placement === "header-bare"
           ? "text-muted-foreground"
           : placement === "header"
-            ? "rounded-full border border-border bg-[hsl(220_30%_11%/0.8)] px-2.5 py-1 text-muted-foreground"
+            ? // BUG-260904-03: this was the literal `bg-[hsl(220_30%_11%/0.8)]` — the DARK theme's
+              // surface, frozen into the markup. In light theme it rendered a near-black pill
+              // (measured `rgba(20, 25, 36, 0.8)` on a white page), which is the "badge colour …
+              // is in black" the operator reported. ⚠ `220 30% 11%` is EXACTLY the dark block's
+              // `--muted`, so `bg-muted/80` is byte-identical in dark and finally correct in
+              // light — a token swap, not a re-design. The floating variant one line below
+              // already used a token (`bg-popover/92`); only this branch was hardcoded.
+              "rounded-full border border-border bg-muted/80 px-2.5 py-1 text-muted-foreground"
             : "rounded-full border border-primary/40 bg-popover/92 px-3 py-1.5 shadow-lg backdrop-blur-md",
         isDone && "text-success",
       )}
