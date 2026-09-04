@@ -1267,6 +1267,7 @@ async def mcp_oauth_callback(
     an authenticated `require_org_manage` request, and `state` is a single-use random handle
     that resolves to that record. Nothing here trusts a value the caller supplied.
     """
+    from redis.exceptions import RedisError
     from app.dependencies import get_redis
     from app.services.mcp_oauth import McpOAuthError, complete_authorization
     from app.config import settings, primary_frontend_origin
@@ -1286,7 +1287,14 @@ async def mcp_oauth_callback(
         )
 
     try:
-        tokens, pending = await complete_authorization(get_redis(), handle=state, code=code)
+        redis_client = get_redis()
+        tokens, pending = await complete_authorization(redis_client, handle=state, code=code)
+    except (RedisError, ConnectionError, TimeoutError, OSError) as exc:
+        logger.error("mcp oauth: redis outage during authorization: %s", exc)
+        return RedirectResponse(
+            url=f"{frontend_url}/app?connections=1&oauth_error=redis_unavailable",
+            status_code=307,
+        )
     except (McpOAuthError, EgressRefused) as exc:
         logger.warning("mcp oauth: could not complete the connection: %s", exc)
         return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=exchange_failed")
@@ -1450,6 +1458,7 @@ async def oauth_callback(
     error_description: str = Query(None),
 ) -> RedirectResponse:
     """Phase 215 (OAUTH-02) — Verify signed state, exchange code for tokens, encrypt, and redirect to settings."""
+    from redis.exceptions import RedisError
     from app.dependencies import get_redis
     from app.services.oauth_state import OAuthStateError, take_pending_state
     from app.services.oauth_service import (
@@ -1479,13 +1488,20 @@ async def oauth_callback(
     pending_org_id: str | None = None
 
     try:
-        pending = await take_pending_state(get_redis(), state, expected_flow="provider")
+        redis_client = get_redis()
+        pending = await take_pending_state(redis_client, state, expected_flow="provider")
         provider = pending.provider
         connection_id = pending.connection_id
         code_verifier = pending.code_verifier
         client_id = pending.client_id
         client_secret = pending.client_secret
         pending_org_id = pending.org_id
+    except (RedisError, ConnectionError, TimeoutError, OSError) as exc:
+        logger.error("oauth callback: redis outage during state lookup: %s", exc)
+        return RedirectResponse(
+            url=f"{frontend_url}/app?connections=1&oauth_error=redis_unavailable",
+            status_code=307,
+        )
     except OAuthStateError:
         # In-flight legacy fallback path (SC#3):
         # Transition fallback: delete after the first prod deploy has been live 24 h

@@ -25,6 +25,7 @@ self-assessment. Decisions go `--to operator`, never settled agent-to-agent.
 
 ## Rules
 - Python backend must use a `venv` virtual environment
+- **Backend unit testing baseline gate (MANDATORY):** The canonical backend unit test command is `pytest tests/unit -q --continue-on-collection-errors` (or `node scripts/check-backend-unit-baseline.cjs`), run in `backend/` with the virtualenv. Milestone v4.0 locks the baseline at **71 failed, 3497 passed, 2 xfailed, 2 xpassed (0 collection errors)**. Any new failure above 71 breaks the gate (zero headroom). Never weaken this ceiling without explicit operator authorisation.
 - No LangChain, no LangGraph — raw SDK calls only
 - Use Pydantic for structured LLM outputs
 - All tables need Row-Level Security — users only see their own data (global folders/skills are the only shared scope)
