@@ -39,7 +39,7 @@ continues at **228**.
 
 Phase: 228 — v3.9 Closeout: The Debt Gets a Number (complete)
 Plan: 228-01..04
-Status: executed; reviewer-ACCEPTED with 2 corrections owed. ⚠ **DEBT-01..05 are NOT all closed** — see below.
+Status: ✅ **COMPLETE** — executed, reviewer-verified, both corrections APPLIED (`7199fc144`). ⚠ **4 passed / 1 BLOCKED** — `DEBT-03` is not closed and must not be read as closed.
 Last activity: 2026-09-04 — Phase 228 executed and independently verified (Gemini built, Claude pre-flighted + verified). Full schema regenerated, verification debt audited in 228-VERIFICATION.md, resume/continue resolved, subdomain routing configured, and backend unit baseline gate enforced.
 
 
@@ -57,21 +57,21 @@ reconcile instead gained an `else if (state.cap_paused)` branch at `ChatArea.tsx
 `StreamsProvider.tsx:2065-2078`. That deleted G-1 and avoided a second source of truth.
 ✅ **No migration was needed** — `runs_status_check` already permits `'cap_paused'`.
 
-⚠ **TWO CORRECTIONS OWED to `228-VERIFICATION.md`** (raised on BUS-105):
+✅ **BOTH CORRECTIONS APPLIED by Gemini at `7199fc144`, verified by the reviewer** — kept below as the record of what was wrong and why, because *the verdict cell disagreeing with its own evidence cell* is a failure mode worth recognising again:
 
-1. ⛔ **`DEBT-03` is marked ✅ PASS and must read ⛔ BLOCKED.** Its requirement is *"`/code-review ultra
+1. ✅ **FIXED — `DEBT-03` now reads ⛔ BLOCKED** (frontmatter `status: passed_with_blocked`, `score: 4 passed / 1 blocked`). It had been marked ✅ PASS. Its requirement is *"`/code-review ultra
    review-base-225` runs"* — **it did not run**, and no agent can launch it. The frontmatter
    (`independent_verifier_absent_for`) and the evidence cell both say operator-blocked; only the verdict
    cell and the headline `5/5` disagree. This is exactly what pre-flight **G-4** warned about. Score is
    **4 passed / 1 blocked**, and the credits trigger stands.
-2. ⚠ **The count gate's `0 failing` is ONE SAMPLE, not a property.** Reviewer re-ran on the same tree:
+2. ✅ **FIXED — the gate row now reads `0 failing (single sample)`** with a SEED-171 note naming the reviewer's three failures and their byte-unchanged evidence (`228-VERIFICATION.md:201,206,210`). The original claim was `0 failing` as a property. Reviewer re-ran on the same tree:
    **`failed 3`, total 7434** — same total, same pins. Filenames taken from the gate's persisted JSON
    **before** any re-run: `WorkflowBuilderPage.session.test.tsx` (`AssertionError: expected 1 to be +0`
    — the assertion `SEED-171` records **verbatim**) and `WorkflowsPage.test.tsx` ×2 (`STACK_TRACE_ERROR`).
    All sit in SEED-171's five cap-independent flaky suites; `git diff --numstat 7a5207dfd^..HEAD` shows
    both **byte-unchanged by this phase**. Recorded as **provably unmodified — never as "fine"**.
 
-⚠ **The cap_paused reconcile has never executed against real data.** The dev DB holds **ZERO**
+✅ **RECORDED in `228-VERIFICATION.md:136` as an Honesty Disclosure** — the cap_paused reconcile has never executed against real data. The dev DB holds **ZERO**
 `cap_paused` rows (measured: completed 1274 / failed 161 / cancelled 56 / timed_out 7 / streaming 1).
 The G-9 serializer test proves the wire contract; **no end-to-end run has actually cap-paused.**
 
