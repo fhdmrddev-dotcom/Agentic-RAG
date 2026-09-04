@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: planning
-last_updated: "2026-09-05T00:41:00.000Z"
+status: planned
+last_updated: "2026-09-05T00:46:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 14
   completed_phases: 1
-  total_plans: 4
+  total_plans: 8
   completed_plans: 4
   percent: 7
 ---
@@ -38,9 +38,10 @@ continues at **228**.
 ## Current Position
 
 Phase: 229 — The One Ingest Splice
-Plan: 229 context gathered; planning next
-Status: 🔄 **PLANNING** — discuss-phase complete; 229-CONTEXT.md and 229-DISCUSSION-LOG.md locked, ready for plan-phase
-Last activity: 2026-09-05 — Phase 229 discuss-phase complete (context captured, D-01..D-17 locked, SEED-115 updated with operator dual-tier storage & centralized access model).
+Plan: 229-01..04 authored (Wave 1: core splice, Wave 2: upload + connectors, Wave 3: email cascade, Wave 4: G-5 discharge & gate validation)
+Status: 📋 **PLANNED** — plan set (229-01..04), cross-plan seam audit (229-SEAM-AUDIT.md), and validation matrix (229-VALIDATION.md) locked; ready for pre-flight and execution
+Last activity: 2026-09-05 — Phase 229 planned (4 plans authored, seam audit complete, bus update ready for Claude pre-flight).
+
 
 
 
