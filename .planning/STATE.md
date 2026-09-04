@@ -117,6 +117,38 @@ than erroring.
 ✅ `scripts/check-deploy-drift.sh` → **PASS**.
 ⚠ `www.superrag.cloud` does not resolve (curl `000`). Pre-existing; not caused by this push.
 
+### ✅ SHIPPED 2026-09-04 — `32992901e` → `826ca7022`, both halves live and driven
+
+All **8 migrations applied by the operator** to cloud Supabase; `BACKEND_PUBLIC_URL=https://api.superrag.cloud`
+confirmed set in Coolify. `develop` `a403e0a27` → `master` `1335b4b1a` → `production` `826ca7022`,
+each a `--no-ff` merge; tag `v3.9` pushed. Promotion ran in a throwaway worktree, torn down with
+`scripts/teardown-worktree.sh` (venv + node_modules verified intact). `full-schema.sql` needed no
+regeneration — all five v3.9 objects were already in it.
+
+**Measured after the deploy, not assumed:**
+- Backend went **173 → 196 routes** and **5 → 14 connector routes**, with `/connectors/oauth/callback`
+  present — that is the tell that the new image is actually serving, rather than `/health` being 200.
+- `https://superrag.cloud/` serves the **landing** (`landing-eU_-LoqR.js`), `https://superrag.cloud/app`
+  serves the product. ⭐ Driven in a real browser on the operator's session.
+- ⭐ **Connections on CLOUD renders the v3.9 catalog**: 13 services, the Popular row (Slack / GitHub /
+  Notion), the `All / Connected / Not connected` filter, and `+ Add a connection` — which OPENS and
+  refuses honestly. Nothing was saved.
+- ⭐ **Migration 127 is proven on real data**: the pre-existing `Gmail (test)` row reads
+  `✓ Ready · checked 8d ago · Used by 1 step`, i.e. an existing row the migration backfilled
+  `service_id` onto, rendering correctly.
+
+⭐ **`CAT-05`'s cloud half — archived hours earlier as ⚠ Partial because it "was never verified" — is
+now verified.** ⚠ **`BUG-260810-01` still does NOT close:** its own bar is TWO things and only one was
+driven; **connecting a Popular service on cloud is still undriven**, and the trigger is narrowed to
+exactly that. Closing on half the evidence is the habit this register exists to prevent.
+
+⚠ **Still unverified on cloud and worth an early look:** `SECRETS_ENCRYPTION_KEY` was never confirmed
+present in Coolify. Migs 129/150 store OAuth tokens as `enc:v1:` ciphertext and that path **fails soft
+to plaintext**, so a missing key leaves no error — check before anyone completes an OAuth connect.
+⚠ `SCHEDULER_PROCESS_ENABLED=false` on production, so Phase 210's scheduler-off behaviour is what
+live will exercise — consistent with CONN-10/CONN-11 being undrivable rather than broken.
+⚠ `www.superrag.cloud` still does not resolve.
+
 ### Two owed items were surfaced at the push and DEFERRED BY THE OPERATOR — recorded, not absorbed
 
 1. **`SEED-242` (product at `app.<domain>`) fired and was deferred by one push.** v3.9 therefore ships

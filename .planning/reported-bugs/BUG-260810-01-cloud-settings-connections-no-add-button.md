@@ -17,7 +17,27 @@ re_open_trigger: "⚠ FOLDED INTO 212 AND SHIPPED, BUT THE CLOUD HALF WAS NEVER 
   and nothing in Phase 212 was driven there. The write affordance sits behind TWO conjuncts —
   `isOrgAdmin && liveConnectorsOn` (ConnectionsTab.tsx) — and only the second was exercised.
   FLIP TO `closed` ONLY AFTER: a cloud install shows the Add affordance and a Popular service
-  connects there. Until then this is shipped-but-unverified on the exact surface it was filed
+  connects there.
+
+  ⭐ **HALF ONE IS NOW DRIVEN — 2026-09-04, ON CLOUD, AT THE v3.9 PRODUCTION PUSH.**
+  Immediately after `826ca7022` deployed, the reviewer drove `https://superrag.cloud/app` →
+  Connections in a real browser on the operator's own logged-in session. **The catalog renders 13
+  services with the Popular row (Slack / GitHub / Notion), the All / Connected / Not connected
+  filter, and `+ Add a connection` is PRESENT** — so both conjuncts of
+  `isOrgAdmin && liveConnectorsOn` are satisfied on a cloud install, which is the exact thing this
+  report said had never been exercised. Clicking it OPENS the form, which asks *which service*
+  first and refuses honestly (*'sends to nothing yet — fill the fields above'* /
+  *'Save is off until this connection has a name and names a service'*). Nothing was saved.
+  ✅ Also observed on the same screen: the pre-existing **Gmail (test)** row reads
+  `✓ Ready · checked 8d ago · Used by 1 step` — an EXISTING row that migration 127 backfilled
+  `service_id` onto, rendering correctly. That is independent evidence 127 worked on real data.
+
+  ⚠ **STATUS STAYS `folded` AND `verified_closed_by` STAYS NULL, DELIBERATELY.** This report's own
+  bar is TWO things, and only one was driven: *a Popular service has NOT been connected on cloud.*
+  Closing on half the evidence is the exact habit this register exists to prevent.
+  **NARROWED re-open trigger — flip to `closed` when:** a Popular service (Slack, GitHub or Notion)
+  completes a real connect on `superrag.cloud` and reaches `Ready`. Everything else it asked for
+  is now evidenced. Until then this is shipped-but-unverified on the exact surface it was filed
   against. Re-open immediately if a cloud user still sees no Add button after 212 deploys."
 reproduces_on:
   branch: production
