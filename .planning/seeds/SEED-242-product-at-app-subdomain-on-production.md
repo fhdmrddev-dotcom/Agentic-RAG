@@ -61,3 +61,22 @@ prove it. Doing it early on develop would sit unverified for weeks.
 
 Fires on the next production push. If it is skipped there, the product ships at `<domain>/app`,
 which works but is not what the operator asked for — say so at the push rather than after it.
+
+### ⚠ IT FIRED ON 2026-09-04, IT WAS SAID, AND THE OPERATOR DEFERRED IT — ONE PUSH, NOT INDEFINITELY
+
+At the **v3.9 production push** the trigger fired and the consequence was stated before the push, as
+this seed requires: *shipping without it works, but it is not what you asked for.* The operator chose
+**ship at `/app` now, subdomain immediately after**, so the split can be proven on a Vercel preview
+without a live cutover in the middle of a 698-commit promotion.
+
+**What v3.9 therefore ships:** `https://superrag.cloud/` serves the **landing** (Vercel gives the
+filesystem precedence over rewrites, so `index.html` wins) and `https://superrag.cloud/app` serves the
+**product**. ⚠ That is already a visible change to the root domain — it served the app before this push.
+
+⚠ **A measured blocker for whoever picks this up:** the reviewer's Vercel access lists only the
+project `rag-app` (`fhdautomation/rag-app`). **The live `agentic-rag` project is NOT visible to that
+token**, so steps 1–5 cannot be driven by an agent through the Vercel MCP — the operator performs them
+in the dashboard and the agent verifies afterwards in a browser.
+
+**Re-open trigger, re-pointed:** the NEXT production push after 2026-09-04, or any earlier session
+where the operator asks for the subdomain. The seven steps below are unchanged and still correct.
