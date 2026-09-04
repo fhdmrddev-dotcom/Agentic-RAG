@@ -3103,6 +3103,17 @@ const BASELINE = {
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
   "scrollAreaViewportWidth.test.tsx": 2,
+  // ── BUG-260904-01 (2026-09-04) — the Continue button's ONLY behavioural guard ──────────
+  // Pinned in the SAME COMMIT that creates it (a BASELINE key naming a path that does not yet
+  // exist makes this gate ERROR at exit 2, not fail). Bare name confirmed unique tree-wide.
+  //
+  // ⚠ WHAT IS UNGUARDED WITHOUT IT, and why an existing fence did not cover it: the call
+  // `continueRun(workflowLock.runId)` was ALREADY asserted by `WorkspacePanel.test.tsx:1218`
+  // — as SOURCE TEXT. That fence passed for as long as the symbol was unimported and the click
+  // threw `ReferenceError`. A fence on the SHAPE of a call cannot see whether the call resolves;
+  // only rendering the card and clicking the button can, which is what this suite does. Driven
+  // RED against the unfixed component first.
+  "MessageItem.continueButton.test.tsx": 2,
   // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
   "MessageItem.cancelledRun.test.tsx": 8,
   "MessageItem.blockedNotice.test.tsx": 4,
@@ -4360,6 +4371,10 @@ const TARGETS = [
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
+  // ── BUG-260904-01 — see the matching BASELINE entry for what it guards. FILE-LEVEL,
+  // ── deliberately not the bare directory `src/components/chat/__tests__`, verbatim the
+  // ── reasoning this script already records for its neighbours. ────────────────────────
+  "src/components/chat/__tests__/MessageItem.continueButton.test.tsx",
   // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
   "src/components/chat/__tests__/MessageItem.cancelledRun.test.tsx",
   "src/components/chat/__tests__/MessageItem.blockedNotice.test.tsx",

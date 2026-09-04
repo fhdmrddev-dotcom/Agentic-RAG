@@ -17,6 +17,11 @@ import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider
 import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
 import { RunCard, RunTerminalStatus } from "./RunCard"
 import { UserBubble } from "./UserMessageBubble"
+// BUG-260904-01: the inline Continue card below calls `continueRun`, and this import had gone
+// missing — the click threw `ReferenceError`, the surrounding catch logged it, and the button
+// re-enabled, so the one affordance that lets a capped run keep going did nothing and said
+// nothing. `tsc` reported it as TS2304 the whole time, inside the accepted-error baseline.
+import { continueRun } from "@/lib/api"
 import { dedupParagraphs } from "./messageText"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
