@@ -481,12 +481,59 @@ async def splice_document(
             except Exception as tbl_err:
                 log.warning("Table extraction warning for %s: %s", document_id, tbl_err)
 
+    app_settings = load_app_settings()
+
+    # ── BUG-260905-06 — THE STEP THIS PATH NEVER RAN ────────────────────────────────────
+    #
+    # ⛔ EVERY UPLOAD SINCE THE PHASE 230 CUTOVER LANDED WITHOUT METADATA. With a `job_id`
+    #    this function stops delegating to `ingest_document` and runs the loop below
+    #    instead — and the loop was written without the enrichment step. Measured:
+    #    `grep "extract_metadata\|metadata_dict\|context_header"` over this file returned
+    #    NOTHING. `/upload` enqueues a job by default, so the metadata-bearing path had no
+    #    traffic at all.
+    #
+    #    What was lost, per document: title / date / author / document_type / custom fields;
+    #    the `[Document: … | Title: … | Date: …]` header prepended to every chunk before
+    #    embedding; SEED-226 vision transcription for scans, drawings and images; and the
+    #    `_source` user-edit guard plus `metadata.source` provenance carry that Phase 233
+    #    added at what it called "the single metadata-write site all three re-extract entry
+    #    points funnel through". They funnelled through it. This path did not.
+    #
+    # ⚠ `run_in_threadpool` IS LOAD-BEARING, not decoration. `enrich_for_ingest` calls
+    #   `asyncio.run` internally and does blocking Supabase I/O; awaiting it here, or
+    #   calling it inline, would raise inside a running loop and its own broad `except`
+    #   would degrade that to `metadata=None` — reintroducing this exact bug in a form that
+    #   looks like a working call.
+    from app.services.ingest_enrich import enrich_for_ingest  # noqa: PLC0415
+
+    enriched = await run_in_threadpool(
+        enrich_for_ingest,
+        document_id=document_id,
+        text=text,
+        raw=raw,
+        mime_type=mime_type,
+        filename=filename,
+        user_id=user_id,
+        supabase=supabase,
+        app_settings=app_settings,
+    )
+    text = enriched.text
+    context_header = enriched.context_header
+
+    if enriched.metadata is not None:
+        try:
+            supabase.table("documents").update(
+                {"metadata": enriched.metadata}
+            ).eq("id", document_id).execute()
+        except Exception as meta_err:
+            # Best-effort, exactly as the legacy path treats it: a metadata write must never
+            # fail an ingestion that has already produced text (D-111-8).
+            log.warning("Metadata write warning for %s: %s", document_id, meta_err)
+
     # 4b. Chunking and Checkpointed Embedding
     clean_text = scrub_text(text)
     chunks = chunk_text(clean_text)
     total_chunks = len(chunks)
-
-    app_settings = load_app_settings()
     _chunk_embedding_model = app_settings.embedding_model or "text-embedding-3-small"
     _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
 
@@ -503,9 +550,16 @@ async def splice_document(
             continue
 
         # Embed batch (transparent batcher in embed_texts handles <= 200k tokens / 512 chunks)
+        # ⚠ THE HEADER IS EMBEDDED, THE RAW CHUNK IS STORED — the same split the legacy path
+        #   makes. It is what lets "amount paid on 17 Jan" match a receipt whose date exists
+        #   only in its filename, and it is what carries a truncated document's own
+        #   INCOMPLETE notice into every one of its chunks.
+        texts_to_embed = (
+            [context_header + c for c in batch_chunks] if context_header else batch_chunks
+        )
         embeddings = await run_in_threadpool(
             embed_chunks,
-            batch_chunks,
+            texts_to_embed,
             model=_chunk_embedding_model,
             user_settings=app_settings,
         )

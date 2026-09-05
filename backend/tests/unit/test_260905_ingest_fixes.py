@@ -161,13 +161,18 @@ class TestProvenanceSurvivesReExtraction:
         # three re-extract entry points funnel through (/upload, /reingest, /reextract).
         import pathlib
 
-        src = pathlib.Path("app/api/documents.py").read_text(encoding="utf-8")
+        # ⚠ RE-POINTED 2026-09-05 (BUG-260905-06). The guard moved to
+        #   `services/ingest_enrich.py` along with the whole enrichment step, because the
+        #   durable queue never called `documents.py` and therefore never ran ANY of it —
+        #   including this guard. The comment below still holds: this is the one function
+        #   all three re-extract entry points funnel through. It is now also the one the
+        #   QUEUE funnels through, which it was not before.
+        src = pathlib.Path("app/services/ingest_enrich.py").read_text(encoding="utf-8")
         assert "_PROVENANCE_KEYS" in src
         i_guard = src.index("_PROVENANCE_KEYS")
-        # ⚠ `rindex`, not `index`: the guard's OWN comment quotes the write it protects, and
-        #    matching that comment would compare a line against itself and pass vacuously.
-        i_write = src.rindex('"metadata": metadata_dict,')
-        assert i_guard < i_write, "the provenance carry must run BEFORE the metadata write"
+        # The carry must precede the value being handed back for the caller to write.
+        i_return = src.rindex("metadata=metadata_dict,")
+        assert i_guard < i_return, "the provenance carry must run BEFORE the metadata is returned"
 
 
 # ── BUG-260905-04 — the connector import uses the durable queue ────────────────────────────
