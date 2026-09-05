@@ -489,3 +489,47 @@ class TestConfirmSubset:
         )
         assert seen == []
         assert r.accounted == 0
+
+
+class TestConfirmRequestWire:
+    """⚠ REGRESSION FENCE. `only_external_ids` was written once and SILENTLY LOST — a
+    string-replace against a reflowed docstring matched nothing, the edit carried no assertion,
+    and the miss surfaced only when the operator hit
+    `'SourcePreviewRequest' object has no attribute 'only_external_ids'` at runtime.
+
+    ⭐ The model behaved correctly throughout: `_StrictBase` is `extra='forbid'`, so the client's
+    field was rejected at the wall while the handler read an attribute that did not exist. The
+    wall did its job; the edit did not. These cases make the field's ABSENCE a test failure
+    instead of a 502."""
+
+    def test_the_request_model_accepts_a_subset(self):
+        from app.models.connector import SourcePreviewRequest
+
+        r = SourcePreviewRequest(folder_id="f", only_external_ids=["a", "b"])
+        assert r.only_external_ids == ["a", "b"]
+
+    def test_the_default_is_None_and_NOT_an_empty_list(self):
+        from app.models.connector import SourcePreviewRequest
+
+        # `None` = everything the preview showed. `[]` = nothing. Defaulting to `[]` would make
+        # every folder-grain import a silent no-op.
+        assert SourcePreviewRequest(folder_id="f").only_external_ids is None
+
+    def test_an_empty_list_survives_as_an_empty_list(self):
+        from app.models.connector import SourcePreviewRequest
+
+        assert SourcePreviewRequest(folder_id="f", only_external_ids=[]).only_external_ids == []
+
+    def test_the_handler_reads_a_field_the_model_declares(self):
+        # The exact shape of the runtime failure: the route passes `body.only_external_ids`, so
+        # the attribute must exist on the model. A `getattr` check is what the 502 was.
+        import pathlib
+
+        from app.models.connector import SourcePreviewRequest
+
+        src = pathlib.Path("app/api/connectors.py").read_text(encoding="utf-8")
+        for field in ("only_external_ids", "recursive"):
+            if f"body.{field}" in src:
+                assert hasattr(SourcePreviewRequest(folder_id="f"), field), (
+                    f"connectors.py reads body.{field} but the model does not declare it"
+                )

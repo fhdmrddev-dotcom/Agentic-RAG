@@ -648,6 +648,18 @@ class SourcePreviewRequest(_StrictBase):
     #: contract advertised a `recursive` flag nothing read, so a person previewing a folder with
     #: sub-folders saw less than they had selected.
     recursive: bool = True
+    #: ⭐ Import only these files (the per-file checkboxes). ⛔ `None` means "everything the
+    #: preview showed"; an EMPTY LIST means "nothing". They are deliberately different values,
+    #: and a falsy check that collapsed them would turn "none" into "all" — the worst direction
+    #: for a mistake in an import.
+    #:
+    #: ⚠ This field was WRITTEN ONCE AND SILENTLY LOST. A string-replace against a docstring that
+    #: had been reflowed matched nothing, and because the edit carried no assertion the miss went
+    #: unnoticed until the operator hit
+    #: `'SourcePreviewRequest' object has no attribute 'only_external_ids'` at runtime.
+    #: `_StrictBase` is `extra='forbid'`, so the CLIENT's field was rejected at the wall while the
+    #: HANDLER read an attribute that did not exist — the model did its job and the edit did not.
+    only_external_ids: list[str] | None = None
 
 
 __all__ = [
