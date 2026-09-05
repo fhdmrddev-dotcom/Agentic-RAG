@@ -39,7 +39,7 @@ while true; do
   new="$(comm -13 "$STATE" "$NEXT" 2>/dev/null)"
   if [ -n "$new" ]; then
     for b in $new; do
-      body="$(awk -v id="$b" '$0 ~ ("\[OPEN\] " id " ") {f=1; next} f && NF {print; exit}' .agent-bus/OPEN.md 2>/dev/null)"
+      body="$(awk -v id="$b" 'index($0, "[OPEN] " id) {f=1; next} f && NF {print; exit}' .agent-bus/OPEN.md 2>/dev/null)"
       echo "BUS ITEM FOR ${WHO^^}: $b :: ${body:0:400}"
     done
     mv "$NEXT" "$STATE"
