@@ -26,6 +26,34 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+async def _db(call):
+    """Run one blocking `supabase-py` call off the event loop.
+
+    ⛔ BUG-260905-14 — WITHOUT THIS, INGESTING A DOCUMENT FROZE THE WHOLE BACKEND.
+      `splice_document` is `async def`, and `supabase-py` is SYNCHRONOUS HTTP. Every bare
+      `.execute()` in this module therefore stopped the event loop for a full network
+      round-trip, and one of them runs PER CHUNK BATCH — so a 400-chunk document stalled the
+      server dozens of times while it ingested.
+
+    ⚠ REPORTED AS A UI BUG, NOT A PERFORMANCE ONE, WHICH IS WHY IT SURVIVED SO LONG: the
+      operator observed that clicking **Accept** on a classification suggestion "does nothing
+      until the full ingestion of other documents finishes". The endpoint was never broken —
+      the request was queued behind these writes. Any symptom of the form *"the UI is dead
+      while something ingests"* is this.
+
+    ⚠ IT IS A RULE, NOT A JUDGEMENT CALL. `CLAUDE.md` D-v2.5-01: *"Do not run blocking I/O
+      (e.g. supabase-py calls) directly inside async handlers — wrap with run_in_threadpool."*
+      The heavy work in this file was already threadpooled correctly — extraction, embedding,
+      enrichment, image description. Only the database writes BETWEEN those steps were not,
+      which is precisely why the omission looked deliberate.
+
+    ⚠ THE CALL IS PASSED AS A LAMBDA so the `supabase.table("documents").update({` literal
+      stays intact at each site. Source-reading fences match on that exact shape, and hoisting
+      a payload into a variable is what made one of them go red on a no-behaviour refactor.
+    """
+    return await run_in_threadpool(call)
+
+
 @dataclass(frozen=True)
 class MintResult:
     document: dict
@@ -383,14 +411,14 @@ async def splice_document(
             document_id, storage_path,
         )
         try:
-            supabase.table("documents").update({
+            await _db(lambda: supabase.table("documents").update({
                 "status": "failed",
                 "ingestion_step": "failed",
                 "error_message": (
                     "The stored copy of this file could not be read, so nothing was "
                     "extracted from it. Please upload it again."
                 ),
-            }).eq("id", document_id).execute()
+            }).eq("id", document_id).execute())
         except Exception:  # noqa: BLE001 — the refusal write must not double-fault
             log.exception("could not mark %s failed after missing bytes", document_id)
         if job_id:
@@ -440,10 +468,10 @@ async def splice_document(
     wall_clock_s = 130.0
 
     try:
-        supabase.table("documents").update({
+        await _db(lambda: supabase.table("documents").update({
             "status": "processing",
             "ingestion_step": "extracting",
-        }).eq("id", document_id).execute()
+        }).eq("id", document_id).execute())
     except Exception:
         pass
 
@@ -482,11 +510,11 @@ async def splice_document(
         except Exception as exc:
             log.warning("splice_document extraction failed for %s: %s", document_id, exc)
             try:
-                supabase.table("documents").update({
+                await _db(lambda: supabase.table("documents").update({
                     "status": "failed",
                     "ingestion_step": "failed",
                     "error_message": str(exc)[:500],
-                }).eq("id", document_id).execute()
+                }).eq("id", document_id).execute())
             except Exception:
                 pass
             if job_uuid:
@@ -550,7 +578,7 @@ async def splice_document(
             log.info("Document %s: skipping table extraction (already at stage=%s)", document_id, stage)
         else:
             try:
-                supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute()
+                await _db(lambda: supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute())
                 from app.services.multimodal_service import extract_and_store_tables  # noqa: PLC0415
                 await run_in_threadpool(
                     extract_and_store_tables,
@@ -605,9 +633,9 @@ async def splice_document(
 
     if enriched.metadata is not None:
         try:
-            supabase.table("documents").update(
+            await _db(lambda: supabase.table("documents").update(
                 {"metadata": enriched.metadata}
-            ).eq("id", document_id).execute()
+            ).eq("id", document_id).execute())
         except Exception as meta_err:
             # Best-effort, exactly as the legacy path treats it: a metadata write must never
             # fail an ingestion that has already produced text (D-111-8).
@@ -621,7 +649,7 @@ async def splice_document(
     _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
 
     try:
-        supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
+        await _db(lambda: supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute())
     except Exception:
         pass
 
@@ -661,7 +689,7 @@ async def splice_document(
             }
             for i, (c, emb) in enumerate(zip(batch_chunks, embeddings))
         ]
-        supabase.table("document_chunks").insert(chunk_rows).execute()
+        await _db(lambda: supabase.table("document_chunks").insert(chunk_rows).execute())
 
         current_offset = batch_start + len(batch_chunks)
         if pool and job_uuid:
@@ -675,7 +703,7 @@ async def splice_document(
     # 4c. Multi-modal image extraction
     if raw and mime_type:
         try:
-            supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute()
+            await _db(lambda: supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute())
             from app.services.multimodal_service import extract_and_store_images  # noqa: PLC0415
             await run_in_threadpool(
                 extract_and_store_images,
@@ -688,10 +716,10 @@ async def splice_document(
     # 4d. Finalize & Authoritative Recount
     try:
         count_resp = (
-            supabase.table("document_chunks")
+            await _db(lambda: supabase.table("document_chunks")
             .select("id", count="exact", head=True)
             .eq("document_id", document_id)
-            .execute()
+            .execute())
         )
         total_recounted = count_resp.count if count_resp.count is not None else total_chunks
     except Exception:
@@ -720,24 +748,24 @@ async def splice_document(
             "document %s produced no chunks — failing rather than completing empty",
             document_id,
         )
-        supabase.table("documents").update({
+        await _db(lambda: supabase.table("documents").update({
             "status": "failed",
             "ingestion_step": "failed",
             "error_message": empty_text_message(mime_type),
             "full_markdown": text,
-        }).eq("id", document_id).execute()
+        }).eq("id", document_id).execute())
         if pool and job_uuid:
             await update_job_progress(
                 pool, job_uuid, stage="failed", progress_patch={"chunk_offset": 0},
             )
         return
 
-    supabase.table("documents").update({
+    await _db(lambda: supabase.table("documents").update({
         "status": "completed",
         "chunk_count": total_recounted,
         "full_markdown": text,
         "extractor": engine_used or "legacy",
-    }).eq("id", document_id).execute()
+    }).eq("id", document_id).execute())
 
     if pool and job_uuid:
         await update_job_progress(

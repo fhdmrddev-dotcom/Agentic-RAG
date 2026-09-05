@@ -58,3 +58,29 @@ def test_the_non_queue_delegation_runs_ingest_document_off_the_event_loop():
     assert re.search(r"await\s+run_in_threadpool\(\s*ingest_document", window), (
         "the threadpool delegation is not awaited"
     )
+
+
+def test_no_blocking_supabase_call_remains_on_the_event_loop_in_splice_document():
+    """⛔ BUG-260905-14 — the UI froze while a document ingested, and it read as a broken button.
+
+    `splice_document` is `async def`; `supabase-py` is synchronous HTTP. A bare `.execute()`
+    here stops the event loop for a whole round-trip, and one of them runs PER CHUNK BATCH.
+    The operator reported it as "clicking Accept does nothing until the full ingestion of
+    other documents finishes" — the endpoint was fine, the request was queued behind these.
+
+    ⚠ D-v2.5-01 in `CLAUDE.md` already forbids this. The fence exists because the rule is
+      invisible at the call site: a bare `.execute()` looks exactly like a correct one.
+    """
+    import re
+    from app.services import ingest_splice
+
+    src = inspect.getsource(ingest_splice.splice_document)
+    bare = [
+        ln.strip()
+        for ln in src.split("\n")
+        if re.match(r"^\s*supabase\.table\(", ln)
+    ]
+    assert not bare, (
+        "blocking supabase-py call(s) left on the event loop inside splice_document — "
+        "wrap each in `await _db(lambda: ...)`:\n  " + "\n  ".join(bare)
+    )
