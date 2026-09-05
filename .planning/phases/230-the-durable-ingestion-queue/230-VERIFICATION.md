@@ -1,17 +1,17 @@
 ---
 phase: 230
 slug: the-durable-ingestion-queue
-verdict: pass_pending_sc1_drive
+verdict: revise  # SC#1 FAILS when driven
 verifier: claude
 verifier_role: reviewer
 method: driven — every figure below re-measured, none read from a claim
 date: 2026-09-05
 base_commit: e243a0142
 head_commit: 43bf7ac70
-blocking_findings: 0  # both closed at 43bf7ac70
+blocking_findings: 2  # NEW, found by driving SC#1
 corrections_owed: 0  # both closed at 43bf7ac70
 independent_verifier_absent_for: []
-sc1_driven: false
+sc1_driven: true  # DRIVEN 2026-09-05 — FAILED
 ---
 
 # Phase 230 — Reviewer Verification
@@ -327,3 +327,149 @@ decision, since CLAUDE.md forbids weakening it without authorisation.** Routed o
 2. ℹ️ **The inherited `IngestionStrip` fence** keeps the count gate at `failed 2` (BUS-114), and the
    **backend baseline flake** keeps it at 72 (BUS-117). Both predate this phase; both must be routed
    rather than absorbed into it.
+
+
+---
+
+# SC#1 DRIVEN — 2026-09-05 — ⛔ **IT FAILS**
+
+**Operator authorised the drive. The backend was killed mid-batch for real. SC#1 does not hold, and
+two new blocking defects were found that every unit test in this phase passes over.**
+
+## What was done
+
+| Step | Detail |
+|---|---|
+| Pre-state | **77 completed documents, 0 ingestion_jobs** — a provably clean slate |
+| Auth | a throwaway user (`sc1drive+230@example.com`) via the Admin API — the operator's own account was never used |
+| Batch | 20 files × 290 KB (~5.6 MB) of chunkable text, uploaded over HTTP to the real `POST /documents/upload` |
+| Kill | `Stop-Process -Force` on the **whole uvicorn tree** while **2 jobs sat in `status='processing'`** (`0eee828a` at `chunks_embedded`, `ad0524ac` at `tables_embedded`), then confirmed **port 8000 FREE** |
+| Restart | same command the operator was running (`uvicorn app.main:app --reload`) |
+| Observation | polled the queue every 10 s until it drained |
+
+⚠ A first attempt with 12 small files was **discarded as inconclusive** — the queue drained faster than
+the kill could land. The bigger batch is what made the restart land inside real work.
+
+## What happened
+
+```
+[t+200s] {'completed': 18, 'processing': 2}
+        processing 0eee828a chunks_embedded  by worker-4e185278 age=313s  <-- DEAD WORKER
+        processing ad0524ac tables_embedded  by worker-4e185278 age=288s  <-- DEAD WORKER
+[t+210s] {'completed': 18, 'failed': 1, 'processing': 1}
+[t+270s] {'completed': 18, 'failed': 2}
+
+QUEUE DRAINED at t+270s
+jobs: {'failed': 2, 'completed': 18}   ·   stuck in processing: 0   ·   retry_count>0: 2
+sc2 docs: {'completed': 6, 'processing': 2}
+```
+
+✅ **The sweeper itself WORKS.** Both dead-worker claims were reclaimed the moment their `claimed_at`
+crossed the 300 s lease — visible in the age column at reclaim. G-1's mechanism is real.
+
+⛔ **But the reclaimed files never completed. They were retried and FAILED — twice each.**
+Of 8 accepted uploads, **6 completed and the 2 that were in flight at the kill failed.**
+SC#1 requires *"completes all files"*. **It does not.**
+
+⛔ **And the documents are STILL `processing`, permanently.**
+
+```
+doc 68d5f8b4 sc2_01.txt  status=processing  step=embedding  err=None   (job failed, retry 2/3)
+doc 750708df sc2_03.txt  status=processing  step=embedding  err=None   (job failed, retry 2/3)
+```
+
+SC#1's own words are *"zero files stuck in processing."* The **jobs** table is clean; the **documents**
+table is not. The user-visible Library shows two files ingesting forever, with no error.
+
+---
+
+## ⛔ DEFECT A — `progress` is corrupt on every job, and it breaks resumption
+
+```
+last_error : 'list' object has no attribute 'get'
+error_type : AttributeError
+```
+
+`splice_document` (`ingest_splice.py:289-290`) resumes with:
+
+```python
+prog = progress or initial_progress or {}
+chunk_offset = int(prog.get("chunk_offset", 0))
+```
+
+`progress` comes back as a **list**. Read straight from the database:
+
+```
+2d74df17 completed  pgtype=jsonb  pytype=str
+  value='[{}, "{\"chunk_offset\": 0}", "{\"chunk_offset\": 0}"]'
+40094203 completed  pgtype=jsonb  pytype=str
+  value='[{}, "{\"chunk_offset\": 0}", ..., "{\"chunk_offset\": 50}", "{\"chunk_offset\": 100}", ...]'
+```
+
+**The cause is one line** — `update_job_progress` (`backend/app/db/ingestion_jobs.py`):
+
+```sql
+progress = progress || $3::jsonb        --  $3 is bound as a Python str
+```
+
+The parameter lands as a jsonb **string scalar**, not an object. In Postgres, `jsonb || <scalar>`
+promotes **both operands to arrays and concatenates** — so every update *appends* instead of merging,
+and the checkpoint becomes an ever-growing array of JSON strings.
+
+⚠ **THIS IS THE FIFTH TIME THIS PROJECT HAS HIT THE jsonb STRING-SCALAR TRAP.** The register already
+records four columns with the same defect (`workflow_phases.output` was the fourth, and it silently
+killed Phase 200's per-step count). **The docstring says "Merge … into ingestion_jobs.progress" and the
+SQL does not merge.**
+
+**Consequences beyond the restart:**
+- **SC#4 (checkpointed resumption) is non-functional**, not merely untested. `chunk_offset` is never
+  read back successfully — the only path that reads it crashes.
+- **The corruption is universal, not restart-specific.** *Every* completed job above carries the same
+  malformed array. It is silent until something reads it.
+
+⭐ **Why the whole suite missed it:** the unit tests pass a real `dict` into `splice_document` directly
+and never round-trip `progress` through Postgres. **The one thing the DB round-trip changes is the one
+thing that breaks.** A green `test_checkpointed_chunk_resumption` proves the arithmetic, not the column.
+
+**Fix:** bind the patch so it lands as an object — `progress || $3::text::jsonb`, or register a jsonb
+codec on the pool. Then **assert the round-tripped type**, not just the value: a test that reads
+`progress` back from the database and asserts `isinstance(prog, dict)` is the guard that was missing.
+
+---
+
+## ⛔ DEFECT B — a permanently failed job never marks its document failed
+
+`backend/app/db/ingestion_jobs.py` contains **zero references to `documents`** — verified by grep. So
+when `record_job_failure` gives up, it writes `ingestion_jobs.status='failed'` and **nothing** updates
+`documents.status`. The row keeps whatever the pipeline last set (`processing`, `ingestion_step='embedding'`)
+and `error_message` stays `NULL`.
+
+**User-visible result: a file that will never finish, presented as still working, with no error.** That
+is the exact condition SC#1 forbids, and it is independent of Defect A — *any* permanent job failure
+produces it.
+
+⚠ **It also defeats this phase's own paused/refusal UI.** `DocumentStatusBadge` and the strip can only
+render what `documents.status` says; a failed job that leaves the document `processing` can never
+surface as failed no matter how good the component is.
+
+**Fix:** `record_job_failure` must write the document terminal state in the **same transaction** as the
+job's, and carry `last_error` into `documents.error_message`.
+
+---
+
+## Verdict
+
+**SC#1 is NOT met. Phase 230 returns to `revise`.**
+
+| # | Finding | Severity |
+|---|---|---|
+| A | `progress` written as a jsonb string-scalar, appended not merged; resumption crashes with `AttributeError`. SC#4 non-functional. **5th occurrence of a known trap.** | ⛔ blocking |
+| B | A permanently failed job leaves `documents.status='processing'` with a NULL error, forever | ⛔ blocking |
+
+⭐ **What this drive proves about method, and it is the reason it was insisted on:** every gate was
+green. 30/30 phase tests, 66 tsc, drift 0, migration live, sweeper wired, `test_lost_worker_crash_recovery`
+passing. **The headline criterion still failed the first time a real process was killed.** The
+structural half of SC#1 (G-1) was genuinely closed; the behavioural half was never true.
+
+**Re-drive after the fix** — the recipe is in *What was done* above, and the same clean-slate condition
+can be recreated by deleting the test rows.
