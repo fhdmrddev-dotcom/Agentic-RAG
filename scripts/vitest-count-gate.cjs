@@ -3035,7 +3035,13 @@ const BASELINE = {
   // undocumented exclusion is how a suite becomes invisible.
   "renameFence.test.ts": 15,
   "acceptFormats.test.ts": 19,
-  "IngestionStrip.test.tsx": 25,
+  // ⚠ RE-PINNED 25 → 31 at Phase 233. It was UNDER-pinned by five before this phase touched it
+  // (the gate's contract is no per-file DECREASE, so an under-pin is silent), and 233 repaired
+  // an INHERITED red in it: `229-03` added `"ingestion_step": "failed"` to `documents.py`, which
+  // is a terminal marker rather than a pipeline stage, and the ORDERED source fence counted it.
+  // The fence was doing its job; what it caught was a real drift. +1 case is 233's own positive
+  // control for the now-NAMED exclusion.
+  "IngestionStrip.test.tsx": 31,
   "DetailSections.lazy.test.tsx": 14,
   "CR01.reset.test.tsx": 2,
   "DetailSections.tables.test.tsx": 15,
@@ -3150,6 +3156,24 @@ const BASELINE = {
   "vercelRouting.test.ts": 6,
   // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
   "SourceFolderPicker.test.tsx": 7,
+  // ── Phase 233 (233-02 / PREV-01…03 / LIB-09) — THE PREVIEW. Two suites, and BOTH knobs ──
+  // ── are set in the SAME COMMIT that creates them, because a BASELINE key naming a path ──
+  // ── that does not yet exist makes this gate ERROR (exit 2) rather than fail. ───────────
+  //
+  // ⚠ Neither file is covered by an existing TARGETS entry: `src/components/sources` is NOT a
+  // directory entry — `SourceFolderPicker.test.tsx` is pinned by an explicit PATH above, and a
+  // path entry recurses into nothing. So both suites needed a TARGETS line of their own, and
+  // that was CHECKED against the array rather than assumed. This is Phase 214's finding
+  // (`WorkflowScheduleModal.test.tsx` ran for phases while guarding nothing) in the one place
+  // where forgetting it would leave the milestone's differentiator unguarded.
+  //
+  // ⭐ These two carry the honesty invariants of the operator-locked sketches 229 + 230: the
+  // four verbatim labels, the no-content-identity claim, the four sections with no removal
+  // control, collapse-hides-files-not-counts, the four-zero receipt, and a NAMED refusal. Four
+  // defects were planted against them and each fired (4 / 1 / 1 / 4 assertions), with both
+  // source files restored md5-identical.
+  "previewVocabulary.test.ts": 12,
+  "SourcePreviewPanel.test.tsx": 22,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4426,6 +4450,10 @@ const TARGETS = [
   "src/__tests__/routing/vercelRouting.test.ts",
   // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
   "src/components/sources/SourceFolderPicker.test.tsx",
+  // ── Phase 233 (233-02) — the preview's two suites. See the BASELINE block for why each ──
+  // ── needs its own line: `src/components/sources` is not a directory entry here. ────────
+  "src/components/sources/previewVocabulary.test.ts",
+  "src/components/sources/SourcePreviewPanel.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

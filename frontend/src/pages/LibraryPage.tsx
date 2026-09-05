@@ -638,7 +638,14 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-full overflow-y-auto p-8">
+      {/* ⭐ THE ONE MEASURE (D-233-07, operator 2026-09-05: "we should unify the width of all").
+          `max-w-6xl` = **1152px** — the width `SettingsPage.tsx:950` and `ConnectionsPage` already
+          use, adopted at the operator's own 2026-08-28 ruling. This page was the actual
+          inconsistency: it had `p-8` and NO max-width at all, so it ran edge to edge on a wide
+          display while every neighbouring page did not. A precedent taken, never a fifth number
+          invented. ⚠ `WorkflowsPage`'s `max-w-[1200px]` is 48px off the same measure — NAMED here
+          rather than silently folded in, because it is outside this phase's blast radius. */}
+      <div className="flex flex-col h-full w-full max-w-6xl mx-auto overflow-y-auto p-8">
         {/* ⛔ THE HOOK FOLLOWS THE ACTIVE TAB (217.1-18): the pagehead is ONE shared shell
             element, and the contract names it per-screen (`<screen>-pagehead`). Dynamic so
             `views-pagehead`/`health-pagehead` resolve when that tab is active. */}

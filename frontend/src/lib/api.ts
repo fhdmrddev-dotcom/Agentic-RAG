@@ -436,6 +436,8 @@ export {
   probeMcpAuth,
   createMcpOAuthAuthorizeUrl,
   browseSourceFolders,
+  previewSource,
+  confirmSourcePreview,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
@@ -454,6 +456,13 @@ export type {
   McpOAuthAuthorizeResponse,
   SourceNode,
   SourceBrowseResponse,
+  PreviewBucket,
+  PreviewOutcome,
+  SourcePreviewItem,
+  SourcePreviewResponse,
+  SourcePreviewRequest,
+  SourceConfirmOutcome,
+  SourceConfirmResponse,
 } from "./api/connectors"
 
 export { submitToolApproval } from "./api/threads"

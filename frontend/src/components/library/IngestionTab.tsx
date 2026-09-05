@@ -38,6 +38,7 @@ import { formatBytes } from "@/lib/formatBytes"
 import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
+import { ConnectedSourceSection } from "@/components/sources/ConnectedSourceSection"
 import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
 import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
@@ -188,6 +189,14 @@ export function IngestionTab({
                 selectedFolderId={uploadFolderId}
               />
             </div>
+            {/* Phase 233 (D-233-06) — the connected-source door. ONE child element: the section
+                owns the connection picker, the source folder tree and the preview, so this tab
+                gains a mount and no branch. It renders NOTHING when no source-capable connection
+                exists, so a person with no connections sees exactly the surface they saw before. */}
+            <ConnectedSourceSection
+              destinationFolderId={uploadFolderId}
+              destinationFolderName={uploadFolderName}
+            />
           </div>
         </TabsContent>
 

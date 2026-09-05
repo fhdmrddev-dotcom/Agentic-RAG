@@ -592,3 +592,99 @@ export async function browseSourceFolders(
   }
   return res.json() as Promise<SourceBrowseResponse>
 }
+
+// ── Phase 233 (PREV-01 / PREV-02 / PREV-03 / LIB-09) — the preview wire ────────────────
+//
+// ⭐ TWO FUNCTIONS, AND ONLY ONE OF THEM WRITES. `previewSource` is a `POST` because it takes a
+//   body, not because it changes anything — its response carries a four-zero `wrote` receipt and
+//   the surface prints that sentence verbatim. `confirmSourcePreview` is the writing door, and it
+//   is a different URL on purpose.
+
+/** ⛔ Exactly four. `bucket` is a union, so a fifth is a type error rather than a surprise. */
+export type PreviewBucket = "add" | "here" | "uns" | "unk"
+
+/** ⛔ Exactly three (D-233-05), so "silently in neither" is unrepresentable. */
+export type PreviewOutcome = "added" | "here" | "refused"
+
+export interface SourcePreviewItem {
+  external_id: string
+  name: string
+  mime_type: string
+  bucket: PreviewBucket
+  /** 3-4 words — what the row shows at rest. */
+  fragment: string
+  /** The full sentence, delivered behind the row (a hover), never printed on it. */
+  reason: string
+  size?: number | null
+  modified_at?: string | null
+  /** SC#3 — where this file would land, known before any row exists. */
+  destination?: string | null
+  rule_suggested?: boolean
+  web_view_url?: string | null
+}
+
+export interface SourcePreviewResponse {
+  folder_id?: string | null
+  folder_name?: string | null
+  items: SourcePreviewItem[]
+  /** Four keys, always. They sum to `total`. */
+  counts: Record<PreviewBucket, number>
+  total: number
+  truncated?: boolean
+  /** The zero-write receipt: `documents` · `chunks` · `jobs` · `folders`, all 0. */
+  wrote: Record<string, number>
+}
+
+export interface SourceConfirmOutcome {
+  external_id: string
+  name: string
+  outcome: PreviewOutcome
+  /** ⛔ Required on `refused`. A refusal that is only a colour is a count, not a name. */
+  reason?: string | null
+  document_id?: string | null
+}
+
+export interface SourceConfirmResponse {
+  outcomes: SourceConfirmOutcome[]
+  accounted: number
+  /** Must be 0. */
+  unaccounted: number
+  preview_said_added: number
+  actually_added: number
+}
+
+export interface SourcePreviewRequest {
+  folder_id?: string | null
+  folder_name?: string | null
+  destination_folder_id?: string | null
+  destination_folder_name?: string | null
+}
+
+async function postPreview<T>(connectionId: string, path: string, body: SourcePreviewRequest, failMsg: string): Promise<T> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/connectors/connections/${encodeURIComponent(connectionId)}/${path}`,
+    { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  )
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(failure.message || failMsg, res.status, failure.reasonCode)
+  }
+  return res.json() as Promise<T>
+}
+
+/** Phase 233 (PREV-01 / PREV-03): what bringing this folder in WOULD do. Writes nothing. */
+export async function previewSource(
+  connectionId: string,
+  body: SourcePreviewRequest,
+): Promise<SourcePreviewResponse> {
+  return postPreview<SourcePreviewResponse>(connectionId, "preview", body, "Failed to preview the source folder")
+}
+
+/** Phase 233 (PREV-02 / LIB-09): bring in exactly what the preview named. The only writing door. */
+export async function confirmSourcePreview(
+  connectionId: string,
+  body: SourcePreviewRequest,
+): Promise<SourceConfirmResponse> {
+  return postPreview<SourceConfirmResponse>(connectionId, "preview/confirm", body, "Failed to import from the source folder")
+}
