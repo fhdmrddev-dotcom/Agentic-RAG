@@ -306,7 +306,7 @@ describe("the consumer reads the constant, and invents no progress", () => {
 
   it("the shipped batch honesty is untouched", () => {
     expect(uploadCode).toContain("Promise.allSettled")
-    expect(uploadCode).toContain("already up to date")
+    expect(uploadCode).toContain("already in your Library")
     expect(uploadCode).toContain("text-xs text-destructive")
   })
 })

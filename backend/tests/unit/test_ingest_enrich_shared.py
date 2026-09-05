@@ -253,3 +253,38 @@ def test_backfill_recognises_a_document_that_needs_metadata(meta, expected):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod._needs_metadata({"metadata": meta}) is expected
+
+
+# ── BUG-260905-07 — a failed extraction must not destroy a good one ──────────────────
+
+
+def test_a_failed_extraction_never_clears_existing_metadata():
+    """⛔ DATA LOSS, OBSERVED BY THE OPERATOR ON A REAL RE-INGEST.
+
+    Enrichment degrades to `None` on ANY failure — provider error, timeout, a model that
+    would not emit — and every one of those is swallowed by design (D-111-8: "a metadata
+    failure never breaks ingestion"). The completion write passed `"metadata": metadata_dict`
+    unconditionally, so that None went straight over the row: a transient provider blip
+    permanently erased a document's title, date, type and every custom field.
+
+    ⚠ The degradation contract says a metadata failure must not BREAK the ingestion. It never
+      said it may DELETE what was already there.
+    """
+    src = _source(_DOCUMENTS)
+    assert '"metadata": metadata_dict,' not in src, (
+        "the completion write must not pass metadata unconditionally — a None clears the row"
+    )
+    assert '**({"metadata": metadata_dict} if metadata_dict is not None else {})' in src, (
+        "the completion write must only set metadata when something was actually derived"
+    )
+
+
+def test_both_paths_refuse_to_write_a_null_metadata():
+    """⚠ THE TWO PATHS MUST AGREE ON THIS TOO.
+
+    The queue path already guarded it (`if enriched.metadata is not None`). Leaving the
+    legacy arm unguarded would have re-opened the same two-paths-disagree gap that
+    BUG-260905-06 closed — in the opposite direction, and as silent data loss.
+    """
+    assert "if enriched.metadata is not None:" in _source(_SPLICE)
+    assert "if metadata_dict is not None else {}" in _source(_DOCUMENTS)

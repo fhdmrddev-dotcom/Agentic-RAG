@@ -2340,13 +2340,46 @@ def ingest_document(
             log.warning("chunk_count total recount failed; using text-chunk count", exc_info=True)
             _total_chunk_count = len(chunks)
 
+        # ── BUG-260905-07 — A FAILED EXTRACTION MUST NOT DESTROY A GOOD ONE ──────────────
+        #
+        # ⛔ THIS WRITE USED TO PASS `"metadata": metadata_dict` UNCONDITIONALLY, AND THAT IS
+        #    DATA LOSS ON RE-INGEST. Enrichment degrades to None on ANY failure — a provider
+        #    error, a timeout, a model that would not emit — and every one of those is
+        #    swallowed by design (D-111-8: "a metadata failure never breaks ingestion").
+        #    Writing that None over an existing row turned a transient provider blip into the
+        #    permanent erasure of a title, date, type and every custom field the document had.
+        #
+        # ⚠ OBSERVED BY THE OPERATOR, not by a test: re-ingesting a document that HAD metadata
+        #   left it with none. The degradation contract says a metadata failure must not break
+        #   the ingestion; it never said it may delete what was already there.
+        #
+        # ⚠ THE QUEUE PATH ALREADY GOT THIS RIGHT (`if enriched.metadata is not None`), so
+        #   leaving this arm unguarded would have re-opened the same two-paths-disagree gap
+        #   BUG-260905-06 was just closed to end — in the opposite direction.
+        #
+        # ⚠ A DELIBERATE CLEAR STILL WORKS. `PATCH /documents/{id}/metadata` writes the field
+        #   directly and is unaffected; this guard only stops an ingest from clearing it as a
+        #   side effect of failing.
+        # ⚠ THE DICT STAYS INLINE, AND THAT IS A CONSTRAINT RATHER THAN A STYLE CHOICE.
+        #   `renameFence.test.ts` extracts every status-bearing payload in this file with
+        #   `/supabase\.table\("documents"\)\s*\.update\(\{/` and asserts no terminal write
+        #   nulls `ingestion_step`. Hoisting this payload into a variable made the ONE
+        #   `completed` write invisible to it — the fence went red on a refactor that changed
+        #   no behaviour, which is the fence working. The conditional key is therefore spliced
+        #   with `**`, keeping the literal where the extractor can see it.
+        if metadata_dict is None:
+            log.warning(
+                "document %s completed with no metadata derived — KEEPING any existing "
+                "metadata rather than clearing it",
+                document_id,
+            )
         supabase.table("documents").update({
             "status": "completed",
             "chunk_count": _total_chunk_count,
-            "metadata": metadata_dict,
             "full_markdown": text,
             # Phase 071 D-071-08 — populate extractor lineage column for new ingests.
             "extractor": engine_used,
+            **({"metadata": metadata_dict} if metadata_dict is not None else {}),
         }).eq("id", document_id).execute()
 
     except Exception as e:

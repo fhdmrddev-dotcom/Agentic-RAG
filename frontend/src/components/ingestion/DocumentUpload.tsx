@@ -47,7 +47,7 @@ interface BatchResult {
  * no `onUploadProgress` and no `XMLHttpRequest` anywhere on this path — so bytes-sent is not
  * observable and any percentage would be invented. The honest status is the one that ships:
  * *"Uploading N files…"* while in flight, then the `Promise.allSettled` batch result
- * (`uploaded` / `already up to date` / one line per error). That batching and its reporting
+ * (`uploaded` / `already in your Library` / one line per error). That batching and its reporting
  * are UNCHANGED by this plan.
  *
  * ── Phase 217.1 plan 03 (D-217.1-05) — the hero variant ───────────────────────────────
@@ -185,10 +185,17 @@ export function DocumentUpload({
         {result && !uploading && (
           <div className="text-center">
             {(result.uploaded > 0 || result.duplicates > 0) && (
-              <p className="text-xs text-muted-foreground">
+              <p
+                className={
+                  result.uploaded === 0
+                    ? "text-xs font-medium text-foreground"
+                    : "text-xs text-muted-foreground"
+                }
+              >
                 {[
                   result.uploaded > 0 && `${result.uploaded} uploaded`,
-                  result.duplicates > 0 && `${result.duplicates} already up to date`,
+                  result.duplicates > 0 &&
+                    `${result.duplicates} already in your Library — nothing to upload`,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -284,10 +291,17 @@ export function DocumentUpload({
       {result && !uploading && (
         <div className="text-center">
           {(result.uploaded > 0 || result.duplicates > 0) && (
-            <p className="text-xs text-muted-foreground">
+            <p
+              className={
+                result.uploaded === 0
+                  ? "text-xs font-medium text-foreground"
+                  : "text-xs text-muted-foreground"
+              }
+            >
               {[
                 result.uploaded > 0 && `${result.uploaded} uploaded`,
-                result.duplicates > 0 && `${result.duplicates} already up to date`,
+                result.duplicates > 0 &&
+                  `${result.duplicates} already in your Library — nothing to upload`,
               ]
                 .filter(Boolean)
                 .join(" · ")}
