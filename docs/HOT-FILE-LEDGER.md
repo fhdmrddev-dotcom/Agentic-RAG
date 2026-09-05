@@ -6621,6 +6621,17 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 
 **Triple re-derived 2026-08-28: `17 / 9 / 362` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
 
+⚠ **CORRECTION 2026-09-05 — THE PARAGRAPH BELOW WAS TRUE WHEN WRITTEN AND MY OWN NEXT COMMIT MADE
+IT FALSE. It is kept rather than overwritten, because the way it went stale is the finding.** At
+`11e7fd86c` this file genuinely was byte-unchanged by Phase 231 and the triple genuinely was
+`17 / 9 / 362`. Then `46b046c5e` (TRUST-04) modified it — threading `source_connection_id` through
+`_enrich_with_filenames`, resolving connection names, and adding the field to `fetch_full_document` —
+and **the cell was never re-derived.** Caught by the REVIEWER, not the builder.
+**Measured at HEAD: `18 / 10 / 423`.**
+⭐ **The lesson is not "re-derive at the close" — it is that a cell written MID-PHASE is a claim about
+a moving file.** A phase that touches a file twice will falsify its own ledger note the second time
+unless the note is written last. G-5 still FIRES here and the extraction remains OWED.
+
 ⭐ **PHASE 231 — honoured by construction, and the mechanism is worth recording.** 231 widened document
 visibility at four enforcement sites, two of which are the `SECURITY DEFINER` functions this file calls
 (`match_document_chunks`, `keyword_search_chunks`). **`retrieval_service.py` is byte-unchanged by 231**
