@@ -117,6 +117,7 @@ No `supabase-py` call is made in this module. Every DB touch happens inside
 """
 
 import logging
+from dataclasses import asdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
@@ -159,6 +160,11 @@ from app.models.connector import (
     OAuthAuthorizeResponse,
     OAuthProvider,
     OAuthTokenResponse,
+    SourceConfirmOutcome,
+    SourceConfirmResponse,
+    SourcePreviewItem,
+    SourcePreviewRequest,
+    SourcePreviewResponse,
     ToolGrantPosture,
 )
 from app.services.audit_service import write_audit_entry
@@ -1702,6 +1708,122 @@ async def import_connection_file(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to download cloud file: {exc}",
         )
+
+
+@router.post(
+    "/connections/{connection_id}/preview",
+    response_model=SourcePreviewResponse,
+    summary="See exactly what bringing a source folder in would do (PREV-01 / PREV-03)",
+)
+async def preview_source_folder(
+    connection_id: str,
+    body: SourcePreviewRequest,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> SourcePreviewResponse:
+    """Phase 233 (PREV-01 / PREV-03 / LIB-09): the read-only half of the diff pass.
+
+    ⛔ **THIS ROUTE WRITES NOTHING** — no document row, no chunk, no ingestion job, no folder, and
+    no audit entry that reads like an import. Its `wrote` field is four literal zeros and the
+    surface prints that sentence in its footer, so *"nothing has been written yet"* is a receipt
+    rather than a promise.
+
+    ⚠ It is a `POST` because it takes a body, not because it changes anything. The writing door is
+    `/preview/confirm`, and it is a different route on purpose.
+    """
+    from app.services.sources import preview_service
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        preview = await preview_service.build_preview(
+            connection=conn,
+            folder_id=body.folder_id,
+            folder_name=body.folder_name,
+            user_id=user["id"],
+            supabase=supabase,
+            destination_folder_name=body.destination_folder_name,
+        )
+    except Exception as exc:
+        logger.error("Failed to preview connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Source provider returned an error while listing: {exc}",
+        )
+
+    return SourcePreviewResponse(
+        folder_id=preview.folder_id,
+        folder_name=preview.folder_name,
+        items=[SourcePreviewItem(**asdict(i)) for i in preview.items],
+        counts=preview.counts,
+        total=preview.total,
+        truncated=preview.truncated,
+        wrote=preview.wrote,
+    )
+
+
+@router.post(
+    "/connections/{connection_id}/preview/confirm",
+    response_model=SourceConfirmResponse,
+    summary="Bring in exactly what the preview said would be brought in (PREV-02 / LIB-09)",
+)
+async def confirm_source_preview(
+    connection_id: str,
+    body: SourcePreviewRequest,
+    background_tasks: BackgroundTasks,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> SourceConfirmResponse:
+    """Phase 233 (PREV-02 / LIB-09 / SC#4 / SC#5): the only door in this pair that writes.
+
+    ⭐ It re-runs the SAME classifier the preview ran, so the counts a person confirmed against and
+    the counts that happen cannot come from two code paths that drift. Every file ends at exactly
+    one of `added` / `here` / `refused`, and a refusal carries its **cause by name**.
+    """
+    from app.services.sources import preview_service
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        result = await preview_service.confirm_preview(
+            connection=conn,
+            folder_id=body.folder_id,
+            folder_name=body.folder_name,
+            user_id=user["id"],
+            active_org=str(active_org),
+            supabase=supabase,
+            background_tasks=background_tasks,
+            destination_folder_id=body.destination_folder_id,
+            destination_folder_name=body.destination_folder_name,
+        )
+    except Exception as exc:
+        logger.error("Failed to confirm preview for connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Source provider returned an error while importing: {exc}",
+        )
+
+    return SourceConfirmResponse(
+        outcomes=[SourceConfirmOutcome(**asdict(o)) for o in result.outcomes],
+        accounted=result.accounted,
+        unaccounted=result.unaccounted,
+        preview_said_added=result.preview_said_added,
+        actually_added=result.actually_added,
+    )
 
 
 @router.get(

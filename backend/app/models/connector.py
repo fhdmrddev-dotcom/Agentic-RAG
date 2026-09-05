@@ -563,6 +563,83 @@ class McpOAuthStartResponse(_StrictBase):
     authorization_host: str | None = None
 
 
+# ── Phase 233 (PREV-01 / PREV-02 / PREV-03 / LIB-09) — the preview wire ────────────────────
+#
+# ⭐ The four bucket names and the three outcome names are `Literal`s, not free strings. That is
+#   what makes SC#1's *"four lists"* and SC#5's *"never silently in neither"* structural rather
+#   than a convention: a fifth bucket or a fourth outcome is a `ValidationError` at the boundary,
+#   in a diff a reviewer reads, and not a surprise a user finds.
+
+
+class SourcePreviewItem(_StrictBase):
+    """One source file and the one verdict the preview is willing to state about it."""
+
+    external_id: str
+    name: str
+    mime_type: str
+    #: ⛔ Exactly four. There is no fifth and no way to remove one (D-233-04).
+    bucket: Literal["add", "here", "uns", "unk"]
+    #: 3-4 words — what the row shows at rest.
+    fragment: str
+    #: The full sentence, delivered behind the row. A bucket labelled "can't tell" whose rows
+    #: never say why is a shrug, so this is carried for every non-`add` verdict.
+    reason: str = ""
+    size: int | None = None
+    modified_at: str | None = None
+    #: SC#3 — where this file would land, resolved BEFORE any row exists.
+    destination: str | None = None
+    rule_suggested: bool = False
+    web_view_url: str | None = None
+
+
+class SourcePreviewResponse(_StrictBase):
+    """What bringing this folder in would do. ⛔ Producing it writes nothing."""
+
+    folder_id: str | None = None
+    folder_name: str | None = None
+    items: list[SourcePreviewItem] = Field(default_factory=list)
+    #: Four keys, always. The surface renders the bar from these and they sum to `total`.
+    counts: dict[str, int] = Field(default_factory=dict)
+    total: int = 0
+    #: ⚠ True when the listing did not finish. A partial listing may never be presented as a
+    #: complete picture.
+    truncated: bool = False
+    #: ⭐ The zero-write receipt the footer prints verbatim.
+    wrote: dict[str, int] = Field(default_factory=dict)
+
+
+class SourceConfirmOutcome(_StrictBase):
+    """What actually happened to one file — one of exactly three things (D-233-05)."""
+
+    external_id: str
+    name: str
+    outcome: Literal["added", "here", "refused"]
+    #: ⛔ A refusal that is only a colour is a COUNT. SC#5 requires a NAMED one.
+    reason: str | None = None
+    document_id: str | None = None
+
+
+class SourceConfirmResponse(_StrictBase):
+    """The SC#4 receipt: the files that arrived are the files the preview named."""
+
+    outcomes: list[SourceConfirmOutcome] = Field(default_factory=list)
+    accounted: int = 0
+    #: Must be 0. Anything else means a file ended in none of the three outcomes.
+    unaccounted: int = 0
+    preview_said_added: int = 0
+    actually_added: int = 0
+
+
+class SourcePreviewRequest(_StrictBase):
+    """Which source folder to look at, and where its files would land."""
+
+    folder_id: str | None = None
+    folder_name: str | None = None
+    #: The Library folder the person chose. `None` = root.
+    destination_folder_id: str | None = None
+    destination_folder_name: str | None = None
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -590,5 +667,10 @@ __all__ = [
     "McpProbeAuthResponse",
     "McpOAuthStartRequest",
     "McpOAuthStartResponse",
+    "SourcePreviewItem",
+    "SourcePreviewRequest",
+    "SourcePreviewResponse",
+    "SourceConfirmOutcome",
+    "SourceConfirmResponse",
 ]
 

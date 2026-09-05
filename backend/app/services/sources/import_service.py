@@ -67,11 +67,30 @@ async def import_single_file(
     active_org: str,
     background_tasks: BackgroundTasks,
     supabase: Client,
+    folder_id: str | None = None,
+    external_id: str | None = None,
+    source_version: str | None = None,
+    source_system: str | None = None,
 ) -> dict[str, Any]:
     """Download a single file from a connected source and mint it into Library.
 
     Preserves TM-232-05 (ingest_visibility read exclusively from connection record)
     and TM-232-06 (org_id resolved explicitly from active_org).
+
+    ── Phase 233 (D-233-01): TIER-1 IDENTITY IS STAMPED HERE ──────────────────────────────────
+    When the caller knows which source file this is, `metadata.source` records
+    `{system, external_id, version}` so a LATER preview can say *"already here"* about it — and
+    say so honestly, matched **by source file, not by content**. ⛔ It is not a content identity
+    and must never be described as one; `documents.metadata` is `jsonb`, so this needs no
+    migration. Tier 2 (the `sha256` inside `mint_document_row`) is untouched and still decides
+    whether the bytes are a duplicate.
+
+    ⚠ All four new parameters are OPTIONAL and default to `None`, so the Phase 216 single-file
+    attach door (`POST /connections/{id}/files/{file_id}/import`) mints exactly the row it minted
+    before this phase — same fields, same absence of a `metadata` key.
+
+    `_already_here` is added to the returned dict when tier 2 refused the import as a duplicate.
+    It is a TRANSPORT flag for `preview_service.confirm_preview`, never a column.
     """
     filename, raw_bytes, mime_type = await fetch_cloud_file(connection, file_id)
 
@@ -84,17 +103,29 @@ async def import_single_file(
         or "private"
     )
 
+    metadata: dict[str, Any] | None = None
+    if external_id:
+        metadata = {
+            "source": {
+                "system": (source_system or "").strip().lower() or None,
+                "external_id": str(external_id),
+                "version": source_version,
+            }
+        }
+
     mint_result = await ingest_splice.async_mint_document_row(
         raw=raw_bytes,
         filename=filename,
         mime_type=mime_type,
         user_id=user_id,
         supabase=supabase,
+        folder_id=folder_id,
+        metadata=metadata,
         org_id=str(active_org),
         source_connection_id=str(conn_id) if conn_id else None,
         ingest_visibility=ingest_vis,
     )
-    doc = mint_result.document
+    doc = dict(mint_result.document)
 
     if not mint_result.is_duplicate:
         srv_supabase = get_supabase()
@@ -108,6 +139,10 @@ async def import_single_file(
             storage_path=mint_result.storage_path,
             supabase=srv_supabase,
         )
+    else:
+        # ⭐ SC#5 / PREV-02: not imported again AND not embedded again. `splice_document` is the
+        #   only thing that embeds, and it is deliberately not scheduled on this arm.
+        doc["_already_here"] = True
 
     return doc
 
