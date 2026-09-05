@@ -78,7 +78,13 @@ export function LibraryHeaderBar({
         className,
       )}
     >
-      <h1 className="text-base font-headline font-bold text-foreground whitespace-nowrap">
+      {/* ⚠ `text-2xl`, matching every other page — MEASURED, not guessed: SettingsPage,
+          WorkflowsPage and SkillsPage all use it. The first cut of this row shrank the title to
+          `text-base` to save height, which made the Library the one page whose name was smaller
+          than its siblings'. **Collapsing four stacked blocks into one row is the space saving;
+          shrinking the page's own name is not** — the row is already only as tall as its tallest
+          child, so the title costs nothing extra here. */}
+      <h1 className="text-2xl font-headline font-bold text-foreground whitespace-nowrap">
         Library
       </h1>
       {/* ⚠ Hidden below `lg` rather than dropped: a row that wraps is a row that costs two rows,
