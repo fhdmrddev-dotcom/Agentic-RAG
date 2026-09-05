@@ -7430,3 +7430,128 @@ a guard gets deleted for being noisy.
 - ⚠ **Its pin was UNDER-SET at 25 against 30 actual** before Phase 233 re-pinned it to **31**. An
   under-pin is silent — the gate's contract is *no per-file DECREASE* — so five cases could have been
   deleted without a word.
+
+---
+
+## `backend/app/services/extractors/aspects/vision_text.py`
+
+**`1 / 0 / 367`** (derived 2026-09-05). Created by `SEED-226`'s L1+L2 close (`b4595f201`).
+
+**What it is.** The vision-as-OCR leaf. One mechanism serving three cases: an uploaded image, a
+scanned PDF, and a vector CAD drawing. It renders pixels and asks a vision model to **transcribe**
+them, which is the entire difference from `multimodal_service.describe_image` — that function
+captions, and SEED-006 measured a caption preserving roughly **5% of a figure's content**. A caption
+of a document that is 100% figure is worse than nothing, because a caption reads as knowledge.
+
+**Why it exists at all.** The product's `application/pdf` empty-text message told users the file
+*needed OCR before it could be searched*, and there was **no OCR engine anywhere in the backend** —
+zero hits for tesseract / pytesseract / easyocr / paddleocr / rapidocr across `requirements.txt`,
+`Dockerfile.sandbox` and `docs/SANDBOX-PACKAGES.md`, measured twice (2026-08-28 and 2026-09-05).
+SEED-226 was planted on that sentence.
+
+⭐ **IT ADDS NO DEPENDENCY.** `Pillow` and `pymupdf` were already committed deps and the OpenAI
+client was already in use. The three candidate OCR engines SEED-226 listed were all avoided; the
+answer to *"which OCR engine"* is **none**.
+
+### The invariants it carries
+
+1. ⛔ **A transcription is `advisory` and says so.** `provenance()` stamps
+   `metadata._vision = {engine, kind, pages_transcribed, advisory: true, detected}`.
+   Text here is **inferred**; DXF **reads**. A transcription that cannot be told apart from a parsed
+   text layer is SEED-226's own failure one level up, and `documents.py` writes this on every path
+   that reaches the module.
+2. ⛔ **Every entry point fails soft.** No key, no vision model, an unopenable PDF, a render error,
+   a page the model chokes on — each returns an empty result and the document ingests exactly as it
+   did before this file existed. One failed page costs that page, never the document.
+3. ⚠ **The classifier must not fire on ordinary documents.** Every paid vision call is justified by
+   `classify_pdf_deficit` returning `None` for prose. `MIN_TEXT_CHARS_PER_PAGE = 100` is deliberately
+   conservative: a false negative costs nothing, a false positive costs money.
+4. ⚠ **The caller's own text is a FLOOR.** `max(page_text, len(extracted_text))` — a document another
+   engine read fine is never re-transcribed. The most expensive possible false positive.
+5. ⚠ **The budget reuses `multimodal_max_vision_calls`, never a second knob**, plus a hard
+   `MAX_PAGES_HARD_CAP = 50`. SEED-227 tracks that this knob is surfaced in no frontend file; that
+   stays one problem, not two.
+
+### ⚠ The `drawing` arm, and why it is the point
+
+SEED-226 predicted this before it was built: a vector CAD PDF *"will look SUCCESSFUL to every gate we
+own… it is the more dangerous of the two, precisely because nothing refuses."* Measured on the
+operator's real floor plan: **2,822 line segments, 2,799 drawing ops, a 252-char text layer holding
+EXACTLY ONE numeral** (the `6` in *PASSAGE 6FEET WIDE*), room names mashed together (`HALLHALL`,
+`BATHBATH`), and **no images at all** — so even the vision-caption consolation yielded nothing. It
+ingested `completed`. **A scan fails loudly; a drawing succeeds and is wrong.**
+
+So the classifier has two arms, and the second keys on **thin text beside dense geometry**
+(`DRAWING_OPS_PER_PAGE = 400`, `DRAWING_MAX_TEXT_CHARS_PER_PAGE = 600`).
+
+⚠ **A drawing's transcription is APPENDED; a scan's REPLACES.** A drawing's text layer is poor but
+not false — the room names really are on the drawing.
+
+### ⭐ The planted defect that found a hole in its own test
+
+Six defects were planted and five fired immediately. The sixth is the one worth recording: **deleting
+the `drawing` arm outright left all 23 tests GREEN.** The fixture used a 45-char stand-in, which falls
+under `MIN_TEXT_CHARS_PER_PAGE`, so the drawing test had been passing through the **scan** arm and the
+dangerous second arm was never executed at all. The fixture now carries the real drawing's measured
+252 characters plus a **positive control on the arm itself** — `text_chars` must sit above the scan
+floor and below the drawing ceiling. A seventh plant then showed the transparency test was likewise
+vacuous: it asserted a fully transparent image flattened to white, which is true whether or not the
+flatten happens.
+
+**The rule this produces:** a threshold-based classifier needs a fixture per ARM, and an assertion
+that the fixture actually lands in the arm it names. Otherwise a deleted branch reads as green.
+
+### The named seam, when it comes
+
+Nothing yet — a 367-line leaf with one dependency direction (`documents.py` → here). If it grows, the
+split is **render** (Pillow/PyMuPDF, pure bytes) from **transcribe** (prompts + client), because only
+the second half can cost money or reach the network.
+
+---
+
+## `backend/app/services/extractors/aspects/dxf.py`
+
+**`2 / 0 / 180`** (derived 2026-09-05). ⚠ **Absent from this ledger and from CLAUDE.md's scan list for
+its entire life** — row added at SEED-226's L1+L2 close, which is also the work that established this
+file had already discharged that seed's L3.
+
+**What it is.** The CAD takeoff extractor (Phase 220, TAKEOFF-01), over `ezdxf>=1.3.0`.
+
+⭐ **IT IS THE ONLY PATH IN THIS PRODUCT THAT READS MEASUREMENTS RATHER THAN INFERRING THEM.**
+SEED-226's DXF measurement settles the architecture: a PDF of a drawing carries 2,822 anonymous
+lines and **one** number; the DXF carries **28 `DIMENSION` entities with computed values**, **32
+named layers**, **16 `INSERT` block references** (item counts, free), and **36 multileaders** whose
+text is already BOQ line-item prose written by the engineer — material, size, and dual imperial and
+metric units, per element. Note `text='<>'` on almost every dimension: that is AutoCAD's placeholder
+meaning *display the measured value*. **The number is not stored as text at all; it is computed from
+the geometry**, which is exactly why plotting to PDF destroys it.
+
+### The invariants it carries
+
+1. ⛔ **`$INSUNITS` is per-file and must NEVER be assumed.** `UNITS[0]` is `("unitless", None)` — a
+   **refusal**, not a default. The operator's own drawing is in **inches**; guessing mm would be
+   silently wrong by a factor of 25.4.
+2. ⚠ **Layer lengths are ORDER-OF-MAGNITUDE ONLY.** A wall in section is two or more parallel lines,
+   so raw summed length **over-measures**. It must never be priced.
+3. ⚠ **CAD formatting codes are stripped before use** — the `_FMT_RE` sweep in `clean_cad_text`.
+4. ⛔ **Areas and volumes are NOT derivable** and the file does not pretend otherwise. Which dimension
+   bounds which element, and what height a wall is, needs a quantity surveyor.
+
+### ⚠ The failure this file's own spike produced, which is still unaddressed
+
+The L3 spike's first matcher priced a gypsum BOARD callout against a suspended gypsum CEILING rate
+line: **a 65% overprice, carrying a valid item code, from a real rate sheet, with correct
+arithmetic** — and nothing downstream could have caught it. Both lines legitimately contain the word
+*gypsum*; the drawing said BOARD and the matcher chose CEILING.
+
+**The extraction step is not where this business case is won or lost; the MATCHING step is.** The
+design rule stands and is **unbuilt**: a token matching more than one rate line is **AMBIGUOUS and
+escalates to a human**, never resolved by position in the sheet. A regex was always the wrong
+instrument — matching a drawing's words to a priced schedule is a judgement task. See SEED-226's
+remaining-work list.
+
+### The named seam, when it comes
+
+`extract_dxf_takeoff` currently does five things in one pass — blocks, dimensions, callouts, layer
+lengths, units. The split at its third phase is **entity harvesting** from **quantity aggregation**:
+the first is `ezdxf` mechanics, the second is domain judgement about what may legitimately be summed.
