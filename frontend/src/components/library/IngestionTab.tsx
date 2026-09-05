@@ -157,7 +157,12 @@ export function IngestionTab({
     <section data-testid="ingestion-tab" className="flex flex-col gap-6 overflow-y-auto">
       {/* ── THE FOUR SUB-TABS ──────────────────────────────────────────────────── */}
       <Tabs value={subTab} onValueChange={setSubTab} data-testid="ingestion-subnav">
-        <TabsList className="mb-4">
+        {/* ⚠ `text-xs` on every child trigger. The `tabs.tsx` primitive defaults to `text-sm`
+            (14px) while sketch 231-A's PARENT tabs are `text-xs` (12px) — so the children were
+            rendering LARGER than their parents, which reads as an inverted hierarchy and is what
+            the operator saw. The sketch has the child marginally smaller than the parent
+            (.76rem vs .79rem); this matches that direction with the two sizes the app has. */}
+        <TabsList className="mb-4 [&>button]:text-xs [&>button]:px-2.5 [&>button]:py-1">
           <TabsTrigger value="add-files">Add files</TabsTrigger>
           {/* ⭐ Sketch 231-A — the live count badge. The header pill and this badge are the SAME
               FACT AT TWO SCALES, derived from the same `inFlight` predicate, so they cannot

@@ -127,7 +127,12 @@ export function DocumentUpload({
               : `${targetLabel} · drop files here or click to browse`
           }
           className={cn(
-            "w-full rounded-2xl border-2 border-dashed px-8 py-10 text-center transition-all duration-300 shadow-sm",
+            // ⭐ SKETCH 231-A — ONE LINE, NOT A BAND. This was `px-8 py-10` with a stacked
+            //    column inside, which spent a full screen band on one action and pushed the
+            //    connected-source panel below the fold. The operator named it twice: "this drop
+            //    file section is very big while it should… allow other functional parts to be
+            //    more usable". Same affordances, one row.
+            "w-full rounded-xl border border-dashed px-4 py-2.5 text-left transition-all duration-200",
             disabled
               ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
               : dragging
@@ -157,21 +162,20 @@ export function DocumentUpload({
               </span>
             </>
           ) : (
-            <div className="flex flex-col items-center gap-2.5">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm group-hover:scale-105 transition-transform duration-200">
-                <Cloud className="h-6 w-6" aria-hidden="true" />
-              </div>
-              <span className="text-base font-semibold text-foreground tracking-tight">Drop files here</span>
-              <span className="text-sm text-muted-foreground">or</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <Cloud className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="text-sm font-medium text-foreground">Drop files here</span>
+              <span className="text-xs text-muted-foreground">or</span>
               <span
-                className="inline-flex items-center rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow active:scale-95"
+                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-95"
                 data-testid="choose-files-button"
               >
                 Choose files
               </span>
               {/* The formats are PRINTED from the same constant that feeds `accept` below —
-                  never a hand-written list (D-217-18). */}
-              <span className="text-xs text-muted-foreground">
+                  never a hand-written list (D-217-18). ⚠ Pushed right rather than dropped: the
+                  sentence is a contract with `acceptedFormats.ts`, not decoration. */}
+              <span className="ml-auto truncate text-[11px] text-muted-foreground">
                 {formatsSentence()}
               </span>
             </div>
