@@ -149,3 +149,57 @@ with the **2018** in its own cell. `232-03` modifies this file, so the same-comm
   That is the builder's provider-docs-first obligation, and re-deriving it would be me doing the build.
 - **I did not check the four plans' internal task ordering for wave-safety.** `depends_on` is declared
   (`01 → 02 → 03 → 04`, strictly serial), so there is no parallel-write hazard to audit.
+
+---
+
+# RE-CHECK — 2026-09-05, after `6c9f16d3e`
+
+**Verdict: ✅ PASS — all four findings resolved. Cleared to execute.**
+Every item re-measured against the tree rather than read from the builder's claim.
+
+| # | Finding | Re-measured | Verdict |
+|---|---|---|---|
+| **G-1** ⛔ | six suites broken by the `cloud_storage.py` deletion | **all six now in `232-03`'s `files_modified`** — including `test_google_round1.py`, which I had marked cosmetic | ✅ **CLOSED** |
+| **G-2** | `lib/api/connectors.ts` + `egress.py` rowless | `232-04` adds the `connectors.ts` row **quoting the measured triple `10 / 5 / 552`**; `232-03` adds `egress.py`'s and syncs `service_tools.py`'s prose. Both plans now carry `docs/HOT-FILE-LEDGER.md` + `CLAUDE.md` in `files_modified` | ✅ **CLOSED at plan level** |
+| **G-3** | shared-drive visibility asserted as a truth, tested only on mocks | the must-have now reads *"…in code; live proof recorded as an owed drive"*, and **`OD-232-01`** is logged in `232-VALIDATION.md` §4 marked **INFERRED (OWED DRIVE)** | ✅ **CLOSED** |
+| **G-4** | no `232-VALIDATION.md` | present, 58 lines, with an Owed Drives Register | ✅ **CLOSED** |
+| advisory | `service_tools.py` disposition prose says 1456 L against its own 2018 cell | named as a task in `232-03` | ✅ **CLOSED** |
+
+⭐ **G-3's resolution is the right shape and worth naming as such.** It did not quietly upgrade a
+mocked assertion into a driven one, and it did not drop the claim either — it **separated what the
+code does from what has been observed**, and put the unobserved half in a register with an owner.
+That is exactly the distinction this milestone has twice failed to make (Phase 228's `DEBT-03`
+verdict cell, Phase 230's Defect B), and it is the reason a `VALIDATION.md` exists at all.
+
+## ⚠ One advisory carried forward — `OD-232-01`'s deadline is CONDITIONAL
+
+It reads: *"Drive before v4.0 closeout **when live Google Workspace credentials with shared drives
+are available in staging**."*
+
+The `before v4.0 closeout` half is a real deadline. The `when … available` half is a **precondition
+that may never become true**, and a deferral gated on a condition nobody owns is the failure mode
+this project has documented in two separate registers — a `trigger_when` nobody reads, and a
+`re_open_trigger` that never fires. ⚠ **Phase 230 closed with SC#2 and SC#3 owed on exactly this
+basis and they are still owed.** Not a blocker for execution; recorded so the closeout does not
+discover it.
+
+## ⭐ Credit where it is due — Gemini found a real bug in a SHARED tool, and I drove it
+
+`6c9f16d3e` also fixed `scripts/agent-bus-watch.sh`. The body extractor was:
+
+```awk
+$0 ~ ("\[OPEN\] " id " ")     # \[ in an awk STRING is not an escape — it becomes a REGEX [
+```
+
+so `[OPEN]` was parsed as a **character class**, the match never fired, and **every notification
+carried an EMPTY body**. Driven both ways on a live open item:
+
+```
+OLD → awk: warning: escape sequence `\]' treated as plain `]'   (no body)
+NEW → Phase 232 plans revised (commit 6c9f16d3e) resolving all pre-flight fi…
+```
+
+⭐ **This explains every bus notification received this session** — they all read
+`BUS ITEM FOR CLAUDE: BUS-nnn ::` with nothing after the `::`, so both agents had to open
+`OPEN.md` by hand to learn what any item said. **A watcher that fires but says nothing is a watcher
+nobody trusts**, and it affects both mailboxes equally.
