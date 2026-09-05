@@ -519,6 +519,9 @@ export interface Document {
   file_size: number
   mime_type: string
   status: "pending" | "processing" | "completed" | "failed" | "paused"
+  /** Phase 231 TRUST-04 — the connection that PLACED this document; absent when a person
+   *  uploaded it. ABSENCE IS THE SIGNAL, so the common case stays unadorned. */
+  source_connection_id?: string | null
   error_message: string | null
   /** Phase 56 D-10/D-11 · corrected Phase 217 (D-217-09/D-217-23): the granular sub-status the
    *  ingestion pipeline last entered. SIX steps, not four — in the order `backend/app/api/documents.py`

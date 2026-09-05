@@ -52,6 +52,16 @@ class DocumentResponse(BaseModel):
     # routes build their response from a narrow select and a required field 500s them.
     extractor: str | None = None
 
+    # Phase 231 (TRUST-04) — the connection that PLACED this document, or None when a person
+    # uploaded it. DEFAULTED for the same reason `extractor` is: five routes build their
+    # response from a narrow select, and a required field 500s every one of them.
+    #
+    # ⚠ ABSENCE IS THE SIGNAL. A person's upload leaves this None and the surface stays
+    #   unadorned; marking every document would make the mark meaningless. So a route that
+    #   forgets to select the column degrades to "somebody uploaded this" — the SAFE wrong
+    #   answer, since it under-claims machine placement rather than inventing it.
+    source_connection_id: UUID | None = None
+
     # Phase 217 (D-217-10) — the stage the ingestion pipeline last entered. Reaching the
     # browser ONLY through the Supabase Realtime payload until now, so a file already
     # mid-ingest when the Library opened showed no stage at all on a cold load (the

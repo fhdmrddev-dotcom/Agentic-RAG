@@ -251,6 +251,26 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
         </button>
       </div>
 
+      {/* ── Phase 231 · TRUST-04 — where this document came from ──────────────────────────
+          A person opening a document can tell machine-placed knowledge from knowledge somebody
+          chose to upload. ⚠ ABSENCE IS THE SIGNAL: rendered ONLY for connection-placed
+          documents, so the ordinary upload stays unadorned and the mark keeps its meaning.
+          ⚠ It names the CONNECTION, not the person — "who put this here" is the question a
+          reader is actually asking, and the uploader field already answers the other one. */}
+      {doc.source_connection_id ? (
+        <div
+          data-testid="document-source-connection"
+          className="flex items-start gap-2 border-b border-[hsl(var(--panel-border))] bg-background/40 px-4 py-2"
+        >
+          <span aria-hidden="true" className="flex-none text-xs leading-5">
+            ⇥
+          </span>
+          <span className="text-xs leading-relaxed text-panel-muted-foreground">
+            Placed here by a connected source, not uploaded by a person.
+          </span>
+        </div>
+      ) : null}
+
       {/* Sections, in the D-217-25a order: Details (112) · Text · Chunks (both 217-10)
           · Tables · Images · Found by (217-11) · Relationships (117) · Classification
           (118). The five 217 sections are INSERTED between Details and Relationships. */}
