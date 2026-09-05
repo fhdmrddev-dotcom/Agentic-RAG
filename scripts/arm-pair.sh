@@ -71,9 +71,28 @@ cat <<BANNER
 ================================================================
 BANNER
 
+# ⚠ POST TO BOTH SIDES, NOT JUST THE REVIEWER.
+#
+# This block posted `--to "$REVIEWER"` ONLY until 2026-09-05, and the miss it caused is why it
+# does not any more. Arming Phase 232 (builder gemini / reviewer claude) put the single bus item
+# in the REVIEWER's mailbox — so the BUILDER was never told on the bus that it was building, and
+# the builder briefing existed only as text for a human to paste by hand. Gemini correctly did
+# nothing, and the operator had to ask why it had not started.
+#
+# ⚠ It survived two phases because the roles happened to line up: while Gemini always reviewed,
+# the reviewer WAS the other agent, so a reviewer-only post reached it every time. The bug became
+# visible in the first phase where Claude reviewed — the reciprocal protocol is what exposed it.
+#
+# So: two posts, each carrying that side's own instruction. The BUILDER post is the one that says
+# "start"; the REVIEWER post is the one that says "baseline first".
 if [ "$POST" = "1" ]; then
-  bash scripts/agent-bus.sh open --to "$REVIEWER" --from operator \
-    "ROLE ASSIGNMENT for Phase $PHASE — BUILDER is $BUILDER, REVIEWER is $REVIEWER. Whoever built it does not verify it (AGENTS.md 6.3). Reviewer: capture baselines BEFORE the builder starts, re-measure every figure rather than reading it from a claim, drive anything behavioural, and return pass/revise with named blocking gaps. Do not hand the builder fixes. Decisions go --to operator, never agent-to-agent." >/dev/null 2>&1 \
-    && echo "posted role assignment to $REVIEWER on the bus" \
-    || echo "WARN: bus post failed — assignment above is still valid, announce it manually"
+  POST_FAILED=0
+
+  bash scripts/agent-bus.sh open --to "$BUILDER" --from operator     "ROLE ASSIGNMENT for Phase $PHASE — YOU BUILD IT. BUILDER is $BUILDER, REVIEWER is $REVIEWER. Whoever built it does not verify it (AGENTS.md 6.3), so $REVIEWER verifies and will NOT send you build direction or hand you fixes. ⚠ Do not start source work until $REVIEWER confirms its baselines are captured — a baseline taken after you start measures the change against itself (AGENTS.md 6.1). Docs-only work (discuss, plan, threat model) is safe meanwhile. Check 'bash scripts/agent-bus.sh list --to $BUILDER' before each plan and after each, and post completion '--to $REVIEWER' with the evidence, not just a claim. Design DECISIONS go --to operator, never agent-to-agent." >/dev/null 2>&1     && echo "posted role assignment to $BUILDER (BUILDER) on the bus"     || { POST_FAILED=1; echo "WARN: bus post to $BUILDER FAILED — paste section 2 above manually"; }
+
+  bash scripts/agent-bus.sh open --to "$REVIEWER" --from operator     "ROLE ASSIGNMENT for Phase $PHASE — YOU REVIEW IT, you are NOT building it. BUILDER is $BUILDER, REVIEWER is $REVIEWER. Whoever built it does not verify it (AGENTS.md 6.3). Capture baselines BEFORE $BUILDER starts and tell it when they are captured, re-measure every figure rather than reading it from a claim, drive anything whose criterion is behavioural rather than structural, and return pass/revise with named blocking gaps posted '--to $BUILDER'. Do NOT hand the builder fixes. Decisions go --to operator, never agent-to-agent." >/dev/null 2>&1     && echo "posted role assignment to $REVIEWER (REVIEWER) on the bus"     || { POST_FAILED=1; echo "WARN: bus post to $REVIEWER FAILED — paste section 3 above manually"; }
+
+  if [ "$POST_FAILED" = "1" ]; then
+    echo "⚠ at least one bus post FAILED — the assignment above is still valid, announce it manually"
+  fi
 fi

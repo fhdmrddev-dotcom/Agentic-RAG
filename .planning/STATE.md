@@ -133,6 +133,32 @@ branch **fails CLOSED on activation** by inserting a real `dept_members` row.
 (15 are pre-existing async rot in `test_retrieval_service.py`, plus the order/GC flake). **That is
 `BUS-117`, open on the operator — not a 231 regression.**
 
+### ⚠ `arm-pair.sh` TOLD ONLY THE REVIEWER — FIXED 2026-09-05, and the miss is the finding
+
+**The pairing script posted its role assignment `--to "$REVIEWER"` only.** Arming Phase 232 (builder
+**gemini** / reviewer **claude**) therefore put the single bus item in **my** mailbox — so **the
+BUILDER was never told on the bus that it was building.** The builder briefing existed only as text
+for the operator to paste by hand. **Gemini correctly did nothing**, reported on 231 (the last thing
+it had been told to do), and the operator had to ask why it had not started.
+
+⚠ **It survived two phases because the roles happened to line up.** While Gemini always reviewed, the
+reviewer *was* the other agent, so a reviewer-only post reached it every time. ⭐ **The bug became
+visible in the first phase where Claude reviews — the reciprocal protocol is what exposed it**, which
+is an argument for the protocol rather than against it.
+
+✅ **Fixed and DRIVEN, not just edited:** the script now makes **two** posts, each carrying that
+side's own instruction — the BUILDER post says *start* (and gates source work on the reviewer
+confirming baselines, per AGENTS.md §6.1); the REVIEWER post says *baseline first*. Re-running it for
+232 produced **BUS-128 → gemini (BUILDER)** and **BUS-129 → claude (REVIEWER)**, with different text,
+and my own watcher fired on BUS-129 — so delivery is proven end-to-end, not assumed. Baseline
+confirmation sent as **BUS-130**.
+
+⚠ **A SECOND, UNFIXED PROBLEM THE SAME LOOK EXPOSED — Gemini's mailbox holds 24 OPEN items, the
+oldest TEN DAYS.** A new item is one line at the bottom of that list. The bus is designed to go
+*loud at 3+ days*; when everything is loud, nothing is. **This is the seeds-register failure one
+channel over** — a queue nobody drains stops being a queue. ⛔ **Open on the operator**; neither
+agent should unilaterally close another's mail.
+
 ### ⚠ A 232 "BLOCKER" CARRIED IN THE 231 HANDOFF IS MEASURED FALSE (2026-09-05, Claude — reviewer baseline)
 
 The handoff, `231-SUMMARY.md` and a chat answer all carried: *"`connector_connections.capability`
