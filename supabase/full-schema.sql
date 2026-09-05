@@ -164,6 +164,46 @@ $$;
 
 
 --
+-- Name: connection_doc_is_visible(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.connection_doc_is_visible(p_source_connection_id uuid, p_ingest_visibility text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  SELECT CASE
+    -- Not from a connection: this predicate has nothing to say. The owner arm still applies.
+    WHEN p_source_connection_id IS NULL THEN false
+
+    -- Everyone in the org. The caller's org gate has already run.
+    WHEN p_ingest_visibility = 'org' THEN true
+
+    -- D-5 — THE INERT DEPARTMENT BRANCH.
+    -- Decided by the operator 2026-09-05: present but inert. It is written now because a second
+    -- scope added AFTER this predicate is set is a re-ingest, not a migration.
+    --
+    -- ⭐ It is DERIVED, not hard-coded true: while no department membership exists there is no
+    --    narrower answer to give, so it reads org-wide — which is exactly today's behaviour.
+    --    The moment departments become real, this branch STOPS granting org-wide on its own and
+    --    must be replaced with a real membership check. That is deliberate: the inert branch
+    --    fails CLOSED on activation rather than silently over-sharing the day someone adds a
+    --    department. No UI offers this value, so no row carries it today.
+    WHEN p_ingest_visibility = 'dept' THEN NOT EXISTS (SELECT 1 FROM public.dept_members)
+
+    -- 'private', and anything unrecognised.
+    ELSE false
+  END;
+$$;
+
+
+--
+-- Name: FUNCTION connection_doc_is_visible(p_source_connection_id uuid, p_ingest_visibility text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.connection_doc_is_visible(p_source_connection_id uuid, p_ingest_visibility text) IS 'Phase 231 (VIS-01): the ONE connection-scoped visibility predicate. All four enforcement sites call it; none re-derives it. Fails closed on NULL and on any unrecognised value. Does NOT re-check org membership — every caller already gates on current_user_org_ids().';
+
+
+--
 -- Name: create_org_with_default_dept(text, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -297,6 +337,7 @@ BEGIN
     AND (                                                               -- PRAG-01 within-org visibility
       dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+      OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
@@ -326,6 +367,7 @@ BEGIN
     AND (                                                               -- PRAG-01 within-org visibility
       dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+      OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
     AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
@@ -1143,6 +1185,9 @@ CREATE TABLE public.documents (
     document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
     date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
     org_id uuid NOT NULL,
+    source_connection_id uuid,
+    ingest_visibility text DEFAULT 'private'::text NOT NULL,
+    CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -1152,6 +1197,20 @@ CREATE TABLE public.documents (
 --
 
 COMMENT ON COLUMN public.documents.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: COLUMN documents.source_connection_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_connection_id IS 'Phase 231 (TRUST-04): the connection that PLACED this document, or NULL when a person uploaded it. Carried into citations so machine-placed knowledge is distinguishable from knowledge somebody chose to upload. ON DELETE SET NULL — deleting a connection must never delete knowledge (D-4 freezes, it does not purge).';
+
+
+--
+-- Name: COLUMN documents.ingest_visibility; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.ingest_visibility IS 'Phase 231 (VIS-01): who can read a document this connection brought in. Enum-shaped, never a boolean. private = owner only · org = anyone in the org · dept = INERT (D-5, see connection_doc_is_visible). Meaningless when source_connection_id IS NULL.';
 
 
 --
@@ -3322,6 +3381,13 @@ CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (d
 
 
 --
+-- Name: idx_documents_source_connection; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_source_connection ON public.documents USING btree (source_connection_id) WHERE (source_connection_id IS NOT NULL);
+
+
+--
 -- Name: idx_eval_ratings_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4526,6 +4592,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: documents documents_source_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.documents
+    ADD CONSTRAINT documents_source_connection_id_fkey FOREIGN KEY (source_connection_id) REFERENCES public.connector_connections(id) ON DELETE SET NULL;
+
+
+--
 -- Name: documents documents_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5563,7 +5637,7 @@ CREATE POLICY "Users can view own ingestion jobs" ON public.ingestion_jobs FOR S
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)))));
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)) OR public.connection_doc_is_visible(source_connection_id, ingest_visibility))));
 
 
 --
@@ -5614,7 +5688,7 @@ CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR S
 
 CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.documents d
-  WHERE ((d.id = document_chunks.document_id) AND (d.folder_id IS NOT NULL) AND public.folder_is_org_shared(d.folder_id)))))));
+  WHERE ((d.id = document_chunks.document_id) AND (((d.folder_id IS NOT NULL) AND public.folder_is_org_shared(d.folder_id)) OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility))))))));
 
 
 --

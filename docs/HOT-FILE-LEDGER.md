@@ -6621,6 +6621,18 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 
 **Triple re-derived 2026-08-28: `17 / 9 / 362` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
 
+⭐ **PHASE 231 — honoured by construction, and the mechanism is worth recording.** 231 widened document
+visibility at four enforcement sites, two of which are the `SECURITY DEFINER` functions this file calls
+(`match_document_chunks`, `keyword_search_chunks`). **`retrieval_service.py` is byte-unchanged by 231**
+— re-derived at the phase's close and still `17 / 9 / 362`. The new connection-scoped arm was added
+*inside the SQL*, behind the single `connection_doc_is_visible()` resolver, so this file inherited the
+narrowing without learning a new rule. **That is the argument for putting the predicate in one SQL
+function rather than in Python:** a caller that never knew the old rule cannot get the new one wrong.
+
+⚠ **The G-5 extraction obligation is NOT discharged by that** — it stays OWED. A third landing on this
+file must propose the extraction before adding behaviour, per the ROADMAP's standing note (it fires at
+both 231 and 241).
+
 ⚠ **IT COMPUTES A PER-HIT SIMILARITY AND THROWS IT AWAY.** `search_documents` is typed `-> tuple[list[dict], float]`; the caller in `tool_dispatcher.py` writes an audit row carrying `{query_text, document_ids}` and **not the score**. So *"times retrieved"*, *"last question"* and *"last found"* are all answerable today while **"average relevance" is not** — the single gap in the Library's Retrieval section, and it is one key on an existing jsonb column rather than a migration.
 
 ⚠ It is also the surface `BUG-260815-05` (folded into Phase 210) touches: the retrieval path **misreports embedding-provider failure**. A Health tab built before that lands would show *"0 searches"* during an outage — inheriting the exact lie it exists to prevent. **That is a sequencing constraint on the document stream, not a defect in it.**
