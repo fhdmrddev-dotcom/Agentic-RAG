@@ -247,9 +247,9 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     "send_email": (),
     # ⚠ A NEW HOST, ADDED DELIBERATELY AND NARROWLY (2026-08-31). Every other entry here
     # belongs to a capability VERB; this one belongs to a SERVICE reached with an OAuth
-    # access token. It exists because `services/cloud_storage.py` was calling
-    # googleapis.com with a RAW `httpx.AsyncClient` — no scheme check, no allow-list, no
-    # DNS pin, no redirect refusal, no size cap — on a path that downloads a file a
+    # access token. It exists because the legacy cloud storage file picker (now retired in Phase 232 /
+    # services/sources) was calling googleapis.com with a RAW `httpx.AsyncClient` — no scheme check,
+    # no allow-list, no DNS pin, no redirect refusal, no size cap — on a path that downloads a file a
     # person names. That module sits OUTSIDE `services/connectors/`, so the D-05 source
     # fence never walked it and the gap was invisible to the guard written for it.
     #

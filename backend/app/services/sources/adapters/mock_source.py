@@ -131,12 +131,22 @@ class MockSourceAdapter(SourceAdapter):
         folder_id: str | None = None,
         recursive: bool = False,
         page_token: str | None = None,
+        query: str | None = None,
+        page_size: int = 30,
     ) -> FilePage:
         """List files in the requested folder."""
         if not folder_id:
-            return FilePage(files=[], next_page_token=None)
+            files = [f for sub in self._files.values() for f in sub]
+        else:
+            files = list(self._files.get(folder_id, []))
 
-        files = self._files.get(folder_id, [])
+        if query:
+            q = query.lower()
+            files = [f for f in files if q in f.name.lower()]
+
+        if page_size and len(files) > page_size:
+            files = files[:page_size]
+
         return FilePage(files=files, next_page_token=None)
 
     async def read_file(

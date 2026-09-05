@@ -1,4 +1,4 @@
-"""Tests for Phase 216 Plan 03: Cloud Storage Browser & Single-File Import."""
+"""Tests for Phase 216 Plan 03 / Phase 232 Plan 03: Source Browser & Single-File Import."""
 
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -7,7 +7,7 @@ import json as jsonlib
 
 import pytest
 from app.models.connector import ConnectorConnectionResponse, McpConfig
-from app.services.cloud_storage import fetch_cloud_file, list_cloud_files
+from app.services.sources.import_service import fetch_cloud_file, list_cloud_files
 
 
 @pytest.mark.asyncio
@@ -42,18 +42,11 @@ async def test_list_cloud_files_google_drive():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "app.services.cloud_storage.get_fresh_access_token",
+            "app.services.sources.adapters.google_drive.get_fresh_access_token",
             AsyncMock(return_value="valid_token"),
         )
-        # ⚠ THE SEAM MOVED, AND THAT IS THE POINT OF THE CHANGE. This used to patch
-        # `httpx.AsyncClient`, because `cloud_storage` opened a RAW client — no scheme
-        # check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path
-        # that downloads a file a caller names. It now goes through the egress binder
-        # under the `drive_read` key, so the binder is what a test replaces.
-        #
-        # ⚠ A PinnedResponse carries `.body` (bytes), not `.json()` and not `.content`.
         mp.setattr(
-            "app.services.cloud_storage.send_pinned_http",
+            "app.services.sources.adapters.google_drive.send_pinned_http",
             AsyncMock(return_value=mock_resp),
         )
 
@@ -94,18 +87,11 @@ async def test_fetch_cloud_file_google_drive_binary():
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
-            "app.services.cloud_storage.get_fresh_access_token",
+            "app.services.sources.adapters.google_drive.get_fresh_access_token",
             AsyncMock(return_value="valid_token"),
         )
-        # ⚠ THE SEAM MOVED, AND THAT IS THE POINT OF THE CHANGE. This used to patch
-        # `httpx.AsyncClient`, because `cloud_storage` opened a RAW client — no scheme
-        # check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path
-        # that downloads a file a caller names. It now goes through the egress binder
-        # under the `drive_read` key, so the binder is what a test replaces.
-        #
-        # ⚠ A PinnedResponse carries `.body` (bytes), not `.json()` and not `.content`.
         mp.setattr(
-            "app.services.cloud_storage.send_pinned_http",
+            "app.services.sources.adapters.google_drive.send_pinned_http",
             AsyncMock(side_effect=[meta_resp, dl_resp]),
         )
 

@@ -37,6 +37,8 @@ class SourceFile:
     size: int | None = None
     modified_at: str | None = None
     drive_id: str | None = None
+    icon_url: str | None = None
+    web_view_url: str | None = None
 
 
 @dataclass
@@ -83,6 +85,8 @@ class SourceAdapter(ABC):
         folder_id: str | None = None,
         recursive: bool = False,
         page_token: str | None = None,
+        query: str | None = None,
+        page_size: int = 30,
     ) -> FilePage:
         """List files available inside a folder (for preview/batch sync)."""
 

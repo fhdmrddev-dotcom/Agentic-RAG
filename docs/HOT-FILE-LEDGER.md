@@ -6311,6 +6311,12 @@ Phases touched: 190, 206, 211, 212, 215, 221, 222, 225, etc.
 
 **Disposition: honoured by construction (225):** dual-mode state resolution inside the two functions it already owns (`create_oauth_authorize_url` and `oauth_callback`), plus redirect target path migration to `/app` (B-1). No new endpoints added.
 
+**Re-derived 2026-09-05 (Phase 232):** `30 commits / 14 phases / 1708 L` · **G-5 FIRES**.
+Phases touched: 190, 206, 211, 212, 215, 221, 222, 225, 226, 229, 230, 231, 232.
+
+**Disposition: partial discharge (232-03).** File browsing and single-file import delegated to `app.services.sources.import_service`, completely retiring `cloud_storage.py`. Net -28 lines discharged from 1736 L to 1708 L.
+
+
 
 ---
 
@@ -6936,6 +6942,10 @@ un-stripping `capability` to make it would put URL paths in front of pickers and
 emitted beside `title`. It carries no host, no path, no method — and a test asserts none of the five
 stripped keys appears on any emitted descriptor.
 
+**Re-derived 2026-09-05 (Phase 232): `11 commits / 1 phase / 2018 L` — G-5: no (1 phase).**
+Line count sync to 2018 L. Delegated internal Google Drive calls (`search_files`, `read_file`) to `app.services.sources.adapters.google_drive`.
+
+
 ---
 
 ### `backend/app/services/connectors/grants.py`
@@ -7097,3 +7107,19 @@ grants surface and the availability line say.
   authoritative.
 
 **No seam proposed.** A vocabulary doing one thing many times is the right shape.
+
+---
+
+## `backend/app/security/egress.py`
+
+**Measured 2026-09-05 (Phase 232): `10 commits / 3 phases / 938 L` · ⚠ G-5 FIRES — EXACTLY AT THRESHOLD (3 phases).**
+Phases touched: 221, 222, 232.
+
+**What it holds:** The outbound egress boundary — SSRF defense, loopback/RFC1918 blocking, DNS resolution, and pinned service endpoint dispatch (`send_pinned_http`).
+
+**Phase 232's change:** Updated Google Drive endpoint docstrings to point to the unified source contract (`app.services.sources.adapters.google_drive`). Preserved pinned endpoint profiles (`drive_read`, `drive_export`).
+
+**Invariants:**
+- ⚠ Outbound egress must never resolve to loopback, link-local, or private RFC1918 addresses.
+- ⚠ All egress calls use pinned endpoint keys, bounded payload limits, and strict timeouts.
+

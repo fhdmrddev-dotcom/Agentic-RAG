@@ -130,7 +130,7 @@ def test_connector_import_sc1_mints_row_and_resolves_pgrst204(mock_clients):
     mock_conn = {"id": CONN_ID, "user_id": USER_ID, "org_id": ORG_ID, "service_name": "google_drive"}
 
     with patch("app.services.connector_service.get_connection", AsyncMock(return_value=mock_conn)), \
-         patch("app.services.cloud_storage.fetch_cloud_file", AsyncMock(return_value=(FILENAME, FILE_BYTES, MIME_TYPE))), \
+         patch("app.services.sources.import_service.fetch_cloud_file", AsyncMock(return_value=(FILENAME, FILE_BYTES, MIME_TYPE))), \
          patch("app.services.ingest_splice.splice_document") as mock_splice:
 
         with TestClient(app) as client:
@@ -193,7 +193,7 @@ def test_connector_import_sc2_upload_parity_and_deduplication(mock_clients):
     mock_conn = {"id": CONN_ID, "user_id": USER_ID, "org_id": ORG_ID}
 
     with patch("app.services.connector_service.get_connection", AsyncMock(return_value=mock_conn)), \
-         patch("app.services.cloud_storage.fetch_cloud_file", AsyncMock(return_value=(FILENAME, FILE_BYTES, MIME_TYPE))), \
+         patch("app.services.sources.import_service.fetch_cloud_file", AsyncMock(return_value=(FILENAME, FILE_BYTES, MIME_TYPE))), \
          patch("app.services.ingest_splice.splice_document") as mock_splice:
 
         with TestClient(app) as client:
@@ -239,7 +239,8 @@ def test_sc4_upload_path_behaviour_preserved(mock_clients):
     }
     sb._tables["documents"]._select.execute.return_value = _make_result([existing_doc])
 
-    with patch("app.api.documents._upload_pipeline") as mock_pipeline:
+    with patch("app.api.documents._upload_pipeline") as mock_pipeline, \
+         patch("app.config.settings.ingest_worker_enabled", False):
         with TestClient(app) as client:
             resp1 = client.post(
                 "/documents/upload",

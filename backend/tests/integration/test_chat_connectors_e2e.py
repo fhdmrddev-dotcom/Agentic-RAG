@@ -17,7 +17,7 @@ from app.services.tool_dispatcher import (
     ToolContext,
     dispatch_tool,
 )
-from app.services.cloud_storage import list_cloud_files, fetch_cloud_file
+from app.services.sources.import_service import list_cloud_files, fetch_cloud_file
 
 
 @pytest.mark.asyncio
@@ -255,8 +255,8 @@ async def test_e2e_cloud_file_import_flow():
             return mock_meta_response
         return mock_dl_response
 
-    with patch("app.services.cloud_storage.get_fresh_access_token", AsyncMock(return_value="valid-oauth-token")), \
-         patch("app.services.cloud_storage.send_pinned_http", side_effect=mock_send):
+    with patch("app.services.sources.adapters.google_drive.get_fresh_access_token", AsyncMock(return_value="valid-oauth-token")), \
+         patch("app.services.sources.adapters.google_drive.send_pinned_http", side_effect=mock_send):
 
         # 1. Listing files
         res = await list_cloud_files(

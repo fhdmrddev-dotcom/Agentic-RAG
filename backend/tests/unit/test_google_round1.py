@@ -1,7 +1,7 @@
 """Round 1 — Sheets, Docs, Calendar and Contacts reads on the SAME Google connection.
 
 ⚠ THE OPERATOR'S QUESTION WAS "WHY ONLY TWO TOOLS", and the honest answer was that two
-was never a product decision: Drive's pair is exactly what `cloud_storage` already
+was never a product decision: Drive's pair is exactly what the Google Drive source adapter already
 implemented for the composer file picker, and Gmail's pair was read-only because the
 write-approval gate was unproven. The gate was proven the same day. These eleven are the
 surfaces that were missing.

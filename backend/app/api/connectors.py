@@ -1642,8 +1642,8 @@ async def list_connection_files(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 (ATTACH-01 / D-216-09): Browse files in cloud storage."""
-    from app.services.cloud_storage import list_cloud_files
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): Browse files in cloud storage."""
+    from app.services.sources.import_service import browse_connection_files
 
     conn = await connector_service.get_connection(
         connection_id=str(connection_id),
@@ -1654,7 +1654,7 @@ async def list_connection_files(
         raise _NOT_FOUND
 
     try:
-        res = await list_cloud_files(conn, query=query, page_token=page_token, page_size=page_size)
+        res = await browse_connection_files(conn, query=query, page_token=page_token, page_size=page_size)
         return res
     except Exception as exc:
         logger.error("Failed to list files from connection %s: %s", connection_id, exc)
@@ -1676,10 +1676,8 @@ async def import_connection_file(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 (ATTACH-01 / D-216-09): User-initiated single file import."""
-    from app.services.cloud_storage import fetch_cloud_file
-    from app.services.ingest_splice import async_mint_document_row, splice_document
-    from app.dependencies import get_supabase
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import."""
+    from app.services.sources.import_service import import_single_file
 
     conn = await connector_service.get_connection(
         connection_id=str(connection_id),
@@ -1690,46 +1688,20 @@ async def import_connection_file(
         raise _NOT_FOUND
 
     try:
-        filename, raw_bytes, mime_type = await fetch_cloud_file(conn, file_id)
+        return await import_single_file(
+            connection=conn,
+            file_id=file_id,
+            user_id=user["id"],
+            active_org=str(active_org),
+            background_tasks=background_tasks,
+            supabase=supabase,
+        )
     except Exception as exc:
         logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to download cloud file: {exc}",
         )
-
-    # Phase 229 (TRUST-01, SC#1, SC#2): mint document row via async_mint_document_row
-    # Resolves PGRST204 storage_path column error and guarantees identical dedupe and versioning.
-    # Phase 231 (VIS-01 / TRUST-04): the connection that PLACED this row, and the scope its
-    # owner chose. Read from the connection itself — never from the request — so a caller cannot
-    # widen a document past what the connection was set to. `org_id` is likewise passed from the
-    # resolved active org, closing the BUG-260905-01 half where imports landed with no org.
-    mint_result = await async_mint_document_row(
-        raw=raw_bytes,
-        filename=filename,
-        mime_type=mime_type,
-        user_id=user["id"],
-        supabase=supabase,
-        org_id=str(active_org),
-        source_connection_id=str(connection_id),
-        ingest_visibility=getattr(conn, "default_ingest_visibility", "private") or "private",
-    )
-    doc = mint_result.document
-
-    if not mint_result.is_duplicate:
-        srv_supabase = get_supabase()
-        background_tasks.add_task(
-            splice_document,
-            document_id=doc["id"],
-            raw=raw_bytes,
-            mime_type=mime_type,
-            filename=filename,
-            user_id=user["id"],
-            storage_path=mint_result.storage_path,
-            supabase=srv_supabase,
-        )
-
-    return doc
 
 
 

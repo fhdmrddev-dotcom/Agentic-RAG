@@ -194,22 +194,32 @@ class GoogleDriveSourceAdapter(SourceAdapter):
         folder_id: str | None = None,
         recursive: bool = False,
         page_token: str | None = None,
+        query: str | None = None,
+        page_size: int = 30,
     ) -> FilePage:
-        """List non-folder files inside a target folder."""
-        if not folder_id or folder_id in ("shared_drives", "virtual_root"):
+        """List non-folder files inside a target folder, or matching an optional search query."""
+        if folder_id in ("shared_drives", "virtual_root") and not query:
             return FilePage(files=[], next_page_token=None)
 
         token = await self._get_auth_token(connection)
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
-        target_parent = "root" if folder_id == "my_drive" else folder_id
-        safe_parent = target_parent.replace("'", "\\'")
+        q_parts = ["trashed = false", "mimeType != 'application/vnd.google-apps.folder'"]
+        if folder_id and folder_id not in ("shared_drives", "virtual_root"):
+            target_parent = "root" if folder_id == "my_drive" else folder_id
+            safe_parent = target_parent.replace("'", "\\'")
+            q_parts.append(f"'{safe_parent}' in parents")
+        if query:
+            safe_q = query.replace("'", "\\'")
+            q_parts.append(f"name contains '{safe_q}'")
 
-        q = f"'{safe_parent}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
         params = {
-            "pageSize": "100",
-            "fields": "nextPageToken, files(id, name, mimeType, size, modifiedTime, driveId)",
-            "q": q,
+            "pageSize": str(min(page_size, 100)),
+            "fields": (
+                "nextPageToken, files(id, name, mimeType, size, modifiedTime, driveId, iconLink, "
+                "webViewLink)"
+            ),
+            "q": " and ".join(q_parts),
             "orderBy": "modifiedTime desc",
             "supportsAllDrives": "true",
             "includeItemsFromAllDrives": "true",
@@ -243,6 +253,8 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                     size=int(f.get("size", 0)) if f.get("size") else None,
                     modified_at=f.get("modifiedTime"),
                     drive_id=f.get("driveId"),
+                    icon_url=f.get("iconLink"),
+                    web_view_url=f.get("webViewLink"),
                 )
             )
         return FilePage(files=files, next_page_token=data.get("nextPageToken"))
@@ -342,3 +354,46 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             )
         except Exception as exc:
             return SourceHealth(ok=False, error=str(exc))
+
+
+async def _list_google_drive_files(
+    connection_id: str | UUID,
+    query: str | None = None,
+    page_token: str | None = None,
+    page_size: int = 30,
+) -> dict[str, Any]:
+    """Shim for legacy callers (service_tools.py and test suites) querying Google Drive files."""
+    adapter = GoogleDriveSourceAdapter()
+    conn = {"id": str(connection_id), "service_id": "google"}
+    page = await adapter.list_files(
+        conn,
+        query=query,
+        page_token=page_token,
+        page_size=page_size,
+    )
+    return {
+        "files": [
+            {
+                "id": f.id,
+                "name": f.name,
+                "mime_type": f.mime_type,
+                "size": f.size,
+                "modified_at": f.modified_at,
+                "icon_url": f.icon_url,
+                "web_view_url": f.web_view_url,
+            }
+            for f in page.files
+        ],
+        "next_page_token": page.next_page_token,
+    }
+
+
+async def _fetch_google_drive_file(
+    connection_id: str | UUID,
+    file_id: str,
+) -> tuple[str, bytes, str]:
+    """Shim for legacy callers downloading a single file from Google Drive."""
+    adapter = GoogleDriveSourceAdapter()
+    conn = {"id": str(connection_id), "service_id": "google"}
+    return await adapter.read_file(conn, file_id)
+
