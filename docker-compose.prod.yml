@@ -75,6 +75,25 @@ services:
       # Phase 230 (QUEUE-01 / QUEUE-05) — the durable ingestion queue daemon. Also read from
       # env_file above; listed here to self-document the knobs. Lifespan task inside the backend,
       # bounds concurrent embeddings, and handles provider outages cleanly.
+      #
+      # ⚠ UNLIKE THE SCHEDULER ABOVE, THIS ONE IS CPU-BOUND, AND THAT CHANGES THE ADVICE.
+      #   The scheduler comment says "NOT a separate compose service ON PURPOSE" — true for
+      #   it, because it only *starts* work. Ingestion PERFORMS work: camelot parses every
+      #   page of every PDF, and CPython's GIL means that does not run in parallel with
+      #   request handling inside the same process. Under load, ingesting freezes the API.
+      #
+      #   To separate them, add a second service off THIS SAME IMAGE — no new build, no code
+      #   change; the queue is safe at any process count (database-level claims, reclaimed
+      #   leases):
+      #
+      #     backend:                      INGEST_WORKER_ENABLED: "false"
+      #     ingest-worker:
+      #       <<: *backend-service-def    INGEST_WORKER_ENABLED: "true"
+      #       ports: []                   # serves nothing; no port, no healthcheck route
+      #
+      #   Left as a documented option rather than shipped as a second service, because on a
+      #   one-box install a single process is simpler and the contention only matters once
+      #   somebody is waiting on a request.
       INGEST_WORKER_ENABLED: ${INGEST_WORKER_ENABLED:-true}
       INGEST_MAX_CONCURRENT_JOBS: ${INGEST_MAX_CONCURRENT_JOBS:-3}
       INGEST_POLL_INTERVAL_SECONDS: ${INGEST_POLL_INTERVAL_SECONDS:-2.0}

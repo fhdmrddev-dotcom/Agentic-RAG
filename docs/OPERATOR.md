@@ -132,6 +132,30 @@ Then edit `./.env` and fill in:
   per worker; `INGEST_POLL_INTERVAL_SECONDS` (default `2.0`) is the polling frequency for due jobs;
   `INGEST_LEASE_TIMEOUT_SECONDS` (default `300`) is the lease timeout used by the stale-claim
   sweeper to rescue in-flight jobs stranded if a worker crashes or restarts (SC#1).
+
+  ⚠ **Once you have real users, set `INGEST_WORKER_ENABLED=false` on the API processes and run
+  one separate process with it `true`.** Document extraction is **CPU-bound Python** — camelot
+  parses every page of every PDF — and CPython's GIL means that work does *not* run in parallel
+  with request handling inside the same process. While a document ingests, that process's event
+  loop is starved and every unrelated request (chat, threads, folders) queues behind it.
+
+  **Measured, not theorised:** at `WORKER_COUNT=2` with `INGEST_MAX_CONCURRENT_JOBS=3`, importing
+  a single Google Drive folder made the whole app unresponsive — up to six CPU-heavy jobs
+  competing with request handling in the same processes.
+
+  | process | `INGEST_WORKER_ENABLED` | role |
+  |---|---|---|
+  | API (`backend`) | `false` | serves requests, never ingests |
+  | one worker, same image | `true` | ingests, serves nothing |
+
+  It needs **no leader election and no coordination at any process count** — claims are a
+  database transaction (`FOR UPDATE SKIP LOCKED`) and stale leases are reclaimed after
+  `INGEST_LEASE_TIMEOUT_SECONDS`, the same guarantee the scheduler relies on. See the worked
+  compose snippet in `docker-compose.prod.yml` beside this variable.
+
+  ⛔ **Do not split a single-box install.** One process that both serves and ingests is simpler,
+  and the contention only matters when somebody else is waiting on a request. The default stays
+  `true` everywhere for exactly that reason.
 - **Connector Watch Loop (Phase 234, LIB-08 / QUEUE-03)** — `WATCH_PROCESS_ENABLED`
   ships **`false`** by default. Set it to `true` to enable automated background polling of
   watched source folders (Google Drive, etc.). Safe across multiple uvicorn workers via database

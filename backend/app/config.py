@@ -1159,6 +1159,34 @@ class Settings(BaseSettings):
 
     # ── Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon ────
     # Worker enabled by default for restart survival and asynchronous upload processing.
+    #
+    # ⚠ BUG-260905-16 — THIS IS THE KNOB THAT SEPARATES INGESTION FROM THE API, AND ON A BOX
+    #   WITH USERS IT SHOULD BE `false` ON THE API PROCESSES.
+    #
+    #   Document extraction is CPU-BOUND PYTHON — camelot parses every page of every PDF,
+    #   embedding batches marshal large payloads. Threads do not make CPU work parallel in
+    #   CPython: the GIL is held, so while a document ingests, the API process's event loop is
+    #   starved and every unrelated request (chat, threads, folders) crawls behind it.
+    #
+    # ⚠ MEASURED BY THE OPERATOR, not inferred: with `WORKER_COUNT=2` and
+    #   `ingest_max_concurrent_jobs=3`, importing a Google Drive folder made the whole app
+    #   unresponsive — "if I wanted to ingest something that should not stop the back end, I
+    #   can navigate to chat, I can do anything". Up to SIX concurrent CPU-heavy jobs were
+    #   competing with request handling inside the same processes.
+    #
+    # ⛔ MOVING THE BLOCKING DB CALLS OFF THE LOOP (BUG-260905-14) DID NOT FIX THIS AND WAS
+    #   NEVER GOING TO. That removed the *I/O* stalls; this is *CPU* contention, and the only
+    #   real remedy is a different process. The queue was already built for it — claims are
+    #   database-level (`FOR UPDATE SKIP LOCKED`), leases are reclaimed after
+    #   `ingest_lease_timeout_seconds`, so N processes are safe with zero coordination.
+    #
+    #   The deployment shape:
+    #     API processes     INGEST_WORKER_ENABLED=false   ← serves requests, never ingests
+    #     one worker process INGEST_WORKER_ENABLED=true   ← ingests, serves nothing
+    #
+    #   The default stays `true` so a single-process dev box and the one-box deploy keep
+    #   working with no configuration at all. Splitting is an operator decision about scale,
+    #   not a behaviour change — see `docs/OPERATOR.md` and `docker-compose.prod.yml`.
     ingest_worker_enabled: bool = True
     # Concurrency limit per worker process (asyncio.Semaphore). Bounds concurrent
     # document extractions and embeddings to prevent provider rate-limit saturation.

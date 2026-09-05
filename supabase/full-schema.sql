@@ -339,6 +339,7 @@ BEGIN
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
       OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
+    AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')  -- Phase 234 VIS-05
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -369,6 +370,7 @@ BEGIN
       OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
       OR public.connection_doc_is_visible(d.source_connection_id, d.ingest_visibility)  -- Phase 231 VIS-01
     )
+    AND (d.source_state IS NULL OR d.source_state != 'source_disconnected')  -- Phase 234 VIS-05
     AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -452,6 +454,7 @@ CREATE FUNCTION public.resize_embedding_column(new_dim integer) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
+  -- ── document_chunks (verbatim from mig 140 — unchanged behaviour) ──────────────────
   -- Drop the HNSW index
   DROP INDEX IF EXISTS public.document_chunks_embedding_idx;
   -- Alter column type (NULLs out existing embeddings + their embedded_at — incompatible
@@ -468,8 +471,30 @@ BEGIN
      USING hnsw (embedding vector_cosine_ops)
      WITH (m = 16, ef_construction = 64)'
   );
+
+  -- ── skill_embeddings (NEW in mig 167) ─────────────────────────────────────────────
+  -- The second table fed by the same embedding knob. No ANN index exists on it by
+  -- design (mig 091), so there is nothing to drop or recreate — only the width changes.
+  -- embedding_model is NULLed in the SAME statement so the row becomes stale by the
+  -- EXISTING D-10 predicate and the established skill-embedding backfill re-embeds it.
+  -- embedding_dimensions is NULLed for the same reason: a recorded width for a vector
+  -- that no longer exists is the same lie embedded_at was on document_chunks.
+  EXECUTE format(
+    'ALTER TABLE public.skill_embeddings
+       ALTER COLUMN embedding TYPE vector(%s) USING NULL,
+       ALTER COLUMN embedding_model TYPE text USING NULL,
+       ALTER COLUMN embedding_dimensions TYPE integer USING NULL',
+    new_dim
+  );
 END;
 $$;
+
+
+--
+-- Name: FUNCTION resize_embedding_column(new_dim integer); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.resize_embedding_column(new_dim integer) IS 'Phase mig 167: resizes the vector column of BOTH tables fed by app_settings.embedding_dimensions — document_chunks (with HNSW drop/recreate) and skill_embeddings (no ANN index by design, mig 091). Called ONLY on a true dims change (backend/app/services/reembed_service.py gates on dims_changed). Every vector in both tables is NULLed by the ALTER: an old-width vector is meaningless in the new space. document_chunks.embedded_at and skill_embeddings.embedding_model/.embedding_dimensions are NULLed alongside so no row claims an index time or a model for a vector that no longer exists — and so skill rows become stale by the existing D-10 predicate and are picked up by the established skill_embedding_service backfill with no second staleness mechanism. ⚠ Before mig 167 this function covered document_chunks ONLY, so any non-1536 model silently broke skill-embedding writes with a pgvector dimension mismatch while document search recovered normally.';
 
 
 --
@@ -686,6 +711,8 @@ CREATE TABLE public.app_settings (
     setup_complete boolean DEFAULT false NOT NULL,
     model_discovery_filter_enabled boolean DEFAULT true NOT NULL,
     supabase_management_token text,
+    vision_model text,
+    vision_max_pages integer DEFAULT 50,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -712,6 +739,20 @@ COMMENT ON COLUMN public.app_settings.document_management_enabled IS 'Phase 110 
 
 
 --
+-- Name: COLUMN app_settings.vision_model; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.vision_model IS 'Model used to transcribe scanned PDFs, drawings and uploaded images (SEED-226). NULL or empty => fall back to the VISION_MODEL env var, then to the active llm_model. Never defaults to a pinned model name.';
+
+
+--
+-- Name: COLUMN app_settings.vision_max_pages; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.vision_max_pages IS 'Hard ceiling on pages transcribed per document. A document with more pages is transcribed up to this number and the shortfall is recorded in documents.metadata._vision.truncated AND stated in every chunk header, so a partial transcription can never read as complete.';
+
+
+--
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -722,7 +763,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text])))
 );
 
 
@@ -1005,6 +1046,150 @@ COMMENT ON COLUMN public.connector_tokens.refresh_claimed_until IS 'Phase 215 (D
 
 
 --
+-- Name: connector_watch_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_watch_items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    watch_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    external_id text NOT NULL,
+    name text NOT NULL,
+    path_hint text DEFAULT ''::text NOT NULL,
+    source_version text,
+    source_modified_at timestamp with time zone,
+    content_hash text,
+    document_id uuid,
+    state text DEFAULT 'present'::text NOT NULL,
+    first_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    missing_since timestamp with time zone,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT connector_watch_items_state_check CHECK ((state = ANY (ARRAY['present'::text, 'missing'::text, 'unauthorized'::text, 'skipped_type'::text, 'skipped_size'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: TABLE connector_watch_items; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.connector_watch_items IS 'Phase 234: Mirror table for external source items tracked by a connector_watch (ARCHITECTURE.md §5).';
+
+
+--
+-- Name: COLUMN connector_watch_items.external_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.external_id IS 'Source system unique file identifier (e.g. Google Drive file ID).';
+
+
+--
+-- Name: COLUMN connector_watch_items.document_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.document_id IS 'Associated Library document in public.documents. Set NULL when document is purged.';
+
+
+--
+-- Name: COLUMN connector_watch_items.state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.state IS 'Lifecycle state: present | missing | unauthorized | skipped_type | skipped_size | failed.';
+
+
+--
+-- Name: COLUMN connector_watch_items.missing_since; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watch_items.missing_since IS 'Timestamp when this item was first detected missing from a complete source listing (H-5).';
+
+
+--
+-- Name: connector_watches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_watches (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    connection_id uuid NOT NULL,
+    source_folder_id text NOT NULL,
+    source_folder_name text NOT NULL,
+    source_drive_id text,
+    library_folder_id uuid,
+    interval_minutes integer DEFAULT 30 NOT NULL,
+    next_run_at timestamp with time zone DEFAULT now() NOT NULL,
+    leased_until timestamp with time zone,
+    is_active boolean DEFAULT true NOT NULL,
+    last_run_at timestamp with time zone,
+    last_status text,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT connector_watches_interval_floor CHECK ((interval_minutes >= 5))
+);
+
+
+--
+-- Name: TABLE connector_watches; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.connector_watches IS 'Phase 234 (LIB-08): Scheduled folder watches mapping external cloud folders to Library folders.';
+
+
+--
+-- Name: COLUMN connector_watches.source_folder_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.source_folder_id IS 'External source folder identifier (e.g. Google Drive folder ID, or "root").';
+
+
+--
+-- Name: COLUMN connector_watches.source_drive_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.source_drive_id IS 'External shared drive identifier when folder lives in a Shared Drive, or NULL for My Drive.';
+
+
+--
+-- Name: COLUMN connector_watches.library_folder_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.library_folder_id IS 'Destination folder in public.folders. NULL means Library root.';
+
+
+--
+-- Name: COLUMN connector_watches.interval_minutes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.interval_minutes IS 'Polling cadence in minutes (presets: 15, 30, 60, 360, 1440; floor: 5m).';
+
+
+--
+-- Name: COLUMN connector_watches.next_run_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.next_run_at IS 'Timestamp when this watch is next due for polling. Indexed for rapid SKIP LOCKED claim.';
+
+
+--
+-- Name: COLUMN connector_watches.leased_until; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.leased_until IS 'Concurrency lease expiration (QUEUE-03). Non-null while a sync worker is processing this watch.';
+
+
+--
+-- Name: COLUMN connector_watches.last_status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_watches.last_status IS 'Status of the latest sync run: success, failed, running, skipped_still_running, or partial.';
+
+
+--
 -- Name: departments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1196,7 +1381,9 @@ CREATE TABLE public.documents (
     org_id uuid NOT NULL,
     source_connection_id uuid,
     ingest_visibility text DEFAULT 'private'::text NOT NULL,
+    source_state text,
     CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
+    CONSTRAINT documents_source_state_check CHECK (((source_state IS NULL) OR (source_state = ANY (ARRAY['live'::text, 'missing_at_source'::text, 'unauthorized_at_source'::text, 'source_disconnected'::text])))),
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -1220,6 +1407,13 @@ COMMENT ON COLUMN public.documents.source_connection_id IS 'Phase 231 (TRUST-04)
 --
 
 COMMENT ON COLUMN public.documents.ingest_visibility IS 'Phase 231 (VIS-01): who can read a document this connection brought in. Enum-shaped, never a boolean. private = owner only · org = anyone in the org · dept = INERT (D-5, see connection_doc_is_visible). Meaningless when source_connection_id IS NULL.';
+
+
+--
+-- Name: COLUMN documents.source_state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.source_state IS 'Phase 234 (VIS-03 / VIS-04 / VIS-05): External source lifecycle state. live = synced and present · missing_at_source = deleted/moved externally (retained in Library, VIS-03) · unauthorized_at_source = unshared/revoked (VIS-04) · source_disconnected = connection disconnected (VIS-05). NULL for manually uploaded documents.';
 
 
 --
@@ -2602,6 +2796,22 @@ ALTER TABLE ONLY public.connector_tokens
 
 
 --
+-- Name: connector_watch_items connector_watch_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT connector_watch_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connector_watches connector_watches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watches
+    ADD CONSTRAINT connector_watches_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: departments departments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2986,6 +3196,14 @@ ALTER TABLE ONLY public.tuner_runs
 
 
 --
+-- Name: connector_watch_items uq_watch_item_watch_external; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT uq_watch_item_watch_external UNIQUE (watch_id, external_id);
+
+
+--
 -- Name: user_memory user_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3278,6 +3496,55 @@ CREATE INDEX idx_connector_tokens_expires_at ON public.connector_tokens USING bt
 
 
 --
+-- Name: idx_connector_watch_items_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watch_items_document_id ON public.connector_watch_items USING btree (document_id) WHERE (document_id IS NOT NULL);
+
+
+--
+-- Name: idx_connector_watch_items_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watch_items_org_user ON public.connector_watch_items USING btree (org_id, user_id);
+
+
+--
+-- Name: idx_connector_watch_items_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watch_items_state ON public.connector_watch_items USING btree (state);
+
+
+--
+-- Name: idx_connector_watch_items_watch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watch_items_watch_id ON public.connector_watch_items USING btree (watch_id);
+
+
+--
+-- Name: idx_connector_watches_connection_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watches_connection_id ON public.connector_watches USING btree (connection_id);
+
+
+--
+-- Name: idx_connector_watches_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watches_due ON public.connector_watches USING btree (next_run_at) WHERE is_active;
+
+
+--
+-- Name: idx_connector_watches_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_watches_org_user ON public.connector_watches USING btree (org_id, user_id);
+
+
+--
 -- Name: idx_departments_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3394,6 +3661,13 @@ CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (d
 --
 
 CREATE INDEX idx_documents_source_connection ON public.documents USING btree (source_connection_id) WHERE (source_connection_id IS NOT NULL);
+
+
+--
+-- Name: idx_documents_source_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_source_state ON public.documents USING btree (source_state) WHERE (source_state IS NOT NULL);
 
 
 --
@@ -3999,6 +4273,34 @@ CREATE TRIGGER connector_connections_set_updated_at BEFORE UPDATE ON public.conn
 
 
 --
+-- Name: connector_watch_items connector_watch_items_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_watch_items_autofill_org_id BEFORE INSERT ON public.connector_watch_items FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: connector_watch_items connector_watch_items_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_watch_items_set_updated_at BEFORE UPDATE ON public.connector_watch_items FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: connector_watches connector_watches_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_watches_autofill_org_id BEFORE INSERT ON public.connector_watches FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: connector_watches connector_watches_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_watches_set_updated_at BEFORE UPDATE ON public.connector_watches FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: document_chunks document_chunks_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4462,6 +4764,70 @@ ALTER TABLE ONLY public.connector_connections
 
 ALTER TABLE ONLY public.connector_tokens
     ADD CONSTRAINT connector_tokens_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.connector_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watch_items connector_watch_items_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT connector_watch_items_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id) ON DELETE SET NULL;
+
+
+--
+-- Name: connector_watch_items connector_watch_items_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT connector_watch_items_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watch_items connector_watch_items_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT connector_watch_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watch_items connector_watch_items_watch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watch_items
+    ADD CONSTRAINT connector_watch_items_watch_id_fkey FOREIGN KEY (watch_id) REFERENCES public.connector_watches(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watches connector_watches_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watches
+    ADD CONSTRAINT connector_watches_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.connector_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watches connector_watches_library_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watches
+    ADD CONSTRAINT connector_watches_library_folder_id_fkey FOREIGN KEY (library_folder_id) REFERENCES public.folders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: connector_watches connector_watches_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watches
+    ADD CONSTRAINT connector_watches_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_watches connector_watches_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_watches
+    ADD CONSTRAINT connector_watches_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -5831,6 +6197,74 @@ ALTER TABLE public.connector_tokens ENABLE ROW LEVEL SECURITY;
 CREATE POLICY connector_tokens_select ON public.connector_tokens FOR SELECT TO authenticated USING ((connection_id IN ( SELECT c.id
    FROM public.connector_connections c
   WHERE (c.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
+
+
+--
+-- Name: connector_watch_items; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_watch_items ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_watch_items connector_watch_items_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watch_items_delete ON public.connector_watch_items FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watch_items connector_watch_items_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watch_items_insert ON public.connector_watch_items FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watch_items connector_watch_items_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watch_items_select ON public.connector_watch_items FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watch_items connector_watch_items_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watch_items_update ON public.connector_watch_items FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watches; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_watches ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_watches connector_watches_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watches_delete ON public.connector_watches FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watches connector_watches_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watches_insert ON public.connector_watches FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watches connector_watches_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watches_select ON public.connector_watches FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_watches connector_watches_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_watches_update ON public.connector_watches FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
