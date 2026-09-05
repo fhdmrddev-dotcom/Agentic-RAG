@@ -13,13 +13,13 @@ export function ChunkProportionBar({ value, max }: { value: number; max: number 
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
   return (
     <div className="flex items-center gap-1.5 shrink-0" data-testid="chunk-proportion-bar">
-      <div className="w-14 h-1.5 bg-muted/60 rounded-full overflow-hidden">
+      <div className="w-14 h-1.5 bg-muted/40 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-primary/60 to-primary rounded-full transition-all duration-300"
+          className="h-full bg-gradient-to-r from-primary/60 to-primary rounded-full transition-all duration-500 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{value}</span>
+      <span className="text-xs text-muted-foreground tabular-nums w-8 text-right font-mono">{value}</span>
     </div>
   )
 }

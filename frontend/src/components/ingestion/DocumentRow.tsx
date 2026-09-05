@@ -318,8 +318,8 @@ export function DocumentRow({
       <tr
         data-selected={selectedDocId === doc.id || undefined}
         className={cn(
-          "border-b last:border-0 hover:bg-muted/20 transition-colors",
-          selectedDocId === doc.id && "bg-primary/5",
+          "group border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors duration-150",
+          selectedDocId === doc.id && "bg-primary/10 hover:bg-primary/15",
         )}
       >
         <td className="px-2 py-3">

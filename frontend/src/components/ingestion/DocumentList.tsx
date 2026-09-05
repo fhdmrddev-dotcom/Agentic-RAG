@@ -139,10 +139,10 @@ export function DocumentList({
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm shadow-sm transition-all duration-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/50">
+            <tr className="border-b border-border/50 bg-muted/40">
               <th className="px-2 py-3 w-8" />
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filename</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>

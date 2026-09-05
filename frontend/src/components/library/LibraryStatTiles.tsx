@@ -15,8 +15,15 @@
 import { useEffect, useState } from "react"
 import { getReembedProgress, getHealthOverview } from "@/lib/api"
 import type { Document } from "@/types"
+import { Layers, Binary, Search } from "lucide-react"
 
 const UNKNOWN = "Not known yet"
+
+const ICONS: Record<string, React.ElementType> = {
+  Chunks: Layers,
+  Vectors: Binary,
+  "Found by a search": Search,
+}
 
 interface TileState<T> {
   value: T | null
@@ -47,12 +54,23 @@ function Tile({
   value: string
   description: string
 }) {
+  const Icon = ICONS[label]
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl bg-card/50 ghost-border px-4 py-3">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="font-mono text-2xl font-bold text-foreground tabular-nums">{value}</span>
+    <div className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
+      {/* Subtle top accent gradient */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        {Icon && (
+          <div className="w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors duration-200">
+            <Icon className="h-3.5 w-3.5" />
+          </div>
+        )}
+      </div>
+      <span className="font-mono text-2xl font-bold text-foreground tabular-nums tracking-tight mt-0.5">{value}</span>
       <span className="text-xs text-muted-foreground">{description}</span>
     </div>
   )
