@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sketch 232 — The Watch Loop and Its Sentence</title>
+  <style>
+    :root {
+      --bg-canvas: #0D1117;
+      --bg-surface: #161B22;
+      --bg-subtle: #21262D;
+      --border-subtle: #30363D;
+      --border-focus: #58A6FF;
+      --text-main: #F0F6FC;
+      --text-muted: #8B949E;
+      --accent: #A3A5FF;
+      --accent-hover: #8284FF;
+      --success: #3FB950;
+      --warning: #D29922;
+      --danger: #F85149;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 980px;
+    }
+
+    header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-title h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-primary { background: rgba(163, 165, 255, 0.15); color: var(--accent); border: 1px solid rgba(163, 165, 255, 0.3); }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid rgba(63, 185, 80, 0.3); }
+    .badge-warning { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid rgba(210, 153, 34, 0.3); }
+    .badge-danger { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.3); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0D1117;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-subtle {
+      background: var(--bg-subtle);
+      border-color: var(--border-subtle);
+      color: var(--text-main);
+    }
+    .btn-subtle:hover { background: #2b323c; border-color: #8b949e; }
+    .btn-danger {
+      background: transparent;
+      border-color: var(--border-subtle);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(248, 81, 73, 0.1); border-color: var(--danger); }
+
+    /* Library Tabs Context */
+    .library-tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 8px 16px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active {
+      color: var(--text-main);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Section Header */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .section-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Watch Cards */
+    .watch-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .watch-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+    .watch-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .watch-source-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .source-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      background: var(--bg-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border: 1px solid var(--border-subtle);
+    }
+    .source-names {
+      display: flex;
+      flex-direction: column;
+    }
+    .source-folder {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .source-connection {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .watch-meta-line {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding-top: 8px;
+      border-top: 1px solid rgba(48, 54, 61, 0.5);
+    }
+    .cadence-sentence {
+      font-weight: 500;
+      color: var(--accent);
+      background: rgba(163, 165, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(163, 165, 255, 0.2);
+    }
+
+    .alert-banner {
+      background: rgba(210, 153, 34, 0.1);
+      border: 1px solid rgba(210, 153, 34, 0.3);
+      color: #e3b341;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .alert-banner strong { font-weight: 600; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(13, 17, 23, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      padding: 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-select, .form-input {
+      width: 100%;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .cadence-options {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .cadence-btn {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 8px 4px;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .cadence-btn.selected {
+      background: rgba(163, 165, 255, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .hint-box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-title">
+        <h1>Library Ingestion</h1>
+        <span class="badge badge-primary">Phase 234 G-2 Sketch</span>
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="openModal()">+ Add Watched Folder</button>
+      </div>
+    </header>
+
+    <!-- Library Tabs -->
+    <div class="library-tabs">
+      <div class="tab">Documents</div>
+      <div class="tab active">Ingestion &amp; Watches</div>
+      <div class="tab">Classification Rules</div>
+    </div>
+
+    <!-- Watched Sources Section -->
+    <div class="section-header">
+      <div>
+        <div class="section-title">Watched Cloud Folders</div>
+        <div class="section-desc">Automated folder sync on the background scheduler. Deleted remote files remain stored in your Library.</div>
+      </div>
+      <div>
+        <button class="btn btn-subtle" onclick="alert('Running poll tick on active watches...')">Poll All Due Watches</button>
+      </div>
+    </div>
+
+    <div class="watch-list">
+      <!-- Active Watch Card -->
+      <div class="watch-card">
+        <div class="watch-card-header">
+          <div class="watch-source-info">
+            <div class="source-icon">📁</div>
+            <div class="source-names">
+              <span class="source-folder">Quarterly Executive Reports</span>
+              <span class="source-connection">Google Drive (Engineering Org) &rarr; Library: /Executive/Quarterly</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge badge-success">Active</span>
+            <button class="btn btn-subtle" style="font-size: 12px; padding: 4px 8px;">Check now</button>
+            <button class="btn btn-subtle" style="font-size: 12px; padding: 4px 8px;">Pause</button>
+          </div>
+        </div>
+        <div class="watch-meta-line">
+          <span class="cadence-sentence">checked every 30 minutes</span>
+          <span>Last checked: 12 mins ago</span>
+          <span>Items: 18 synced, 0 missing</span>
+          <span>Next check: in ~18 minutes</span>
+        </div>
+      </div>
+
+      <!-- Disconnected Watch Card (SC#3) -->
+      <div class="watch-card" style="border-color: rgba(210, 153, 34, 0.4);">
+        <div class="watch-card-header">
+          <div class="watch-source-info">
+            <div class="source-icon" style="border-color: rgba(210, 153, 34, 0.4);">⚠️</div>
+            <div class="source-names">
+              <span class="source-folder">Supplier Master Contracts</span>
+              <span class="source-connection">Google Drive (Procurement) &rarr; Library: /Contracts/Suppliers</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge badge-warning">Disconnected</span>
+            <button class="btn btn-danger" style="font-size: 12px; padding: 4px 8px;" onclick="confirmPurge()">Purge missing files</button>
+            <button class="btn btn-subtle" style="font-size: 12px; padding: 4px 8px;">Delete watch</button>
+          </div>
+        </div>
+
+        <!-- Banner with Reconnect Offered BY NAME (SC#3) -->
+        <div class="alert-banner">
+          <div>
+            <strong>Source connection disconnected:</strong> Connection <em>"Google Drive (Procurement)"</em> token revoked or expired. Sync is frozen.
+          </div>
+          <button class="btn btn-subtle" style="background: #21262d; border-color: #d29922; color: #f0f6fc; font-weight: 600;" onclick="alert('Opening OAuth reconnect for Google Drive (Procurement)')">
+            Reconnect Google Drive (Procurement)
+          </button>
+        </div>
+
+        <div class="watch-meta-line">
+          <span class="cadence-sentence" style="color: var(--text-muted); border-color: var(--border-subtle); background: transparent;">checked every 60 minutes</span>
+          <span>Last success: Yesterday 16:45</span>
+          <span style="color: #e3b341;">4 files marked missing_at_source (retained in Library)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Watch Modal Dialog -->
+    <div class="modal-overlay" id="watchModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Watch a Connected Folder</div>
+          <button onclick="closeModal()" style="background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer;">&times;</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Connected Service</label>
+          <select class="form-select">
+            <option>Google Drive (Engineering Org) — drive.readonly</option>
+            <option>Google Drive (Legal) — drive.readonly</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Source Folder to Watch</label>
+          <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">Browsing Google Drive:</div>
+            <div style="padding-left: 8px; font-family: var(--font-mono); font-size: 12px;">
+              <div>📁 /My Drive</div>
+              <div style="padding-left: 16px; color: var(--accent); font-weight: 600;">✓ 📁 /Executive/Quarterly Reports</div>
+              <div style="padding-left: 16px; color: var(--text-muted);">📁 /Projects</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Destination Library Folder</label>
+          <select class="form-select">
+            <option>/Finance/Q3 (Org-shared)</option>
+            <option>/Private/Reports (Private to you)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Check Cadence (SURF-01)</label>
+          <div class="cadence-options">
+            <div class="cadence-btn" onclick="selectCadence(this, 15)">15m</div>
+            <div class="cadence-btn selected" onclick="selectCadence(this, 30)">30m (Default)</div>
+            <div class="cadence-btn" onclick="selectCadence(this, 60)">1h</div>
+            <div class="cadence-btn" onclick="selectCadence(this, 360)">6h</div>
+            <div class="cadence-btn" onclick="selectCadence(this, 1440)">24h</div>
+          </div>
+          <div class="hint-box" id="cadenceSummary">
+            This folder will be <strong>checked every 30 minutes</strong>. New and modified files will be ingested into the queue automatically.
+          </div>
+        </div>
+
+        <div class="hint-box" style="border-left: 3px solid var(--accent);">
+          <strong>Retention Policy:</strong> Files removed or unshared at Google Drive are never deleted automatically from the Library. They remain answerable until you explicitly purge them.
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-subtle" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitWatch()">Create Watch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openModal() { document.getElementById('watchModal').classList.add('open'); }
+    function closeModal() { document.getElementById('watchModal').classList.remove('open'); }
+    function selectCadence(el, mins) {
+      document.querySelectorAll('.cadence-btn').forEach(b => b.classList.remove('selected'));
+      el.classList.add('selected');
+      const text = mins >= 60 ? (mins / 60) + ' hours' : mins + ' minutes';
+      document.getElementById('cadenceSummary').innerHTML = 
+        'This folder will be <strong>checked every ' + mins + ' minutes</strong>. New and modified files will be ingested into the queue automatically.';
+    }
+    function confirmPurge() {
+      if (confirm('Purge 4 missing files from the Library? This action cannot be undone.')) {
+        alert('Missing files purged from Library.');
+      }
+    }
+    function submitWatch() {
+      alert('Watch created! Folder will be checked every 30 minutes.');
+      closeModal();
+    }
+  </script>
+</body>
+</html>

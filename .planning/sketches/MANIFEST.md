@@ -2736,3 +2736,18 @@ strip is what it expands into while a run is live: **one object at two sizes, no
 ⚠ B's space win is real and should be harvested separately — it just cannot be the only change.
 
 **Five defects planted, five fired**; `index.html` restored md5-identical.
+
+---
+
+## Session 2026-09-06 — Phase 234: The Watch Loop and Its Sentence (Sketch 232)
+
+**G-2 sketch gate for Phase 234.** `ROADMAP.md` flags Phase 234 with `⚠ G-2 SKETCH (SURF-01's sentence + the watch-config screen)`.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 232 | the-watch-loop-and-its-sentence | How does an autonomous background watch loop present itself to a user — its cadence, its status, its failures, and its boundaries — without ever misleading someone into expecting instant sync, and without destroying knowledge when a remote file disappears? | **A — Ingestion Tab Home + Exact Cadence Sentence + Named Reconnect** ★ | phase-234, surf-01, lib-08, vis-03, vis-05, d-4, watch-loop, g2-sketch-gate |
+
+- **SURF-01 Cadence Sentence**: Exact copy *"checked every N minutes"*, strictly forbidding *"instantly"* or *"on change"*.
+- **SC#3 Lifecycle Actions**: Warning banner for disconnected source with *"Reconnect {connection_name}"* action offered by name, plus *"Purge missing files"* action.
+- **G-1 Pre-emption**: Mounted inside the Library Ingestion surface, leaving `ConnectionFormPanel.tsx` and `ConnectionsTab.tsx` completely untouched.
+

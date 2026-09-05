@@ -7555,3 +7555,53 @@ remaining-work list.
 `extract_dxf_takeoff` currently does five things in one pass — blocks, dimensions, callouts, layer
 lengths, units. The split at its third phase is **entity harvesting** from **quantity aggregation**:
 the first is `ezdxf` mechanics, the second is domain judgement about what may legitimately be summed.
+
+---
+
+## `backend/app/services/scheduler_service.py`
+
+**`5 / 2 / 399`** (derived 2026-09-06). ⚠ **Absent from this ledger and from CLAUDE.md's scan list for
+its entire life** — row added Phase 234, because this milestone's watch loop binds to the shipped
+scheduler and G-5 currently cannot fire on it at any count.
+
+**What it is.** The background workflow scheduler service (Phase 204, SCHED-01 / D-204-09 / D-204-11).
+Runs a poll loop that asks the database which schedules are due, and launches unattended runs.
+
+### The invariants it carries
+
+1. ⚠ **The duplicate-firing guarantee is not in this file.** `claim_due_schedules` owns it (the
+   `FOR UPDATE SKIP LOCKED` select and the in-transaction `next_run_at` advance in one transaction).
+   This loop can run in every uvicorn worker without leader election or Redis locks.
+2. ⚠ **The launch reuses `_build_resume_context`** rather than composing a bespoke context bag.
+3. ⚠ **The producer shell must be terminalized on every exit path.**
+4. ⚠ **Cancellation is inherited, not reimplemented.**
+
+### The named seam, when it comes
+
+Phase 234 binds the watch loop (`WatchService`) to this background runner pattern or tick loop.
+The split is **cadence claiming** (DB layer `db/schedules.py`, `db/watches.py`) from **job execution**
+(`launch_scheduled_run`, `WatchService.tick()`).
+
+---
+
+## `backend/app/db/schedules.py`
+
+**`1 / 1 / 359`** (derived 2026-09-06). ⚠ **Absent from this ledger and from CLAUDE.md's scan list for
+its entire life** — row added Phase 234, where `claim_due_schedules` was measured at `:263`
+as the authoritative reference for atomic leasing.
+
+**What it is.** The single data-access home for `workflow_schedules` (Phase 204, SCHED-01).
+
+### The invariants it carries
+
+1. ⚠ **The owner predicate is in every statement, including those that already have an ID.**
+   Service-role pool queries bypass RLS; explicit `AND user_id = $2` prevents cross-tenant access.
+2. ⚠ **`claim_due_schedules` is the sole owner-agnostic read.** It represents the background poller
+   with no caller session at 03:00.
+3. ⚠ **`inputs` is bound as a plain `dict`**, relying on asyncpg's jsonb codec.
+4. ⚠ **The three-place lockstep:** `_SCHEDULE_COLUMNS`, `WorkflowScheduleRead`, and API serializer move together.
+
+### The named seam, when it comes
+
+Leaf data-access module. In Phase 234, `db/watches.py` replicates this pattern (`claim_due_watches`)
+for external folder watching rather than widening `workflow_schedules`.
