@@ -3193,6 +3193,8 @@ const BASELINE = {
   // 22 → 30: per-file selection (operator: "how can I select individual files") and the
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
+  // ── Phase 234 (234-05 / LIB-08 / SURF-01 / VIS-05) — Watched folders surface ──
+  "WatchedFoldersSection.test.tsx": 6,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4486,6 +4488,8 @@ const TARGETS = [
   // ── needs its own line: `src/components/sources` is not a directory entry here. ────────
   "src/components/sources/previewVocabulary.test.ts",
   "src/components/sources/SourcePreviewPanel.test.tsx",
+  // ── Phase 234 (234-05) — watched folders surface ──
+  "src/components/sources/WatchedFoldersSection.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

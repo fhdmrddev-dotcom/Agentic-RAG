@@ -39,6 +39,7 @@ import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
 import { ConnectedSourceSection } from "@/components/sources/ConnectedSourceSection"
+import { WatchedFoldersSection } from "@/components/sources/WatchedFoldersSection"
 import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
 import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
@@ -223,6 +224,9 @@ export function IngestionTab({
             <ConnectedSourceSection
               destinationFolderId={uploadFolderId}
               destinationFolderName={uploadFolderName}
+            />
+            <WatchedFoldersSection
+              destinationFolderId={uploadFolderId}
             />
           </div>
         </TabsContent>
