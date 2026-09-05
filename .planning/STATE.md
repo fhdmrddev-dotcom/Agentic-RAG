@@ -61,11 +61,15 @@ finding this project has now hit twice.
 - **Defect A (jsonb string scalar)**: ✅ **VERIFIED.** `($n::text)::jsonb` plus a self-healing `CASE`.
   `jsonb_typeof = object` across all 14 jobs; the reclaimed job carried `{chunk_offset: 450}`, so
   **SC#4 checkpointed resumption is functional for the first time.**
-- **Defect B (document failure status sync)**: ⚠ **IMPLEMENTED, NOT EXERCISED.** Present at
-  `ingestion_jobs.py:175` and `:341` where the file previously referenced `documents` zero times —
-  correct on reading. **But ZERO jobs failed in the drive, so the failure→document path never
-  executed.** It has not been observed running. **Re-open trigger: a drive that forces a permanent
-  failure** (exhaust `max_retries` on one job) — cheap, and it closes the last open claim on 230.
+- **Defect B (document failure status sync)**: ✅ **VERIFIED BY DRIVING (2026-09-05).** It was
+  recorded here as *implemented, not exercised* — zero jobs failed in the SC#1 re-drive, so the
+  path had never been observed running. **The re-open trigger was then executed rather than left
+  standing:** a probe job was inserted with `retry_count = max_retries - 1` so the next failure
+  was permanent, and `record_job_failure` was called against the real pool.
+  **Measured:** `record_job_failure` → `'failed'` · `job.status='failed'`, `retry=3` ·
+  **`documents.status` moved `'processing'` → `'failed'`** and `error_message` carried the job's
+  message through. Probe rows cleaned up; the corpus is back to **77 completed / 0 jobs**.
+  ⭐ **Phase 230 now has no unexercised claim.**
 
 ⚠ **NEW MINOR, filed not fixed — a document can be minted with NO job row.** The kill landed between
 the `documents` INSERT and the `ingestion_jobs` enqueue, leaving a row at `pending` that nothing will

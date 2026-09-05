@@ -1,7 +1,7 @@
 ---
 phase: 230
 slug: the-durable-ingestion-queue
-verdict: pass  # SC#1 RE-DRIVEN and PASSES at 43bf7ac70+fixes
+verdict: pass  # SC#1 driven; Defect B driven 2026-09-05 — no unexercised claim remains
 verifier: claude
 verifier_role: reviewer
 method: driven — every figure below re-measured, none read from a claim
@@ -562,3 +562,41 @@ Defect B's fix already established.
 **Phase 230's blocking findings are all closed.** What remains against this phase is the unexercised
 Defect B path and one minor new hygiene defect — plus the two pre-existing gate problems routed away from
 this phase (BUS-114 inherited fence, BUS-117 backend baseline flake).
+
+
+---
+
+# Defect B — DRIVEN 2026-09-05, and it PASSES
+
+The SC#1 re-drive left exactly one honest gap: **zero jobs failed, so the failure→document path was
+never observed running.** This file recorded that as *implemented, not exercised*, with a re-open
+trigger. **The trigger has now been executed rather than left standing.**
+
+**Method.** A probe document (`status='processing'`, `ingestion_step='embedding'`) and its job were
+inserted with `retry_count = max_retries - 1`, so the next failure could only be **permanent** rather
+than another retry. `record_job_failure(..., is_transient=True)` was then called against the real
+`asyncpg` pool — the production function, not a stub.
+
+```
+BEFORE  doc.status='processing'  error_message=None
+record_job_failure returned: 'failed'
+AFTER   job.status='failed' retry=3
+AFTER   doc.status='failed'  error_message='defect B probe — forced permanent failure'
+```
+
+✅ **The document followed the job**, and `error_message` carried through — so a permanently failed
+ingestion is now visible as failed in the Library instead of sitting at `processing` forever, which
+is the defect the SC#1 drive originally exposed.
+
+Probe rows deleted; the corpus is back to **77 completed / 0 ingestion_jobs**.
+
+## What remains against Phase 230 — and none of it is an unexercised claim
+
+| Item | State |
+|---|---|
+| SC#1 restart survival | ✅ driven |
+| SC#4 checkpointed resumption | ✅ driven (`chunk_offset: 450`) |
+| Defect A — jsonb string scalar | ✅ driven |
+| Defect B — document follows the job | ✅ **driven (this section)** |
+| Orphaned document (mint-then-enqueue not atomic) | ⚠ minor, filed, does not block SC#1 |
+| `BUS-114` inherited fence · `BUS-117` baseline flake | ⛔ **operator decisions, not this phase's** |
