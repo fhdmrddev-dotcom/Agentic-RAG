@@ -309,6 +309,23 @@ agent-to-agent.* The department-access question below is a DECISION, not a revie
 reviewing Claude's 231 cannot authorise it, and Claude must not have Gemini ratify it. It is the one
 genuine blocker on autonomous execution of 231.
 
+### ✅ D-5 DECIDED (operator, 2026-09-05) — the INERT DEPARTMENT DIMENSION
+
+**Answer: build the visibility predicate WITH a department dimension that is present but inert.**
+
+- The predicate takes a scope that today resolves to **`mine | org`**; the **`dept` branch is written
+  and defaults to org-wide** until `dept_members` has rows.
+- **Nothing changes behaviourally.** No new access level ships, no UI, no third state a user can see.
+- ⭐ **Why now:** a second scope added *after* the predicate is set is a **re-ingest, not a migration**
+  — the operator's own recorded reason, and the same logic `SEED-210` applies to source ACLs. Cheap
+  this week, expensive the first time a real tenant asks for *"Finance can see this, Legal cannot."*
+- ⚠ **The fence:** *inert* means inert. 231 must not ship a department **UI**, a department **grant
+  path**, or any behaviour that differs from today's two levels. If a plan finds itself building
+  `dept_members` management, that is a different phase and it has not been scoped.
+- ⚠ 231 still owns resolving the `folders.is_org_shared` **column** vs `folder_is_org_shared()`
+  **function** collision (G-1 at Phase 229 pre-flight) — a department dimension layered on an
+  unresolved org-shared predicate compounds two ambiguities into one.
+
 ### Open decisions owed at discuss-phase
 
 | Phase | Decision |

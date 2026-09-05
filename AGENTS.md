@@ -168,6 +168,35 @@ This includes the reviewer's own fixes. If Claude fixes a defect it found, Claud
 an independent verifier of that fix — say so, and route the check elsewhere or accept it as
 self-assessed. A phase that closes on self-assessment should record that it did.
 
+### 6.3.1 · Arm it with one command
+
+Both halves of §6.3 — the role assignment and the two briefing lines of §6.4 — are scripted, so a
+pairing can be armed in one step instead of reconstructed from memory each phase:
+
+```bash
+bash scripts/arm-pair.sh <phase> <claude|gemini>     # the named agent BUILDS, the other REVIEWS
+bash scripts/arm-pair.sh 231 claude --no-post        # print only, do not post to the bus
+```
+
+It prints the assignment, the watcher command each side runs, both briefing lines, and the one thing
+neither agent may settle — then posts the assignment to the reviewer on the bus.
+
+**Each agent watches its own mailbox** (this is what makes an unattended pairing possible — neither
+agent can wake the other, but each can watch):
+
+```bash
+bash scripts/agent-bus-watch.sh claude 30    # emits one line per NEW item addressed to claude
+bash scripts/agent-bus-watch.sh gemini 30
+```
+
+Items already open when the watcher starts are the baseline and are not re-announced. In Claude Code,
+run it through the **Monitor** tool with `persistent: true`.
+
+⚠ **The scripts enforce nothing** — they only make the rule cheap to follow. §6.3 is still the rule,
+and `arm-pair.sh` will happily print an assignment that violates it if you name the wrong builder.
+⚠ **A pairing is per SESSION as well as per phase.** The watchers die with the session that started
+them; re-arm after any restart, or the mailbox goes unread and the pair silently stops coordinating.
+
 ### 6.4 The two briefing lines
 
 **To the builder:** *"You build Phase N. Read AGENTS.md — there is a coordination bus at
