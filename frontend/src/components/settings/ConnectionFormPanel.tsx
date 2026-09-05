@@ -87,6 +87,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { IngestVisibilityField } from "./IngestVisibilityField"
 import {
   ConnectorApiError,
   createOAuthAuthorizeUrl,
@@ -103,6 +104,7 @@ import type {
   McpDiscoveredTool,
   OAuthProvider,
   ToolGrantPosture,
+  IngestVisibility,
 } from "@/lib/api"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
 import { ConnectionGrantsList } from "@/components/settings/ConnectionGrantsList"
@@ -581,6 +583,9 @@ export function ConnectionFormPanel({
   const [probeResult, setProbeResult] = useState<McpDiscoveredTool[] | null>(null)
   const [probeError, setProbeError] = useState<string | null>(null)
   const [defaultPosture, setDefaultPosture] = useState<ToolGrantPosture>("ask")
+  // Phase 231 (VIS-02). Seeds to the NARROW end so a form that fails to load a value can
+  // only ever propose the closed one.
+  const [ingestVisibility, setIngestVisibility] = useState<IngestVisibility>("private")
   const [toolGrants, setToolGrants] = useState<Record<string, ToolGrantPosture | boolean>>({})
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
@@ -609,6 +614,7 @@ export function ConnectionFormPanel({
     if (mode === "edit" && connection) {
       setDraft(draftFromConnection(connection))
       setDefaultPosture(connection.default_approval_posture ?? "ask")
+      setIngestVisibility(connection.default_ingest_visibility ?? "private")
       setToolGrants(connection.tool_grants ?? {})
       // ⚠ The baseline the save path diffs against — see `grantsChanged`. Captured HERE,
       // beside the seeding it mirrors, so the two can never drift apart.
@@ -973,6 +979,10 @@ export function ConnectionFormPanel({
           config: configFromDraft(draft),
         }
 
+        // ⚠ Set for EVERY capability, never inside a branch — VIS-02 forbids a configuration
+        //   path that omits the scope, and a per-branch assignment is how one gets omitted.
+        body.default_ingest_visibility = ingestVisibility
+
         if (draft.capability === "mcp") {
           body.mcp_server_url = draft.mcpServerUrl.trim()
           body.default_approval_posture = defaultPosture
@@ -1005,6 +1015,7 @@ export function ConnectionFormPanel({
           name: draft.name.trim(),
           config: configFromDraft(draft),
           default_approval_posture: defaultPosture,
+          default_ingest_visibility: ingestVisibility,
         }
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
         if (draft.capability === "oauth") body.auth_type = "oauth_byo"
@@ -2237,6 +2248,22 @@ export function ConnectionFormPanel({
             {SERVICE_SAVE_DISABLED_REASON}
           </p>
         )}
+
+        {/* ── Phase 231 · VIS-02 — sketch 228 variant B ─────────────────────────────────
+            ⚠ MOUNTED UNCONDITIONALLY, outside every capability branch. SC#1 is a COVERAGE
+            claim — "there is no configuration path where that sentence is absent" — so a
+            per-capability mount would ship the exact hole the criterion forbids.
+            ⚠ memberCount is null: this panel does not know the roster size and a fabricated
+            count is worse than an honest "everyone in <org>". */}
+        <div className="mb-3.5" data-testid="connection-ingest-visibility">
+          <IngestVisibilityField
+            value={ingestVisibility}
+            onChange={setIngestVisibility}
+            orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
+            memberCount={null}
+            isExisting={mode === "edit"}
+          />
+        </div>
 
         <div className="mt-3 flex items-center justify-end gap-2">
           {saveRefusal?.kind === "generic" && (

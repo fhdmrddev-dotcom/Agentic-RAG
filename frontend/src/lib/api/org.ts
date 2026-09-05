@@ -510,6 +510,12 @@ export interface McpDiscoveredTool {
  *  connection is still listed and still bindable. */
 export type ToolGrantPosture = "allow" | "ask" | "deny"
 
+/** Phase 231 (VIS-01 / VIS-02 / D-5) — who may read what a connection brings in.
+ *  Enum-shaped and NEVER a boolean: 069-A's extensible-audience contract, applied inbound.
+ *  ⚠ `"dept"` is INERT by operator decision D-5 — the value exists and the SQL resolver carries
+ *    a branch for it, but NO UI offers it. A scope nobody can grant must not be offered. */
+export type IngestVisibility = "private" | "org" | "dept"
+
 export interface ConnectorConnection {
   id: string
   org_id: string
@@ -539,6 +545,7 @@ export interface ConnectorConnection {
   is_enabled: boolean
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture | boolean>
   discovered_tools?: McpDiscoveredTool[]
   last_checked_at?: string | null
@@ -564,6 +571,7 @@ export interface ConnectorConnectionCreate {
   config?: ConnectorConnectionConfig
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture>
   /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
    *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
@@ -580,6 +588,7 @@ export interface ConnectorConnectionUpdate {
   is_enabled?: boolean
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture>
   discovered_tools?: McpDiscoveredTool[]
 }

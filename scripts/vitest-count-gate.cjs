@@ -2835,6 +2835,7 @@ const BASELINE = {
   "apiBarrel.test.ts": 5,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
+  "ingestVisibility.test.tsx": 16,
   // ── Added in Phase 221 (221-01 / T7), every value read from THIS script's own printed
   // ── `— N new` column in the same run that adopted them. Not booked ahead: an unpinned
   // ── file is not lightly guarded, it is UNGUARDED — its count can fall to 1 and the gate
@@ -4236,6 +4237,11 @@ const TARGETS = [
   // `src/components/settings/` entries here are FILE-LEVEL by deliberate choice, so
   // every new file under it is invisible until somebody types its name.
   "src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx",
+  // ── Added in Phase 231 (VIS-02) — the "who will see this" sentence ──────────
+  // FILE-LEVEL, matching this directory's standing convention (the bare directory
+  // is deliberately not adopted). Added in the SAME COMMIT that creates the file,
+  // and to BOTH knobs — `src/components/settings/` is reached by nothing above.
+  "src/components/settings/__tests__/ingestVisibility.test.tsx",
   "src/components/settings/toolGroups.test.ts",
   "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
   "src/components/settings/connectionRowVerdict.test.ts",

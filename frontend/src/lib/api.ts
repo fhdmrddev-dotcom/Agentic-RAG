@@ -414,6 +414,7 @@ export type {
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
   ToolGrantPosture,
+  IngestVisibility,
 } from "./api/org"
 
 // ── connectors ─────────────────────────────────────────────────────────
