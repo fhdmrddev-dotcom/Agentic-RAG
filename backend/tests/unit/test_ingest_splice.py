@@ -377,3 +377,49 @@ async def test_splice_document_extraction_failure_marks_failed():
             "ingestion_step": "failed",
             "error_message": "Corrupt document stream",
         })
+
+
+# ── BUG-260905-09 — A NON-ASCII CHARACTER IN A FILENAME KILLED THE UPLOAD ────────────────
+#
+# ⛔ MEASURED on the operator's library 2026-09-05. The file
+#   `Application – Deputy Manager, PMO _ Aster Digital Health (Dubai).msg` failed to ingest,
+#   and it read as a broken `.msg` handler. It was not: `.msg` extraction is wired and works.
+#   The only offending character is a single U+2013 EN DASH pasted from an email subject.
+#   `_STORAGE_UNSAFE` is an ASCII-only set, so the dash went straight into the Storage object
+#   key, Supabase refused the key, and the upload failed.
+#
+# ⚠ THE TEST IS NOT ABOUT `.msg`. Any curly quote, accent, em dash or Arabic character does
+#   the same thing to any extension, which is why the cases below span several scripts.
+def test_a_non_ascii_filename_is_reduced_to_a_usable_storage_key():
+    from app.services.ingest_splice import _storage_safe
+
+    key = _storage_safe("Application \u2013 Deputy Manager, PMO _ Aster (Dubai).msg")
+    assert "\u2013" not in key, "the en dash is what Storage refused"
+    assert key == "Application _ Deputy Manager, PMO _ Aster (Dubai).msg"
+    assert key.isascii(), "a storage key must be reducible to ASCII"
+
+
+def test_every_non_ascii_script_is_handled_not_just_the_dash():
+    from app.services.ingest_splice import _storage_safe
+
+    for name in ("caf\u00e9 r\u00e9sum\u00e9.docx", "\u0645\u0644\u0641.pdf", "sm\u00f6rg\u00e5s.txt"):
+        assert _storage_safe(name).isascii(), f"{name!r} left a non-ASCII byte in the key"
+
+
+def test_an_ordinary_ascii_filename_is_untouched():
+    """The widened sanitiser must not become a filename policy — the prior contract holds."""
+    from app.services.ingest_splice import _storage_safe
+
+    assert _storage_safe("normal-file_1.PDF") == "normal-file_1.PDF"
+    # The original BUG-260905-06 case still behaves exactly as it did.
+    assert (
+        _storage_safe("Cambridge IELTS 14 [www.luckyielts.com].pdf")
+        == "Cambridge IELTS 14 _www.luckyielts.com_.pdf"
+    )
+
+
+def test_a_wholly_non_ascii_name_still_yields_a_key_rather_than_an_empty_one():
+    from app.services.ingest_splice import _storage_safe
+
+    assert _storage_safe("\u0645\u0644\u0641") == "_"
+    assert _storage_safe("") == "file"

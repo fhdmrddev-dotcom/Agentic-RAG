@@ -197,6 +197,15 @@ _IMAGE_EMPTY_TEXT = (
     "still be opened — there is just nothing written on it to search."
 )
 
+#: ⚠ THE COUNTERPART TO `_IMAGE_EMPTY_TEXT`, AND THE DISTINCTION IS THE WHOLE POINT.
+#: "read, found nothing" and "never looked at" are different facts about a file, and only one
+#: of them is the person's to fix. Saying the first when the second is true is the lie that
+#: five of the operator's images told on 2026-09-05 — see `vision_text.resolve_vision_model`.
+_IMAGE_NO_VISION_MODEL = (
+    "No vision model is set, so this image was not read. Nothing was stored about its "
+    "contents. Choose a vision model in Settings, then upload it again."
+)
+
 _EMPTY_TEXT_MESSAGES: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         "This spreadsheet is empty — none of its sheets contain any data. "
@@ -506,7 +515,16 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             # the failure is legible in the UI rather than an empty chunk list.
             return ""
         # load_app_settings is sync/cache-only — the same call the ingest path makes.
-        return vision_text.transcribe_pages([page], "scan", load_app_settings())
+        _image_settings = load_app_settings()
+        # ⚠ "no text was found" and "nothing looked at it" are DIFFERENT FACTS and this is the
+        #   only place that can still tell them apart. Below, both arrive as "" and collapse
+        #   into `_IMAGE_EMPTY_TEXT` — which says the image was READ, and would be a lie.
+        #   A plain ValueError is the right shape: `splice_document` catches any exception from
+        #   here and writes it verbatim into `error_message` with status `failed`, so the
+        #   sentence below is what the person actually reads on the row.
+        if not vision_text.resolve_vision_model(_image_settings):
+            raise ValueError(_IMAGE_NO_VISION_MODEL)
+        return vision_text.transcribe_pages([page], "scan", _image_settings)
 
     # plain text, markdown — decode as UTF-8
     decoded = raw.decode("utf-8")

@@ -36,8 +36,28 @@ class TestStorageSafeKey:
 
     def test_ordinary_names_are_untouched(self):
         # A sanitiser that mangles normal filenames is worse than the bug it fixes.
-        for name in ["report.pdf", "normal file.pdf", "Ünïcodé näme.docx", "a-b_c.1.txt"]:
+        #
+        # ⚠ CORRECTED 2026-09-06 (BUG-260905-09) — `"Ünïcodé näme.docx"` USED TO BE IN THIS
+        #   LIST, asserting that non-ASCII survives. That assertion was never measured, and it
+        #   is FALSE. Probed against the live local Storage API, every one of these was refused
+        #   with `400 InvalidKey` — including this test's own example:
+        #
+        #       Ünïcodé näme.docx   REJECT  Invalid key: _probe/Ünïcodé näme.docx
+        #       Application – …msg  REJECT  (U+2013 en dash — the operator's real failure)
+        #       em—dash.pdf         REJECT      curly’quote.pdf   REJECT
+        #       ملف.pdf             REJECT      中文.pdf           REJECT
+        #       plain-ascii.docx    OK
+        #
+        #   So the file this test was protecting could never have been uploaded at all. The
+        #   original intent still holds and is kept below — a sanitiser must not mangle an
+        #   ORDINARY name — but "ordinary" means ASCII, because that is what Storage accepts.
+        for name in ["report.pdf", "normal file.pdf", "a-b_c.1.txt"]:
             assert _storage_safe(name) == name
+
+    def test_a_non_ascii_name_is_reduced_because_storage_refuses_it(self):
+        """The measured counterpart to the corrected assertion above."""
+        assert _storage_safe("Ünïcodé näme.docx").isascii()
+        assert _storage_safe("Application – Deputy.msg") == "Application _ Deputy.msg"
 
     def test_runs_of_replacement_collapse(self):
         assert _storage_safe("a[b]c__d.docx") == "a_b_c_d.docx"

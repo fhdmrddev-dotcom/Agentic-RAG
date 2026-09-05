@@ -58,12 +58,30 @@ def _storage_safe(name: str) -> str:
     storage KEY is sanitised. A sanitiser that renamed the document would fix the 400 by
     lying about what the file is called.
 
+    ⚠ NON-ASCII IS REPLACED TOO, AND THE ASCII SET ALONE WAS NOT ENOUGH — MEASURED.
+      `Application – Deputy Manager, PMO _ Aster Digital Health (Dubai).msg` failed on the
+      operator's library 2026-09-05. The character that broke it is a single **U+2013 EN DASH**
+      copied out of an email subject; every other character in the name is ordinary. The set
+      above is ASCII-only, so the dash passed straight through into the object key and Storage
+      refused it — and because the refusal arrives as a failed upload, the file looked like a
+      broken `.msg` rather than a filename this sanitiser did not cover. It is not about `.msg`
+      at all: a curly quote, an accent, an em dash or any Arabic character would do the same.
+
+    ⚠ COLLISIONS ARE STRUCTURALLY IMPOSSIBLE, which is why blunt replacement is safe here: the
+      key is `{user_id}/{document_id}/{filename}` and `document_id` is a fresh uuid, so two
+      files that sanitise to the same name still land on different keys. A name that is ENTIRELY
+      non-ASCII degrades to underscores — ugly, and still correct, because `documents.filename`
+      keeps the real name and every reader derives the key from the `file_path` column.
+
     ⚠ It is applied HERE, at the single minting site, so `file_path` is written sanitised ONCE
     and every later reader (`splice_document`'s download, the queue worker, re-extract) derives
     the same key from the column rather than recomputing it. Sanitising at the upload call
     instead would have produced a key that no download could reproduce.
     """
-    cleaned = "".join("_" if ch in _STORAGE_UNSAFE else ch for ch in (name or ""))
+    cleaned = "".join(
+        "_" if (ch in _STORAGE_UNSAFE or not (32 <= ord(ch) <= 126)) else ch
+        for ch in (name or "")
+    )
     cleaned = cleaned.strip() or "file"
     # Collapse runs of the replacement so `[www.x.com]` does not become `__www.x.com__`.
     while "__" in cleaned:

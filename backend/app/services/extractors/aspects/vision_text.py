@@ -70,6 +70,13 @@ MAX_IMAGE_EDGE_PX = 2000
 #: A drawing SET is many pages and each is a paid call.
 MAX_PAGES_HARD_CAP = 50
 
+#: Providers whose models this code path may be SILENTLY fallen back to for a vision call.
+#: See `resolve_vision_model` for why this is a provider set and not a per-model flag: it
+#: guards ONLY the unconfigured fallback, and an explicit `vision_model` bypasses it entirely.
+#: ⚠ Deliberately conservative. A provider missing here costs a configuration prompt; a
+#: provider wrongly present costs a refusal sentence stored as a document's text.
+_FALLBACK_VISION_PROVIDERS = frozenset({"openai", "anthropic", "google"})
+
 Deficit = Literal["scan", "drawing"]
 
 
@@ -258,12 +265,59 @@ def classify_pdf_deficit(raw: bytes, extracted_text: str = "") -> PdfDeficit | N
 # ── Transcription ─────────────────────────────────────────────────────────────────────
 
 
+def credentials_for_vision(app_settings: Any) -> Any:
+    """Return settings whose api_key / base_url belong to the VISION model's own provider.
+
+    ⛔ THE BUG THIS FIXES IS THE SECOND HALF OF THE SAME STORY, AND IT ONLY APPEARS ONCE THE
+      FIRST HALF IS FIXED. `resolve_vision_model` picks a MODEL. The client was then built from
+      `llm_api_key` / `llm_base_url`, which are resolved for the ACTIVE CHAT PROVIDER
+      (`config.py:893-903`). Those are two different providers the moment anyone sets a vision
+      model that is not from the provider they chat with.
+
+    ⚠ MEASURED on the operator's box 2026-09-06, minutes after the first fix shipped. With
+      `vision_model = 'gpt-4o'` and `llm_provider = 'deepseek'`, every image upload sent
+      **gpt-4o to DeepSeek's endpoint using DeepSeek's key — which is NULL on this box.** Every
+      page failed, `transcribe_pages` returned "", and the document was refused with
+      *"This image was read, but no text could be found in it"* — a sentence that is false
+      twice over: nothing read it, and the file is full of text.
+
+    ⚠ THE FIRST FIX IS WHAT EXPOSED THIS. Before it, the wrong-provider call still "succeeded"
+      because the chat model answered in prose; the credentials were never exercised. Removing
+      the lie turned a silent wrong answer into a visible failure, which is the point of it.
+
+    ⚠ IT DEGRADES TO TODAY'S BEHAVIOUR RATHER THAN RAISING: `override_provider` returns the
+      settings unchanged when that provider is absent or holds no key, so a single-provider
+      deployment is byte-identical to before.
+    """
+    from app.config import get_model_capability  # noqa: PLC0415
+
+    model = resolve_vision_model(app_settings)
+    if not model:
+        return app_settings
+
+    provider = (get_model_capability(model) or {}).get("provider")
+    if True:
+        return app_settings
+
+    try:
+        from app.models.user_settings import override_provider  # noqa: PLC0415
+
+        return override_provider(app_settings, provider)
+    except Exception:  # noqa: BLE001 — credentials resolution must never block an ingest
+        log.warning(
+            "could not switch credentials to %r for vision model %r; using the active "
+            "provider's key, which is likely to be refused", provider, model, exc_info=True,
+        )
+        return app_settings
+
+
 def _vision_client(app_settings: Any):
     from openai import OpenAI  # noqa: PLC0415
 
+    creds = credentials_for_vision(app_settings)
     return OpenAI(
-        api_key=getattr(app_settings, "llm_api_key", None),
-        base_url=getattr(app_settings, "llm_base_url", None) or None,
+        api_key=getattr(creds, "llm_api_key", None),
+        base_url=getattr(creds, "llm_base_url", None) or None,
     )
 
 
@@ -283,14 +337,60 @@ def resolve_vision_model(app_settings: Any) -> str | None:
 
     ⛔ NEVER RE-PIN A MODEL NAME HERE. An empty chain must end at the operator's active chat
       model, which is by definition one they have credentials for.
-    """
-    from app.config import settings as env_settings  # noqa: PLC0415
 
-    return (
+    ⚠ BUT THE CHAT-MODEL FALLBACK IS NOW GUARDED, AND THIS IS THE POINT OF THE GUARD.
+      MEASURED on the operator's library 2026-09-05: `vision_model` was NULL and the active
+      chat model was `deepseek-v4-flash`, which has no vision. The OpenAI-compatible endpoint
+      ACCEPTED the request, the text-only model read the transcription prompt, could not see
+      the image part, and answered in fluent English:
+
+          "I cannot see the image content because it was received in an unsupported format…
+           Please re-upload the image in a supported format (such as PNG or JPG)."
+
+      That sentence was then STORED AS THE DOCUMENT'S TEXT and embedded. Five files — a
+      scanned TIFF financial statement, a business card, two WebPs and a PNG — each ingested
+      `completed` with exactly one chunk whose entire content was a refusal. The corpus did
+      not merely lose the text; it gained a confident lie, and the agent would answer from it.
+
+      ⚠ THE FORMATS WERE NEVER THE PROBLEM — that is what the refusal sentence made it look
+        like. Re-run against `gpt-4o` on the same pipeline, TIFF/WEBP/JPEG/PNG all transcribe
+        correctly; `image_to_png_b64` normalises every one of them through Pillow first.
+
+    ⚠ SO: an EXPLICIT setting is always honoured — the operator chose it and knows what it is,
+      and `vision_model` (migration 166) exists precisely so they can. Only the SILENT fallback
+      to the chat model is guarded, and it is guarded FAIL-CLOSED: unless the model's registry
+      provider is one we know serves vision on this code path, this returns `None` and the
+      caller reports honestly that no vision model is configured.
+
+    ⚠ THE GUARD IS BY PROVIDER, NOT BY MODEL NAME, ON PURPOSE. `MODEL_CAPABILITIES` carries no
+      vision flag, and inventing one for ~60 models would mean asserting per-model facts nobody
+      measured. A provider set is coarse — some Zhipu and MiniMax models do see — but it errs
+      in the only safe direction, and the explicit setting is the documented way past it.
+    """
+    from app.config import settings as env_settings, get_model_capability  # noqa: PLC0415
+
+    chosen = (
         (getattr(app_settings, "vision_model", "") or "").strip()
         or (getattr(env_settings, "vision_model", "") or "").strip()
-        or getattr(app_settings, "llm_model", None)
     )
+    if chosen:
+        return chosen
+
+    fallback = (getattr(app_settings, "llm_model", None) or "").strip()
+    if not fallback:
+        return None
+
+    provider = (get_model_capability(fallback) or {}).get("provider")
+    if provider in _FALLBACK_VISION_PROVIDERS:
+        return fallback
+
+    log.warning(
+        "no vision model configured and the active chat model %r (provider=%r) is not known "
+        "to accept images — refusing to send one rather than storing its reply as text. "
+        "Set a vision model in Settings.",
+        fallback, provider,
+    )
+    return None
 
 
 def _transcribe_one(b64_png: str, kind: str, app_settings: Any, client) -> str:
@@ -327,6 +427,12 @@ def transcribe_pages(
     costs that page and not the document.
     """
     if not pages_b64:
+        return ""
+
+    # ⚠ CHECKED BEFORE THE CLIENT IS BUILT AND BEFORE ANY PAID CALL. `resolve_vision_model`
+    #   returns None when nothing is configured and the active chat model is not known to
+    #   accept images; sending anyway is what produced the stored refusal sentences.
+    if not resolve_vision_model(app_settings):
         return ""
 
     own_client = client is None

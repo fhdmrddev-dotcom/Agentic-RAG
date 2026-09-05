@@ -488,3 +488,134 @@ def test_a_whole_document_has_no_truncated_key_at_all():
     """An always-present key would make `if provenance.get("truncated")` useless."""
     d = vision_text.PdfDeficit("scan", 4, 0, 0)
     assert "truncated" not in vision_text.provenance("scan", 4, d)
+
+
+# ── BUG-260905-10 — A TEXT-ONLY MODEL'S REFUSAL WAS STORED AS THE DOCUMENT'S TEXT ────────
+#
+# ⛔ MEASURED on the operator's library 2026-09-05. `app_settings.vision_model` was NULL, so
+#   `resolve_vision_model` fell through to the active chat model — `deepseek-v4-flash`, which
+#   has no vision. The OpenAI-compatible endpoint ACCEPTED the call, the model read the
+#   transcription prompt, could not see the image part, and replied in fluent English:
+#
+#       "I cannot see the image content because it was received in an unsupported format…
+#        Please re-upload the image in a supported format (such as PNG or JPG)."
+#
+#   That sentence became the document's text and was embedded. Five files — a scanned TIFF
+#   financial statement, a business card, two WebPs and a PNG — each ingested `completed`
+#   with one chunk containing nothing but a refusal. The corpus gained a confident lie.
+#
+# ⚠ THE FORMATS WERE INNOCENT, which is exactly what the refusal made it look like: re-run
+#   against gpt-4o, TIFF/WEBP/JPEG/PNG all transcribe (Pillow normalises them to PNG first).
+class _S:
+    def __init__(self, vision_model="", llm_model=""):
+        self.vision_model = vision_model
+        self.llm_model = llm_model
+
+
+def test_the_silent_fallback_refuses_a_model_not_known_to_accept_images():
+    """The bug, driven directly: deepseek must NOT be handed an image."""
+    from app.services.extractors.aspects.vision_text import resolve_vision_model
+
+    assert resolve_vision_model(_S(llm_model="deepseek-v4-flash")) is None
+
+
+def test_the_silent_fallback_still_works_for_a_provider_that_does_accept_images():
+    """The guard must not cost the working case — gpt-4o transcribed correctly all along."""
+    from app.services.extractors.aspects.vision_text import resolve_vision_model
+
+    assert resolve_vision_model(_S(llm_model="gpt-4o")) == "gpt-4o"
+
+
+def test_an_explicit_setting_is_always_honoured_even_for_an_unknown_provider():
+    """Migration 166 exists so the operator can choose. Their choice outranks the guard."""
+    from app.services.extractors.aspects.vision_text import resolve_vision_model
+
+    assert resolve_vision_model(_S(vision_model="glm-4.6v", llm_model="deepseek-v4-flash")) == "glm-4.6v"
+
+
+def test_nothing_configured_at_all_resolves_to_none_rather_than_a_guess():
+    from app.services.extractors.aspects.vision_text import resolve_vision_model
+
+    assert resolve_vision_model(_S()) is None
+
+
+def test_transcribe_pages_spends_no_call_when_no_vision_model_resolves():
+    """⚠ The check must sit BEFORE the client is built, or a blind call is still paid for.
+
+    ⚠ THIS TEST RECORDS ACCESS RATHER THAN RAISING ON IT, AND THE DIFFERENCE IS LOAD-BEARING.
+      The first version raised `AssertionError` from the fake client — and `transcribe_pages`
+      catches `Exception` per page and continues, so the raise was swallowed, the function
+      returned "" anyway, and the test passed whether or not the fix was present. A guard that
+      cannot fail is not a guard. The flag is checked AFTER the call, outside any except.
+    """
+    from app.services.extractors.aspects import vision_text
+
+    touched: list[str] = []
+
+    class _RecordingClient:
+        def __getattr__(self, name):
+            touched.append(name)
+            raise RuntimeError("no call should have been attempted")
+
+    out = vision_text.transcribe_pages(
+        ["ZmFrZS1iNjQ="], "scan", _S(llm_model="deepseek-v4-flash"), client=_RecordingClient(),
+    )
+    assert out == ""
+    assert touched == [], f"a vision call was attempted with no vision model: {touched}"
+
+
+# ── BUG-260905-11 — THE MODEL WAS CHOSEN, THE CREDENTIALS WERE NOT ───────────────────────
+#
+# ⛔ The second half of BUG-260905-10, and it only became visible once the first half was
+#   fixed. `resolve_vision_model` picks a MODEL; the client was built from `llm_api_key` /
+#   `llm_base_url`, which `config.py:893-903` resolves for the ACTIVE CHAT PROVIDER. Those
+#   diverge the moment a vision model comes from a different provider than the chat model.
+#
+# ⚠ MEASURED on the operator's box 2026-09-06: `vision_model='gpt-4o'` with
+#   `llm_provider='deepseek'` sent gpt-4o to DeepSeek's endpoint with DeepSeek's key (NULL
+#   here). Every page failed, transcription returned "", and the upload was refused with
+#   "This image was read, but no text could be found in it" — false twice over.
+def test_credentials_follow_the_vision_model_not_the_chat_model():
+    from app.models.user_settings import load_app_settings
+    from app.services.extractors.aspects.vision_text import credentials_for_vision
+
+    sim = load_app_settings().model_copy(update={
+        "active_provider": "deepseek",
+        "vision_model": "gpt-4o",
+        "llm_model": "deepseek-v4-flash",
+        "llm_api_key": "DEEPSEEK-KEY",
+        "llm_base_url": "https://api.deepseek.com",
+    })
+    creds = credentials_for_vision(sim)
+    assert creds.llm_api_key != "DEEPSEEK-KEY", (
+        "the vision call would go to DeepSeek's endpoint with DeepSeek's key"
+    )
+    assert "deepseek" not in (creds.llm_base_url or "")
+
+
+def test_credentials_are_left_alone_when_the_providers_already_agree():
+    """A single-provider deployment must be byte-identical to the pre-fix behaviour."""
+    from app.models.user_settings import load_app_settings
+    from app.services.extractors.aspects.vision_text import credentials_for_vision
+
+    sim = load_app_settings().model_copy(update={
+        "active_provider": "openai",
+        "vision_model": "gpt-4o",
+        "llm_api_key": "OPENAI-KEY",
+        "llm_base_url": "",
+    })
+    creds = credentials_for_vision(sim)
+    assert creds.llm_api_key == "OPENAI-KEY"
+
+
+def test_credentials_degrade_rather_than_raise_when_no_vision_model_resolves():
+    from app.models.user_settings import load_app_settings
+    from app.services.extractors.aspects.vision_text import credentials_for_vision
+
+    sim = load_app_settings().model_copy(update={
+        "active_provider": "deepseek",
+        "vision_model": "",
+        "llm_model": "deepseek-v4-flash",
+        "llm_api_key": "DEEPSEEK-KEY",
+    })
+    assert credentials_for_vision(sim).llm_api_key == "DEEPSEEK-KEY"
