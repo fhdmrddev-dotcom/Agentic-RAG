@@ -296,7 +296,7 @@ def credentials_for_vision(app_settings: Any) -> Any:
         return app_settings
 
     provider = (get_model_capability(model) or {}).get("provider")
-    if True:
+    if not provider or provider == getattr(app_settings, "active_provider", None):
         return app_settings
 
     try:
