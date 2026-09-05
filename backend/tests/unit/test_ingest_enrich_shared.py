@@ -288,3 +288,37 @@ def test_both_paths_refuse_to_write_a_null_metadata():
     """
     assert "if enriched.metadata is not None:" in _source(_SPLICE)
     assert "if metadata_dict is not None else {}" in _source(_DOCUMENTS)
+
+
+# ── BUG-260905-08 — a document whose bytes were never stored must not report success ──
+
+
+def test_a_storage_failure_refuses_instead_of_ingesting_nothing():
+    """⛔ MEASURED ON THE OPERATOR'S LIBRARY, not imagined.
+
+    `Screenshot 2026-05-29 042925.png` uploaded at 19:56, reached `status=completed` with
+    `chunk_count=0`, an EMPTY `error_message`, and a 404 from storage on its own `file_path`.
+    The storage upload had failed, been logged at WARNING, and the flow carried on to enqueue
+    a job for a file that does not exist.
+
+    Everything downstream needs those bytes — re-ingest, preview, download, and the SEED-226
+    vision pass. A row that looks successful and is unusable is worse than a visible refusal.
+    """
+    src = _source(_DOCUMENTS)
+    i = src.index("Storage upload during /upload FAILED")
+    tail = src[i : i + 2000]
+    assert '"status": "failed"' in tail, (
+        "a failed storage upload must mark the document failed"
+    )
+    assert "error_message" in tail, "the refusal must say why, not leave an empty message"
+    assert "return" in tail, (
+        "the handler must RETURN after a storage failure — enqueueing a job for bytes that "
+        "do not exist produces an empty document that still completes"
+    )
+
+
+def test_the_storage_failure_is_logged_as_an_error_not_a_warning():
+    """A silent-by-severity failure is how this one survived: it was `log.warning`."""
+    src = _source(_DOCUMENTS)
+    i = src.index("Storage upload during /upload FAILED")
+    assert "log.error(" in src[max(0, i - 400) : i + 200]

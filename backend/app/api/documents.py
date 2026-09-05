@@ -611,12 +611,39 @@ async def upload_document(
             file_options={"content-type": mime_type},
         )
     except Exception as up_exc:
-        log.warning(
-            "Storage upload during /upload failed for %s (%s): %s",
+        # ── BUG-260905-08 — NO BYTES MEANS NO DOCUMENT. STOP HERE. ──────────────────────
+        #
+        # ⛔ THIS USED TO LOG A WARNING AND CARRY ON, and the result was a document row that
+        #    reported `completed` while its file did not exist. MEASURED on the operator's
+        #    library: `Screenshot 2026-05-29 042925.png` uploaded at 19:56, reached
+        #    `status=completed` with `chunk_count=0`, an EMPTY `error_message`, and a 404 from
+        #    storage on its own `file_path`. It looks like a successful upload on the shelf and
+        #    is unusable by everything downstream — re-ingest, preview, download, and the
+        #    SEED-226 vision pass all need the bytes this step was supposed to keep.
+        #
+        # ⚠ ENQUEUEING AFTER THIS FAILS IS WORSE THAN NOT ENQUEUEING. The worker fetches the
+        #   file from storage; with nothing there it produces an empty document that still
+        #   completes. A visible refusal is the only outcome a person can act on.
+        log.error(
+            "Storage upload during /upload FAILED for %s (%s): %s — marking the document "
+            "failed rather than ingesting a file that does not exist",
             doc["id"],
             mint_result.storage_path,
             up_exc,
         )
+        try:
+            service_supabase.table("documents").update({
+                "status": "failed",
+                "ingestion_step": "failed",
+                "error_message": (
+                    "This file could not be stored, so nothing was read from it. "
+                    "Please try uploading it again."
+                ),
+            }).eq("id", doc["id"]).execute()
+        except Exception:  # noqa: BLE001 — the refusal write must not double-fault
+            log.exception("could not mark %s failed after a storage failure", doc["id"])
+        response.status_code = status.HTTP_201_CREATED
+        return {**doc, "status": "failed"}
 
     # 2. Enqueue durable job into ingestion_jobs
     from app.db.ingestion_jobs import insert_ingestion_job  # noqa: PLC0415

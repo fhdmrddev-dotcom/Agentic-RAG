@@ -310,3 +310,49 @@ describe("the consumer reads the constant, and invents no progress", () => {
     expect(uploadCode).toContain("text-xs text-destructive")
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ⛔ THE ROW MUST NOT CHANGE HEIGHT — the operator saw the dropzone SHAKING
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// Reported as the dropzone "shaking to the left and right". MEASURED in the live page by
+// sweeping the dropzone container from 1220px down to 620px and recording the row height:
+//
+//   ml-auto truncate          -> heights {24, 47}      ← wraps, so the row grows 23px
+//   flex-nowrap + min-w-0     -> heights {24, 40, 60}  ← worse
+//   ml-auto min-w-0 flex-1    -> heights {24}          ← constant, shipped
+//
+// `truncate` CANNOT shrink a flex item on its own, and inside a `flex-wrap` row the item
+// WRAPS instead. That height change toggles the page's vertical scrollbar, the scrollbar
+// changes the viewport width by ~15px, and the width change flips the wrap back — a feedback
+// loop that reads as horizontal jitter.
+//
+// ⚠ IT WAS LATENT UNTIL THE LIST GREW. The wrap boundary is ~950px of dropzone width; the six
+//   image formats (13 -> 19 entries, SEED-226) made the sentence long enough to cross it at
+//   ordinary window sizes. So this fence guards a CONSEQUENCE of this very module growing —
+//   the next format added walks straight back into it.
+//
+// ⛔ jsdom has no layout engine: `getBoundingClientRect` is all zeros, so the height flip
+//   itself is UNTESTABLE here. This asserts the classes that were measured to prevent it,
+//   and says so rather than implying it proved the geometry.
+describe("⛔ the formats line shrinks instead of wrapping (no layout shake)", () => {
+  const formatsSpan = /<span\s+className="([^"]*truncate[^"]*)"\s*\n?\s*title=\{formatsSentence\(\)\}/
+
+  it("the truncating formats span was found in the source", () => {
+    // Non-vacuity: a regex that stops matching would make every claim below free.
+    expect(formatsSpan.test(uploadCode)).toBe(true)
+  })
+
+  it("it can actually shrink — `min-w-0` and `flex-1`, not `truncate` alone", () => {
+    const cls = uploadCode.match(formatsSpan)![1]
+    expect(cls).toContain("min-w-0")
+    expect(cls).toContain("flex-1")
+    expect(cls).toContain("truncate")
+  })
+
+  it("the full list stays reachable when it ellipsizes", () => {
+    // Truncation hides formats; the title attribute is what keeps the sentence a contract
+    // rather than a decoration that silently drops half of what the server accepts.
+    expect(uploadCode).toMatch(/title=\{formatsSentence\(\)\}/)
+  })
+})

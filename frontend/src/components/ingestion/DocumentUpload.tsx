@@ -174,8 +174,29 @@ export function DocumentUpload({
               </span>
               {/* The formats are PRINTED from the same constant that feeds `accept` below —
                   never a hand-written list (D-217-18). ⚠ Pushed right rather than dropped: the
-                  sentence is a contract with `acceptedFormats.ts`, not decoration. */}
-              <span className="ml-auto truncate text-[11px] text-muted-foreground">
+                  sentence is a contract with `acceptedFormats.ts`, not decoration.
+
+                  ⛔ `flex-1 min-w-0` IS LOAD-BEARING — WITHOUT IT THIS ROW VISIBLY SHAKES.
+                  Reported by the operator as the dropzone "shaking to the left and right".
+                  MEASURED in the live page by sweeping the container from 1220px to 620px:
+
+                    ml-auto truncate            -> row heights {24, 47}, ellipsis only at 670px
+                    flex-nowrap + min-w-0       -> row heights {24, 40, 60}   (worse)
+                    flex-1 min-w-0 (this)       -> row heights {24}          ✅ constant
+
+                  `truncate` alone cannot shrink a flex item, and in a `flex-wrap` row the
+                  item WRAPS instead — taking the dropzone from 24px to 47px tall. That height
+                  change toggles the page's vertical scrollbar, the scrollbar changes the
+                  viewport width by ~15px, and the width change flips the wrap back: a
+                  feedback loop that reads as horizontal jitter.
+
+                  ⚠ IT WAS LATENT UNTIL THE LIST GREW. The wrap boundary sits at ~950px of
+                  dropzone width; adding the six image formats (13 -> 19 entries, SEED-226)
+                  pushed the sentence long enough to cross it at ordinary window sizes. */}
+              <span
+                className="ml-auto min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground"
+                title={formatsSentence()}
+              >
                 {formatsSentence()}
               </span>
             </div>
