@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
 status: in_progress
-last_updated: "2026-09-05T05:20:00.000Z"
+last_updated: "2026-09-05T12:00:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 14
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
   completed_plans: 8
-  percent: 21
+  percent: 29
 ---
 
 # Project State
@@ -37,11 +37,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 231 — Connection-Scoped Visibility (Claude building, Gemini reviewing) · 230 complete
-Prior: 230 — The Durable Ingestion Queue (EXECUTED by Gemini, VERIFIED by Claude by driving — PASS)
-Plan: 231 in progress (Claude building, Gemini reviewing)
-Status: in_progress
-Last activity: 2026-09-05 — Phase 230 complete (SC#1 re-driven and PASS, all 5 suites 33/33, UI Sketch 227 Variant B locked, summaries written).
+Phase: 232 — The Source Contract + Google Drive (NOT STARTED — builder not yet named) · 231 complete
+Prior: 231 — Connection-Scoped Visibility (BUILT by Claude, REVIEWED by Gemini by driving — PASS)
+Plan: none in flight
+Status: between_phases
+Last activity: 2026-09-05 — Phase 231 CLOSED (`231-SUMMARY.md` written, ROADMAP progress + checklist updated, migration reservations 234-241 shifted +2).
 
 ### ✅ Phase 230 — The Durable Ingestion Queue VERIFIED (2026-09-05, Claude — DRIVEN, not read)
 
@@ -92,6 +92,47 @@ completed.** Its natural home is the same transaction boundary Defect B's fix es
 
 
 
+### ✅ Phase 231 — Connection-Scoped Visibility CLOSED (2026-09-05)
+
+**Built by Claude · reviewed by Gemini INDEPENDENTLY BY DRIVING · verdict ✅ PASS.**
+Full record: `.planning/phases/231-connection-scoped-visibility/231-SUMMARY.md`.
+Commit range `11e7fd86c..230ed11b0`; reviewer baseline `d852cbc79`.
+
+All four success criteria verified by driving the live database, not by reading claims. One resolver
+(`connection_doc_is_visible`) called from all four sites; **H-1 honoured exactly** — policies first,
+both `SECURITY DEFINER` bodies last, ONE transaction, negative case driven RED against all four sites
+BEFORE the widening. The reviewer drove two further fail-closed scenarios unprompted (an unconnected
+upload is immune to widening; an unrecognised value fails closed) and proved D-5's inert department
+branch **fails CLOSED on activation** by inserting a real `dept_members` row.
+
+⚠ **THREE THINGS CARRIED OUT OF THE PHASE — recorded here so they are not re-derived:**
+
+1. ⛔ **MIGRATION COLLISION, now corrected in the ROADMAP.** 231 was reserved **154** and consumed
+   **154, 155 AND 156** — so 234's reserved block (155-158) was invalid. **All reservations from 234
+   on are shifted +2** (234 → 157-160 · 235 → 161 · 237 → 162 · 239 → 163 · 240 → 164 · 241 → 165;
+   the milestone range is now **153-165**). Numbers are monotonic and gaps are NEVER backfilled.
+   ⚠ **156 is a HOTFIX**: 155 added `default_ingest_visibility` with no grant and **broke the
+   Connections page** — the `connector_connections` column-grant trap firing for the **second** time
+   in this repo (migration 118 was the first, granting SELECT column by column). It has a memory
+   entry and it still cost a broken page.
+2. ⚠ **A ledger cell written mid-phase was falsified by the same phase's own later commit.** The cell
+   claimed `retrieval_service.py` byte-unchanged by 231; `46b046c5e` then modified it (+65/-3) for
+   TRUST-04. **The reviewer caught it, not the builder.** Corrected to **18 / 10 / 423** in both
+   `CLAUDE.md` and `docs/HOT-FILE-LEDGER.md` at `b10a7262d`. ⭐ **The rule: write the ledger note
+   LAST, or re-derive at the phase's final commit.** ⚠ Its **G-5 extraction stays OWED** — 241 is the
+   second landing this milestone; a third must propose the extraction first.
+3. ⚠ **Three ROADMAP flags were NOT discharged here, and none is a defect** — each is scope that
+   belongs elsewhere: **Pitfall 3** (one `audit_log` row per connection-sourced retrieval hit) has no
+   sync to attach to yet, and its own flag says retrofitting makes the first months permanently
+   unauditable — **so it must land WITH the first sync, not after it**; **Pitfall 2** (the preview
+   stating count and tree) is 233's subject; **`SEED-211`**'s M-Files metadata-derived model was to
+   be *decided and recorded with a migration path* and **that decision was not taken** — it carries
+   forward.
+
+⚠ **The backend gate read 74, not the 71 `CLAUDE.md` pins.** The diff against the baseline is EMPTY
+(15 are pre-existing async rot in `test_retrieval_service.py`, plus the order/GC flake). **That is
+`BUS-117`, open on the operator — not a 231 regression.**
+
 ### ⭐ ROLE ASSIGNMENT — reciprocal review (operator-ratified 2026-09-05)
 
 ⚠ **Restored 2026-09-05 after a STATE.md rewrite dropped it.** Recording it again rather than
@@ -103,7 +144,8 @@ assuming it is remembered — the whole point of the protocol is that it survive
 | Phase | Builds | Reviews |
 |---|---|---|
 | **230** — The Durable Ingestion Queue | **Gemini** | **Claude** ✅ done |
-| **231** — connection-scoped visibility | **Claude** | **Gemini** ← current |
+| **231** — connection-scoped visibility | **Claude** | **Gemini** ✅ done (PASS, driven) |
+| **232** — the source contract + Google Drive | ⚠ **NOT NAMED** — alternation says **Gemini**, unless an AGENTS.md §3.1 trigger fires | **Claude** |
 
 ⭐ Not a new rule — `AGENTS.md` §3.1 already required it. **231 is Claude-built by the ratified
 criticality test**, hitting three of five triggers: the permission model, a migration that commits a
