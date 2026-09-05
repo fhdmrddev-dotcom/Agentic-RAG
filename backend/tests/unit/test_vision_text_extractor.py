@@ -619,3 +619,30 @@ def test_credentials_degrade_rather_than_raise_when_no_vision_model_resolves():
         "llm_api_key": "DEEPSEEK-KEY",
     })
     assert credentials_for_vision(sim).llm_api_key == "DEEPSEEK-KEY"
+
+
+def test_credentials_helper_never_raises_on_a_settings_object_it_cannot_read():
+    """⛔ THE REGRESSION THAT COST A GATE RUN, PINNED.
+
+    The first version of `credentials_for_vision` guarded only `override_provider`, leaving
+    `resolve_vision_model` and `get_model_capability` outside the try. `extract_and_store_images`
+    passes a MagicMock in unit tests; `get_model_capability` raised on it; the exception
+    propagated into that function's own broad try/except, which swallowed it and returned
+    BEFORE STORING A SINGLE ROW. Eleven tests went red for a helper that touches no database.
+
+    ⚠ The contract is in its docstring — "must never block an ingest" — so the test asserts the
+      contract, not the implementation: hand it something hostile and it must still return.
+    """
+    from unittest.mock import MagicMock
+
+    from app.services.extractors.aspects.vision_text import credentials_for_vision
+
+    hostile = MagicMock()
+    assert credentials_for_vision(hostile) is not None
+
+    class _Exploding:
+        def __getattr__(self, name):
+            raise RuntimeError(f"settings object refuses {name}")
+
+    exploding = _Exploding()
+    assert credentials_for_vision(exploding) is exploding

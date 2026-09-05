@@ -288,25 +288,32 @@ def credentials_for_vision(app_settings: Any) -> Any:
     ⚠ IT DEGRADES TO TODAY'S BEHAVIOUR RATHER THAN RAISING: `override_provider` returns the
       settings unchanged when that provider is absent or holds no key, so a single-provider
       deployment is byte-identical to before.
+
+    ⚠ THE WHOLE BODY IS GUARDED, NOT JUST THE SWITCH — AND THAT COST A GATE RUN. The first
+      version wrapped only `override_provider`, leaving `resolve_vision_model` and
+      `get_model_capability` outside the try. `extract_and_store_images` passes a MagicMock in
+      unit tests, `get_model_capability` raised on it, and the exception propagated into that
+      function's own broad try/except — which swallowed it and returned before storing a single
+      row. **Eleven tests went red for a credentials helper that never touches the database.**
+      A function whose docstring promises it "must never block an ingest" has to mean it.
     """
-    from app.config import get_model_capability  # noqa: PLC0415
-
-    model = resolve_vision_model(app_settings)
-    if not model:
-        return app_settings
-
-    provider = (get_model_capability(model) or {}).get("provider")
-    if not provider or provider == getattr(app_settings, "active_provider", None):
-        return app_settings
-
     try:
+        from app.config import get_model_capability  # noqa: PLC0415
         from app.models.user_settings import override_provider  # noqa: PLC0415
+
+        model = resolve_vision_model(app_settings)
+        if not model or not isinstance(model, str):
+            return app_settings
+
+        provider = (get_model_capability(model) or {}).get("provider")
+        if not provider or provider == getattr(app_settings, "active_provider", None):
+            return app_settings
 
         return override_provider(app_settings, provider)
     except Exception:  # noqa: BLE001 — credentials resolution must never block an ingest
         log.warning(
-            "could not switch credentials to %r for vision model %r; using the active "
-            "provider's key, which is likely to be refused", provider, model, exc_info=True,
+            "could not resolve vision credentials; falling back to the active provider's "
+            "key, which may be refused", exc_info=True,
         )
         return app_settings
 
