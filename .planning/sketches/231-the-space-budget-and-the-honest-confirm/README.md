@@ -5,8 +5,8 @@ phase: 233.1
 requirement: PREV-03, LIB-02, LIB-09
 guardrail: G-2
 question: "When the work finishes AFTER you leave the page, what may the bar honestly say — and what does the page owe the functional parts instead of empty space?"
-winner: TBD
-status: awaiting-operator
+winner: "A"
+status: locked
 variants: 3
 date: 2026-09-05
 author: claude
@@ -20,7 +20,7 @@ shipped preview, on one surface.
 
 ```
 open .planning/sketches/231-the-space-budget-and-the-honest-confirm/index.html
-node .planning/sketches/231-the-space-budget-and-the-honest-confirm/drive.cjs   # 59 assertions
+node .planning/sketches/231-the-space-budget-and-the-honest-confirm/drive.cjs   # 75 assertions
 ```
 
 ⚠ **Open tab `✕ today` first.** It is the shipped screen, measured — the variants only make sense
@@ -107,9 +107,16 @@ day: *"why is it not full-width like other pages"*. Re-measured, the convention 
 
 ### A — one bar, one strip
 
-**212px → 46px.** Title, the five tabs and the queue pill share one row; the breadcrumb is deleted;
-the sub-tabs vanish from this view because *Add files* **is** the tab body. The dropzone becomes a
-single line, and the reclaimed height goes to the folder rail and the source tree.
+**212px → 46px.** Title, the five tabs and the queue pill share one row, and the breadcrumb is
+deleted. The dropzone becomes a single line, and the reclaimed height goes to the folder rail and
+the source tree.
+
+⚠ **CORRECTED after the operator read the first cut.** This paragraph said *"the sub-tabs vanish
+from this view because Add files IS the tab body"*, and that was wrong — *"where are the children
+mini that was under ingestion and other tabs"*. **Folding a parent strip into one row is a space
+saving; swallowing its children is a lost surface**, and the two are easy to confuse while counting
+pixels. The four child tabs are back as an attached row, and *In progress* now carries a **live
+count badge** — so the pill and the tab are the same fact at two scales.
 
 ⭐ **The dead corner is given the one job that needed a home** — the queue. Press *Add 12 · read 4*
 and the panel bar re-colours to *reading*, while the same work appears in the header pill. **The
@@ -150,7 +157,28 @@ space this sketch exists to reclaim. **Judge whether it earns the row when it ap
 4. **Press it in C** and watch the bar physically move to the shell.
 5. **Toggle `notes`** for the reasoning. Off by default, on purpose.
 
-## Recommendation
+## ✅ LOCKED 2026-09-05 (operator): **A — one bar, one strip**
+
+The recommendation below was **A + C's strip**. The operator chose **A whole**. It is kept unedited
+rather than rewritten, because a superseded recommendation is evidence and an overwritten one is not.
+
+**What A carries into the build:**
+
+- **The header collapses to ONE row** — title, the five primary tabs as a segmented control, and the
+  queue pill. `212px → ~46px`.
+- ⛔ **The breadcrumb is deleted.** It duplicated the sidebar and the tab strip.
+- ⭐ **The child tabs STAY** (the operator caught their absence in the first cut) and *In progress*
+  carries a **live count badge**. The pill and the badge are the same fact at two scales, and the
+  pill lands on that tab.
+- **The dropzone becomes one line**, and the reclaimed height goes to the folder rail and the
+  source tree.
+- ⚠ **The vocabulary ships with it**: *Waiting → Reading → **Readable***. ⛔ The confirm may not
+  call a queued file *added*.
+- ⚠ **C's strip is NOT built.** Its job — surviving navigation — is carried by the pill instead, so
+  **the pill has to actually live above the route**, not merely look like it does. That is the one
+  thing to check at UAT: confirm, go to Chat, come back.
+
+## Superseded recommendation — A's header with C's strip
 
 **A's header with C's strip**, and they compose rather than compete: A decides *where the page
 spends its pixels*, C decides *what happens when work outlives the panel*. A's pill becomes the
@@ -164,7 +192,7 @@ its own merits; it just cannot be the *only* change, because it removes the surf
 
 ## Driven, not asserted
 
-`drive.cjs` — **59 assertions**, extracted from the running sketch rather than copied from it. It
+`drive.cjs` — **75 assertions**, extracted from the running sketch rather than copied from it. It
 guards the width reversal, the breadcrumb deletion, the single tab strip, the slim dropzone, the
 four buckets carried over from 229, the no-content-identity claim, and — the one that matters —
 **that a shell-level home for the queue exists in A and C and is absent from B**.

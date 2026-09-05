@@ -66,6 +66,11 @@ import appSource from "@/App.tsx?raw"
 import layoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import navSource from "@/lib/nav-items.ts?raw"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
+// ⚠ ADDED at sketch 231-A. The page's `<h1>` and its subtitle moved into the header row this
+//   component owns. The fence follows the CONTENT, not the file it used to live in — a rename
+//   fence that stops finding the name because the name MOVED would report a rename regression
+//   that never happened, which is worse than not having the fence.
+import headerBarSource from "@/components/library/LibraryHeaderBar.tsx?raw"
 // The cross-language `?raw` over a backend `.py` is the shipped idiom in this repository
 // (`argumentModel.test.ts:29-32`). From `src/__tests__/library/` the relative depth to the
 // repo root is identical: four levels.
@@ -174,7 +179,7 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
   })
 
   it("the page subtitle is the contract's sentence, and the one it replaced is gone", () => {
-    expect(PAGE).toContain("What the agent can read, and how well it reads it.")
+    expect(PAGE + headerBarSource).toContain("What the agent can read, and how well it reads it.")
     expect(PAGE).not.toContain("Upload documents to give the AI context for your conversations.")
   })
 
@@ -190,8 +195,11 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
   })
 
   it("the rename itself DID land — this fence is not guarding a no-op", () => {
-    expect(PAGE).toContain(">Library</h1>")
-    expect(PAGE).not.toContain(">Documents</h1>")
+    // The heading lives in `LibraryHeaderBar` since sketch 231-A; both files are checked so the
+    // fence cannot pass vacuously if it moves again.
+    expect(headerBarSource.length).toBeGreaterThan(1500)
+    expect(PAGE + headerBarSource).toMatch(/Library\s*<\/h1>/)
+    expect(PAGE + headerBarSource).not.toContain(">Documents</h1>")
     expect(LAYOUT).toContain('from "@/pages/LibraryPage"')
   })
 })

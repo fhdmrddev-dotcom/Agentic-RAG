@@ -2668,7 +2668,7 @@ identical reasoning the 2026-08-28 comment used, and the reason the count is fou
 
 ---
 
-## 231 · The space budget and the honest confirm — `awaiting-operator`
+## 231 · The space budget and the honest confirm — ✅ **LOCKED → A**
 
 **Phase 233.1 · G-2 · variants 3 (+ a measured "today") · 59 assertions**
 
@@ -2728,7 +2728,9 @@ full band for one action while the folder rail scrolls in a cramped column.
 | **B** | the rail owns the tabs — most space reclaimed | ⛔ **fails** — no home for the queue |
 | **C** | the queue is chrome — the bar migrates into a shell strip | ✅ passes, with room to spare |
 
-**Recommendation: A's header with C's strip** — they compose. A decides where the page spends its
+⭐ **LOCKED 2026-09-05 (operator): A.** The recommendation was A+C and is preserved below rather than overwritten. ⚠ **C's strip is not built, so its job falls to the pill — which must therefore live ABOVE the route, not merely look like it does.**
+
+**Superseded recommendation: A's header with C's strip** — they compose. A decides where the page spends its
 pixels; C decides what happens when work outlives the panel. A's pill is the resting state, C's
 strip is what it expands into while a run is live: **one object at two sizes, not two designs.**
 ⚠ B's space win is real and should be harvested separately — it just cannot be the only change.

@@ -3173,7 +3173,17 @@ const BASELINE = {
   // defects were planted against them and each fired (4 / 1 / 1 / 4 assertions), with both
   // source files restored md5-identical.
   // 12 → 17 at the recursion fix: the scanned-depth and budget-stop sentences.
-  "previewVocabulary.test.ts": 17,
+  // 17 → 21 at sketch 231-A: the honest-confirm vocabulary (Accepted ≠ Readable) and the
+  // three-terminal-outcomes fence.
+  "previewVocabulary.test.ts": 21,
+  // ── Sketch 231-A (operator-locked 2026-09-05) — the Library's one header row. ──────────
+  // ⚠ BOTH knobs, same commit, AND THE CHECK MATTERED: this comment first read
+  // "`src/components/library` IS a directory entry so the file already runs". **It is not.**
+  // That directory's suites are listed one PATH at a time in TARGETS, and a path entry
+  // recurses into nothing — so without its own TARGETS line this file would never have been
+  // EXECUTED, and a BASELINE key naming an unexecuted file makes this gate ERROR (exit 2)
+  // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
+  "LibraryHeaderBar.test.tsx": 9,
   "SourcePreviewPanel.test.tsx": 22,
 }
 
@@ -4394,6 +4404,7 @@ const TARGETS = [
   // rule: TARGETS decides what RUNS, BASELINE decides what is GUARDED). The three
   // DocumentStatusBadge / FilterBar entries close 217's deferred-§3 re-open trigger. Pins
   // were captured by 217.1-18 at the gate's own printed `-- N new`, never while red.
+  "src/components/library/__tests__/LibraryHeaderBar.test.tsx",
   "src/components/library/__tests__/sketchComposition.test.tsx",
   "src/components/library/__tests__/ingestionFailureCopy.test.ts",
   "src/components/library/__tests__/IngestionTab.test.tsx",

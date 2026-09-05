@@ -283,7 +283,8 @@ describe("the confirm dissolves the bar and names every refusal", () => {
     await user.click(screen.getByTestId("preview-confirm"))
     const line = await screen.findByTestId("preview-reconciliation")
     expect(line.textContent).toContain("6 accounted · 0 unaccounted")
-    expect(line.textContent).toContain("preview said 2 → 3 added")
+    // ⛔ "accepted", not "added" — the files are queued at this moment, not readable.
+    expect(line.textContent).toContain("preview said 2 → 3 accepted")
   })
 
   it("⛔ SC#5 — every refusal NAMES its cause, never only a colour", async () => {

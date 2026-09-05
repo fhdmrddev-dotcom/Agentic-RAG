@@ -27,6 +27,9 @@ import {
   confirmLabel,
   scannedLine,
   STOPPED_REASON,
+  OUTCOME_LABEL,
+  LIVE_STAGE,
+  ACCEPTED_NOT_DONE,
 } from "./previewVocabulary"
 
 // The live source this suite is BOUND to — the repo's shipped `?raw` fence idiom.
@@ -111,8 +114,9 @@ describe("outcomes", () => {
 
 describe("the sentences the surface composes", () => {
   it("the reconciliation line is the SC#4 receipt", () => {
+    // ⛔ "accepted", not "added" — at the moment this renders the files are QUEUED.
     expect(reconciliationLine(26, 0, 12, 12)).toBe(
-      "26 accounted · 0 unaccounted — preview said 12 → 12 added",
+      "26 accounted · 0 unaccounted — preview said 12 → 12 accepted",
     )
   })
 
@@ -158,5 +162,33 @@ describe("⛔ a budget-stopped listing names WHICH budget stopped it", () => {
     for (const sentence of Object.values(STOPPED_REASON)) {
       expect(sentence.toLowerCase()).not.toContain("some files")
     }
+  })
+})
+
+describe("⛔ the confirm may not call a queued file 'added'", () => {
+  it("the outcome label says Accepted, because that is what is true when it renders", () => {
+    // 230-A was drawn when confirm READ each file inline. BUG-260905-04 moved the work onto the
+    // durable queue — correctly — and that changed what the same word means.
+    expect(OUTCOME_LABEL.added).toBe("Accepted")
+    expect(OUTCOME_LABEL.added).not.toBe("Added")
+  })
+
+  it("the receipt is preceded by a sentence that says the work is not finished", () => {
+    expect(ACCEPTED_NOT_DONE).toContain("queue")
+    expect(ACCEPTED_NOT_DONE).toContain("searchable")
+    expect(ACCEPTED_NOT_DONE).toContain("you can leave this page")
+  })
+
+  it("the journey has words for its middle, and 'Readable' is the one that means done", () => {
+    expect(LIVE_STAGE.waiting).toBe("Waiting")
+    expect(LIVE_STAGE.reading).toBe("Reading")
+    expect(LIVE_STAGE.readable).toBe("Readable")
+  })
+
+  it("⛔ and the TERMINAL outcomes are still exactly three — no fourth destination", () => {
+    // SC#5's "never silently in neither" depends on this. The queue added a journey, not a
+    // fourth place a file can end up.
+    expect(Object.keys(OUTCOME_LABEL)).toHaveLength(3)
+    expect(Object.keys(LIVE_STAGE)).toHaveLength(3)
   })
 })

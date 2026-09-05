@@ -56,6 +56,7 @@ import {
   ZERO_WRITE_LINE,
   CANCEL_TOAST,
   OUTCOME_LABEL,
+  ACCEPTED_NOT_DONE,
   reconciliationLine,
   confirmLabel,
   PREVIEW_TITLE,
@@ -395,6 +396,14 @@ export function SourcePreviewPanel({
           {/* ── the confirm receipt ─────────────────────────────────────────────── */}
           {result && (
             <div data-testid="preview-reconciliation" className="mt-4 space-y-1.5">
+              {/* ⛔ THE FILES ARE QUEUED, NOT READABLE — say so before the arithmetic, because a
+                  receipt read without this line means something stronger than what happened. */}
+              <div
+                data-testid="accepted-not-done"
+                className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-300"
+              >
+                {ACCEPTED_NOT_DONE}
+              </div>
               <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
                 {reconciliationLine(
                   result.accounted,

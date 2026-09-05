@@ -159,7 +159,29 @@ export function IngestionTab({
       <Tabs value={subTab} onValueChange={setSubTab} data-testid="ingestion-subnav">
         <TabsList className="mb-4">
           <TabsTrigger value="add-files">Add files</TabsTrigger>
-          <TabsTrigger value="in-progress">In progress</TabsTrigger>
+          {/* ⭐ Sketch 231-A — the live count badge. The header pill and this badge are the SAME
+              FACT AT TWO SCALES, derived from the same `inFlight` predicate, so they cannot
+              disagree: the pill says a run is happening, the tab says how much is left, and the
+              pill's click lands here. ⛔ A control that lights up and goes nowhere is what the
+              sketch's own variant C had to fix. */}
+          <TabsTrigger value="in-progress" data-testid="subtab-in-progress">
+            In progress
+            {inFlight.length > 0 && (
+              <span
+                data-testid="in-progress-badge"
+                /* ⛔ aria-hidden, and that is deliberate rather than lazy. Without it the tab's
+                   ACCESSIBLE NAME becomes "In progress 3" and every `getByRole("tab", {name:
+                   "In progress"})` breaks — six cases did, measured. The count is not lost to a
+                   screen reader: the In-progress body states it in words ("N files"). A badge
+                   may decorate a control's name; it may not RENAME it. */
+                aria-hidden="true"
+                className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 text-[10px] tabular-nums text-sky-400"
+              >
+                <span className="h-1 w-1 rounded-full bg-sky-400 animate-pulse" />
+                {inFlight.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="needs-attention">Needs attention</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>

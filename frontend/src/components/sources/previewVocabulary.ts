@@ -67,19 +67,57 @@ export const OUTCOME_ORDER = ["added", "here", "refused"] as const
 export type PreviewOutcomeKey = (typeof OUTCOME_ORDER)[number]
 
 export const OUTCOME_LABEL: Record<PreviewOutcomeKey, string> = {
-  added: "Added",
+  // ⛔ "Accepted", not "Added". See ACCEPTED_NOT_DONE below — this word is reached the moment a
+  //    file is queued, and the file is not readable yet.
+  added: "Accepted",
   here: "Already here",
   refused: "Refused",
 }
 
-/** The SC#4 receipt, rendered after a confirm. */
+/**
+ * ⛔ **THE WORD "ADDED" IS A LIE NOW, AND THE FIX THAT MADE IT ONE WAS CORRECT.**
+ *
+ * Sketch 230-A was drawn when confirm READ each file inline: `added` meant *in the Library and
+ * searchable*, and saying it the moment the request returned was true. `BUG-260905-04` then routed
+ * connector imports onto the durable queue — necessary, because the old path had no retries,
+ * unbounded parallelism, and silently degraded metadata — and in doing so **changed what the same
+ * word means**: `added` is now reached when a file is *accepted into a queue*, minutes before it
+ * is readable, and possibly after the person has navigated away.
+ *
+ * ⚠ **The terminal outcomes are still exactly three.** SC#5's *"never silently in neither"*
+ * depends on there being no fourth destination, and this module does not add one. What the queue
+ * adds is a **journey**, and these are the words for the middle of it:
+ *
+ *   Waiting  → accepted, nothing read yet
+ *   Reading  → being read now, five at a time, so the wait has a reason
+ *   Readable → in the Library **and searchable** — the only word that means done
+ *
+ * ⭐ *Readable*, not *added*: **added is what the system did; readable is what the person gets**,
+ * and only the second one is worth saying to them.
+ */
+export const LIVE_STAGE = {
+  waiting: "Waiting",
+  reading: "Reading",
+  readable: "Readable",
+} as const
+export type LiveStageKey = keyof typeof LIVE_STAGE
+
+/** What the confirm may claim at the moment it returns — and what it may not. */
+export const ACCEPTED_NOT_DONE =
+  "Accepted into the queue. They become searchable as they are read — you can leave this page."
+
+/**
+ * The SC#4 receipt. ⚠ It says **accepted**, because at the moment it renders that is the only
+ * true word: the files are queued, not readable. The arithmetic is unchanged — what changed is
+ * that the sentence no longer overstates what the arithmetic proves.
+ */
 export function reconciliationLine(
   accounted: number,
   unaccounted: number,
   said: number,
   actually: number,
 ): string {
-  return `${accounted} accounted · ${unaccounted} unaccounted — preview said ${said} → ${actually} added`
+  return `${accounted} accounted · ${unaccounted} unaccounted — preview said ${said} → ${actually} accepted`
 }
 
 /** The confirm button. It names BOTH numbers: what is certain, and what still has to be opened. */
