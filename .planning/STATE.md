@@ -126,6 +126,17 @@ rows survive whole milestones unrun (`v3.9` closed with 16 owed rows on Phase 21
 | **SC#2** | *"several hundred files at once and the product stays usable"* | the global `pg_advisory_xact_lock` bound + unit tests | **only 20 files were ever driven.** Nobody has watched a few hundred queue under the cap |
 | **SC#3** | *"the person is told the embedding provider failed, **and which one**"* — pause with that refusal on screen, resume on recovery | `test_provider_outage_trips_breaker_and_pauses_queue`, `test_probe_provider_auto_resumes_paused_queue`, and locked Sketch 227 variant B | ⛔ **no live 429 has ever occurred.** The pause banner and the named refusal have never been seen by a human |
 
+⚠ **AND A CONCRETE THING FOR THAT DRIVE TO CHECK, found 2026-09-05 while building 231.**
+Phase 230 widened `Document["status"]` with `"paused"` (frontend) and added a `status.paused` term,
+and the reviewer had Gemini add a `paused` arm to `segmentState()`. **But nothing writes
+`documents.status = 'paused'`** — both `UPDATE documents` sites in `db/ingestion_jobs.py` (`:175`,
+`:341`) write `'failed'`, and the backend `DocumentResponse` Literal does not even permit `'paused'`.
+**The pause is a JOB-level state, not a document-level one.** So the paused strip arm may be
+unreachable, and SC#3's on-screen pause may be carried entirely by the batch lane reading job state.
+⭐ **The drive settles it in one observation:** when the queue pauses, does a document row read as
+paused anywhere a person looks? If not, either the frontend widening is dead code or a writer is
+missing — and only the live drive can say which.
+
 ⛔ **SC#3 is the one that matters**, and it is the phase's most user-visible promise: it exists to
 close `BUG-260815-05`, where retrieval misreports provider failure and a person is told *"your
 documents returned nothing."* **A mechanism nobody has watched refuse is not yet a refusal.**
