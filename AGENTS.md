@@ -192,6 +192,17 @@ bash scripts/agent-bus-watch.sh gemini 30
 Items already open when the watcher starts are the baseline and are not re-announced. In Claude Code,
 run it through the **Monitor** tool with `persistent: true`.
 
+**The operator's whole flow is one command.** In Claude Code:
+
+```
+/pair 231 claude          # phase 231, Claude builds, Gemini reviews
+/pair 232 gemini          # phase 232, Gemini builds, Claude reviews
+```
+
+Claude runs the script, arms its own watcher when it is the reviewer, and hands back the reviewer
+briefing block to paste into the other agent. **That paste is the only manual step** — the bus cannot
+wake an agent, so a human carries the first message.
+
 ⚠ **The scripts enforce nothing** — they only make the rule cheap to follow. §6.3 is still the rule,
 and `arm-pair.sh` will happily print an assignment that violates it if you name the wrong builder.
 ⚠ **A pairing is per SESSION as well as per phase.** The watchers die with the session that started
