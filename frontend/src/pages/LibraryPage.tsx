@@ -638,14 +638,21 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
   return (
     <TooltipProvider>
-      {/* ⭐ THE ONE MEASURE (D-233-07, operator 2026-09-05: "we should unify the width of all").
-          `max-w-6xl` = **1152px** — the width `SettingsPage.tsx:950` and `ConnectionsPage` already
-          use, adopted at the operator's own 2026-08-28 ruling. This page was the actual
-          inconsistency: it had `p-8` and NO max-width at all, so it ran edge to edge on a wide
-          display while every neighbouring page did not. A precedent taken, never a fifth number
-          invented. ⚠ `WorkflowsPage`'s `max-w-[1200px]` is 48px off the same measure — NAMED here
-          rather than silently folded in, because it is outside this phase's blast radius. */}
-      <div className="flex flex-col h-full w-full max-w-6xl mx-auto overflow-y-auto p-8">
+      {/* ⛔ THIS PAGE IS DELIBERATELY FULL-WIDTH. DO NOT PUT A `max-w-*` BACK ON IT.
+          ⚠ D-233-07 DID exactly that — `max-w-6xl` (1152px) — and it was WRONG, reverted the same
+          day on the operator's *"why is it not full-width like other pages"*. The reasoning that
+          produced it is kept here rather than deleted, because the error is instructive: it
+          derived "one measure for the whole app" from TWO pages and never checked the rest.
+          Re-measured across every page:
+            Settings · Connections  max-w-6xl (1152)   ← FORMS
+            Workflows               max-w-[1200px]     ← cards
+            Skills · Chat           none, FULL WIDTH   ← data
+            Library                 none, FULL WIDTH   ← data
+          The convention is not one number. It is **form-shaped pages are constrained,
+          data-dense pages are full width** — and this page is a folder rail beside a
+          seven-column table whose columns 3-5 already shed by `nth-child` under pressure.
+          Narrowing it spends the width that table needs. */}
+      <div className="flex flex-col h-full overflow-y-auto p-8">
         {/* ⛔ THE HOOK FOLLOWS THE ACTIVE TAB (217.1-18): the pagehead is ONE shared shell
             element, and the contract names it per-screen (`<screen>-pagehead`). Dynamic so
             `views-pagehead`/`health-pagehead` resolve when that tab is active. */}

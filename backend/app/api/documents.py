@@ -2144,6 +2144,38 @@ def ingest_document(
                 if isinstance(metadata_dict.get("_confidence"), dict):
                     metadata_dict["_confidence"].pop(fld, None)
 
+        # ── Phase 233 (BUG-260905-03 / PREV-02) — PROVENANCE SURVIVES EXTRACTION ──────────
+        #
+        # ⛔ THE WRITE BELOW REPLACES `metadata` WHOLESALE, AND THAT SILENTLY DESTROYED
+        #    TIER-1 IDENTITY ON EVERY SUCCESSFUL INGEST.
+        #
+        # `mint_document_row` stamps `metadata.source = {system, external_id, version}` so a
+        # later preview can honestly say "already here — matched by source file, not by
+        # content". `metadata_dict` is built from the EXTRACTED metadata and has never heard
+        # of that key, so `update({"metadata": metadata_dict})` deleted it the moment a
+        # document completed.
+        #
+        # ⚠ MEASURED ON REAL ROWS, not reasoned about. After a Drive folder import:
+        #     13:35:42  completed  src=None                     O6 OPERATIONALIZATION...
+        #     13:33:19  failed     src={google, 1GofDH...}       FMrad_AI_writing_report.pdf
+        #   ONLY THE FAILED ROWS KEPT THEIR IDENTITY — because only they never reached this
+        #   write. The "Already here" bucket would therefore have matched NOTHING, FOREVER,
+        #   which is the one bucket Phase 233 exists to make honest.
+        #
+        # ⚠ It is carried at the SAME SITE as the `_source` user-edit guard above, and off the
+        #   SAME `prior_meta` read, deliberately: this is the single metadata-write site all
+        #   three re-extract entry points funnel through (/upload, /reingest, /reextract). A
+        #   guard placed anywhere else inherits only one of them — Pitfall 1, one key over.
+        #
+        # ⚠ Extraction has no opinion about these keys. They are stamped by the INGRESS DOOR
+        #   and describe where the bytes came from, so re-extracting must carry them forward
+        #   untouched rather than re-deriving or dropping them.
+        _PROVENANCE_KEYS = ("source",)
+        for _pk in _PROVENANCE_KEYS:
+            if _pk in prior_meta:
+                metadata_dict = metadata_dict or {}
+                metadata_dict.setdefault(_pk, prior_meta[_pk])
+
         supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
         if not chunks:

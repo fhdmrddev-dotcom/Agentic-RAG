@@ -34,6 +34,43 @@ class MintResult:
     version_number: int
 
 
+#: Characters Supabase Storage refuses in an object key. ⚠ DERIVED FROM A REAL 400, not from the
+#: docs: `Cambridge IELTS 14 with Answers GT [www.luckyielts.com].pdf` produced
+#:     StorageApiError {'statusCode': 400, 'error': 'InvalidKey',
+#:                      'message': 'Invalid key: <user>/<doc>/Cambridge ... [www.luckyielts.com].pdf'}
+#: Square brackets are the ones that bit; the rest are the shell/URL-hostile set that would bite
+#: next. Kept deliberately SMALL — this is a key sanitiser, not a filename policy.
+_STORAGE_UNSAFE = '[]{}#%^`"\'<>|\\?*\r\n\t'
+
+
+def _storage_safe(name: str) -> str:
+    """Make a filename usable as a Supabase Storage object key, without renaming the document.
+
+    ⚠ BUG-260905-06 — THE FAILURE THIS FIXES WAS INVISIBLE, AND THAT IS THE POINT. The upload
+    raised `InvalidKey`, but `/upload` and `splice_document` BOTH swallow storage-upload errors
+    (a `log.warning` and a `log.debug` respectively, deliberately, so a storage hiccup does not
+    lose an ingest). The document therefore sailed on to extraction with **no bytes ever
+    stored**, and later failed with an EMPTY `error_message` — which is what two of the six
+    failures in the operator's Drive import actually were. **The blank message was the tell:**
+    every honest failure path in this pipeline names a cause.
+
+    ⚠ `documents.filename` is NOT touched. The person sees the file they uploaded; only the
+    storage KEY is sanitised. A sanitiser that renamed the document would fix the 400 by
+    lying about what the file is called.
+
+    ⚠ It is applied HERE, at the single minting site, so `file_path` is written sanitised ONCE
+    and every later reader (`splice_document`'s download, the queue worker, re-extract) derives
+    the same key from the column rather than recomputing it. Sanitising at the upload call
+    instead would have produced a key that no download could reproduce.
+    """
+    cleaned = "".join("_" if ch in _STORAGE_UNSAFE else ch for ch in (name or ""))
+    cleaned = cleaned.strip() or "file"
+    # Collapse runs of the replacement so `[www.x.com]` does not become `__www.x.com__`.
+    while "__" in cleaned:
+        cleaned = cleaned.replace("__", "_")
+    return cleaned
+
+
 def mint_document_row(
     *,
     raw: bytes,
@@ -142,7 +179,7 @@ def mint_document_row(
 
     # 5. Insert new documents row with status='pending'
     document_id = str(uuid4())
-    storage_path = f"{user_id}/{document_id}/{filename}"
+    storage_path = f"{user_id}/{document_id}/{_storage_safe(filename)}"
 
     doc_data: dict = {
         "id": document_id,

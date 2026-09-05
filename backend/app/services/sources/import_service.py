@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from fastapi import BackgroundTasks
+from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.dependencies import get_supabase
@@ -58,6 +59,111 @@ async def browse_connection_files(
         "files": files,
         "next_page_token": file_page.next_page_token,
     }
+
+
+async def _enqueue_or_splice(
+    *,
+    doc: dict[str, Any],
+    raw: bytes,
+    mime_type: str,
+    filename: str,
+    user_id: str,
+    active_org: str,
+    storage_path: str,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Hand a freshly minted document to the DURABLE QUEUE, exactly as `/upload` does.
+
+    ── ⛔ WHY THIS IS NOT `background_tasks.add_task(splice_document)` ANY MORE ────────────────
+
+    It was, and that was a real defect (`BUG-260905-04`), found by driving a Drive folder import
+    rather than by reading the code. **A connector import created NO `ingestion_jobs` row at all**
+    — measured: 93 completed documents against 6 job rows, with every 13:xx Drive import missing
+    from the queue entirely. Four things followed from that, none of them visible on screen:
+
+    1. **No retries and no lease recovery.** Phase 230 built exactly that, and this path opted out
+       of it silently. A killed worker abandoned the document at `processing` forever.
+    2. **Unbounded parallelism.** `/upload` is capped at `INGEST_MAX_CONCURRENT_JOBS` (3); this
+       path fanned out one task per file, so a folder of ten 10 MB PDFs ran ten at once.
+    3. ⚠ **ENRICHED METADATA SILENTLY DEGRADED ON EVERY CONNECTOR IMPORT.** `ingest_document`
+       calls `asyncio.run(extract_metadata_enriched(...))` at `documents.py:2021`. Inside a
+       `BackgroundTask` the loop is ALREADY RUNNING, so that raises
+       `RuntimeError: asyncio.run() cannot be called from a running event loop` and the handler
+       degrades to `None`. The queue worker runs the same function from a threadpool, where it is
+       fine. **The same document ingested through two doors got two different metadata results**,
+       and only the log said so.
+    4. **The Ingestion tab could not account for the work**, because there was no job to show.
+
+    So: enqueue, and let the one worker that already exists do the work. ⚠ The fallback below is
+    the same one `/upload` carries — it fires only when the worker is explicitly disabled, or when
+    the enqueue itself fails, so a document can never be minted with nothing that will ever
+    advance it.
+    """
+    from uuid import UUID  # noqa: PLC0415
+
+    from app.config import settings  # noqa: PLC0415
+    from app.db.ingestion_jobs import insert_ingestion_job  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    worker_enabled = bool(getattr(settings, "ingest_worker_enabled", True))
+    enqueued = False
+
+    if worker_enabled:
+        # ⛔ THE BYTES MUST BE IN STORAGE **BEFORE** THE JOB EXISTS, and this is the step that
+        #    made the change non-trivial. The worker calls `splice_document` with no `raw`, and
+        #    that function then DOWNLOADS from `documents.file_path`. The legacy direct-splice
+        #    path never uploaded either — `splice_document` did it, from bytes it was handed.
+        #    Enqueue without this and the worker downloads nothing, gets `raw = b""`, and the
+        #    document fails with an empty-text error that names the FILE rather than the bug.
+        #
+        # ⚠ A failed upload therefore MUST NOT enqueue. It falls through to the direct splice,
+        #   which still holds the bytes in memory — degraded, but never a stranded document.
+        try:
+            await run_in_threadpool(
+                lambda: get_supabase().storage.from_("documents").upload(
+                    path=storage_path,
+                    file=raw,
+                    file_options={"content-type": mime_type},
+                )
+            )
+        except Exception as up_exc:  # noqa: BLE001
+            logger.warning(
+                "Connector import: storage upload failed for %s (%s); falling back to a direct splice",
+                doc.get("id"),
+                up_exc,
+            )
+            worker_enabled = False
+
+    if worker_enabled:
+        try:
+            pool = await get_pg_pool()
+            await insert_ingestion_job(
+                pool,
+                document_id=UUID(str(doc["id"])),
+                user_id=UUID(str(user_id)),
+                org_id=UUID(str(active_org)) if active_org else None,
+            )
+            enqueued = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Connector import: enqueue failed for %s (%s); falling back to a direct splice",
+                doc.get("id"),
+                exc,
+            )
+
+    if not enqueued:
+        # ⚠ The legacy path, kept ONLY as the never-strand fallback. It carries defect (3) above,
+        #   so it must stay the exception rather than the rule.
+        background_tasks.add_task(
+            ingest_splice.splice_document,
+            document_id=doc["id"],
+            raw=raw,
+            mime_type=mime_type,
+            filename=filename,
+            user_id=user_id,
+            storage_path=storage_path,
+            supabase=get_supabase(),
+        )
 
 
 async def import_single_file(
@@ -128,16 +234,15 @@ async def import_single_file(
     doc = dict(mint_result.document)
 
     if not mint_result.is_duplicate:
-        srv_supabase = get_supabase()
-        background_tasks.add_task(
-            ingest_splice.splice_document,
-            document_id=doc["id"],
+        await _enqueue_or_splice(
+            doc=doc,
             raw=raw_bytes,
             mime_type=mime_type,
             filename=filename,
             user_id=user_id,
+            active_org=str(active_org),
             storage_path=mint_result.storage_path,
-            supabase=srv_supabase,
+            background_tasks=background_tasks,
         )
     else:
         # ⭐ SC#5 / PREV-02: not imported again AND not embedded again. `splice_document` is the
