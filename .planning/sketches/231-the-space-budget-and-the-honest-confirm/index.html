@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>231 · The space budget and the honest confirm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%); --elev:hsl(220 40% 5%); --surf:hsl(220 30% 7%);
+  --muted:hsl(220 30% 11%); --accent:hsl(220 25% 14%);
+  --tx:hsl(226 60% 97%); --tx2:hsl(220 16% 65%); --tx3:hsl(220 16% 45%);
+  --bd:hsl(220 20% 16%); --bd2:hsl(220 20% 16% / .5);
+  --pri:hsl(239 100% 82%); --pri2:hsl(239 84% 67%); --pridim:hsl(239 100% 82% / .15);
+  --ok:hsl(142 71% 45%); --okdim:hsl(142 71% 45% / .13);
+  --wa:hsl(38 92% 60%); --wadim:hsl(38 92% 60% / .13);
+  --da:hsl(0 72% 51%); --dadim:hsl(0 72% 51% / .13);
+  --sk:hsl(199 89% 55%); --skdim:hsl(199 89% 55% / .13);
+  --fs:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --fh:'Manrope','Inter',sans-serif;
+  --fm:'JetBrains Mono',ui-monospace,monospace;
+  --r1:6px; --r2:10px; --r3:14px; --rf:9999px;
+  /* ⛔ NO WIDTH TOKEN HERE, AND THAT IS THE POINT.
+     Sketches 229/230 declared a 1152px measure and Phase 233 shipped it on LibraryPage.
+     ⚠ This comment deliberately does NOT spell that token: `drive.cjs` greps for its
+     declaration, and prose containing the literal would satisfy the grep it must fail.
+     The operator REVERTED it 2026-09-05: "why is it not full-width like other pages".
+     Re-measured: Settings/Connections 1152 = FORMS. Skills/Chat = none = DATA.
+     The Library is data. It is FULL WIDTH, and the sketch must not re-narrow it. */
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--fs);font-size:.9rem;line-height:1.5}
+h1{font-family:var(--fh);margin:0}
+
+/* ── sketch chrome (not part of the design) ────────────────────────── */
+.top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:14px;
+  padding:10px 20px;background:hsl(216 45% 4% / .94);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .id{font-family:var(--fm);font-size:.75rem;color:var(--tx3)}
+.top h1{font-size:.94rem;font-weight:600}
+.tabs{margin-left:auto;display:flex;gap:5px;align-items:center}
+.tab{padding:5px 12px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;color:var(--tx2);
+  font-size:.79rem;cursor:pointer;font-family:var(--fs)}
+.tab:hover{border-color:var(--tx3);color:var(--tx)}
+.tab.on{background:var(--accent);border-color:var(--tx3);color:var(--tx)}
+.tab.win.on{background:var(--okdim);border-color:hsl(142 71% 45% / .5);color:var(--ok)}
+.ntoggle{padding:5px 11px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;
+  color:var(--tx3);font-size:.75rem;cursor:pointer;font-family:var(--fs)}
+.ntoggle.on{color:var(--pri);border-color:hsl(239 84% 67% / .5)}
+.stage{padding:20px 20px 80px}
+.v{display:none} .v.on{display:block;animation:in .25s both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.note{display:none;margin:10px 0 0;padding:9px 12px;border-radius:var(--r2);font-size:.78rem;
+  color:var(--tx2);background:var(--muted);border-left:2px solid var(--bd)}
+body.notes .note{display:block}
+.note.good{border-left-color:var(--ok)} .note.warn{border-left-color:var(--wa)}
+.note.bad{border-left-color:var(--da)}
+.note b{color:var(--tx)}
+
+/* ── the app frame ─────────────────────────────────────────────────── */
+.app{display:flex;border:1px solid var(--bd);border-radius:var(--r3);overflow:hidden;background:var(--bg);height:660px}
+.side{width:186px;flex:none;background:var(--elev);border-right:1px solid var(--bd);padding:12px 9px;display:flex;flex-direction:column;gap:2px}
+.side .brand{display:flex;align-items:center;gap:8px;padding:6px 8px 14px}
+.side .logo{width:24px;height:24px;border-radius:7px;background:linear-gradient(145deg,var(--pri2),var(--vio,hsl(258 90% 66%)))}
+.nav{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--r2);color:var(--tx2);font-size:.82rem}
+.nav.on{background:var(--pridim);color:var(--tx);font-weight:500}
+.nav .ic{width:14px;text-align:center;opacity:.75;font-size:.8rem}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* the measured BEFORE, so the reclaim is arithmetic rather than an impression */
+.hdr-old{padding:22px 22px 0}
+.hdr-old h2{font-family:var(--fh);font-size:1.35rem;margin:0}
+.hdr-old .sub{color:var(--tx3);font-size:.8rem;margin-top:5px}
+.crumb{margin-top:16px;font-size:.78rem;color:var(--tx3)}
+.strip1{margin-top:16px;display:flex;gap:4px}
+.strip2{margin-top:14px;display:flex;gap:4px}
+.pt{padding:6px 13px;border-radius:var(--r2);font-size:.81rem;color:var(--tx2);background:transparent;border:0;cursor:pointer;font-family:var(--fs)}
+.pt.on{background:var(--accent);color:var(--tx);font-weight:500}
+.st{padding:4px 11px;border-radius:var(--rf);font-size:.76rem;color:var(--tx3);background:transparent;border:1px solid transparent;cursor:pointer;font-family:var(--fs)}
+.st.on{border-color:var(--bd);color:var(--tx);background:var(--surf)}
+.ruler{position:absolute;right:8px;top:0;bottom:0;width:2px;background:linear-gradient(var(--da),transparent)}
+.deadzone{position:absolute;inset:0;border:2px dashed hsl(0 72% 51% / .45);border-radius:var(--r2);
+  display:grid;place-items:center;color:hsl(0 72% 60%);font-size:.74rem;font-family:var(--fm);pointer-events:none}
+
+/* ── the reclaimed header: ONE row ─────────────────────────────────── */
+.bar{display:flex;align-items:center;gap:14px;padding:9px 16px;border-bottom:1px solid var(--bd);background:var(--elev);flex:none}
+.bar h2{font-family:var(--fh);font-size:.98rem;margin:0;white-space:nowrap}
+.seg{display:flex;gap:2px;background:var(--surf);border:1px solid var(--bd);border-radius:var(--r2);padding:2px}
+.seg button{padding:4px 11px;border-radius:7px;border:0;background:transparent;color:var(--tx2);font-size:.79rem;cursor:pointer;font-family:var(--fs)}
+.seg button.on{background:var(--accent);color:var(--tx);font-weight:500}
+.spacer{margin-left:auto}
+
+/* the queue pill — the thing the dead corner becomes */
+.qpill{display:flex;align-items:center;gap:9px;padding:5px 11px;border-radius:var(--rf);
+  border:1px solid var(--bd);background:var(--surf);font-size:.77rem;color:var(--tx2);cursor:pointer}
+.qpill.live{border-color:hsl(199 89% 55% / .5);background:var(--skdim);color:var(--sk)}
+.qpill .dot{width:6px;height:6px;border-radius:50%;background:var(--tx3)}
+.qpill.live .dot{background:var(--sk);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.qpill .mini{width:52px;height:4px;border-radius:2px;background:var(--muted);overflow:hidden;display:flex}
+.qpill .mini i{display:block;height:100%}
+.mini .done{background:var(--ok)} .mini .work{background:var(--sk)} .mini .wait{background:var(--tx3);opacity:.4}
+
+/* ── body ──────────────────────────────────────────────────────────── */
+.body{flex:1;min-height:0;display:flex;gap:14px;padding:14px 16px}
+.rail{width:230px;flex:none;border:1px solid var(--bd);border-radius:var(--r2);background:var(--surf);display:flex;flex-direction:column;overflow:hidden}
+.rail .rh{padding:8px 11px;border-bottom:1px solid var(--bd);font-size:.7rem;letter-spacing:.06em;color:var(--tx3);display:flex;align-items:center}
+.rail .rh b{margin-left:auto;color:var(--tx3);font-weight:400;font-family:var(--fm)}
+.rail .rb{flex:1;overflow-y:auto;padding:5px}
+.fl{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--r1);font-size:.8rem;color:var(--tx2);cursor:pointer}
+.fl:hover{background:var(--muted)} .fl.on{background:var(--pridim);color:var(--tx)}
+.fl .n{margin-left:auto;font-family:var(--fm);font-size:.72rem;color:var(--tx3)}
+.work{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+
+/* the slim dropzone */
+.dz{display:flex;align-items:center;gap:11px;padding:10px 14px;border:1px dashed var(--bd);
+  border-radius:var(--r2);background:hsl(220 30% 7% / .5);font-size:.81rem;color:var(--tx2);flex:none}
+.dz .fmt{margin-left:auto;font-size:.72rem;color:var(--tx3);font-family:var(--fm)}
+.dz button{padding:4px 11px;border-radius:var(--r1);border:1px solid var(--bd);background:var(--accent);color:var(--tx);font-size:.76rem;cursor:pointer;font-family:var(--fs)}
+.dz.big{flex-direction:column;padding:34px;gap:7px;text-align:center}
+.dz.big .fmt{margin:0}
+
+/* the source panel */
+.panel{border:1px solid var(--bd);border-radius:var(--r2);background:var(--surf);overflow:hidden;flex:none}
+.pnh{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--bd);background:var(--elev);font-size:.83rem;font-weight:500}
+.pnh .rt{margin-left:auto;font-family:var(--fm);font-size:.73rem;color:var(--tx3);font-weight:400}
+.pnb{padding:12px 13px}
+.two{display:grid;grid-template-columns:250px 1fr;gap:13px}
+.tree{border:1px solid var(--bd);border-radius:var(--r1);background:var(--bg);max-height:210px;overflow-y:auto;padding:5px}
+.tn{display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:var(--r1);font-size:.79rem;color:var(--tx2);cursor:pointer}
+.tn:hover{background:var(--muted)} .tn.on{background:var(--pridim);color:var(--tx)}
+.tn.d1{padding-left:20px} .tn.d2{padding-left:33px}
+
+/* the bar */
+.bars{display:flex;height:26px;border-radius:var(--r1);overflow:hidden;border:1px solid var(--bd)}
+.sg{transition:width .6s cubic-bezier(.4,0,.2,1);display:grid;place-items:center;font-size:.7rem;font-family:var(--fm);color:hsl(0 0% 100% / .85)}
+.sg.add{background:hsl(142 71% 45% / .55)} .sg.here{background:hsl(199 89% 55% / .4)}
+.sg.uns{background:hsl(220 16% 45% / .35)} .sg.ref{background:hsl(0 72% 51% / .5)}
+.sg.unk{background:repeating-linear-gradient(45deg,hsl(38 92% 60% / .55) 0 6px,hsl(38 92% 60% / .12) 6px 12px);animation:hatch 1.1s linear infinite}
+.sg.qd{background:repeating-linear-gradient(45deg,hsl(199 89% 55% / .5) 0 5px,hsl(199 89% 55% / .14) 5px 10px);animation:hatch 1.1s linear infinite}
+@keyframes hatch{to{background-position:17px 0}}
+.lg{display:flex;gap:16px;margin-top:11px;flex-wrap:wrap}
+.lgi{min-width:104px}
+.lgi .n{font-size:1.15rem;font-weight:600;font-family:var(--fm);display:flex;align-items:baseline;gap:6px}
+.lgi .n::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--tx3)}
+.lgi.add .n::before{background:var(--ok)} .lgi.here .n::before{background:var(--sk)}
+.lgi.uns .n::before{background:var(--tx3)} .lgi.unk .n::before{background:var(--wa)}
+.lgi.ref .n::before{background:var(--da)} .lgi.rdy .n::before{background:var(--ok)}
+.lgi .l{font-size:.77rem;color:var(--tx2)} .lgi .q{font-size:.7rem;color:var(--tx3)}
+.foot{display:flex;align-items:center;gap:11px;padding:9px 13px;border-top:1px solid var(--bd);background:var(--elev)}
+.zw{font-family:var(--fm);font-size:.71rem;color:var(--tx3)}
+.acts{margin-left:auto;display:flex;gap:7px}
+.btn{padding:5px 13px;border-radius:var(--r1);border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:.79rem;cursor:pointer;font-family:var(--fs)}
+.btn.pri{background:var(--pri2);border-color:var(--pri2);color:hsl(226 60% 99%);font-weight:500}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* rows */
+.rows{margin-top:11px;border:1px solid var(--bd2);border-radius:var(--r1);overflow:hidden;max-height:190px;overflow-y:auto}
+.row{display:flex;align-items:center;gap:10px;padding:6px 11px;font-size:.78rem;border-top:1px solid var(--bd2)}
+.row:first-child{border-top:0}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .fr{font-size:.71rem;color:var(--tx3);flex:none}
+.row .st2{font-size:.7rem;font-family:var(--fm);flex:none;padding:1px 7px;border-radius:var(--rf)}
+.st2.q{background:var(--skdim);color:var(--sk)} .st2.r{background:var(--okdim);color:var(--ok)}
+.st2.x{background:var(--dadim);color:var(--da)} .st2.w{background:var(--wadim);color:var(--wa)}
+.scan{font-size:.75rem;color:var(--tx3);margin-bottom:9px}
+
+/* the persistent strip (variant C) */
+.cstrip{display:flex;align-items:center;gap:12px;padding:7px 16px;border-bottom:1px solid var(--bd);
+  background:linear-gradient(90deg,var(--skdim),transparent);font-size:.78rem;flex:none}
+.cstrip .lab{color:var(--sk);font-weight:500}
+.cstrip .bars{flex:1;max-width:340px;height:8px}
+.cstrip .mut{color:var(--tx3);font-size:.74rem;font-family:var(--fm)}
+.cstrip button{margin-left:auto;padding:3px 10px;border-radius:var(--rf);border:1px solid hsl(199 89% 55% / .4);background:transparent;color:var(--sk);font-size:.73rem;cursor:pointer;font-family:var(--fs)}
+
+.tag{display:inline-block;padding:1px 7px;border-radius:var(--rf);font-size:.68rem;font-family:var(--fm)}
+.tag.win{background:var(--okdim);color:var(--ok)} .tag.bad{background:var(--dadim);color:var(--da)}
+.tip{position:fixed;z-index:99;max-width:330px;padding:8px 11px;border-radius:var(--r2);background:var(--muted);
+  border:1px solid var(--bd);font-size:.76rem;color:var(--tx2);pointer-events:none;opacity:0;transition:.12s}
+.tip.on{opacity:1}
+.tst{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(18px);z-index:99;padding:9px 15px;
+  border-radius:var(--rf);background:var(--muted);border:1px solid var(--bd);font-size:.79rem;opacity:0;transition:.2s}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <span class="id">231</span>
+  <h1>The space budget &amp; the honest confirm</h1>
+  <div class="tabs">
+    <button class="tab win on" data-v="A" onclick="show('A')">A · one bar, one strip</button>
+    <button class="tab" data-v="B" onclick="show('B')">B · rail owns the tabs</button>
+    <button class="tab" data-v="C" onclick="show('C')">C · the queue is chrome</button>
+    <button class="tab" data-v="X" onclick="show('X')">✕ today</button>
+    <button class="ntoggle" id="nt" onclick="document.body.classList.toggle('notes');this.classList.toggle('on')">notes</button>
+  </div>
+</div>
+
+<div class="stage">
+
+<!-- ══ X · TODAY, measured ══════════════════════════════════════════ -->
+<section class="v" id="vX">
+  <div class="app">
+    <div class="side">
+      <div class="brand"><div class="logo"></div><b style="font-size:.84rem">Agentic RAG</b></div>
+      <div class="nav"><span class="ic">💬</span>Chat</div>
+      <div class="nav"><span class="ic">⚙</span>Workflows</div>
+      <div class="nav on"><span class="ic">📚</span>Library</div>
+      <div class="nav"><span class="ic">🔌</span>Connections</div>
+    </div>
+    <div class="main" style="position:relative">
+      <div class="hdr-old" style="position:relative">
+        <div style="position:absolute;left:52%;right:14px;top:6px;height:212px">
+          <div class="deadzone">dead — 48% of the width, 212px tall</div>
+        </div>
+        <h2>Library</h2>
+        <div class="sub">What the agent can read, and how well it reads it.</div>
+        <div class="crumb">Library &nbsp;›&nbsp; Documents</div>
+        <div class="strip1">
+          <button class="pt on">Documents</button><button class="pt">Views</button>
+          <button class="pt">Ingestion</button><button class="pt">Indexing</button><button class="pt">Health</button>
+        </div>
+        <div class="strip2">
+          <button class="st on">Add files</button><button class="st">In progress</button>
+          <button class="st">Needs attention</button><button class="st">History</button>
+        </div>
+      </div>
+      <div class="body" style="padding-top:14px">
+        <div class="rail" style="max-height:150px"><div class="rh">FOLDERS <b>19</b></div>
+          <div class="rb"><div class="fl on">📁 Root <span class="n">44</span></div>
+          <div class="fl">📁 Cloud <span class="n">19</span></div><div class="fl">📁 DBA <span class="n">2</span></div></div></div>
+        <div class="work">
+          <div class="dz big"><b>Drop files here, or choose them</b>
+            <div class="fmt">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB</div></div>
+          <div style="font-size:.76rem;color:var(--tx3)">…everything functional starts below the fold</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note bad"><b>Measured, not impressionistic.</b> Four stacked blocks — title, sub-line, breadcrumb,
+    then <b>two</b> tab strips — consume <b>212px</b> of vertical before a single functional pixel, and every one
+    of them is left-aligned inside a full-width page, so <b>48% of that band is empty</b>.</div>
+  <div class="note bad"><b>The breadcrumb is pure duplication.</b> It reads <em>Library › Documents</em> while
+    the sidebar already says <b>Library</b> and the tab already says <b>Documents</b>. It only carries
+    information when a folder is selected — and the folder rail is showing that selection two inches below.</div>
+  <div class="note bad"><b>Two tab strips is a second tax.</b> Parent (Documents/Views/Ingestion/…) and child
+    (Add files/In progress/…) stack, so the deeper you go the less page you have.</div>
+</section>
+
+<!-- ══ A · ONE BAR, ONE STRIP ═══════════════════════════════════════ -->
+<section class="v on" id="vA">
+  <div class="app">
+    <div class="side">
+      <div class="brand"><div class="logo"></div><b style="font-size:.84rem">Agentic RAG</b></div>
+      <div class="nav"><span class="ic">💬</span>Chat</div>
+      <div class="nav"><span class="ic">⚙</span>Workflows</div>
+      <div class="nav on"><span class="ic">📚</span>Library</div>
+      <div class="nav"><span class="ic">🔌</span>Connections</div>
+    </div>
+    <div class="main">
+      <div class="bar">
+        <h2>Library</h2>
+        <div class="seg">
+          <button>Documents</button><button>Views</button><button class="on">Ingestion</button>
+          <button>Indexing</button><button>Health</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="qpill" id="A-pill" onclick="A.go()">
+          <span class="dot"></span><span id="A-pilltx">Nothing ingesting</span>
+          <span class="mini" id="A-mini"></span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="rail">
+          <div class="rh">FOLDERS <b>19</b></div>
+          <div class="rb" id="A-rail"></div>
+        </div>
+        <div class="work">
+          <div class="dz"><span>⬆</span><b>Drop files here</b><span style="color:var(--tx3)">or</span>
+            <button>Choose files</button>
+            <span class="fmt">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB → Root</span></div>
+
+          <div class="panel">
+            <div class="pnh">🔗 From a connected source
+              <span class="rt" id="A-rt">Rate Sheets 2026 · 26 files</span></div>
+            <div class="pnb">
+              <div class="two">
+                <div class="tree">
+                  <div class="tn">▸ 📁 My Drive</div>
+                  <div class="tn d1 on">▾ 📁 Rate Sheets 2026</div>
+                  <div class="tn d2">📁 Q3</div><div class="tn d2">📁 Archive</div>
+                  <div class="tn d1">▸ 📁 Operations</div>
+                  <div class="tn">▸ 🗄 Team Operations</div>
+                </div>
+                <div>
+                  <div class="scan" id="A-scan">This folder and 2 sub-folders.</div>
+                  <div class="bars" id="A-bar"></div>
+                  <div class="lg" id="A-lg"></div>
+                  <div class="rows" id="A-rows"></div>
+                </div>
+              </div>
+            </div>
+            <div class="foot">
+              <span class="zw" id="A-zw">0 documents · 0 chunks · 0 jobs · 0 folders</span>
+              <div class="acts">
+                <button class="btn" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+                <button class="btn pri" id="A-go" onclick="A.go()">Add 12 · read 4</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note good"><b>212px → 46px, and the dead corner does a job.</b> Title, the five tabs and the
+    queue pill share ONE row. The breadcrumb is deleted (the rail shows the folder), and the sub-tabs are gone
+    from this view because <em>Add files</em> IS the tab body.</div>
+  <div class="note good"><b>⭐ The pill is what makes the confirm honest.</b> Press <em>Add 12 · read 4</em>:
+    the panel bar re-colours to <b>queued</b>, and the same work appears in the header pill — which lives on
+    the shell, so it survives leaving the page. <b>Come back and it is still counting.</b></div>
+  <div class="note warn"><b>The one thing to judge:</b> the pill is small. Is a 52px bar in the corner enough
+    signal for "your 12 files are still being read", or does it need the room variant C gives it?</div>
+</section>
+
+<!-- ══ B · RAIL OWNS THE TABS ═══════════════════════════════════════ -->
+<section class="v" id="vB">
+  <div class="app">
+    <div class="side">
+      <div class="brand"><div class="logo"></div><b style="font-size:.84rem">Agentic RAG</b></div>
+      <div class="nav"><span class="ic">💬</span>Chat</div>
+      <div class="nav"><span class="ic">⚙</span>Workflows</div>
+      <div class="nav on"><span class="ic">📚</span>Library</div>
+      <div style="padding:2px 0 6px 22px;display:flex;flex-direction:column;gap:1px">
+        <div class="nav" style="padding:4px 9px;font-size:.78rem">Documents</div>
+        <div class="nav" style="padding:4px 9px;font-size:.78rem">Views</div>
+        <div class="nav on" style="padding:4px 9px;font-size:.78rem">Ingestion</div>
+        <div class="nav" style="padding:4px 9px;font-size:.78rem">Indexing</div>
+        <div class="nav" style="padding:4px 9px;font-size:.78rem">Health</div>
+      </div>
+      <div class="nav"><span class="ic">🔌</span>Connections</div>
+    </div>
+    <div class="main">
+      <div class="bar"><h2>Ingestion</h2>
+        <div class="seg"><button class="on">Add files</button><button>In progress</button>
+          <button>Needs attention</button><button>History</button></div>
+      </div>
+      <div class="body">
+        <div class="rail"><div class="rh">FOLDERS <b>19</b></div><div class="rb" id="B-rail"></div></div>
+        <div class="work">
+          <div class="dz"><span>⬆</span><b>Drop files here</b><span style="color:var(--tx3)">or</span>
+            <button>Choose files</button><span class="fmt">8 formats → Root</span></div>
+          <div class="panel">
+            <div class="pnh">🔗 From a connected source <span class="rt">Rate Sheets 2026 · 26 files</span></div>
+            <div class="pnb">
+              <div class="two">
+                <div class="tree">
+                  <div class="tn">▸ 📁 My Drive</div><div class="tn d1 on">▾ 📁 Rate Sheets 2026</div>
+                  <div class="tn d2">📁 Q3</div><div class="tn d2">📁 Archive</div>
+                  <div class="tn d1">▸ 📁 Operations</div><div class="tn">▸ 🗄 Team Operations</div>
+                </div>
+                <div>
+                  <div class="scan">This folder and 2 sub-folders.</div>
+                  <div class="bars" id="B-bar"></div>
+                  <div class="lg" id="B-lg"></div>
+                  <div class="rows" id="B-rows"></div>
+                </div>
+              </div>
+            </div>
+            <div class="foot"><span class="zw">0 documents · 0 chunks · 0 jobs · 0 folders</span>
+              <div class="acts"><button class="btn">Cancel</button>
+                <button class="btn pri" id="B-go" onclick="B.go()">Add 12 · read 4</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note good"><b>The most vertical space of the three</b> — one tab strip, not two, because the
+    five primary tabs moved into the rail they already belong to. The header is a single 40px row.</div>
+  <div class="note bad"><b>⛔ AND IT FAILS THE DECIDING CLAUSE.</b> There is nowhere on the shell for the
+    queue to live, so confirm animates and then the page forgets. Navigate to Chat and back:
+    <b>the surface can no longer tell you your files are still being read.</b> Press Add, then imagine
+    leaving. That is the whole argument against it.</div>
+  <div class="note warn"><b>It also changes the app's IA</b>, not just this page — every other page's tabs
+    would have to follow, or the Library becomes the one page that navigates differently.</div>
+</section>
+
+<!-- ══ C · THE QUEUE IS CHROME ══════════════════════════════════════ -->
+<section class="v" id="vC">
+  <div class="app">
+    <div class="side">
+      <div class="brand"><div class="logo"></div><b style="font-size:.84rem">Agentic RAG</b></div>
+      <div class="nav"><span class="ic">💬</span>Chat</div>
+      <div class="nav"><span class="ic">⚙</span>Workflows</div>
+      <div class="nav on"><span class="ic">📚</span>Library</div>
+      <div class="nav"><span class="ic">🔌</span>Connections</div>
+    </div>
+    <div class="main">
+      <div class="bar"><h2>Library</h2>
+        <div class="seg"><button>Documents</button><button>Views</button><button class="on">Ingestion</button>
+          <button>Indexing</button><button>Health</button></div>
+        <div class="spacer"></div>
+        <span style="font-size:.75rem;color:var(--tx3);font-family:var(--fm)">103 documents · 2,715 chunks</span>
+      </div>
+      <div class="cstrip" id="C-strip" style="display:none">
+        <span class="lab" id="C-lab">Reading 12 files</span>
+        <div class="bars" id="C-sbar"></div>
+        <span class="mut" id="C-mut">4 readable · 6 reading · 2 waiting</span>
+        <button onclick="show('C')">View</button>
+      </div>
+      <div class="body">
+        <div class="rail"><div class="rh">FOLDERS <b>19</b></div><div class="rb" id="C-rail"></div></div>
+        <div class="work">
+          <div class="dz"><span>⬆</span><b>Drop files here</b><span style="color:var(--tx3)">or</span>
+            <button>Choose files</button><span class="fmt">8 formats → Root</span></div>
+          <div class="panel">
+            <div class="pnh">🔗 From a connected source <span class="rt">Rate Sheets 2026 · 26 files</span></div>
+            <div class="pnb">
+              <div class="two">
+                <div class="tree">
+                  <div class="tn">▸ 📁 My Drive</div><div class="tn d1 on">▾ 📁 Rate Sheets 2026</div>
+                  <div class="tn d2">📁 Q3</div><div class="tn d2">📁 Archive</div>
+                  <div class="tn d1">▸ 📁 Operations</div><div class="tn">▸ 🗄 Team Operations</div>
+                </div>
+                <div>
+                  <div class="scan">This folder and 2 sub-folders.</div>
+                  <div class="bars" id="C-bar"></div>
+                  <div class="lg" id="C-lg"></div>
+                  <div class="rows" id="C-rows"></div>
+                </div>
+              </div>
+            </div>
+            <div class="foot"><span class="zw">0 documents · 0 chunks · 0 jobs · 0 folders</span>
+              <div class="acts"><button class="btn">Cancel</button>
+                <button class="btn pri" id="C-go" onclick="C.go()">Add 12 · read 4</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note good"><b>⭐ The handoff is VISIBLE.</b> Confirm and the preview bar migrates into a strip
+    that sits on the shell, above every tab. The object you were reading becomes the object you are watching —
+    230-A's promise kept, but against a queue instead of a synchronous loop.</div>
+  <div class="note good"><b>It answers the clause with room to spare.</b> The strip names the three live
+    states in words — <em>readable · reading · waiting</em> — where A's pill has only a 52px bar.</div>
+  <div class="note warn"><b>The cost is permanent chrome.</b> It is hidden at rest here; if it were always
+    visible it would spend the vertical space this sketch exists to reclaim. <b>Judge whether it earns the
+    row when it appears.</b></div>
+</section>
+
+</div>
+
+<div class="tip" id="tip"></div>
+<div class="tst" id="tst"></div>
+
+<script>
+/* ── the fixture. Cross-checked against 229/230 so the three sketches cannot
+      come to disagree about the same folder. ────────────────────────────── */
+var FILES = [
+ {n:"Rate Sheet — Midwest Q3.xlsx",b:"add",wy:"XLSX",dest:"/Pricing"},
+ {n:"Master Rate Sheet 2026.xlsx",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content: the bytes have not been compared."},
+ {n:"kickoff-call.mp4",b:"uns",wy:"video/mp4",full:"video/mp4 — we cannot read this kind of file. Nothing is imported."},
+ {n:"scan_2026-03-11.pdf",b:"unk",wy:"may have no text",full:"A PDF. It may be image-only — we cannot know whether there is readable text in it until we open it."},
+ {n:"Rate Sheet — Southeast Q3.xlsx",b:"add",wy:"XLSX",dest:"/Pricing"},
+ {n:"Carrier Terms — Northeast.docx",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content."},
+ {n:"Fuel Index March 2026.csv",b:"add",wy:"CSV",dest:"/Pricing"},
+ {n:"Q3 Pricing Review",b:"unk",wy:"native Google file",full:"A native Google document. Drive publishes no content identity for native files, so we cannot tell whether anything material changed without exporting it."},
+ {n:"rate-sheets-archive.zip",b:"uns",wy:"application/zip",full:"application/zip — archives are not unpacked. Nothing is imported."},
+ {n:"Broker Agreement — Redline.docx",b:"add",wy:"DOCX",dest:"/Contracts"},
+ {n:"LTL Fuel Surcharge Table.csv",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content."},
+ {n:"Lane Pricing Deck",b:"uns",wy:"presentation",full:"A native Google Slides file has no readable export. Nothing is imported."},
+ {n:"NOTES",b:"unk",wy:"no extension",full:"No extension and no declared type. The source will not say what this is."},
+ {n:"Insurance Certificate.pdf",b:"add",wy:"PDF",dest:"/Compliance"},
+ {n:"Q1 Pricing Memo.pdf",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content."},
+ {n:"terminal-layout.dwg",b:"uns",wy:"AutoCAD",full:"AutoCAD drawing — we cannot read this kind of file. Nothing is imported."},
+ {n:"2026 Tariff Notes.md",b:"add",wy:"MD",dest:"/Pricing"},
+ {n:"Warehouse Rates",b:"add",wy:"GSHEET",dest:"/Pricing"},
+ {n:"Accessorial Charges.xlsx",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content."},
+ {n:"Detention Policy.pdf",b:"add",wy:"PDF",dest:"/Compliance"},
+ {n:"→ Regional Rates",b:"unk",wy:"shortcut, target unread",full:"A shortcut. We can see the pointer, but not whether its target is reachable or readable."},
+ {n:"brand-assets.psd",b:"uns",wy:"Photoshop",full:"image/vnd.adobe.photoshop — we cannot read this kind of file. Nothing is imported."},
+ {n:"Onboarding Checklist",b:"add",wy:"GDOC",dest:"/Operations"},
+ {n:"Contract Template v4.docx",b:"here",wy:"same file, unchanged",full:"The same source file at the same version. Matched by source file, not by content."},
+ {n:"Q2 Volume Report.xlsx",b:"add",wy:"XLSX",dest:"/Reports"},
+ {n:"Insurance Renewal.docx",b:"add",wy:"DOCX",dest:"/Compliance"}
+];
+var LABEL={add:"Will be added",here:"Already here",uns:"Type not supported",unk:"Can’t tell without reading it"};
+var BK=["add","here","uns","unk"], TOTAL=FILES.length;
+
+/* ⭐ THE VOCABULARY THIS SKETCH ADDS. `outcome` still has exactly THREE terminal values —
+   added | here | refused — because SC#5 requires that. What the queue introduces is that
+   `added` is NOT REACHED INSTANTLY, so the surface needs words for the journey: */
+var LIVE={queued:"Waiting",reading:"Reading",readable:"Readable",refused:"Refused"};
+
+var FOLDERS=[["Root",44,1],["Cloud",19],["DBA",2],["DeepWiki (206…)",0],["Email testing",3],
+ ["Engineering",3],["Hybrid Search",2],["My puplication",1],["PM Demo Proje…",5],["Private",2],
+ ["Project Meridia…",3],["Pricing",8],["Compliance",4],["Contracts",6],["Reports",5],["Operations",7]];
+
+function toast(m){var t=document.getElementById("tst");t.textContent=m;t.style.opacity="1";
+  t.style.transform="translateX(-50%) translateY(0)";clearTimeout(t._h);
+  t._h=setTimeout(function(){t.style.opacity="0";t.style.transform="translateX(-50%) translateY(18px)"},2800)}
+
+function show(v){["A","B","C","X"].forEach(function(x){
+    var el=document.getElementById("v"+x); if(el) el.classList.toggle("on",x===v)});
+  document.querySelectorAll(".tab[data-v]").forEach(function(t){t.classList.toggle("on",t.getAttribute("data-v")===v)});
+  var R={A:A,B:B,C:C}[v]; if(R&&!R._p){R._p=true;R.draw()}}
+
+document.addEventListener("mouseover",function(e){
+  var r=e.target.closest("[data-full]"); var tip=document.getElementById("tip");
+  if(!r){tip.classList.remove("on");return}
+  tip.textContent=r.getAttribute("data-full"); tip.classList.add("on");
+  var b=r.getBoundingClientRect(); tip.style.left=Math.min(b.left,window.innerWidth-350)+"px";
+  tip.style.top=(b.bottom+7)+"px"});
+
+function rail(id){var h="";FOLDERS.forEach(function(f,i){
+  h+='<div class="fl'+(i===0?' on':'')+'">📁 '+f[0]+' <span class="n">'+f[1]+'</span></div>'});
+  var el=document.getElementById(id); if(el) el.innerHTML=h}
+
+function counts(){var c={};BK.forEach(function(b){c[b]=FILES.filter(function(f){return f.b===b}).length});return c}
+
+function drawBar(id,segs){
+  var el=document.getElementById(id); if(!el) return;
+  el.innerHTML=segs.map(function(s){
+    return '<div class="sg '+s[0]+'" style="width:'+(s[1]/TOTAL*100)+'%">'+(s[1]>1?s[1]:"")+'</div>'}).join("")}
+
+function drawLegend(id,items){
+  var el=document.getElementById(id); if(!el) return;
+  el.innerHTML=items.map(function(i){
+    return '<div class="lgi '+i[0]+'"><div class="n">'+i[1]+'</div><div class="l">'+i[2]+'</div>'+
+      (i[3]?'<div class="q">'+i[3]+'</div>':'')+'</div>'}).join("")}
+
+function drawRows(id,list){
+  var el=document.getElementById(id); if(!el) return;
+  el.innerHTML=list.map(function(f){
+    return '<div class="row"'+(f.full?' data-full="'+f.full.replace(/"/g,"&quot;")+'"':'')+'>'+
+      '<span class="nm">'+f.n+'</span>'+
+      (f.dest?'<span class="fr">'+f.dest+'</span>':'')+
+      '<span class="fr">'+(f.wy||"")+'</span>'+
+      (f.live?'<span class="st2 '+f.lv+'">'+f.live+'</span>':'')+'</div>'}).join("")}
+
+/* ── the resting preview, shared by all three ─────────────────────── */
+function restSegs(){var c=counts();return [["add",c.add],["here",c.here],["uns",c.uns],["unk",c.unk]]}
+function restLegend(){var c=counts();return [
+  ["add",c.add,LABEL.add],["here",c.here,LABEL.here,"by source file, not content"],
+  ["uns",c.uns,LABEL.uns],["unk",c.unk,LABEL.unk]]}
+
+/* ── A ─────────────────────────────────────────────────────────────── */
+var A={_p:false,live:false,
+  draw:function(){rail("A-rail");drawBar("A-bar",restSegs());drawLegend("A-lg",restLegend());
+    drawRows("A-rows",FILES.filter(function(f){return f.b==="unk"}))},
+  go:function(){
+    if(this.live) return; this.live=true;
+    document.getElementById("A-go").disabled=true;
+    document.getElementById("A-zw").textContent="16 documents queued · 0 chunks yet";
+    var pill=document.getElementById("A-pill"); pill.classList.add("live");
+    var q=16,done=0;
+    var step=function(){
+      done++;
+      document.getElementById("A-pilltx").textContent=done<q?("Reading "+(q-done)+" of "+q):"All "+q+" readable";
+      document.getElementById("A-mini").innerHTML=
+        '<i class="done" style="width:'+(done/q*100)+'%"></i>'+
+        '<i class="work" style="width:'+(Math.min(5,q-done)/q*100)+'%"></i>'+
+        '<i class="wait" style="width:'+(Math.max(0,q-done-5)/q*100)+'%"></i>';
+      drawBar("A-bar",[["add",done],["qd",q-done],["here",counts().here],["uns",counts().uns]]);
+      drawLegend("A-lg",[["rdy",done,"Readable","in the Library, searchable"],
+        ["here",q-done,"Still reading","queued — 5 at a time"],
+        ["here",counts().here,LABEL.here,"by source file, not content"],
+        ["uns",counts().uns+2,"Refused","reason on each row"]]);
+      if(done<q) setTimeout(step,420); else pill.classList.remove("live");
+    };
+    setTimeout(step,500);
+    toast("16 files queued. They become searchable as they are read — you can leave this page.");
+  }};
+
+/* ── B — same confirm, NO home for it ─────────────────────────────── */
+var B={_p:false,
+  draw:function(){rail("B-rail");drawBar("B-bar",restSegs());drawLegend("B-lg",restLegend());
+    drawRows("B-rows",FILES.filter(function(f){return f.b==="unk"}))},
+  go:function(){
+    document.getElementById("B-go").disabled=true;
+    var q=16,done=0;
+    var step=function(){done++;
+      drawBar("B-bar",[["add",done],["qd",q-done],["here",counts().here],["uns",counts().uns]]);
+      drawLegend("B-lg",[["rdy",done,"Readable"],["here",q-done,"Still reading"],
+        ["here",counts().here,LABEL.here,"by source file, not content"],["uns",counts().uns+2,"Refused"]]);
+      if(done<q) setTimeout(step,420);};
+    setTimeout(step,500);
+    toast("Queued — but nothing outside this panel knows. Leave the page and the signal is gone.");
+  }};
+
+/* ── C — the handoff is visible ───────────────────────────────────── */
+var C={_p:false,
+  draw:function(){rail("C-rail");drawBar("C-bar",restSegs());drawLegend("C-lg",restLegend());
+    drawRows("C-rows",FILES.filter(function(f){return f.b==="unk"}))},
+  go:function(){
+    document.getElementById("C-go").disabled=true;
+    var strip=document.getElementById("C-strip"); strip.style.display="flex";
+    var q=16,done=0;
+    var step=function(){done++;
+      var reading=Math.min(5,q-done), waiting=Math.max(0,q-done-reading);
+      document.getElementById("C-lab").textContent=done<q?("Reading "+q+" files"):"All "+q+" readable";
+      document.getElementById("C-mut").textContent=done+" readable · "+reading+" reading · "+waiting+" waiting";
+      drawBar("C-sbar",[["add",done],["qd",reading],["uns",waiting]]);
+      drawBar("C-bar",[["add",done],["qd",q-done],["here",counts().here],["uns",counts().uns]]);
+      drawLegend("C-lg",[["rdy",done,"Readable","in the Library, searchable"],
+        ["here",q-done,"Still reading","queued — 5 at a time"],
+        ["here",counts().here,LABEL.here,"by source file, not content"],
+        ["uns",counts().uns+2,"Refused","reason on each row"]]);
+      if(done<q) setTimeout(step,420);};
+    setTimeout(step,500);
+    toast("The bar moved to the shell. It keeps counting wherever you go.");
+  }};
+
+rail("A-rail"); A.draw(); A._p=true;
+</script>
+</body>
+</html>

@@ -2665,3 +2665,72 @@ identical reasoning the 2026-08-28 comment used, and the reason the count is fou
   phase's blast radius, and a fifth number appearing by accident is exactly what this entry exists to stop.
 
 ⭐ **Both G-2 sketches are now LOCKED: 229 → C, 230 → A.** Phase 233 has its acceptance bar.
+
+---
+
+## 231 · The space budget and the honest confirm — `awaiting-operator`
+
+**Phase 233.1 · G-2 · variants 3 (+ a measured "today") · 59 assertions**
+
+Raised by the operator while **driving the shipped preview**, which is the only reason either
+question exists. Two of them, on one surface.
+
+### ⚠ CORRECTION TO THE 229/230 ENTRY ABOVE — THE 1152 MEASURE WAS REVERTED
+
+The entry above records *"⭐ DECISION: `max-w-6xl` = 1152px is THE measure"* and says applying it to
+`LibraryPage` is a one-line change. **Phase 233 shipped exactly that, and the operator reverted it
+the same day** — *"why is it not full-width like other pages"*. The original entry is kept unedited
+rather than rewritten, because **the reasoning failed in an instructive way: it derived a
+whole-app rule from TWO pages and never checked the rest.**
+
+Re-measured across every page:
+
+| Page | Width | Shape |
+|---|---|---|
+| Settings · Connections | `max-w-6xl` (1152) | **forms** |
+| Workflows | `max-w-[1200px]` | cards |
+| Skills · Chat | **none — full width** | **data** |
+| Library | **none — full width** | **data** |
+
+⭐ **The convention is not one number. It is: form-shaped pages are constrained, data-dense pages
+are full width.** `231/drive.cjs` asserts that this sketch declares **no width token at all**, so
+the reverted decision cannot creep back in through a mockup.
+
+### ⭐ The deciding clause — and it did not exist when 230 was drawn
+
+> **After you confirm and navigate away, what does the surface say when you come back?**
+
+**230-A won on a dissolve that assumed confirm did the work synchronously. It no longer does.**
+`BUG-260905-04` routed connector imports onto the durable queue (5 concurrent), so `added` changed
+meaning from *"in the Library and searchable"* to *"accepted into a queue"* — and the shipped
+reconciliation line still says `preview said 12 → 12 added` while those twelve are `pending`. **An
+honesty defect introduced by a correct fix**, which is why the sketch had to re-answer the question
+rather than repaint the drawing.
+
+⚠ **The three terminal outcomes are UNCHANGED** — `added` · `here` · `refused`, because SC#5 depends
+on there being no fourth destination. What the queue adds is a **journey**: *Waiting → Reading →
+**Readable***. ⭐ *Readable*, not *added* — **added is what the system did; readable is what the
+person gets.**
+
+### The space arithmetic
+
+**~212px before one functional pixel, and 48% of that band empty.** Title + sub-line (62) ·
+breadcrumb (38) · primary tabs (56) · **second** tab strip (56). Three findings from
+`LibraryPage.tsx:656-690`: the breadcrumb is **pure duplication** (the sidebar says *Library*, the
+tab says *Documents*); the parent and child tab strips **stack**; and the hero dropzone claims a
+full band for one action while the folder rail scrolls in a cramped column.
+
+### The variants
+
+| | Variant | Deciding clause |
+|---|---|---|
+| **A** | one bar, one strip — title + tabs + a live **queue pill** in 46px | ✅ passes — the pill is on the shell |
+| **B** | the rail owns the tabs — most space reclaimed | ⛔ **fails** — no home for the queue |
+| **C** | the queue is chrome — the bar migrates into a shell strip | ✅ passes, with room to spare |
+
+**Recommendation: A's header with C's strip** — they compose. A decides where the page spends its
+pixels; C decides what happens when work outlives the panel. A's pill is the resting state, C's
+strip is what it expands into while a run is live: **one object at two sizes, not two designs.**
+⚠ B's space win is real and should be harvested separately — it just cannot be the only change.
+
+**Five defects planted, five fired**; `index.html` restored md5-identical.
