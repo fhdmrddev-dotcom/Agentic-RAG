@@ -1700,12 +1700,19 @@ async def import_connection_file(
 
     # Phase 229 (TRUST-01, SC#1, SC#2): mint document row via async_mint_document_row
     # Resolves PGRST204 storage_path column error and guarantees identical dedupe and versioning.
+    # Phase 231 (VIS-01 / TRUST-04): the connection that PLACED this row, and the scope its
+    # owner chose. Read from the connection itself — never from the request — so a caller cannot
+    # widen a document past what the connection was set to. `org_id` is likewise passed from the
+    # resolved active org, closing the BUG-260905-01 half where imports landed with no org.
     mint_result = await async_mint_document_row(
         raw=raw_bytes,
         filename=filename,
         mime_type=mime_type,
         user_id=user["id"],
         supabase=supabase,
+        org_id=str(active_org),
+        source_connection_id=str(connection_id),
+        ingest_visibility=getattr(conn, "default_ingest_visibility", "private") or "private",
     )
     doc = mint_result.document
 

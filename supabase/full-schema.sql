@@ -859,8 +859,10 @@ CREATE TABLE public.connector_connections (
     status text DEFAULT 'active'::text NOT NULL,
     error_message text,
     oauth_client_secret_ciphertext text,
+    default_ingest_visibility text DEFAULT 'private'::text NOT NULL,
     CONSTRAINT connector_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['static_key'::text, 'oauth_byo'::text, 'mcp'::text]))),
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_default_ingest_visibility_check CHECK ((default_ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
     CONSTRAINT connector_connections_default_posture_check CHECK ((default_approval_posture = ANY (ARRAY['allow'::text, 'ask'::text, 'deny'::text]))),
     CONSTRAINT connector_connections_has_a_service_identity CHECK (((service_id IS NOT NULL) AND (length(btrim(service_id)) > 0))),
     CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
@@ -945,6 +947,13 @@ COMMENT ON COLUMN public.connector_connections.status IS 'Phase 215 (D-215-05): 
 --
 
 COMMENT ON COLUMN public.connector_connections.oauth_client_secret_ciphertext IS 'Phase 215 follow-up (2026-08-31): the customer-registered OAuth application secret, encrypted (enc:v1: AES-256-GCM) exactly as secret_ciphertext is. NEVER granted SELECT to authenticated or anon — it is deliberately absent from the GRANT below and from _SELECTABLE_COLUMNS. It previously lived in config.custom_client_secret as PLAINTEXT, in a column every org member can read.';
+
+
+--
+-- Name: COLUMN connector_connections.default_ingest_visibility; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.default_ingest_visibility IS 'Phase 231 (VIS-02): who the connection owner said may read what this connection brings in. Stamped onto documents.ingest_visibility at ingest; changing it does NOT re-scope documents already brought in. Defaults to private — the narrow end — so a connection created by any path that forgets to ask is closed, not open.';
 
 
 --

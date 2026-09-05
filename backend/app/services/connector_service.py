@@ -260,6 +260,8 @@ class ResolvedConnection:
     #: mints another colon-bearing token and fails identically.
     auth_scheme: str = "auto"
     default_approval_posture: str = "ask"
+    #: Phase 231 (VIS-02) — who may read what this connection brings in. Narrow by default.
+    default_ingest_visibility: str = "private"
     tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
 
@@ -432,6 +434,10 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["config"] = {}
     if d.get("default_approval_posture") is None:
         d["default_approval_posture"] = "ask"
+    # ⚠ Fail CLOSED on a missing value: a row written before migration 155, or by any path that
+    #   did not set it, reads as private. The open end must never be reachable by omission.
+    if d.get("default_ingest_visibility") is None:
+        d["default_ingest_visibility"] = "private"
     cfg = d.get("config")
     if isinstance(cfg, dict):
         if not d.get("account_email") and cfg.get("account_email"):
@@ -740,6 +746,7 @@ async def resolve_connection(
             secret_ciphertext=None,
             mcp_server_url=row.get("mcp_server_url"),
             default_approval_posture=str(row.get("default_approval_posture") or "ask"),
+            default_ingest_visibility=str(row.get("default_ingest_visibility") or "private"),
             tool_grants=dict(row.get("tool_grants") or {}),
             discovered_tools=list(row.get("discovered_tools") or []),
         )
@@ -848,6 +855,7 @@ async def resolve_connection(
         mcp_server_url=row.get("mcp_server_url"),
         auth_scheme=resolved_scheme,
         default_approval_posture=str(row.get("default_approval_posture") or "ask"),
+        default_ingest_visibility=str(row.get("default_ingest_visibility") or "private"),
         tool_grants=dict(row.get("tool_grants") or {}),
         discovered_tools=list(row.get("discovered_tools") or []),
     )
@@ -929,6 +937,7 @@ async def create_connection(
         "last_check_verdict": "not_checked",
         "mcp_server_url": payload.mcp_server_url,
         "default_approval_posture": getattr(payload, "default_approval_posture", "ask") or "ask",
+        "default_ingest_visibility": getattr(payload, "default_ingest_visibility", "private") or "private",
         "tool_grants": _sanitize_tool_grants(payload.tool_grants) if payload.tool_grants else {},
         # ⚠ `tool_grants` above is UNTOUCHED by the descriptor. A descriptor ADVERTISES an
         # action; it does not GRANT one. The executor's gate reads `tool_grants` alone and a
@@ -1070,6 +1079,9 @@ async def update_connection(
 
     if "default_approval_posture" in submitted and payload.default_approval_posture is not None:
         changes["default_approval_posture"] = payload.default_approval_posture
+
+    if "default_ingest_visibility" in submitted and payload.default_ingest_visibility is not None:
+        changes["default_ingest_visibility"] = payload.default_ingest_visibility
 
     if "tool_grants" in submitted and payload.tool_grants is not None:
         changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)

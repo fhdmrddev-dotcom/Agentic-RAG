@@ -45,6 +45,8 @@ def mint_document_row(
     metadata: dict | None = None,
     org_id: str | None = None,
     on_conflict: Literal["raise", "link"] = "raise",
+    source_connection_id: str | None = None,
+    ingest_visibility: str | None = None,
 ) -> MintResult:
     """Synchronously validates, dedupes, versions, and mints a single document row.
 
@@ -145,6 +147,18 @@ def mint_document_row(
     if org_id:
         doc_data["org_id"] = org_id
 
+    # Phase 231 (VIS-01 / TRUST-04) — provenance and the scope the connection's owner chose.
+    # ⚠ BOTH keys are omitted entirely for a person's upload, so /upload's minted dict stays
+    #   field-for-field what Phase 229's verification pinned. The column default ('private')
+    #   covers the omitted case, and the SQL predicate ignores visibility outright when
+    #   source_connection_id IS NULL — so a hand-uploaded row is untouched by this phase.
+    # ⚠ Visibility is only meaningful WITH a connection. Accepting one without the other would
+    #   mint a row claiming a scope nothing enforces, so the pair is written together or not
+    #   at all.
+    if source_connection_id:
+        doc_data["source_connection_id"] = source_connection_id
+        doc_data["ingest_visibility"] = ingest_visibility or "private"
+
     try:
         result = supabase.table("documents").insert(doc_data).execute()
         doc = result.data[0]
@@ -198,6 +212,8 @@ async def async_mint_document_row(
     metadata: dict | None = None,
     org_id: str | None = None,
     on_conflict: Literal["raise", "link"] = "raise",
+    source_connection_id: str | None = None,
+    ingest_visibility: str | None = None,
 ) -> MintResult:
     """Asynchronous wrapper for mint_document_row using run_in_threadpool."""
     return await run_in_threadpool(
@@ -211,6 +227,8 @@ async def async_mint_document_row(
             metadata=metadata,
             org_id=org_id,
             on_conflict=on_conflict,
+            source_connection_id=source_connection_id,
+            ingest_visibility=ingest_visibility,
         )
     )
 

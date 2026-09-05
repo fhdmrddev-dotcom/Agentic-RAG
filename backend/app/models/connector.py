@@ -292,6 +292,13 @@ def _reject_config_capability_mismatch(capability: str | None, config: object) -
 
 ToolGrantPosture = Literal["allow", "ask", "deny"]
 
+# Phase 231 (VIS-01 / VIS-02 / D-5) — who may read what a connection brings in.
+# Enum-shaped and NEVER a boolean: 069-A's extensible-audience contract, applied inbound. A
+# boolean here is what turns adding a third scope into a re-ingest instead of a migration.
+# ⚠ "dept" is INERT by operator decision D-5 — the value exists and the SQL resolver carries a
+#   branch for it, but NO UI offers it. A scope nobody can grant must not be offered.
+IngestVisibility = Literal["private", "org", "dept"]
+
 
 # ── the CRUD trio ────────────────────────────────────────────────────────────────────────
 class ConnectorConnectionCreate(_StrictBase):
@@ -308,6 +315,10 @@ class ConnectorConnectionCreate(_StrictBase):
     error_message: str | None = None
     capability: ConnectorCapability | None = None
     service_id: ServiceId
+    # Defaults to the NARROW end. A creation path that forgets to ask produces a closed
+    # connection, never an open one (VIS-02's "no configuration path" clause, defended in the
+    # model rather than trusted to every caller).
+    default_ingest_visibility: IngestVisibility = "private"
     name: NonEmpty
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
@@ -349,6 +360,7 @@ class ConnectorConnectionUpdate(_StrictBase):
     is_enabled: bool | None = None
     mcp_server_url: str | None = None
     default_approval_posture: ToolGrantPosture | None = None
+    default_ingest_visibility: IngestVisibility | None = None
     tool_grants: dict[str, ToolGrantPosture] | None = None
     discovered_tools: list[dict[str, Any]] | None = None
     auth_type: AuthType | None = None
@@ -413,6 +425,8 @@ class ConnectorConnectionResponse(_StrictBase):
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
     default_approval_posture: ToolGrantPosture = "ask"
+    #: Phase 231 (VIS-02) — the UI cannot render the sentence for a value it cannot read.
+    default_ingest_visibility: IngestVisibility = "private"
     tool_grants: dict[str, ToolGrantPosture] = Field(default_factory=dict)
     discovered_tools: list[dict[str, Any]] = Field(default_factory=list)
     is_enabled: bool = True
