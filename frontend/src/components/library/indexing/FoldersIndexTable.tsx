@@ -62,8 +62,8 @@ export function FoldersIndexTable({
   }
 
   return (
-    <div className="rounded-xl bg-card/50 ghost-border">
-      <h3 className="px-4 pt-3 text-sm font-semibold leading-tight">Folders</h3>
+    <div className="rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm shadow-sm overflow-hidden">
+      <h3 className="px-4 pt-3.5 pb-1 text-sm font-semibold leading-tight text-foreground">Folders</h3>
       {loading ? (
         <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
@@ -83,7 +83,7 @@ export function FoldersIndexTable({
         <div className="mt-1 overflow-x-auto">
           <table className="w-full text-sm" data-testid="folders-index-table">
             <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <tr className="border-b border-border/50 bg-muted/40 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 <th className="px-4 py-3">Folder</th>
                 <th className="px-4 py-3">Documents</th>
                 <th className="px-4 py-3">Chunks</th>
@@ -99,7 +99,7 @@ export function FoldersIndexTable({
                 const msg = feedback[key]
                 const isBusy = busyId === key
                 return (
-                  <tr key={key} className="border-b border-border/50" data-folder-id={key}>
+                  <tr key={key} className="border-b border-border/30 hover:bg-muted/30 transition-colors duration-150" data-folder-id={key}>
                     <td className="px-4 py-3 font-medium">{folder.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {hasChunks ? folder.documents : "–"}
@@ -111,14 +111,14 @@ export function FoldersIndexTable({
                       {hasChunks ? (
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
-                            <span>{folder.vectors}</span>
-                            <span className="text-[10px] text-muted-foreground/70">
+                            <span className="font-mono text-xs">{folder.vectors}</span>
+                            <span className="text-[10px] text-muted-foreground/70 font-mono">
                               {Math.round(((folder.vectors ?? 0) / (folder.chunks || 1)) * 100)}%
                             </span>
                           </div>
-                          <div className="w-20 h-1 rounded-full bg-muted/50 overflow-hidden">
+                          <div className="w-20 h-1.5 rounded-full bg-muted/40 overflow-hidden">
                             <div
-                              className="h-full bg-primary transition-all duration-300 rounded-full"
+                              className="h-full bg-gradient-to-r from-primary/60 to-primary transition-all duration-500 ease-out rounded-full"
                               style={{
                                 width: `${Math.min(100, Math.round(((folder.vectors ?? 0) / (folder.chunks || 1)) * 100))}%`,
                               }}
@@ -129,7 +129,7 @@ export function FoldersIndexTable({
                         "–"
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
                       {folder.last_indexed
                         ? new Date(folder.last_indexed).toLocaleString()
                         : "never"}
@@ -143,7 +143,7 @@ export function FoldersIndexTable({
                           data-testid={`reindex-${key}`}
                           onClick={() => handleReindex(folder)}
                           disabled={isBusy}
-                          className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-60"
+                          className="rounded-lg border border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-200 active:scale-95 disabled:opacity-60 shadow-sm"
                         >
                           {isBusy ? "Re-indexing..." : "Re-index selected"}
                         </button>

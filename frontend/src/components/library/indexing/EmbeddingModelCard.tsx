@@ -13,17 +13,18 @@ import { useState } from "react"
 import type { IndexSummary } from "@/lib/api"
 import { kickReembed } from "@/lib/api"
 import type { ActiveView } from "@/App"
+import { Cpu } from "lucide-react"
 
 const UNKNOWN = "Not known yet"
 
 function Fact({ label, value, loading }: { label: string; value?: string; loading?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+    <div className="flex items-baseline justify-between gap-4 py-2 px-1 rounded-md hover:bg-muted/30 transition-colors duration-150">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       {loading ? (
         <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
       ) : (
-        <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
+        <span className="min-w-0 truncate font-mono text-sm font-medium text-foreground" title={value}>
           {value ?? UNKNOWN}
         </span>
       )}
@@ -53,9 +54,17 @@ export function EmbeddingModelCard({
   const provider = summary?.provider
 
   return (
-    <div className="rounded-xl bg-card/50 ghost-border px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold leading-tight">Embedding model</h3>
+    <div className="group relative rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
+      {/* Subtle top accent gradient */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+            <Cpu className="h-3.5 w-3.5" />
+          </div>
+          <h3 className="text-sm font-semibold leading-tight text-foreground">Embedding model</h3>
+        </div>
         {canManage && (
           <div className="flex items-center gap-2">
             <button
@@ -71,7 +80,7 @@ export function EmbeddingModelCard({
                     ?.scrollIntoView({ behavior: "smooth", block: "center" })
                 }, 100)
               }}
-              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors"
+              className="rounded-lg border border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-200 active:scale-95 shadow-sm"
             >
               Change model
             </button>
@@ -90,14 +99,14 @@ export function EmbeddingModelCard({
                   setTimeout(() => setReindexing(false), 2000)
                 }
               }}
-              className="rounded-lg border border-border bg-card/50 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent/40 transition-colors disabled:opacity-60"
+              className="rounded-lg border border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-200 disabled:opacity-60 active:scale-95 shadow-sm"
             >
               {reindexing ? "Starting..." : "Re-index everything"}
             </button>
           </div>
         )}
       </div>
-      <div className="mt-1">
+      <div className="mt-1 divide-y divide-border/20">
         <Fact label="Model" value={model} loading={loading} />
         <Fact label="Dimensions" value={dimensions == null ? undefined : String(dimensions)} loading={loading} />
         <Fact label="Provider" value={provider} loading={loading} />
