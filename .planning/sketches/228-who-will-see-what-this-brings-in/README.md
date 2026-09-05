@@ -4,14 +4,20 @@ title: Who will see what this brings in
 phase: 231
 requirement: VIS-02
 guardrail: G-2
-status: awaiting-operator-pick
+status: locked
 variants: 3
-winner: null
+winner: "B + A (B writes the copy, A guarantees coverage); C DEFERRED to Phase 233"
 date: 2026-09-05
 author: claude
 ---
 
 # 228 · Who will see what this brings in
+
+> ✅ **LOCKED 2026-09-05 (operator): B + A.** B's audience rows are the control and write the copy;
+> A's always-on footer is the coverage rule binding every path B does not reach — including the
+> edit-later screens. **C is DEFERRED to Phase 233**, whose preview shares the surface and can name a
+> real file count. Build both halves or the SC#1 clause is met by audit rather than by construction,
+> which is the failure mode it was worded to prevent.
 
 **G-2 sketch for Phase 231 / `VIS-02`.** A connection is about to place documents into the knowledge
 base that **nobody chose to upload**. The sentence naming who can then read them **is the

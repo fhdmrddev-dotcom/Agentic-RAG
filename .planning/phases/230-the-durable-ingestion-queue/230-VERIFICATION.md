@@ -1,17 +1,17 @@
 ---
 phase: 230
 slug: the-durable-ingestion-queue
-verdict: revise  # SC#1 FAILS when driven
+verdict: pass  # SC#1 RE-DRIVEN and PASSES at 43bf7ac70+fixes
 verifier: claude
 verifier_role: reviewer
 method: driven — every figure below re-measured, none read from a claim
 date: 2026-09-05
 base_commit: e243a0142
 head_commit: 43bf7ac70
-blocking_findings: 2  # NEW, found by driving SC#1
+blocking_findings: 0  # both closed and re-driven
 corrections_owed: 0  # both closed at 43bf7ac70
 independent_verifier_absent_for: []
-sc1_driven: true  # DRIVEN 2026-09-05 — FAILED
+sc1_driven: true  # RE-DRIVEN 2026-09-05 — PASSES
 ---
 
 # Phase 230 — Reviewer Verification
@@ -473,3 +473,92 @@ structural half of SC#1 (G-1) was genuinely closed; the behavioural half was nev
 
 **Re-drive after the fix** — the recipe is in *What was done* above, and the same clean-slate condition
 can be recreated by deleting the test rows.
+
+
+---
+
+# SC#1 RE-DRIVEN after the defect fixes — ✅ **IT PASSES**
+
+Same recipe as the failing drive: clean slate (**77 completed docs, 0 jobs**), throwaway user, 20 × 290 KB
+files, **whole uvicorn tree hard-killed with a job in `status='processing'`**, restart, poll to drain.
+
+## The moment that decides it
+
+```
+[t+290s] {'completed': 13, 'processing': 1}
+        processing 666eb08d tables_embedded  by worker-d6a747c3 age=343s   <- dead worker, past the 300s lease
+[t+300s] {'completed': 13, 'processing': 1}
+        processing 666eb08d chunks_embedded  by worker-aa1ca16a age=9s     <- RECLAIMED by a NEW worker
+[t+310s] {'completed': 14}
+
+QUEUE DRAINED at t+310s
+jobs: {'completed': 14}   ·   stuck in processing: 0   ·   retry_count>0: 1
+```
+
+⭐ **Read the stage column across the reclaim: `tables_embedded` → `chunks_embedded`.** The job did not
+restart from zero — **it resumed from its checkpoint**, which is the behaviour that was impossible before,
+because reading the checkpoint is exactly what used to raise `AttributeError`.
+
+⭐ **Zero failed.** In the failing drive the two in-flight jobs went `failed` and their documents were
+stranded at `processing` forever. This time the in-flight job **completed**.
+
+## Defect A — fixed, and proven at the strongest available level
+
+```
+=== the reclaimed job's progress ===
+  job 666eb08d retry=1 jsonb_typeof=object
+    progress = {"chunk_offset": 450}
+
+=== ALL job progress types ===
+  object: 14
+```
+
+**`jsonb_typeof` is `object` on all 14 jobs** — previously it was a string-scalar array on every row.
+And the reclaimed job carries a real `{"chunk_offset": 450}`, so **SC#4 checkpointed resumption is
+functional for the first time**, not merely untested.
+
+⭐ **Gemini's fix is better than the one the review asked for.** I recommended `$n::text::jsonb`; the
+shipped fix is that **plus a self-healing `CASE`** that coerces an already-corrupt non-object `progress`
+back to `{}` before merging. So **existing corrupt rows heal on their next write** rather than only new
+rows being correct — the review named the leak, the builder also drained the pool.
+
+## ⚠ Defect B is present in code but was NOT EXERCISED by this drive
+
+`ingestion_jobs.py` now updates `documents` at two sites (lease exhaustion `:175`, permanent failure
+`:341`), where it previously referenced `documents` zero times. **But zero jobs failed in this run**, so
+the failure→document-status path never executed.
+
+**Recorded as unexercised, never as verified.** The fix is structurally present and correct on reading;
+it has not been observed running. A drive that forces a permanent failure would close this.
+
+## ⚠ NEW, MINOR — a document can be minted with no job, and is then orphaned
+
+```
+sc2_02.txt   doc=pending   step=None   *** NO JOB ROW ***
+```
+
+The kill landed **between** minting the `documents` row and enqueueing its `ingestion_jobs` row, so the
+document exists with nothing that will ever process it. **Mint-then-enqueue is not atomic.**
+
+✅ **This does NOT block SC#1**, and the reason is measured rather than argued: the client received
+`ConnectionResetError` for `sc2_02` — **it was never accepted**. Of the **14 uploads that returned 201,
+all 14 completed.** SC#1's *"completes all files"* is satisfied for every file the user was told was taken.
+
+⚠ **But it is a real Library-hygiene defect**: a document sits at `pending` forever, visible, with nothing
+to advance it. It is the inbound twin of Defect B — *"a row whose worker never comes"* rather than *"a row
+whose worker gave up"*. **Filed rather than fixed**; the natural home is the same transaction boundary
+Defect B's fix already established.
+
+## Verdict
+
+| Criterion | Result |
+|---|---|
+| **SC#1** — batch survives restart, all files complete, zero stuck in `processing` | ✅ **PASS, driven** |
+| **SC#4** — checkpointed resumption | ✅ **PASS** — resumed at `chunk_offset: 450`, stage `tables_embedded` → `chunks_embedded` |
+| Defect A — jsonb string-scalar | ✅ **fixed, proven** (`jsonb_typeof = object` × 14) |
+| Defect B — failed job leaves document `processing` | ⚠ **fixed in code, NOT exercised** — no job failed this run |
+| Orphaned document (no job row) | ⚠ **new, minor** — does not block SC#1; filed |
+
+**Phase 230's blocking findings are all closed.** What remains against this phase is the unexercised
+Defect B path and one minor new hygiene defect — plus the two pre-existing gate problems routed away from
+this phase (BUS-114 inherited fence, BUS-117 backend baseline flake).
