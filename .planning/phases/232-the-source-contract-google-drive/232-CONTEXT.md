@@ -50,7 +50,7 @@ A person browses a connected Google Drive from inside the product and picks a fo
    - Test/dev environment gating for mock source visibility (via `VITE_ENABLE_MOCK_SOURCES` / dev mode).
 
 7. **Database Schema & Migrations**:
-   - **ZERO migrations**: Per SEED-146 and operator ratification, no schema change on `connector_connections`. Inbound folder selections and source configs are stored in `connector_connections.config` JSONB.
+   - **ZERO migrations**: Per SEED-146 and operator ratification (2026-09-05 discuss-phase), no schema change on `connector_connections`. Inbound folder selection is handled via component callback contract; watched folders are managed in Phase 234's `connector_watches` table.
 
 </domain>
 
@@ -64,19 +64,11 @@ A person browses a connected Google Drive from inside the product and picks a fo
 - Children load lazily via `browse(connection, folder_id, page_token)`.
 - Clicking a folder selects it as the target sync/work folder, emitting `{ folder_id, folder_name, drive_id, drive_name }`.
 
-### 2. Zero Migrations & Connection Persistence (D-232-02)
-- Reaffirmed: Migration count remains zero (`none expected`).
-- Existing rows with `service_id='google'`, `capability=NULL`, and `mcp_server_url=NULL` are valid under migration 127's `connector_connections_shape_is_not_ambiguous` constraint.
-- Folder selection is persisted in `connector_connections.config` as:
-  ```json
-  {
-    "source_folder_id": "...",
-    "source_folder_name": "...",
-    "source_drive_id": null,
-    "source_drive_name": null
-  }
-  ```
-- Any future inbound capability typing is purely in TypeScript/Python union models without DB schema mutation.
+### 2. Zero Migrations & Multi-Folder State Boundary (D-232-02)
+- **Zero Migrations (Ratified by Operator 2026-09-05)**: Reaffirmed: Migration count remains zero (`none expected`). Existing rows with `service_id='google'`, `capability=NULL`, and `mcp_server_url=NULL` are valid under migration 127's `connector_connections_shape_is_not_ambiguous` constraint.
+- **Connection != Folder (No Foreclosure of Multi-Folder Watching)**: A connection represents the authenticated *source account* (e.g. Google Workspace OAuth account), NOT a single folder. A single Google connection can have multiple watched folders in Phase 234 (`connector_watches`, migration 157).
+- **Single Source of Truth**: Phase 232 does NOT bind a singular authoritative folder into `connector_connections.config`. Storing a single folder ID on the connection would create a duplicate source of truth when `connector_watches` lands in Phase 234.
+- **Picker Callback Contract**: `SourceFolderPicker` is a pure selector component. When a folder is picked, it emits `{ folderId, folderName, driveId, driveName }` to its caller via `onSelectFolder`. In Phase 233 this feeds the preview diff; in Phase 234 it creates `connector_watches` rows. Any connection config usage in Phase 232 is strictly transient/client-side preference (e.g. `last_browsed_folder_id`), never an authoritative singular watch claim.
 
 ### 3. Mock/Fake Source Family Registration & Gating (D-232-03)
 - `MockSourceAdapter` is registered in `SourceRegistry` under `service_id="mock_source"`.

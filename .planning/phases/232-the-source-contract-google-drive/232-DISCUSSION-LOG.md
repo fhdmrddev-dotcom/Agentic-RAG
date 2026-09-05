@@ -24,8 +24,12 @@
 - **Options Considered:**
   1. *(Recommended)* Zero migrations: Use existing `connector_connections` with `service_id='google'` and store source folder configuration in the existing `config` JSONB (respecting SEED-146).
   2. Raise migration 157 to explicitly add an inbound capability / direction column on `connector_connections`.
-- **Decision:** **Option 1 (Zero migrations)**.
-- **Rationale:** The measurement pack (`BUS-127` / `BUS-130`) proved that `capability` is nullable, and migration 127's `connector_connections_shape_is_not_ambiguous` constraint explicitly permits both `capability` and `mcp_server_url` to be null. Google OAuth connections already exist in this shape today. Adding a column triggers SEED-146's warning against prematurely committing connection table shapes. Storing selected folder metadata in `config` JSONB is clean, non-breaking, and requires no schema change.
+- **Decision:** **Option 1 (Zero migrations, ratified by Operator on 2026-09-05 discuss-phase turn)**.
+- **State Boundary & Multi-Folder Watching Rationale (BUS-131 addressed):**
+  - The measurement pack (`BUS-127` / `BUS-130`) proved that `capability` is nullable, and migration 127's `connector_connections_shape_is_not_ambiguous` constraint explicitly permits both `capability` and `mcp_server_url` to be null. Google OAuth connections already exist in this shape today.
+  - Adding a column triggers SEED-146's warning against prematurely committing connection table shapes.
+  - Crucially, a connection represents an authenticated *account* (1 connection -> N watched folders). Storing a singular authoritative folder in `connector_connections.config` would foreclose multi-folder watching and create a duplicate source of truth when Phase 234's `connector_watches` table lands.
+  - Therefore, Phase 232 implements folder selection as an interactive component callback contract (`onSelectFolder({ folderId, folderName, driveId, driveName })`) without binding a singular authoritative watch into `config`. Watched folders remain cleanly owned by Phase 234.
 
 ---
 
