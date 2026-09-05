@@ -435,6 +435,7 @@ export {
   importCloudFile,
   probeMcpAuth,
   createMcpOAuthAuthorizeUrl,
+  browseSourceFolders,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
@@ -451,6 +452,8 @@ export type {
   McpAuthKind,
   McpProbeAuthResponse,
   McpOAuthAuthorizeResponse,
+  SourceNode,
+  SourceBrowseResponse,
 } from "./api/connectors"
 
 export { submitToolApproval } from "./api/threads"

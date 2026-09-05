@@ -549,4 +549,46 @@ export async function createMcpOAuthAuthorizeUrl(
   return res.json() as Promise<McpOAuthAuthorizeResponse>
 }
 
+export interface SourceNode {
+  id: string
+  name: string
+  kind: "folder" | "drive"
+  drive_id?: string | null
+  has_children?: boolean
+  parent_id?: string | null
+}
 
+export interface SourceBrowseResponse {
+  items: SourceNode[]
+  next_page_token?: string | null
+}
+
+/** Phase 232 (SRC-02): Hierarchical folder and drive browsing. */
+export async function browseSourceFolders(
+  connectionId: string,
+  folderId?: string,
+  pageToken?: string,
+): Promise<SourceBrowseResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (folderId) {
+    params.set("folder_id", folderId)
+  }
+  if (pageToken) {
+    params.set("page_token", pageToken)
+  }
+  const qs = params.toString() ? `?${params.toString()}` : ""
+  const res = await fetch(`${API_BASE}/connectors/connections/${encodeURIComponent(connectionId)}/browse${qs}`, {
+    method: "GET",
+    headers,
+  })
+  if (!res.ok) {
+    const failure = await readConnectorFailure(res)
+    throw new ConnectorApiError(
+      failure.message || `Failed to browse source folder hierarchy`,
+      res.status,
+      failure.reasonCode,
+    )
+  }
+  return res.json() as Promise<SourceBrowseResponse>
+}

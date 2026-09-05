@@ -1704,5 +1704,54 @@ async def import_connection_file(
         )
 
 
+@router.get(
+    "/connections/{connection_id}/browse",
+    summary="Browse folder hierarchy in connected cloud source (SRC-02)",
+)
+async def browse_connection_hierarchy(
+    connection_id: str,
+    folder_id: str | None = None,
+    page_token: str | None = None,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Phase 232 (SRC-02): Hierarchical browse for connected source drives and folders."""
+    from app.services.sources.base import SourceRegistry
 
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    adapter = SourceRegistry.get_adapter(conn)
+    if not adapter:
+        return {"items": [], "next_page_token": None}
+
+    try:
+        page = await adapter.browse(conn, folder_id=folder_id, page_token=page_token)
+        items = [
+            {
+                "id": node.id,
+                "name": node.name,
+                "kind": node.kind,
+                "drive_id": node.drive_id,
+                "parent_id": node.parent_id,
+                "has_children": node.has_children,
+            }
+            for node in page.items
+        ]
+        return {
+            "items": items,
+            "next_page_token": page.next_page_token,
+        }
+    except Exception as exc:
+        logger.error("Failed to browse hierarchy for connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Source provider browse returned an error: {exc}",
+        )
 
