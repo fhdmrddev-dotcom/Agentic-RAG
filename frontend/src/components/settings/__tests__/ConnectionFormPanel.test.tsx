@@ -2520,9 +2520,16 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     // own types cannot see, and a subset match would pass straight through it.
     // ⚠ `service_id` is REQUIRED on every shape since 211-02 — the model and migration 127's
     // `connector_connections_has_a_service_identity` agree exactly.
+      // ⚠ Phase 231 (VIS-02) — `default_ingest_visibility` joined this key set
+      //   DELIBERATELY. The connection carries the scope its owner chose, and it is sent
+      //   on EVERY create path because VIS-02 admits no configuration path that omits it.
+      //   The key is accepted: `ConnectorConnectionCreate` gained the field in the same
+      //   phase, so this is contract GROWTH, not the 422 this guard exists to catch —
+      //   which it still catches for any key the server has not been taught.
     expect(Object.keys(body).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
       "service_id",
@@ -2549,6 +2556,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     expect(Object.keys(withSecret).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
       "secret",
@@ -2594,7 +2602,14 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
 
     const body = onCreate.mock.calls[0][0] as Record<string, unknown>
-    expect(Object.keys(body).sort()).toEqual(["config", "name", "service_id"])
+    // ⚠ Phase 231 — the scope travels even on the service nobody here has heard of. A path
+    //   that omits it would be a configuration path with no chosen visibility (VIS-02).
+    expect(Object.keys(body).sort()).toEqual([
+      "config",
+      "default_ingest_visibility",
+      "name",
+      "service_id",
+    ])
     expect(body.service_id).toBe("my_custom_wiki")
     // ⚠ KEY ABSENCE, never a value comparison — `capability: null` is a PRESENT value and a
     // different thing from absence, and only absence is what the server's shape arm reads.
@@ -2826,6 +2841,7 @@ describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live de
     expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
     ])

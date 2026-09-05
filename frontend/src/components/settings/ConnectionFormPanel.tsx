@@ -87,7 +87,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { IngestVisibilityField } from "./IngestVisibilityField"
+import { IngestVisibilityField, IngestVisibilityFooter } from "./IngestVisibilityField"
 import {
   ConnectorApiError,
   createOAuthAuthorizeUrl,
@@ -2256,13 +2256,28 @@ export function ConnectionFormPanel({
             ⚠ memberCount is null: this panel does not know the roster size and a fabricated
             count is worse than an honest "everyone in <org>". */}
         <div className="mb-3.5" data-testid="connection-ingest-visibility">
-          <IngestVisibilityField
-            value={ingestVisibility}
-            onChange={setIngestVisibility}
-            orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
-            memberCount={null}
-            isExisting={mode === "edit"}
-          />
+          {/* ⭐ THIS IS WHY THE SKETCH LOCKED B *AND* A, AND THEY ARE NOT REDUNDANT.
+              A read-only viewer must still read the sentence — SC#1 admits no configuration
+              path without it — but this panel's rule is that a write affordance is ABSENT, not
+              disabled, when the viewer cannot write (U-02, and the kill-switch OFF state).
+              So: B is the control, A is the read-only rendering of the same fact. Rendering B
+              disabled here would have failed the panel's own convention; rendering nothing
+              would have failed VIS-02. */}
+          {readOnly ? (
+            <IngestVisibilityFooter
+              visibility={ingestVisibility}
+              orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
+              memberCount={null}
+            />
+          ) : (
+            <IngestVisibilityField
+              value={ingestVisibility}
+              onChange={setIngestVisibility}
+              orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
+              memberCount={null}
+              isExisting={mode === "edit"}
+            />
+          )}
         </div>
 
         <div className="mt-3 flex items-center justify-end gap-2">
