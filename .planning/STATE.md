@@ -53,9 +53,25 @@ Last activity: 2026-09-05 — Phase 230 complete (SC#1 re-driven and PASS, all 5
 - Stage transition across reclaim: `tables_embedded` → `chunks_embedded` (resumed from chunk offset 450 rather than restarting from 0).
 - Queue drained: 14 completed, 0 failed, 0 stuck in `processing`.
 
-⭐ **Defect A & B verified**:
-- **Defect A (jsonb string scalar)**: Fixed via `($n::text)::jsonb` and self-healing `CASE` coercion. `jsonb_typeof = object` across all 14 jobs. SC#4 checkpointed resumption fully functional.
-- **Defect B (document failure status sync)**: Implemented in `record_job_failure` and `reclaim_stale_ingestion_claims` in the same transaction as the job status.
+⭐ **Defect A verified · ⚠ Defect B IMPLEMENTED BUT NOT EXERCISED** — corrected by the reviewer
+2026-09-05. The closeout originally read *"Defect A & B verified"*; **B was not verified and
+`230-VERIFICATION.md` never claimed it was.** The correction is kept visible rather than silently
+applied, because *a verdict cell disagreeing with its own evidence cell* is the exact Phase 228
+finding this project has now hit twice.
+- **Defect A (jsonb string scalar)**: ✅ **VERIFIED.** `($n::text)::jsonb` plus a self-healing `CASE`.
+  `jsonb_typeof = object` across all 14 jobs; the reclaimed job carried `{chunk_offset: 450}`, so
+  **SC#4 checkpointed resumption is functional for the first time.**
+- **Defect B (document failure status sync)**: ⚠ **IMPLEMENTED, NOT EXERCISED.** Present at
+  `ingestion_jobs.py:175` and `:341` where the file previously referenced `documents` zero times —
+  correct on reading. **But ZERO jobs failed in the drive, so the failure→document path never
+  executed.** It has not been observed running. **Re-open trigger: a drive that forces a permanent
+  failure** (exhaust `max_retries` on one job) — cheap, and it closes the last open claim on 230.
+
+⚠ **NEW MINOR, filed not fixed — a document can be minted with NO job row.** The kill landed between
+the `documents` INSERT and the `ingestion_jobs` enqueue, leaving a row at `pending` that nothing will
+ever advance. **Mint-then-enqueue is not atomic.** It does **not** block SC#1 — the client received
+`ConnectionResetError` for that file, so it was never accepted, and **all 14 uploads that returned 201
+completed.** Its natural home is the same transaction boundary Defect B's fix established.
 
 ⭐ **Pre-flight and Review closures**:
 - Pre-flight G-1 closed: `run_stale_sweep()` in lifespan boot and periodic tick loop.
@@ -71,6 +87,48 @@ Last activity: 2026-09-05 — Phase 230 complete (SC#1 re-driven and PASS, all 5
 
 
 
+
+### ⭐ ROLE ASSIGNMENT — reciprocal review (operator-ratified 2026-09-05)
+
+⚠ **Restored 2026-09-05 after a STATE.md rewrite dropped it.** Recording it again rather than
+assuming it is remembered — the whole point of the protocol is that it survives a handoff.
+
+**Roles ALTERNATE per phase so the pair can run without the operator present.** Operator instruction:
+*"the bars that cannot be autonomous — let Gemini review your work and vice versa."*
+
+| Phase | Builds | Reviews |
+|---|---|---|
+| **230** — The Durable Ingestion Queue | **Gemini** | **Claude** ✅ done |
+| **231** — connection-scoped visibility | **Claude** | **Gemini** ← current |
+
+⭐ Not a new rule — `AGENTS.md` §3.1 already required it. **231 is Claude-built by the ratified
+criticality test**, hitting three of five triggers: the permission model, a migration that commits a
+table shape, and anything that can fail OPEN. Arm a pairing with `bash scripts/arm-pair.sh <phase>
+<builder>` (or `/pair` in Claude Code). ⚠ **A pairing is per SESSION as well as per phase** — the bus
+watchers die with the session that started them.
+
+⚠ **What role-swapping does NOT delegate:** `CLAUDE.md` says decisions go `--to operator`, never
+agent-to-agent. A reviewer approving a builder's decision is not authorisation, it is laundering.
+
+### ⚠ Two gate problems OPEN ON THE OPERATOR — neither belongs to any phase
+
+⚠ **Restored 2026-09-05 after the same rewrite dropped both pointers.** A routed item with no pointer
+in `STATE.md` is a deferral with no re-open, which this project's own register rule calls a deletion
+that looks like a decision.
+
+- **`BUS-114` — the inherited `IngestionStrip` ordered fence is RED**, and has been since before Phase
+  229. `documents.py` carries **7** distinct `ingestion_step` writes; the fence asserts exactly **6**.
+  **Consequence: the vitest count gate cannot reach green**, so every phase since has closed against a
+  gate that was already failing. ⚠ Root cause of the miss: *"frontend untouched, so the gate cannot be
+  affected"* is **unsound here** — that suite imports `backend/app/api/documents.py?raw`.
+- **`BUS-117` — the backend unit baseline is NOT deterministic.** Measured 71 and 72 on byte-identical
+  trees, by **two independent agents**. The unstable test is
+  `test_cross_worker_cancellation.py::test_a_late_producer_finalize_may_not_write_failed_over_a_cancel`,
+  which passes **28/28 in isolation** and fails only in the full suite via an unraisable
+  `coroutine 'handle_query_tables' was never awaited` attributed at GC time. ⛔ **`CLAUDE.md` pins the
+  ceiling at `failed <= 71` with explicitly zero headroom, so a clean tree can fail the gate** and a
+  phase can be blamed for a flake it did not cause. **Needs an operator decision: fix the flake, or
+  restate the ceiling as 72** — CLAUDE.md forbids weakening it without authorisation.
 
 ### ⚠ `BUG-260905-01` + `SEED-247` — the ingestion doors are INVERTED (operator, 2026-09-05)
 
