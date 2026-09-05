@@ -1,24 +1,32 @@
 ---
 phase: 230
 slug: the-durable-ingestion-queue
-verdict: revise
+verdict: pass_pending_sc1_drive
 verifier: claude
 verifier_role: reviewer
 method: driven — every figure below re-measured, none read from a claim
 date: 2026-09-05
 base_commit: e243a0142
-head_commit: 010bc2f71
-blocking_findings: 2
-corrections_owed: 1
+head_commit: 43bf7ac70
+blocking_findings: 0  # both closed at 43bf7ac70
+corrections_owed: 0  # both closed at 43bf7ac70
 independent_verifier_absent_for: []
 sc1_driven: false
 ---
 
 # Phase 230 — Reviewer Verification
 
-> **Verdict: `revise`.** Two blocking findings, one correction owed, one criterion (SC#1) not yet
-> driven. The queue's *mechanism* is sound and pre-flight G-1 is genuinely closed; what fails is the
-> **paused** state the phase exists to introduce, which currently cannot render.
+> ⚠ **THIS SECTION IS THE FIRST PASS AND IS SUPERSEDED — read *Re-verification after `43bf7ac70`* at
+> the bottom for the current verdict.** It is kept verbatim rather than rewritten, because what the
+> findings WERE is the record of why the fixes exist.
+>
+> **Current verdict: PASS on every reviewer finding** (all four closed at `43bf7ac70`), with **SC#1's
+> behavioural half still not driven** and two pre-existing gate problems routed away from this phase
+> (BUS-114, BUS-117).
+>
+> **First-pass verdict was `revise`.** Two blocking findings, one correction owed, one criterion (SC#1)
+> not yet driven. The queue's *mechanism* is sound and pre-flight G-1 is genuinely closed; what failed
+> was the **paused** state the phase exists to introduce, which could not render.
 
 ⚠ **BUS-112 claimed completion in one sentence with no evidence and no `230-VERIFICATION.md`.**
 Every figure in this file was re-measured by the reviewer. Where a number disagreed with a document,
@@ -225,3 +233,97 @@ is 0.
 
 **Findings 1–4 must close before Phase 230 can be verified.** Finding 1 is the one that matters: the
 phase's headline user-visible state currently renders as nothing.
+
+
+---
+
+# Re-verification after `43bf7ac70` (2026-09-05, Claude — DRIVEN)
+
+**All four findings CLOSE.** Re-measured, not read from BUS-115's claim.
+
+| # | Finding | Status | Evidence |
+|---|---|---|---|
+| 1 | `paused` had no arm in `segmentState()` | ✅ **closed** | arm added at `IngestionStrip.tsx:118`; returns `done` up to `ingestion_step` and `pending` after, **with no `active` pulse** — the honest rendering, not a `default` that would claim no stage completed |
+| 2 | `LibraryPage.test.tsx` — batch lane duplicated the filename | ✅ **closed** | count gate **3 → 2 failures**; the LibraryPage failure is gone |
+| 3 | `tsc` 66 → 68 | ✅ **closed** | **exactly 66**, and `comm` against the base error set is **empty in both directions** — nothing new, nothing silenced |
+| 4 | SC#2's cap was per-process | ✅ **closed** | now a genuine **global** bound (below) |
+
+### Finding 4's fix is the right shape — option (b), and it holds up
+
+`claim_due_ingestion_jobs` takes `pg_advisory_xact_lock(4230230)`, counts live `status='processing'`
+rows, and claims only up to the remaining global slots. That is a real cross-process bound, not a
+restatement.
+
+⭐ **The failure mode I went looking for is already handled.** A global cap counted from
+`status='processing'` can be permanently consumed by rows belonging to a **dead** worker — the queue
+would then stall until a restart. It does not, because `ingestion_queue_service.py:171` re-runs
+`run_stale_sweep()` **every 60 s inside the tick loop**, not only at boot. Worst case a slot is held
+for `lease_timeout_seconds` (300) + 60, then reclaimed.
+
+### The deletion in finding 2 was checked against the locked sketch, not just the test
+
+The fix removed `activeFileName` from `IngestionBatchLane` entirely. **That is correct, not lossy:**
+`.planning/sketches/227-the-paused-queue-and-its-refusal/README.md` never specifies naming the active
+file — the row was an addition beyond locked variant B. Removing it **restores** sketch fidelity.
+⚠ Recorded because "fix the duplication" could equally have been satisfied by deleting the wrong half.
+
+### Gates re-run
+
+| Gate | Result |
+|---|---|
+| Phase 230's 5 suites | **30 passed** (+2 — the new global-bound tests) |
+| `tsc -p tsconfig.app.json` | **66**, zero delta vs base |
+| vitest count gate | total 7435 · **failed 2** — both the *inherited* `IngestionStrip` fence failures (BUS-114). Phase 230's own failure is gone. |
+| backend unit | **72 failed / 3527 passed / 0 collection errors** — see the correction below |
+
+---
+
+## ⚠ CORRECTION TO THIS FILE'S OWN FIRST PASS — the backend baseline is NOT deterministic
+
+**§1 above recorded `71 failed / 3526 passed` and presented it as the measurement. That number does
+not reproduce, and the original is kept rather than overwritten because the instability is the
+finding.**
+
+Measured three further times, failure lists captured and diffed rather than counted:
+
+| Run | Tree | Result |
+|---|---|---|
+| 1 (§1 above) | `010bc2f71` | **71 failed** |
+| 2 | `43bf7ac70` (HEAD) | **72 failed** |
+| 3 | `010bc2f71` in a worktree — **the same commit as run 1** | **72 failed** |
+| 4 | `43bf7ac70` (HEAD) | **72 failed** |
+
+⭐ **`comm` on the run-3 and run-4 failure lists is EMPTY IN BOTH DIRECTIONS — the failure SETS are
+identical.** So **`43bf7ac70` introduced no backend regression**; runs 1 and 3 differ on byte-identical
+code.
+
+**The unstable test is `tests/unit/test_cross_worker_cancellation.py::test_a_late_producer_finalize_may_not_write_failed_over_a_cancel`**, and its mechanism is visible in the report:
+
+```
+_pytest/unraisableexception.py:33: RuntimeWarning:
+    coroutine 'handle_query_tables' was never awaited
+```
+
+An unraisable warning is surfaced at **garbage-collection time** and attributed to whichever test is
+running when GC fires — so it is order- and timing-dependent by construction. Confirmed: the file
+passes **28/28 in isolation on three consecutive runs**, and fails only inside the full suite.
+
+⛔ **CONSEQUENCE FOR THE GATE, not just for this phase.** `CLAUDE.md` fixes the ceiling at
+**`failed <= 71` with explicitly zero headroom**. A baseline that oscillates 71↔72 on an unchanged tree
+means **the gate can fail on a clean checkout, and a phase can be blamed for a flake it did not
+cause.** This phase came within one GC timing of exactly that. The ceiling needs either the flake fixed
+(`handle_query_tables` awaited or its warning filtered) or the ceiling restated as 72 — **an operator
+decision, since CLAUDE.md forbids weakening it without authorisation.** Routed on **BUS-117**.
+
+---
+
+## Verdict after re-verification
+
+**PASS on everything the reviewer raised.** Two items remain, neither of them Phase 230's defect:
+
+1. ⏸ **SC#1's behavioural half is still NOT driven** — no real restart mid-batch has been performed.
+   The phase cannot be called verified against its headline criterion until it is. Conditions remain
+   ideal (**77 completed / 0 job rows**).
+2. ℹ️ **The inherited `IngestionStrip` fence** keeps the count gate at `failed 2` (BUS-114), and the
+   **backend baseline flake** keeps it at 72 (BUS-117). Both predate this phase; both must be routed
+   rather than absorbed into it.
