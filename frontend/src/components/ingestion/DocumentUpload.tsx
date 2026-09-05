@@ -127,12 +127,12 @@ export function DocumentUpload({
               : `${targetLabel} · drop files here or click to browse`
           }
           className={cn(
-            "w-full rounded-xl border border-dashed px-8 py-10 text-center transition-colors",
+            "w-full rounded-2xl border-2 border-dashed px-8 py-10 text-center transition-all duration-300 shadow-sm",
             disabled
               ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
               : dragging
-                ? "cursor-copy border-primary bg-primary/10"
-                : "cursor-pointer border-border bg-card/40 hover:border-primary/50 hover:bg-accent/40",
+                ? "cursor-copy border-primary bg-primary/10 shadow-[0_0_30px_rgba(99,102,241,0.15)] ring-2 ring-primary/20 scale-[1.01]"
+                : "cursor-pointer border-border/70 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm hover:border-primary/50 hover:bg-card/90 hover:shadow-md",
             uploading && "cursor-default opacity-70",
           )}
         >
@@ -157,12 +157,14 @@ export function DocumentUpload({
               </span>
             </>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Cloud className="h-8 w-8 text-primary/70" aria-hidden="true" />
-              <span className="text-base font-medium text-foreground">Drop files here</span>
+            <div className="flex flex-col items-center gap-2.5">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm group-hover:scale-105 transition-transform duration-200">
+                <Cloud className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <span className="text-base font-semibold text-foreground tracking-tight">Drop files here</span>
               <span className="text-sm text-muted-foreground">or</span>
               <span
-                className="inline-flex items-center rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow active:scale-95"
                 data-testid="choose-files-button"
               >
                 Choose files
@@ -227,12 +229,12 @@ export function DocumentUpload({
           // A BAND, not a hero panel (see the docblock's height arithmetic). Full width so
           // it is the first thing the eye lands on, ~82px tall so the list below it does not
           // move — which is the objection the corner button was created to answer.
-          "w-full rounded-xl border border-dashed px-6 py-5 text-center transition-colors",
+          "w-full rounded-xl border border-dashed px-6 py-5 text-center transition-all duration-200 shadow-sm",
           disabled
             ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
             : dragging
-              ? "cursor-copy border-primary bg-primary/10"
-              : "cursor-pointer border-border bg-card/40 hover:border-primary/50 hover:bg-accent/40",
+              ? "cursor-copy border-primary bg-primary/10 shadow-[0_0_24px_rgba(99,102,241,0.15)] ring-2 ring-primary/20"
+              : "cursor-pointer border-border/70 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm hover:border-primary/50 hover:bg-card/90 hover:shadow-md",
           uploading && "cursor-default opacity-70",
         )}
       >
@@ -260,7 +262,9 @@ export function DocumentUpload({
         ) : (
           <>
             <span className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
-              <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+                <Upload className="h-3 w-3 shrink-0" aria-hidden="true" />
+              </div>
               <span>Drop files here, or choose them</span>
             </span>
             {/* The formats are PRINTED from the same constant that feeds `accept` below —

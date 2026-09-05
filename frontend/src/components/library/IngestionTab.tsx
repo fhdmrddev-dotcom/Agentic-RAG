@@ -25,6 +25,7 @@
  * ⛔ NO SECOND STATUS VOCABULARY. Every stage word comes from `TERM_MAP`.
  */
 import React, { useState } from "react"
+import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { IngestionStrip } from "@/components/ingestion/IngestionStrip"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
@@ -54,15 +55,32 @@ function PipelineCard({
   cardId: PipelineCardId
   count: number
 }) {
+  const isPopulated = count > 0
   return (
     <div
       data-stage-card={cardId}
-      className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl bg-card/50 ghost-border px-3 py-2.5"
+      className={cn(
+        "group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border p-3 shadow-sm card-interactive overflow-hidden transition-all duration-200",
+        isPopulated
+          ? "border-primary/40 bg-gradient-to-b from-primary/10 to-card/50 shadow-primary/5"
+          : "border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm",
+      )}
     >
-      <span className="truncate text-xs font-medium text-foreground">
-        {CARD_LABEL[cardId]}
+      {/* Subtle top accent line for active cards */}
+      {isPopulated && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent" />
+      )}
+      <div className="flex items-center justify-between gap-1">
+        <span className="truncate text-xs font-medium text-foreground">
+          {CARD_LABEL[cardId]}
+        </span>
+        {isPopulated && (
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        )}
+      </div>
+      <span className={cn("font-mono text-lg font-bold tabular-nums", isPopulated ? "text-primary" : "text-foreground")}>
+        {count}
       </span>
-      <span className="font-mono text-lg font-bold text-foreground">{count}</span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {count === 1 ? "file here now" : "files here now"}
       </span>
