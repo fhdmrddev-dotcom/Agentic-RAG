@@ -67,6 +67,31 @@ ok("⛔ B has NEITHER — the counter-example is preserved, not quietly fixed",
 ok("B's failure is NAMED in its own notes rather than left for the reader to find",
    /FAILS THE DECIDING CLAUSE/.test(vB));
 
+/* ── 3b. ⛔ THE CHILD TABS SURVIVE, AND "VIEW" LANDS SOMEWHERE ────────────────────
+   ⚠ THE FIRST CUT OF THIS SKETCH DELETED THEM, and the operator caught it: "where are the
+   children mini that was under ingestion and other tabs". Folding a parent strip into one row
+   is a space saving; SWALLOWING ITS CHILDREN is a lost surface, and the two are easy to
+   confuse when you are counting pixels. A sketch that reclaims space by deleting navigation
+   has not answered the question, it has changed it.
+   ⚠ AND: C's strip carried a `View` button wired to a no-op. A control that lights up and goes
+   nowhere is precisely what this sketch is supposed to be against, so it is now asserted to
+   target the `In progress` child — the queue's own list. */
+const SUBS = ["Add files", "In progress", "Needs attention", "History"];
+["A", "C"].forEach((v, i) => {
+  const src = [vA, vC][i];
+  ok(`${v} still renders the four CHILD tabs`, src.includes(`id="${v}-sub"`));
+  SUBS.forEach(n => ok(`${v} names the child tab "${n}"`, src.includes(n)));
+  ok(`${v} has a live count badge on "In progress"`, src.includes(`id="${v}-badge"`));
+});
+ok("B keeps its child tabs too (they are its ONLY horizontal strip)",
+   SUBS.every(n => vB.includes(n)));
+ok("⭐ C's strip View NAVIGATES to the In progress child, it is not a no-op",
+   /id="C-view"[^>]*onclick="sub\('C',1\)"/.test(vC));
+ok("the sub() switcher exists", /function sub\(/.test(HTML));
+ok("both badges go live from the SAME arithmetic as the pill and the strip",
+   /A-badge[\s\S]{0,140}classList\.toggle\("live"/.test(HTML) &&
+   /C-badge[\s\S]{0,140}classList\.toggle\("live"/.test(HTML));
+
 /* ── 4. ⛔ "ADDED" MAY NOT MEAN "QUEUED" ──────────────────────────────────────────
    This is the defect the queue fix introduced in the shipped app: the reconciliation line
    said "12 added" when the files were merely enqueued. The sketch must distinguish

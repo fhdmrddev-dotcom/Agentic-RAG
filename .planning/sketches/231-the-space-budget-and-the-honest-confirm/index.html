@@ -91,6 +91,17 @@ body.notes .note{display:block}
 .seg button.on{background:var(--accent);color:var(--tx);font-weight:500}
 .spacer{margin-left:auto}
 
+/* ── the CHILD tabs. ⚠ They were DELETED from the first cut of this sketch and the operator
+   caught it: "where are the children mini that was under ingestion and other tabs". A parent
+   strip that swallows its children is not a space saving, it is a lost surface.
+   They cost ONE row — and that row now does a second job (see .badge). ─────────────────── */
+.subbar{display:flex;align-items:center;gap:10px;flex:none}
+.seg.sm button{padding:3px 10px;font-size:.76rem}
+.badge{display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:0 6px;border-radius:var(--rf);
+  font-family:var(--fm);font-size:.68rem;background:var(--muted);color:var(--tx3)}
+.badge.live{background:var(--skdim);color:var(--sk)}
+.badge.live::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--sk);animation:pulse 1.5s infinite}
+
 /* the queue pill — the thing the dead corner becomes */
 .qpill{display:flex;align-items:center;gap:9px;padding:5px 11px;border-radius:var(--rf);
   border:1px solid var(--bd);background:var(--surf);font-size:.77rem;color:var(--tx2);cursor:pointer}
@@ -277,6 +288,14 @@ body.notes .note{display:block}
           <div class="rb" id="A-rail"></div>
         </div>
         <div class="work">
+          <div class="subbar">
+            <div class="seg sm" id="A-sub">
+              <button class="on" onclick="sub('A',0)">Add files</button>
+              <button onclick="sub('A',1)">In progress<span class="badge" id="A-badge">0</span></button>
+              <button onclick="sub('A',2)">Needs attention</button>
+              <button onclick="sub('A',3)">History</button>
+            </div>
+          </div>
           <div class="dz"><span>⬆</span><b>Drop files here</b><span style="color:var(--tx3)">or</span>
             <button>Choose files</button>
             <span class="fmt">PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB → Root</span></div>
@@ -406,11 +425,19 @@ body.notes .note{display:block}
         <span class="lab" id="C-lab">Reading 12 files</span>
         <div class="bars" id="C-sbar"></div>
         <span class="mut" id="C-mut">4 readable · 6 reading · 2 waiting</span>
-        <button onclick="show('C')">View</button>
+        <button id="C-view" onclick="sub('C',1)">View</button>
       </div>
       <div class="body">
         <div class="rail"><div class="rh">FOLDERS <b>19</b></div><div class="rb" id="C-rail"></div></div>
         <div class="work">
+          <div class="subbar">
+            <div class="seg sm" id="C-sub">
+              <button class="on" onclick="sub('C',0)">Add files</button>
+              <button onclick="sub('C',1)">In progress<span class="badge" id="C-badge">0</span></button>
+              <button onclick="sub('C',2)">Needs attention</button>
+              <button onclick="sub('C',3)">History</button>
+            </div>
+          </div>
           <div class="dz"><span>⬆</span><b>Drop files here</b><span style="color:var(--tx3)">or</span>
             <button>Choose files</button><span class="fmt">8 formats → Root</span></div>
           <div class="panel">
@@ -512,6 +539,19 @@ document.addEventListener("mouseover",function(e){
   var b=r.getBoundingClientRect(); tip.style.left=Math.min(b.left,window.innerWidth-350)+"px";
   tip.style.top=(b.bottom+7)+"px"});
 
+/* ⭐ THE CHILD TABS ARE A REAL DESTINATION, NOT DECORATION.
+   The strip's "View" and the pill both LAND on `In progress` — the same fact at three scales:
+   a dot in the header, a count on the tab, and the list itself. A control that lights up and
+   goes nowhere is the thing this sketch is supposed to be against. */
+var SUBNAMES=["Add files","In progress","Needs attention","History"];
+function sub(v,i){
+  var bar=document.getElementById(v+"-sub"); if(!bar) return;
+  [].forEach.call(bar.children,function(b,n){b.classList.toggle("on",n===i)});
+  var body=document.getElementById(v+"-subbody");
+  if(body) body.textContent=SUBNAMES[i];
+  if(i===1) toast("In progress — the queue's own list. This is where the pill and the strip land.");
+}
+
 function rail(id){var h="";FOLDERS.forEach(function(f,i){
   h+='<div class="fl'+(i===0?' on':'')+'">📁 '+f[0]+' <span class="n">'+f[1]+'</span></div>'});
   var el=document.getElementById(id); if(el) el.innerHTML=h}
@@ -557,6 +597,8 @@ var A={_p:false,live:false,
     var step=function(){
       done++;
       document.getElementById("A-pilltx").textContent=done<q?("Reading "+(q-done)+" of "+q):"All "+q+" readable";
+      var ab=document.getElementById("A-badge");
+      ab.textContent=(q-done); ab.classList.toggle("live",done<q);
       document.getElementById("A-mini").innerHTML=
         '<i class="done" style="width:'+(done/q*100)+'%"></i>'+
         '<i class="work" style="width:'+(Math.min(5,q-done)/q*100)+'%"></i>'+
@@ -600,6 +642,8 @@ var C={_p:false,
       var reading=Math.min(5,q-done), waiting=Math.max(0,q-done-reading);
       document.getElementById("C-lab").textContent=done<q?("Reading "+q+" files"):"All "+q+" readable";
       document.getElementById("C-mut").textContent=done+" readable · "+reading+" reading · "+waiting+" waiting";
+      var cb=document.getElementById("C-badge");
+      cb.textContent=(q-done); cb.classList.toggle("live",done<q);
       drawBar("C-sbar",[["add",done],["qd",reading],["uns",waiting]]);
       drawBar("C-bar",[["add",done],["qd",q-done],["here",counts().here],["uns",counts().uns]]);
       drawLegend("C-lg",[["rdy",done,"Readable","in the Library, searchable"],
