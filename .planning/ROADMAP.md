@@ -213,7 +213,7 @@ A, because A does not do what the requirement says.**
 - [ ] **Phase 229: The One Ingest Splice** — one piece of code mints every document row; the same bytes through any door produce the same row (TRUST-01) ⭐ REFACTOR ONLY · G-5 DISCHARGE on `documents.py`
 - [x] **Phase 230: The Durable Ingestion Queue** — ingestion survives a restart and a burst, batches within real provider limits, and names an embedding failure instead of saying your documents returned nothing (QUEUE-01/02/04/05) ⭐ PROVEN ON `/upload` FIRST
 - [x] **Phase 231: Connection-Scoped Visibility** — one visibility per connection enforced at all four RLS sites, stated plainly on screen, with provenance visible at retrieval and citation time (VIS-01, VIS-02, TRUST-04) ⚠ THREAT MODEL · G-2 SKETCH
-- [ ] **Phase 232: The Source Contract + Google Drive** — one `browse/list/read/check` contract with Drive as the first thin adapter, and the shipped one-file import re-pointed onto it (SRC-01, SRC-02)
+- [x] **Phase 232: The Source Contract + Google Drive** — one `browse/list/read/check` contract with Drive as the first thin adapter, and the shipped one-file import re-pointed onto it (SRC-01, SRC-02)
 - [ ] **Phase 233: The Preview — See It Before It Lands** — four honestly-labelled buckets, two-tier identity, rules evaluated with nothing written, and nothing ingested until a person confirms (PREV-01/02/03, LIB-09) ⚠ G-2 SKETCH MANDATORY
 - [ ] **Phase 234: The Watch Loop — The Library Reads By Itself** — a mapped folder read on the shipped scheduler, a lifecycle diff that can never delete on an incomplete listing, a disconnect that freezes, and a synced document that cannot make the agent act (LIB-08, SRC-06, QUEUE-03, VIS-03/04/05/06, TRUST-03, SURF-01) ⭐ RETIRES THE CLAUDE.md RULE, SAME COMMIT · ⚠ THREAT MODEL MANDATORY
 - [ ] **Phase 235: The Source Says What It Did** — per-source run history with counts and errors, a stopped source that says when and offers the fix, and a signal that reaches someone who is not on the page (LIB-10, SURF-02, SURF-03) ⚠ SURF-03's home is an OPEN DECISION · G-2 SKETCH
@@ -711,7 +711,7 @@ found at the v3.7 close.
 | 229. The One Ingest Splice | 4/4 | ✅ Complete — VERIFIED by driving | 2026-09-05 |
 | 230. The Durable Ingestion Queue | 5/5 | ✅ Complete — ⚠ **SC#2 / SC#3 are OWED DRIVES**, deadline before v4.0 closes | 2026-09-05 |
 | 231. Connection-Scoped Visibility | — (built direct under the pairing, no GSD plan set) | ✅ Complete — Claude built, Gemini REVIEWED PASS by driving | 2026-09-05 |
-| 232. The Source Contract + Google Drive | 0/? | Not started | — |
+| 232. The Source Contract + Google Drive | 4/4 | ✅ Complete — Gemini built, Claude REVIEWED by driving. ⚠ `OD-232-01` live-Drive drive OWED | 2026-09-05 |
 | 233. The Preview — See It Before It Lands | 0/? | Not started | — |
 | 234. The Watch Loop — The Library Reads By Itself | 0/? | Not started | — |
 | 235. The Source Says What It Did | 0/? | Not started | — |
