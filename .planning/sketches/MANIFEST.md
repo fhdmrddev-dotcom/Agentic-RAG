@@ -2507,3 +2507,82 @@ machinery.
 decision cannot be rendered back into the transcript at the quality `SeamCard` already reaches for
 `ask_user` — a hole on reload, or machinery beyond a new `SeamKind`. **Decide it at plan-phase, before
 the dock is built.**
+
+---
+
+### Phase 233 session — the preview, and what it costs to look (2026-09-05)
+
+⚠ **`.planning/sketches/` holds 227 and 228; this MANIFEST does not.** Grepped at this session's start:
+zero rows for `227-the-paused-queue-and-its-refusal` or `228-who-will-see-what-this-brings-in`. Recorded
+rather than backfilled — 228's winner is locked in its own README (**B + A**, operator, 2026-09-05) and can
+be transcribed by whoever owns it; 227's is unknown to this session and **guessing it would be worse than
+the gap**. Same failure the seeds register has: a winner that lives only in a folder is invisible to the index.
+
+**G-2 is MANDATORY for Phase 233** — the ROADMAP says so in the phase's own flags, and *"the four bucket
+labels are the deliverable, not decoration"*. Both sketches are therefore acceptance bars, not explorations.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 229 | the-four-buckets | How do four buckets read so the fourth one's uncertainty is FELT, not filed away? | *pending* — **A four lanes** (recommended, control) + **C's proportional bar** as its header · ⛔ B is the counter-example | phase-233, prev-01, lib-09, preview, animation, g-2, acceptance-bar |
+| 230 | nothing-has-been-written-yet | What makes "nothing has been written" and "here is where it lands" believable at the confirm — and how does the fourth bucket resolve honestly? | *pending* — **A the receipt + resolution** (recommended, control) + **C's zero-line** as its footer · B **deferred to Phase 234** | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
+
+### The axis both sketches were decided on
+
+⭐ **Not "which is prettiest" — "which state can this surface be left in".** Sketch 229's SC#1 says a person
+*sees four lists*; the question that separates three good-looking layouts is whether any interaction produces
+a **three-bucket screen**. Variant B's filter chips do, in one click, and that state survives a screenshot and
+a handover — so B is rejected **on the criterion, not on taste**, and is kept in the file as the visible
+counter-example rather than deleted. This is the same reading that decided sketch 228: a clause worded
+*"there is no path where it is absent"* can only be met **by construction, never by audit**.
+
+### Motion had to earn its place, and the test was stated before it was written
+
+Both sketches animate, and the bar was: **remove the animation and the surface must still be honest; remove
+the thing the animation carries and it must not be.**
+
+- **229** — files fly from the scanner head into a lane, one at a time. **Three lanes settle; the fourth does
+  not.** It keeps a hatched ground and a breathing count, so you *watch the preview decline to guess*.
+- **230** — the four unknowns resolve **one at a time** after the confirm, each landing in the Library or in a
+  **named refusal**. `outcome` has exactly three values and there is deliberately no fourth, because
+  *"silently in neither"* is the failure SC#5 names.
+
+### ⭐ The four bucket labels, and the claim that must never come back
+
+| Bucket | Label (verbatim) | The qualifier that travels with it |
+|---|---|---|
+| 1 | **Will be added** | destination per file, incl. any rule-suggested folder |
+| 2 | **Already here** | *matched by source file, not by content* — **never** a hash claim |
+| 3 | **Type not supported** | we can't read this kind of file; nothing is imported |
+| 4 | **Can't tell without reading it** | each row names *why* we can't tell |
+
+⛔ **`PROJECT.md`'s "a `content_hash` lookup, not a guess" is FALSE for a list-only pass** and must not be
+reinstated in the copy. `documents.py:620` hashes raw **bytes** (needing the download the preview exists to
+avoid); Google Drive publishes **no** hash for native Docs/Sheets/Slides; Microsoft Graph guarantees only
+`quickXorHash` and populates hashes **after** download. **Tier 1 at preview time is
+`(source_system, external_id, source_version)` compared for equality; Tier 2 `sha256` still runs at splice** —
+and 230 shows one file resolving exactly that way, which is the honest end of a Tier 1 *"we can't tell"*.
+
+### Both sketches are DRIVEN, and one guard was proven broken before it was trusted
+
+`node drive.cjs` in each folder — **52 and 38 assertions**, extracted from the running sketch rather than from
+a copy of it. 230's harness **cross-checks 229's fixture**, so the preview and the confirm cannot come to
+disagree about the same folder (a ROADMAP failure mode in its own words).
+
+⚠ **Eight defects were planted and driven RED — and the FIRST ONE DID NOT FIRE.** 229's "already here must
+not overclaim a hash" check searched the whole document, so rewriting variant A's copy to *"matched by content
+hash"* still passed: the phrase survived in variant C and in the footnotes, and the sub-region regex silently
+matched nothing at all. **The guard was region-scoped, given a "region was found" assertion, and re-driven
+RED.** It is recorded rather than quietly fixed, because *a guard that cannot fail on the defect it names is
+decoration* — and this one was written by the same session that wrote the thing it was guarding.
+Both `index.html` files restored **md5-identical** after every plant.
+
+### What 230 hands forward rather than settling
+
+**Variant B (the Library tree with dashed "would add" ghost rows and `41 → 44` projected counts) is DEFERRED,
+not rejected.** SC#3 is worded at the **row** grain — *"where **each file** would land"* — and 229's rows
+already carry that. B answers a different, real question (*what happens to my Library?*) and is the natural
+shape for **Phase 234's folder mapping**. Carry it forward; do not re-derive it.
+
+**One rule survives from it regardless:** a projected row must be **visibly not a row** — dashed border, a
+*would* verb, and counts rendered as a transition (`41 → 44`) never as a new total. Same principle as the
+185 canvas seal: *a projection that renders like a fact is a lie with good typography.*
