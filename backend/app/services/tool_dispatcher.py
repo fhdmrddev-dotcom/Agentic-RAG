@@ -823,6 +823,11 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
                     "similarity": hit.get("similarity"),
                     "is_full_doc": False,
                     "version_number": hit.get("version_number", 1),
+                    # Phase 231 TRUST-04 — a reader can tell machine-placed knowledge from
+                    # knowledge somebody chose to upload. Both keys travel: the name is what
+                    # gets rendered, the id is what survives a rename.
+                    "source_connection_id": hit.get("source_connection_id"),
+                    "source_connection_name": hit.get("source_connection_name"),
                 })
         if avg_sim > 0.0:
             similarity_score = avg_sim
@@ -1157,6 +1162,11 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
         "similarity": None,
         "is_full_doc": True,
         "version_number": doc.get("version_number", 1),
+        # Phase 231 TRUST-04 — the SAME two keys as the search-hit citation above. A citation
+        # shape that carries provenance on one path and not the other is how a reader learns to
+        # distrust the mark rather than the document.
+        "source_connection_id": doc.get("source_connection_id"),
+        "source_connection_name": doc.get("source_connection_name"),
     }]
 
     await ctx.emit(ctx.redis, ctx.run_id, 'sub_agent_start', filename=doc['filename'], task=args['task'])

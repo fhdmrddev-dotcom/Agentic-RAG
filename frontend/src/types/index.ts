@@ -116,6 +116,14 @@ export interface Citation {
   similarity: number | null
   is_full_doc: boolean
   version_number?: number
+  /** Phase 231 TRUST-04 — the connection that PLACED this document, absent when a person
+   *  uploaded it. ABSENCE IS THE SIGNAL: an unmarked citation is knowledge somebody chose to
+   *  put here, which is the common case and should stay unadorned (the 074-A rule). */
+  source_connection_id?: string | null
+  /** The connection's name, when it still resolves. `null` with an id present is a real state —
+   *  a deleted connection nulls the id (D-4), and a name may simply not be readable. The
+   *  surface then says "a connection" rather than inventing one. */
+  source_connection_name?: string | null
 }
 
 export interface ConfidenceResult {

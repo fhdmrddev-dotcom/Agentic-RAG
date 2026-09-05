@@ -122,7 +122,7 @@ const path = require("node:path")
 const BASELINE = {
   "Seam.test.tsx": 8,
   "TodosSection.test.tsx": 12,
-  "CitationList.test.tsx": 11,
+  "CitationList.test.tsx": 15,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,

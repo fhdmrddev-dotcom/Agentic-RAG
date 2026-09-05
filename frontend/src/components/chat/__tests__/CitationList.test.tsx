@@ -176,3 +176,49 @@ describe("CitationCard — un-numbered legacy render stays provider-free", () =>
     expect(screen.getByText("alpha.pdf")).toBeInTheDocument()
   })
 })
+
+describe("CitationCard — TRUST-04: machine-placed knowledge says so", () => {
+  it("marks a citation that a connection placed, by NAME", () => {
+    render(
+      <CitationCard
+        citation={makeCitation({
+          source_connection_id: "conn-1",
+          source_connection_name: "Engineering Drive",
+        })}
+      />,
+    )
+    expect(screen.getByTestId("citation-source-connection").textContent).toContain(
+      "via Engineering Drive",
+    )
+  })
+
+  it("⭐ ABSENCE IS THE SIGNAL — a person's upload carries NO mark", () => {
+    // If every citation were marked, the mark would say nothing. An unadorned row is the
+    // common case and must stay unadorned.
+    render(<CitationCard citation={makeCitation()} />)
+    expect(screen.queryByTestId("citation-source-connection")).toBeNull()
+  })
+
+  it("says 'a connection' rather than inventing a name it cannot resolve", () => {
+    // A deleted connection nulls the id (D-4); a name may simply not be readable. Both are real
+    // states, and neither licenses making one up.
+    render(
+      <CitationCard
+        citation={makeCitation({ source_connection_id: "conn-9", source_connection_name: null })}
+      />,
+    )
+    expect(screen.getByTestId("citation-source-connection").textContent).toContain(
+      "via a connection",
+    )
+  })
+
+  it("puts the provenance in real DOM text, not a title attribute", () => {
+    render(
+      <CitationCard
+        citation={makeCitation({ source_connection_id: "c", source_connection_name: "Drive" })}
+      />,
+    )
+    // A fact only a hover reveals is a fact assistive tech and touch users never get.
+    expect(screen.getByTestId("citation-source-connection").getAttribute("title")).toBeNull()
+  })
+})
