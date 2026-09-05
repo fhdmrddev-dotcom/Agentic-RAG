@@ -107,16 +107,16 @@ export function HealthTab() {
             )}
           </Suspense>
           <div className="flex items-center justify-between gap-2 mt-2">
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 p-0.5 rounded-lg bg-muted/20 border border-border/30">
               {[7, 30, 90].map((d) => (
                 <button
                   key={d}
                   type="button"
                   onClick={() => setTrendDays(d)}
-                  className={`text-xs px-2 py-1 rounded ${
+                  className={`text-xs px-2.5 py-1 rounded-md font-medium transition-all ${
                     trendDays === d
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary/20 text-primary border border-primary/30 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
                   }`}
                 >
                   {d}d
@@ -145,16 +145,17 @@ export function HealthTab() {
           return (
             <div
               key={tile ? tile.label : `skeleton-${i}`}
-              className="ghost-border bg-card/50 rounded-lg p-4 flex flex-col gap-2"
+              className="card-interactive relative overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 flex flex-col gap-2 shadow-sm"
               // 217.1-18 — the MATCH STRENGTH tile carries the contract's per-tile hook.
               data-testid={isMatchStrength ? "health-match-strength-tile" : undefined}
             >
-              <span className="text-xs font-medium text-muted-foreground">
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {tile ? tile.label : "…"}
               </span>
               {!isTileLoading ? (
                 <>
-                  <span className="text-3xl font-bold font-headline tabular-nums leading-none text-foreground">
+                  <span className="text-3xl font-bold font-headline tabular-nums leading-none text-foreground tracking-tight">
                     {tile.value}
                   </span>
                   <span className="text-xs text-muted-foreground">{tile.description}</span>

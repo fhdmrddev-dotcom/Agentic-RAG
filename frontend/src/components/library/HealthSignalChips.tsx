@@ -73,10 +73,10 @@ function ChipRow({ id, label, count, loading }: SignalChip) {
   return (
     <div
       key={id}
-      className="ghost-border bg-card/50 rounded-lg px-3 py-2 flex items-center justify-between min-w-0"
+      className="card-interactive rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm px-3.5 py-2.5 flex items-center justify-between min-w-0 shadow-sm transition-all duration-200"
     >
-      <span className="text-sm text-foreground truncate">{label}</span>
-      <span className="text-xs tabular-nums text-muted-foreground shrink-0 ml-2">
+      <span className="text-sm font-medium text-foreground/90 truncate">{label}</span>
+      <span className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded-md bg-muted/50 text-foreground/80 shrink-0 ml-2 border border-border/30">
         {loading ? "…" : count}
       </span>
     </div>
@@ -161,7 +161,7 @@ export function HealthSignalChips() {
           <p className="text-xs font-medium text-muted-foreground">Being used</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {Array.from({ length: expectedBeingUsed }).map((_, i) => (
-              <div key={i} className="ghost-border bg-card/50 rounded-lg px-3 py-2 h-10 animate-pulse" />
+              <div key={i} className="rounded-xl border border-border/30 bg-card/30 backdrop-blur-sm px-3 py-2 h-10 animate-pulse" />
             ))}
           </div>
         </div>
@@ -169,7 +169,7 @@ export function HealthSignalChips() {
           <p className="text-xs font-medium text-muted-foreground">In good shape</p>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             {Array.from({ length: expectedInGoodShape }).map((_, i) => (
-              <div key={i} className="ghost-border bg-card/50 rounded-lg px-3 py-2 h-10 animate-pulse" />
+              <div key={i} className="rounded-xl border border-border/30 bg-card/30 backdrop-blur-sm px-3 py-2 h-10 animate-pulse" />
             ))}
           </div>
         </div>

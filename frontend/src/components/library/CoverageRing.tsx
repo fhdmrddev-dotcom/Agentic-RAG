@@ -29,21 +29,31 @@ export function CoverageRing({ retrieved, total, size = "lg" }: Props) {
     <div className="flex flex-col items-center">
       <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          <defs>
+            <linearGradient id={`covGrad-${size}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="1" />
+              <stop offset="100%" stopColor={strokeColor} stopOpacity="0.8" />
+            </linearGradient>
+            <filter id={`covGlow-${size}`} x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor={strokeColor} floodOpacity="0.3" />
+            </filter>
+          </defs>
           <circle
             cx={cx} cy={cy} r={r}
             fill="none"
-            stroke="hsl(var(--muted))"
+            stroke="hsl(var(--muted) / 0.4)"
             strokeWidth={sw}
           />
           <circle
             cx={cx} cy={cy} r={r}
             fill="none"
-            stroke={strokeColor}
+            stroke={`url(#covGrad-${size})`}
+            filter={`url(#covGlow-${size})`}
             strokeWidth={sw}
             strokeLinecap="round"
             strokeDasharray={`${fill} ${circ}`}
             transform={`rotate(-90 ${cx} ${cy})`}
-            style={{ transition: "stroke-dasharray 0.6s ease-out, stroke 0.4s ease-out" }}
+            style={{ transition: "stroke-dasharray 0.8s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s ease-out" }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">

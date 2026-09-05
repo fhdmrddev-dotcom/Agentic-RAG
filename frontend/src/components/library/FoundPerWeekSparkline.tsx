@@ -35,25 +35,52 @@ export function FoundPerWeekSparkline({ weeks }: Props) {
   const points = weeks.map((w, i) => {
     const x = pad + i * stepX
     const y = H - pad - ((w.count / maxCount) * (H - pad * 2))
-    return `${x},${y}`
+    return { x, y, str: `${x},${y}` }
   })
+
+  const areaPoints = [
+    `${pad},${H - pad}`,
+    ...points.map((p) => p.str),
+    `${pad + (weeks.length - 1) * stepX},${H - pad}`,
+  ].join(" ")
+
+  const lastPoint = points[points.length - 1]
 
   return (
     <svg
       width={W}
       height={H}
       viewBox={`0 0 ${W} ${H}`}
-      className="shrink-0"
+      className="shrink-0 overflow-visible"
       aria-label={`Found per week, ${weeks.length} weeks`}
     >
+      <defs>
+        <linearGradient id="sparklineGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.0} />
+        </linearGradient>
+      </defs>
+      <polygon
+        points={areaPoints}
+        fill="url(#sparklineGrad)"
+      />
       <polyline
         fill="none"
         stroke="hsl(var(--primary))"
-        strokeWidth={1.5}
+        strokeWidth={1.75}
         strokeLinecap="round"
         strokeLinejoin="round"
-        points={points.join(" ")}
+        points={points.map((p) => p.str).join(" ")}
       />
+      {lastPoint && (
+        <circle
+          cx={lastPoint.x}
+          cy={lastPoint.y}
+          r={2.5}
+          fill="hsl(var(--primary))"
+          className="animate-pulse"
+        />
+      )}
     </svg>
   )
 }
