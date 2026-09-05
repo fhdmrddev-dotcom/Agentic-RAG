@@ -1814,6 +1814,7 @@ async def confirm_source_preview(
             destination_folder_id=body.destination_folder_id,
             destination_folder_name=body.destination_folder_name,
             recursive=body.recursive,
+            only_external_ids=body.only_external_ids,
         )
     except Exception as exc:
         logger.error("Failed to confirm preview for connection %s: %s", connection_id, exc)

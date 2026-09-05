@@ -386,3 +386,106 @@ class TestRecursiveWalk:
         a = _TreeAdapter(shared)
         r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
         assert sorted(f.id for f in r.files) == ["a", "dup"]
+
+
+# ── individual-file selection ──────────────────────────────────────────────────────────────
+
+
+class TestConfirmSubset:
+    """Operator: "how can I select individual files". The preview lists them with a verdict, so
+    ticking a subset is a filter over what is ALREADY on screen — not a second listing."""
+
+    @pytest.mark.asyncio
+    async def test_only_the_named_ids_are_imported(self, monkeypatch):
+        from app.services.sources import preview_service as ps
+
+        seen = []
+
+        async def _fake_import(**kw):
+            seen.append(kw["file_id"])
+            return {"id": "doc-" + kw["file_id"]}
+
+        monkeypatch.setattr("app.services.sources.import_service.import_single_file", _fake_import)
+
+        async def _fake_preview(**kw):
+            return ps.SourcePreview(
+                folder_id="f", folder_name="f", total=3,
+                counts={"add": 3, "here": 0, "uns": 0, "unk": 0},
+                items=[
+                    ps.PreviewItem(external_id=i, name=i, mime_type="text/plain",
+                                   bucket="add", fragment="TXT", reason="")
+                    for i in ("a", "b", "c")
+                ],
+            )
+
+        monkeypatch.setattr(ps, "build_preview", _fake_preview)
+        r = await ps.confirm_preview(
+            connection={"id": "c", "service_id": "google"}, folder_id="f", folder_name="f",
+            user_id="u", active_org="o", supabase=None, background_tasks=None,
+            only_external_ids=["a", "c"],
+        )
+        assert seen == ["a", "c"]
+        assert r.accounted == 2
+
+    @pytest.mark.asyncio
+    async def test_unaccounted_is_measured_against_what_was_ASKED_FOR(self, monkeypatch):
+        """⚠ A person who ticked 2 of 3 has not left 1 unaccounted — they declined it. Measuring
+        against the folder total would report a shortfall on every partial import, which is a
+        false alarm on the one field that exists to catch a real one."""
+        from app.services.sources import preview_service as ps
+
+        async def _fake_import(**kw):
+            return {"id": "doc"}
+
+        monkeypatch.setattr("app.services.sources.import_service.import_single_file", _fake_import)
+
+        async def _fake_preview(**kw):
+            return ps.SourcePreview(
+                folder_id="f", folder_name="f", total=3,
+                counts={"add": 3, "here": 0, "uns": 0, "unk": 0},
+                items=[
+                    ps.PreviewItem(external_id=i, name=i, mime_type="text/plain",
+                                   bucket="add", fragment="TXT", reason="")
+                    for i in ("a", "b", "c")
+                ],
+            )
+
+        monkeypatch.setattr(ps, "build_preview", _fake_preview)
+        r = await ps.confirm_preview(
+            connection={"id": "c", "service_id": "google"}, folder_id="f", folder_name="f",
+            user_id="u", active_org="o", supabase=None, background_tasks=None,
+            only_external_ids=["a", "b"],
+        )
+        assert r.unaccounted == 0
+        assert r.preview_said_added == 2  # …and the receipt promises only what was asked for
+
+    @pytest.mark.asyncio
+    async def test_an_EMPTY_list_means_nothing_not_everything(self, monkeypatch):
+        """⛔ `None` and `[]` are different values. A falsy check would turn 'none' into 'all' —
+        the worst direction for a mistake in an import."""
+        from app.services.sources import preview_service as ps
+
+        seen = []
+
+        async def _fake_import(**kw):
+            seen.append(kw["file_id"])
+            return {"id": "doc"}
+
+        monkeypatch.setattr("app.services.sources.import_service.import_single_file", _fake_import)
+
+        async def _fake_preview(**kw):
+            return ps.SourcePreview(
+                folder_id="f", folder_name="f", total=1,
+                counts={"add": 1, "here": 0, "uns": 0, "unk": 0},
+                items=[ps.PreviewItem(external_id="a", name="a", mime_type="text/plain",
+                                      bucket="add", fragment="TXT", reason="")],
+            )
+
+        monkeypatch.setattr(ps, "build_preview", _fake_preview)
+        r = await ps.confirm_preview(
+            connection={"id": "c", "service_id": "google"}, folder_id="f", folder_name="f",
+            user_id="u", active_org="o", supabase=None, background_tasks=None,
+            only_external_ids=[],
+        )
+        assert seen == []
+        assert r.accounted == 0

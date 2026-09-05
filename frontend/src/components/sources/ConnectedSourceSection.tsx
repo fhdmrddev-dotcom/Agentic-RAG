@@ -88,40 +88,61 @@ export function ConnectedSourceSection({
         </div>
       ) : (
         <>
-          <select
-            data-testid="source-connection-select"
-            value={connectionId ?? ""}
-            onChange={(e) => {
-              setConnectionId(e.target.value || null)
-              setFolder(null)
-            }}
-            className="h-9 w-full max-w-sm rounded-md border border-border/60 bg-background px-2 text-sm"
-          >
-            <option value="">Choose a connection…</option>
-            {options.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-
-          {connectionId && (
-            <SourceFolderPicker
-              connectionId={connectionId}
-              selectedFolderId={folder?.folderId ?? null}
-              onSelectFolder={setFolder}
-              className="max-h-72 overflow-y-auto"
-            />
+          {/* ⭐ SKETCH 231-A — ONE CARD, TWO COLUMNS. The connection picker rides in the card
+              header; the folder tree is the LEFT column of the same card as the bar it feeds.
+              ⚠ The shipped shape stacked three full-width blocks (select → tree → panel), which
+              is what put the tree in a cramped box with the bar below the fold. */}
+          {!connectionId && (
+            <select
+              data-testid="source-connection-select"
+              value=""
+              onChange={(e) => {
+                setConnectionId(e.target.value || null)
+                setFolder(null)
+              }}
+              className="h-9 w-full max-w-sm rounded-md border border-border/60 bg-background px-2 text-sm"
+            >
+              <option value="">Choose a connection…</option>
+              {options.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           )}
 
-          {connectionId && folder && (
+          {connectionId && (
             <SourcePreviewPanel
               connectionId={connectionId}
-              folderId={folder.folderId}
-              folderName={folder.folderName}
+              folderId={folder?.folderId ?? null}
+              folderName={folder?.folderName}
               destinationFolderId={destinationFolderId}
               destinationFolderName={destinationFolderName}
               onClose={() => setFolder(null)}
+              headerSlot={
+                <select
+                  data-testid="source-connection-select"
+                  value={connectionId}
+                  onChange={(e) => {
+                    setConnectionId(e.target.value || null)
+                    setFolder(null)
+                  }}
+                  className="ml-auto h-8 max-w-[16rem] rounded-md border border-border/60 bg-background px-2 text-xs"
+                >
+                  {options.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              }
+              leftSlot={
+                <SourceFolderPicker
+                  connectionId={connectionId}
+                  selectedFolderId={folder?.folderId ?? null}
+                  onSelectFolder={setFolder}
+                />
+              }
             />
           )}
         </>

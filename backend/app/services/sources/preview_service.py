@@ -598,6 +598,7 @@ async def confirm_preview(
     destination_folder_id: str | None = None,
     destination_folder_name: str | None = None,
     recursive: bool = True,
+    only_external_ids: list[str] | None = None,
     page_size: int = 200,
 ) -> ConfirmResult:
     """Import what the preview said would be imported — and resolve every "can't tell".
@@ -623,7 +624,21 @@ async def confirm_preview(
     outcomes: list[ConfirmOutcome] = []
     added = 0
 
-    for item in preview.items:
+    # ⭐ A SUBSET IS A SUBSET OF WHAT THE PREVIEW SAID, never a second listing.
+    #
+    # The person ticks rows on a screen the preview produced, so the selection is filtered out of
+    # `preview.items` here rather than re-derived from a fresh call. ⚠ That ordering is the whole
+    # SC#4 guarantee: if the confirm listed the folder again and filtered THAT, a file added at the
+    # source in between would silently join a set the person never saw.
+    #
+    # ⚠ `None` means "everything the preview showed" — an explicit EMPTY list means "nothing", and
+    # the two must not collapse into each other.
+    selected = set(only_external_ids) if only_external_ids is not None else None
+    items = (
+        preview.items if selected is None else [i for i in preview.items if i.external_id in selected]
+    )
+
+    for item in items:
         if item.bucket == "here":
             outcomes.append(
                 ConfirmOutcome(external_id=item.external_id, name=item.name, outcome="here")
@@ -687,10 +702,19 @@ async def confirm_preview(
                 )
             )
 
+    # ⚠ `unaccounted` is measured against what was ASKED FOR, not against the whole folder — a
+    #   person who ticked 3 of 26 has not left 23 unaccounted, they declined them. Comparing to
+    #   `preview.total` would report a shortfall on every partial import.
+    asked = len(items)
+    said_added = (
+        preview.counts.get("add", 0)
+        if selected is None
+        else sum(1 for i in items if i.bucket == "add")
+    )
     return ConfirmResult(
         outcomes=outcomes,
         accounted=len(outcomes),
-        unaccounted=preview.total - len(outcomes),
-        preview_said_added=preview.counts.get("add", 0),
+        unaccounted=asked - len(outcomes),
+        preview_said_added=said_added,
         actually_added=added,
     )

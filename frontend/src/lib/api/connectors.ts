@@ -666,6 +666,8 @@ export interface SourcePreviewRequest {
   destination_folder_name?: string | null
   /** Walk sub-folders. Defaults true on the server. */
   recursive?: boolean
+  /** Import only these files. `undefined` = everything the preview showed; `[]` = nothing. */
+  only_external_ids?: string[] | null
 }
 
 async function postPreview<T>(connectionId: string, path: string, body: SourcePreviewRequest, failMsg: string): Promise<T> {

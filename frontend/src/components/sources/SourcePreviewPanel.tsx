@@ -77,6 +77,13 @@ export interface SourcePreviewPanelProps {
   destinationFolderName?: string | null
   onClose?: () => void
   onImported?: (result: SourceConfirmResponse) => void
+  /** ⭐ Sketch 231-A's two-column body: the source folder tree renders HERE, inside the same card
+   *  as the bar it feeds. Stacking them (tree above, panel below) was the shipped shape and it
+   *  pushed the bar off the fold — the operator's "the drive folders are in a very small area".
+   *  Passing the tree in as a slot keeps ONE component owning header, body and footer. */
+  leftSlot?: React.ReactNode
+  /** Rendered in the card header beside the title — the connection picker. */
+  headerSlot?: React.ReactNode
   className?: string
 }
 
@@ -105,7 +112,17 @@ const HATCH_STYLE: React.CSSProperties = {
     "repeating-linear-gradient(45deg, rgba(245,158,11,0.55) 0 6px, rgba(245,158,11,0.12) 6px 12px)",
 }
 
-function BucketRow({ item }: { item: SourcePreviewItem }) {
+function BucketRow({
+  item,
+  selectable,
+  checked,
+  onToggle,
+}: {
+  item: SourcePreviewItem
+  selectable: boolean
+  checked: boolean
+  onToggle: (id: string) => void
+}) {
   return (
     <div
       data-preview-row={item.bucket}
@@ -114,6 +131,23 @@ function BucketRow({ item }: { item: SourcePreviewItem }) {
       title={item.reason || undefined}
       className="flex items-center gap-3 border-t border-border/40 px-3 py-1.5 text-xs first:border-t-0"
     >
+      {/* ⚠ Only `add` and `unk` get a checkbox. `here` needs no import and `uns` cannot be read,
+          so a checkbox there would offer an action that does nothing — the same defect as a
+          button that lights up and goes nowhere. The column is reserved on every row so the
+          names stay aligned across buckets. */}
+      {selectable ? (
+        <input
+          type="checkbox"
+          data-testid="preview-pick"
+          data-external-id={item.external_id}
+          aria-label={`Include ${item.name}`}
+          checked={checked}
+          onChange={() => onToggle(item.external_id)}
+          className="h-3.5 w-3.5 shrink-0 accent-primary"
+        />
+      ) : (
+        <span className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      )}
       <span className="min-w-0 flex-1 truncate text-foreground">{item.name}</span>
       {item.fragment && (
         <span data-preview-fragment className="shrink-0 text-[11px] text-muted-foreground">
@@ -145,6 +179,8 @@ export function SourcePreviewPanel({
   destinationFolderName = null,
   onClose,
   onImported,
+  leftSlot,
+  headerSlot,
   className,
 }: SourcePreviewPanelProps) {
   const [preview, setPreview] = useState<SourcePreviewResponse | null>(null)
@@ -155,6 +191,13 @@ export function SourcePreviewPanel({
   const [toast, setToast] = useState<string | null>(null)
   /** ⚠ Open/closed is about FILES. The header — label and count — renders either way. */
   const [open, setOpen] = useState<Record<string, boolean>>({ unk: true })
+
+  /** ⭐ WHICH FILES. `null` means "everything the preview showed" and is the resting state — the
+   *  folder-grain import is still the default and still one click. A Set means the person has
+   *  taken over, and an EMPTY set is a real state ("none"), not a fallback to "all".
+   *  ⚠ Only `add` and `unk` rows are selectable: `here` needs no import and `uns` cannot be read,
+   *  so offering a checkbox there would offer an action that does nothing. */
+  const [picked, setPicked] = useState<Set<string> | null>(null)
 
   useEffect(() => {
     if (!connectionId || !folderId) {
@@ -193,6 +236,41 @@ export function SourcePreviewPanel({
 
   const total = preview?.total ?? 0
 
+  /** Rows a person may act on. `here` is already in; `uns` cannot be read. */
+  const selectable = useMemo(
+    () => (preview?.items ?? []).filter((i) => i.bucket === "add" || i.bucket === "unk"),
+    [preview],
+  )
+  const isPicked = useCallback(
+    (id: string) => (picked === null ? true : picked.has(id)),
+    [picked],
+  )
+  const pickedIds = useMemo(
+    () => selectable.filter((i) => isPicked(i.external_id)).map((i) => i.external_id),
+    [selectable, isPicked],
+  )
+  const togglePick = useCallback(
+    (id: string) => {
+      setPicked((prev) => {
+        // First touch materialises "all" into a real Set, so removing one file from the default
+        // does not silently mean "only this one".
+        const next = new Set(prev ?? selectable.map((i) => i.external_id))
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    },
+    [selectable],
+  )
+  const pickedAdd = useMemo(
+    () => selectable.filter((i) => i.bucket === "add" && isPicked(i.external_id)).length,
+    [selectable, isPicked],
+  )
+  const pickedUnk = useMemo(
+    () => selectable.filter((i) => i.bucket === "unk" && isPicked(i.external_id)).length,
+    [selectable, isPicked],
+  )
+
   /** After a confirm, the outcomes drive the bar instead of the buckets — 230-A's dissolve. */
   const outcomeCounts = useMemo(() => {
     if (!result) return null
@@ -220,6 +298,10 @@ export function SourcePreviewPanel({
         folder_name: folderName ?? null,
         destination_folder_id: destinationFolderId,
         destination_folder_name: destinationFolderName,
+        // ⛔ `undefined` (not `[]`) when the person has not touched the checkboxes — the server
+        //    treats an empty array as "nothing", and collapsing the two would turn the default
+        //    folder import into a no-op.
+        only_external_ids: picked === null ? undefined : pickedIds,
       })
       setResult(res)
       onImported?.(res)
@@ -228,9 +310,12 @@ export function SourcePreviewPanel({
     } finally {
       setConfirming(false)
     }
-  }, [connectionId, folderId, folderName, destinationFolderId, destinationFolderName, onImported])
+  }, [connectionId, folderId, folderName, destinationFolderId, destinationFolderName, onImported, picked, pickedIds])
 
-  if (!folderId) return null
+  // ⚠ NO LONGER an early `return null` on a missing folder: the folder TREE lives inside this
+  //   card now, so returning nothing would hide the very control used to pick a folder. Without
+  //   a `leftSlot` the old behaviour stands — a panel with no folder and no tree renders nothing.
+  if (!folderId && !leftSlot) return null
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0)
 
@@ -244,12 +329,13 @@ export function SourcePreviewPanel({
     >
       {/* ── header ─────────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 shrink-0">
           <div className="truncate text-sm font-medium text-foreground">{PREVIEW_TITLE}</div>
           <div className="truncate text-xs text-muted-foreground">
             {folderName || "Selected folder"}
           </div>
         </div>
+        {headerSlot}
         {loading && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -271,6 +357,20 @@ export function SourcePreviewPanel({
         </div>
       )}
 
+      {/* ⭐ SKETCH 231-A's BODY: the tree and the bar are SIDE BY SIDE inside one card. The
+          shipped shape stacked them, so the folder tree got a cramped 288px box and the bar it
+          feeds was pushed below the fold — "the drive folders are in a very small area that is
+          not user friendly", measured on the operator's own screen. */}
+      <div className={cn("grid gap-0", leftSlot ? "md:grid-cols-[300px_1fr]" : "grid-cols-1")}>
+        {leftSlot && (
+          <div
+            data-testid="preview-tree"
+            className="max-h-[26rem] overflow-y-auto border-b border-border/40 p-2 md:border-b-0 md:border-r"
+          >
+            {leftSlot}
+          </div>
+        )}
+        <div className="min-w-0">
       {preview && (
         <div className="px-4 py-3">
           {/* ⛔ WHAT WAS ACTUALLY SCANNED, stated rather than assumed. The first shipped version
@@ -384,7 +484,13 @@ export function SourcePreviewPanel({
                         {BUCKET_BLURB[b]}
                       </div>
                       {rows.map((item) => (
-                        <BucketRow key={item.external_id} item={item} />
+                        <BucketRow
+                          key={item.external_id}
+                          item={item}
+                          selectable={b === "add" || b === "unk"}
+                          checked={isPicked(item.external_id)}
+                          onToggle={togglePick}
+                        />
                       ))}
                     </div>
                   )}
@@ -440,6 +546,8 @@ export function SourcePreviewPanel({
           )}
         </div>
       )}
+        </div>
+      </div>
 
       {/* ── the footer: the zero-write receipt ─────────────────────────────────── */}
       <div className="flex items-center gap-3 border-t border-border/40 px-4 py-2.5">
@@ -453,11 +561,11 @@ export function SourcePreviewPanel({
           <Button
             size="sm"
             onClick={handleConfirm}
-            disabled={!preview || confirming || !!result || counts.add + counts.unk === 0}
+            disabled={!preview || confirming || !!result || pickedAdd + pickedUnk === 0}
             data-testid="preview-confirm"
           >
             {confirming && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-            {confirmLabel(counts.add, counts.unk)}
+            {confirmLabel(pickedAdd, pickedUnk)}
           </Button>
         </div>
       </div>

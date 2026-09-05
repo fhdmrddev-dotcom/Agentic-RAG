@@ -3184,7 +3184,9 @@ const BASELINE = {
   // EXECUTED, and a BASELINE key naming an unexecuted file makes this gate ERROR (exit 2)
   // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
   "LibraryHeaderBar.test.tsx": 9,
-  "SourcePreviewPanel.test.tsx": 22,
+  // 22 → 30: per-file selection (operator: "how can I select individual files") and the
+  // two-column body that puts the folder tree inside the card it feeds.
+  "SourcePreviewPanel.test.tsx": 30,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

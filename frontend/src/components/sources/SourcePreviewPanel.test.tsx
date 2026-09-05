@@ -340,3 +340,110 @@ describe("edges", () => {
     expect(container.firstChild).toBeNull()
   })
 })
+
+// ── per-file selection (operator: "how can I select individual files") ─────────────────────
+
+describe("⭐ individual files can be picked, and the default is still the whole folder", () => {
+  it("only add and unk rows are selectable — here needs no import, uns cannot be read", async () => {
+    const user = userEvent.setup()
+    renderPanel()
+    await waitFor(() => expect(screen.getByTestId("preview-buckets")).toBeInTheDocument())
+    for (const b of ["add", "here", "uns"]) {
+      await user.click(document.querySelector(`[data-bucket-header="${b}"]`) as HTMLElement)
+    }
+    const pickable = (bucket: string) =>
+      [...document.querySelectorAll(`[data-preview-row="${bucket}"]`)].filter((r) =>
+        r.querySelector('[data-testid="preview-pick"]'),
+      ).length
+    expect(pickable("add")).toBe(2)
+    expect(pickable("unk")).toBe(2)
+    // A checkbox here would offer an action that does nothing.
+    expect(pickable("here")).toBe(0)
+    expect(pickable("uns")).toBe(0)
+  })
+
+  it("everything is picked at rest, so the folder-grain import stays one click", async () => {
+    renderPanel()
+    await waitFor(() => expect(document.querySelector('[data-bucket-body="unk"]')).toBeTruthy())
+    const boxes = [...document.querySelectorAll('[data-testid="preview-pick"]')]
+    expect(boxes.length).toBeGreaterThan(0)
+    expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true)
+    expect(screen.getByTestId("preview-confirm").textContent).toContain("Add 2 · read 2")
+  })
+
+  it("⭐ unticking one file changes the button, and does NOT mean 'only that one'", async () => {
+    // The first touch materialises "all" into a real set. Getting this wrong inverts the
+    // selection — a person removing one file would import exactly that file.
+    const user = userEvent.setup()
+    renderPanel()
+    await waitFor(() => expect(document.querySelector('[data-bucket-body="unk"]')).toBeTruthy())
+    await user.click(
+      document.querySelector('[data-testid="preview-pick"][data-external-id="d-5"]') as HTMLElement,
+    )
+    expect(screen.getByTestId("preview-confirm").textContent).toContain("Add 2 · read 1")
+  })
+
+  it("confirm sends ONLY the ticked ids once the person has taken over", async () => {
+    const user = userEvent.setup()
+    renderPanel()
+    await waitFor(() => expect(document.querySelector('[data-bucket-body="unk"]')).toBeTruthy())
+    await user.click(
+      document.querySelector('[data-testid="preview-pick"][data-external-id="d-5"]') as HTMLElement,
+    )
+    await user.click(screen.getByTestId("preview-confirm"))
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled())
+    const body = mockConfirm.mock.calls[0][1]
+    expect(body.only_external_ids).toEqual(["d-1", "d-2", "d-6"])
+  })
+
+  it("⛔ an untouched selection sends undefined, NOT an empty array", async () => {
+    // The server reads `[]` as "nothing". Collapsing the two would make the default import a
+    // silent no-op — the worst possible failure for a button labelled "Add 2 · read 2".
+    const user = userEvent.setup()
+    renderPanel()
+    await waitFor(() => expect(screen.getByTestId("preview-confirm")).toBeInTheDocument())
+    await user.click(screen.getByTestId("preview-confirm"))
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled())
+    expect(mockConfirm.mock.calls[0][1].only_external_ids).toBeUndefined()
+  })
+
+  it("confirm is disabled when everything selectable has been unticked", async () => {
+    const user = userEvent.setup()
+    renderPanel()
+    await waitFor(() => expect(document.querySelector('[data-bucket-body="unk"]')).toBeTruthy())
+    await user.click(document.querySelector('[data-bucket-header="add"]') as HTMLElement)
+    for (const id of ["d-1", "d-2", "d-5", "d-6"]) {
+      await user.click(
+        document.querySelector(`[data-testid="preview-pick"][data-external-id="${id}"]`) as HTMLElement,
+      )
+    }
+    expect(screen.getByTestId("preview-confirm")).toBeDisabled()
+  })
+})
+
+describe("the tree lives inside the card (sketch 231-A's two-column body)", () => {
+  it("renders the left column when a tree is supplied", async () => {
+    render(
+      <SourcePreviewPanel
+        connectionId="conn-1"
+        folderId="f-1"
+        folderName="Rate Sheets 2026"
+        leftSlot={<div data-testid="fake-tree">tree</div>}
+      />,
+    )
+    expect(await screen.findByTestId("preview-tree")).toBeInTheDocument()
+    expect(screen.getByTestId("fake-tree")).toBeInTheDocument()
+  })
+
+  it("⭐ with a tree but NO folder chosen it still renders — the tree is how you choose one", () => {
+    // The old early-return on a missing folder would have hidden the very control used to pick.
+    render(
+      <SourcePreviewPanel
+        connectionId="conn-1"
+        folderId={null}
+        leftSlot={<div data-testid="fake-tree">tree</div>}
+      />,
+    )
+    expect(screen.getByTestId("fake-tree")).toBeInTheDocument()
+  })
+})
