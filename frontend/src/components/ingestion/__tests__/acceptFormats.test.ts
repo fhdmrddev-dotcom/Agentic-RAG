@@ -70,9 +70,33 @@ const codeOf = (src: string): string =>
  * The terminator is a line-anchored closing brace so the match stops at the end of the set
  * literal rather than running on into the next dict in the file.
  */
+/**
+ * The server's real accept set.
+ *
+ * ⚠ IT IS TWO LITERALS, NOT ONE, AND THIS FENCE FOUND THAT ITSELF. `ALLOWED_MIME_TYPES`
+ * splats a named `IMAGE_MIME_TYPES` frozenset into itself (`*IMAGE_MIME_TYPES`) so the image
+ * types have ONE home shared with `extract_text`'s routing branch. A regex reading only the
+ * outer literal sees the splat as no members at all — so the six image mimes looked absent,
+ * and the subset assertion below went red the moment they were advertised. That is the fence
+ * behaving correctly on a real change in shape; the fix is to resolve the splat, never to
+ * loosen the assertion.
+ *
+ * ⛔ THE SPLAT IS RESOLVED, NOT ASSUMED. If `IMAGE_MIME_TYPES` is ever renamed or inlined,
+ * the non-vacuity test below still guards the total, and `imageMimeTypes()` returning []
+ * would shrink the set rather than silently widen it — the safe direction.
+ */
+function imageMimeTypes(): string[] {
+  const m = /IMAGE_MIME_TYPES\s*=\s*frozenset\(\{([\s\S]*?)\}\)/.exec(documentsPySource)
+  return m === null ? [] : quoted(m[1])
+}
+
 function serverAllowedMimeTypes(): string[] {
   const m = /ALLOWED_MIME_TYPES\s*=\s*\{([\s\S]*?)\r?\n\}/.exec(documentsPySource)
-  return m === null ? [] : quoted(m[1])
+  if (m === null) return []
+  const direct = quoted(m[1])
+  // Only expand the splat the outer literal actually performs.
+  const splatted = /\*IMAGE_MIME_TYPES/.test(m[1]) ? imageMimeTypes() : []
+  return [...direct, ...splatted]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════

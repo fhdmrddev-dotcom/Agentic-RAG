@@ -92,6 +92,22 @@ export const ACCEPTED_FORMATS: AcceptedFormats = Object.freeze({
     ".eml",
     ".msg",
     ".dxf",
+    // ⭐ IMAGES, 2026-09-05 (SEED-226 / 233-UAT item 8). Until this commit an uploaded `.png`
+    // was refused by the server gate, so the vision machinery that already describes images
+    // pulled OUT of a PDF could not be reached by an image uploaded on its own. The server
+    // now transcribes them — text first, not a caption — so the door and the sign open
+    // together.
+    //
+    // ⛔ `.gif` is deliberately NOT advertised even though the server accepts it: an
+    // animation transcribes as its first frame, which is honest but rarely what someone
+    // dragging a GIF expects. The gate stays wider than the sign, which is the direction
+    // this module's docblock requires.
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".tiff",
+    ".bmp",
   ]),
 
   // The mime half of the literal this module replaced, verbatim. Browsers report several of
@@ -119,6 +135,12 @@ export const ACCEPTED_FORMATS: AcceptedFormats = Object.freeze({
     "application/dxf",
     "image/vnd.dxf",
     "application/x-dxf",
+    // Images. ⚠ `image/gif` is omitted here on purpose — see the note on `extensions`.
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/tiff",
+    "image/bmp",
   ]),
 
   // ⚠ INDEX-ALIGNED WITH `extensions`, one label per extension — so a label can never exist
@@ -137,6 +159,12 @@ export const ACCEPTED_FORMATS: AcceptedFormats = Object.freeze({
     "EML",
     "MSG",
     "DXF",
+    "PNG",
+    "JPG",
+    "JPEG",
+    "WEBP",
+    "TIFF",
+    "BMP",
   ]),
 })
 

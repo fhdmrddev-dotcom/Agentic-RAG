@@ -108,7 +108,15 @@ const overrideExts = extMimeMatch
   : []
 const serverOnlyExts = ["MSG", "EML", "DXF"].filter((ext) => overrideExts.includes(ext))
 
-const expectedIngestFormats = [...dropzoneLabels, ...serverOnlyExts]
+// ⚠ DEDUPED 2026-09-05, AND THE DUPLICATE WAS A REAL BUG, not a cosmetic one. This line
+//   read `[...dropzoneLabels, ...serverOnlyExts]`, which was correct while MSG / EML / DXF
+//   were server-only. 233.1 put all three ON the dropzone, so the guard began DEMANDING that
+//   `facts.ts` list them twice — and `facts.ts` feeds `FilesSection.tsx`, which renders one
+//   chip per entry with `key={fmt}`. Honouring the guard literally would have printed
+//   `MSG · EML · DXF` twice on the landing page under duplicate React keys.
+//   `serverOnlyExts` now means what its name says: formats the server takes that the dropzone
+//   does not advertise.
+const expectedIngestFormats = [...new Set([...dropzoneLabels, ...serverOnlyExts])]
 
 const factsIngestMatch = factsSource.match(/export const INGEST_FORMATS:[^=]+=\s*Object\.freeze\(\[([\s\S]*?)\]\)/)
 const factsIngestFormats = factsIngestMatch
@@ -198,7 +206,20 @@ const factsOrgAdminTabs = extractTabsForKey("orgAdmin")
 
 // 7a. Library tabs (LibraryPage.tsx)
 const libraryPageTsx = readFileOrDie("frontend/src/pages/LibraryPage.tsx")
-const libraryTabsMatches = Array.from(libraryPageTsx.matchAll(/<TabsTrigger\s+value="([^"]+)"\s*>([^<]+)<\/TabsTrigger>/g)).map(m => m[2].trim())
+// ⚠ RE-POINTED 2026-09-05, AND THE OLD REGEX'S FAILURE MODE IS THE REASON THIS MATTERS.
+//   233.1 replaced the Library's `<TabsTrigger>` markup with a segmented control driven by
+//   `TAB_LABELS`, so this pattern stopped matching and extracted `[]` — which the guard then
+//   reported as "the source has no tabs". A guard that silently degrades to an empty
+//   extraction accuses the file it can no longer read, so it must key on the DECLARATION
+//   (`TAB_LABELS`, which `LIBRARY_TABS` is derived from) rather than on rendered JSX.
+const libraryTabsBlock = libraryPageTsx.match(/const TAB_LABELS:[^=]+=\s*\{([\s\S]*?)\n\}/)
+const libraryTabsMatches = libraryTabsBlock
+  ? Array.from(libraryTabsBlock[1].matchAll(/:\s*"([^"]+)"/g)).map(m => m[1].trim())
+  : []
+if (libraryTabsMatches.length === 0) {
+  console.error("❌ LANDING DRIFT GUARD BROKEN: could not read TAB_LABELS from LibraryPage.tsx — re-point this extractor rather than trusting its empty result.")
+  process.exit(2)
+}
 if (JSON.stringify(factsLibraryTabs) !== JSON.stringify(libraryTabsMatches)) {
   recordMismatch("SURFACE_TABS.library (LibraryPage.tsx)", libraryTabsMatches, factsLibraryTabs)
 }

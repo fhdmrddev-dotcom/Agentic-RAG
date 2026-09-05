@@ -3090,7 +3090,7 @@ const BASELINE = {
   // (TARGETS decides what RUNS) and a pin here (BASELINE decides what is GUARDED). The three
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
-  "ingestionFailureCopy.test.ts": 22,
+  "ingestionFailureCopy.test.ts": 25,
   "IngestionTab.test.tsx": 40,
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,

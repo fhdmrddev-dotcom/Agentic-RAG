@@ -98,6 +98,20 @@ class MetadataUpdateRequest(BaseModel):
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+#: Image types the upload gate accepts and `extract_text` sends to vision transcription.
+#: ⚠ Kept as its own named set so the routing test and the gate read the SAME list — a
+#: second hand-typed copy is how a format gets a door with no sign on it, or a sign with no
+#: door. `image/gif` is included (Pillow reads frame 1) but is not advertised by the
+#: frontend: an animation transcribes as its first frame, which is honest but rarely useful.
+IMAGE_MIME_TYPES = frozenset({
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/tiff",
+    "image/bmp",
+    "image/gif",
+})
+
 ALLOWED_MIME_TYPES = {
     "text/plain",
     "text/markdown",
@@ -116,6 +130,16 @@ ALLOWED_MIME_TYPES = {
     "application/dxf",
     "image/vnd.dxf",
     "application/x-dxf",
+    # ── SEED-226 / 233-UAT item 8 — images become searchable documents.
+    #
+    # ⚠ Until now an uploaded `.png` was refused at this gate, so the vision machinery that
+    #   already describes images pulled OUT of a PDF could never be reached by an image
+    #   uploaded on its own. These entries are the door; `extract_text` routes them into
+    #   `vision_text.transcribe_pages`, which TRANSCRIBES rather than captions.
+    #
+    # ⛔ `image/vnd.dxf` is NOT an image and is handled by the DXF branch above it — the DXF
+    #   arm is checked FIRST in `extract_text` for exactly that reason.
+    *IMAGE_MIME_TYPES,
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -128,6 +152,16 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".eml":  "message/rfc822",
     ".msg":  "application/vnd.ms-outlook",
     ".dxf":  "application/dxf",
+    # Images. ⚠ `.jpg` is the one browsers most often announce as octet-stream from a
+    # drag-and-drop, and `.tif`/`.tiff` are reported inconsistently across platforms.
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".tif":  "image/tiff",
+    ".tiff": "image/tiff",
+    ".bmp":  "image/bmp",
+    ".gif":  "image/gif",
     # ⚠ BUG-260825-01 — `.docx` and `.pdf` WERE ABSENT, AND THAT IS THE OBSERVED SPLIT.
     #   Measured 2026-08-25 against the real endpoint: a `.docx` announced as
     #   `application/octet-stream`, `application/zip`, `application/msword` or with NO
@@ -156,6 +190,12 @@ _UNRELIABLE_MIME_TYPES: tuple[str, ...] = (
 #: Formats whose "no text" case has a CONCRETE cause a person can act on. Anything not
 #: listed here falls through to the generic sentence, which is deliberately vague because
 #: for those formats we genuinely do not know why the extractor came back empty.
+#: One sentence, six mimes — written once so the six image rows below cannot drift apart.
+_IMAGE_EMPTY_TEXT = (
+    "This image was read, but no text could be found in it. It is still stored, and it can "
+    "still be opened — there is just nothing written on it to search."
+)
+
 _EMPTY_TEXT_MESSAGES: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         "This spreadsheet is empty — none of its sheets contain any data. "
@@ -166,15 +206,35 @@ _EMPTY_TEXT_MESSAGES: dict[str, str] = {
     "text/csv":
         "This CSV has no rows — only a header, or nothing at all. "
         "Add rows and upload it again.",
+    # ⭐ REWRITTEN 2026-09-05 (SEED-226 L1). The old sentence ended with a promise that this
+    #   file needed OCR before it could be searched — naming a capability the product did not
+    #   have, which is what SEED-226 was planted on. Vision transcription now RUNS on this
+    #   case before the document is ever declared empty, so reaching this message means the
+    #   transcription was attempted and yielded nothing either.
+    #
+    # ⛔ NO DOUBLE QUOTES IN THIS BLOCK, and that is a real constraint rather than a style
+    #   preference: `ingestionFailureCopy.test.ts` extracts every string literal inside this
+    #   dict to prove each sentence survives `classifyIngestionError` unchanged, and its
+    #   walker cannot tell a quoted phrase in a COMMENT from a value. A quoted aside here
+    #   reds that fence — measured, 2026-09-05.
     "application/pdf":
-        "No text could be read from this PDF. It is most likely a scan or a set of "
-        "images, which needs OCR before it can be searched.",
+        "No text could be read from this PDF. It looks like a scan or a drawing, and "
+        "reading it as an image produced nothing legible either.",
     "message/rfc822":
         "This email has no readable message body.",
     "application/vnd.ms-outlook":
         "This email has no readable message body.",
     "application/x-msg":
         "This email has no readable message body.",
+    # SEED-226 / 233-UAT item 8. An image reaching here was readable as an image and simply
+    # had no text on it — a photograph of a landscape, say. That is not a failure of the
+    # importer and the sentence should not imply one.
+    "image/png": _IMAGE_EMPTY_TEXT,
+    "image/jpeg": _IMAGE_EMPTY_TEXT,
+    "image/webp": _IMAGE_EMPTY_TEXT,
+    "image/tiff": _IMAGE_EMPTY_TEXT,
+    "image/bmp": _IMAGE_EMPTY_TEXT,
+    "image/gif": _IMAGE_EMPTY_TEXT,
 }
 
 #: The fallback. Kept WORD-FOR-WORD as it shipped, so the generic case is unchanged.
@@ -426,6 +486,26 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             return takeoff.get("text_summary", "")
         except Exception as exc:
             return f"CAD Drawing (unparsed DXF: {exc})"
+
+    # ── SEED-226 / 233-UAT item 8 — an uploaded image IS its text.
+    #
+    # ⚠ THIS ARM MUST STAY BELOW THE DXF ARM. `image/vnd.dxf` is one of the three mimes
+    #   Windows reports for an AutoCAD drawing; it is a CAD file wearing an `image/*` label,
+    #   and sending it to a vision model would transcribe nothing while the real parser sat
+    #   one branch away.
+    #
+    # ⚠ It returns "" rather than raising when the model yields nothing, so the caller's
+    #   normal empty-text path runs and `_IMAGE_EMPTY_TEXT` explains it.
+    if mime_type in IMAGE_MIME_TYPES:
+        from app.services.extractors.aspects import vision_text  # noqa: PLC0415
+        try:
+            page = vision_text.image_to_png_b64(raw)
+        except ValueError:
+            # Bytes that are not a readable image at all. Say so as the document's text so
+            # the failure is legible in the UI rather than an empty chunk list.
+            return ""
+        # load_app_settings is sync/cache-only — the same call the ingest path makes.
+        return vision_text.transcribe_pages([page], "scan", load_app_settings())
 
     # plain text, markdown — decode as UTF-8
     decoded = raw.decode("utf-8")
@@ -1959,6 +2039,66 @@ def ingest_document(
         # handler, so D-v2.5-01 does NOT fire (it's hoisted, not newly introduced).
         app_settings = load_app_settings()
 
+        #: Stamped onto the document's metadata when a model read its text off pixels.
+        #: None means the text came from a real text layer — the two must stay tellable apart.
+        vision_provenance: dict | None = None
+
+        # ── SEED-226 L1 + L2 — READ THE PAGES WHEN THE TEXT LAYER CANNOT BE TRUSTED ───────
+        #
+        # Two shapes of PDF arrive here with text that does not represent the document, and
+        # they fail in opposite directions:
+        #
+        #   SCAN     — no text layer at all. Fails LOUDLY: zero chunks, and the user is told
+        #              the file "needs OCR", a capability this product did not have.
+        #   DRAWING  — a text layer that extracts fine and means nothing. Fails SILENTLY, and
+        #              is the more dangerous of the two. MEASURED on a real AutoCAD floor plan
+        #              (SEED-226, 2026-08-28): 2,822 line segments, 2,799 drawing ops, and a
+        #              text layer of 252 chars containing EXACTLY ONE numeral. It ingested
+        #              `completed`, with no error and nothing red, and a BOQ question against
+        #              it would have been answered from run-together room names.
+        #
+        # ⚠ THIS RUNS BEFORE METADATA EXTRACTION ON PURPOSE. Title, date and document_type are
+        #   derived from `text`; deriving them from 252 chars of room names and then replacing
+        #   the text underneath would leave the metadata describing a document that no longer
+        #   exists.
+        #
+        # ⚠ IT IS ADDITIVE FOR THE DRAWING CASE AND REPLACING FOR THE SCAN CASE. A drawing's
+        #   own text layer is poor but not false — the room names ARE on the drawing — so it is
+        #   kept and the transcription appended. A scan has nothing to keep.
+        #
+        # ⚠ EVERY FAILURE IS SOFT. No transcription, a model without vision, no API key, a
+        #   render error: the document ingests exactly as it did before this block existed.
+        if mime_type == "application/pdf" and raw:
+            try:
+                from app.services.extractors.aspects import vision_text  # noqa: PLC0415
+
+                deficit = vision_text.classify_pdf_deficit(raw, text)
+                if deficit is not None:
+                    budget = vision_text.page_budget(app_settings, deficit.pages)
+                    pages_b64 = vision_text.render_pdf_pages_b64(raw, budget)
+                    transcribed = vision_text.transcribe_pages(
+                        pages_b64, deficit.kind, app_settings,
+                    )
+                    if transcribed.strip():
+                        if deficit.kind == "drawing" and text.strip():
+                            text = f"{text.strip()}\n\n{transcribed}"
+                        else:
+                            text = transcribed
+                        vision_provenance = vision_text.provenance(
+                            deficit.kind, len(pages_b64), deficit,
+                        )
+                        log.info(
+                            "vision transcription for %s: kind=%s pages=%d chars=%d",
+                            document_id, deficit.kind, len(pages_b64), len(transcribed),
+                        )
+                    else:
+                        log.info(
+                            "vision transcription for %s produced nothing (kind=%s)",
+                            document_id, deficit.kind,
+                        )
+            except Exception:  # noqa: BLE001 — never let this block an ingest
+                log.warning("vision transcription pass failed for %s", document_id, exc_info=True)
+
         # Extract metadata FIRST so we can use it to enrich chunk embeddings.
         # This is best-effort — failures are logged but never block ingestion.
         #
@@ -2092,6 +2232,24 @@ def ingest_document(
                     metadata_dict["document_type"] = "cad_drawing"
             except Exception as dxf_exc:
                 log.warning("DXF takeoff extraction warning for %s: %s", document_id, dxf_exc)
+
+        # ── SEED-226 — SAY THAT A MODEL READ THIS, RATHER THAN A PARSER ──────────────────
+        #
+        # ⚠ NOT DECORATION. Text produced by transcription is INFERRED. Retrieval, the detail
+        #   panel and anything that later prices a line item off this document are entitled to
+        #   know that before quoting a number from it — and a transcription that cannot be told
+        #   apart from a real text layer is precisely the failure SEED-226 was planted on.
+        if mime_type in IMAGE_MIME_TYPES:
+            from app.services.extractors.aspects import vision_text  # noqa: PLC0415
+            metadata_dict = metadata_dict or {}
+            metadata_dict["_vision"] = vision_text.provenance("scan", 1)
+            if not metadata_dict.get("document_type"):
+                metadata_dict["document_type"] = "image"
+        elif vision_provenance is not None:
+            metadata_dict = metadata_dict or {}
+            metadata_dict["_vision"] = vision_provenance
+            if vision_provenance.get("kind") == "drawing" and not metadata_dict.get("document_type"):
+                metadata_dict["document_type"] = "drawing"
 
         # Normalize case-sensitive filter fields for consistent retrieval.
         # D-111-9: lowercase ONLY document_type + language; _confidence is nested and

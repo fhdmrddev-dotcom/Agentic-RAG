@@ -168,6 +168,25 @@ def test_the_generic_sentence_itself_has_not_been_reworded():
     assert _EMPTY_TEXT_DEFAULT == "No text content could be extracted from the file."
 
 
+#: Markers standing in for "this sentence tells the reader what to DO, or explains WHY".
+#:
+#: ⚠ `"OCR"` WAS ONE OF THESE AND WAS REMOVED 2026-09-05 (SEED-226). It was accepted here as
+#:   an explanation, and it was the opposite: the PDF sentence promised OCR while the backend
+#:   contained no OCR engine of any kind. A marker list that rewards naming a capability the
+#:   product lacks makes this fence complicit in the defect it exists to catch, so the promise
+#:   left the message and the word left this list in the same commit.
+#:
+#: ⚠ THIS IS A PROXY, NOT THE PROPERTY. It is deliberately narrow — the generic sentence
+#:   (`_EMPTY_TEXT_DEFAULT`, "No text content could be extracted from the file.") still fails
+#:   it, which is the case the fence was written for.
+_ACTIONABLE_OR_EXPLANATORY = (
+    "again",              # xlsx / xls / csv — says what to do
+    "body",               # the three email mimes — says which part was empty
+    "scan or a drawing",  # pdf — says what the file probably IS
+    "still stored",       # images — says the file was read and kept, not rejected
+)
+
+
 def test_every_message_is_actionable_or_explanatory_never_bare():
     """Each specific message must either tell the reader what to DO or explain WHY.
     A sentence that only restates the failure is what this change exists to remove."""
@@ -175,4 +194,18 @@ def test_every_message_is_actionable_or_explanatory_never_bare():
 
     for mime, msg in _EMPTY_TEXT_MESSAGES.items():
         assert len(msg) > 30, mime
-        assert any(w in msg for w in ("again", "OCR", "body")), (mime, msg)
+        assert any(w in msg for w in _ACTIONABLE_OR_EXPLANATORY), (mime, msg)
+
+
+def test_no_empty_text_message_promises_ocr():
+    """⛔ SEED-226'S ROOT DEFECT, FENCED SO IT CANNOT RETURN.
+
+    The product told users a file needed OCR before it could be searched while shipping no OCR
+    engine at all. Vision transcription now runs on that case, so no message may name OCR as
+    the missing step — reaching an empty-text message means transcription was already tried.
+    """
+    from app.api.documents import _EMPTY_TEXT_MESSAGES, _EMPTY_TEXT_DEFAULT
+
+    for mime, msg in _EMPTY_TEXT_MESSAGES.items():
+        assert "OCR" not in msg, (mime, msg)
+    assert "OCR" not in _EMPTY_TEXT_DEFAULT
