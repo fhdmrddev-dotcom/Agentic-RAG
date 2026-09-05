@@ -66,41 +66,77 @@ export interface AcceptedFormats {
  * entry to one array without the other reds `acceptFormats.test.ts`.
  */
 export const ACCEPTED_FORMATS: AcceptedFormats = Object.freeze({
+  // ⭐ WIDENED 2026-09-05 (operator: "the supported file format list is not updated").
+  //
+  // ⚠ THE GAP WAS MEASURED, NOT ESTIMATED: the dropzone advertised **8** formats while
+  // `documents.py`'s `ALLOWED_MIME_TYPES` accepted **17**. Five whole file types had a working
+  // parser, a real door, and no sign on it — HTML, `.eml`, `.msg`, `.xls` and DXF. The docblock
+  // above already predicted this: *"the server deliberately allows more than this list
+  // advertises — offering them is a product decision that belongs to a phase, not a constant."*
+  // This is that decision.
+  //
+  // ⛔ STILL A SUBSET, NEVER AN EQUALITY. `application/csv` remains unlisted: it is a legacy
+  // alias browsers essentially never report, and `text/csv` already covers `.csv`. Listing a
+  // mime no browser sends would inflate this constant without opening a door.
   extensions: Object.freeze([
     ".pdf",
     ".docx",
     ".pptx",
     ".xlsx",
+    ".xls",
     ".csv",
     ".txt",
     ".md",
+    ".html",
     ".epub",
+    ".eml",
+    ".msg",
+    ".dxf",
   ]),
 
   // The mime half of the literal this module replaced, verbatim. Browsers report several of
   // these unreliably (a `.docx` announced as `application/octet-stream` is measured and
   // handled SERVER-side, by extension, in `documents.py`'s override table) — which is one
   // more reason the extensions above are in the `accept` attribute too.
+  //
+  // ⚠ `.msg` and `.dxf` are the WORST offenders for that: Windows reports Outlook messages as
+  // any of three mimes and AutoCAD drawings as three more, which is exactly why the server's
+  // set carries all six. All six are listed here so the file picker greys out neither.
   mimeTypes: Object.freeze([
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
     "text/csv",
     "text/plain",
     "text/markdown",
+    "text/html",
     "application/epub+zip",
+    "message/rfc822",
+    "application/vnd.ms-outlook",
+    "application/x-msg",
+    "application/dxf",
+    "image/vnd.dxf",
+    "application/x-dxf",
   ]),
 
+  // ⚠ INDEX-ALIGNED WITH `extensions`, one label per extension — so a label can never exist
+  // that has no door behind it. Thirteen and thirteen.
   displayLabels: Object.freeze([
     "PDF",
     "DOCX",
     "PPTX",
     "XLSX",
+    "XLS",
     "CSV",
     "TXT",
     "MD",
+    "HTML",
     "EPUB",
+    "EML",
+    "MSG",
+    "DXF",
   ]),
 })
 

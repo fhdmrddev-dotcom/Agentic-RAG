@@ -78,6 +78,11 @@ vi.mock("@/providers/TechnicalNamesProvider", async (importOriginal) => {
   }
 })
 
+import { formatsSentence } from "@/components/ingestion/acceptedFormats"
+
+/** Escape a literal for use inside a RegExp — the formats sentence contains `·` and `.`. */
+const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
 import { IngestionTab } from "../IngestionTab"
 import { acceptAttribute } from "@/components/ingestion/acceptedFormats"
 import { PIPELINE_CARDS, CARD_LABEL, cardForStage } from "../ingestion/pipelineGroups"
@@ -233,7 +238,12 @@ describe("IngestionTab — Add files renders the hero dropzone (D-217.1-05)", ()
     // The hero variant renders "or" as a separator
     expect(screen.getByText("or")).toBeInTheDocument()
     // The hero variant renders the formats line from formatsSentence()
-    expect(screen.getByText(/PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB/)).toBeInTheDocument()
+    // ⚠ DERIVED, NOT TRANSCRIBED. This line used to hard-code the eight-format sentence, so
+    //    widening the list (operator, 2026-09-05) broke a test that was asserting a CONSTANT
+    //    rather than a BEHAVIOUR — the exact drift `acceptedFormats.ts` exists to prevent, in a
+    //    test written to protect it. The claim is that the dropzone PRINTS the shared list;
+    //    which formats are in that list is `acceptFormats.test.ts`'s business, not this file's.
+    expect(screen.getByText(new RegExp(escapeRegExp(formatsSentence())))).toBeInTheDocument()
   })
 
   it("the hidden file input still carries the computed accept attribute", () => {

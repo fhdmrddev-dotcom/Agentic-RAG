@@ -174,41 +174,59 @@ describe("one list, three consumers", () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════════════
-// 3 · THE NEGATIVE ARM — the two formats the sketch's own fence caught
+// 3 · THE FIVE FORMATS THAT HAD A DOOR AND NO SIGN
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THIS SECTION USED TO ASSERT THE OPPOSITE, AND THE INVERSION IS THE POINT.
+//
+// It was a NEGATIVE arm — `.msg` and `.eml` must NOT be advertised — written when an older
+// dropzone offered formats the input then refused. But its own second case recorded, in as many
+// words, that **the server's silence was not the reason: it allows them.** The dropzone was
+// deliberately narrower, and `acceptedFormats.ts`'s docblock said exactly what that meant:
+// *"offering them is a product decision that belongs to a phase, not a constant."*
+//
+// ⭐ The operator made that decision on 2026-09-05 — *"the supported file format list is not
+// updated"* — so the arm flips from absence to PRESENCE. The measurement underneath never
+// changed; only the product call did. Kept as an inversion rather than a deletion so the history
+// reads correctly: this was never a bug being fixed, it was a fence outliving its condition.
 // ══════════════════════════════════════════════════════════════════════════════════════
 
-describe("⛔ the formats an older dropzone advertised and the input refuses", () => {
+describe("⭐ the formats the server accepted while the dropzone stayed silent", () => {
   // Needles assembled at runtime so this file's prose cannot satisfy the checks.
   const OUTLOOK = "." + "msg"
   const EMAIL = "." + "eml"
 
-  it("neither appears in extensions, labels or the accept attribute", () => {
-    // Non-vacuity for an ABSENCE arm: the lists really do have contents to be absent from.
-    expect(ACCEPTED_FORMATS.extensions.length).toBeGreaterThan(1)
-
-    expect(ACCEPTED_FORMATS.extensions).not.toContain(OUTLOOK)
-    expect(ACCEPTED_FORMATS.extensions).not.toContain(EMAIL)
-    expect(ACCEPTED_FORMATS.displayLabels).not.toContain(OUTLOOK.slice(1).toUpperCase())
-    expect(ACCEPTED_FORMATS.displayLabels).not.toContain(EMAIL.slice(1).toUpperCase())
+  it("both are advertised now — extension, label and accept attribute", () => {
+    expect(ACCEPTED_FORMATS.extensions).toContain(OUTLOOK)
+    expect(ACCEPTED_FORMATS.extensions).toContain(EMAIL)
+    expect(ACCEPTED_FORMATS.displayLabels).toContain(OUTLOOK.slice(1).toUpperCase())
+    expect(ACCEPTED_FORMATS.displayLabels).toContain(EMAIL.slice(1).toUpperCase())
 
     const attr = acceptAttribute()
-    expect(attr.length).toBeGreaterThan(50) // the string is real before we assert on absence
-    expect(attr).not.toContain(OUTLOOK)
-    expect(attr).not.toContain(EMAIL)
-    expect(formatsSentence()).not.toContain(OUTLOOK.slice(1).toUpperCase())
+    expect(attr.length).toBeGreaterThan(50)
+    expect(attr).toContain(OUTLOOK)
+    expect(attr).toContain(EMAIL)
   })
 
-  it("⚠ and the SERVER's silence is not the reason — it allows them", () => {
-    // Measured 2026-08-29 and recorded so a future editor does not "reconcile" the two in
-    // the wrong direction. The server's set is WIDER; the dropzone is deliberately narrower,
-    // which is exactly what the subset fence permits and equality would have forbidden.
+  it("⚠ and the SERVER really does allow them — the claim above rests on this", () => {
+    // Unchanged from the negative arm. It was the caveat; it is now the justification.
     const server = new Set(serverAllowedMimeTypes())
     expect(server.size).toBeGreaterThanOrEqual(8) // non-vacuity before the claim
     expect(server.has("message/rfc" + "822")).toBe(true)
   })
+
+  it("⛔ the list is still a SUBSET — widening is not the same as equality", () => {
+    // The direction is load-bearing twice over (see the module docblock): `accept` is not a
+    // security control, and this constant may only ever make the client STRICTER than the gate.
+    const server = new Set(serverAllowedMimeTypes())
+    for (const m of ACCEPTED_FORMATS.mimeTypes) expect(server.has(m)).toBe(true)
+    expect(ACCEPTED_FORMATS.mimeTypes.length).toBeLessThan(server.size + 1)
+    // …and one server mime is deliberately still unlisted, so "subset" is not an accident.
+    expect(server.has("application/csv")).toBe(true)
+    expect(ACCEPTED_FORMATS.mimeTypes).not.toContain("application/csv")
+  })
 })
 
-// ══════════════════════════════════════════════════════════════════════════════════════
 // 4 · THE KEY LINK — the consumer really reads the constant, and prints no percentage
 // ══════════════════════════════════════════════════════════════════════════════════════
 

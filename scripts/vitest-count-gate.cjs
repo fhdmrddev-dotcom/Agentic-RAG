@@ -3034,7 +3034,9 @@ const BASELINE = {
   // Phase 114 move-to-folder row action), so BOTH are pinned and NEITHER is excluded — an
   // undocumented exclusion is how a suite becomes invisible.
   "renameFence.test.ts": 15,
-  "acceptFormats.test.ts": 19,
+  // 19 → 20 at the format-list widening: the negative arm inverted to a presence arm, plus a
+  // new case proving the list is still a SUBSET (one server mime deliberately unlisted).
+  "acceptFormats.test.ts": 20,
   // ⚠ RE-PINNED 25 → 31 at Phase 233. It was UNDER-pinned by five before this phase touched it
   // (the gate's contract is no per-file DECREASE, so an under-pin is silent), and 233 repaired
   // an INHERITED red in it: `229-03` added `"ingestion_step": "failed"` to `documents.py`, which
