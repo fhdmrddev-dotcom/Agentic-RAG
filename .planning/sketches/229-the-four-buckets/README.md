@@ -21,7 +21,7 @@ it"*, is the one every tidy design deletes.
 
 ```
 open .planning/sketches/229-the-four-buckets/index.html
-node .planning/sketches/229-the-four-buckets/drive.cjs     # 64 assertions
+node .planning/sketches/229-the-four-buckets/drive.cjs     # 68 assertions
 ```
 
 > ⚠ **REBUILT 2026-09-05 (operator: *"even 229 includes a lot of text and noise"*).** The design decisions
@@ -80,6 +80,49 @@ rather than rewritten, because a superseded recommendation is evidence and an ov
   Its *filter semantics* are the defect. Try it in the browser: turn off the fourth chip and the surface
   reads as a clean three-way split, one click away, and it survives a screenshot and a handover.
 
+## Where this lives, and how wide it is
+
+⚠ **MEASURED at the operator's question (2026-09-05): *"why is the width reduced — where will this page be…
+we should unify the width of all"*.** Three answers, none of them a guess.
+
+**1. The sketch's old 880/900px was MINE, not the product's.** It was the sketch page's own container. No
+design decision sat behind it.
+
+**2. This surface has no home yet — and that is a Phase 232 leftover, not a Phase 233 choice.**
+`SourceFolderPicker.tsx` shipped at `232-04` and is **mounted nowhere**: `grep -rl SourceFolderPicker
+frontend/src` returns the component and its own test, and nothing else. **Phase 233 must give it one.**
+Recommended home: the Library's **Ingestion tab** — where getting-things-in already lives (`IngestionTab`
+hosts upload) and where Phase 234's watch loop lands. **Not a sixth tab.** So the preview inherits
+`LibraryPage`'s measure, whatever that is.
+
+**3. There is still no width convention, and the operator's own prior ruling is in the code, un-propagated.**
+`SettingsPage.tsx:930-950` carries a comment dated **2026-08-28** quoting the same complaint —
+*"why did we make it narrow… we have to maintain consistency in all the pages"* — which adopted
+`max-w-6xl` for Settings **and stopped there**. Re-derived today:
+
+| Page | Container | px |
+|---|---|---|
+| `SettingsPage.tsx:950` | `max-w-6xl w-full mx-auto` | **1152** |
+| `ConnectionsPage.tsx` | `max-w-6xl` | **1152** |
+| `WorkflowsPage.tsx:1238` | `max-w-[1200px] mx-auto` | 1200 |
+| `WorkflowBuilderPage.tsx:2053` | `max-w-[640px]` | 640 |
+| **`LibraryPage.tsx:641`** | `p-8` — **no max-width** | **unconstrained** |
+| `GovernancePage` · `SkillsPage` | none | unconstrained |
+
+⭐ **DECISION for plan-phase: `max-w-6xl` = 1152px, everywhere.** It is a width the app **already uses
+twice** and it was the operator's own adoption — so this **takes a precedent instead of inventing a fifth
+number**, which is the reasoning the 2026-08-28 comment used and the reason there are four widths rather
+than five.
+
+- Both sketches now declare a single `--measure:1152px` token and use `var(--measure)`; `drive.cjs` pins it
+  in **both files and asserts they agree with each other**, driven RED against a drift back to 880px and
+  against a re-introduced literal.
+- ⚠ **`LibraryPage` is the actual inconsistency** — it is unconstrained today. Applying `max-w-6xl` there is
+  a one-line change, and **the thing to eyeball is the Documents tab**, which pairs a folder rail with a
+  seven-column table whose column order is load-bearing (`LibraryPage` sheds columns 3-5 by `nth-child`).
+- ⚠ `WorkflowsPage`'s `1200` is 48px off the same measure. **Named, not silently folded in** — it is outside
+  this phase's blast radius.
+
 ## Why the animation is load-bearing
 
 Not decoration, and this is the part to judge in the browser:
@@ -120,7 +163,7 @@ resolves that way.
 
 ## Driven, not asserted
 
-`drive.cjs` — **64 assertions, extracted from the running sketch rather than a copy of it**: bucket counts
+`drive.cjs` — **68 assertions, extracted from the running sketch rather than a copy of it**: bucket counts
 sum to the scan total, four sections exist with no removal control, every unknown carries a full reason
 behind its fragment, every added row carries a destination, the labels are verbatim in all three variants,
 and the "already here" copy makes no hash claim. **It also guards the density** — annotations off by

@@ -110,6 +110,26 @@ ok("outcome reasons are delivered by hover, not printed", /data-full/.test(HTML)
 ok("annotations are OFF by default", /\.note\{display:none/.test(HTML) && /body\.notes \.note\{display:block/.test(HTML));
 ok("only one variant is on screen at a time", /\.v\{display:none\}/.test(HTML));
 
+/* -- 9. THE ONE MEASURE --------------------------------------------------
+   Operator direction 2026-09-05: "we should unify the width of all". The number is
+   Tailwind's max-w-6xl (1152px), already used by SettingsPage.tsx:950 and
+   ConnectionsPage -- adopted rather than invented, and pinned here so the two
+   sketches cannot drift apart from each other or from the app. */
+const MEASURE = 1152;
+const tok = (HTML.match(/--measure:\s*(\d+)px/) || [])[1];
+ok("the page declares a single --measure token", !!tok, "found " + tok);
+ok(`--measure is ${MEASURE}px (Tailwind max-w-6xl, the app's existing precedent)`,
+   Number(tok) === MEASURE, tok + "px");
+ok("the stage uses the token rather than a literal width",
+   /\.stage\{max-width:var\(--measure\)/.test(HTML));
+ok("no hard-coded page width survives beside the token",
+   !/\.stage\{max-width:\d/.test(HTML));
+
+if (fs.existsSync(SIB)) {
+  const sibTok = (fs.readFileSync(SIB, "utf8").match(/--measure:\s*(\d+)px/) || [])[1];
+  ok("229 and 230 declare the SAME measure", sibTok === tok, `229:${sibTok} 230:${tok}`);
+}
+
 const line = "─".repeat(62);
 console.log(line);
 console.log("sketch 230 · nothing has been written yet — drive");

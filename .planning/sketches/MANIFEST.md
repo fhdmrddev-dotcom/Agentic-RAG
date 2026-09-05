@@ -2524,7 +2524,7 @@ labels are the deliverable, not decoration"*. Both sketches are therefore accept
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 229 | the-four-buckets | How do four buckets read so the fourth one's uncertainty is FELT, not filed away? | ✅ **C · the proportional spine** (operator, 2026-09-05) — recommendation had been A + C's bar | phase-233, prev-01, lib-09, preview, animation, g-2, acceptance-bar |
-| 230 | nothing-has-been-written-yet | When the buckets are a bar, what does the confirm look like — and where does a NAMED refusal live once prose is off the screen? | *pending* — **A the bar dissolves** (recommended) + **C's zero-line** as its footer · ⛔ B fails SC#5 | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
+| 230 | nothing-has-been-written-yet | When the buckets are a bar, what does the confirm look like — and where does a NAMED refusal live once prose is off the screen? | ✅ **A · the bar dissolves** (operator, 2026-09-05), + **C's zero-line** as its footer · ⛔ B fails SC#5 | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
 
 ### The axis both sketches were decided on
 
@@ -2622,3 +2622,46 @@ row** — dashed, a *would* verb, counts as `41 → 44` never as a new total.
 SC#5**: a refusal that is only a colour is a count, not a named refusal. **Density is not the only way to
 fail this screen** — and a sketch session that had just been told "too dense" needed that counter-example
 on the record.
+
+### ⭐ THE ONE MEASURE — 1152px, and the ruling that was already made and never propagated
+
+> Operator, 2026-09-05: *"why the width is reduced — where this page will be … we should unify the width
+> of all"*.
+
+**The sketches' 880/900px was the SKETCH PAGE's container, not a product decision** — said plainly rather
+than defended. But the question exposed two measured facts worth more than the fix:
+
+**1. `SourceFolderPicker.tsx` — shipped at `232-04` — is MOUNTED NOWHERE.** `grep -rl SourceFolderPicker
+frontend/src` returns the component and its own test and nothing else. **Phase 233 must give it a home**, and
+the recommendation is the Library's **Ingestion tab** (where `IngestionTab` already hosts upload, and where
+Phase 234's watch loop lands) — **not a sixth tab**. A phase that ships a picker with no mount site is how a
+capability becomes invisible to everything except its own suite.
+
+**2. The operator's own prior width ruling is sitting in the code, un-propagated.** `SettingsPage.tsx:930-950`
+carries a comment dated **2026-08-28** quoting *the same complaint* — *"why did we make it narrow… we have to
+maintain consistency in all the pages"* — which adopted `max-w-6xl` for Settings **and stopped there**.
+Re-derived 2026-09-05:
+
+| Page | Container | px |
+|---|---|---|
+| `SettingsPage.tsx:950` | `max-w-6xl w-full mx-auto` | **1152** |
+| `ConnectionsPage.tsx` | `max-w-6xl` | **1152** |
+| `WorkflowsPage.tsx:1238` | `max-w-[1200px] mx-auto` | 1200 |
+| `WorkflowBuilderPage.tsx:2053` | `max-w-[640px]` | 640 |
+| **`LibraryPage.tsx:641`** | `p-8` — **no max-width** | **unconstrained** |
+| `GovernancePage` · `SkillsPage` | none | unconstrained |
+
+⭐ **DECISION: `max-w-6xl` = 1152px is THE measure.** Chosen because the app **already uses it twice** and it
+was the operator's own adoption — **taking a precedent rather than inventing a fifth number**, which is the
+identical reasoning the 2026-08-28 comment used, and the reason the count is four widths and not five.
+
+- Both sketches declare a single `--measure:1152px` token and consume `var(--measure)`. **`drive.cjs` pins it
+  in BOTH files and asserts they agree with each other** — driven RED against a drift back to 880px and
+  against a re-introduced literal.
+- ⚠ **`LibraryPage` is the actual inconsistency, and it is unconstrained TODAY.** Applying `max-w-6xl` there
+  is a one-line change; **the thing to eyeball is the Documents tab**, which pairs a folder rail with a
+  seven-column table whose column order is load-bearing (`LibraryPage` sheds columns 3-5 by `nth-child`).
+- ⚠ `WorkflowsPage`'s `1200` is 48px off the same measure. **Named, not silently folded in** — outside this
+  phase's blast radius, and a fifth number appearing by accident is exactly what this entry exists to stop.
+
+⭐ **Both G-2 sketches are now LOCKED: 229 → C, 230 → A.** Phase 233 has its acceptance bar.

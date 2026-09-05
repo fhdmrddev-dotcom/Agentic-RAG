@@ -5,8 +5,8 @@ phase: 233
 requirement: PREV-02, PREV-03, LIB-09
 guardrail: G-2
 question: "When the buckets are a bar (229-C), what does the confirm look like — and where does a NAMED refusal live if prose is off the screen?"
-winner: null
-status: awaiting-operator
+winner: "A"
+status: locked
 variants: 3
 date: 2026-09-05
 author: claude
@@ -19,7 +19,7 @@ tags: [preview, confirm, dry-run, two-tier-identity, refusal, animation, g-2]
 
 ```
 open  .planning/sketches/230-nothing-has-been-written-yet/index.html
-node  .planning/sketches/230-nothing-has-been-written-yet/drive.cjs    # 47 assertions
+node  .planning/sketches/230-nothing-has-been-written-yet/drive.cjs    # 52 assertions
 ```
 
 > ⚠ **REBUILT 2026-09-05 (operator: *"too dense … a lot of text that's very messy and very polluted"*).**
@@ -49,7 +49,23 @@ these three, and it is why the leanest variant is not the winner.
 | **B** | **The strip** | One row of pills + four dots that flip colour | ⛔ too spare — **fails SC#5** |
 | **C** | **The drawer** | The read/write ledger, and a drawer of the four unknowns | ⚠ good ledger, wrong place for the resolution |
 
-## Recommendation — A, with C's ledger reduced to one line
+## ✅ LOCKED 2026-09-05 (operator): **A — the bar dissolves**
+
+Recommended and selected. **What A carries into the build:**
+
+- **No second screen.** 229-C's segmented bar *is* the progress — the hatched segment shrinks file by file
+  into `added` / `already here` / a new red `refused`. The object you were reading becomes the object you
+  are watching.
+- **The reconciliation line** — `26 accounted · 0 unaccounted — preview said 12 → 12 added` — is the SC#4
+  receipt, and it is the same arithmetic `drive.cjs` asserts.
+- **C's zero-line ships with it**, in the footer: `0 documents · 0 chunks · 0 jobs · 0 folders`. C's
+  **expanded** read/write ledger does **not** — it goes behind a disclosure, or it is the density problem
+  returning.
+- ⚠ **B's failure must not be re-introduced by a later "simplification".** A refusal that is only a colour
+  is a count; SC#5 requires a named one. `drive.cjs` asserts every refusal names a cause and says it was
+  not imported.
+
+## Recommendation as written before the pick — A, with C's ledger reduced to one line
 
 - **A** — no second screen and no new object: **the thing you were reading becomes the thing you are
   watching.** The hatched width physically moves into a real outcome as each file is opened. It composes
@@ -90,7 +106,7 @@ publishes no hash for native Docs — so the preview said *"can't tell"* and it 
 
 ## Driven, not asserted
 
-`drive.cjs` — **47 assertions**, and it **cross-checks 229's fixture** so the preview and the confirm cannot
+`drive.cjs` — **52 assertions**, and it **cross-checks 229's fixture** so the preview and the confirm cannot
 come to disagree about the same folder (a ROADMAP failure mode in its own words).
 
 | Planted defect | Fires |
@@ -102,6 +118,14 @@ come to disagree about the same folder (a ROADMAP failure mode in its own words)
 | the re-embed cost claim is dropped | ✅ 1 |
 
 `index.html` restored **md5-identical** after every plant.
+
+## Width and home
+
+Both sketches now sit at **`--measure:1152px`** (Tailwind `max-w-6xl`) — the width `SettingsPage.tsx:950`
+and `ConnectionsPage` already use, adopted at the operator's *"we should unify the width of all"*
+(2026-09-05). `drive.cjs` pins the token in both files **and asserts they agree with each other**.
+Full inventory, the un-propagated 2026-08-28 ruling, and the recommended home (the Library's **Ingestion
+tab**; `SourceFolderPicker` from 232 is currently mounted **nowhere**) are in **229's README**.
 
 ## Related
 

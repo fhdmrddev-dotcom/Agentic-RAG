@@ -117,6 +117,21 @@ ok("README names tier-1 identity and refuses to call it a hash",
 ok("the superseded recommendation is preserved, not overwritten",
    /Superseded recommendation/.test(RDME));
 
+/* -- 13. THE ONE MEASURE --------------------------------------------------
+   Operator direction 2026-09-05: "we should unify the width of all". The number is
+   Tailwind's max-w-6xl (1152px), already used by SettingsPage.tsx:950 and
+   ConnectionsPage -- adopted rather than invented, and pinned here so the two
+   sketches cannot drift apart from each other or from the app. */
+const MEASURE = 1152;
+const tok = (HTML.match(/--measure:\s*(\d+)px/) || [])[1];
+ok("the page declares a single --measure token", !!tok, "found " + tok);
+ok(`--measure is ${MEASURE}px (Tailwind max-w-6xl, the app's existing precedent)`,
+   Number(tok) === MEASURE, tok + "px");
+ok("the stage uses the token rather than a literal width",
+   /\.stage\{max-width:var\(--measure\)/.test(HTML));
+ok("no hard-coded page width survives beside the token",
+   !/\.stage\{max-width:\d/.test(HTML));
+
 const line = "─".repeat(62);
 console.log(line);
 console.log("sketch 229 · the four buckets — drive   (winner: C)");
