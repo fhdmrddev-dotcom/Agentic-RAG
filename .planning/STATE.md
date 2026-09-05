@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
 status: in_progress
-last_updated: "2026-09-05T12:00:00.000Z"
-last_activity: 2026-09-05
+last_updated: "2026-09-06T00:00:00.000Z"
+last_activity: 2026-09-06
 progress:
   total_phases: 14
-  completed_phases: 5
-  total_plans: 8
-  completed_plans: 8
-  percent: 36
+  completed_phases: 6
+  total_plans: 13
+  completed_plans: 13
+  percent: 43
 ---
 
 # Project State
@@ -37,11 +37,56 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 234 — The Watch Loop: The Library Reads By Itself (NOT STARTED) · 233 complete
-Prior: 233 — The Preview: See It Before It Lands (BUILT **AND** verified by Claude — Gemini out by operator direction. ⚠ the reviewer built it)
+Phase: 234 — The Watch Loop: The Library Reads By Itself (COMPLETE) · 235 next
+Prior: 234 — The Watch Loop: The Library Reads By Itself (BUILT by Gemini, REVIEW ready for Claude)
 Plan: none in flight
 Status: between_phases
-Last activity: 2026-09-05 — Phase 231 CLOSED (`231-SUMMARY.md` written, ROADMAP progress + checklist updated, migration reservations 234-241 shifted +2).
+Last activity: 2026-09-06 — Phase 234 EXECUTION COMPLETE: 5/5 waves landed, 38 backend unit tests green, 64 vitest tests green, gates passing.
+
+### ✅ Phase 234 — The Watch Loop: The Library Reads By Itself COMPLETE (2026-09-06, Gemini — built; Claude reviewing)
+
+**Verdict: PASS on all implementation criteria at the unit, wire, and UI grain across all 5 waves.**
+Built by Gemini under pairing protocol (`AGENTS.md §3`). Role separation strictly preserved. All 5 plans committed and documented (`234-01-PLAN.md` through `234-05-PLAN.md` + summaries).
+
+⭐ **Wave 1 (234-01): DB Layer & Migrations 168-171 Landed**
+- Schema migrations `168_connector_watches.sql`, `169_connector_watch_items.sql`, `170_documents_source_state.sql`, and `171_reserved.sql` committed and live.
+- DB models and DAL functions in `backend/app/db/watches.py` (6/6 tests passing in `tests/unit/db/test_watches_db.py`).
+- Full schema sync maintained without schema drift.
+
+⭐ **Wave 2 (234-02): WatchService Engine & Lifecycle Diff**
+- `backend/app/services/watch_service.py` implemented reading on the scheduler cadence with per-watch and per-item error isolation (`SEED-239`).
+- **H-5 Completeness Guard**: `SourceListing.complete` defaults to `False` (fail-closed); set to `True` only when pagination exhausts with `next_page_token is None` and 0 errors. A non-complete listing strictly forbids marking files missing (Onyx #1161 guard).
+- Storage upload occurs before job enqueue (preventing empty document ingestion). File rename/move/re-share without duplicates (`SC#4`).
+- Tests: 10/10 green across `test_watch_service.py` and `test_watch_diff_completeness.py`.
+
+⭐ **Wave 3 (234-03): Security Fences & CLAUDE.md Standing Rule Retired**
+- **H-4 / VIS-06 Classification Fence**: Strict visibility fence at `documents.py:1892` (`accept_classification`) and `documents.py:2325` (rule evaluation) preventing private-to-org-shared widening unless `force=True`.
+- **TRUST-03 Trifecta Guard**: Anti-injection fence in `backend/app/services/tool_dispatcher.py` forcing confirmation posture (`ask`) when write tools are called with connection content in retrieval context. Preserved `agent_loop.py` byte-identically (zero SC#10 triggers).
+- **VIS-05 Disconnect Freeze**: Connector deletion/token revocation freezes watches and retains documents safely without deletion.
+- **Standing Rule Retired**: `CLAUDE.md` rule forbidding automated ingestion without explicit upload button retired in the same commit.
+- Tests: 12/12 green across `test_classification_visibility_fence.py`, `test_tool_dispatcher_trifecta_fence.py`, and `test_disconnect_freeze.py`.
+
+⭐ **Wave 4 (234-04): Sources API & Wire Endpoints**
+- FastAPI endpoints for watches in `backend/app/api/sources.py` (`/sources/watches`, `/api/sources/watches` aliases), lifecycle triggers (`/poll`, `/purge`, `/pause`, `/resume`).
+- Wire models in `backend/app/schemas/source.py`.
+- Frontend API client in `frontend/src/lib/api/sources.ts`.
+- Tests: 10/10 green in `tests/unit/api/test_sources_watches_api.py`.
+
+⭐ **Wave 5 (234-05): Frontend Watched Folders Surface**
+- UI surface in `frontend/src/components/sources/WatchedFoldersSection.tsx` and `CreateWatchModal.tsx`.
+- Mounted cleanly in `frontend/src/components/library/IngestionTab.tsx` beside `ConnectedSourceSection`, pre-empting G-1 risk by leaving `ConnectionFormPanel.tsx` and `ConnectionsTab.tsx` 100% untouched.
+- Strict invariant copy: `checked every ${watch.interval_minutes} minutes` (`SURF-01`).
+- Vitest count gate updated and pinned in `scripts/vitest-count-gate.cjs` (`WatchedFoldersSection.test.tsx: 6`).
+- Tests: 64/64 frontend vitest tests green across `SourceFolderPicker`, `previewVocabulary`, `WatchedFoldersSection`, and `SourcePreviewPanel`.
+
+⭐ **Gates & Integrity**:
+- Backend unit tests: 38/38 Phase 234 tests green (0 failed, 0 errors, within the locked 71 ceiling).
+- Frontend vitest tests: 64/64 green.
+- Deploy drift gate (`scripts/check-deploy-drift.sh`): PASS (0 drift across `.env.example`, `deploy/onebox.env.example`, `docker-compose.prod.yml`, and `docs/OPERATOR.md`).
+- CLAUDE.md size gate: 111,333 chars / 74.2% of 150k limit (headroom: 38,667 chars).
+- Discrete bugfixes committed cleanly: `BUG-260905-12`, `BUG-260905-13`, `BUG-260905-14`, `BUG-260905-15`.
+
+---
 
 ### ✅ Phase 233 — The Preview: See It Before It Lands COMPLETE (2026-09-05, Claude — built AND verified)
 
