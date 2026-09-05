@@ -2175,6 +2175,20 @@ carries the verdict — **⚠ absent at 56 phases (added 196)** — and this is 
 
 ### `scripts/vitest-count-gate.cjs`
 
+⚠ **RE-DERIVED 2026-09-05 (Phase 233): `159 / 36 / 4687`** — the row read `141 / 28 / 4514`.
+Honoured by construction: **2 BASELINE pins + 2 TARGETS lines + 1 re-pin**, and NO change to any
+logic, threshold or check.
+
+⚠ **BOTH KNOBS WERE NEEDED, AND THAT WAS CHECKED RATHER THAN ASSUMED.** `src/components/sources` is
+**not** a directory entry — `SourceFolderPicker.test.tsx` is pinned by an explicit PATH, and a path
+entry recurses into nothing. Phase 214's `WorkflowScheduleModal.test.tsx` finding (a suite that RAN
+for phases while guarding nothing) would have recurred here, on the milestone's differentiator.
+
+⚠ **`IngestionStrip.test.tsx` was found UNDER-PINNED at 25 against 30 actual** and re-pinned to 31.
+An under-pin is silent, because the contract is *no per-file DECREASE* — five cases could have been
+deleted without a word.
+
+
 **⚠ RE-DERIVED AT PHASE 214.1's CLOSE (2026-08-28, plan `214.1-02`): `124 / 24 / 4045` → `127 commits / 25 phases / 4189 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814`. Recorded beside every previous value, never over them. **Honoured by construction:** the edit adds one `TARGETS` line and re-baselines six BASELINE pins — **no logic, no threshold and no check changed.** Its standing finding — *absent at 16 phases, the file that ENFORCES the guardrails* — is NOT discharged by this and must not appear to be.
 
 ⭐ **THE TWO-KNOB TRAP, MEASURED TWICE IN ONE PHASE WITH OPPOSITE ANSWERS.** `214.1` created two suites ten directories apart:
@@ -6283,6 +6297,16 @@ Phases touched: 206.1, 212.
 
 ## `backend/app/models/connector.py`
 
+⚠ **RE-DERIVED 2026-09-05 (Phase 233): `18 / 10 / 676`** — the row read `12 / 6 / 471`, **stale by 6
+commits and 4 phases**. Honoured by construction: five preview models appended at the end, none of
+them editing an existing one.
+
+⭐ **`bucket` and `outcome` are `Literal`s, and that is the enforcement point.** A fifth bucket or a
+fourth outcome is a `ValidationError` at the wire boundary, in a diff a reviewer reads — the same
+reason `ConnectorConnectionResponse` is `extra='forbid'`. SC#1's "four lists" and SC#5's "never
+silently in neither" are held HERE, not by a convention in a component.
+
+
 **Re-derived 2026-08-27 (Phase 212):** `6 commits / 3 phases / 468 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
 Phases touched: 190, 211, 212.
 
@@ -6300,6 +6324,12 @@ Phases touched: 211, 212.
 ---
 
 ## `backend/app/api/connectors.py`
+
+⚠ **RE-DERIVED 2026-09-05 (Phase 233): `33 / 16 / 1879`** — the row read `32 / 15 / 1757`.
+**THE EXTRACTION IS STILL OWED AND THE FILE GREW BY ANOTHER 122 LINES** (two preview routes). The
+named seam is unchanged. Recorded rather than re-promised: 232-03 claimed a discharge that 232-04
+falsified, and 233 does not repeat the claim — it adds routes and says so.
+
 
 ⚠⚠ **CORRECTION AT PHASE 232's CLOSE — THE `232-03` DISCHARGE CLAIM WAS FALSIFIED BY `232-04`.**
 The original cell is quoted here rather than quietly overwritten, because the claim being WRONG is
@@ -6570,6 +6600,12 @@ One of the twelve domain modules the 207 split created. The barrel re-exports it
 
 ### `frontend/src/lib/api/connectors.ts`
 
+⚠ **RE-DERIVED 2026-09-05 (Phase 233): `12 / 7 / 690`** — the row read `11 / 6 / 594`. Honoured by
+construction: `previewSource` and `confirmSourcePreview` share ONE `postPreview` helper rather than
+duplicating the auth/error dance a third time. ⚠ **`lib/api.ts`'s row is the BARREL, not this
+module** — a green cell there says nothing about this file.
+
+
 **11 / 6 / 594** — re-derived at Phase 232's close (`1ae6defbb`).
 
 ⚠ **Absent from the scan list and from this file for its ENTIRE LIFE, at six phases.** The Phase 207
@@ -6656,6 +6692,19 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 ---
 
 ### `frontend/src/pages/LibraryPage.tsx`
+
+⚠ **RE-DERIVED 2026-09-05 (Phase 233): `40 / 12 / 825`** — the row read `35 / 11 / 814`.
+**Honoured by construction:** 233 changed ONE container class and no branch, because 217-09's seam
+was taken and every tab body is already a CHILD.
+
+⭐ **D-233-07 — THIS PAGE WAS THE APP'S ACTUAL WIDTH INCONSISTENCY.** It carried `p-8` and **no
+max-width at all**, running edge to edge while `SettingsPage.tsx:950` and `ConnectionsPage` both sat
+at `max-w-6xl` (1152px). 233 adopts the same token — **a precedent taken, never a fifth number
+invented**, which is the reasoning the un-propagated 2026-08-28 comment in `SettingsPage.tsx` used.
+⚠ `WorkflowsPage`'s `max-w-[1200px]` is 48px off the same measure and is **named, not silently folded
+in** — it was outside 233's blast radius. ⚠ The thing to eyeball on any width change here is the
+**Documents tab**, whose seven-column table sheds columns 3-5 by `nth-child`.
+
 
 **Triple re-derived 2026-08-30 (Phase 217.1 close): `35 / 11 / 814` — G-5: ⚠ FIRES.** ⚠ **The 2026-08-29 close measured `28 / 10 / 724` and is preserved rather than overwritten — Phase 217.1's five-tab shell grew it `+90 L`.** Same-day staleness is this ledger's most-repeated finding; it has now been demonstrated three times on this one file. ⚠ Absent for its entire life until 2026-08-28; the 2026-08-28 re-derivation read `26 / 9 / 601` at the old path and is preserved here rather than overwritten.
 
@@ -7175,3 +7224,209 @@ Phases touched: 221, 222, 232.
 - ⚠ Outbound egress must never resolve to loopback, link-local, or private RFC1918 addresses.
 - ⚠ All egress calls use pinned endpoint keys, bounded payload limits, and strict timeouts.
 
+
+---
+
+### `backend/app/services/sources/preview_service.py`
+
+**1 / 1 / 549 — young (Phase 233).** The milestone's differentiator, and the one classifier the
+whole preview rests on.
+
+⭐ **THE PREVIEW *IS* THE DIFF PASS.** `confirm_preview` calls `build_preview` rather than deriving
+anything a second time. A preview built as its own code path is guaranteed to eventually disagree
+with the ingest, and the ROADMAP names that as a failure mode in its own words: *"the first
+divergence from the ingest verdict is found by a user."*
+
+**Invariants:**
+
+- ⛔ **`build_preview` writes NOTHING** — no document, chunk, ingestion job, folder, or audit entry
+  that reads like an import. Rule evaluation is a **READ**: `build_suggestion` resolves a folder
+  **name**, and no folder is minted. `test_preview_service.py` makes that structural with a Supabase
+  double whose **every write verb raises**, so a stray `insert` is a test failure rather than a
+  review miss.
+- ⛔ **Tier-1 identity is an EQUALITY, never a hash.** `(source_system, external_id,
+  source_version)`, and the word must not appear in a `here` verdict.
+  `PROJECT.md`'s *"a `content_hash` lookup, not a guess"* is FALSE for a list-only pass, measured:
+  `documents.py:620` hashes raw **bytes**; Drive publishes **no** identity for native
+  Docs/Sheets/Slides; Graph guarantees only `quickXorHash` and populates hashes **after** download.
+- ⛔ **`BUCKETS` is a 4-tuple and `Outcome` is a 3-value `Literal`.** No fifth bucket, no fourth
+  outcome — SC#5's *"silently in neither"* is **unrepresentable**, not merely unlikely.
+- ⚠ **ARM 6 IS LOAD-BEARING AND LOOKS LIKE A BUG UNTIL YOU READ IT.** `application/pdf` **is** in
+  `ALLOWED_MIME_TYPES`, and the classifier still sends it to `unk`. An image-only scan has no text
+  and only reading it can say so; a "supported-first" ordering would count every scan as *will be
+  added*, which is precisely how a preview lies.
+- ⚠ **The tier-1 index is scoped to the CONNECTION, not the org.** Two connections into the same
+  Drive are two different placements, and conflating them would let one connection's import make
+  another's preview claim *"already here"* about a file it never placed.
+- ⚠ **An unreadable index returns an empty map and claims nothing is here.** Fail toward honesty: a
+  preview that cannot read the Library must not fabricate an *"already here"*.
+
+**No seam proposed at 1 phase.** ⚠ **The thing to watch is the classifier's arm count.** Every new
+source family (Graph at 238, MCP at 239) will want an arm, and eight ordered arms is already the
+limit of what reads as one rule. The seam when it comes is **per-family verdict tables consulted by
+one ordered walk**, never a second classifier — the whole design claim of this file is that there is
+exactly one.
+
+---
+
+### `backend/app/services/sources/import_service.py`
+
+**2 / 2 / 172 — young (232, 233).** The single-file import door, re-pointed onto the source contract
+at 232 and taught tier-1 identity at 233.
+
+**Invariants:**
+
+- ⚠ **All four of Phase 233's parameters default to `None`** (`folder_id`, `external_id`,
+  `source_version`, `source_system`), so the Phase 216 attach door
+  (`POST /connections/{id}/files/{file_id}/import`) mints **exactly** the row it minted before —
+  same fields, same absence of a `metadata` key. That is what keeps 229's verification pin valid.
+- ⭐ **`_already_here` is a TRANSPORT flag, never a column.** It rides on the returned dict so
+  `confirm_preview` can distinguish a duplicate from a fresh mint.
+- ⛔ **A duplicate mint deliberately does NOT schedule `splice_document`.** `splice_document` is the
+  only thing that embeds, so this is where *"not embedded again"* (PREV-02 / SC#5) actually lives.
+  Adding an unconditional `background_tasks.add_task` here would pay the embedding bill twice and
+  nobody would notice until the invoice.
+
+---
+
+### `frontend/src/components/sources/SourcePreviewPanel.tsx`
+
+**1 / 1 / 453 — young (Phase 233).** Sketch **229-C** at rest, sketch **230-A** on confirm. Both
+operator-locked 2026-09-05.
+
+**Invariants:**
+
+- ⛔ **Four sections render UNCONDITIONALLY, empty or not.** SC#1's clause is *"sees four lists"*,
+  and 229's own verdict is that a clause worded that way can only be met **by construction, never by
+  audit**.
+- ⛔ **No filter chip, no "collapse all", no "hide".** A filter chip **is** a control that removes a
+  bucket — it is exactly why sketch variant **B** lost, and its own README notes you can turn the
+  fourth chip off and get a clean three-way split that *"survives a screenshot and a handover"*.
+- ⭐ **Collapsing hides a bucket's FILES, never its label or its COUNT.** This is the one risk 229-C
+  carried over 229-A, named in 229's README, which asked for the guard *"at plan-phase"*. It got
+  one. **Do not gate `data-bucket-count` on `isOpen`** — a planted version of exactly that edit
+  fires the test.
+- ⛔ **The hatched `unk` segment is not decoration.** Three lanes settle; the fourth does not. Remove
+  the animation and the surface is still honest; remove the fourth lane and it is not.
+- ⛔ **A refusal NAMES its cause on the row.** Sketch variant B failed SC#5 on exactly this: four
+  dots flipped colour and there was nowhere for *why*. A refusal that is only a colour is a count.
+- ⚠ **Full reasons live BEHIND the row (`title`), never printed at rest.** Both sketches were rebuilt
+  after the operator's *"too dense … a lot of text that's very messy and very polluted"*. A row shows
+  a 3-4 word fragment. **But a fragment with no sentence behind it is the shrug the fourth bucket
+  exists to avoid** — both are required, and both are asserted.
+- ⭐ **The confirm has NO second screen.** The four preview segments are replaced in place by
+  `added` / `here` / `refused`. The object you were reading becomes the object you are watching.
+
+**No seam proposed at 1 phase.** The likely first pressure is Phase 234's watch config wanting to
+reuse the bar; the shape to extract then is the **bar + legend** as a presentational leaf, keeping
+the accordions and the confirm here.
+
+---
+
+### `frontend/src/components/sources/previewVocabulary.ts`
+
+**1 / 1 / 98 — young (Phase 233).** Every word the preview says, in one strict leaf with **zero
+imports**.
+
+**Invariants:**
+
+- ⛔ **The four labels are the deliverable, not decoration** — the ROADMAP says so in as many words.
+  They live here so there is no second place for one to be softened.
+- ⛔ **No `hash` / `checksum` / `digest` / `identical` in any exported string.** ⚠ The guard reads the
+  **string constants**, not the file: the module's docblock discusses hashes at length precisely to
+  explain why the copy must not, and a whole-file search would fire on the explanation and then be
+  softened into uselessness — **which is exactly how the sketch's first guard became decoration.**
+  That guard was proven broken before it was trusted: it searched the whole document, the overclaim
+  survived elsewhere, and the sub-region regex silently matched nothing at all.
+- ⭐ **`HERE_QUALIFIER` is a POSITIVE statement, not an absent overclaim.** An absent overclaim and a
+  present qualifier are different guarantees, and only the second survives a copy edit that reflows
+  the sentence. Both are asserted.
+- ⭐ **`ZERO_WRITE_LINE` is four numbers, never a mood.** *"Nothing was written"* is a promise;
+  `0 documents · 0 chunks · 0 jobs · 0 folders` is a receipt. **Cancel prints the receipt too** — it
+  deliberately does not say *"Cancelled"*.
+
+**No seam proposed.** A vocabulary doing one thing many times is the right shape — the same verdict
+`doorVocabulary.ts` and `connectionsCopy.ts` carry.
+
+---
+
+### `frontend/src/components/sources/ConnectedSourceSection.tsx`
+
+**1 / 1 / 131 — young (Phase 233).** The connected-source door, and the reason `SourceFolderPicker`
+finally has a mount.
+
+⚠ **MEASURED 2026-09-05: `SourceFolderPicker` shipped at `232-04` and was mounted NOWHERE.**
+`grep -rl SourceFolderPicker frontend/src` returned the component and its own test, and nothing else.
+**A component with no mount is a component nobody can find a defect in**, so giving it a home was
+part of Phase 233 rather than a tidy-up.
+
+**Invariants:**
+
+- ⛔ **Not a sixth Library tab** (D-233-06). It is a block inside the Ingestion tab's `Add files`,
+  where getting-things-in already lives and where Phase 234's watch loop lands. The preview inherits
+  `LibraryPage`'s measure rather than declaring one of its own.
+- ⭐ **It renders `null` when no source-capable connection exists**, so a person with no connections
+  sees exactly the surface they saw before this phase.
+- ⚠ **`isSourceCapable` is deliberately NARROW and is the client's approximation of the server's
+  `SourceRegistry`.** There is no endpoint publishing that list. A connection that is offered and
+  then cannot browse is worse than one that is not offered — **so widen this predicate when an
+  adapter is actually registered (Graph, Phase 238), never by guess.** Widening it by guess is how a
+  dead option appears in a dropdown.
+
+---
+
+### `frontend/src/components/library/IngestionTab.tsx`
+
+**13 / 4 / 456 — ⚠ FIRES.** ⚠ **Absent from this ledger and from the CLAUDE.md scan list for its
+entire life, at four phases** — row added at Phase 233. That is the same failure `WorkflowsPage.tsx`
+suffered for ten phases and `config.py` for the project's entire life: **G-5 could never have fired
+on it at any count.**
+
+**Invariants:**
+
+- ⭐ **The sub-tab state is LOCAL** (`useState`), never in `librarySelection`'s reducer. The
+  action-set count stays at 6.
+- ⛔ **No progress arithmetic of any kind** (D-217-19), and **it fetches nothing** — every document it
+  renders is one the page already holds.
+- ⛔ **No second status vocabulary.** Every stage word comes from `TERM_MAP`.
+- ⭐ **Phase 233 is honoured by construction:** one import, one mount, **zero branches**.
+  `ConnectedSourceSection` owns the entire connected-source door, which is what kept a G-5-firing
+  file from growing a fifth concern.
+
+**Seam, if a fifth concern arrives:** the four sub-tab bodies are already separable; extract them
+before adding anything that is not a child component.
+
+---
+
+### `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx`
+
+**3 / 3 / 516 — ⚠ FIRES, EXACTLY AT THRESHOLD.** ⚠ Absent from both lists until Phase 233. It is a
+test file, and this ledger normally leaves those to the count gate (see the Phase 195 note above) —
+but this one carries a **cross-language ORDERED source fence** over `backend/app/api/documents.py`,
+which is a production invariant living in a test.
+
+⚠ **IT WENT RED FROM ANOTHER PHASE'S COMMIT, AND SAT RED.** The count gate measured `failed 2` on
+Phase 233's merge base, before any work. Cause found with `git log -S` rather than guessed:
+**`7cca8f50a` (`229-03`, the email-attachment splice cascade) added `"ingestion_step": "failed"` to
+`documents.py`.** That is a **terminal marker**, not a pipeline stage — a document does not pass
+*through* `failed`, it stops there — and the fence's *"exactly six"* control counted it.
+
+⭐ **The fence was doing its job; what it caught was a real drift.** Recorded here rather than
+quietly fixed, because *a guard going red on a commit from a different phase and staying red* is how
+a guard gets deleted for being noisy.
+
+**Invariants:**
+
+- ⛔ **The comparison is ORDERED, never sorted.** The sketch's own `A5b` sorted both sides first and
+  was structurally blind to the reorder D-217-09 exists to fix.
+- ⛔ **Every extraction carries a non-vacuity control, asserted FIRST** — a length floor on the `?raw`
+  import (217-06 measured `index.css?raw` resolving to `""` under vitest with nine cases green over
+  nothing), an identity symbol, and a count control.
+- ⚠ **`TERMINAL_MARKERS` is a NAMED exclusion, and it cannot be a by-construction one.** `failed` is
+  a quoted lowercase value, structurally identical to a stage — unlike the legitimate `None` reset,
+  which the quoted-value pattern excludes for free. So it gets what the `None` case gets: a
+  **positive control asserting the marker really is written**, so the exclusion is doing work rather
+  than describing an absence.
+- ⚠ **Its pin was UNDER-SET at 25 against 30 actual** before Phase 233 re-pinned it to **31**. An
+  under-pin is silent — the gate's contract is *no per-file DECREASE* — so five cases could have been
+  deleted without a word.

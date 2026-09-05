@@ -37,11 +37,77 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 233 — The Preview: See It Before It Lands (NOT STARTED — ⚠ **G-2 SKETCH MANDATORY BEFORE PLANNING**) · 232 complete
-Prior: 232 — The Source Contract + Google Drive (BUILT by Gemini, REVIEWED by Claude by driving — PASS)
+Phase: 234 — The Watch Loop: The Library Reads By Itself (NOT STARTED) · 233 complete
+Prior: 233 — The Preview: See It Before It Lands (BUILT **AND** verified by Claude — Gemini out by operator direction. ⚠ the reviewer built it)
 Plan: none in flight
 Status: between_phases
 Last activity: 2026-09-05 — Phase 231 CLOSED (`231-SUMMARY.md` written, ROADMAP progress + checklist updated, migration reservations 234-241 shifted +2).
+
+### ✅ Phase 233 — The Preview: See It Before It Lands COMPLETE (2026-09-05, Claude — built AND verified)
+
+**Verdict: PASS on all five criteria at the unit and wire grain.** ⚠ **The reviewer built it.**
+`AGENTS.md 6.3` normally forbids that; the operator assigned this phase to one agent, so it is
+recorded as a **known weakening of the review**, never as a pass that satisfies the rule. What is
+offered instead: **every honesty claim was driven against a planted defect** and both source files
+restored **md5-identical**.
+
+⭐ **THE MILESTONE'S DIFFERENTIATOR SHIPPED, AND G-2 WAS DISCHARGED BEFORE PLANNING** — sketches
+`229-the-four-buckets` (winner **C**, the proportional spine) and `230-nothing-has-been-written-yet`
+(winner **A**, the bar dissolves), both operator-locked 2026-09-05. The sketches were the acceptance
+bar and the React suites re-assert their `drive.cjs` invariants, so mockup and build cannot drift.
+
+⭐ **THE PREVIEW *IS* THE DIFF PASS.** `confirm_preview` calls `build_preview` — one classifier, two
+invocations. A preview built as its own code path is guaranteed to eventually disagree with the
+ingest, and the first person to find the disagreement is a user.
+
+⭐ **D-1's two-tier identity landed here and nowhere earlier, and it refuses the claim `PROJECT.md`
+makes.** Tier 1 is `(source_system, external_id, source_version)` compared for **equality**, ⛔ never
+a hash: `documents.py:620` hashes raw **bytes**, Drive publishes **no** identity for native
+Docs/Sheets/Slides, and Graph populates hashes **after** download. Tier 2 `sha256` still settles it
+at splice — and a duplicate is neither imported again **nor embedded again**.
+
+⭐ **Zero migrations, exactly as the ROADMAP predicted** — tier-1 identity lives in
+`documents.metadata.source`, a `jsonb` column that already existed.
+
+⭐ **`SourceFolderPicker` finally has a mount.** Measured: it shipped at `232-04` and
+`grep -rl SourceFolderPicker frontend/src` returned the component and its own test **and nothing
+else**. Home is the Library's **Ingestion tab**, as ONE child element — not a sixth tab.
+
+⭐ **`LibraryPage` adopted `max-w-6xl` (1152px)** — it was the app's actual inconsistency, with `p-8`
+and **no max-width at all**. A precedent taken (`SettingsPage.tsx:950`, `ConnectionsPage`), never a
+fifth number invented. ⚠ `WorkflowsPage`'s `1200` is **named, not silently folded in**.
+
+⚠ **AN INHERITED RED WAS FOUND AND REPAIRED, AND IT IS NOT THIS PHASE'S.** The count gate measured
+**`failed 2`** on the merge base, before any work. Cause found with `git log -S` rather than guessed:
+`7cca8f50a` (**`229-03`**) added `"ingestion_step": "failed"` to `documents.py` — a **terminal
+marker**, not a pipeline stage — and `IngestionStrip.test.tsx`'s ORDERED source fence counted it.
+**The fence was doing its job; what it caught was a real drift.** Repaired with a NAMED exclusion
+plus a positive control that the marker really is written. Its pin was also **under-set at 25 against
+30 actual** → re-pinned to **31**.
+
+⚠ **THE BACKEND CEILING IS ALREADY EXCEEDED, AND IT WAS BEFORE THIS PHASE STARTED.** Measured on the
+merge base with this phase's source stashed and its tests removed: **72 failed / 3567 passed**. With
+Phase 233: **72 failed / 3601 passed** (`+34`, all passing). `CLAUDE.md` locks the ceiling at **71
+with zero headroom**. **Phase 233 adds no failure**; the stale ceiling belongs to whoever owns it.
+
+**Gates.** Frontend `count gate OK — 224/224 pinned, 0 failing · total 7498 · pinned 6771` (baseline
+before the phase: `7463 · failed 2 · pinned 6731`). Backend `pytest tests/unit/services/sources` →
+**71 passed**. ⚠ Both new vitest suites needed **TARGETS *and* BASELINE**: `src/components/sources` is
+**not** a directory entry, which was **checked against the array rather than assumed** — Phase 214's
+`WorkflowScheduleModal` finding, in the one place where forgetting it would leave the milestone's
+differentiator unguarded.
+
+**Five defects planted, five fired:** the fourth bucket dropped (**4**), the collapse hiding a count
+(**1**), a refusal reduced to a colour (**1**), the `here` reason claiming a content hash — backend
+(**1**) and frontend (**4**).
+
+⛔ **OWED: G-4 lived-experience UAT — 5 rows, none run.** It needs a live backend, a real Drive
+connection and a person at the screen. Every criterion is proved at the unit and wire grain and
+**none has been watched happening**. **Run row 2 first** — *close without confirming, then check
+`documents` / `document_chunks` / `folders` / `ingestion_jobs` are unchanged* — because it is the one
+criterion whose failure is invisible from the screen. Rows in `233-VERIFICATION.md`.
+
+---
 
 ### ✅ Phase 230 — The Durable Ingestion Queue VERIFIED (2026-09-05, Claude — DRIVEN, not read)
 

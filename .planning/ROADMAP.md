@@ -214,7 +214,7 @@ A, because A does not do what the requirement says.**
 - [x] **Phase 230: The Durable Ingestion Queue** — ingestion survives a restart and a burst, batches within real provider limits, and names an embedding failure instead of saying your documents returned nothing (QUEUE-01/02/04/05) ⭐ PROVEN ON `/upload` FIRST
 - [x] **Phase 231: Connection-Scoped Visibility** — one visibility per connection enforced at all four RLS sites, stated plainly on screen, with provenance visible at retrieval and citation time (VIS-01, VIS-02, TRUST-04) ⚠ THREAT MODEL · G-2 SKETCH
 - [x] **Phase 232: The Source Contract + Google Drive** — one `browse/list/read/check` contract with Drive as the first thin adapter, and the shipped one-file import re-pointed onto it (SRC-01, SRC-02)
-- [ ] **Phase 233: The Preview — See It Before It Lands** — four honestly-labelled buckets, two-tier identity, rules evaluated with nothing written, and nothing ingested until a person confirms (PREV-01/02/03, LIB-09) ⚠ G-2 SKETCH MANDATORY
+- [x] **Phase 233: The Preview — See It Before It Lands** — four honestly-labelled buckets, two-tier identity, rules evaluated with nothing written, and nothing ingested until a person confirms (PREV-01/02/03, LIB-09) ⚠ G-2 SKETCH MANDATORY — **DISCHARGED**: sketches 229 (winner C) + 230 (winner A), both operator-locked 2026-09-05
 - [ ] **Phase 234: The Watch Loop — The Library Reads By Itself** — a mapped folder read on the shipped scheduler, a lifecycle diff that can never delete on an incomplete listing, a disconnect that freezes, and a synced document that cannot make the agent act (LIB-08, SRC-06, QUEUE-03, VIS-03/04/05/06, TRUST-03, SURF-01) ⭐ RETIRES THE CLAUDE.md RULE, SAME COMMIT · ⚠ THREAT MODEL MANDATORY
 - [ ] **Phase 235: The Source Says What It Did** — per-source run history with counts and errors, a stopped source that says when and offers the fix, and a signal that reaches someone who is not on the page (LIB-10, SURF-02, SURF-03) ⚠ SURF-03's home is an OPEN DECISION · G-2 SKETCH
 - [ ] **Phase 236: The Corpus Under Attack** — an adversarial corpus that fails when a defence is removed, driven on the full native roster, with the payload planted in a real synced document (TRUST-02)
@@ -712,7 +712,7 @@ found at the v3.7 close.
 | 230. The Durable Ingestion Queue | 5/5 | ✅ Complete — ⚠ **SC#2 / SC#3 are OWED DRIVES**, deadline before v4.0 closes | 2026-09-05 |
 | 231. Connection-Scoped Visibility | — (built direct under the pairing, no GSD plan set) | ✅ Complete — Claude built, Gemini REVIEWED PASS by driving | 2026-09-05 |
 | 232. The Source Contract + Google Drive | 4/4 | ✅ Complete — Gemini built, Claude REVIEWED by driving. ⚠ `OD-232-01` live-Drive drive OWED | 2026-09-05 |
-| 233. The Preview — See It Before It Lands | 0/? | Not started | — |
+| 233. The Preview — See It Before It Lands | 2/2 | ✅ Complete — Claude built AND verified (Gemini out, operator direction). ⚠ **G-4 lived-experience UAT is OWED** — 5 rows, run row 2 first | 2026-09-05 |
 | 234. The Watch Loop — The Library Reads By Itself | 0/? | Not started | — |
 | 235. The Source Says What It Did | 0/? | Not started | — |
 | 236. The Corpus Under Attack | 0/? | Not started | — |
