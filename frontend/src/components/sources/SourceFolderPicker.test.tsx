@@ -6,12 +6,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react"
+import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { SourceFolderPicker } from "./SourceFolderPicker"
 import * as api from "@/lib/api"
-import type { SourceNode, SourceBrowseResponse } from "@/lib/api"
+import type { SourceNode } from "@/lib/api"
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
