@@ -24,7 +24,7 @@
  * ⛔ IT FETCHES NOTHING. Every document it renders is one the page already holds.
  * ⛔ NO SECOND STATUS VOCABULARY. Every stage word comes from `TERM_MAP`.
  */
-import React, { useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { IngestionStrip } from "@/components/ingestion/IngestionStrip"
@@ -46,6 +46,72 @@ import {
   CARD_LABEL,
   type PipelineCardId,
 } from "@/components/library/ingestion/pipelineGroups"
+
+function AnimatedNumber({ value, duration = 300 }: { value: number | string; duration?: number }) {
+  const isTest =
+    (typeof process !== "undefined" && process.env?.NODE_ENV === "test") ||
+    (typeof import.meta !== "undefined" && (import.meta as any)?.env?.MODE === "test")
+  const prefersReduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  if (isTest || prefersReduced) {
+    return <>{value}</>
+  }
+
+  return <AnimatedNumberInner value={value} duration={duration} />
+}
+
+function AnimatedNumberInner({ value, duration }: { value: number | string; duration: number }) {
+  const hasAnimatedRef = useRef(false)
+  const [display, setDisplay] = useState<number | string>(value)
+
+  useEffect(() => {
+    if (hasAnimatedRef.current) {
+      setDisplay(value)
+      return
+    }
+
+    const cleanStr = String(value).replace(/,/g, "")
+    const match = cleanStr.match(/^([^0-9.-]*)([0-9]+(?:\.[0-9]+)?)(.*)$/)
+    if (!match) {
+      setDisplay(value)
+      return
+    }
+
+    const prefix = match[1]
+    const targetNum = parseFloat(match[2])
+    const suffix = match[3]
+    const hasCommas = String(value).includes(",")
+
+    hasAnimatedRef.current = true
+
+    const startNum = 0
+    const startTime = performance.now()
+    let rafId: number
+
+    const step = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const ease = 1 - Math.pow(1 - progress, 3)
+      const current = Math.round(startNum + (targetNum - startNum) * ease)
+      const formattedNum = hasCommas ? current.toLocaleString() : current.toString()
+      setDisplay(`${prefix}${formattedNum}${suffix}`)
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(step)
+      } else {
+        setDisplay(value)
+      }
+    }
+
+    rafId = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafId)
+  }, [value, duration])
+
+  return <>{display}</>
+}
 
 /** One pipeline card: how many in-flight documents are at this group of stages. */
 function PipelineCard({
@@ -79,7 +145,7 @@ function PipelineCard({
         )}
       </div>
       <span className={cn("font-mono text-lg font-bold tabular-nums", isPopulated ? "text-primary" : "text-foreground")}>
-        {count}
+        <AnimatedNumber value={count} />
       </span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {count === 1 ? "file here now" : "files here now"}
