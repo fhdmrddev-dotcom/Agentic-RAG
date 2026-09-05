@@ -85,19 +85,34 @@ def mint_document_row(
     # 2. Content hashing
     content_hash = hashlib.sha256(raw).hexdigest()
 
-    # 3. Folder-scoped deduplication check (completed + is_latest)
+    # 3. Deduplication — SCOPED TO MATCH THE CONSTRAINT THAT ACTUALLY FIRES.
+    #
+    # ⚠ BUG-260905-02. This check used to be FOLDER-scoped and to require `is_latest = True`.
+    #   The unique index it is supposed to anticipate is neither:
+    #
+    #     documents_completed_hash_unique_idx
+    #       ON documents (user_id, content_hash)
+    #       WHERE content_hash IS NOT NULL AND status = 'completed'
+    #
+    #   So re-uploading a file you already had, into a DIFFERENT folder, passed this check,
+    #   ran the whole extraction and embedding pipeline, and then died at the completion write
+    #   with a raw 23505 — after all the work was paid for, and leaving the row `failed` when
+    #   nothing had actually gone wrong. Measured on a real bulk ingest: `Train-the-Trainer.pptx`
+    #   completed in folder e400e289 on 2026-09-01, re-uploaded to the root on 09-05, failed.
+    #
+    # ⚠ A CHECK THAT IS NARROWER THAN ITS CONSTRAINT DOES NOT PREVENT THE ERROR, IT ONLY DELAYS
+    #   IT. The two predicates below are now the index's predicate, verbatim.
+    #
+    # ⚠ DELIBERATE BEHAVIOUR CHANGE: the same bytes uploaded to a second folder are now reported
+    #   as a duplicate instead of appearing to succeed and then failing. The database already
+    #   forbade the second copy — this only moves the refusal to where a person can act on it.
     dedup_query = (
         supabase.table("documents")
         .select("*")
         .eq("user_id", user_id)
         .eq("content_hash", content_hash)
         .eq("status", "completed")
-        .eq("is_latest", True)
     )
-    if folder_id:
-        dedup_query = dedup_query.eq("folder_id", folder_id)
-    else:
-        dedup_query = dedup_query.is_("folder_id", "null")
 
     existing = dedup_query.limit(1).execute()
     if existing.data:

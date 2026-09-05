@@ -395,7 +395,7 @@ export function DocumentRow({
           ) : doc.status === "failed" ? (
             // The failure sentence — the SAME mapper Wave 1 built, imported, not re-implemented.
             <span data-testid="row-failure-sentence" className="text-xs text-destructive">
-              {classifyIngestionError(doc.error_message)}
+              {classifyIngestionError(doc.error_message, doc.filename)}
             </span>
           ) : (
             <DocumentStatusBadge status={doc.status} ingestionStep={doc.ingestion_step} />

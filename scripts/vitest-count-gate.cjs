@@ -3083,7 +3083,7 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 22,
-  "IngestionTab.test.tsx": 38,
+  "IngestionTab.test.tsx": 40,
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,
   "viewRulePhrase.test.ts": 4,

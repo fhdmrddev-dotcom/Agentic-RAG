@@ -322,8 +322,25 @@ describe("IngestionTab — the Needs attention row (D-217.1-21)", () => {
   it("renders the plain sentence (not the raw error)", async () => {
     await renderNeedsAttention({ documents: [doc({ status: "failed", error_message: "BadZipFile: not a zip" })] })
     const reason = screen.getByTestId("failure-reason")
-    expect(reason.textContent).toContain("not the kind of spreadsheet")
+    // ⚠ BUG-260905-03 — this used to assert "not the kind of spreadsheet". That copy was WRONG:
+    //   every OOXML format is a zip, so the sentence fired on .docx and .pptx too and told the
+    //   owner of a broken Word file to save it as .csv. The sentence is now format-agnostic
+    //   unless the filename says otherwise (see notAZipSentence).
+    expect(reason.textContent).toContain("not the format its name suggests")
     expect(reason.textContent).not.toContain("BadZipFile")
+    // The wrong advice must not come back.
+    expect(reason.textContent).not.toContain("spreadsheet")
+  })
+
+  it("⭐ BUG-260905-03 — a broken .docx is told to save it as a Word document, never a spreadsheet", async () => {
+    await renderNeedsAttention({
+      documents: [
+        doc({ status: "failed", filename: "facilitator-guide.docx", error_message: "File is not a zip file" }),
+      ],
+    })
+    const reason = screen.getByTestId("failure-reason")
+    expect(reason.textContent).toContain("Word document")
+    expect(reason.textContent).not.toContain(".csv")
   })
 
   it("renders the file size", async () => {

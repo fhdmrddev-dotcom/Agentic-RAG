@@ -386,7 +386,7 @@ function NeedsAttentionRow({
 
   const reason = showTechnical
     ? (doc.error_message ?? "It stopped, and no reason was recorded.")
-    : classifyIngestionError(doc.error_message)
+    : classifyIngestionError(doc.error_message, doc.filename)
 
   return (
     <li
