@@ -526,7 +526,54 @@ async def delete_connection(
 
     Org-scoped at the delete itself (never by id alone), against migration 116's existing
     DELETE policy. A miss is the same generic 404 every other route returns.
+
+    Phase 234 VIS-05 / D-4 Disconnect Freeze Policy:
+    When a connection is disconnected / deleted:
+    - All watches on the connection are deactivated (is_active = false).
+    - All documents from this connection are marked source_state='source_disconnected',
+      excluding them from match RPC queries while retaining them in the Library (VIS-03).
     """
+    from uuid import UUID  # noqa: PLC0415
+    from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
+
+    # 1. Org-scoped check: verify connection exists and belongs to caller's active org
+    conn_res = await run_in_threadpool(
+        lambda: supabase.table("connector_connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("org_id", active_org)
+        .maybe_single()
+        .execute()
+    )
+    if not conn_res or not conn_res.data:
+        raise _NOT_FOUND
+
+    # 2. VIS-05 / D-4: Disconnect freeze policy
+    # Deactivate all watches on this connection
+    try:
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        pool = await get_pg_pool()
+        if pool:
+            async with pool.acquire() as con:
+                await con.execute(
+                    "UPDATE connector_watches SET is_active = false, updated_at = now() WHERE connection_id = $1::uuid",
+                    UUID(str(connection_id)),
+                )
+    except Exception as pool_err:
+        logger.warning("Failed to deactivate watches for connection %s: %s", connection_id, pool_err)
+
+    # Freeze documents: source_state = 'source_disconnected' (retained in Library, VIS-03 / D-4)
+    try:
+        await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .update({"source_state": "source_disconnected"})
+            .eq("source_connection_id", connection_id)
+            .execute()
+        )
+    except Exception as doc_err:
+        logger.warning("Failed to mark documents source_disconnected for connection %s: %s", connection_id, doc_err)
+
+    # 3. Delete connection record
     removed = await connector_service.delete_connection(
         connection_id, org_id=active_org, supabase=supabase
     )

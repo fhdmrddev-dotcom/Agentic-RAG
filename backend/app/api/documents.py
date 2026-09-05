@@ -1891,6 +1891,7 @@ async def update_document_metadata(
 @router.patch("/{document_id}/classification/accept", response_model=DocumentResponse)
 async def accept_classification(
     document_id: str,
+    force: bool = False,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -1904,6 +1905,10 @@ async def accept_classification(
     (never the forbidden status) on a non-owner / absent / no-active-suggestion miss (no
     existence leak).
 
+    Phase 234 H-4 / VIS-06 fence:
+    If a document originated from a private connection, moving it into an org-shared folder
+    widens visibility beyond its private connection scope. Refuses with 403 unless force=True.
+
     Undo needs NO endpoint — the frontend reverses via the EXISTING PATCH
     /documents/{id}/move with the stamped prior_folder_id. Every `.execute()` is
     threadpool-wrapped (D-v2.5-01 — this is an async handler; follow update_document_metadata,
@@ -1913,7 +1918,7 @@ async def accept_classification(
     try:
         doc = await run_in_threadpool(
             lambda: supabase.table("documents")
-            .select("folder_id, metadata")
+            .select("folder_id, metadata, ingest_visibility, source_connection_id")
             .eq("id", document_id)
             .eq("user_id", current_user["id"])
             .maybe_single()
@@ -1938,7 +1943,7 @@ async def accept_classification(
     try:
         folder = await run_in_threadpool(
             lambda: supabase.table("folders")
-            .select("id")
+            .select("id, is_org_shared")
             .eq("id", str(target))
             .or_(f"user_id.eq.{caller_uid},is_org_shared.eq.true")
             .maybe_single()
@@ -1948,6 +1953,28 @@ async def accept_classification(
         raise HTTPException(status_code=404, detail="Folder not found")
     if not folder or not getattr(folder, "data", None):
         raise HTTPException(status_code=404, detail="Folder not found")
+
+    # ── H-4 / VIS-06: Classification Access Fence ─────────────────────────────
+    # If a document originated from a private connection, moving it into an org-shared folder
+    # widens visibility beyond its private connection scope. Refuse unless force=True.
+    if (
+        doc.data.get("source_connection_id")
+        and doc.data.get("ingest_visibility") == "private"
+        and folder.data.get("is_org_shared") is True
+    ):
+        if not force:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "classification_refusal",
+                    "reason": "Moving this connection-sourced document to an org-shared folder widens visibility beyond its private connection scope. Explicit human confirmation required.",
+                    "requires_confirmation": True,
+                },
+            )
+        log.info(
+            "User %s forced visibility-widening move of connection document %s to org-shared folder %s (H-4 override)",
+            current_user["id"], document_id, target,
+        )
 
     # 4. Record the prior folder (Undo, D-118-6), mark accepted, ONE owner-scoped UPDATE
     #    writing folder_id + the marked metadata (the move + the suggestion stamp together).
@@ -1967,15 +1994,18 @@ async def accept_classification(
     # 5. Audit ONLY after the move succeeds (never optimistic). classification.apply is
     #    LIVE in VALID_ACTION_TYPES — write_audit_entry swallows errors so the live
     #    round-trip is the verification.
+    audit_meta = {
+        "document_id": document_id,
+        "rule_id": sugg.get("rule_id"),
+        "from_folder": prior_folder,
+        "to_folder": str(target),
+    }
+    if force:
+        audit_meta["force"] = True
     await write_audit_entry(
         user_id=current_user["id"],
         action_type="classification.apply",
-        metadata={
-            "document_id": document_id,
-            "rule_id": sugg.get("rule_id"),
-            "from_folder": prior_folder,
-            "to_folder": str(target),
-        },
+        metadata=audit_meta,
         supabase=supabase,
     )
     return result.data[0]
