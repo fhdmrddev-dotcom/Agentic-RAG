@@ -1021,17 +1021,6 @@
   }
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-}
-
 .animate-chartFadeIn {
   animation: chartFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -1040,9 +1029,17 @@
   animation: floatSlow 3.5s ease-in-out infinite;
 }
 
-.animate-pulseGlow {
-  animation: pulseGlow 2s ease-in-out infinite;
-}
+/* ⚠ `pulseGlow` and `.animate-pulseGlow` are NOT redefined here. They already exist
+   above (the box-shadow halo) and are consumed by CHAT — StepRow.tsx:229 and
+   ToolCallDetails.tsx:151, the live tool-call indicators, documented as run-frame
+   vocabulary in RunCard.tsx:54. A second definition here silently overrode them
+   (CSS later-wins), turning a halo that costs no layout space into an opacity+scale
+   throb on the agent's live execution surface. Kept OUT deliberately. The
+   reduced-motion block below still names the class, which is a real improvement —
+   the original was never gated, though this file's own comments say all motion is.
+   ⭐ Before adding any utility class here, grep first:
+       grep -n "@keyframes <name>" frontend/src/index.css
+       grep -rn "animate-<name>" frontend/src                                      */
 
 .card-interactive {
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
