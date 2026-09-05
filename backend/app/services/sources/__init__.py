@@ -4,6 +4,7 @@ Provides the unified SourceAdapter contract and registry for external document s
 (Google Drive, Mock Source, Microsoft Graph in Phase 238, MCP in Phase 239).
 """
 
+from app.services.sources.adapters import google_drive, mock_source  # noqa: F401
 from app.services.sources.base import (
     BrowsePage,
     FilePage,

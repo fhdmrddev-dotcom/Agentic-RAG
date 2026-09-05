@@ -125,6 +125,19 @@ class SourceRegistry:
         return decorator
 
     @classmethod
+    def _ensure_registered(cls, service_id: str) -> None:
+        if "google" in service_id or "workspace" in service_id:
+            try:
+                import app.services.sources.adapters.google_drive  # noqa: F401
+            except Exception:
+                pass
+        elif "mock" in service_id:
+            try:
+                import app.services.sources.adapters.mock_source  # noqa: F401
+            except Exception:
+                pass
+
+    @classmethod
     def get_adapter(cls, connection_or_service_id: Any) -> SourceAdapter | None:
         """Resolve an instantiated SourceAdapter for a connection or service_id string."""
         if not connection_or_service_id:
@@ -139,6 +152,8 @@ class SourceRegistry:
                 else ""
             )
             service_id = str(service_id).strip().lower()
+
+        cls._ensure_registered(service_id)
 
         # Direct match or canonical alias match
         adapter_cls = cls._adapters.get(service_id)

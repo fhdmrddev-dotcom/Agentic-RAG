@@ -29,5 +29,7 @@ def test_adapter_directory_boundary():
     """Assert all files in services/sources/adapters/ inherit from SourceAdapter."""
     from app.services.sources.base import SourceAdapter
     from app.services.sources.adapters.mock_source import MockSourceAdapter
+    from app.services.sources.adapters.google_drive import GoogleDriveSourceAdapter
 
     assert issubclass(MockSourceAdapter, SourceAdapter)
+    assert issubclass(GoogleDriveSourceAdapter, SourceAdapter)
