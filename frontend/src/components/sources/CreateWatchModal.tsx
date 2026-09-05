@@ -76,15 +76,13 @@ export function CreateWatchModal({
           setSelectedConnectionId(capable[0].id)
         }
       })
-      .catch((err) => {
+      .catch(() => {
         setError("Could not load connected services.")
       })
       .finally(() => {
         setLoadingConnections(false)
       })
   }, [open])
-
-  const selectedConnection = connections?.find((c) => c.id === selectedConnectionId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

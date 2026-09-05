@@ -8,16 +8,14 @@
  * - Disconnect freeze banner: "Reconnect {connection_name}" by name (VIS-05 / SC#3).
  */
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AlertCircle,
   AlertTriangle,
   Clock,
-  ExternalLink,
   Folder,
   HardDrive,
   Loader2,
-  MoreVertical,
   Pause,
   Play,
   Plus,

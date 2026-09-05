@@ -37,7 +37,7 @@ export interface ConnectorWatch {
   leased_until?: string | null
   is_active: boolean
   last_run_at?: string | null
-  last_status: string
+  last_status?: string | null
   last_error?: string | null
   item_count: number
   connection_name?: string | null

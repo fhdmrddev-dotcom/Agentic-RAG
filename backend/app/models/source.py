@@ -55,7 +55,7 @@ class WatchResponse(BaseModel):
     leased_until: datetime | None = None
     is_active: bool = True
     last_run_at: datetime | None = None
-    last_status: str = "pending"
+    last_status: str | None = "pending"
     last_error: str | None = None
     item_count: int = 0
     connection_name: str | None = None

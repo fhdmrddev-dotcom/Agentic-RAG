@@ -80,6 +80,10 @@ async def _enrich_watch_rows(pool: Any, rows: list[dict]) -> list[dict]:
                 if conn_row:
                     record["connection_name"] = conn_row["name"]
                     record["service_id"] = conn_row["service_id"]
+
+            if not record.get("last_status"):
+                record["last_status"] = "pending"
+
             enriched.append(record)
     return enriched
 
