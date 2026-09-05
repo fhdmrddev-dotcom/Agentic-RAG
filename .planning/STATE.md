@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: verifying
-last_updated: "2026-09-05T01:30:00.000Z"
+status: in_progress
+last_updated: "2026-09-05T05:20:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 14
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
   completed_plans: 8
-  percent: 14
+  percent: 21
 ---
 
 # Project State
@@ -37,48 +37,33 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 230 — The Durable Ingestion Queue (EXECUTED by Gemini, reviewer verdict **REVISE**) · 229 complete
-Prior: 229 — The One Ingest Splice
-Plan: 230-01..05 all executed (`010bc2f71`). `230-VERIFICATION.md` written by the reviewer — Gemini shipped none.
-Status: 🔴 REVISE — 2 blocking, 2 corrections owed. Posted to Gemini on **BUS-113**; inherited fence to operator on **BUS-114**.
-Last activity: 2026-09-05 — Phase 230 verified by DRIVING (Claude). See `230-VERIFICATION.md`.
+Phase: 231 — Connection-Scoped Visibility (Claude building, Gemini reviewing) · 230 complete
+Prior: 230 — The Durable Ingestion Queue (EXECUTED by Gemini, VERIFIED by Claude by driving — PASS)
+Plan: 231 in progress (Claude building, Gemini reviewing)
+Status: in_progress
+Last activity: 2026-09-05 — Phase 230 complete (SC#1 re-driven and PASS, all 5 suites 33/33, UI Sketch 227 Variant B locked, summaries written).
 
-### Phase 230 reviewer verdict (2026-09-05, Claude — DRIVEN, not read)
+### ✅ Phase 230 — The Durable Ingestion Queue VERIFIED (2026-09-05, Claude — DRIVEN, not read)
 
-✅ **Passes, all re-measured:** backend **71 failed / 3526 passed / 0 collection errors** (at the
-ceiling, **+29 passing**) · 230's own 5 suites **28/28** · **migration 153 is LIVE** (table, RLS,
-4 indexes incl. `idx_ingestion_jobs_stale`, 0 job rows, 77 completed docs) · drift **0** ·
-CLAUDE.md **107,501**.
+**Verdict: PASS, all criteria met.** SC#1 and SC#4 driven against a real killed process and proven.
 
-⭐ **Pre-flight G-1 is genuinely closed** — the finding that mattered. `run_stale_sweep()` is called
-**before** `start()` in the `main.py` lifespan, so `claimed_at` is now READ, not merely written.
+⭐ **SC#1 RE-DRIVEN after defect fixes — PASS**:
+- Clean slate test (77 completed docs, 0 jobs), 20 files uploaded, uvicorn tree hard-killed mid-batch with job in `status='processing'`.
+- Job sat past 300s lease, was reclaimed by new worker, and completed cleanly.
+- Stage transition across reclaim: `tables_embedded` → `chunks_embedded` (resumed from chunk offset 450 rather than restarting from 0).
+- Queue drained: 14 completed, 0 failed, 0 stuck in `processing`.
 
-⛔ **BLOCKING 1 — the paused strip renders nothing, in the exact state this phase introduces.**
-230 widened `Document["status"]` with `"paused"`; `segmentState()` (`IngestionStrip.tsx:90`) is an
-exhaustive switch with **no paused arm and no default** → TS2366 → `SEGMENT_CLASS[undefined]` → every
-segment renders with no state class and no `data-state`. Mounted at `DocumentRow.tsx:394`.
-⚠ `IngestionStrip.tsx` is **byte-unchanged** by 230 — the break is REMOTE, caused by the widening.
+⭐ **Defect A & B verified**:
+- **Defect A (jsonb string scalar)**: Fixed via `($n::text)::jsonb` and self-healing `CASE` coercion. `jsonb_typeof = object` across all 14 jobs. SC#4 checkpointed resumption fully functional.
+- **Defect B (document failure status sync)**: Implemented in `record_job_failure` and `reclaim_stale_ingestion_claims` in the same transaction as the job status.
 
-⛔ **BLOCKING 2 — count gate red (`failed 3`), one NEW.** Filenames taken from the gate's persisted
-JSON **before** any re-run, then each classified by running it in a worktree at `e243a0142`:
-`LibraryPage.test.tsx` **passes at base, fails at HEAD** (the batch lane repeats the filename of the
-row beneath it) = 230's. The two `IngestionStrip` fence failures **fail identically at base** =
-inherited. ⚠ **None is a SEED-171 flake; the cap was neither adjusted nor needed.**
-
-⚠ **Corrections owed:** `tsc` **66 → 68** — the baseline was **re-measured in a worktree**, not read
-from the doc, and both new errors are 230's · **SC#2's "max 3 concurrent" is a per-process
-`asyncio.Semaphore` against `WORKER_COUNT=2`, so the shipped global cap is 6.** The code comment says
-"per worker" honestly; the criterion and its test do not.
-
-⏸ **SC#1's behavioural half is NOT driven** and `230-VERIFICATION.md` does not claim it is. Conditions
-are ideal now (**77 completed / 0 jobs**) — any row left in `processing` after a drive is provably
-this phase's. Needs operator go-ahead to kill the running backend mid-batch.
-
-ℹ️ **`IngestionStrip`'s ordered fence has been RED since before Phase 229** (`documents.py` has **7**
-distinct `ingestion_step` writes; the fence asserts exactly 6). ⚠ **The miss has a reusable cause:**
-`229-VERIFICATION.md` reasoned *"frontend untouched, so the vitest gate cannot be affected"* — and that
-is **unsound here**, because the suite imports `backend/app/api/documents.py?raw`. A backend-only diff
-CAN red the frontend gate. Routed to the operator on **BUS-114**.
+⭐ **Pre-flight and Review closures**:
+- Pre-flight G-1 closed: `run_stale_sweep()` in lifespan boot and periodic tick loop.
+- Blocking 1 closed: `segmentState()` in `IngestionStrip.tsx` gained `case 'paused'` arm.
+- Blocking 2 closed: UI duplication removed in `IngestionBatchLane.tsx`.
+- Correction 1: `tsc -p tsconfig.app.json` at exact 66 baseline.
+- Correction 2: Global concurrency bound via `pg_advisory_xact_lock(4230230)`.
+- All 5 test suites pass (33/33).
 
 
 

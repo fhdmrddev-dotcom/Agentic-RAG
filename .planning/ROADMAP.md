@@ -211,7 +211,7 @@ A, because A does not do what the requirement says.**
 
 - [ ] **Phase 228: v3.9 Closeout — The Debt Gets a Number** — owed UAT driven or re-deferred with a reason, the resume/continue moment stops lying, the product serves from `app.<domain>`, and the backend baseline is a number that can gate again (DEBT-01..05)
 - [ ] **Phase 229: The One Ingest Splice** — one piece of code mints every document row; the same bytes through any door produce the same row (TRUST-01) ⭐ REFACTOR ONLY · G-5 DISCHARGE on `documents.py`
-- [ ] **Phase 230: The Durable Ingestion Queue** — ingestion survives a restart and a burst, batches within real provider limits, and names an embedding failure instead of saying your documents returned nothing (QUEUE-01/02/04/05) ⭐ PROVEN ON `/upload` FIRST
+- [x] **Phase 230: The Durable Ingestion Queue** — ingestion survives a restart and a burst, batches within real provider limits, and names an embedding failure instead of saying your documents returned nothing (QUEUE-01/02/04/05) ⭐ PROVEN ON `/upload` FIRST
 - [ ] **Phase 231: Connection-Scoped Visibility** — one visibility per connection enforced at all four RLS sites, stated plainly on screen, with provenance visible at retrieval and citation time (VIS-01, VIS-02, TRUST-04) ⚠ THREAT MODEL · G-2 SKETCH
 - [ ] **Phase 232: The Source Contract + Google Drive** — one `browse/list/read/check` contract with Drive as the first thin adapter, and the shipped one-file import re-pointed onto it (SRC-01, SRC-02)
 - [ ] **Phase 233: The Preview — See It Before It Lands** — four honestly-labelled buckets, two-tier identity, rules evaluated with nothing written, and nothing ingested until a person confirms (PREV-01/02/03, LIB-09) ⚠ G-2 SKETCH MANDATORY
@@ -295,7 +295,7 @@ A, because A does not do what the requirement says.**
   4. A file that failed nine-tenths of the way through is picked up where it stopped — a person does not watch the same nine thousand files re-embed from zero (QUEUE-01's resume, QUEUE-05's retry).
   5. Everything else about the existing upload experience is unchanged — same screen, same stages, same counts. The queue is proven by the path that already has coverage, **before any connector touches it** (QUEUE-02).
 
-**Plans**: TBD
+**Plans**: 5 plans (230-01..230-05) executed and verified by driving (PASS)
 
 **UI hint**: yes (the named refusal and the paused state are user-visible).
 **Migrations**: **153** — `153_ingestion_jobs.sql`.
