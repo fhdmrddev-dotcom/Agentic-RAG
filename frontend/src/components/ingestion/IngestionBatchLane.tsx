@@ -8,8 +8,6 @@ interface IngestionBatchLaneProps {
   completedFiles: number
   /** Whether the queue is currently held/paused on provider refusal */
   isPaused?: boolean
-  /** Active file name being embedded (optional) */
-  activeFileName?: string
   /** External motion energy override (0 = calm, 1 = energized). Defaults to internal state. */
   energy?: number
   className?: string
@@ -31,7 +29,6 @@ export function IngestionBatchLane({
   totalFiles,
   completedFiles,
   isPaused = false,
-  activeFileName,
   energy: externalEnergy,
   className,
 }: IngestionBatchLaneProps) {
@@ -138,16 +135,6 @@ export function IngestionBatchLane({
           each bar ≈ {step} {step === 1 ? "file" : "files"}
         </span>
       </div>
-
-      {/* Optional Active File Row */}
-      {activeFileName && !isPaused && (
-        <div className="mt-2.5 pt-2 border-t border-border/50 flex items-center gap-2 text-xs">
-          <span className="w-2 h-2 rounded-full bg-primary animate-brandPulse flex-none" />
-          <span className="truncate text-muted-foreground">
-            Embedding: <span className="text-foreground font-medium">{activeFileName}</span>
-          </span>
-        </div>
-      )}
     </div>
   )
 }

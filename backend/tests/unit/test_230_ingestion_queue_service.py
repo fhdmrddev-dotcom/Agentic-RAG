@@ -86,7 +86,9 @@ async def test_concurrency_bounding_with_semaphore():
         with patch.object(service, "_safe_process_job", new_callable=AsyncMock):
             claimed_count = await service.tick()
             assert claimed_count == 1
-            mock_claim.assert_called_once_with(pool, limit=1, worker_id=service.worker_id)
+            mock_claim.assert_called_once_with(
+                pool, limit=1, worker_id=service.worker_id, max_concurrent=2
+            )
 
 
 @pytest.mark.asyncio

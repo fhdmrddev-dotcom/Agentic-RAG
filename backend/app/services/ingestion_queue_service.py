@@ -192,7 +192,10 @@ class IngestionQueueService:
         limit = min(available, self.max_concurrent_jobs)
         try:
             claimed = await claim_due_ingestion_jobs(
-                self.pool, limit=limit, worker_id=self.worker_id
+                self.pool,
+                limit=limit,
+                worker_id=self.worker_id,
+                max_concurrent=self.max_concurrent_jobs,
             )
         except Exception:
             logger.exception("Failed claiming due ingestion jobs (loop continues)")

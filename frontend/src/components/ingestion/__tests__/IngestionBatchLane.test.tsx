@@ -35,7 +35,7 @@ describe("IngestionBatchLane (Sketch 227 Variant B)", () => {
   })
 
   it("supports the calm / energized motion toggle", () => {
-    const { container } = render(<IngestionBatchLane totalFiles={340} completedFiles={218} />)
+    render(<IngestionBatchLane totalFiles={340} completedFiles={218} />)
     const root = screen.getByTestId("ingestion-batch-lane")
     expect(root.style.getPropertyValue("--energy")).toBe("1")
 

@@ -58,19 +58,35 @@ async def insert_ingestion_job(
 async def claim_due_ingestion_jobs(
     pool: asyncpg.Pool,
     *,
-    limit: int = 3,
     worker_id: str,
+    limit: int = 3,
     now: datetime | None = None,
+    max_concurrent: int | None = None,
 ) -> list[dict]:
     """Atomically claim due ingestion jobs using FOR UPDATE SKIP LOCKED.
 
     Inside an explicit transaction, claims up to `limit` rows where status IN ('pending', 'retry_queued')
     and next_run_at <= now, updates their status to 'processing', stamps claimed_at=now() and
     claimed_by=worker_id, and commits.
+
+    If `max_concurrent` is provided, enforces a global cross-process concurrency bound (SC#2 / QUEUE-05).
+    Using pg_advisory_xact_lock(4230230) to serialize claim decisions across all worker processes,
+    it counts active jobs with status='processing' and only claims up to the remaining global slots.
     """
     claimed: list[dict] = []
     async with pool.acquire() as con:
         async with con.transaction():
+            claim_limit = limit
+            if max_concurrent is not None:
+                await con.execute("SELECT pg_advisory_xact_lock(4230230)")
+                active_count = await con.fetchval(
+                    "SELECT count(*) FROM ingestion_jobs WHERE status = 'processing'"
+                )
+                available = max_concurrent - (active_count or 0)
+                if available <= 0:
+                    return []
+                claim_limit = min(limit, available)
+
             due = await con.fetch(
                 f"""
                 SELECT {_CLAIM_COLUMNS} FROM ingestion_jobs
@@ -80,7 +96,7 @@ async def claim_due_ingestion_jobs(
                 LIMIT $1
                 FOR UPDATE SKIP LOCKED
                 """,
-                limit,
+                claim_limit,
                 now,
             )
             for row in due:

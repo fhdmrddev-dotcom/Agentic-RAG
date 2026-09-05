@@ -215,7 +215,6 @@ export function IngestionTab({
                 totalFiles={totalBatchCount > 0 ? totalBatchCount : inFlight.length}
                 completedFiles={completedDocs.length}
                 isPaused={isPaused}
-                activeFileName={inFlight.find((d) => d.status === "processing")?.filename}
               />
             </div>
           )}

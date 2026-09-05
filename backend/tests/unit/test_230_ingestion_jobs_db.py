@@ -142,6 +142,62 @@ async def test_claim_due_ingestion_jobs_executes_in_transaction_with_skip_locked
 
 
 @pytest.mark.asyncio
+async def test_claim_due_ingestion_jobs_enforces_global_concurrency_bound():
+    pool = MagicMock()
+    con = AsyncMock()
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock()
+    txn.__aexit__ = AsyncMock()
+    con.transaction = MagicMock(return_value=txn)
+    pool.acquire.return_value.__aenter__.return_value = con
+
+    # Active count is 2, max_concurrent is 3 -> available slots = 1
+    con.fetchval.return_value = 2
+    job_id = uuid4()
+    con.fetch.return_value = [{"id": job_id, "document_id": uuid4()}]
+
+    claimed = await claim_due_ingestion_jobs(
+        pool,
+        limit=5,
+        worker_id="worker-test-1",
+        max_concurrent=3,
+    )
+
+    assert len(claimed) == 1
+    # Check advisory lock was acquired to serialize claim
+    execute_calls = [c[0][0] for c in con.execute.call_args_list]
+    assert any("pg_advisory_xact_lock" in q for q in execute_calls)
+    # Check limit passed to query was capped to available (1), not original limit (5)
+    fetch_call_args = con.fetch.call_args[0]
+    assert fetch_call_args[1] == 1  # effective_limit is 1
+
+
+@pytest.mark.asyncio
+async def test_claim_due_ingestion_jobs_returns_empty_when_concurrency_saturated():
+    pool = MagicMock()
+    con = AsyncMock()
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock()
+    txn.__aexit__ = AsyncMock()
+    con.transaction = MagicMock(return_value=txn)
+    pool.acquire.return_value.__aenter__.return_value = con
+
+    # Active count is 3, max_concurrent is 3 -> available slots = 0
+    con.fetchval.return_value = 3
+
+    claimed = await claim_due_ingestion_jobs(
+        pool,
+        limit=5,
+        worker_id="worker-test-1",
+        max_concurrent=3,
+    )
+
+    assert claimed == []
+    # con.fetch for due jobs should not even be called
+    con.fetch.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_reclaim_stale_ingestion_claims_mock():
     pool = MagicMock()
     con = AsyncMock()
