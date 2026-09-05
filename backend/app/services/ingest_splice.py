@@ -287,6 +287,20 @@ async def splice_document(
             )
 
     prog = progress or initial_progress or {}
+    if isinstance(prog, list):
+        # Defensive against malformed array: find last dict or empty dict
+        dict_items = [x for x in prog if isinstance(x, dict)]
+        prog = dict_items[-1] if dict_items else {}
+    elif isinstance(prog, str):
+        import json  # noqa: PLC0415
+        try:
+            parsed = json.loads(prog)
+            prog = parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            prog = {}
+    elif not isinstance(prog, dict):
+        prog = {}
+
     chunk_offset = int(prog.get("chunk_offset", 0))
     stage = prog.get("stage")
     job_uuid = UUID(str(job_id)) if job_id else None

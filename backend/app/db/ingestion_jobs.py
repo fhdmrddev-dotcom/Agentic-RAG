@@ -128,43 +128,58 @@ async def reclaim_stale_ingestion_claims(
 
     Jobs whose claimed_at is older than lease_timeout_seconds are reclaimed:
     - If retry_count + 1 < max_retries: reset to status='pending', increment retry_count, clear claim.
-    - Else: transition to terminal status='failed' with last_error='lease_timeout_exceeded'.
+    - Else: transition to terminal status='failed' with last_error='lease_timeout_exceeded' and mark
+      the document status='failed' in the same transaction (Defect B).
     """
     async with pool.acquire() as con:
-        # 1. Recoverable jobs -> pending
-        reclaimed_rows = await con.fetch(
-            """
-            UPDATE ingestion_jobs
-            SET status = 'pending',
-                retry_count = retry_count + 1,
-                claimed_at = NULL,
-                claimed_by = NULL,
-                updated_at = now()
-            WHERE status = 'processing'
-              AND claimed_at < now() - make_interval(secs => $1::double precision)
-              AND retry_count + 1 < max_retries
-            RETURNING id
-            """,
-            float(lease_timeout_seconds),
-        )
-        # 2. Exhausted jobs -> failed
-        exhausted_rows = await con.fetch(
-            """
-            UPDATE ingestion_jobs
-            SET status = 'failed',
-                stage = 'failed',
-                retry_count = retry_count + 1,
-                last_error = 'lease_timeout_exceeded',
-                claimed_at = NULL,
-                claimed_by = NULL,
-                updated_at = now()
-            WHERE status = 'processing'
-              AND claimed_at < now() - make_interval(secs => $1::double precision)
-              AND retry_count + 1 >= max_retries
-            RETURNING id
-            """,
-            float(lease_timeout_seconds),
-        )
+        async with con.transaction():
+            # 1. Recoverable jobs -> pending
+            reclaimed_rows = await con.fetch(
+                """
+                UPDATE ingestion_jobs
+                SET status = 'pending',
+                    retry_count = retry_count + 1,
+                    claimed_at = NULL,
+                    claimed_by = NULL,
+                    updated_at = now()
+                WHERE status = 'processing'
+                  AND claimed_at < now() - make_interval(secs => $1::double precision)
+                  AND retry_count + 1 < max_retries
+                RETURNING id
+                """,
+                float(lease_timeout_seconds),
+            )
+            # 2. Exhausted jobs -> failed (and fail documents atomically)
+            exhausted_rows = await con.fetch(
+                """
+                UPDATE ingestion_jobs
+                SET status = 'failed',
+                    stage = 'failed',
+                    retry_count = retry_count + 1,
+                    last_error = 'lease_timeout_exceeded',
+                    claimed_at = NULL,
+                    claimed_by = NULL,
+                    updated_at = now()
+                WHERE status = 'processing'
+                  AND claimed_at < now() - make_interval(secs => $1::double precision)
+                  AND retry_count + 1 >= max_retries
+                RETURNING id, document_id
+                """,
+                float(lease_timeout_seconds),
+            )
+            if exhausted_rows:
+                doc_ids = [r["document_id"] for r in exhausted_rows if r.get("document_id")]
+                if doc_ids:
+                    await con.execute(
+                        """
+                        UPDATE documents
+                        SET status = 'failed',
+                            error_message = 'lease_timeout_exceeded',
+                            updated_at = now()
+                        WHERE id = ANY($1::uuid[])
+                        """,
+                        doc_ids,
+                    )
         total = len(reclaimed_rows) + len(exhausted_rows)
         if total > 0:
             logger.warning(
@@ -187,13 +202,19 @@ async def update_job_progress(
     import json  # noqa: PLC0415
     patch_json = json.dumps(progress_patch) if progress_patch is not None else None
 
+    # Self-healing jsonb merge expression: handles object merge, heals any corrupted array, and handles NULL
+    _MERGE_SQL = (
+        "(CASE WHEN jsonb_typeof(COALESCE(progress, '{}'::jsonb)) = 'object' "
+        "THEN COALESCE(progress, '{}'::jsonb) ELSE '{}'::jsonb END) || ($%d::text)::jsonb"
+    )
+
     async with pool.acquire() as con:
         if stage is not None and patch_json is not None:
             await con.execute(
-                """
+                f"""
                 UPDATE ingestion_jobs
                 SET stage = $2,
-                    progress = progress || $3::jsonb,
+                    progress = {_MERGE_SQL % 3},
                     updated_at = now()
                 WHERE id = $1
                 """,
@@ -214,9 +235,9 @@ async def update_job_progress(
             )
         elif patch_json is not None:
             await con.execute(
-                """
+                f"""
                 UPDATE ingestion_jobs
-                SET progress = progress || $2::jsonb,
+                SET progress = {_MERGE_SQL % 2},
                     updated_at = now()
                 WHERE id = $1
                 """,
@@ -257,8 +278,12 @@ async def record_job_failure(
     """Record an ingestion job failure.
 
     If transient and retry_count + 1 < max_retries, schedules a retry (status='retry_queued').
-    Otherwise, marks permanently failed (status='failed').
+    Otherwise, marks permanently failed (status='failed') and marks the associated document
+    failed with error_message in the same transaction (Defect B).
     """
+    import json  # noqa: PLC0415
+    details_json = json.dumps(error_details) if error_details is not None else None
+
     async with pool.acquire() as con:
         row = await con.fetchrow(
             "SELECT retry_count, max_retries FROM ingestion_jobs WHERE id = $1",
@@ -278,7 +303,7 @@ async def record_job_failure(
                     retry_count = retry_count + 1,
                     next_run_at = now() + make_interval(secs => $2::double precision),
                     last_error = $3,
-                    error_details = $4,
+                    error_details = ($4::text)::jsonb,
                     claimed_at = NULL,
                     claimed_by = NULL,
                     updated_at = now()
@@ -287,27 +312,41 @@ async def record_job_failure(
                 job_id,
                 float(retry_delay_seconds),
                 error_message,
-                error_details,
+                details_json,
             )
             return "retry_queued"
         else:
-            await con.execute(
-                """
-                UPDATE ingestion_jobs
-                SET status = 'failed',
-                    stage = 'failed',
-                    retry_count = retry_count + 1,
-                    last_error = $2,
-                    error_details = $3,
-                    claimed_at = NULL,
-                    claimed_by = NULL,
-                    updated_at = now()
-                WHERE id = $1
-                """,
-                job_id,
-                error_message,
-                error_details,
-            )
+            async with con.transaction():
+                doc_id = await con.fetchval(
+                    """
+                    UPDATE ingestion_jobs
+                    SET status = 'failed',
+                        stage = 'failed',
+                        retry_count = retry_count + 1,
+                        last_error = $2,
+                        error_details = ($3::text)::jsonb,
+                        claimed_at = NULL,
+                        claimed_by = NULL,
+                        updated_at = now()
+                    WHERE id = $1
+                    RETURNING document_id
+                    """,
+                    job_id,
+                    error_message,
+                    details_json,
+                )
+                if doc_id:
+                    await con.execute(
+                        """
+                        UPDATE documents
+                        SET status = 'failed',
+                            error_message = $2,
+                            updated_at = now()
+                        WHERE id = $1
+                        """,
+                        doc_id,
+                        error_message,
+                    )
             return "failed"
 
 
@@ -318,13 +357,16 @@ async def pause_jobs_for_provider(
     error_details: dict[str, Any] | None = None,
 ) -> int:
     """Pause pending and processing jobs when an embedding provider outage/rate-limit occurs."""
+    import json  # noqa: PLC0415
+    details_json = json.dumps(error_details) if error_details is not None else None
+
     async with pool.acquire() as con:
         paused = await con.fetch(
             """
             UPDATE ingestion_jobs
             SET status = 'paused',
                 last_error = $1,
-                error_details = $2,
+                error_details = ($2::text)::jsonb,
                 claimed_at = NULL,
                 claimed_by = NULL,
                 updated_at = now()
@@ -332,7 +374,7 @@ async def pause_jobs_for_provider(
             RETURNING id
             """,
             refusal_reason,
-            error_details,
+            details_json,
         )
         return len(paused)
 
@@ -355,6 +397,30 @@ async def resume_paused_jobs(
         return len(resumed)
 
 
+def _normalize_job_record(row: asyncpg.Record | None) -> dict | None:
+    if not row:
+        return None
+    rec = dict(row)
+    # Ensure progress is always a dict, even if decoded as a string or empty
+    if isinstance(rec.get("progress"), str):
+        import json  # noqa: PLC0415
+        try:
+            parsed = json.loads(rec["progress"])
+            rec["progress"] = parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            rec["progress"] = {}
+    elif not isinstance(rec.get("progress"), dict):
+        rec["progress"] = {}
+
+    if isinstance(rec.get("error_details"), str):
+        import json  # noqa: PLC0415
+        try:
+            rec["error_details"] = json.loads(rec["error_details"])
+        except Exception:
+            pass
+    return rec
+
+
 async def get_ingestion_job_by_id(
     pool: asyncpg.Pool,
     job_id: UUID,
@@ -365,7 +431,7 @@ async def get_ingestion_job_by_id(
             f"SELECT {_CLAIM_COLUMNS} FROM ingestion_jobs WHERE id = $1",
             job_id,
         )
-        return dict(row) if row else None
+        return _normalize_job_record(row)
 
 
 async def get_ingestion_job_by_document_id(
@@ -378,4 +444,4 @@ async def get_ingestion_job_by_document_id(
             f"SELECT {_CLAIM_COLUMNS} FROM ingestion_jobs WHERE document_id = $1 ORDER BY created_at DESC LIMIT 1",
             document_id,
         )
-        return dict(row) if row else None
+        return _normalize_job_record(row)

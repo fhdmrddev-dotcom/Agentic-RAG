@@ -201,12 +201,17 @@ async def test_claim_due_ingestion_jobs_returns_empty_when_concurrency_saturated
 async def test_reclaim_stale_ingestion_claims_mock():
     pool = MagicMock()
     con = AsyncMock()
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock()
+    txn.__aexit__ = AsyncMock()
+    con.transaction = MagicMock(return_value=txn)
     pool.acquire.return_value.__aenter__.return_value = con
 
+    doc_id = uuid4()
     # Recoverable jobs
     con.fetch.side_effect = [
         [{"id": uuid4()}, {"id": uuid4()}],  # 2 reclaimed to pending
-        [{"id": uuid4()}],                   # 1 terminal failed
+        [{"id": uuid4(), "document_id": doc_id}],  # 1 terminal failed
     ]
 
     total = await reclaim_stale_ingestion_claims(pool, lease_timeout_seconds=120)
@@ -221,6 +226,13 @@ async def test_reclaim_stale_ingestion_claims_mock():
     assert "status = 'failed'" in q2
     assert "retry_count + 1 >= max_retries" in q2
     assert "lease_timeout_exceeded" in q2
+
+    # Defect B: Assert document was marked failed in same transaction
+    assert con.execute.called
+    q_doc, doc_ids = con.execute.call_args[0]
+    assert "UPDATE documents" in q_doc
+    assert "status = 'failed'" in q_doc
+    assert doc_id in doc_ids
 
 
 @pytest.mark.asyncio
@@ -241,7 +253,7 @@ async def test_update_job_progress_mock():
     assert con.execute.called
     q, j_id, stage, patch = con.execute.call_args[0]
     assert "stage = $2" in q
-    assert "progress = progress || $3" in q
+    assert "($3::text)::jsonb" in q
     assert j_id == job_id
     assert stage == "chunks_embedded"
     if isinstance(patch, str):
@@ -254,9 +266,14 @@ async def test_update_job_progress_mock():
 async def test_record_job_failure_transient_vs_terminal():
     pool = MagicMock()
     con = AsyncMock()
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock()
+    txn.__aexit__ = AsyncMock()
+    con.transaction = MagicMock(return_value=txn)
     pool.acquire.return_value.__aenter__.return_value = con
 
     job_id = uuid4()
+    doc_id = uuid4()
 
     # Case 1: Transient and retry_count < max_retries -> retry_queued
     con.fetchrow.return_value = {"retry_count": 1, "max_retries": 3}
@@ -272,8 +289,9 @@ async def test_record_job_failure_transient_vs_terminal():
     q = con.execute.call_args[0][0]
     assert "status = 'retry_queued'" in q
 
-    # Case 2: Transient but retries exhausted -> failed
+    # Case 2: Transient but retries exhausted -> failed and updates documents
     con.fetchrow.return_value = {"retry_count": 2, "max_retries": 3}
+    con.fetchval.return_value = doc_id
     status = await record_job_failure(
         pool,
         job_id,
@@ -281,11 +299,18 @@ async def test_record_job_failure_transient_vs_terminal():
         is_transient=True,
     )
     assert status == "failed"
-    q = con.execute.call_args[0][0]
-    assert "status = 'failed'" in q
+    con.transaction.assert_called_once()
+    assert con.fetchval.called
+    q_job = con.fetchval.call_args[0][0]
+    assert "UPDATE ingestion_jobs" in q_job
+    assert "status = 'failed'" in q_job
+    q_doc = con.execute.call_args[0][0]
+    assert "UPDATE documents" in q_doc
+    assert "status = 'failed'" in q_doc
 
-    # Case 3: Non-transient error -> failed immediately
+    # Case 3: Non-transient error -> failed immediately and updates documents
     con.fetchrow.return_value = {"retry_count": 0, "max_retries": 3}
+    con.fetchval.return_value = doc_id
     status = await record_job_failure(
         pool,
         job_id,
@@ -421,3 +446,212 @@ async def test_live_claim_exclusivity_and_stale_recovery(live_pg_pool):
                 j1["id"],
                 j2["id"],
             )
+
+
+@pytest.mark.asyncio
+async def test_live_progress_jsonb_roundtrip_type_and_merge(live_pg_pool):
+    """Verify that progress is always stored and decoded as a jsonb object (dict), not a string or array.
+
+    Asserts the TYPE (isinstance(prog, dict)), prevents the regression where $3::jsonb created
+    a string scalar that promoted progress to a list: '[{}, "{\"chunk_offset\": 0}"]',
+    and verifies self-healing if legacy array data is encountered.
+    """
+    pool = live_pg_pool
+
+    async with pool.acquire() as con:
+        doc_row = await con.fetchrow("SELECT id, user_id, org_id FROM documents LIMIT 1")
+        if not doc_row:
+            pytest.skip("No documents in local DB")
+        doc_id = doc_row["id"]
+        user_id = doc_row["user_id"]
+        org_id = doc_row["org_id"]
+
+    job = await insert_ingestion_job(pool, document_id=doc_id, user_id=user_id, org_id=org_id)
+    job_id = job["id"]
+
+    try:
+        # Step 1: Initial progress must be dict
+        async with pool.acquire() as con:
+            raw_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        assert isinstance(raw_row["progress"], dict), f"Expected dict, got {type(raw_row['progress'])}"
+        assert raw_row["progress"] == {}
+
+        # Step 2: First progress update (chunk_offset = 0)
+        await update_job_progress(pool, job_id, stage="extracting", progress_patch={"chunk_offset": 0})
+        async with pool.acquire() as con:
+            raw_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        # CRITICAL: Assert TYPE is dict, NOT list, NOT str
+        assert isinstance(raw_row["progress"], dict), f"Expected dict after patch, got {type(raw_row['progress'])}: {raw_row['progress']}"
+        assert raw_row["progress"] == {"chunk_offset": 0}
+
+        # Step 3: Second progress update (chunk_offset = 50, total_chunks = 100)
+        await update_job_progress(pool, job_id, stage="tables_embedded", progress_patch={"chunk_offset": 50, "total_chunks": 100})
+        async with pool.acquire() as con:
+            raw_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        assert isinstance(raw_row["progress"], dict)
+        assert raw_row["progress"] == {"chunk_offset": 50, "total_chunks": 100}
+
+        # Step 4: Third progress update (embedded_chunks = 50) -> should merge, not overwrite or append to list
+        await update_job_progress(pool, job_id, stage="chunks_embedded", progress_patch={"embedded_chunks": 50})
+        async with pool.acquire() as con:
+            raw_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        assert isinstance(raw_row["progress"], dict)
+        assert raw_row["progress"] == {
+            "chunk_offset": 50,
+            "total_chunks": 100,
+            "embedded_chunks": 50,
+        }
+
+        # Step 5: Verify get_ingestion_job_by_id returns dict and supports .get() without AttributeError
+        job_record = await get_ingestion_job_by_id(pool, job_id)
+        assert job_record is not None
+        prog = job_record["progress"]
+        assert isinstance(prog, dict), f"Expected dict from get_ingestion_job_by_id, got {type(prog)}"
+        assert prog.get("chunk_offset", 0) == 50
+
+        # Step 6: Test self-healing of legacy corrupted array data
+        async with pool.acquire() as con:
+            await con.execute(
+                """
+                UPDATE ingestion_jobs
+                SET progress = '[{}, "{\\"chunk_offset\\": 0}"]'::jsonb
+                WHERE id = $1
+                """,
+                job_id,
+            )
+        # Verify raw DB currently has list
+        async with pool.acquire() as con:
+            corrupt_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        assert isinstance(corrupt_row["progress"], list)
+
+        # Call update_job_progress - should heal the array back to an object
+        await update_job_progress(pool, job_id, stage="chunks_embedded", progress_patch={"chunk_offset": 100})
+        async with pool.acquire() as con:
+            healed_row = await con.fetchrow("SELECT progress FROM ingestion_jobs WHERE id = $1", job_id)
+        assert isinstance(healed_row["progress"], dict), f"Self-healing failed: {type(healed_row['progress'])}"
+        assert healed_row["progress"] == {"chunk_offset": 100}
+
+    finally:
+        async with pool.acquire() as con:
+            await con.execute("DELETE FROM ingestion_jobs WHERE id = $1", job_id)
+
+
+@pytest.mark.asyncio
+async def test_live_record_job_failure_permanent_updates_document_status(live_pg_pool):
+    """Verify Defect B fix: permanent job failure sets documents.status='failed' in same transaction."""
+    pool = live_pg_pool
+
+    async with pool.acquire() as con:
+        user_row = await con.fetchrow("SELECT user_id FROM documents LIMIT 1")
+        if not user_row:
+            pytest.skip("No documents in local DB")
+        user_id = user_row["user_id"]
+
+    doc_id = uuid4()
+    async with pool.acquire() as con:
+        await con.execute(
+            """
+            INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, status)
+            VALUES ($1, $2, 'defect_b_test.txt', 'test/defect_b_test.txt', 1234, 'text/plain', 'processing')
+            """,
+            doc_id,
+            user_id,
+        )
+
+    job = await insert_ingestion_job(pool, document_id=doc_id, user_id=user_id)
+    job_id = job["id"]
+
+    try:
+        # Force permanent failure
+        status = await record_job_failure(
+            pool,
+            job_id,
+            error_message="Permanent parser failure: corrupt PDF syntax",
+            is_transient=False,
+        )
+        assert status == "failed"
+
+        # Check ingestion_jobs row
+        job_record = await get_ingestion_job_by_id(pool, job_id)
+        assert job_record is not None
+        assert job_record["status"] == "failed"
+        assert job_record["last_error"] == "Permanent parser failure: corrupt PDF syntax"
+
+        # Check documents row — MUST be 'failed' and carry error_message
+        async with pool.acquire() as con:
+            doc_row = await con.fetchrow("SELECT status, error_message FROM documents WHERE id = $1", doc_id)
+        assert doc_row is not None
+        assert doc_row["status"] == "failed", f"Expected documents.status='failed', got {doc_row['status']}"
+        assert doc_row["error_message"] == "Permanent parser failure: corrupt PDF syntax"
+
+    finally:
+        async with pool.acquire() as con:
+            await con.execute("DELETE FROM ingestion_jobs WHERE id = $1", job_id)
+            await con.execute("DELETE FROM documents WHERE id = $1", doc_id)
+
+
+@pytest.mark.asyncio
+async def test_live_reclaim_stale_ingestion_claims_exhausted_fails_document(live_pg_pool):
+    """Verify Defect B fix on stale-claim exhaustion: documents.status set to 'failed'."""
+    pool = live_pg_pool
+
+    async with pool.acquire() as con:
+        user_row = await con.fetchrow("SELECT user_id FROM documents LIMIT 1")
+        if not user_row:
+            pytest.skip("No documents in local DB")
+        user_id = user_row["user_id"]
+
+    doc_id = uuid4()
+    async with pool.acquire() as con:
+        await con.execute(
+            """
+            INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, status)
+            VALUES ($1, $2, 'stale_exhaust_test.txt', 'test/stale_exhaust_test.txt', 5678, 'text/plain', 'processing')
+            """,
+            doc_id,
+            user_id,
+        )
+
+    # Job with max_retries = 1 so that 1 failure exhausts it
+    job = await insert_ingestion_job(pool, document_id=doc_id, user_id=user_id, max_retries=1)
+    job_id = job["id"]
+
+    try:
+        # Claim it
+        claimed = await claim_due_ingestion_jobs(pool, limit=1, worker_id="worker-crash-test")
+        assert len(claimed) == 1
+        assert claimed[0]["id"] == job_id
+
+        # Worker dies: stall claimed_at past 300s lease
+        async with pool.acquire() as con:
+            await con.execute(
+                """
+                UPDATE ingestion_jobs
+                SET claimed_at = now() - interval '400 seconds'
+                WHERE id = $1
+                """,
+                job_id,
+            )
+
+        # Run stale claim sweeper
+        swept = await reclaim_stale_ingestion_claims(pool, lease_timeout_seconds=300)
+        assert swept >= 1
+
+        # Check job
+        job_record = await get_ingestion_job_by_id(pool, job_id)
+        assert job_record is not None
+        assert job_record["status"] == "failed"
+        assert job_record["last_error"] == "lease_timeout_exceeded"
+
+        # Check document
+        async with pool.acquire() as con:
+            doc_row = await con.fetchrow("SELECT status, error_message FROM documents WHERE id = $1", doc_id)
+        assert doc_row is not None
+        assert doc_row["status"] == "failed"
+        assert doc_row["error_message"] == "lease_timeout_exceeded"
+
+    finally:
+        async with pool.acquire() as con:
+            await con.execute("DELETE FROM ingestion_jobs WHERE id = $1", job_id)
+            await con.execute("DELETE FROM documents WHERE id = $1", doc_id)
+
