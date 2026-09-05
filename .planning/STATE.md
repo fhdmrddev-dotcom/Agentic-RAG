@@ -7,10 +7,10 @@ last_updated: "2026-09-05T12:00:00.000Z"
 last_activity: 2026-09-05
 progress:
   total_phases: 14
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 8
   completed_plans: 8
-  percent: 29
+  percent: 36
 ---
 
 # Project State
@@ -37,8 +37,8 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 232 — The Source Contract + Google Drive (NOT STARTED — builder not yet named) · 231 complete
-Prior: 231 — Connection-Scoped Visibility (BUILT by Claude, REVIEWED by Gemini by driving — PASS)
+Phase: 233 — The Preview: See It Before It Lands (NOT STARTED — ⚠ **G-2 SKETCH MANDATORY BEFORE PLANNING**) · 232 complete
+Prior: 232 — The Source Contract + Google Drive (BUILT by Gemini, REVIEWED by Claude by driving — PASS)
 Plan: none in flight
 Status: between_phases
 Last activity: 2026-09-05 — Phase 231 CLOSED (`231-SUMMARY.md` written, ROADMAP progress + checklist updated, migration reservations 234-241 shifted +2).
@@ -158,6 +158,46 @@ oldest TEN DAYS.** A new item is one line at the bottom of that list. The bus is
 *loud at 3+ days*; when everything is loud, nothing is. **This is the seeds-register failure one
 channel over** — a queue nobody drains stops being a queue. ⛔ **Open on the operator**; neither
 agent should unilaterally close another's mail.
+
+### ✅ Phase 232 — The Source Contract + Google Drive CLOSED (2026-09-05)
+
+**Gemini built · Claude REVIEWED BY DRIVING · ✅ PASS on capability.** Report:
+`.planning/phases/232-the-source-contract-google-drive/232-VERIFICATION.md`. Range `53bb866e4..1ae6defbb`.
+
+⭐ **The contract was exercised end-to-end through the real registry**, not read: `browse` → browse child
+→ `list_files` → `read_file` → `check`, and `SourceRegistry` resolved **both** `mock_source` and `google`
+by `service_id` — `SRC-01`'s "a source family is a registration, not a branch" claim actually working.
+
+**Gates:** backend **72 failed / 3567 passed / 0 collection errors** (failures identical to baseline,
+**+37 passing**) · tsc **66**, exact · source suites 37 · picker 7/7, pinned in TARGETS **and** BASELINE.
+⭐ **The blocking pre-flight finding closed by MEASUREMENT**: deleting `cloud_storage.py` was predicted
+to take collection errors 0 → ≥2; all six suites were re-pointed and **4560 tests collect with zero errors.**
+
+⚠ **TWO REVIEWER CORRECTIONS — APPLIED BY THE REVIEWER, OPERATOR-AUTHORISED** (`347abc357`), because the
+builder session had gone idle. Both figures re-derived at HEAD, never copied:
+
+1. ⚠⚠ **The `232-03` PARTIAL DISCHARGE claim was FALSIFIED by `232-04`.** `connectors.py` went
+   **1736 → 1757** across the phase (`232-03` −28, then `232-04` **+49** for `/browse`) — the file **GREW
+   by 21 lines** while its cell read *"✅ PARTIAL DISCHARGE — −28 net L"*. Triple corrected
+   `30 / 14 / 1708` → **`32 / 15 / 1757`**; **the G-5 extraction stays OWED.**
+   ⭐⭐ **This is Phase 231's OWN recorded finding repeating one phase later** — *write the ledger note
+   LAST, or re-derive at the phase's final commit.* **A cell reading `✅ DISCHARGED` stops the next audit.**
+2. **`frontend/src/lib/api/connectors.ts` had NO ledger row**, despite being a `232-04` must-have. Added
+   at **`11 / 6 / 594`** — absent for its entire life at six phases. ⚠ The plan quoted `10 / 5 / 552`,
+   **already stale when it shipped**.
+
+⚠ **Also found: `docs/HOT-FILE-LEDGER.md` carries TWO `## backend/app/api/connectors.py` sections**
+(`6 / 3 / 734` and `7 / 3 / 781`), both stale by ~1000 lines. Flagged in place, not merged.
+
+⚠ **`232-04` was committed BY THE REVIEWER** (`1ae6defbb`) after the builder session went idle with the
+work finished but uncommitted. **No line was changed**, so review independence holds (AGENTS.md §6.3);
+it is disclosed at the top of the verification report rather than left to be found in `git log`.
+
+⛔ **`OD-232-01` — NO LIVE GOOGLE DRIVE HAS EVER BEEN BROWSED.** `SRC-02` is verified STRUCTURALLY only;
+the shared-drive claim rests on mocked `/drives` responses. Recorded honestly in `232-VALIDATION.md` §4
+as **INFERRED (OWED DRIVE)**. ⚠ Its deadline reads *"before v4.0 closeout **when** live credentials are
+available"* — **the second clause is a precondition nobody owns**, which is exactly how Phase 230's SC#2
+and SC#3 came to be still owed.
 
 ### ⚠ A 232 "BLOCKER" CARRIED IN THE 231 HANDOFF IS MEASURED FALSE (2026-09-05, Claude — reviewer baseline)
 
