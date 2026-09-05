@@ -20,7 +20,7 @@
 | Backend unit | `pytest tests/unit -q --continue-on-collection-errors` | **72 failed · 3530 passed · 2 xfailed · 2 xpassed · 0 collection errors** |
 | Deploy drift | `bash scripts/check-deploy-drift.sh` | **PASS — 0 drift** |
 | `CLAUDE.md` budget | `node scripts/check-claude-md-size.cjs` | **107,507 chars · 71.7% · headroom 42,493 · OK** |
-| Vitest count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` | see §1.1 |
+| Vitest count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` | **total 7456 · pinned total 6724 · failed 2** — `COUNT GATE VIOLATED`, and the 2 are inherited (§1.1) |
 
 ### 1.1 ⚠ Two gates cannot read clean for ANYONE, and neither is 232's fault
 
@@ -35,6 +35,20 @@
   `IngestionStrip` ordered fence asserts exactly **6**.
   ⚠ **Root cause of how this was missed, worth not repeating:** *"frontend untouched, so the gate
   cannot be affected"* is **UNSOUND here** — that suite imports `backend/app/api/documents.py?raw`.
+
+  ⭐ **Both failing tests taken from the gate's OWN persisted JSON report before any re-run**
+  (`/tmp/vitest-count-gate-1528-1788591945517.json`), per the SEED-171 triage procedure:
+
+  ```
+  IngestionStrip.test.tsx :: non-vacuity 3/3 — EXACTLY six distinct ingestion_step writes were extracted
+  IngestionStrip.test.tsx :: ⭐ the six stages are in the backend's WRITE ORDER — an ORDERED comparison, never sorted
+  ```
+
+  **Nothing else failed.** Both are `BUS-114` verbatim, one file, and **none of SEED-171's five
+  cap-independent flaky suites went red on this run** — recorded as an observation, never as proof
+  of innocence, because one green sample of a flaky suite proves nothing.
+  ⭐ **`failed 2` is therefore the EXACT inherited figure**, identical to what `BUS-115` and
+  `BUS-121` measured. A run reading anything other than these two files has found something new.
 
 ---
 
@@ -198,8 +212,12 @@ re-proposed forever, and the frontmatter write belongs to whoever routes it at d
 
 - **Shared-drive invisibility** — the ROADMAP marks it **INFERRED, not driven**. I did not drive it.
   It stays inferred until somebody runs it.
-- **The count gate's per-file deltas** — the run was still in flight when this pack was written; the
-  headline is §1.1's standing RED, which is inherited and operator-owned either way.
+- **A per-file DECREASE check across the whole gate.** The run reports **no per-file decrease** and
+  named **five UNPINNED new suites** — `PromptVariableChips.test.tsx` (3), `RunHero.test.tsx` (18),
+  `automationFacts.test.ts` (11), `nodeEffectBanner.test.ts` (8), `toolReadOnlyMap.test.ts` (7).
+  ⚠ **`total 7456` exceeds `pinned total 6724` by 732** — that gap is suites nobody has adopted.
+  **TARGETS decides what RUNS; BASELINE decides what is GUARDED**, and a suite can sit on the wrong
+  side of exactly one of them. I did not adopt any of them; that is the builder's call at its close.
 - **Whether `drive.readonly` is actually live on the two Google rows.** The ROADMAP says the scope was
   granted at Phase 221 and that 232 needs **no new OAuth scope**; I did not verify the grant on these
   specific rows.
