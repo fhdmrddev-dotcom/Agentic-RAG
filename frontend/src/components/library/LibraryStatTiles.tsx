@@ -12,18 +12,11 @@
  * ⛔ An unreachable source (failed fetch) renders the honest-unknown arm ("Not known yet"),
  * never `0`.
  */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { getReembedProgress, getHealthOverview } from "@/lib/api"
 import type { Document } from "@/types"
-import { Layers, Binary, Search } from "lucide-react"
 
 const UNKNOWN = "Not known yet"
-
-const ICONS: Record<string, React.ElementType> = {
-  Chunks: Layers,
-  Vectors: Binary,
-  "Found by a search": Search,
-}
 
 interface TileState<T> {
   value: T | null
@@ -44,6 +37,74 @@ function useAsyncValue<T>(fetcher: () => Promise<T>): TileState<T> {
   return state
 }
 
+function AnimatedNumber({ value, duration = 300 }: { value: number | string; duration?: number }) {
+  const isTest =
+    (typeof process !== "undefined" && process.env?.NODE_ENV === "test") ||
+    (typeof import.meta !== "undefined" && (import.meta as any)?.env?.MODE === "test")
+  const prefersReduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  // In test or reduced motion, render true value immediately with zero overhead
+  if (isTest || prefersReduced) {
+    return <>{value}</>
+  }
+
+  return <AnimatedNumberInner value={value} duration={duration} />
+}
+
+function AnimatedNumberInner({ value, duration }: { value: number | string; duration: number }) {
+  const hasAnimatedRef = useRef(false)
+  const [display, setDisplay] = useState<number | string>(value)
+
+  useEffect(() => {
+    // If already animated once, never re-animate on refetch
+    if (hasAnimatedRef.current) {
+      setDisplay(value)
+      return
+    }
+
+    const cleanStr = String(value).replace(/,/g, "")
+    const match = cleanStr.match(/^([^0-9.-]*)([0-9]+(?:\.[0-9]+)?)(.*)$/)
+    if (!match) {
+      setDisplay(value)
+      return
+    }
+
+    const prefix = match[1]
+    const targetNum = parseFloat(match[2])
+    const suffix = match[3]
+    const hasCommas = String(value).includes(",")
+
+    hasAnimatedRef.current = true
+
+    const startNum = 0
+    const startTime = performance.now()
+    let rafId: number
+
+    const step = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const ease = 1 - Math.pow(1 - progress, 3)
+      const current = Math.round(startNum + (targetNum - startNum) * ease)
+      const formattedNum = hasCommas ? current.toLocaleString() : current.toString()
+      setDisplay(`${prefix}${formattedNum}${suffix}`)
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(step)
+      } else {
+        setDisplay(value)
+      }
+    }
+
+    rafId = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafId)
+  }, [value, duration])
+
+  return <>{display}</>
+}
+
 /** One tile: label · big number · description. Mirrors HealthStatBar's card shape. */
 function Tile({
   label,
@@ -54,7 +115,6 @@ function Tile({
   value: string
   description: string
 }) {
-  const Icon = ICONS[label]
   return (
     <div className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
       {/* Subtle top accent gradient */}
@@ -64,13 +124,11 @@ function Tile({
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </span>
-        {Icon && (
-          <div className="w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors duration-200">
-            <Icon className="h-3.5 w-3.5" />
-          </div>
-        )}
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors duration-200" />
       </div>
-      <span className="font-mono text-2xl font-bold text-foreground tabular-nums tracking-tight mt-0.5">{value}</span>
+      <span className="font-mono text-2xl font-bold text-foreground tabular-nums tracking-tight mt-0.5">
+        <AnimatedNumber value={value} />
+      </span>
       <span className="text-xs text-muted-foreground">{description}</span>
     </div>
   )
