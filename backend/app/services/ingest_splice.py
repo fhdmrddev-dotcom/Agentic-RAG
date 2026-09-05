@@ -330,8 +330,10 @@ async def splice_document(
         storage_path = storage_path or doc.get("file_path", "")
 
     # Resolve raw bytes if missing
+    _expected_bytes_from_storage = False
     if raw is None or len(raw) == 0:
         if storage_path:
+            _expected_bytes_from_storage = True
             try:
                 raw = supabase.storage.from_("documents").download(storage_path)
             except Exception as dl_exc:
@@ -339,6 +341,43 @@ async def splice_document(
                 raw = b""
         else:
             raw = b""
+
+    # ── BUG-260905-08 (second half) — NO BYTES MEANS NO DOCUMENT, ON THIS PATH TOO ───────
+    #
+    # ⛔ THE FIX AT THE `/upload` DOOR WAS ONLY HALF THE FIX, and this is the half Phase 234
+    #    runs through. `/upload` now refuses when the storage PUT fails; nothing refused when
+    #    the later GET came back empty. A document whose row exists and whose bytes do not
+    #    then flowed straight on: extraction of `b""` yields no text, no text yields no chunks,
+    #    and this path had no empty guard — so it reached `completed` with `chunk_count=0` and
+    #    an EMPTY `error_message`. Measured on the operator's library
+    #    (`Screenshot 2026-05-29 042925.png`), and it is the exact shape a watch loop produces
+    #    at scale: the watch mints rows for files NOBODY uploaded, so a mint that forgets the
+    #    upload makes every watched file an empty document that reports success.
+    #
+    # ⚠ ONLY WHEN STORAGE WAS THE SOURCE. A caller that legitimately passes `raw=b""` — the
+    #   backfill tool does, deliberately, because the bytes live in storage and it only wants
+    #   metadata re-derived — must not be failed by this. The flag is set on the branch that
+    #   actually went to storage and came back with nothing.
+    if _expected_bytes_from_storage and not raw:
+        log.error(
+            "document %s has a storage_path (%s) but no bytes — refusing rather than "
+            "ingesting an empty document that reports success",
+            document_id, storage_path,
+        )
+        try:
+            supabase.table("documents").update({
+                "status": "failed",
+                "ingestion_step": "failed",
+                "error_message": (
+                    "The stored copy of this file could not be read, so nothing was "
+                    "extracted from it. Please upload it again."
+                ),
+            }).eq("id", document_id).execute()
+        except Exception:  # noqa: BLE001 — the refusal write must not double-fault
+            log.exception("could not mark %s failed after missing bytes", document_id)
+        if job_id:
+            raise RuntimeError(f"no bytes in storage for document {document_id}")
+        return
 
     # Step 1: Storage upload (if raw & storage_path provided and not already uploaded)
     if storage_path and raw:
@@ -613,6 +652,41 @@ async def splice_document(
         total_recounted = count_resp.count if count_resp.count is not None else total_chunks
     except Exception:
         total_recounted = total_chunks
+
+    # ── THE THIRD TWO-PATHS DISAGREEMENT, AND THE ONE PHASE 234 RUNS THROUGH ────────────
+    #
+    # ⛔ `ingest_document` HAS ALWAYS REFUSED HERE AND THIS PATH NEVER DID. documents.py:2093
+    #    reads `if not chunks: status='failed', error_message=empty_text_message(mime_type)`.
+    #    The queue path fell straight through to `completed`, so a document that produced NO
+    #    searchable content reported success with `chunk_count=0` and nothing to explain it.
+    #    A person cannot tell that from a document that worked.
+    #
+    # ⚠ IT USES THE AUTHORITATIVE RECOUNT, not the in-memory `chunks` list, so a RESUMED job
+    #   is judged on what is actually in `document_chunks` rather than on what this invocation
+    #   happened to embed. A job resuming at `chunks_embedded` has an empty batch loop and a
+    #   non-zero row count; failing it on the local list would destroy a good document.
+    #
+    # ⚠ SAME SENTENCE AS THE LEGACY PATH, from the same function. Two paths that refuse for the
+    #   same reason must say the same thing, or the wording becomes the tell for which code
+    #   ran — which is the class of divergence this whole seam was built to end.
+    if total_recounted == 0:
+        from app.api.documents import empty_text_message  # noqa: PLC0415
+
+        log.warning(
+            "document %s produced no chunks — failing rather than completing empty",
+            document_id,
+        )
+        supabase.table("documents").update({
+            "status": "failed",
+            "ingestion_step": "failed",
+            "error_message": empty_text_message(mime_type),
+            "full_markdown": text,
+        }).eq("id", document_id).execute()
+        if pool and job_uuid:
+            await update_job_progress(
+                pool, job_uuid, stage="failed", progress_patch={"chunk_offset": 0},
+            )
+        return
 
     supabase.table("documents").update({
         "status": "completed",

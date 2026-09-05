@@ -322,3 +322,63 @@ def test_the_storage_failure_is_logged_as_an_error_not_a_warning():
     src = _source(_DOCUMENTS)
     i = src.index("Storage upload during /upload FAILED")
     assert "log.error(" in src[max(0, i - 400) : i + 200]
+
+
+# ── The queue path must refuse the two empty outcomes, like the legacy path always has ──
+
+
+def test_the_queue_path_refuses_a_document_with_no_bytes():
+    """⛔ THE HALF OF BUG-260905-08 THE `/upload` FIX DID NOT COVER.
+
+    `/upload` now refuses when the storage PUT fails. Nothing refused when the later GET came
+    back empty — and that is the path a WATCH LOOP takes, because it mints rows for files
+    nobody uploaded. A mint that forgets the upload made every watched file an empty document
+    that reported success.
+    """
+    src = _source(_SPLICE)
+    assert "_expected_bytes_from_storage" in src, (
+        "the queue path must distinguish 'storage returned nothing' from 'caller passed no raw'"
+    )
+    i = src.index("_expected_bytes_from_storage and not raw")
+    tail = src[i : i + 1200]
+    assert '"status": "failed"' in tail
+    assert "error_message" in tail
+
+
+def test_a_caller_that_deliberately_passes_no_bytes_is_not_failed():
+    """⚠ The backfill tool passes `raw=b''` ON PURPOSE — the bytes live in storage and it only
+    re-derives metadata. The guard must key on the storage branch, not on emptiness alone."""
+    src = _source(_SPLICE)
+    assert "_expected_bytes_from_storage = False" in src, (
+        "the flag must default False so a deliberate empty-raw caller is untouched"
+    )
+
+
+def test_the_queue_path_refuses_to_complete_with_zero_chunks():
+    """⛔ THE THIRD TWO-PATHS DISAGREEMENT. `ingest_document` has always refused here
+    (documents.py: `if not chunks` -> failed + empty_text_message); the queue path fell through
+    to `completed` with chunk_count=0 and an empty error_message."""
+    src = _source(_SPLICE)
+    assert "if total_recounted == 0:" in src, (
+        "the queue path must refuse when nothing was indexed"
+    )
+    i = src.index("if total_recounted == 0:")
+    tail = src[i : i + 900]
+    assert "empty_text_message" in tail, (
+        "it must reuse the legacy path's sentence — two paths refusing for the same reason "
+        "must say the same thing"
+    )
+
+
+def test_the_zero_chunk_guard_uses_the_authoritative_recount_not_the_local_list():
+    """⚠ A RESUMED job has an empty batch loop and a non-zero row count. Judging it on the
+    in-memory `chunks` list would fail a document that is actually fine."""
+    # ⚠ COMMENTS STRIPPED FIRST. A first version asserted on the raw source and failed on the
+    #   guard's OWN comment, which quotes the legacy path's `if not chunks:` to explain the
+    #   divergence. Prose about code is not code — in both directions.
+    src = _source(_SPLICE)
+    code = "\n".join(ln for ln in src.split("\n") if not ln.lstrip().startswith("#"))
+    assert "if total_recounted == 0:" in code
+    assert "if not chunks:" not in code.split("4d. Finalize")[-1], (
+        "the finalize guard must read the recount, never the local chunk list"
+    )
