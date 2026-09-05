@@ -6,718 +6,494 @@
 <title>229 · The four buckets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --color-bg:hsl(216 45% 4%); --color-bg-elev1:hsl(220 40% 5%); --color-surface:hsl(220 30% 7%);
-  --color-surface-hi:hsl(220 30% 8%); --color-muted:hsl(220 30% 11%); --color-accent:hsl(220 25% 14%);
-  --color-text:hsl(226 60% 97%); --color-text-muted:hsl(220 16% 65%); --color-text-dim:hsl(220 16% 45%);
-  --color-border:hsl(220 20% 16%); --color-border-soft:hsl(220 20% 16% / .5);
-  --color-primary:hsl(239 100% 82%); --color-primary-strong:hsl(239 84% 67%);
-  --color-primary-dim:hsl(239 100% 82% / .15); --color-primary-glow:hsl(239 100% 82% / .35);
-  --color-violet:hsl(258 90% 66%);
-  --color-success:hsl(142 71% 45%); --color-success-dim:hsl(142 71% 45% / .13);
-  --color-warning:hsl(38 92% 60%); --color-warning-dim:hsl(38 92% 60% / .13);
-  --color-danger:hsl(0 72% 51%); --color-danger-dim:hsl(0 72% 51% / .13);
-  --color-slate:hsl(220 14% 46%);
-  --font-sans:'Inter',ui-sans-serif,system-ui,sans-serif;
-  --font-headline:'Manrope','Inter',sans-serif;
-  --font-mono:'JetBrains Mono',ui-monospace,monospace;
-  --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-xl:20px; --radius-full:9999px;
+  --bg:hsl(216 45% 4%); --elev:hsl(220 40% 5%); --surf:hsl(220 30% 7%);
+  --muted:hsl(220 30% 11%); --accent:hsl(220 25% 14%);
+  --tx:hsl(226 60% 97%); --tx2:hsl(220 16% 65%); --tx3:hsl(220 16% 45%);
+  --bd:hsl(220 20% 16%); --bd2:hsl(220 20% 16% / .5);
+  --pri:hsl(239 100% 82%); --pri2:hsl(239 84% 67%); --pridim:hsl(239 100% 82% / .15);
+  --vio:hsl(258 90% 66%);
+  --ok:hsl(142 71% 45%); --okdim:hsl(142 71% 45% / .13);
+  --wa:hsl(38 92% 60%); --wadim:hsl(38 92% 60% / .13);
+  --da:hsl(0 72% 51%); --dadim:hsl(0 72% 51% / .13);
+  --sl:hsl(220 14% 46%);
+  --fs:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --fh:'Manrope','Inter',sans-serif;
+  --fm:'JetBrains Mono',ui-monospace,monospace;
+  --r1:6px; --r2:10px; --r3:14px; --rf:9999px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:.9rem;line-height:1.55;
-  background-image:radial-gradient(1000px 520px at 14% -12%, hsl(239 100% 82% / .05), transparent 62%);
-  background-attachment:fixed;padding:30px 22px 90px}
-h1,h2,h3{font-family:var(--font-headline);margin:0}
-.wrap{max-width:1320px;margin:0 auto}
-.page-head{margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--color-border)}
-.page-head h1{font-size:1.5rem;letter-spacing:-.02em}
-.page-head p{color:var(--color-text-muted);margin:8px 0 0;max-width:82ch}
-.crit{margin-top:14px;padding:12px 14px;border-left:2px solid var(--color-primary-strong);
-  background:var(--color-primary-dim);border-radius:0 var(--radius-md) var(--radius-md) 0;
-  font-size:.85rem;color:var(--color-text-muted);max-width:96ch}
-.crit b{color:var(--color-text)}
-code{font-family:var(--font-mono);font-size:.78rem;background:var(--color-muted);padding:1px 5px;border-radius:4px}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--fs);font-size:.9rem;line-height:1.5}
+h1{font-family:var(--fh);margin:0}
 
-.variants{display:flex;flex-direction:column;gap:34px;margin-top:30px}
-.variant{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-bg-elev1);overflow:hidden}
-.vhead{display:flex;align-items:baseline;gap:12px;padding:15px 20px;border-bottom:1px solid var(--color-border);background:var(--color-surface);flex-wrap:wrap}
-.vtag{font-family:var(--font-mono);font-size:.72rem;padding:3px 8px;border-radius:var(--radius-full);
-  background:var(--color-accent);color:var(--color-text-muted);letter-spacing:.04em}
-.vhead h2{font-size:1.02rem}
-.vhead .sub{color:var(--color-text-dim);font-size:.82rem;margin-left:auto;text-align:right;max-width:52ch}
-.vbody{padding:20px}
+/* chrome: one thin bar */
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:10px 20px;background:hsl(216 45% 4% / .92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .id{font-family:var(--fm);font-size:.75rem;color:var(--tx3);letter-spacing:.03em}
+.top h1{font-size:.94rem;font-weight:600}
+.tabs{margin-left:auto;display:flex;gap:5px}
+.tab{padding:5px 12px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;color:var(--tx2);
+  font-family:var(--fs);font-size:.79rem;cursor:pointer;transition:.15s}
+.tab:hover{border-color:var(--tx3);color:var(--tx)}
+.tab.on{background:var(--accent);border-color:var(--tx3);color:var(--tx)}
+.tab.win.on{background:var(--okdim);border-color:hsl(142 71% 45% / .5);color:var(--ok)}
+.ntoggle{padding:5px 11px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;
+  color:var(--tx3);font-size:.75rem;cursor:pointer;font-family:var(--fs)}
+.ntoggle.on{color:var(--pri);border-color:hsl(239 84% 67% / .5)}
 
-/* ---------- the preview panel shell (shared) ---------- */
-.prev{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);overflow:hidden}
-.prev-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--color-border);background:var(--color-bg-elev1)}
-.svc{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;font-size:.95rem;
-  background:linear-gradient(145deg,hsl(220 30% 13%),hsl(220 30% 9%));border:1px solid var(--color-border)}
-.crumbs{font-size:.85rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
-.crumbs .dim{color:var(--color-text-dim)}
-.crumbs .cur{font-weight:600}
-.prev-head .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.stage{max-width:900px;margin:0 auto;padding:34px 20px 90px}
+.v{display:none} .v.on{display:block;animation:in .25s both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-/* the scanner */
-.scanner{padding:13px 16px;border-bottom:1px solid var(--color-border);background:var(--color-bg-elev1)}
-.scan-line{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--color-text-muted)}
-.scan-dot{width:7px;height:7px;border-radius:50%;background:var(--color-text-dim);flex:none}
-.scanning .scan-dot{background:var(--color-primary);animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
-.scan-name{font-family:var(--font-mono);font-size:.76rem;color:var(--color-text);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
-.scan-count{margin-left:auto;font-family:var(--font-mono);font-size:.75rem;color:var(--color-text-dim);flex:none}
-.track{height:2px;background:var(--color-muted);border-radius:2px;margin-top:9px;overflow:hidden}
-.track i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--color-primary-strong),var(--color-primary));
-  transition:width .22s linear}
+/* preview panel */
+.p{border:1px solid var(--bd);border-radius:var(--r3);background:var(--surf);overflow:hidden}
+.ph{display:flex;align-items:center;gap:11px;padding:13px 15px;border-bottom:1px solid var(--bd);background:var(--elev)}
+.svc{width:27px;height:27px;border-radius:7px;display:grid;place-items:center;flex:none;font-size:.85rem;
+  background:linear-gradient(145deg,hsl(220 30% 13%),hsl(220 30% 9%));border:1px solid var(--bd)}
+.ph .nm{font-weight:600;font-size:.89rem}
+.ph .pa{color:var(--tx3);font-size:.75rem;font-family:var(--fm)}
+.ph .rt{margin-left:auto;font-family:var(--fm);font-size:.73rem;color:var(--tx3)}
+.ico{background:none;border:0;color:var(--tx3);cursor:pointer;padding:3px 6px;border-radius:var(--r1);font-size:.8rem}
+.ico:hover{background:var(--muted);color:var(--tx)}
 
-/* the flier — a file in transit from the scanner head to its bucket */
-.flier{position:fixed;z-index:9000;pointer-events:none;font-family:var(--font-mono);font-size:.72rem;
-  padding:4px 9px;border-radius:var(--radius-full);border:1px solid var(--color-primary-strong);
-  background:hsl(220 30% 9%);color:var(--color-text);white-space:nowrap;
-  box-shadow:0 6px 22px hsl(216 45% 2% / .7);
-  transition:transform .46s cubic-bezier(.34,.9,.32,1), opacity .46s ease}
+/* scanner */
+.sc{padding:10px 15px;border-bottom:1px solid var(--bd);background:var(--elev)}
+.scl{display:flex;align-items:center;gap:9px;font-size:.77rem;color:var(--tx3)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--tx3);flex:none}
+.scanning .dot{background:var(--pri);animation:pu 1s ease-in-out infinite}
+@keyframes pu{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+.scn{font-family:var(--fm);font-size:.72rem;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.scc{font-family:var(--fm);font-size:.72rem;flex:none}
+.trk{height:2px;background:var(--muted);border-radius:2px;margin-top:7px;overflow:hidden}
+.trk i{display:block;height:100%;width:0;background:var(--pri2);transition:width .2s linear}
 
-/* ---------- VARIANT A: four lanes ---------- */
-.lanes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--color-border)}
-@media(max-width:1080px){.lanes{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.lane{background:var(--color-surface);display:flex;flex-direction:column;min-height:360px}
-.lane-head{padding:12px 13px 11px;border-bottom:1px solid var(--color-border);background:var(--color-surface);z-index:2}
-.lane-title{display:flex;align-items:baseline;gap:8px}
-.lane-n{font-family:var(--font-headline);font-size:1.5rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
-.lane-lab{font-size:.82rem;font-weight:600;line-height:1.25}
-.lane-sub{font-size:.735rem;color:var(--color-text-dim);margin-top:6px;line-height:1.4}
-.lane-rows{padding:8px;display:flex;flex-direction:column;gap:6px;overflow:auto;flex:1;max-height:330px}
-.lane.add .lane-n{color:var(--color-success)}
-.lane.here .lane-n{color:var(--color-primary)}
-.lane.uns .lane-n{color:var(--color-slate)}
-.lane.unk .lane-n{color:var(--color-warning)}
-.lane.add .lane-head{box-shadow:inset 0 2px 0 var(--color-success)}
-.lane.here .lane-head{box-shadow:inset 0 2px 0 var(--color-primary-strong)}
-.lane.uns .lane-head{box-shadow:inset 0 2px 0 var(--color-slate)}
-.lane.unk .lane-head{box-shadow:inset 0 2px 0 var(--color-warning)}
-/* the unknown lane never stops being unsettled */
-.lane.unk{background:
-   repeating-linear-gradient(135deg, hsl(38 92% 60% / .028) 0 9px, transparent 9px 18px), var(--color-surface)}
-.settled .lane.unk .lane-n{animation:breathe 2.6s ease-in-out infinite}
-@keyframes breathe{0%,100%{opacity:.72}50%{opacity:1;text-shadow:0 0 18px hsl(38 92% 60% / .55)}}
-
-.f{display:flex;gap:9px;align-items:flex-start;padding:8px 9px;border-radius:var(--radius-md);
-  border:1px solid var(--color-border);background:var(--color-bg-elev1);animation:dropin .36s cubic-bezier(.2,.85,.3,1) both}
-@keyframes dropin{from{opacity:0;transform:translateY(-12px) scale(.965)}to{opacity:1;transform:none}}
-.f .ext{flex:none;font-family:var(--font-mono);font-size:.62rem;font-weight:500;letter-spacing:.03em;
-  padding:2px 5px;border-radius:4px;background:var(--color-muted);color:var(--color-text-dim);margin-top:1px}
-.f .body{min-width:0}
-.f .nm{font-size:.795rem;line-height:1.35;word-break:break-word}
-.f .rr{font-size:.715rem;color:var(--color-text-dim);margin-top:3px;line-height:1.4;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.f .dest{color:var(--color-success);font-family:var(--font-mono);font-size:.7rem}
-.f .rulechip{font-size:.66rem;padding:1px 5px;border-radius:var(--radius-full);
-  border:1px solid hsl(258 90% 66% / .4);color:var(--color-violet);background:hsl(258 90% 66% / .1)}
-.f.q{border-color:hsl(38 92% 60% / .34)}
-.f.q .qm{flex:none;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;margin-top:1px;
-  border:1px solid hsl(38 92% 60% / .55);color:var(--color-warning);font-size:.66rem;font-weight:700;
-  animation:qpulse 1.9s ease-in-out infinite}
-@keyframes qpulse{0%,100%{box-shadow:0 0 0 0 hsl(38 92% 60% / 0)}50%{box-shadow:0 0 0 3px hsl(38 92% 60% / .16)}}
-.f.q .rr{color:var(--color-warning)}
-
-.prev-foot{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--color-border);background:var(--color-bg-elev1);flex-wrap:wrap}
-.zero{display:flex;align-items:center;gap:8px;font-size:.79rem;color:var(--color-text-muted);flex-wrap:wrap}
-.zero .n{font-family:var(--font-mono);color:var(--color-success);font-weight:500}
-.prev-foot .acts{margin-left:auto;display:flex;gap:8px}
-
-/* ---------- VARIANT B: one list + verdict column ---------- */
-.tbl-wrap{position:relative;max-height:390px;overflow:auto}
-table.lst{width:100%;border-collapse:collapse;font-size:.815rem}
-table.lst th{position:sticky;top:0;background:var(--color-bg-elev1);text-align:left;font-size:.7rem;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim);font-weight:600;
-  padding:9px 12px;border-bottom:1px solid var(--color-border);z-index:3}
-table.lst td{padding:8px 12px;border-bottom:1px solid var(--color-border-soft);vertical-align:top}
-table.lst tr.hidden-by-filter{display:none}
-.vchip{display:inline-flex;align-items:center;gap:5px;font-size:.71rem;padding:2px 8px;border-radius:var(--radius-full);
-  border:1px solid var(--color-border);color:var(--color-text-dim);background:var(--color-muted);white-space:nowrap}
-.vchip.add{border-color:hsl(142 71% 45% / .45);color:var(--color-success);background:var(--color-success-dim)}
-.vchip.here{border-color:hsl(239 84% 67% / .45);color:var(--color-primary);background:var(--color-primary-dim)}
-.vchip.uns{border-color:hsl(220 14% 46% / .45);color:var(--color-slate);background:hsl(220 14% 46% / .12)}
-.vchip.unk{border-color:hsl(38 92% 60% / .45);color:var(--color-warning);background:var(--color-warning-dim)}
-.vchip.wait{opacity:.5}
-.sweep{position:absolute;left:0;right:0;height:34px;pointer-events:none;z-index:2;
-  background:linear-gradient(180deg,transparent, hsl(239 100% 82% / .09), transparent);
-  border-top:1px solid hsl(239 100% 82% / .22);border-bottom:1px solid hsl(239 100% 82% / .22);display:none}
-.filters{display:flex;gap:7px;padding:11px 14px;border-bottom:1px solid var(--color-border);background:var(--color-bg-elev1);flex-wrap:wrap}
-.fchip{display:inline-flex;align-items:center;gap:7px;font-size:.775rem;padding:5px 11px;border-radius:var(--radius-full);
-  border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);cursor:pointer;
-  transition:border-color .15s,opacity .15s,background .15s;font-family:var(--font-sans)}
-.fchip .c{font-family:var(--font-mono);font-size:.73rem;color:var(--color-text-dim)}
-.fchip.off{opacity:.34;text-decoration:line-through}
-.fchip.add.on{border-color:hsl(142 71% 45% / .5)} .fchip.here.on{border-color:hsl(239 84% 67% / .5)}
-.fchip.uns.on{border-color:hsl(220 14% 46% / .5)} .fchip.unk.on{border-color:hsl(38 92% 60% / .5)}
-.leak{margin:0;padding:9px 14px;border-top:1px solid var(--color-border);background:var(--color-danger-dim);
-  color:var(--color-danger);font-size:.775rem;display:none}
-.leak.show{display:block;animation:dropin .3s both}
-
-/* ---------- VARIANT C: proportional spine ---------- */
-.spine{padding:16px}
-.bar{display:flex;height:34px;border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--color-border);background:var(--color-muted)}
-.seg{height:100%;width:0;transition:width .45s cubic-bezier(.3,.9,.3,1);display:grid;place-items:center;
-  font-family:var(--font-mono);font-size:.72rem;font-weight:500;overflow:hidden;cursor:pointer}
-.seg.add{background:hsl(142 71% 45% / .3);color:var(--color-success);box-shadow:inset 0 -2px 0 var(--color-success)}
-.seg.here{background:hsl(239 84% 67% / .28);color:var(--color-primary);box-shadow:inset 0 -2px 0 var(--color-primary-strong)}
-.seg.uns{background:hsl(220 14% 46% / .28);color:var(--color-text-muted);box-shadow:inset 0 -2px 0 var(--color-slate)}
-.seg.unk{color:var(--color-warning);box-shadow:inset 0 -2px 0 var(--color-warning);
-  background:repeating-linear-gradient(135deg, hsl(38 92% 60% / .32) 0 7px, hsl(38 92% 60% / .1) 7px 14px);
+/* C: the spine */
+.spine{padding:15px}
+.bar{display:flex;height:30px;border-radius:var(--r2);overflow:hidden;border:1px solid var(--bd);background:var(--muted)}
+.sg{height:100%;width:0;transition:width .42s cubic-bezier(.3,.9,.3,1);display:grid;place-items:center;
+  font-family:var(--fm);font-size:.71rem;overflow:hidden;cursor:pointer}
+.sg.add{background:hsl(142 71% 45% / .3);color:var(--ok);box-shadow:inset 0 -2px 0 var(--ok)}
+.sg.here{background:hsl(239 84% 67% / .28);color:var(--pri);box-shadow:inset 0 -2px 0 var(--pri2)}
+.sg.uns{background:hsl(220 14% 46% / .28);color:var(--tx2);box-shadow:inset 0 -2px 0 var(--sl)}
+.sg.unk{color:var(--wa);box-shadow:inset 0 -2px 0 var(--wa);
+  background:repeating-linear-gradient(135deg,hsl(38 92% 60% / .34) 0 7px,hsl(38 92% 60% / .1) 7px 14px);
   background-size:19.8px 100%;animation:hatch 1.4s linear infinite}
 @keyframes hatch{from{background-position:0 0}to{background-position:19.8px 0}}
-.legend{display:flex;gap:16px;margin-top:11px;flex-wrap:wrap;font-size:.775rem;color:var(--color-text-muted)}
-.legend b{color:var(--color-text)}
-.legend .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
-.acc{margin-top:16px;display:flex;flex-direction:column;gap:8px}
-.accsec{border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-bg-elev1);overflow:hidden}
-.acchd{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;font-size:.85rem;user-select:none}
-.acchd .caret{transition:transform .18s;color:var(--color-text-dim);font-size:.7rem}
-.accsec.open .acchd .caret{transform:rotate(90deg)}
-.acchd .cnt{margin-left:auto;font-family:var(--font-mono);font-size:.76rem;color:var(--color-text-dim)}
-.accbd{display:none;padding:4px 10px 11px;flex-direction:column;gap:6px;border-top:1px solid var(--color-border-soft);max-height:250px;overflow:auto}
-.accsec.open .accbd{display:flex}
 
-/* buttons */
-.btn{padding:7px 14px;border-radius:var(--radius-md);font-size:.82rem;font-weight:600;cursor:pointer;
-  border:1px solid var(--color-border);background:var(--color-accent);color:var(--color-text);font-family:var(--font-sans);
-  transition:background .15s,border-color .15s,transform .08s}
-.btn:hover{background:var(--color-muted);border-color:var(--color-text-dim)}
-.btn:active{transform:translateY(1px)}
-.btn.primary{background:var(--color-primary-strong);border-color:var(--color-primary-strong);color:hsl(220 45% 6%)}
-.btn.primary:hover{background:var(--color-primary);border-color:var(--color-primary)}
-.btn.ghost{background:transparent}
-.btn.sm{padding:5px 10px;font-size:.75rem;font-weight:500}
+.lg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+@media(max-width:620px){.lg{grid-template-columns:repeat(2,1fr)}}
+.lgi{border-top:2px solid var(--bd);padding-top:8px}
+.lgi.add{border-color:var(--ok)} .lgi.here{border-color:var(--pri2)}
+.lgi.uns{border-color:var(--sl)} .lgi.unk{border-color:var(--wa)}
+.lgi .n{font-family:var(--fh);font-size:1.3rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.lgi.add .n{color:var(--ok)} .lgi.here .n{color:var(--pri)}
+.lgi.uns .n{color:var(--sl)} .lgi.unk .n{color:var(--wa)}
+.lgi .l{font-size:.775rem;margin-top:5px;line-height:1.3}
+.lgi .q{font-size:.685rem;color:var(--tx3);margin-top:3px;line-height:1.3}
+.settled .lgi.unk .n{animation:br 2.6s ease-in-out infinite}
+@keyframes br{0%,100%{opacity:.72}50%{opacity:1;text-shadow:0 0 16px hsl(38 92% 60% / .55)}}
 
-/* notes */
-.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:0 20px 20px}
-@media(max-width:980px){.notes{grid-template-columns:1fr}}
-.note{border-left:2px solid var(--color-border);padding-left:12px;font-size:.815rem;color:var(--color-text-muted)}
-.note.good{border-color:var(--color-success)} .note.bad{border-color:var(--color-danger)} .note.warn{border-color:var(--color-warning)}
-.note .h{font-weight:600;color:var(--color-text);font-size:.755rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+/* accordions */
+.acc{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.as{border:1px solid var(--bd);border-radius:var(--r2);background:var(--elev);overflow:hidden}
+.as.unk{border-color:hsl(38 92% 60% / .3)}
+.ah{display:flex;align-items:center;gap:9px;padding:9px 12px;cursor:pointer;font-size:.815rem;user-select:none}
+.ah:hover{background:var(--muted)}
+.ah .cv{transition:transform .18s;color:var(--tx3);font-size:.62rem}
+.as.open .ah .cv{transform:rotate(90deg)}
+.ah .c{margin-left:auto;font-family:var(--fm);font-size:.74rem;color:var(--tx3)}
+.ab{display:none;padding:2px 8px 8px;flex-direction:column;gap:2px;max-height:260px;overflow:auto}
+.as.open .ab{display:flex}
 
-.foot{margin-top:44px;padding-top:22px;border-top:1px solid var(--color-border);color:var(--color-text-dim);font-size:.83rem}
-.foot h3{font-size:.94rem;color:var(--color-text);margin:0 0 10px}
-.foot ul{margin:0 0 18px;padding-left:20px;line-height:1.75}
-.foot b{color:var(--color-text-muted)}
-.win{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:var(--radius-full);
-  background:var(--color-success-dim);border:1px solid hsl(142 71% 45% / .45);color:var(--color-success);font-weight:600}
-.lose{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:var(--radius-full);
-  background:var(--color-danger-dim);border:1px solid hsl(0 72% 51% / .45);color:var(--color-danger);font-weight:600}
-#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;
-  background:rgba(0,0,0,.72);color:#fff;padding:7px 11px;border-radius:8px;opacity:.35;transition:opacity .2s;display:flex;gap:8px;align-items:center}
-#sketch-tools:hover{opacity:1}
-#sketch-tools button{background:#333;border:1px solid #555;color:#fff;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px}
+.f{display:flex;gap:9px;align-items:center;padding:5px 7px;border-radius:var(--r1);font-size:.775rem;animation:in .3s both}
+.f:hover{background:var(--muted)}
+.ex{flex:none;font-family:var(--fm);font-size:.6rem;padding:1px 5px;border-radius:3px;
+  background:var(--muted);color:var(--tx3);min-width:46px;text-align:center}
+.f .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.f .to{font-family:var(--fm);font-size:.69rem;color:var(--ok);flex:none}
+.f .rl{font-size:.62rem;padding:0 5px;border-radius:var(--rf);border:1px solid hsl(258 90% 66% / .4);color:var(--vio);flex:none}
+.f .wy{font-size:.69rem;color:var(--tx3);flex:none;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f.q .wy{color:var(--wa);cursor:help;border-bottom:1px dotted hsl(38 92% 60% / .45)}
+.f.q .ex{color:var(--wa)}
+
+/* footer */
+.pf{display:flex;align-items:center;gap:12px;padding:11px 15px;border-top:1px solid var(--bd);background:var(--elev)}
+.zw{font-family:var(--fm);font-size:.73rem;color:var(--ok)}
+.pf .ac{margin-left:auto;display:flex;gap:7px}
+.btn{padding:6px 13px;border-radius:var(--r2);font-size:.8rem;font-weight:600;cursor:pointer;
+  border:1px solid var(--bd);background:var(--accent);color:var(--tx);font-family:var(--fs);transition:.15s}
+.btn:hover{background:var(--muted);border-color:var(--tx3)}
+.btn.pri{background:var(--pri2);border-color:var(--pri2);color:hsl(220 45% 6%)}
+.btn.pri:hover{background:var(--pri)}
+.btn.gh{background:transparent}
+
+/* A: lanes */
+.lanes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--bd)}
+@media(max-width:860px){.lanes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ln{background:var(--surf);display:flex;flex-direction:column;min-height:300px}
+.lh{padding:10px 11px;border-bottom:1px solid var(--bd)}
+.lh .n{font-family:var(--fh);font-size:1.25rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.lh .l{font-size:.755rem;margin-top:5px;line-height:1.3}
+.lh .q{font-size:.665rem;color:var(--tx3);margin-top:3px}
+.ln.add .lh{box-shadow:inset 0 2px 0 var(--ok)} .ln.add .n{color:var(--ok)}
+.ln.here .lh{box-shadow:inset 0 2px 0 var(--pri2)} .ln.here .n{color:var(--pri)}
+.ln.uns .lh{box-shadow:inset 0 2px 0 var(--sl)} .ln.uns .n{color:var(--sl)}
+.ln.unk .lh{box-shadow:inset 0 2px 0 var(--wa)} .ln.unk .n{color:var(--wa)}
+.ln.unk{background:repeating-linear-gradient(135deg,hsl(38 92% 60% / .025) 0 9px,transparent 9px 18px),var(--surf)}
+.lr{padding:6px;display:flex;flex-direction:column;gap:3px;overflow:auto;flex:1;max-height:280px}
+.lr .f{flex-wrap:wrap;font-size:.735rem}
+.lr .f .fn{flex:1 1 100%}
+.lr .f .to,.lr .f .wy{max-width:100%}
+.flier{position:fixed;z-index:900;pointer-events:none;font-family:var(--fm);font-size:.68rem;
+  padding:3px 8px;border-radius:var(--rf);border:1px solid var(--pri2);background:hsl(220 30% 9%);
+  white-space:nowrap;box-shadow:0 6px 20px hsl(216 45% 2% / .7);
+  transition:transform .44s cubic-bezier(.34,.9,.32,1),opacity .44s}
+
+/* B: table + filters */
+.fl{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--bd);background:var(--elev);flex-wrap:wrap}
+.fc{display:inline-flex;gap:6px;align-items:center;font-size:.755rem;padding:4px 10px;border-radius:var(--rf);
+  border:1px solid var(--bd);background:var(--surf);color:var(--tx);cursor:pointer;transition:.15s;font-family:var(--fs)}
+.fc .c{font-family:var(--fm);font-size:.71rem;color:var(--tx3)}
+.fc.off{opacity:.32;text-decoration:line-through}
+.tw{position:relative;max-height:360px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:.785rem}
+th{position:sticky;top:0;background:var(--elev);text-align:left;font-size:.67rem;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--tx3);font-weight:600;padding:8px 11px;border-bottom:1px solid var(--bd);z-index:3}
+td{padding:6px 11px;border-bottom:1px solid var(--bd2);vertical-align:middle}
+tr.hid{display:none}
+.vc{display:inline-block;font-size:.69rem;padding:1px 7px;border-radius:var(--rf);border:1px solid var(--bd);
+  color:var(--tx3);background:var(--muted);white-space:nowrap}
+.vc.add{border-color:hsl(142 71% 45% / .45);color:var(--ok);background:var(--okdim)}
+.vc.here{border-color:hsl(239 84% 67% / .45);color:var(--pri);background:var(--pridim)}
+.vc.uns{border-color:hsl(220 14% 46% / .45);color:var(--sl)}
+.vc.unk{border-color:hsl(38 92% 60% / .45);color:var(--wa);background:var(--wadim)}
+.vc.w{opacity:.4}
+.sw{position:absolute;left:0;right:0;height:28px;pointer-events:none;z-index:2;display:none;
+  background:linear-gradient(180deg,transparent,hsl(239 100% 82% / .09),transparent);
+  border-top:1px solid hsl(239 100% 82% / .2);border-bottom:1px solid hsl(239 100% 82% / .2)}
+.leak{margin:0;padding:8px 12px;border-top:1px solid var(--bd);background:var(--dadim);color:var(--da);
+  font-size:.755rem;display:none}
+.leak.show{display:block}
+
+/* notes — OFF by default */
+.note{display:none;margin-top:16px;border-left:2px solid var(--bd);padding:2px 0 2px 13px;
+  font-size:.795rem;color:var(--tx2);max-width:80ch}
+.note.good{border-color:var(--ok)} .note.bad{border-color:var(--da)} .note.warn{border-color:var(--wa)}
+body.notes .note{display:block;animation:in .25s both}
+.note b{color:var(--tx)}
+.note + .note{margin-top:9px}
+code{font-family:var(--fm);font-size:.76rem;background:var(--muted);padding:1px 4px;border-radius:3px}
+.tip{position:fixed;z-index:950;max-width:330px;padding:8px 11px;border-radius:var(--r2);
+  border:1px solid hsl(38 92% 60% / .4);background:hsl(220 30% 8%);font-size:.755rem;color:var(--tx2);
+  box-shadow:0 8px 26px hsl(216 45% 2% / .8);pointer-events:none;opacity:0;transition:opacity .15s}
+.tip.on{opacity:1}
+#tst{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(18px);z-index:960;
+  background:hsl(220 30% 8%);border:1px solid var(--bd);padding:8px 15px;border-radius:10px;
+  font-family:var(--fm);font-size:.77rem;opacity:0;transition:.24s;pointer-events:none}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<div class="page-head">
-  <h1>229 · The four buckets</h1>
-  <p>Phase 233 · <code>PREV-01</code> / <code>LIB-09</code>. A person points at a Drive folder. Before anything is
-  imported they must see <b>four</b> honestly-labelled lists — and the fourth one, <em>&ldquo;can&rsquo;t tell without reading it&rdquo;</em>,
-  is the one every tidy design deletes.</p>
-  <div class="crit">
-    <b>SC#1, verbatim:</b> &ldquo;A person points at a Drive folder and sees <b>four lists</b> before anything is imported:
-    what would be <b>added</b>, what is <b>already here (matched by source file, not by content)</b>, what
-    <b>type is not supported</b>, and what <b>cannot be told without reading it</b>.&rdquo;
-    <br><br>
-    <b>So the deciding axis is whether a bucket can DISAPPEAR.</b> All three variants show four buckets at rest.
-    Only some of them still show four after the user touches something. <em>&ldquo;A bucket is dropped to make the
-    screen tidier &mdash; three buckets is the version that lies&rdquo;</em> is a named failure mode in the ROADMAP, and it is
-    the reading that separates these three.
+<div class="top">
+  <span class="id">229</span>
+  <h1>The four buckets</h1>
+  <div class="tabs">
+    <button class="tab win on" data-v="C" onclick="show('C')">C &starf;</button>
+    <button class="tab" data-v="A" onclick="show('A')">A</button>
+    <button class="tab" data-v="B" onclick="show('B')">B</button>
   </div>
+  <button class="ntoggle" onclick="document.body.classList.toggle('notes');this.classList.toggle('on')">notes</button>
 </div>
 
-<div class="variants">
+<div class="stage">
 
-<!-- ══════════════════════ VARIANT A ══════════════════════ -->
-<section class="variant" id="vA">
-  <div class="vhead">
-    <span class="vtag">A</span>
-    <h2>Four lanes &mdash; the sort you watch</h2>
-    <span class="sub">The buckets are <b>columns</b>, not filters. There is no control that removes one.</span>
-  </div>
-  <div class="vbody">
-    <div class="prev">
-      <div class="prev-head">
-        <div class="svc">&#9650;</div>
-        <div class="crumbs">
-          <span class="dim">Google Drive</span><span class="dim">&middot;</span>
-          <span class="dim">My Drive</span><span class="dim">/</span>
-          <span class="dim">Operations</span><span class="dim">/</span>
-          <span class="cur">Rate Sheets 2026</span>
-        </div>
-        <div class="right">
-          <button class="btn sm ghost" onclick="A.run()">&#8635; Re-scan</button>
-        </div>
+<!-- ── C · the spine (SELECTED) ── -->
+<section class="v on" id="vC">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files &middot; 3 folders</span>
+      <button class="ico" onclick="C.run()" title="re-scan">&#8635;</button>
+    </div>
+    <div class="sc" id="C-sc">
+      <div class="scl"><span class="dot"></span><span class="scn" id="C-nm">Reading&hellip;</span><span class="scc" id="C-ct">0 / 26</span></div>
+      <div class="trk"><i id="C-tk"></i></div>
+    </div>
+    <div class="spine">
+      <div class="bar">
+        <div class="sg add" onclick="C.open('add')"><span id="C-sg-add"></span></div>
+        <div class="sg here" onclick="C.open('here')"><span id="C-sg-here"></span></div>
+        <div class="sg uns" onclick="C.open('uns')"><span id="C-sg-uns"></span></div>
+        <div class="sg unk" onclick="C.open('unk')"><span id="C-sg-unk"></span></div>
       </div>
-
-      <div class="scanner" id="A-scanner">
-        <div class="scan-line">
-          <span class="scan-dot"></span>
-          <span id="A-scanlabel">Reading the folder listing&hellip;</span>
-          <span class="scan-name" id="A-scanname"></span>
-          <span class="scan-count" id="A-scancount">0 / 26</span>
-        </div>
-        <div class="track"><i id="A-track"></i></div>
+      <div class="lg">
+        <div class="lgi add"><div class="n" id="C-n-add">0</div><div class="l">Will be added</div></div>
+        <div class="lgi here"><div class="n" id="C-n-here">0</div><div class="l">Already here</div><div class="q">by source file, not content</div></div>
+        <div class="lgi uns"><div class="n" id="C-n-uns">0</div><div class="l">Type not supported</div></div>
+        <div class="lgi unk"><div class="n" id="C-n-unk">0</div><div class="l">Can&rsquo;t tell without reading it</div></div>
       </div>
-
-      <div class="lanes" id="A-lanes">
-        <div class="lane add" data-b="add">
-          <div class="lane-head">
-            <div class="lane-title"><span class="lane-n" id="A-n-add">0</span><span class="lane-lab">Will be added</span></div>
-            <div class="lane-sub">New to the Library. Destination shown per file.</div>
-          </div>
-          <div class="lane-rows" id="A-r-add"></div>
-        </div>
-        <div class="lane here" data-b="here">
-          <div class="lane-head">
-            <div class="lane-title"><span class="lane-n" id="A-n-here">0</span><span class="lane-lab">Already here</span></div>
-            <div class="lane-sub"><b>Matched by source file, not by content.</b> Same Drive file at the same version &mdash; we have not compared the bytes.</div>
-          </div>
-          <div class="lane-rows" id="A-r-here"></div>
-        </div>
-        <div class="lane uns" data-b="uns">
-          <div class="lane-head">
-            <div class="lane-title"><span class="lane-n" id="A-n-uns">0</span><span class="lane-lab">Type not supported</span></div>
-            <div class="lane-sub">We can&rsquo;t read this kind of file. Nothing will be imported.</div>
-          </div>
-          <div class="lane-rows" id="A-r-uns"></div>
-        </div>
-        <div class="lane unk" data-b="unk">
-          <div class="lane-head">
-            <div class="lane-title"><span class="lane-n" id="A-n-unk">0</span><span class="lane-lab">Can&rsquo;t tell without reading it</span></div>
-            <div class="lane-sub">Drive doesn&rsquo;t tell us enough. Each file says <b>why</b> &mdash; and stays unresolved until we open it.</div>
-          </div>
-          <div class="lane-rows" id="A-r-unk"></div>
-        </div>
+      <div class="acc" id="C-acc">
+        <div class="as" data-b="add"><div class="ah" onclick="tog(this)"><span class="cv">&#9654;</span>Will be added<span class="c" id="C-a-add">0</span></div><div class="ab" id="C-b-add"></div></div>
+        <div class="as" data-b="here"><div class="ah" onclick="tog(this)"><span class="cv">&#9654;</span>Already here<span class="c" id="C-a-here">0</span></div><div class="ab" id="C-b-here"></div></div>
+        <div class="as" data-b="uns"><div class="ah" onclick="tog(this)"><span class="cv">&#9654;</span>Type not supported<span class="c" id="C-a-uns">0</span></div><div class="ab" id="C-b-uns"></div></div>
+        <div class="as unk open" data-b="unk"><div class="ah" onclick="tog(this)"><span class="cv">&#9654;</span>Can&rsquo;t tell without reading it<span class="c" id="C-a-unk">0</span></div><div class="ab" id="C-b-unk"></div></div>
       </div>
-
-      <div class="prev-foot">
-        <div class="zero">
-          <span>Nothing has been written.</span>
-          <span class="n">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders</span>
-        </div>
-        <div class="acts">
-          <button class="btn ghost" onclick="toast('Closed. 0 rows written.')">Cancel</button>
-          <button class="btn primary" onclick="toast('Confirm → 12 added, 4 read-then-decided. See sketch 230.')">Add 12 files</button>
-        </div>
+    </div>
+    <div class="pf">
+      <span class="zw">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders</span>
+      <div class="ac">
+        <button class="btn gh" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+        <button class="btn pri">Add 12</button>
       </div>
     </div>
   </div>
-  <div class="notes">
-    <div class="note good"><div class="h">Why it holds</div>
-      The four buckets are <b>structure</b>. There is no chip to unselect, no accordion to collapse to zero, no
-      &ldquo;show only new&rdquo;. A screenshot of this surface at any moment contains all four counts &mdash; so SC#1 is met
-      <b>by construction rather than by audit</b>.</div>
-    <div class="note good"><div class="h">The animation is the argument</div>
-      Files fly from the scanner head into a lane, one at a time. Three lanes settle. The fourth keeps its hatched
-      ground and its breathing count &mdash; you <b>watch the preview decline to guess</b>. That is the honesty claim
-      made kinetic instead of written in a caption nobody reads.</div>
-    <div class="note warn"><div class="h">The cost</div>
-      Four columns at ~300px each needs &ge;1080px. Below that it wraps 2&times;2 &mdash; still four, never three. Long filenames
-      wrap rather than truncate: deliberate, because a truncated name in the <em>already here</em> lane is exactly how
-      you mis-identify a file.</div>
-  </div>
+
+  <div class="note good"><b>&starf; Selected (operator, 2026-09-05).</b> The bar is the primary object: it always sums to the
+    folder, and the hatched segment makes uncertainty <b>proportional</b> rather than numeric. A count of 4 beside a count
+    of 12 is arithmetic; a hatched sixth of a bar is a feeling.</div>
+  <div class="note warn"><b>The one risk C carries and A did not:</b> an accordion can be collapsed. Collapsing hides the
+    <b>files</b>, never the bucket or its count &mdash; that is what keeps SC#1 met. The build must add no &ldquo;collapse
+    all&rdquo; and no chip that removes a section; <code>drive.cjs</code> should gain that guard at plan-phase.</div>
+  <div class="note"><b>Reasons live behind the row, not on it.</b> Each unknown shows a 3&ndash;4 word fragment; hover for the
+    full reason. A bucket labelled &ldquo;can&rsquo;t tell&rdquo; whose rows never say why is a shrug &mdash; but the disclosure
+    does not have to be printed on the screen at rest.</div>
 </section>
 
-<!-- ══════════════════════ VARIANT B ══════════════════════ -->
-<section class="variant" id="vB">
-  <div class="vhead">
-    <span class="vtag">B</span>
-    <h2>One list, a verdict column</h2>
-    <span class="sub">Path of least resistance &mdash; reuses the shipped <code>DocumentList</code> table shape. Buckets become filter chips.</span>
-  </div>
-  <div class="vbody">
-    <div class="prev">
-      <div class="prev-head">
-        <div class="svc">&#9650;</div>
-        <div class="crumbs"><span class="dim">Google Drive</span><span class="dim">/</span><span class="cur">Rate Sheets 2026</span></div>
-        <div class="right"><button class="btn sm ghost" onclick="B.run()">&#8635; Re-scan</button></div>
-      </div>
-      <div class="scanner" id="B-scanner">
-        <div class="scan-line">
-          <span class="scan-dot"></span><span id="B-scanlabel">Reading the folder listing&hellip;</span>
-          <span class="scan-name" id="B-scanname"></span><span class="scan-count" id="B-scancount">0 / 26</span>
-        </div>
-        <div class="track"><i id="B-track"></i></div>
-      </div>
-      <div class="filters" id="B-filters">
-        <button class="fchip add on" data-b="add" onclick="B.toggle(this)">Will be added <span class="c" id="B-c-add">0</span></button>
-        <button class="fchip here on" data-b="here" onclick="B.toggle(this)">Already here <span class="c" id="B-c-here">0</span></button>
-        <button class="fchip uns on" data-b="uns" onclick="B.toggle(this)">Type not supported <span class="c" id="B-c-uns">0</span></button>
-        <button class="fchip unk on" data-b="unk" onclick="B.toggle(this)">Can&rsquo;t tell without reading it <span class="c" id="B-c-unk">0</span></button>
-      </div>
-      <div class="tbl-wrap" id="B-wrap">
-        <div class="sweep" id="B-sweep"></div>
-        <table class="lst">
-          <thead><tr><th style="width:44%">File</th><th style="width:20%">Verdict</th><th style="width:36%">Where it would land / why</th></tr></thead>
-          <tbody id="B-body"></tbody>
-        </table>
-      </div>
-      <p class="leak" id="B-leak">&#9888; A bucket is now off screen. This surface can be left in a state where a person
-        cannot see that four buckets exist &mdash; which is the clause SC#1 was worded to prevent.</p>
-      <div class="prev-foot">
-        <div class="zero"><span>Nothing has been written.</span><span class="n">0 documents &middot; 0 chunks &middot; 0 jobs</span></div>
-        <div class="acts">
-          <button class="btn ghost" onclick="toast('Closed. 0 rows written.')">Cancel</button>
-          <button class="btn primary">Add 12 files</button>
-        </div>
+<!-- ── A · four lanes ── -->
+<section class="v" id="vA">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files &middot; 3 folders</span>
+      <button class="ico" onclick="A.run()" title="re-scan">&#8635;</button>
+    </div>
+    <div class="sc" id="A-sc">
+      <div class="scl"><span class="dot"></span><span class="scn" id="A-nm">Reading&hellip;</span><span class="scc" id="A-ct">0 / 26</span></div>
+      <div class="trk"><i id="A-tk"></i></div>
+    </div>
+    <div class="lanes" id="A-lanes">
+      <div class="ln add" data-b="add"><div class="lh"><div class="n" id="A-n-add">0</div><div class="l">Will be added</div></div><div class="lr" id="A-r-add"></div></div>
+      <div class="ln here" data-b="here"><div class="lh"><div class="n" id="A-n-here">0</div><div class="l">Already here</div><div class="q">by source file, not content</div></div><div class="lr" id="A-r-here"></div></div>
+      <div class="ln uns" data-b="uns"><div class="lh"><div class="n" id="A-n-uns">0</div><div class="l">Type not supported</div></div><div class="lr" id="A-r-uns"></div></div>
+      <div class="ln unk" data-b="unk"><div class="lh"><div class="n" id="A-n-unk">0</div><div class="l">Can&rsquo;t tell without reading it</div></div><div class="lr" id="A-r-unk"></div></div>
+    </div>
+    <div class="pf">
+      <span class="zw">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders</span>
+      <div class="ac">
+        <button class="btn gh" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+        <button class="btn pri">Add 12</button>
       </div>
     </div>
   </div>
-  <div class="notes">
-    <div class="note good"><div class="h">What it gets right</div>
-      One row per file, one verdict per row &mdash; the densest read, and it maps onto a table the app already ships.
-      The sweep resolves each verdict <em>in place</em>, so you see the pass happen without a layout change.</div>
-    <div class="note bad"><div class="h">Why it fails the clause</div>
-      <b>A filter chip is a control that removes a bucket.</b> Turn off <em>&ldquo;can&rsquo;t tell without reading it&rdquo;</em> &mdash;
-      the count goes with it and the surface reads as a clean three-way split. Try it above. That state is
-      reachable in one click and survives a screenshot, a screen-share and a handover.</div>
-    <div class="note warn"><div class="h">Salvageable?</div>
-      Only by making the chips non-interactive &mdash; at which point they are lane headers with extra steps, i.e. Variant A.
-      <b>Keep the table shape for the row; drop the filter semantics.</b></div>
-  </div>
+  <div class="note"><b>Not selected.</b> Buckets as columns: no control removes one, so four is guaranteed by construction.
+    Files fly from the scanner head into a lane; three lanes settle and the fourth keeps its hatched ground. Costs ~1080px
+    of width, and C reaches the same guarantee in a quarter of the vertical space.</div>
 </section>
 
-<!-- ══════════════════════ VARIANT C ══════════════════════ -->
-<section class="variant" id="vC">
-  <div class="vhead">
-    <span class="vtag">C</span>
-    <h2>The proportional spine</h2>
-    <span class="sub">One bar carries the whole folder; the hatched segment is the part we cannot claim to know.</span>
-  </div>
-  <div class="vbody">
-    <div class="prev">
-      <div class="prev-head">
-        <div class="svc">&#9650;</div>
-        <div class="crumbs"><span class="dim">Google Drive</span><span class="dim">/</span><span class="cur">Rate Sheets 2026</span></div>
-        <div class="right"><button class="btn sm ghost" onclick="C.run()">&#8635; Re-scan</button></div>
-      </div>
-      <div class="scanner" id="C-scanner">
-        <div class="scan-line">
-          <span class="scan-dot"></span><span id="C-scanlabel">Reading the folder listing&hellip;</span>
-          <span class="scan-name" id="C-scanname"></span><span class="scan-count" id="C-scancount">0 / 26</span>
-        </div>
-        <div class="track"><i id="C-track"></i></div>
-      </div>
-      <div class="spine">
-        <div class="bar" id="C-bar">
-          <div class="seg add" data-b="add" onclick="C.open('add')"><span id="C-s-add"></span></div>
-          <div class="seg here" data-b="here" onclick="C.open('here')"><span id="C-s-here"></span></div>
-          <div class="seg uns" data-b="uns" onclick="C.open('uns')"><span id="C-s-uns"></span></div>
-          <div class="seg unk" data-b="unk" onclick="C.open('unk')"><span id="C-s-unk"></span></div>
-        </div>
-        <div class="legend">
-          <span><span class="sw" style="background:var(--color-success)"></span><b id="C-l-add">0</b> will be added</span>
-          <span><span class="sw" style="background:var(--color-primary-strong)"></span><b id="C-l-here">0</b> already here <span style="color:var(--color-text-dim)">(matched by source file, not by content)</span></span>
-          <span><span class="sw" style="background:var(--color-slate)"></span><b id="C-l-uns">0</b> type not supported</span>
-          <span><span class="sw" style="background:var(--color-warning)"></span><b id="C-l-unk">0</b> can&rsquo;t tell without reading it</span>
-        </div>
-        <div class="acc" id="C-acc">
-          <div class="accsec" data-b="add"><div class="acchd" onclick="C.tog(this)"><span class="caret">&#9654;</span><b>Will be added</b><span class="cnt" id="C-a-add">0</span></div><div class="accbd" id="C-b-add"></div></div>
-          <div class="accsec" data-b="here"><div class="acchd" onclick="C.tog(this)"><span class="caret">&#9654;</span><b>Already here</b> <span style="color:var(--color-text-dim);font-size:.78rem">&mdash; matched by source file, not by content</span><span class="cnt" id="C-a-here">0</span></div><div class="accbd" id="C-b-here"></div></div>
-          <div class="accsec" data-b="uns"><div class="acchd" onclick="C.tog(this)"><span class="caret">&#9654;</span><b>Type not supported</b><span class="cnt" id="C-a-uns">0</span></div><div class="accbd" id="C-b-uns"></div></div>
-          <div class="accsec open" data-b="unk"><div class="acchd" onclick="C.tog(this)"><span class="caret">&#9654;</span><b>Can&rsquo;t tell without reading it</b><span class="cnt" id="C-a-unk">0</span></div><div class="accbd" id="C-b-unk"></div></div>
-        </div>
-      </div>
-      <div class="prev-foot">
-        <div class="zero"><span>Nothing has been written.</span><span class="n">0 documents &middot; 0 chunks &middot; 0 jobs</span></div>
-        <div class="acts">
-          <button class="btn ghost" onclick="toast('Closed. 0 rows written.')">Cancel</button>
-          <button class="btn primary">Add 12 files</button>
-        </div>
+<!-- ── B · table + filters (counter-example) ── -->
+<section class="v" id="vB">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files &middot; 3 folders</span>
+      <button class="ico" onclick="B.run()" title="re-scan">&#8635;</button>
+    </div>
+    <div class="sc" id="B-sc">
+      <div class="scl"><span class="dot"></span><span class="scn" id="B-nm">Reading&hellip;</span><span class="scc" id="B-ct">0 / 26</span></div>
+      <div class="trk"><i id="B-tk"></i></div>
+    </div>
+    <div class="fl">
+      <button class="fc on" data-b="add" onclick="B.tog(this)">Will be added <span class="c" id="B-c-add">0</span></button>
+      <button class="fc on" data-b="here" onclick="B.tog(this)">Already here <span class="c" id="B-c-here">0</span></button>
+      <button class="fc on" data-b="uns" onclick="B.tog(this)">Type not supported <span class="c" id="B-c-uns">0</span></button>
+      <button class="fc on" data-b="unk" onclick="B.tog(this)">Can&rsquo;t tell without reading it <span class="c" id="B-c-unk">0</span></button>
+    </div>
+    <div class="tw"><div class="sw" id="B-sw"></div>
+      <table><thead><tr><th style="width:46%">File</th><th style="width:22%">Verdict</th><th style="width:32%">Where / why</th></tr></thead>
+      <tbody id="B-body"></tbody></table>
+    </div>
+    <p class="leak" id="B-leak">&#9888; A bucket is off screen. Four buckets can no longer be seen &mdash; the clause SC#1 was worded to prevent.</p>
+    <div class="pf">
+      <span class="zw">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders</span>
+      <div class="ac">
+        <button class="btn gh" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+        <button class="btn pri">Add 12</button>
       </div>
     </div>
   </div>
-  <div class="notes">
-    <div class="note good"><div class="h">The one thing it does better than A</div>
-      <b>Proportion.</b> A count of 4 next to a count of 12 is arithmetic; a hatched segment holding a visible
-      sixth of the bar is a <em>feeling</em>. And the bar is a single object &mdash; a screenshot of it always sums to 26.</div>
-    <div class="note warn"><div class="h">The compromise</div>
-      Below the bar the buckets are accordions, and an accordion <b>can</b> be collapsed. That is weaker than A&rsquo;s
-      lanes but stronger than B&rsquo;s filters: collapsing hides the <em>files</em>, never the bucket or its count.</div>
-    <div class="note good"><div class="h">What survives into the build</div>
-      The bar. It is ~40 lines, it belongs above A&rsquo;s lanes, and it makes the fourth bucket <b>proportionally</b>
-      undeniable at a glance before anyone has read a single lane header.</div>
-  </div>
+  <div class="note bad"><b>The counter-example &mdash; kept, not deleted.</b> Turn off the fourth chip. A filter chip <b>is</b> a
+    control that removes a bucket, and that state is one click away and survives a screenshot. Rejected on the criterion,
+    not on taste; its <em>row</em> shape is what C&rsquo;s accordion rows reuse.</div>
 </section>
 
 </div>
 
-<div class="foot">
-  <h3>Recommendation &mdash; A as the control, C&rsquo;s bar folded in as its header</h3>
-  <ul>
-    <li><span class="win">A</span> <b>Four lanes.</b> The buckets are structure, not state. There is no interaction that
-      produces a three-bucket screen, so the &ldquo;no bucket disappears&rdquo; clause is met by construction &mdash; the same
-      reading that decided sketch 228.</li>
-    <li><span class="win">C</span> <b>The proportional bar only</b>, mounted above A&rsquo;s lanes. Proportion is the one
-      thing counts cannot convey, and the hatched segment does more honest work than any label. Its accordions are
-      dropped; A&rsquo;s lanes replace them.</li>
-    <li><span class="lose">B</span> <b>Rejected on the criterion, not on taste.</b> Filter chips are a control that
-      removes a bucket. Its table shape is worth keeping for the <em>row</em> (file &middot; verdict &middot; where/why); its
-      filter semantics are not.</li>
-  </ul>
-  <h3>What this sketch commits to</h3>
-  <ul>
-    <li><b>The four labels are verbatim deliverables.</b> &ldquo;Already here&rdquo; always carries <em>matched by source file,
-      not by content</em> &mdash; because <code>documents.py:620</code> hashes raw bytes, which needs the download this
-      preview exists to avoid, and Drive publishes no hash at all for native Docs/Sheets/Slides.</li>
-    <li><b>Every row in the fourth bucket names its own reason.</b> A bucket labelled &ldquo;can&rsquo;t tell&rdquo; whose rows do not
-      say <em>why we cannot tell</em> is a shrug, not a disclosure.</li>
-    <li><b>Motion is load-bearing, not decorative.</b> Three lanes settle; the fourth keeps breathing. Remove the
-      animation and the surface is still honest &mdash; remove the fourth lane and it is not.</li>
-    <li><b>Tier 1 identity only.</b> The scan compares <code>(source_system, external_id, source_version)</code> for
-      equality and never calls it a hash. Tier 2 <code>sha256</code> still runs at splice.</li>
-    <li><b>Zero writes, stated on the surface.</b> Every variant carries the <code>0 documents &middot; 0 chunks &middot; 0 jobs</code>
-      footer. Sketch 230 turns that line into the argument.</li>
-  </ul>
-  <h3>Drive it</h3>
-  <ul>
-    <li><code>node drive.cjs</code> &mdash; asserts the honesty invariants against this file (bucket counts sum to the
-      scan total, four lanes exist with no removal control, every unknown row carries a reason, the labels are verbatim).</li>
-  </ul>
-</div>
-</div>
-
-<div id="toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);z-index:9500;
-  background:var(--color-surface-hi);border:1px solid var(--color-border);padding:9px 16px;border-radius:10px;
-  font-size:.83rem;opacity:0;transition:all .25s;pointer-events:none"></div>
-
-<div id="sketch-tools">
-  <button onclick="document.querySelector('.wrap').style.maxWidth='1320px'">Desktop</button>
-  <button onclick="document.querySelector('.wrap').style.maxWidth='900px'">Narrow</button>
-  <button onclick="A.run();B.run();C.run()">Replay all</button>
-</div>
+<div class="tip" id="tip"></div>
+<div id="tst"></div>
 
 <script>
-/* ────────────────────────────────────────────────────────────
-   Shared fixture — a real-shaped Drive folder.
-   b: add | here | uns | unk
-   ──────────────────────────────────────────────────────────── */
+/* fixture — a real-shaped Drive folder.  b: add | here | uns | unk
+   `wy` is the 3-4 word fragment shown at rest; `full` is the reason on hover. */
 var FILES = [
-  {n:"Rate Sheet — Midwest Q3.xlsx",    e:"XLSX",  b:"add",  dest:"/Pricing/Rate Sheets", rule:"rule: Rate sheets"},
-  {n:"Master Rate Sheet 2026.xlsx",          e:"XLSX",  b:"here", why:"Same Drive file, version v18 — unchanged since 12 Aug"},
-  {n:"kickoff-call.mp4",                     e:"MP4",   b:"uns",  why:"video/mp4 — no text to extract"},
-  {n:"scan_2026-03-11.pdf",                  e:"PDF",   b:"unk",  why:"14.2 MB. May be image-only — we cannot know if there is readable text until we open it."},
-  {n:"Rate Sheet — Southeast Q3.xlsx",  e:"XLSX",  b:"add",  dest:"/Pricing/Rate Sheets", rule:"rule: Rate sheets"},
-  {n:"Carrier Terms — Northeast.docx",  e:"DOCX",  b:"here", why:"Same Drive file, version v4"},
-  {n:"Fuel Index March 2026.csv",            e:"CSV",   b:"add",  dest:"/Pricing"},
-  {n:"Q3 Pricing Review",                    e:"GDOC",  b:"unk",  why:"Google Doc. Drive publishes no content hash for native Docs — the version moved, but we cannot tell whether anything material changed without exporting it."},
-  {n:"rate-sheets-archive.zip",              e:"ZIP",   b:"uns",  why:"application/zip — archives are not unpacked"},
-  {n:"Broker Agreement — Redline.docx", e:"DOCX",  b:"add",  dest:"/Contracts", rule:"rule: Agreements"},
-  {n:"LTL Fuel Surcharge Table.csv",         e:"CSV",   b:"here", why:"Same Drive file, version v2"},
-  {n:"Lane Pricing Deck",                    e:"GSLIDE",b:"add",  dest:"/Pricing"},
-  {n:"NOTES",                                e:"—",b:"unk",  why:"No extension, application/octet-stream. Drive will not say what this is."},
-  {n:"Insurance Certificate.pdf",            e:"PDF",   b:"add",  dest:"/Compliance", rule:"rule: Certificates"},
-  {n:"Q1 Pricing Memo.pdf",                  e:"PDF",   b:"here", why:"Same Drive file, version v1"},
-  {n:"terminal-layout.dwg",                  e:"DWG",   b:"uns",  why:"AutoCAD drawing — unsupported"},
-  {n:"2026 Tariff Notes.md",                 e:"MD",    b:"add",  dest:"/Pricing"},
-  {n:"Warehouse Rates",                      e:"GSHEET",b:"add",  dest:"/Pricing/Rate Sheets", rule:"rule: Rate sheets"},
-  {n:"Accessorial Charges.xlsx",             e:"XLSX",  b:"here", why:"Same Drive file, version v7"},
-  {n:"Detention Policy.pdf",                 e:"PDF",   b:"add",  dest:"/Compliance"},
-  {n:"→ Regional Rates",                e:"LINK",  b:"unk",  why:"A shortcut into a Shared Drive this connection cannot reach. We can see the pointer, not the file."},
-  {n:"brand-assets.psd",                     e:"PSD",   b:"uns",  why:"image/vnd.adobe.photoshop — unsupported"},
-  {n:"Onboarding Checklist",                 e:"GDOC",  b:"add",  dest:"/Operations"},
-  {n:"Contract Template v4.docx",            e:"DOCX",  b:"here", why:"Same Drive file, version v11"},
-  {n:"Q2 Volume Report.xlsx",                e:"XLSX",  b:"add",  dest:"/Reports"},
-  {n:"Insurance Renewal.docx",               e:"DOCX",  b:"add",  dest:"/Compliance", rule:"rule: Certificates"}
+ {n:"Rate Sheet — Midwest Q3.xlsx",e:"XLSX",b:"add",dest:"/Pricing/Rate Sheets",rule:"rule"},
+ {n:"Master Rate Sheet 2026.xlsx",e:"XLSX",b:"here",wy:"same file, v18",full:"Same Drive file at the same version (v18) — unchanged since 12 Aug. Matched by source file, not by content: the bytes have not been compared."},
+ {n:"kickoff-call.mp4",e:"MP4",b:"uns",wy:"video/mp4",full:"video/mp4 — there is no text to extract."},
+ {n:"scan_2026-03-11.pdf",e:"PDF",b:"unk",wy:"may have no text",full:"14.2 MB PDF. May be image-only — we cannot know whether there is readable text until we open it."},
+ {n:"Rate Sheet — Southeast Q3.xlsx",e:"XLSX",b:"add",dest:"/Pricing/Rate Sheets",rule:"rule"},
+ {n:"Carrier Terms — Northeast.docx",e:"DOCX",b:"here",wy:"same file, v4",full:"Same Drive file at the same version (v4). Matched by source file, not by content."},
+ {n:"Fuel Index March 2026.csv",e:"CSV",b:"add",dest:"/Pricing"},
+ {n:"Q3 Pricing Review",e:"GDOC",b:"unk",wy:"no hash for Docs",full:"Google Doc. Drive publishes no content hash for native Docs — the version moved, but we cannot tell whether anything material changed without exporting it."},
+ {n:"rate-sheets-archive.zip",e:"ZIP",b:"uns",wy:"application/zip",full:"application/zip — archives are not unpacked."},
+ {n:"Broker Agreement — Redline.docx",e:"DOCX",b:"add",dest:"/Contracts",rule:"rule"},
+ {n:"LTL Fuel Surcharge Table.csv",e:"CSV",b:"here",wy:"same file, v2",full:"Same Drive file at the same version (v2). Matched by source file, not by content."},
+ {n:"Lane Pricing Deck",e:"GSLIDE",b:"add",dest:"/Pricing"},
+ {n:"NOTES",e:"—",b:"unk",wy:"no extension",full:"No extension, application/octet-stream. Drive will not say what this is."},
+ {n:"Insurance Certificate.pdf",e:"PDF",b:"add",dest:"/Compliance",rule:"rule"},
+ {n:"Q1 Pricing Memo.pdf",e:"PDF",b:"here",wy:"same file, v1",full:"Same Drive file at the same version (v1). Matched by source file, not by content."},
+ {n:"terminal-layout.dwg",e:"DWG",b:"uns",wy:"AutoCAD drawing",full:"AutoCAD drawing — unsupported."},
+ {n:"2026 Tariff Notes.md",e:"MD",b:"add",dest:"/Pricing"},
+ {n:"Warehouse Rates",e:"GSHEET",b:"add",dest:"/Pricing/Rate Sheets",rule:"rule"},
+ {n:"Accessorial Charges.xlsx",e:"XLSX",b:"here",wy:"same file, v7",full:"Same Drive file at the same version (v7). Matched by source file, not by content."},
+ {n:"Detention Policy.pdf",e:"PDF",b:"add",dest:"/Compliance"},
+ {n:"→ Regional Rates",e:"LINK",b:"unk",wy:"shortcut out of reach",full:"A shortcut into a Shared Drive this connection cannot reach. We can see the pointer, not the file."},
+ {n:"brand-assets.psd",e:"PSD",b:"uns",wy:"Photoshop file",full:"image/vnd.adobe.photoshop — unsupported."},
+ {n:"Onboarding Checklist",e:"GDOC",b:"add",dest:"/Operations"},
+ {n:"Contract Template v4.docx",e:"DOCX",b:"here",wy:"same file, v11",full:"Same Drive file at the same version (v11). Matched by source file, not by content."},
+ {n:"Q2 Volume Report.xlsx",e:"XLSX",b:"add",dest:"/Reports"},
+ {n:"Insurance Renewal.docx",e:"DOCX",b:"add",dest:"/Compliance",rule:"rule"}
 ];
-var LABEL = {add:"Will be added", here:"Already here", uns:"Type not supported", unk:"Can’t tell without reading it"};
-var TOTAL = FILES.length;
-var STEP  = 200;
+var LABEL={add:"Will be added",here:"Already here",uns:"Type not supported",unk:"Can’t tell without reading it"};
+var BK=["add","here","uns","unk"], TOTAL=FILES.length, STEP=170;
 
-function toast(msg){
-  var t=document.getElementById("toast");
-  t.textContent=msg; t.style.opacity="1"; t.style.transform="translateX(-50%) translateY(0)";
-  clearTimeout(t._h); t._h=setTimeout(function(){t.style.opacity="0";t.style.transform="translateX(-50%) translateY(20px)";},2400);
+function toast(m){var t=document.getElementById("tst");t.textContent=m;t.style.opacity="1";
+  t.style.transform="translateX(-50%) translateY(0)";clearTimeout(t._h);
+  t._h=setTimeout(function(){t.style.opacity="0";t.style.transform="translateX(-50%) translateY(18px)"},2600)}
+function tog(h){h.parentElement.classList.toggle("open")}
+function show(v){
+  ["A","B","C"].forEach(function(x){document.getElementById("v"+x).classList.toggle("on",x===v)});
+  document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("on",t.getAttribute("data-v")===v)});
+  var R={A:A,B:B,C:C}[v]; if(!R._played){R._played=true;R.run()}
 }
-
-/* a file in transit: scanner head -> its bucket */
-function fly(fromEl, toEl, label, tone){
-  if(!fromEl||!toEl) return;
-  var a=fromEl.getBoundingClientRect(), b=toEl.getBoundingClientRect();
-  if(a.width===0 && a.left===0) return;
-  var el=document.createElement("div");
-  el.className="flier"; el.textContent=label;
-  el.style.left=a.left+"px"; el.style.top=(a.top-6)+"px";
-  if(tone) el.style.borderColor=tone;
-  document.body.appendChild(el);
-  var dx=(b.left+b.width/2)-a.left-el.offsetWidth/2, dy=(b.top+16)-a.top;
-  requestAnimationFrame(function(){
-    el.style.transform="translate("+dx+"px,"+dy+"px) scale(.9)"; el.style.opacity="0";
-  });
-  setTimeout(function(){ el.remove(); }, 520);
-}
+/* hover reason — no prose on screen at rest */
+var tip=document.getElementById("tip");
+document.addEventListener("mouseover",function(e){
+  var el=e.target.closest?e.target.closest("[data-full]"):null; if(!el)return;
+  tip.textContent=el.getAttribute("data-full"); tip.classList.add("on");
+  var r=el.getBoundingClientRect();
+  tip.style.left=Math.min(r.left,window.innerWidth-345)+"px";
+  tip.style.top=(r.bottom+7)+"px";
+});
+document.addEventListener("mouseout",function(e){
+  if(e.target.closest&&e.target.closest("[data-full]")) tip.classList.remove("on")});
 
 function row(f){
-  var d=document.createElement("div");
-  d.className="f"+(f.b==="unk"?" q":"");
-  var meta = (f.b==="add")
-    ? '<span class="dest">'+f.dest+'</span>'+(f.rule?'<span class="rulechip">'+f.rule+'</span>':'')
-    : '<span>'+f.why+'</span>';
-  d.innerHTML=(f.b==="unk"?'<span class="qm">?</span>':'')+
-    '<span class="ext">'+f.e+'</span><div class="body"><div class="nm">'+f.n+'</div><div class="rr">'+meta+'</div></div>';
+  var d=document.createElement("div"); d.className="f"+(f.b==="unk"?" q":"");
+  var tail=(f.b==="add")
+    ? '<span class="to">'+f.dest+'</span>'+(f.rule?'<span class="rl">'+f.rule+'</span>':'')
+    : '<span class="wy"'+(f.full?' data-full="'+f.full.replace(/"/g,"&quot;")+'"':'')+'>'+f.wy+'</span>';
+  d.innerHTML='<span class="ex">'+f.e+'</span><span class="fn">'+f.n+'</span>'+tail;
   return d;
 }
-function tone(b){
-  return b==="unk"?"hsl(38 92% 60%)":b==="add"?"hsl(142 71% 45%)":b==="here"?"hsl(239 84% 67%)":"hsl(220 14% 46%)";
+function fly(a0,b0,label){
+  if(!a0||!b0)return; var a=a0.getBoundingClientRect(), b=b0.getBoundingClientRect();
+  if(!a.width)return;
+  var el=document.createElement("div"); el.className="flier"; el.textContent=label;
+  el.style.left=a.left+"px"; el.style.top=(a.top-4)+"px"; document.body.appendChild(el);
+  var dx=(b.left+b.width/2)-a.left-el.offsetWidth/2, dy=(b.top+14)-a.top;
+  requestAnimationFrame(function(){el.style.transform="translate("+dx+"px,"+dy+"px) scale(.9)";el.style.opacity="0"});
+  setTimeout(function(){el.remove()},500);
 }
-var BUCKETS=["add","here","uns","unk"];
-
-/* ─────────── VARIANT A ─────────── */
-var A = {
-  timers:[],
-  run:function(){
-    var self=this;
-    this.timers.forEach(clearTimeout); this.timers=[];
-    var sc=document.getElementById("A-scanner"), prev=document.getElementById("A-lanes").parentElement;
-    prev.classList.remove("settled");
-    BUCKETS.forEach(function(b){
-      document.getElementById("A-r-"+b).innerHTML="";
-      document.getElementById("A-n-"+b).textContent="0";
-    });
-    document.getElementById("A-scanlabel").textContent="Reading the folder listing…";
-    document.getElementById("A-track").style.width="0";
-    sc.classList.add("scanning");
-    var head=document.getElementById("A-scanname");
-    var seen={add:0,here:0,uns:0,unk:0};
-    FILES.forEach(function(f,i){
-      self.timers.push(setTimeout(function(){
-        head.textContent=f.n;
-        document.getElementById("A-scancount").textContent=(i+1)+" / "+TOTAL;
-        document.getElementById("A-track").style.width=(((i+1)/TOTAL)*100)+"%";
-        var laneHead=document.querySelector('#A-lanes .lane[data-b="'+f.b+'"] .lane-head');
-        fly(head, laneHead, f.n.length>30?f.n.slice(0,29)+"…":f.n, tone(f.b));
-        self.timers.push(setTimeout(function(){
-          document.getElementById("A-r-"+f.b).appendChild(row(f));
-          seen[f.b]++; document.getElementById("A-n-"+f.b).textContent=seen[f.b];
-        }, 340));
-      }, i*STEP));
-    });
-    this.timers.push(setTimeout(function(){
-      sc.classList.remove("scanning");
-      head.textContent="";
-      document.getElementById("A-scanlabel").textContent="26 files · 3 subfolders · listing complete";
-      prev.classList.add("settled");
-    }, TOTAL*STEP+460));
-  }
-};
-
-/* ─────────── VARIANT B ─────────── */
-var B = {
-  timers:[], off:{},
-  run:function(){
-    var self=this;
-    this.timers.forEach(clearTimeout); this.timers=[];
-    var body=document.getElementById("B-body"); body.innerHTML="";
-    var sc=document.getElementById("B-scanner"); sc.classList.add("scanning");
-    document.getElementById("B-scanlabel").textContent="Reading the folder listing…";
-    document.getElementById("B-track").style.width="0";
-    BUCKETS.forEach(function(b){ document.getElementById("B-c-"+b).textContent="0"; });
-    FILES.forEach(function(f){
-      var tr=document.createElement("tr"); tr.setAttribute("data-b", f.b);
-      tr.innerHTML='<td><span class="ext" style="margin-right:7px">'+f.e+'</span>'+f.n+'</td>'+
-        '<td><span class="vchip wait">…</span></td><td style="color:var(--color-text-dim)"></td>';
-      body.appendChild(tr);
-    });
-    var sweep=document.getElementById("B-sweep"); sweep.style.display="block";
-    var seen={add:0,here:0,uns:0,unk:0};
-    var rows=Array.prototype.slice.call(body.children);
-    FILES.forEach(function(f,i){
-      self.timers.push(setTimeout(function(){
-        var tr=rows[i];
-        sweep.style.top=(tr.offsetTop-2)+"px";
-        document.getElementById("B-scanname").textContent=f.n;
-        document.getElementById("B-scancount").textContent=(i+1)+" / "+TOTAL;
-        document.getElementById("B-track").style.width=(((i+1)/TOTAL)*100)+"%";
-        tr.children[1].innerHTML='<span class="vchip '+f.b+'">'+LABEL[f.b]+'</span>';
-        tr.children[2].innerHTML = (f.b==="add")
-          ? '<span class="dest">'+f.dest+'</span>'+(f.rule?' <span class="rulechip">'+f.rule+'</span>':'')
-          : f.why;
-        seen[f.b]++; document.getElementById("B-c-"+f.b).textContent=seen[f.b];
-      }, i*STEP));
-    });
-    this.timers.push(setTimeout(function(){
-      sc.classList.remove("scanning"); sweep.style.display="none";
-      document.getElementById("B-scanname").textContent="";
-      document.getElementById("B-scanlabel").textContent="26 files · 3 subfolders · listing complete";
-    }, TOTAL*STEP+320));
-  },
-  toggle:function(el){
-    var b=el.getAttribute("data-b");
-    el.classList.toggle("off"); el.classList.toggle("on");
-    this.off[b] = !this.off[b];
-    var offSet=this.off;
-    Array.prototype.slice.call(document.getElementById("B-body").children).forEach(function(tr){
-      tr.classList.toggle("hidden-by-filter", !!offSet[tr.getAttribute("data-b")]);
-    });
-    var any = BUCKETS.some(function(k){ return !!offSet[k]; });
-    document.getElementById("B-leak").classList.toggle("show", any);
-  }
-};
-
-/* ─────────── VARIANT C ─────────── */
-var C = {
-  timers:[],
-  run:function(){
-    var self=this;
-    this.timers.forEach(clearTimeout); this.timers=[];
-    BUCKETS.forEach(function(b){
-      document.getElementById("C-b-"+b).innerHTML="";
-      document.getElementById("C-a-"+b).textContent="0";
-      document.getElementById("C-l-"+b).textContent="0";
-      document.querySelector('#C-bar .seg.'+b).style.width="0";
-      document.getElementById("C-s-"+b).textContent="";
-    });
-    var sc=document.getElementById("C-scanner"); sc.classList.add("scanning");
-    document.getElementById("C-scanlabel").textContent="Reading the folder listing…";
-    document.getElementById("C-track").style.width="0";
-    var seen={add:0,here:0,uns:0,unk:0};
-    FILES.forEach(function(f,i){
-      self.timers.push(setTimeout(function(){
-        document.getElementById("C-scanname").textContent=f.n;
-        document.getElementById("C-scancount").textContent=(i+1)+" / "+TOTAL;
-        document.getElementById("C-track").style.width=(((i+1)/TOTAL)*100)+"%";
-        seen[f.b]++;
-        var grown=i+1;
-        BUCKETS.forEach(function(b){
-          document.querySelector('#C-bar .seg.'+b).style.width=((seen[b]/grown)*100)+"%";
-          document.getElementById("C-s-"+b).textContent=seen[b]||"";
-          document.getElementById("C-a-"+b).textContent=seen[b];
-          document.getElementById("C-l-"+b).textContent=seen[b];
-        });
-        document.getElementById("C-b-"+f.b).appendChild(row(f));
-      }, i*STEP));
-    });
-    this.timers.push(setTimeout(function(){
-      sc.classList.remove("scanning");
-      document.getElementById("C-scanname").textContent="";
-      document.getElementById("C-scanlabel").textContent="26 files · 3 subfolders · listing complete";
-    }, TOTAL*STEP+320));
-  },
-  tog:function(hd){ hd.parentElement.classList.toggle("open"); },
-  open:function(b){
-    var s=document.querySelector('#C-acc .accsec[data-b="'+b+'"]');
-    s.classList.add("open"); s.scrollIntoView({behavior:"smooth",block:"nearest"});
-  }
-};
-
-/* autoplay each variant when it scrolls into view (once) */
-var RUNNERS={vA:A,vB:B,vC:C};
-var io=new IntersectionObserver(function(es){
-  es.forEach(function(e){
-    if(e.isIntersecting && !e.target._played){
-      e.target._played=true;
-      RUNNERS[e.target.id].run();
-    }
+function scan(pfx,onFile,onDone){
+  var sc=document.getElementById(pfx+"-sc"); sc.classList.add("scanning");
+  document.getElementById(pfx+"-tk").style.width="0";
+  var T=[];
+  FILES.forEach(function(f,i){
+    T.push(setTimeout(function(){
+      document.getElementById(pfx+"-nm").textContent=f.n;
+      document.getElementById(pfx+"-ct").textContent=(i+1)+" / "+TOTAL;
+      document.getElementById(pfx+"-tk").style.width=(((i+1)/TOTAL)*100)+"%";
+      onFile(f,i);
+    },i*STEP));
   });
-},{threshold:.2});
-["vA","vB","vC"].forEach(function(id){ io.observe(document.getElementById(id)); });
+  T.push(setTimeout(function(){
+    sc.classList.remove("scanning");
+    document.getElementById(pfx+"-nm").textContent="listing complete";
+    if(onDone)onDone();
+  },TOTAL*STEP+400));
+  return T;
+}
+
+/* C */
+var C={T:[],run:function(){
+  this.T.forEach(clearTimeout);
+  var seen={add:0,here:0,uns:0,unk:0};
+  BK.forEach(function(b){document.getElementById("C-b-"+b).innerHTML="";
+    document.getElementById("C-a-"+b).textContent="0";document.getElementById("C-n-"+b).textContent="0";
+    document.querySelector("#vC .sg."+b).style.width="0";document.getElementById("C-sg-"+b).textContent=""});
+  document.getElementById("vC").classList.remove("settled");
+  this.T=scan("C",function(f,i){
+    seen[f.b]++; var g=i+1;
+    BK.forEach(function(b){
+      document.querySelector("#vC .sg."+b).style.width=((seen[b]/g)*100)+"%";
+      document.getElementById("C-sg-"+b).textContent=seen[b]||"";
+      document.getElementById("C-a-"+b).textContent=seen[b];
+      document.getElementById("C-n-"+b).textContent=seen[b];
+    });
+    document.getElementById("C-b-"+f.b).appendChild(row(f));
+  },function(){document.getElementById("vC").classList.add("settled")});
+},open:function(b){var s=document.querySelector('#C-acc .as[data-b="'+b+'"]');s.classList.add("open");
+  s.scrollIntoView({behavior:"smooth",block:"nearest"})}};
+
+/* A */
+var A={T:[],run:function(){
+  this.T.forEach(clearTimeout);
+  var seen={add:0,here:0,uns:0,unk:0}, self=this;
+  BK.forEach(function(b){document.getElementById("A-r-"+b).innerHTML="";document.getElementById("A-n-"+b).textContent="0"});
+  var head=document.getElementById("A-nm");
+  this.T=scan("A",function(f){
+    fly(head,document.querySelector('#A-lanes .ln[data-b="'+f.b+'"] .lh'),f.n.length>26?f.n.slice(0,25)+"…":f.n);
+    self.T.push(setTimeout(function(){
+      document.getElementById("A-r-"+f.b).appendChild(row(f));
+      seen[f.b]++; document.getElementById("A-n-"+f.b).textContent=seen[f.b];
+    },330));
+  });
+}};
+
+/* B */
+var B={T:[],off:{},run:function(){
+  this.T.forEach(clearTimeout);
+  var body=document.getElementById("B-body"); body.innerHTML="";
+  BK.forEach(function(b){document.getElementById("B-c-"+b).textContent="0"});
+  FILES.forEach(function(f){
+    var tr=document.createElement("tr"); tr.setAttribute("data-b",f.b);
+    tr.innerHTML='<td><span class="ex" style="margin-right:6px">'+f.e+'</span>'+f.n+'</td>'+
+      '<td><span class="vc w">…</span></td><td style="color:var(--tx3)"></td>';
+    body.appendChild(tr);
+  });
+  var sw=document.getElementById("B-sw"); sw.style.display="block";
+  var seen={add:0,here:0,uns:0,unk:0}, rows=[].slice.call(body.children);
+  this.T=scan("B",function(f,i){
+    var tr=rows[i]; sw.style.top=(tr.offsetTop-1)+"px";
+    tr.children[1].innerHTML='<span class="vc '+f.b+'">'+LABEL[f.b]+'</span>';
+    tr.children[2].innerHTML=(f.b==="add")
+      ? '<span class="to">'+f.dest+'</span>'+(f.rule?' <span class="rl">rule</span>':'')
+      : '<span'+(f.full?' data-full="'+f.full.replace(/"/g,"&quot;")+'"':'')+'>'+f.wy+'</span>';
+    seen[f.b]++; document.getElementById("B-c-"+f.b).textContent=seen[f.b];
+  },function(){sw.style.display="none"});
+},tog:function(el){
+  var b=el.getAttribute("data-b"); el.classList.toggle("off"); el.classList.toggle("on");
+  this.off[b]=!this.off[b]; var o=this.off;
+  [].slice.call(document.getElementById("B-body").children).forEach(function(tr){
+    tr.classList.toggle("hid",!!o[tr.getAttribute("data-b")])});
+  document.getElementById("B-leak").classList.toggle("show",BK.some(function(k){return !!o[k]}));
+}};
+
+C._played=true; C.run();
 </script>
 </body>
 </html>

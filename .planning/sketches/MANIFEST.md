@@ -2523,8 +2523,8 @@ labels are the deliverable, not decoration"*. Both sketches are therefore accept
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 229 | the-four-buckets | How do four buckets read so the fourth one's uncertainty is FELT, not filed away? | *pending* — **A four lanes** (recommended, control) + **C's proportional bar** as its header · ⛔ B is the counter-example | phase-233, prev-01, lib-09, preview, animation, g-2, acceptance-bar |
-| 230 | nothing-has-been-written-yet | What makes "nothing has been written" and "here is where it lands" believable at the confirm — and how does the fourth bucket resolve honestly? | *pending* — **A the receipt + resolution** (recommended, control) + **C's zero-line** as its footer · B **deferred to Phase 234** | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
+| 229 | the-four-buckets | How do four buckets read so the fourth one's uncertainty is FELT, not filed away? | ✅ **C · the proportional spine** (operator, 2026-09-05) — recommendation had been A + C's bar | phase-233, prev-01, lib-09, preview, animation, g-2, acceptance-bar |
+| 230 | nothing-has-been-written-yet | When the buckets are a bar, what does the confirm look like — and where does a NAMED refusal live once prose is off the screen? | *pending* — **A the bar dissolves** (recommended) + **C's zero-line** as its footer · ⛔ B fails SC#5 | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
 
 ### The axis both sketches were decided on
 
@@ -2586,3 +2586,39 @@ shape for **Phase 234's folder mapping**. Carry it forward; do not re-derive it.
 **One rule survives from it regardless:** a projected row must be **visibly not a row** — dashed border, a
 *would* verb, and counts rendered as a transition (`41 → 44`) never as a new total. Same principle as the
 185 canvas seal: *a projection that renders like a fact is a lie with good typography.*
+
+### ⚠ BOTH SKETCHES WERE REBUILT THE SAME SESSION — the operator's critique, and why the fix was structural
+
+> *"for 230 it is too dense and it includes a lot of text that's very messy and very polluted"* … then, after
+> 229's winner was recorded: *"and even 229 includes a lot of text and noise"*.
+
+**The critique was correct, and the defect was mine in a specific way: I put the reasoning ON THE SCREEN.**
+Four consequence paragraphs in the confirm, a three-column notes block under every variant, three variants
+stacked on one scrolling page, and every refusal reason printed at rest. A sketch whose argument is written
+across the mock is no longer showing the design — it is arguing for it, on top of it.
+
+**The fix was structural, not a trim:**
+
+| Was | Now |
+|---|---|
+| 3 variants stacked on one page | **one at a time behind tabs**, winner first and marked |
+| notes columns beside every variant | a **`notes` toggle, OFF by default** |
+| full reasons printed on every row | a **3-4 word fragment**, full sentence **on hover** |
+| verbatim SC blockquotes + long footers | a 4-row table in the README; nothing on the screen |
+| 229 ~740 lines / 230 ~700 | **229 · 499 · 230 · 513** |
+
+⭐ **And the guards were extended to hold it there.** `drive.cjs` now asserts *annotations are off by
+default*, *only one variant is on screen at a time*, and *reasons are delivered by hover rather than
+rendered at rest* — driven RED against a planted `.note{display:block}`. **Density is now a regression that
+fails a check**, not a matter of taste that drifts back next session.
+
+⚠ **230's variants were REPLACED, not re-labelled.** Once 229's winner was C, the confirm had to compose
+with a **bar**, so the receipt-and-resolution shape was rebuilt as *"the bar dissolves"* — the hatched
+segment shrinking file-by-file into `added` / `already here` / a new red `refused`. The old destination-tree
+variant is **deferred to Phase 234**, carrying one rule with it: a projected row must be **visibly not a
+row** — dashed, a *would* verb, counts as `41 → 44` never as a new total.
+
+⚠ **B is kept in 230 as the OPPOSITE failure.** Four dots that flip colour are maximally lean and **fail
+SC#5**: a refusal that is only a colour is a count, not a named refusal. **Density is not the only way to
+fail this screen** — and a sketch session that had just been told "too dense" needed that counter-example
+on the record.

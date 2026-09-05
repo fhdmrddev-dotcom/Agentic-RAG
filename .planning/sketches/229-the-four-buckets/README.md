@@ -5,8 +5,8 @@ phase: 233
 requirement: PREV-01, LIB-09
 guardrail: G-2
 question: "How do four buckets read so the fourth one's uncertainty is FELT, not filed away?"
-winner: null
-status: awaiting-operator
+winner: "C"
+status: locked
 variants: 3
 date: 2026-09-05
 author: claude
@@ -21,8 +21,15 @@ it"*, is the one every tidy design deletes.
 
 ```
 open .planning/sketches/229-the-four-buckets/index.html
-node .planning/sketches/229-the-four-buckets/drive.cjs     # 52 assertions
+node .planning/sketches/229-the-four-buckets/drive.cjs     # 64 assertions
 ```
+
+> ⚠ **REBUILT 2026-09-05 (operator: *"even 229 includes a lot of text and noise"*).** The design decisions
+> are unchanged; the **presentation** was the defect. Three variants no longer stack on one page — they sit
+> behind tabs with **C first and marked**; the notes columns became a `notes` toggle that is **off by
+> default**; and every full reason moved **behind a hover**, so a row shows a 3-4 word fragment and nothing
+> more. `drive.cjs` now guards the density too: annotations-off, one-variant-at-a-time, and reasons-behind
+> -the-row are asserted, so the noise cannot come back unnoticed.
 
 ## The criterion decides the axis
 
@@ -43,7 +50,24 @@ the version that lies."* That single reading separates them.
 | **B** | **One list, a verdict column** | The shipped `DocumentList` table shape; buckets become filter chips; a sweep resolves each verdict in place | ⛔ **fails the clause** — a filter chip *is* a control that removes a bucket |
 | **C** | **The proportional spine** | One segmented bar carrying the whole folder + accordions below | ⚠ strong on proportion, weaker below the bar |
 
-## Recommendation — A as the control, C's bar folded in as its header
+## ✅ LOCKED 2026-09-05 (operator): **C — the proportional spine**
+
+The recommendation below was **A + C's bar**. The operator chose **C whole**. It is kept unedited
+rather than rewritten, because a superseded recommendation is evidence and an overwritten one is not.
+
+**What C carries into the build:**
+
+- **The segmented bar is the primary object.** One bar, always summing to the folder's file count, with
+  the *can't tell* segment **hatched and animating** so uncertainty is proportional rather than numeric.
+- **The legend beneath it carries the four verbatim labels** and the *matched by source file, not by content*
+  qualifier. `drive.cjs` asserts the legend region makes no hash claim.
+- **The four buckets are accordions.** ⚠ **The one risk C carries and A did not:** an accordion can be
+  collapsed. Collapsing hides the **files**, never the bucket or its count — that is what keeps SC#1 met —
+  but the build must not add a "collapse all" or a chip that removes a section. **`drive.cjs` should gain a
+  guard for that at plan-phase**, because the count staying visible is now doing the whole job.
+- **The bar is what sketch 230 composes with**, and it is why 230's confirm was rebuilt around it.
+
+## Superseded recommendation — A as the control, C's bar folded in as its header
 
 **A and C are not rivals.** A is the structure; C's bar is the one thing counts cannot convey.
 
@@ -69,11 +93,11 @@ Not decoration, and this is the part to judge in the browser:
 
 ## What to look for
 
-1. **Scroll to B and turn off the fourth chip.** That state is the whole argument.
-2. **Watch A settle**, then look at the fourth lane thirty seconds later — it is still unsettled, on purpose.
-3. **Read the fourth lane's rows.** Every one names *why* we cannot tell. A bucket labelled "can't tell"
-   whose rows do not say why is a shrug, not a disclosure.
-4. **Narrow the window below 1080px.** A goes 2×2 — still four, never three.
+1. **Watch C settle**, then look at the hatched segment and the fourth count a minute later — still
+   unsettled, on purpose.
+2. **Hover an unknown's fragment.** The row says *no hash for Docs*; the reason is one hover away.
+3. **Open tab B and turn off the fourth chip.** That state is the whole argument for why B lost.
+4. **Toggle `notes`** if you want the reasoning. Off by default, on purpose.
 
 ## The copy this sketch commits to
 
@@ -96,22 +120,27 @@ resolves that way.
 
 ## Driven, not asserted
 
-`drive.cjs` — **52 assertions, extracted from the running sketch rather than a copy of it**: bucket counts
-sum to the scan total, four lanes exist with no removal control, every unknown row carries a reason, every
-added row carries a destination, the labels are verbatim, and the "already here" copy makes no hash claim.
+`drive.cjs` — **64 assertions, extracted from the running sketch rather than a copy of it**: bucket counts
+sum to the scan total, four sections exist with no removal control, every unknown carries a full reason
+behind its fragment, every added row carries a destination, the labels are verbatim in all three variants,
+and the "already here" copy makes no hash claim. **It also guards the density** — annotations off by
+default, one variant on screen at a time, reasons behind the row.
 
-⚠ **Four defects were planted and driven RED, and the first one did not fire.** The original qualifier check
-searched the whole document, so rewriting variant A's copy to *"matched by content hash"* still passed —
-the phrase survived in variant C and in the footnotes, and the sub-region regex silently matched nothing.
-**The guard was region-scoped and given a "region was found" assertion, then re-driven RED.** It is recorded
-here rather than quietly fixed, because a guard that cannot fail on the defect it names is decoration.
+⚠ **A guard was proven broken before it was trusted.** The first version of the "already here must not
+overclaim a hash" check searched the **whole document**, so rewriting one variant's copy to *"matched by
+content hash"* still passed: the phrase survived elsewhere and the sub-region regex silently matched
+nothing at all. **Region-scoped, given a "region was found" assertion, and re-driven RED** — it now fires
+**four** assertions on that defect. Recorded rather than quietly fixed, because a guard that cannot fail on
+the defect it names is decoration, and this one was written by the same session that wrote the thing it
+was guarding.
 
 | Planted defect | Fires |
 |---|---|
-| "already here" overclaims a content hash | ✅ 2 assertions (after the fix) |
-| the fourth lane is dropped to tidy the screen | ✅ 2 assertions |
-| a filter chip is added to variant A | ✅ 2 assertions |
-| an unknown file loses its reason | ✅ 1 assertion |
+| the legend overclaims a content hash | ✅ 4 |
+| the fourth section is dropped | ✅ 2 |
+| a filter chip is added to the winner | ✅ 2 |
+| annotations render by default again | ✅ 1 |
+| an unknown loses its reason | ✅ 1 |
 
 `index.html` restored **md5-identical** after every plant.
 
