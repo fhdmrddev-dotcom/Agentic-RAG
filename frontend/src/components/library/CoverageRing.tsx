@@ -5,6 +5,8 @@
  *  component — the sketch bans a bare proportion as quality grade.
  */
 
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+
 interface Props {
   retrieved: number
   total: number
@@ -58,8 +60,8 @@ export function CoverageRing({ retrieved, total, size = "lg" }: Props) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`font-bold font-headline tabular-nums leading-none text-foreground ${isLg ? "text-2xl" : "text-lg"}`}>
-            {retrieved}
-            <span className="text-muted-foreground">/{total}</span>
+            <AnimatedNumber value={retrieved} />
+            <span className="text-muted-foreground">/<AnimatedNumber value={total} /></span>
           </span>
           <span className={`font-medium text-muted-foreground mt-0.5 ${isLg ? "text-xs" : "text-[9px]"}`}>
             found by a search

@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { reingestDocument } from "@/lib/api"
-import { cn } from "@/lib/utils"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
 import { DocumentRow, hasVersions } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
@@ -194,7 +193,9 @@ export function DocumentList({
               {deleteTarget && hasVersions(deleteTarget) ? (
                 <>
                   This document has {deleteTarget.version_number} versions.{" "}
-                  <span className="font-medium text-foreground">Delete v{deleteTarget.version_number}</span>{" "}
+                  <span className="font-medium text-foreground">
+                    Delete v{deleteTarget.version_number}
+                  </span>{" "}
                   to promote v{(deleteTarget.version_number ?? 1) - 1} as current, or delete all versions permanently.
                 </>
               ) : (
@@ -237,7 +238,7 @@ export function DocumentList({
                       Deleting...
                     </>
                   ) : (
-                    `Delete v${deleteTarget.version_number}`
+                    <>Delete v{deleteTarget.version_number}</>
                   )}
                 </Button>
                 <Button

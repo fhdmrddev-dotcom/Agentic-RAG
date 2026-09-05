@@ -1,3 +1,5 @@
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+
 interface Props {
   score: number
   size?: "lg" | "sm"
@@ -59,7 +61,7 @@ export function HealthScoreGauge({ score, size = "lg" }: Props) {
         {/* Score + label centered via absolute overlay (avoids SVG font quirks) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`font-bold font-headline tabular-nums leading-none ${colorClass} ${isLg ? "text-4xl" : "text-2xl"}`}>
-            {v}
+            <AnimatedNumber value={v} />
           </span>
           <span className={`font-medium text-muted-foreground mt-0.5 ${isLg ? "text-xs" : "text-[9px]"}`}>
             {label}

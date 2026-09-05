@@ -8,19 +8,21 @@
  * ⛔ HONESTY: an unknown value reads `UNKNOWN`, never `0`. `Last indexed` is
  * `max(embedded_at)` (BE-1) — a `never` (null) reads `never`, never a fabricated time.
  */
+import type React from "react"
 import type { IndexSummary } from "@/lib/api"
 import { Database } from "lucide-react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 const UNKNOWN = "Not known yet"
 
-function Fact({ label, value, loading }: { label: string; value?: string; loading?: boolean }) {
+function Fact({ label, value, loading }: { label: string; value?: React.ReactNode; loading?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-2 px-1 rounded-md hover:bg-muted/30 transition-colors duration-150">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       {loading ? (
         <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
       ) : (
-        <span className="min-w-0 truncate font-mono text-sm font-medium text-foreground" title={value}>
+        <span className="min-w-0 truncate font-mono text-sm font-medium text-foreground" title={typeof value === "string" ? value : undefined}>
           {value ?? UNKNOWN}
         </span>
       )}
@@ -47,11 +49,19 @@ export function VectorStoreCard({ summary }: { summary: IndexSummary | null }) {
         <h3 className="text-sm font-semibold leading-tight text-foreground">Vector store</h3>
       </div>
       <div className="mt-1 divide-y divide-border/20">
-        <Fact label="Vectors" value={vectors == null ? undefined : vectors.toLocaleString()} loading={loading} />
-        <Fact label="Chunks indexed" value={chunks == null ? undefined : chunks.toLocaleString()} loading={loading} />
+        <Fact
+          label="Vectors"
+          value={vectors == null ? undefined : <AnimatedNumber value={vectors.toLocaleString()} />}
+          loading={loading}
+        />
+        <Fact
+          label="Chunks indexed"
+          value={chunks == null ? undefined : <AnimatedNumber value={chunks.toLocaleString()} />}
+          loading={loading}
+        />
         <Fact
           label="Documents with no vectors"
-          value={noVectors == null ? undefined : noVectors.toLocaleString()}
+          value={noVectors == null ? undefined : <AnimatedNumber value={noVectors.toLocaleString()} />}
           loading={loading}
         />
         <Fact

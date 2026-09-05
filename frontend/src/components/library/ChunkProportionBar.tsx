@@ -9,6 +9,8 @@
  * ⛔ `max === 0` (no loaded document has chunks) renders the empty track — fill width is
  * 0%, never a division by zero and never a NaN width.
  */
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+
 export function ChunkProportionBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
   return (
@@ -19,7 +21,9 @@ export function ChunkProportionBar({ value, max }: { value: number; max: number 
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs text-muted-foreground tabular-nums w-8 text-right font-mono">{value}</span>
+      <span className="text-xs text-muted-foreground tabular-nums w-8 text-right font-mono">
+        <AnimatedNumber value={value} />
+      </span>
     </div>
   )
 }

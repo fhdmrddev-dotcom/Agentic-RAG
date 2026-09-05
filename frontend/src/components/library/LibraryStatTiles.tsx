@@ -12,8 +12,9 @@
  * ⛔ An unreachable source (failed fetch) renders the honest-unknown arm ("Not known yet"),
  * never `0`.
  */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { getReembedProgress, getHealthOverview } from "@/lib/api"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { Document } from "@/types"
 
 const UNKNOWN = "Not known yet"
@@ -37,74 +38,6 @@ function useAsyncValue<T>(fetcher: () => Promise<T>): TileState<T> {
   return state
 }
 
-function AnimatedNumber({ value, duration = 300 }: { value: number | string; duration?: number }) {
-  const isTest =
-    (typeof process !== "undefined" && process.env?.NODE_ENV === "test") ||
-    (typeof import.meta !== "undefined" && (import.meta as any)?.env?.MODE === "test")
-  const prefersReduced =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-
-  // In test or reduced motion, render true value immediately with zero overhead
-  if (isTest || prefersReduced) {
-    return <>{value}</>
-  }
-
-  return <AnimatedNumberInner value={value} duration={duration} />
-}
-
-function AnimatedNumberInner({ value, duration }: { value: number | string; duration: number }) {
-  const hasAnimatedRef = useRef(false)
-  const [display, setDisplay] = useState<number | string>(value)
-
-  useEffect(() => {
-    // If already animated once, never re-animate on refetch
-    if (hasAnimatedRef.current) {
-      setDisplay(value)
-      return
-    }
-
-    const cleanStr = String(value).replace(/,/g, "")
-    const match = cleanStr.match(/^([^0-9.-]*)([0-9]+(?:\.[0-9]+)?)(.*)$/)
-    if (!match) {
-      setDisplay(value)
-      return
-    }
-
-    const prefix = match[1]
-    const targetNum = parseFloat(match[2])
-    const suffix = match[3]
-    const hasCommas = String(value).includes(",")
-
-    hasAnimatedRef.current = true
-
-    const startNum = 0
-    const startTime = performance.now()
-    let rafId: number
-
-    const step = (now: number) => {
-      const elapsed = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const ease = 1 - Math.pow(1 - progress, 3)
-      const current = Math.round(startNum + (targetNum - startNum) * ease)
-      const formattedNum = hasCommas ? current.toLocaleString() : current.toString()
-      setDisplay(`${prefix}${formattedNum}${suffix}`)
-
-      if (progress < 1) {
-        rafId = requestAnimationFrame(step)
-      } else {
-        setDisplay(value)
-      }
-    }
-
-    rafId = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(rafId)
-  }, [value, duration])
-
-  return <>{display}</>
-}
-
 /** One tile: label · big number · description. Mirrors HealthStatBar's card shape. */
 function Tile({
   label,
@@ -113,7 +46,7 @@ function Tile({
 }: {
   label: string
   value: string
-  description: string
+  description: React.ReactNode
 }) {
   return (
     <div className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
@@ -159,7 +92,7 @@ export function LibraryStatTiles({ documents }: { documents: Document[] }) {
       <Tile
         label="Chunks"
         value={chunkSum.toLocaleString()}
-        description={`across ${docCount} document${docCount === 1 ? "" : "s"}`}
+        description={<>across <AnimatedNumber value={docCount} /> document{docCount === 1 ? "" : "s"}</>}
       />
       <Tile
         label="Vectors"

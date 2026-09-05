@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react"
 import { HealthDocumentRow } from "@/components/health/HealthDocumentRow"
 import { getStaleDocs } from "@/lib/api"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 interface DocumentHealthItem {
   document_id: string
@@ -92,7 +93,7 @@ export function HealthDocumentBars() {
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-base font-headline font-bold">Document status</h3>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {total} {total === 1 ? "document" : "documents"}
+          <AnimatedNumber value={total} /> {total === 1 ? "document" : "documents"}
         </span>
       </div>
       <Legend />

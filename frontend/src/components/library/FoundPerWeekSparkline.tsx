@@ -6,6 +6,7 @@
  */
 
 import { useMemo } from "react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 interface WeekBucket {
   week: string
@@ -22,7 +23,13 @@ export function FoundPerWeekSparkline({ weeks }: Props) {
   if (weeks.length < 2) {
     return (
       <div className="text-xs text-muted-foreground tabular-nums">
-        {weeks.length === 1 ? `${weeks[0].count} this week` : "No data"}
+        {weeks.length === 1 ? (
+          <>
+            <AnimatedNumber value={weeks[0].count} /> this week
+          </>
+        ) : (
+          "No data"
+        )}
       </div>
     )
   }

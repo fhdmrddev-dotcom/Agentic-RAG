@@ -24,6 +24,7 @@ import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
 import { LibraryBreadcrumb } from "@/components/library/LibraryBreadcrumb"
 import { DocumentsPager } from "@/components/library/DocumentsPager"
 import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
 import { useAuth } from "@/hooks/useAuth"
@@ -570,7 +571,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           <>
             <h2 className="text-lg font-semibold leading-tight">Root</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Documents not assigned to a folder · {rootDocumentCount}{" "}
+              Documents not assigned to a folder · <AnimatedNumber value={rootDocumentCount} />{" "}
               {rootDocumentCount === 1 ? "document" : "documents"}
             </p>
           </>

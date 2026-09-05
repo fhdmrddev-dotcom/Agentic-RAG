@@ -19,6 +19,7 @@ import {
   getGovLowConfidence,
 } from "@/lib/api"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 interface SignalChip {
   id: string
@@ -77,7 +78,7 @@ function ChipRow({ id, label, count, loading }: SignalChip) {
     >
       <span className="text-sm font-medium text-foreground/90 truncate">{label}</span>
       <span className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded-md bg-muted/50 text-foreground/80 shrink-0 ml-2 border border-border/30">
-        {loading ? "…" : count}
+        {loading ? "…" : <AnimatedNumber value={count} />}
       </span>
     </div>
   )
