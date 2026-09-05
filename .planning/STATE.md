@@ -287,6 +287,28 @@ instrument for a Deep pause.
 - ⚠ **G-5 triples were re-derived from git at roadmapping and 8 of 12 had DRIFTED** — e.g. `documents.py`
   measured `73/30/2562` against a cell reading `72/30/2535`. Re-derive, never read the cell.
 
+### ⭐ ROLE ASSIGNMENT — reciprocal review, ratified by the operator 2026-09-05
+
+**To let the pair run autonomously, the roles now ALTERNATE per phase.** The operator's instruction:
+*"the bars that cannot be autonomous — let Gemini review your work and vice versa."*
+
+| Phase | Builds | Reviews |
+|---|---|---|
+| **230** — The Durable Ingestion Queue | **Gemini** | **Claude** (verify by driving; SC#1 re-drive owed) |
+| **231** — connection-scoped visibility | **Claude** | **Gemini** |
+
+⭐ **This is not a new rule — `AGENTS.md` §3.1 already required it, and the practice had ossified.**
+Roles are *"per phase, not permanent"* (§3), and **Phase 231 is Claude-built by the ratified
+criticality test**, hitting three of five triggers: **#3 the permission/approval model** (231 *is* the
+visibility predicate — *"a permission bug is a security bug"*), **#4 a migration that commits a table
+shape** (four RLS sites), and **#5 anything that can fail OPEN** (an RLS predicate that fails open
+leaks documents across tenants). Announced to Gemini on **BUS-119**.
+
+⚠ **What role-swapping does NOT delegate.** `CLAUDE.md`: *decisions go `--to operator`, never settled
+agent-to-agent.* The department-access question below is a DECISION, not a review finding — Gemini
+reviewing Claude's 231 cannot authorise it, and Claude must not have Gemini ratify it. It is the one
+genuine blocker on autonomous execution of 231.
+
 ### Open decisions owed at discuss-phase
 
 | Phase | Decision |
