@@ -1810,6 +1810,10 @@ const BASELINE = {
   // but never the whole word "failed" that §14 names — THE TEST was wrong, and it now
   // asserts the stem.
   "ConnectionFormPanel.test.tsx": 63,
+  // Pinned 2026-09-05 at the gate's OWN printed `— N new` figure, never a hand count of
+  // `it(`. Guards the destructive/non-destructive split in the re-embed confirm gate; see
+  // the TARGETS entry for why this suite needed both knobs.
+  "ReembedConfirmModal.test.tsx": 7,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -3833,6 +3837,18 @@ const TARGETS = [
   // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
   // the file — never before, never after.
   "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
+  // ── Added 2026-09-05 with `ReembedConfirmModal.test.tsx` — the SAME two-knob reason the
+  //    entries above give: every `src/components/settings/` entry here is FILE-LEVEL, so a
+  //    new file in that directory is invisible to the gate until it is named. TARGETS decides
+  //    what RUNS; BASELINE decides what is GUARDED, and this suite needed both.
+  //
+  //    What it guards is worth stating, because it is not ordinary coverage: until this
+  //    commit the re-embed confirm modal rendered "Resumable & non-destructive" for a
+  //    DIMENSIONS change, which is the one case where every vector is destroyed up front by
+  //    resize_embedding_column. The four destructive cases were driven RED against the
+  //    pre-fix component (4 failed / 3 passed) and the component restored before commit — a
+  //    guard nobody has seen fire is not a guard.
+  "src/components/settings/__tests__/ReembedConfirmModal.test.tsx",
   // ── Added in 206.1-01 (item 3, the per-service mark map) — the THIRD entry on
   //    `src/components/settings/`, for the identical reason the two above give: those two
   //    are FILE-LEVEL, so a THIRD file in that directory is still invisible to the gate.

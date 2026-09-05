@@ -21,6 +21,21 @@ import { Button } from "@/components/ui/button"
  *
  * Cancel = no change. Confirm = the save proceeds (which the Plan 05 backend
  * turns into the re-embed job kickoff). Deep Midnight danger/warning tokens.
+ *
+ * ⚠ CORRECTED 2026-09-05 — THIS MODAL TOLD A LIE IN THE ONE CASE THAT MATTERS.
+ * It rendered "Resumable & non-destructive — old vectors are kept until each
+ * replacement is written" for EVERY change. That sentence is true for a
+ * MODEL-only change, where reembed_service walks stale chunks and overwrites
+ * them one batch at a time. It is FALSE for a DIMENSIONS change: the job's
+ * first act is `resize_embedding_column(new_dim)`, an
+ * `ALTER … TYPE vector(n) USING NULL` that destroys every vector in the table
+ * up front (mig 073/140, and mig 167 extends it to skill_embeddings). Between
+ * that ALTER and the end of the re-embed, `match_document_chunks` compares
+ * against NULL and search returns NOTHING — not "dips".
+ *
+ * So the two cases are now told apart by `dimsChanged`, and the destructive arm
+ * says what actually happens. The reassurance was worse than a missing warning:
+ * it was strongest exactly where the danger was.
  */
 
 interface ReembedConfirmModalProps {
@@ -31,6 +46,16 @@ interface ReembedConfirmModalProps {
   targetModel: string
   /** Target dimensions (shown beside the model in the fact grid). */
   targetDims: number
+  /**
+   * True when the DIMENSIONS are changing, not just the model. This is the
+   * destructive case: resize_embedding_column NULLs every vector before the
+   * re-embed loop starts, so search returns nothing until the job completes.
+   * Defaults false so a caller that only changed the model keeps the (correct)
+   * non-destructive copy.
+   */
+  dimsChanged?: boolean
+  /** The dimensions being moved AWAY from — shown only when dimsChanged. */
+  currentDims?: number | null
   onCancel: () => void
   onConfirm: () => void
   /** Disables Confirm while the save is in flight. */
@@ -51,6 +76,8 @@ export function ReembedConfirmModal({
   chunkCount,
   targetModel,
   targetDims,
+  dimsChanged = false,
+  currentDims = null,
   onCancel,
   onConfirm,
   busy = false,
@@ -102,11 +129,26 @@ export function ReembedConfirmModal({
           </div>
 
           <h2 id="reembed-modal-title" className="font-headline text-lg font-bold text-foreground mb-1.5">
-            This will re-embed your library
+            {dimsChanged
+              ? "This deletes every search vector first"
+              : "This will re-embed your library"}
           </h2>
           <p id="reembed-modal-desc" className="text-sm text-muted-foreground mb-5">
-            Switching to <b className="text-foreground font-mono">{targetModel}</b> rebuilds the search
-            vectors for every document in your knowledge base.
+            {dimsChanged ? (
+              <>
+                Switching to <b className="text-foreground font-mono">{targetModel}</b> changes the vector
+                width{currentDims ? (
+                  <> from <b className="text-foreground font-mono">{currentDims}d</b> to{" "}
+                  <b className="text-foreground font-mono">{targetDims}d</b></>
+                ) : null}, so every existing vector is <b className="text-foreground">deleted immediately</b> —
+                they cannot be converted. Your documents, chunks and files are untouched; only the vectors go.
+              </>
+            ) : (
+              <>
+                Switching to <b className="text-foreground font-mono">{targetModel}</b> rebuilds the search
+                vectors for every document in your knowledge base.
+              </>
+            )}
           </p>
 
           {/* A's 4-fact grid — chunks · ETA · target model · runs-in-background */}
@@ -126,8 +168,16 @@ export function ReembedConfirmModal({
               </div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Runs</div>
-              <div className="text-sm font-mono text-foreground">in background</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                {dimsChanged ? "Vector width" : "Runs"}
+              </div>
+              <div className="text-sm font-mono text-foreground">
+                {dimsChanged && currentDims
+                  ? `${currentDims}d → ${targetDims}d`
+                  : dimsChanged
+                    ? `→ ${targetDims}d`
+                    : "in background"}
+              </div>
             </div>
           </div>
 
@@ -136,15 +186,35 @@ export function ReembedConfirmModal({
             <li className="flex items-start gap-3 border-t border-border/50 py-3">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
               <span className="text-muted-foreground">
-                <b className="text-foreground">Search quality dips</b> until the job finishes — chunks not yet
-                re-embedded drop out of results, then recover.
+                {dimsChanged ? (
+                  <>
+                    <b className="text-foreground">Search returns nothing</b> until the job finishes — not
+                    &ldquo;degraded&rdquo;, empty. Every chunk is un-indexed the moment you confirm, and comes back
+                    only as it is re-embedded.
+                  </>
+                ) : (
+                  <>
+                    <b className="text-foreground">Search quality dips</b> until the job finishes — chunks not yet
+                    re-embedded drop out of results, then recover.
+                  </>
+                )}
               </span>
             </li>
             <li className="flex items-start gap-3 border-t border-border/50 py-3">
               <RefreshCw className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
               <span className="text-muted-foreground">
-                <b className="text-foreground">Resumable &amp; non-destructive.</b> Old vectors are kept until each
-                replacement is written; an interrupted run picks up where it stopped.
+                {dimsChanged ? (
+                  <>
+                    <b className="text-foreground">Resumable, but not reversible by stopping.</b> An interrupted run
+                    picks up where it stopped — but cancelling midway leaves the library part-indexed, and the old
+                    vectors are already gone.
+                  </>
+                ) : (
+                  <>
+                    <b className="text-foreground">Resumable &amp; non-destructive.</b> Old vectors are kept until each
+                    replacement is written; an interrupted run picks up where it stopped.
+                  </>
+                )}
               </span>
             </li>
             <li className="flex items-start gap-3 border-t border-border/50 py-3">
@@ -167,7 +237,7 @@ export function ReembedConfirmModal({
               disabled={busy}
               className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 border-none font-semibold"
             >
-              {busy ? "Starting…" : "Re-embed now →"}
+              {busy ? "Starting…" : dimsChanged ? "Delete vectors & re-embed →" : "Re-embed now →"}
             </Button>
           </div>
         </div>

@@ -52,6 +52,22 @@ export const EMBEDDING_PRESETS: ProviderPreset[] = [
   { key: "google", label: "Google · gemini-embedding-001", base_url: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemini-embedding-001", dims: 3072, threshold: 0.3, local: false, keyNote: "uses your Google key" },
   { key: "ollama", label: "Ollama (local) · nomic-embed-text", base_url: "http://localhost:11434/v1", model: "nomic-embed-text", dims: 768, threshold: 0.3, local: true, dummyKey: "ollama", keyNote: "no key needed" },
   { key: "lmstudio", label: "LM Studio (local) · loaded GGUF embedder", base_url: "http://localhost:1234/v1", model: "nomic-embed-text", dims: 768, threshold: 0.3, local: true, dummyKey: "lm-studio", keyNote: "no key needed" },
+  // Measured on this project's own 6,017-chunk corpus, 2026-09-05, 80 known-item queries:
+  // Qwen3-0.6B scored R@1 0.450 / MRR 0.531 against text-embedding-3-small's 0.450 / 0.551
+  // — a tie at rank 1, and inside noise elsewhere. It is a real alternative to the cloud
+  // default, not a downgrade, which is why it earns a named preset rather than "Custom".
+  // ⚠ `model` is LM Studio's SERVED SLUG, not the HuggingFace repo id: LM Studio 400s an
+  // unknown slug, but was measured SILENTLY SERVING a different loaded model when asked
+  // for one it had downloaded but not loaded. Verify with GET /v1/models before trusting.
+  // threshold stays 0.30: on a topically homogeneous corpus its negatives scored LOWER
+  // than OpenAI's (neg p95 0.539 vs 0.559), so this model needs no special floor.
+  { key: "lmstudio-qwen3", label: "LM Studio (local) · Qwen3-Embedding-0.6B", base_url: "http://localhost:1234/v1", model: "text-embedding-qwen3-embedding-0.6b", dims: 1024, threshold: 0.3, local: true, dummyKey: "lm-studio", keyNote: "no key needed · slug must match GET /v1/models" },
+  // The SAME open model, served from somewhere the deployed backend can actually reach.
+  // A cloud backend cannot resolve `localhost`, so the local presets above are dev-only by
+  // construction; this row is the production shape of the identical choice. base_url is
+  // blank on purpose — there is no default host to guess, and a wrong guess would look
+  // configured. HTTPS + a real key, because this endpoint is not on the operator's desk.
+  { key: "selfhosted", label: "Self-hosted open model (remote, OpenAI-compatible)", base_url: "", model: "", dims: 1024, threshold: 0.3, local: false, keyNote: "your server's HTTPS URL + its key — reachable from the backend, not localhost" },
   { key: "cohere", label: "Cohere · embed-v4 (Custom / compat)", base_url: "https://api.cohere.ai/compatibility/v1", model: "embed-v4.0", dims: 1536, threshold: 0.3, local: false, keyNote: "uses your Cohere key · compat mode" },
   { key: "jina", label: "Jina · jina-embeddings-v3", base_url: "https://api.jina.ai/v1", model: "jina-embeddings-v3", dims: 1024, threshold: 0.3, local: false, keyNote: "uses your Jina key" },
   { key: "mistral", label: "Mistral · mistral-embed", base_url: "https://api.mistral.ai/v1", model: "mistral-embed", dims: 1024, threshold: 0.3, local: false, keyNote: "uses your Mistral key" },
