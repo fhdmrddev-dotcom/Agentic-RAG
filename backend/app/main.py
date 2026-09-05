@@ -565,6 +565,31 @@ async def lifespan(app_instance):
             _ingestion_queue = None
     app_instance.state.ingestion_queue_service = _ingestion_queue
 
+    # Phase 234 (LIB-08 / QUEUE-03) — the background connector watch loop.
+    # Off by default, safe across multiple uvicorn workers with database-level claim exclusivity.
+    _watch_service = None
+    if not _setup_mode and getattr(settings, "watch_process_enabled", False):
+        try:
+            from app.services.watch_service import WatchService
+            from app.dependencies import get_supabase
+
+            _pg_pool = await get_pg_pool()
+            _watch_service = WatchService(
+                pool=_pg_pool,
+                settings=settings,
+                supabase=get_supabase(),
+            )
+            _watch_service.start()
+            logger.info(
+                "Watch service started (poll every %ds, lease %ds)",
+                settings.watch_poll_interval_seconds,
+                settings.watch_lease_seconds,
+            )
+        except Exception:
+            logger.exception("Watch service failed to start (app continues)")
+            _watch_service = None
+    app_instance.state.watch_service = _watch_service
+
     yield
 
     # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
@@ -586,6 +611,14 @@ async def lifespan(app_instance):
             await _iq.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Ingestion queue service stop failed at lifespan shutdown")
+
+    # Phase 234 — stop the watch service
+    try:
+        _ws = getattr(app_instance.state, "watch_service", None)
+        if _ws is not None:
+            _ws.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Watch service stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and

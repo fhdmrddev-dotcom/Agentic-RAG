@@ -58,6 +58,15 @@ class FilePage:
 
 
 @dataclass
+class SourceListing:
+    """Aggregated listing resulting from an exhaustive folder traversal loop (SRC-06 / H-5)."""
+
+    files: list[SourceFile] = field(default_factory=list)
+    complete: bool = False  # Fails closed. ONLY True when loop completes with next_page_token IS None and 0 errors.
+    error: str | None = None
+
+
+@dataclass
 class SourceHealth:
     """Health check diagnostic result for a source connection."""
 

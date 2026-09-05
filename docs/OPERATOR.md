@@ -132,6 +132,12 @@ Then edit `./.env` and fill in:
   per worker; `INGEST_POLL_INTERVAL_SECONDS` (default `2.0`) is the polling frequency for due jobs;
   `INGEST_LEASE_TIMEOUT_SECONDS` (default `300`) is the lease timeout used by the stale-claim
   sweeper to rescue in-flight jobs stranded if a worker crashes or restarts (SC#1).
+- **Connector Watch Loop (Phase 234, LIB-08 / QUEUE-03)** — `WATCH_PROCESS_ENABLED`
+  ships **`false`** by default. Set it to `true` to enable automated background polling of
+  watched source folders (Google Drive, etc.). Safe across multiple uvicorn workers via database
+  transaction claiming (`FOR UPDATE SKIP LOCKED`). `WATCH_POLL_INTERVAL_SECONDS` (default `60`)
+  controls how frequently the worker checks for due watches; `WATCH_LEASE_SECONDS` (default `600`)
+  is the lease timeout for in-flight folder sync passes.
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick

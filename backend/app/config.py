@@ -1169,6 +1169,15 @@ class Settings(BaseSettings):
     # this duration are reclaimed by reclaim_stale_ingestion_claims (G-1 / SC#1).
     ingest_lease_timeout_seconds: int = 300
 
+    # ── Phase 234 (LIB-08 / QUEUE-03) — the background connector watch loop ─────────────
+    # OFF BY DEFAULT, matching scheduler_process_enabled: makes outbound cloud provider calls
+    # autonomously, so it must be explicitly enabled by the operator.
+    watch_process_enabled: bool = False
+    # Poll interval in seconds for the watch loop (default 60s).
+    watch_poll_interval_seconds: int = 60
+    # Lease duration in seconds for in-flight watch passes (default 600s).
+    watch_lease_seconds: int = 600
+
 
     @model_validator(mode="after")
     def _validate_run_stale_sweep_bounds(self) -> "Settings":
