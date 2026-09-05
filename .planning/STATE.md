@@ -114,6 +114,30 @@ watchers die with the session that started them.
 ⚠ **What role-swapping does NOT delegate:** `CLAUDE.md` says decisions go `--to operator`, never
 agent-to-agent. A reviewer approving a builder's decision is not authorisation, it is laundering.
 
+### ⚠ OWED DRIVES against Phase 230 — recorded at its close (operator, 2026-09-05)
+
+**Phase 230 closed with SC#1 and SC#4 DRIVEN and SC#2 / SC#3 TESTED BUT NEVER OBSERVED.** The
+operator's decision was to record these rather than hold the phase open. They are written here as
+**owed drives with a deadline**, not as a note, because this project's own history is that owed UAT
+rows survive whole milestones unrun (`v3.9` closed with 16 owed rows on Phase 217 alone).
+
+| # | The promise | What exists | What has never happened |
+|---|---|---|---|
+| **SC#2** | *"several hundred files at once and the product stays usable"* | the global `pg_advisory_xact_lock` bound + unit tests | **only 20 files were ever driven.** Nobody has watched a few hundred queue under the cap |
+| **SC#3** | *"the person is told the embedding provider failed, **and which one**"* — pause with that refusal on screen, resume on recovery | `test_provider_outage_trips_breaker_and_pauses_queue`, `test_probe_provider_auto_resumes_paused_queue`, and locked Sketch 227 variant B | ⛔ **no live 429 has ever occurred.** The pause banner and the named refusal have never been seen by a human |
+
+⛔ **SC#3 is the one that matters**, and it is the phase's most user-visible promise: it exists to
+close `BUG-260815-05`, where retrieval misreports provider failure and a person is told *"your
+documents returned nothing."* **A mechanism nobody has watched refuse is not yet a refusal.**
+
+⭐ **Deadline: before v4.0 closes** — not *"sometime"*. Cheapest honest method: stub the embedding
+provider to return 429 for a fixed window and drive one real batch through `/upload`, then watch the
+banner appear, the queue pause, and the queue resume when the stub recovers. **Both halves must be
+observed — pausing is not the feature, resuming on its own is.**
+
+⚠ Re-open trigger if the deadline slips: **any phase that touches embedding, the ingestion queue, or
+provider failure copy** picks these up as UAT rows.
+
 ### ⚠ Two gate problems OPEN ON THE OPERATOR — neither belongs to any phase
 
 ⚠ **Restored 2026-09-05 after the same rewrite dropped both pointers.** A routed item with no pointer
