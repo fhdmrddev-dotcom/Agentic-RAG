@@ -496,10 +496,36 @@ async def splice_document(
     extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
 
     # Step 3: When job_id is not provided, delegate directly to legacy ingest_document
+    #
+    # ⛔ BUG-260905-13 — `run_in_threadpool` IS LOAD-BEARING HERE, AND ITS ABSENCE COST EVERY
+    #   NON-QUEUE INGEST ITS METADATA. `splice_document` is `async def` and runs in the event
+    #   loop; `ingest_document` is a SYNC function that calls `enrich_for_ingest`, which calls
+    #   `asyncio.run(extract_metadata_enriched(...))`. Calling it inline therefore invokes
+    #   `asyncio.run()` from inside a running loop, which raises immediately — and the
+    #   enrichment's own broad `except` degrades that to `metadata_dict = None`. The document
+    #   completes, nothing is red, and it simply has no metadata.
+    #
+    # ⚠ THE TELL IS IN THE BACKEND LOG, and the operator's paste is what identified it:
+    #     ingest_enrich.py:236: RuntimeWarning: coroutine 'extract_metadata_enriched'
+    #                           was never awaited
+    #       metadata_dict = None
+    #   "never awaited" means the coroutine object was built and `asyncio.run` threw before
+    #   running it. That warning IS the signature of this bug.
+    #
+    # ⚠ IT EXPLAINS WHY THE FAILURE LOOKED RANDOM: documents that went through the QUEUE
+    #   (`job_id` set) reached the `run_in_threadpool` call ~60 lines below and kept all seven
+    #   metadata fields; documents that came through `/upload` or `/reingest` with no job took
+    #   THIS branch and got none. Same file, same request, two different answers.
+    #
+    # ⚠ THE RULE WAS ALREADY WRITTEN DOWN — see the `run_in_threadpool IS LOAD-BEARING`
+    #   comment on the enrichment call below, and D-v2.5-01 (no blocking I/O in async
+    #   handlers). This call site simply never applied it, and it also blocked the whole event
+    #   loop for the duration of an ingest.
     if not job_uuid:
         from app.api.documents import ingest_document  # noqa: PLC0415
 
-        ingest_document(
+        await run_in_threadpool(
+            ingest_document,
             document_id=document_id,
             text=text,
             user_id=user_id,
