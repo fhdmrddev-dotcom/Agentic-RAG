@@ -295,6 +295,25 @@ def enrich_for_ingest(
     #   transcription THAT NEVER RAN. A provenance record that claims work nobody did is
     #   worse than none — it is the exact "cannot tell inferred from parsed" failure the
     #   stamp exists to prevent, inverted.
+    # ⛔ BUG-260905-12 — REMEMBER THAT ENRICHMENT PRODUCED NOTHING, BEFORE ANYTHING HIDES IT.
+    #
+    # `ingest_document`'s BUG-260905-07 guard keeps a document's existing metadata when a
+    # degraded extraction returns `None`. The image branch immediately below promotes that
+    # `None` to `{"document_type": "image", "_vision": …}` — a NON-None dict — so for an image
+    # that guard can never fire, and the wholesale `update({"metadata": …})` erases the title,
+    # date, summary, topics, author and language the document already had.
+    #
+    # ⚠ MEASURED on the operator's library 2026-09-06, and this is the exact fingerprint:
+    #   two re-ingested images left holding `['document_type']` and nothing else, beside a
+    #   TIFF and a WebP whose enrichment happened to succeed and which kept all seven fields.
+    #   Reported as "re-ingesting the documents again is not extracting metadata" — the
+    #   metadata was not missing, it was DELETED by the re-ingest.
+    #
+    # ⚠ IT IS BUG-260905-07 RE-OPENED THROUGH A PATH ITS GUARD CANNOT SEE, which is why the
+    #   flag is captured HERE rather than the guard being duplicated downstream: this is the
+    #   last line at which "extraction produced nothing" is still knowable.
+    enrichment_degraded = metadata_dict is None
+
     if raw and mime_type in IMAGE_MIME_TYPES:
         from app.services.extractors.aspects import vision_text  # noqa: PLC0415
         metadata_dict = metadata_dict or {}
@@ -342,6 +361,33 @@ def enrich_for_ingest(
     # read) so the SELECT result stays pristine and restored values don't share a
     # mutable reference with the prior object. Behavior unchanged; purely defensive.
     prior_meta = dict((getattr(prior, "data", None) or {}).get("metadata") or {})
+    # ── BUG-260905-12 — A DEGRADE RESTORES WHAT WAS THERE, NOT JUST WHAT A HUMAN TYPED ────
+    #
+    # The `_source='user'` loop below preserves HUMAN edits across a re-extract. That was
+    # always right and is untouched — but it is not enough, because nothing preserved the
+    # MODEL-derived fields, and for an image `metadata_dict` is never None by the time the
+    # downstream keep-guard looks at it (see `enrichment_degraded` above).
+    #
+    # ⚠ ONLY ON A DEGRADE, AND ONLY FOR FIELDS THE FRESH PASS DID NOT SET. A successful
+    #   extraction must still be able to CHANGE a title or drop a stale topic — restoring
+    #   unconditionally would make metadata permanently un-updatable, which is a worse bug
+    #   than the one being fixed.
+    #
+    # ⚠ UNDERSCORE KEYS ARE EXCLUDED. `_vision`, `_classification`, `_confidence` and
+    #   `_source` describe THIS pass; carrying a previous pass's `_vision` forward would
+    #   claim a transcription that did not happen — the same class of lie the `raw and`
+    #   guard above exists to prevent.
+    if enrichment_degraded and prior_meta:
+        metadata_dict = metadata_dict or {}
+        for fld, val in prior_meta.items():
+            if fld.startswith("_"):
+                continue
+            if fld == "document_type" and metadata_dict.get("document_type") == "image":
+                # The placeholder must not outrank a real type the document already carried.
+                metadata_dict[fld] = val
+            elif fld not in metadata_dict:
+                metadata_dict[fld] = val
+
     user_fields = dict(prior_meta.get("_source") or {})  # {field: "user"}
     if user_fields:
         metadata_dict = metadata_dict or {}  # Pitfall 2: degrade None -> {} before the loop
