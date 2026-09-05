@@ -197,6 +197,18 @@ class UserEffectiveSettings(BaseModel):
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
 
+    # SEED-226 (migration 166) — the vision model is a SETTING, not a constant.
+    #
+    # ⚠ EMPTY IS THE ONLY CORRECT DEFAULT, and the previous non-empty one was a live bug:
+    #   `config.py` pinned `vision_model = "gpt-4o-mini"`, so the resolution
+    #   `env_settings.vision_model or app_settings.llm_model` COULD NEVER FALL THROUGH.
+    #   The llm_model half was dead code and every vision call in this product went to
+    #   gpt-4o-mini whatever provider the operator had configured. Same shape as
+    #   `extraction_model` above: unset => the active chat model.
+    vision_model: str = ""
+    #: Hard ceiling on pages transcribed per document. Exceeding it is RECORDED, never silent.
+    vision_max_pages: int = 50
+
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
 
@@ -880,6 +892,12 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
+
+        # SEED-226 (migration 166). ⚠ `env_attr="vision_model"` is kept ONLY so an operator
+        # who already set the env var is not silently switched; `config.py`'s default is now
+        # "" so the chain really does reach `llm_model`. DB > env > active chat model.
+        vision_model=str(_val(row, "vision_model", "vision_model", "")),
+        vision_max_pages=int(_val(row, "vision_max_pages", None, 50)),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)

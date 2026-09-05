@@ -574,6 +574,9 @@ export interface FullAppSettings {
   rerank_has_api_key: boolean
   /** SEED-227 — per-document ceiling on images read by the vision model. */
   multimodal_max_vision_calls: number
+  /** SEED-226. Empty means "use the active chat model" — never a pinned name. */
+  vision_model: string
+  vision_max_pages: number
   retrieval_top_k: number
   retrieval_match_threshold: number
   hybrid_search_enabled: boolean
@@ -668,6 +671,8 @@ export interface SettingsUpdate {
   rerank_model?: string
   rerank_top_n?: number
   multimodal_max_vision_calls?: number
+  vision_model?: string
+  vision_max_pages?: number
   retrieval_top_k?: number
   retrieval_match_threshold?: number
   hybrid_search_enabled?: boolean

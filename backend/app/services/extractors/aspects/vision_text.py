@@ -267,10 +267,34 @@ def _vision_client(app_settings: Any):
     )
 
 
-def _transcribe_one(b64_png: str, kind: str, app_settings: Any, client) -> str:
+def resolve_vision_model(app_settings: Any) -> str | None:
+    """The ONE place a vision model name is decided. DB setting > env override > chat model.
+
+    ⚠ THIS FUNCTION EXISTS BECAUSE THE PREVIOUS EXPRESSION WAS BROKEN, and it was broken
+      identically at both call sites (here and `multimodal_service.describe_image`):
+
+          env_settings.vision_model or app_settings.llm_model
+
+      `config.py` defaulted `vision_model` to the literal `"gpt-4o-mini"`, so the left side was
+      ALWAYS truthy and the right side was DEAD CODE. Every vision call this product has ever
+      made went to gpt-4o-mini — regardless of which provider the operator configured, and
+      including deployments holding no OpenAI key at all, where it simply failed and the
+      caller's soft-failure path swallowed it.
+
+    ⛔ NEVER RE-PIN A MODEL NAME HERE. An empty chain must end at the operator's active chat
+      model, which is by definition one they have credentials for.
+    """
     from app.config import settings as env_settings  # noqa: PLC0415
 
-    model = env_settings.vision_model or getattr(app_settings, "llm_model", None)
+    return (
+        (getattr(app_settings, "vision_model", "") or "").strip()
+        or (getattr(env_settings, "vision_model", "") or "").strip()
+        or getattr(app_settings, "llm_model", None)
+    )
+
+
+def _transcribe_one(b64_png: str, kind: str, app_settings: Any, client) -> str:
+    model = resolve_vision_model(app_settings)
     resp = client.chat.completions.create(
         model=model,
         messages=[{
@@ -341,11 +365,39 @@ def page_budget(app_settings: Any, pages: int) -> int:
     ⚠ REUSES THE CAP THAT ALREADY EXISTS rather than inventing a second one.
       `multimodal_max_vision_calls` (user_settings, DB-backed, default 100) is the operator's
       existing control over vision spend; a transcription is a vision call like any other.
-      SEED-227 tracks that this knob is surfaced in no frontend file — that stays one problem,
-      not two.
+      `vision_max_pages` (migration 166, default 50) is the per-document ceiling on top of it.
+      SEED-227 tracks that neither knob is surfaced in a frontend file — that stays one problem.
+
+    ⚠ THE CALLER MUST ASK `truncation_note` WHAT THIS DROPPED. A budget that silently returns a
+      smaller number is how a 1,000-page scan becomes a 50-page document that reads as complete.
     """
     cap = int(getattr(app_settings, "multimodal_max_vision_calls", 100) or 100)
-    return max(0, min(pages, cap, MAX_PAGES_HARD_CAP))
+    hard = int(getattr(app_settings, "vision_max_pages", MAX_PAGES_HARD_CAP) or MAX_PAGES_HARD_CAP)
+    return max(0, min(pages, cap, hard))
+
+
+def truncation_note(total_pages: int, transcribed: int) -> str | None:
+    """The sentence a partially-transcribed document must carry, or None when it is whole.
+
+    ⛔ THIS IS THE ANSWER TO "WHAT IF THE FILE IS 1,000 PAGES", AND WITHOUT IT THE ANSWER WAS
+       BAD. The budget above would transcribe 50 pages of a 1,000-page scan, the document would
+       reach `completed` with no error, and it would be **5% of itself while reading as whole**.
+       That is precisely the confident-wrong-answer failure SEED-226 was planted to prevent,
+       reproduced by the fix for it.
+
+    ⚠ THE EXISTING PRECEDENT IS SILENT AND WAS NOT GOOD ENOUGH TO COPY. `multimodal_service`
+      records image truncation as `metadata._images = {total, read}`; a grep for it across
+      `frontend/src` returns NOTHING, and `DocumentDetailPanel` documents that it always ignores
+      `_`-prefixed keys. So that fact has never once reached a human. This sentence goes into the
+      CHUNK HEADER instead — every chunk of a truncated document carries it, so the agent
+      answering from any part of it can see the limit rather than inferring completeness.
+    """
+    if transcribed >= total_pages or total_pages <= 0:
+        return None
+    return (
+        f"INCOMPLETE: only the first {transcribed} of {total_pages} pages of this document "
+        f"were read. Nothing is known about pages {transcribed + 1}-{total_pages}."
+    )
 
 
 def provenance(kind: str, pages_transcribed: int, deficit: PdfDeficit | None = None) -> dict[str, Any]:
@@ -364,4 +416,11 @@ def provenance(kind: str, pages_transcribed: int, deficit: PdfDeficit | None = N
     }
     if deficit is not None:
         rec["detected"] = deficit.as_provenance()
+        note = truncation_note(deficit.pages, pages_transcribed)
+        if note is not None:
+            rec["truncated"] = {
+                "total_pages": deficit.pages,
+                "transcribed": pages_transcribed,
+                "note": note,
+            }
     return rec

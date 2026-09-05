@@ -69,6 +69,10 @@ class FullSettingsResponse(BaseModel):
     # It had a DB column, a loader and a live reader in multimodal_service, and NO route
     # to any surface: `api:0 ui:0` when measured 2026-08-28.
     multimodal_max_vision_calls: int
+    # SEED-226 — the vision model was a HARDCODED CONSTANT and the fallback that was
+    # supposed to reach the active chat model was dead code. Empty => active chat model.
+    vision_model: str
+    vision_max_pages: int
     # Retrieval
     retrieval_top_k: int
     retrieval_match_threshold: float
@@ -167,6 +171,8 @@ class SettingsUpdate(BaseModel):
     rerank_top_n: int | None = None
     # Multimodal (SEED-227)
     multimodal_max_vision_calls: int | None = None
+    vision_model: str | None = None          # SEED-226; "" clears it back to the chat model
+    vision_max_pages: int | None = None
     # Retrieval
     retrieval_top_k: int | None = None
     retrieval_match_threshold: float | None = None
@@ -243,6 +249,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
         rerank_top_n=s.rerank_top_n,
         rerank_has_api_key=bool(s.rerank_api_key),
         multimodal_max_vision_calls=s.multimodal_max_vision_calls,
+        vision_model=s.vision_model,
+        vision_max_pages=s.vision_max_pages,
         retrieval_top_k=s.retrieval_top_k,
         retrieval_match_threshold=s.retrieval_match_threshold,
         hybrid_search_enabled=s.hybrid_search_enabled,
@@ -425,6 +433,31 @@ async def update_settings(
                 ),
             )
         updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
+
+    # SEED-226 — the vision model, and the per-document page ceiling on transcription.
+    #
+    # ⚠ EMPTY IS A REAL, MEANINGFUL VALUE HERE and is stored as such: it means "use the active
+    #   chat model", which is by definition one the operator has credentials for. That is the
+    #   whole point of the fix — the previous behaviour pinned `gpt-4o-mini` in code, so an
+    #   install with no OpenAI key made vision calls it could never complete.
+    if body.vision_model is not None:
+        updates["vision_model"] = body.vision_model.strip()
+
+    # ⚠ BOUNDED ON WRITE for the same reason as the cap above, but the failure is worse: this
+    #   one silently SHORTENS documents. 0 would transcribe nothing while every ingestion still
+    #   reported success, and an unbounded value turns one 1,000-page scan into 1,000 paid
+    #   calls. A truncated document does say so in every chunk header — but a refusal here is
+    #   cheaper than a library full of 5% documents.
+    if body.vision_max_pages is not None:
+        if not 1 <= body.vision_max_pages <= 500:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Pages read per document must be between 1 and 500. "
+                    "0 would silently stop every scanned page from being read."
+                ),
+            )
+        updates["vision_max_pages"] = body.vision_max_pages
 
     if body.retrieval_top_k is not None:
         updates["retrieval_top_k"] = body.retrieval_top_k

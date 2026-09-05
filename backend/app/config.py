@@ -1071,9 +1071,20 @@ class Settings(BaseSettings):
     # Overrides _MODEL_OUTPUT_DEFAULTS for the listed models.
     model_output_limits: str = ""
 
-    # Vision model for image description during ingestion (must support vision)
-    # Defaults to gpt-4o-mini — override with VISION_MODEL=<model-id> in .env
-    vision_model: str = "gpt-4o-mini"
+    # Vision model for image description + transcription during ingestion (must support vision).
+    #
+    # ⚠ DEFAULT CHANGED "gpt-4o-mini" -> "" 2026-09-05 (SEED-226), AND THE OLD DEFAULT WAS A LIVE
+    #   BUG, not merely a stale name. Both call sites resolve
+    #       env_settings.vision_model or app_settings.llm_model
+    #   so a NON-EMPTY default here made the second half unreachable: every vision call this
+    #   product has ever made went to gpt-4o-mini regardless of the operator's configured
+    #   provider — including deployments with no OpenAI key at all, where it simply failed.
+    #
+    # ⚠ THE REAL HOME IS NOW `app_settings.vision_model` (migration 166), per CLAUDE.md's
+    #   "settings live in user_settings/app_settings; env vars are for secrets and infra only".
+    #   This env var survives ONLY as an override for an operator who already set it.
+    #   Empty => the DB setting, then the active chat model. Never a pinned model name.
+    vision_model: str = ""
 
     # Sub-agent settings
     sub_agent_model: str = ""

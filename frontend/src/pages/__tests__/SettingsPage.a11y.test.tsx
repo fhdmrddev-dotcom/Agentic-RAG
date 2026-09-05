@@ -81,6 +81,10 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     rerank_top_n: 5,
     rerank_has_api_key: false,
     multimodal_max_vision_calls: 100,
+    // SEED-226 — required by the response, so the fixture carries them rather than
+    // the API defaulting them away and hiding a field it forgot to build.
+    vision_model: "",
+    vision_max_pages: 50,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,

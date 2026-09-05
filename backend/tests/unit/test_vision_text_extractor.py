@@ -389,3 +389,102 @@ def test_an_image_with_no_text_gets_a_sentence_that_does_not_imply_a_broken_impo
     msg = empty_text_message("image/png")
     assert "no text" in msg.lower()
     assert "still stored" in msg.lower()
+
+
+# ── Model resolution: the bug that made every vision call go to one vendor ────────────
+#
+# ⛔ THE EXPRESSION THIS REPLACED WAS `env_settings.vision_model or app_settings.llm_model`,
+#   and `config.py` defaulted `vision_model` to the literal "gpt-4o-mini". The left side was
+#   ALWAYS truthy, so the right side was DEAD CODE. Every vision call this product ever made
+#   went to gpt-4o-mini — regardless of the configured provider, and including installs with
+#   no OpenAI key, where it failed and the soft-failure path swallowed it.
+
+class _SettingsWithVision(_Settings):
+    vision_model = "my-vision-model"
+
+
+def test_the_db_setting_wins():
+    assert vision_text.resolve_vision_model(_SettingsWithVision()) == "my-vision-model"
+
+
+def test_an_unset_vision_model_falls_through_to_the_active_chat_model(monkeypatch):
+    """⭐ THE ARM THAT WAS UNREACHABLE. This is the whole point of the fix."""
+    from app.config import settings as env_settings
+
+    monkeypatch.setattr(env_settings, "vision_model", "", raising=False)
+    assert vision_text.resolve_vision_model(_Settings()) == "gpt-4o-mini"  # == llm_model
+
+
+def test_the_env_var_still_overrides_for_an_operator_who_already_set_it(monkeypatch):
+    from app.config import settings as env_settings
+
+    monkeypatch.setattr(env_settings, "vision_model", "env-pinned", raising=False)
+    assert vision_text.resolve_vision_model(_Settings()) == "env-pinned"
+
+
+def test_whitespace_only_settings_are_treated_as_unset(monkeypatch):
+    """A model name of spaces is a typo, not a choice — it must not reach the API."""
+    from app.config import settings as env_settings
+
+    monkeypatch.setattr(env_settings, "vision_model", "   ", raising=False)
+
+    class Spaces(_Settings):
+        vision_model = "  "
+
+    assert vision_text.resolve_vision_model(Spaces()) == "gpt-4o-mini"
+
+
+def test_config_no_longer_pins_a_model_name():
+    """⛔ THE REGRESSION FENCE. A non-empty default here makes the fallback unreachable again."""
+    from app.config import settings as env_settings
+
+    assert (getattr(env_settings, "vision_model", "") or "").strip() == ""
+
+
+def test_the_resolved_model_is_what_actually_reaches_the_api():
+    """Driven, not inferred from the resolver alone."""
+    client = _FakeClient(["X"])
+    vision_text.transcribe_pages(["a"], "scan", _SettingsWithVision(), client=client)
+    assert client.calls[0]["model"] == "my-vision-model"
+
+
+# ── Truncation: the 1,000-page question ───────────────────────────────────────────────
+
+
+def test_a_document_within_budget_carries_no_truncation_note():
+    assert vision_text.truncation_note(10, 10) is None
+    assert vision_text.truncation_note(3, 10) is None
+
+
+def test_a_truncated_document_names_exactly_which_pages_are_unknown():
+    """⛔ WITHOUT THIS, 50 PAGES OF A 1,000-PAGE SCAN READ AS A COMPLETE DOCUMENT.
+
+    A reader cannot otherwise tell a document that HAS no answer from one whose answer was
+    on page 400 — which is the confident-wrong-answer failure SEED-226 exists to prevent.
+    """
+    note = vision_text.truncation_note(1000, 50)
+    assert note is not None
+    assert "INCOMPLETE" in note
+    assert "50 of 1000" in note
+    assert "51-1000" in note
+
+
+def test_the_budget_respects_the_operator_page_ceiling():
+    class Tight(_Settings):
+        vision_max_pages = 5
+
+    assert vision_text.page_budget(Tight(), 1000) == 5
+
+
+def test_provenance_carries_the_truncation_so_the_document_row_records_it():
+    d = vision_text.PdfDeficit("scan", 1000, 0, 0)
+    rec = vision_text.provenance("scan", 50, d)
+    assert rec["truncated"]["total_pages"] == 1000
+    assert rec["truncated"]["transcribed"] == 50
+    assert "INCOMPLETE" in rec["truncated"]["note"]
+
+
+def test_a_whole_document_has_no_truncated_key_at_all():
+    """An always-present key would make `if provenance.get("truncated")` useless."""
+    d = vision_text.PdfDeficit("scan", 4, 0, 0)
+    assert "truncated" not in vision_text.provenance("scan", 4, d)

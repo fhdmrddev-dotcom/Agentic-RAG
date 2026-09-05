@@ -2088,9 +2088,16 @@ def ingest_document(
                             deficit.kind, len(pages_b64), deficit,
                         )
                         log.info(
-                            "vision transcription for %s: kind=%s pages=%d chars=%d",
-                            document_id, deficit.kind, len(pages_b64), len(transcribed),
+                            "vision transcription for %s: kind=%s pages=%d/%d chars=%d",
+                            document_id, deficit.kind, len(pages_b64), deficit.pages,
+                            len(transcribed),
                         )
+                        if vision_provenance.get("truncated"):
+                            log.warning(
+                                "document %s transcribed only %d of %d pages — "
+                                "the shortfall is stated in every chunk header",
+                                document_id, len(pages_b64), deficit.pages,
+                            )
                     else:
                         log.info(
                             "vision transcription for %s produced nothing (kind=%s)",
@@ -2357,6 +2364,26 @@ def ingest_document(
                 header_parts.append(f"Date: {metadata_dict['date']}")
             if metadata_dict.get("document_type"):
                 header_parts.append(f"Type: {metadata_dict['document_type']}")
+
+        # ── SEED-226 — A PARTIAL TRANSCRIPTION SAYS SO IN EVERY CHUNK ───────────────────
+        #
+        # ⛔ THE ALTERNATIVE WAS A SILENT 5% DOCUMENT. The page budget will transcribe 50 pages
+        #   of a 1,000-page scan; without this the document reaches `completed` with no error
+        #   and reads as whole. A reader — human or agent — cannot tell a document that HAS no
+        #   answer from one whose answer was on page 400.
+        #
+        # ⚠ IT GOES IN THE HEADER, NOT IN THE BODY, ON PURPOSE. A note appended to the text is
+        #   one chunk among many and is retrieved only if it happens to match the query. The
+        #   header is prepended to EVERY chunk before embedding, so any retrieved fragment of a
+        #   truncated document carries its own limit with it.
+        #
+        # ⚠ `metadata._vision.truncated` is written too, but is NOT relied on for this: a grep
+        #   for the sibling `_images` truncation key across `frontend/src` returns nothing, and
+        #   `DocumentDetailPanel` ignores `_`-prefixed keys by contract. That fact has never
+        #   reached a human, which is exactly why this one does not depend on the UI.
+        if vision_provenance and vision_provenance.get("truncated", {}).get("note"):
+            header_parts.append(vision_provenance["truncated"]["note"])
+
         context_header = f"[{' | '.join(header_parts)}]\n" if header_parts else ""
 
         texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks

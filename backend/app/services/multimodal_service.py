@@ -685,8 +685,11 @@ def describe_image(b64_png: str, app_settings: "UserEffectiveSettings", client=N
             api_key=app_settings.llm_api_key,
             base_url=app_settings.llm_base_url or None,
         )
-    from app.config import settings as env_settings
-    vision_model = env_settings.vision_model or app_settings.llm_model
+    # SEED-226: ONE resolver, shared with the transcription path. The expression that used to
+    # live here (`env_settings.vision_model or app_settings.llm_model`) could never reach its
+    # right-hand side, because config.py pinned a non-empty default.
+    from app.services.extractors.aspects.vision_text import resolve_vision_model  # noqa: PLC0415
+    vision_model = resolve_vision_model(app_settings)
     resp = client.chat.completions.create(
         model=vision_model,
         messages=[{

@@ -614,6 +614,12 @@ export function SettingsPage() {
   // PUT when the embedding model OR dims changed; only Confirm commits the save.
   const [reembedModalOpen, setReembedModalOpen] = useState(false)
   const [reembedChunkCount, setReembedChunkCount] = useState<number | null>(null)
+  // A DIMENSIONS change and a MODEL-only change are different acts, and the gate must
+  // say which one is happening: only the dims change runs resize_embedding_column, which
+  // NULLs every vector up front. Lifted to state because the gate renders outside the
+  // save handler that computes it.
+  const [reembedDimsChanged, setReembedDimsChanged] = useState(false)
+  const [reembedPrevDims, setReembedPrevDims] = useState<number | null>(null)
   const [pendingSearchSave, setPendingSearchSave] = useState<SettingsUpdate | null>(null)
 
   // Reranking
@@ -626,6 +632,9 @@ export function SettingsPage() {
   // Retrieval
   // SEED-227 — mirrors migration 044's default so a cold load matches the server.
   const [maxVisionCalls, setMaxVisionCalls] = useState(100)
+  // SEED-226 — empty means "use the active chat model". It is NOT a missing value.
+  const [visionModel, setVisionModel] = useState("")
+  const [visionMaxPages, setVisionMaxPages] = useState(50)
   const [retrievalTopK, setRetrievalTopK] = useState(5)
   const [retrievalThreshold, setRetrievalThreshold] = useState(0.3)
   const [hybridEnabled, setHybridEnabled] = useState(true)
@@ -698,6 +707,8 @@ export function SettingsPage() {
     setRerankTopN(data.rerank_top_n)
     setRerankApiKey(data.rerank_has_api_key ? KEY_PLACEHOLDER : "")
     setMaxVisionCalls(data.multimodal_max_vision_calls)
+    setVisionModel(data.vision_model ?? "")
+    setVisionMaxPages(data.vision_max_pages ?? 50)
     setRetrievalTopK(data.retrieval_top_k)
     setRetrievalThreshold(data.retrieval_match_threshold)
     setHybridEnabled(data.hybrid_search_enabled)
@@ -816,6 +827,8 @@ export function SettingsPage() {
       rerank_model: rerankModel,
       rerank_top_n: rerankTopN,
       multimodal_max_vision_calls: maxVisionCalls,
+      vision_model: visionModel,
+      vision_max_pages: visionMaxPages,
       retrieval_top_k: retrievalTopK,
       retrieval_match_threshold: retrievalThreshold,
       hybrid_search_enabled: hybridEnabled,
@@ -832,6 +845,8 @@ export function SettingsPage() {
     if (modelChanged || dimsChanged) {
       setPendingSearchSave(body)
       setReembedChunkCount(null)
+      setReembedDimsChanged(dimsChanged)
+      setReembedPrevDims(s ? s.embedding_dimensions : null)
       setReembedModalOpen(true)
       // Pull the LIVE chunk count for the gate's "how many chunks" fact (the
       // current-model total — what will go stale + re-embed). Best-effort.
@@ -917,6 +932,8 @@ export function SettingsPage() {
         chunkCount={reembedChunkCount}
         targetModel={embeddingModel}
         targetDims={embeddingDimensions}
+        dimsChanged={reembedDimsChanged}
+        currentDims={reembedPrevDims}
         busy={savingSearch}
         onCancel={() => {
           setReembedModalOpen(false)
@@ -1410,12 +1427,37 @@ export function SettingsPage() {
 
               {/* Images SectionCard — SEED-227. The description carries the CONSEQUENCE,
                   because a bare number is what this setting already was in the database. */}
+              {/* ⚠ THE DESCRIPTION USED TO END "and the document says so on its detail panel",
+                  and that was FALSE — measured 2026-09-05. The cap writes `metadata._images`,
+                  a grep for it across `frontend/src` returns nothing, and DocumentDetailPanel
+                  ignores `_`-prefixed keys by contract. The claim is removed rather than
+                  softened; a settings description that promises a surface which does not exist
+                  is the same defect as an error message naming a capability we lack. */}
               <SectionCard
-                title="Images in documents"
-                description="How many images are read per document. Anything past this limit is not read, and the document says so on its detail panel."
+                title="Images, scans and drawings"
+                description="How documents that are pictures rather than text get read. A scanned or drawn page is transcribed by a vision model; anything past these limits is not read."
               >
                 <FieldRow label="Images read per document">
                   <NumberInput value={maxVisionCalls} onChange={setMaxVisionCalls} min={1} max={1000} />
+                </FieldRow>
+
+                {/* ⚠ A TRUNCATED DOCUMENT DOES ANNOUNCE ITSELF, and unlike the image cap above
+                    that claim is true: the shortfall is written into EVERY chunk header, so an
+                    answer drawn from any part of the document carries its own limit. */}
+                <FieldRow label="Scanned pages read per document">
+                  <NumberInput value={visionMaxPages} onChange={setVisionMaxPages} min={1} max={500} />
+                </FieldRow>
+
+                {/* SEED-226 — this was a constant in `config.py` (`gpt-4o-mini`) and the
+                    fallback meant to reach the active chat model was unreachable, so every
+                    install made vision calls to OpenAI whatever provider it was configured
+                    for. Empty is the correct, meaningful default. */}
+                <FieldRow label="Vision model">
+                  <TextInput
+                    value={visionModel}
+                    onChange={setVisionModel}
+                    placeholder="Leave empty to use your chat model"
+                  />
                 </FieldRow>
               </SectionCard>
 
