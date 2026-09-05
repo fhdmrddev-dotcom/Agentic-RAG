@@ -6301,6 +6301,36 @@ Phases touched: 211, 212.
 
 ## `backend/app/api/connectors.py`
 
+⚠⚠ **CORRECTION AT PHASE 232's CLOSE — THE `232-03` DISCHARGE CLAIM WAS FALSIFIED BY `232-04`.**
+The original cell is quoted here rather than quietly overwritten, because the claim being WRONG is
+the finding.
+
+It read: `30 / 14 / 1708` · *✅ PARTIAL DISCHARGE (232-03) — file browse & import extracted to
+`services/sources/import_service.py` (−28 net L)*. **Re-derived at HEAD: `32 / 15 / 1757`.**
+
+| | lines |
+|---|---|
+| `53bb866e4` (phase start) | **1736** |
+| `1ae6defbb` (phase end) | **1757** |
+| **phase net** | **+21 — the file GREW** |
+
+`232-03` removed 28 lines; `232-04` then added **49** for the `/browse` endpoint. **The claim is true
+of one plan and false of the phase.** The extraction into `import_service.py` is real and worth
+recording; what is not true is that this file got smaller, so **the G-5 extraction stays OWED.**
+
+⭐⭐ **THIS IS PHASE 231's OWN RECORDED FINDING REPEATING ONE PHASE LATER.** `231-SUMMARY.md` finding
+#2: *"Ledger cell written mid-phase falsified by the same phase's later commit… **write the ledger
+note LAST, or re-derive at the phase's final commit.** A phase that touches a file twice falsifies
+its own note."* 232 touched it twice and did it again. **A cell reading `✅ DISCHARGED` stops the next
+audit** — which is why this ledger holds that a present-and-wrong row is worse than an absent one.
+
+⚠ **THIS FILE HAS TWO `## backend/app/api/connectors.py` SECTIONS** (the other is earlier, re-derived
+at `211-05` reading `6 / 3 / 734`). Both were stale. The duplicate is recorded, not merged, because
+merging two sections is a bigger edit than this correction warrants — but **an auditor reading the
+first one gets a figure that is wrong by a thousand lines.**
+
+---
+
 **Re-derived 2026-08-27 (Phase 212):** `7 commits / 3 phases / 781 L` · **G-5 FIRES — EXACTLY AT THRESHOLD (3 phases)**.
 Phases touched: 190, 211, 212.
 
@@ -6538,6 +6568,28 @@ One of the twelve domain modules the 207 split created. The barrel re-exports it
 
 **1600 lines and no row for its entire life.** The 207 split moved the code and left the guardrail behind on the barrel.
 
+### `frontend/src/lib/api/connectors.ts`
+
+**11 / 6 / 594** — re-derived at Phase 232's close (`1ae6defbb`).
+
+⚠ **Absent from the scan list and from this file for its ENTIRE LIFE, at six phases.** The Phase 207
+split created it with no row — exactly as it did for `org.ts`, `knowledge.ts`, `threads.ts` and
+`workflows.ts`. ⚠ **`lib/api.ts`'s row is the BARREL and does NOT cover this module.** That is why
+each sibling needed its own row, and it is why G-5 could not fire here at any count.
+
+⭐ **The row was added by the REVIEWER at 232's close, not by the builder.** `232-04`'s own must-have
+read: *"HOT-FILE-LEDGER.md and CLAUDE.md record the new G-5 ledger row for
+`frontend/src/lib/api/connectors.ts` (10 / 5 / 552) in the same commit (G-2)"*. The plan promised it;
+the commit did not contain it. It had been named in `232-MEASUREMENTS.md` §3 **before planning began**
+and again in `232-PREFLIGHT.md` G-2. ⚠ **The figure the plan quoted was already stale when it shipped**
+(`10 / 5 / 552` against a measured `11 / 6 / 594`) — the row above is re-derived at HEAD, per this
+ledger's own rule that a cell is measured and never copied.
+
+**What it carries:** the typed client for every connector route, and as of Phase 232
+`browseSourceFolders` — the one call the folder picker makes.
+
+**No seam proposed.** A per-domain api module doing one thing many times is the right shape. The
+trigger to revisit is it beginning to **branch on source family** rather than merely list endpoints.
 ### `frontend/src/lib/api/workflows.ts`
 
 **Triple at Phase 214's close (2026-08-28): `3 / 3 / 1055` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules**
