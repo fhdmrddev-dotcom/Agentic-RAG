@@ -143,6 +143,32 @@ milestone to land on it, and a third must propose the extraction before adding t
 OUTBOUND writes.** The connection model has **no way to say "this is a file source"**, so 232 must
 add an inbound capability before Drive can populate `source_connection_id` for real.
 
+> ### ⚠ CORRECTION 2026-09-05 — **THIS BLOCKER IS MEASURED FALSE.** The original is kept above, never overwritten.
+>
+> **I wrote it, and it does not survive contact with the live schema.** Measured against the running
+> database while capturing 232's reviewer baseline — full derivation in `232-MEASUREMENTS.md` §2:
+>
+> - **`capability` is NULLABLE** (migration **126** dropped `NOT NULL`), and a `CHECK ... IN (...)`
+>   **passes when the column is NULL** — it evaluates to NULL, not FALSE.
+> - Migration 126's *"one shape or the other"* guard (`capability IS NOT NULL OR mcp_server_url IS
+>   NOT NULL`) **was DROPPED by migration 127** (`:178`) and replaced with `shape_is_not_ambiguous`,
+>   which forbids **both being SET** and **permits both being NULL**.
+> - ⭐ **TWO `service_id='google'` rows EXIST RIGHT NOW** with `capability = NULL` and no MCP URL,
+>   plus a `microsoft` row of the same shape. `servicesCatalog.ts:84-93` gives Google
+>   `shape: "oauth"` — a **third** shape beside capability and MCP.
+>
+> ⭐ **So `documents.source_connection_id` can point at a real Google connection today, and NO
+> migration is required to represent one.** What is genuinely absent is narrower: nothing on the row
+> **declares a connection INBOUND**. That is a contract-design question for 232, **not a schema
+> blocker** — and `SEED-146` warns against committing the `connector_connections` shape a third time,
+> so if 232 concludes a column is needed that is a **deviation to raise and an operator decision**,
+> never something to absorb. ⚠ ROADMAP says 232 expects no migration; **157 is the next free number.**
+>
+> ⚠ **Why this matters beyond the fact itself:** the claim was carried into a handoff, a summary and
+> a chat answer without once being run against the database. **It is the same shape as the finding
+> this phase's own anti-pattern table records** — a verdict cell that disagrees with its evidence.
+
+
 ### 4. Three ROADMAP flags this phase did NOT discharge
 
 Recorded rather than left silent — none is a defect, each is scope that went elsewhere:

@@ -133,6 +133,30 @@ branch **fails CLOSED on activation** by inserting a real `dept_members` row.
 (15 are pre-existing async rot in `test_retrieval_service.py`, plus the order/GC flake). **That is
 `BUS-117`, open on the operator — not a 231 regression.**
 
+### ⚠ A 232 "BLOCKER" CARRIED IN THE 231 HANDOFF IS MEASURED FALSE (2026-09-05, Claude — reviewer baseline)
+
+The handoff, `231-SUMMARY.md` and a chat answer all carried: *"`connector_connections.capability`
+only permits `send_email | create_ticket | post_message`, so 232 must add an inbound capability
+before Drive can populate `source_connection_id`."* **I wrote it. It was never run against the
+database, and it is wrong.**
+
+`capability` is **NULLABLE** (migration 126), a `CHECK ... IN (...)` **passes on NULL**, and
+migration **127 DROPPED** 126's *"one shape or the other"* guard in favour of `shape_is_not_ambiguous`
+— which forbids both being SET and **permits both being NULL**. ⭐ **Two `service_id='google'` rows
+exist right now** in exactly that shape, alongside a `microsoft` one; `servicesCatalog.ts` gives them
+`shape: "oauth"`, a third shape beside capability and MCP.
+
+⭐ **`documents.source_connection_id` can point at a real Google connection today; no migration is
+required to represent one.** What is genuinely absent is narrower and is a CONTRACT question, not a
+schema one: **nothing on the row declares a connection INBOUND.** ⚠ `SEED-146` warns against
+committing the `connector_connections` shape a third time, so a new column would be a **deviation to
+raise and an operator decision**. Full derivation:
+`.planning/phases/232-the-source-contract-google-drive/232-MEASUREMENTS.md` §2.
+
+⚠ **The lesson is the mechanism, not the fact:** an unmeasured claim was carried into a handoff, a
+summary and an answer to the operator. **It is the same shape as this milestone's recurring finding**
+— a verdict cell that disagrees with its own evidence cell.
+
 ### ⭐ ROLE ASSIGNMENT — reciprocal review (operator-ratified 2026-09-05)
 
 ⚠ **Restored 2026-09-05 after a STATE.md rewrite dropped it.** Recording it again rather than
