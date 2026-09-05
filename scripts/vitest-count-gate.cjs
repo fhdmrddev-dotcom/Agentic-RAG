@@ -3172,7 +3172,8 @@ const BASELINE = {
   // control, collapse-hides-files-not-counts, the four-zero receipt, and a NAMED refusal. Four
   // defects were planted against them and each fired (4 / 1 / 1 / 4 assertions), with both
   // source files restored md5-identical.
-  "previewVocabulary.test.ts": 12,
+  // 12 → 17 at the recursion fix: the scanned-depth and budget-stop sentences.
+  "previewVocabulary.test.ts": 17,
   "SourcePreviewPanel.test.tsx": 22,
 }
 

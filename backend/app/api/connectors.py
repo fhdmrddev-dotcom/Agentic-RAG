@@ -1750,6 +1750,7 @@ async def preview_source_folder(
             user_id=user["id"],
             supabase=supabase,
             destination_folder_name=body.destination_folder_name,
+            recursive=body.recursive,
         )
     except Exception as exc:
         logger.error("Failed to preview connection %s: %s", connection_id, exc)
@@ -1765,6 +1766,9 @@ async def preview_source_folder(
         counts=preview.counts,
         total=preview.total,
         truncated=preview.truncated,
+        stopped_by=preview.stopped_by,
+        folders_scanned=preview.folders_scanned,
+        recursive=preview.recursive,
         wrote=preview.wrote,
     )
 
@@ -1809,6 +1813,7 @@ async def confirm_source_preview(
             background_tasks=background_tasks,
             destination_folder_id=body.destination_folder_id,
             destination_folder_name=body.destination_folder_name,
+            recursive=body.recursive,
         )
     except Exception as exc:
         logger.error("Failed to confirm preview for connection %s: %s", connection_id, exc)

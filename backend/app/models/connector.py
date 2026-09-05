@@ -604,6 +604,12 @@ class SourcePreviewResponse(_StrictBase):
     #: ⚠ True when the listing did not finish. A partial listing may never be presented as a
     #: complete picture.
     truncated: bool = False
+    #: WHICH budget stopped the walk — depth / folders / files / pages / unreadable.
+    stopped_by: str | None = None
+    #: How many folders were read. 1 = the chosen folder had no sub-folders.
+    folders_scanned: int = 1
+    #: Whether sub-folders were walked. ⛔ The screen must not imply a depth it did not go to.
+    recursive: bool = True
     #: ⭐ The zero-write receipt the footer prints verbatim.
     wrote: dict[str, int] = Field(default_factory=dict)
 
@@ -638,6 +644,10 @@ class SourcePreviewRequest(_StrictBase):
     #: The Library folder the person chose. `None` = root.
     destination_folder_id: str | None = None
     destination_folder_name: str | None = None
+    #: Walk sub-folders. Defaults TRUE — Phase 233 shipped one level deep while the adapter
+    #: contract advertised a `recursive` flag nothing read, so a person previewing a folder with
+    #: sub-folders saw less than they had selected.
+    recursive: bool = True
 
 
 __all__ = [

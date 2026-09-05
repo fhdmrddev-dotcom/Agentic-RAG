@@ -201,3 +201,188 @@ class TestConnectorImportUsesTheQueue:
         i_upload = src.index(".upload(")
         i_enqueue = src.index("insert_ingestion_job(")
         assert i_upload < i_enqueue, "the upload must precede the enqueue"
+
+
+# ── BUG-260905-07 — the recursive walk, and the budget that stops it ───────────────────────
+
+
+class _Node:
+    def __init__(self, id, name="f"):
+        self.id = id
+        self.name = name
+        self.kind = "folder"
+        self.drive_id = None
+        self.has_children = True
+        self.parent_id = None
+
+
+class _File:
+    def __init__(self, id, name="a.txt"):
+        self.id = id
+        self.name = name
+        self.mime_type = "text/plain"
+        self.size = 1
+        self.modified_at = "2026-09-01T00:00:00Z"
+        self.drive_id = None
+        self.icon_url = None
+        self.web_view_url = None
+
+
+class _TreeAdapter:
+    """A source shaped exactly like the tree under test.
+
+    `tree` maps folder_id -> (list[file_id], list[child_folder_id]).
+    """
+
+    def __init__(self, tree, pages=None, unreadable=()):
+        self.tree = tree
+        self.pages = pages or {}
+        self.unreadable = set(unreadable)
+        self.listed: list[str | None] = []
+
+    async def list_files(self, connection=None, folder_id=None, recursive=False,
+                         page_token=None, query=None, page_size=30):
+        from app.services.sources.base import FilePage
+
+        self.listed.append(folder_id)
+        if folder_id in self.pages:
+            # A folder that always claims one more page — the unbounded-pagination case.
+            return FilePage(files=[_File(f"{folder_id}-p{page_token or 0}")],
+                            next_page_token=str(int(page_token or 0) + 1))
+        files, _ = self.tree.get(folder_id, ([], []))
+        return FilePage(files=[_File(i) for i in files], next_page_token=None)
+
+    async def browse(self, connection=None, folder_id=None, page_token=None):
+        from app.services.sources.base import BrowsePage
+
+        if folder_id in self.unreadable:
+            raise ValueError("permission denied")
+        _, children = self.tree.get(folder_id, ([], []))
+        return BrowsePage(items=[_Node(c) for c in children], next_page_token=None)
+
+
+TREE = {
+    "root": (["a", "b"], ["sub1", "sub2"]),
+    "sub1": (["c"], ["deep"]),
+    "sub2": (["d"], []),
+    "deep": (["e"], []),
+}
+
+
+class TestRecursiveWalk:
+    """⚠ `SourceAdapter.list_files` has taken `recursive: bool = False` since Phase 232 and
+    NEITHER shipped adapter ever read it — `grep -rn recursive` returned three declarations and
+    zero uses. The preview therefore looked one level deep while its own signature said it could
+    go deeper, and the operator was shown less than they had selected."""
+
+    @pytest.mark.asyncio
+    async def test_non_recursive_reads_only_the_chosen_folder(self):
+        from app.services.sources import preview_service as ps
+
+        a = _TreeAdapter(TREE)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=False)
+        assert [f.id for f in r.files] == ["a", "b"]
+        assert r.folders_visited == 1
+        assert r.truncated is False
+
+    @pytest.mark.asyncio
+    async def test_recursive_reaches_every_level(self):
+        from app.services.sources import preview_service as ps
+
+        a = _TreeAdapter(TREE)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert sorted(f.id for f in r.files) == ["a", "b", "c", "d", "e"]
+        assert r.folders_visited == 4
+        assert r.truncated is False
+
+    @pytest.mark.asyncio
+    async def test_a_cycle_does_not_loop_forever(self):
+        # Drive shortcuts and shared drives can point back at a folder already queued.
+        from app.services.sources import preview_service as ps
+
+        cyclic = {"root": (["a"], ["sub"]), "sub": (["b"], ["root", "sub"])}
+        a = _TreeAdapter(cyclic)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert sorted(f.id for f in r.files) == ["a", "b"]
+
+    @pytest.mark.asyncio
+    async def test_depth_is_bounded_and_the_stop_is_NAMED(self, monkeypatch):
+        from app.services.sources import preview_service as ps
+
+        monkeypatch.setattr(ps, "MAX_DEPTH", 1)
+        a = _TreeAdapter(TREE)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert r.truncated is True
+        # ⛔ "some files" is the sentence that lets a person assume the rest were fine.
+        assert r.stopped_by == "depth"
+        assert "e" not in [f.id for f in r.files]
+
+    @pytest.mark.asyncio
+    async def test_folder_count_is_bounded(self, monkeypatch):
+        from app.services.sources import preview_service as ps
+
+        monkeypatch.setattr(ps, "MAX_FOLDERS", 2)
+        a = _TreeAdapter(TREE)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert r.truncated is True and r.stopped_by == "folders"
+
+    @pytest.mark.asyncio
+    async def test_file_count_is_bounded_and_the_list_is_actually_trimmed(self, monkeypatch):
+        from app.services.sources import preview_service as ps
+
+        monkeypatch.setattr(ps, "MAX_FILES", 3)
+        a = _TreeAdapter(TREE)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert r.truncated is True and r.stopped_by == "files"
+        # A cap that reports truncation but returns MORE than the cap is not a cap.
+        assert len(r.files) == 3
+
+    @pytest.mark.asyncio
+    async def test_endless_pagination_stops_and_says_so(self, monkeypatch):
+        from app.services.sources import preview_service as ps
+
+        monkeypatch.setattr(ps, "MAX_PAGES_PER_FOLDER", 3)
+        a = _TreeAdapter({"root": ([], [])}, pages={"root"})
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=False)
+        assert r.truncated is True and r.stopped_by == "pages"
+        assert len(r.files) == 3
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_branch_truncates_and_NEVER_fabricates(self):
+        # ⛔ The Onyx #1161 shape: a partial read must not be presented as a complete one.
+        from app.services.sources import preview_service as ps
+
+        a = _TreeAdapter(TREE, unreadable={"sub1"})
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert r.truncated is True and r.stopped_by == "unreadable"
+        # sub2 was still read — one bad branch degrades itself, not the whole walk.
+        assert "d" in [f.id for f in r.files]
+
+    @pytest.mark.asyncio
+    async def test_the_adapter_is_asked_for_ONE_level_at_a_time(self):
+        # ⚠ The walk owns recursion, NOT the adapter — that is the Phase 232 contract honoured:
+        #   "adding a source family is data and registration, never an ingest path".
+        from app.services.sources import preview_service as ps
+
+        seen = []
+
+        class _Recorder(_TreeAdapter):
+            async def list_files(self, connection=None, folder_id=None, recursive=False, **kw):
+                seen.append(recursive)
+                return await super().list_files(connection=connection, folder_id=folder_id, **kw)
+
+        a = _Recorder(TREE)
+        await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert seen and all(r is False for r in seen)
+
+    @pytest.mark.asyncio
+    async def test_a_file_in_two_folders_is_counted_ONCE(self):
+        # Drive lets a file have more than one parent, so two folders legitimately return the
+        # same file in one walk. Counting it twice breaks SC#4 by ARITHMETIC rather than logic:
+        # the preview promises N and the confirm delivers N-1, with nothing obviously wrong.
+        from app.services.sources import preview_service as ps
+
+        shared = {"root": (["a"], ["s1", "s2"]), "s1": (["dup"], []), "s2": (["dup"], [])}
+        a = _TreeAdapter(shared)
+        r = await ps.walk_source_files(adapter=a, connection={}, folder_id="root", recursive=True)
+        assert sorted(f.id for f in r.files) == ["a", "dup"]

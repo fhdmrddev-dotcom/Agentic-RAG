@@ -61,6 +61,8 @@ import {
   PREVIEW_TITLE,
   PREVIEW_EMPTY,
   PREVIEW_TRUNCATED,
+  STOPPED_REASON,
+  scannedLine,
   SCANNING,
   CANCEL_LABEL,
 } from "./previewVocabulary"
@@ -270,9 +272,17 @@ export function SourcePreviewPanel({
 
       {preview && (
         <div className="px-4 py-3">
+          {/* ⛔ WHAT WAS ACTUALLY SCANNED, stated rather than assumed. The first shipped version
+              of this panel read ONE folder deep and said nothing about it, so the reader had no
+              way to know the preview covered less than they had selected. */}
+          <div data-testid="preview-scanned" className="mb-2 text-xs text-muted-foreground">
+            {scannedLine(preview.folders_scanned ?? 1, preview.recursive !== false)}
+          </div>
           {preview.truncated && (
             <div data-testid="preview-truncated" className="mb-2 text-xs text-amber-600">
-              {PREVIEW_TRUNCATED}
+              {/* ⛔ It must say WHICH budget stopped it. "Some files" is the sentence that lets
+                  a person assume the rest were fine. */}
+              {(preview.stopped_by && STOPPED_REASON[preview.stopped_by]) || PREVIEW_TRUNCATED}
             </div>
           )}
 

@@ -91,6 +91,35 @@ export function confirmLabel(addCount: number, unknownCount: number): string {
 /** Header copy. */
 export const PREVIEW_TITLE = "Before anything is added"
 export const PREVIEW_EMPTY = "This folder has no files we can see."
+/**
+ * ⛔ THE SCREEN MUST NOT IMPLY A DEPTH THE WALK DID NOT GO TO.
+ *
+ * Phase 233 shipped listing ONE level deep while `SourceAdapter.list_files` carried a `recursive`
+ * flag nothing read — so a person who pointed at a folder with sub-folders was shown less than
+ * they had selected, **and the screen said nothing about it.** These sentences exist so the scope
+ * of the scan is a stated fact rather than an assumption the reader has to make.
+ */
+export function scannedLine(foldersScanned: number, recursive: boolean): string {
+  if (!recursive) return "This folder only — sub-folders were not read."
+  if (foldersScanned <= 1) return "This folder — it has no sub-folders."
+  return `This folder and ${foldersScanned - 1} sub-folder${foldersScanned - 1 === 1 ? "" : "s"}.`
+}
+
+/**
+ * ⛔ A BUDGET-STOPPED LISTING MAY NEVER READ AS A COMPLETE ONE, and it must say WHICH budget
+ * stopped it — "some files" is the sentence that lets a person assume the rest were fine.
+ *
+ * This is the same fence `SRC-06` puts on the watch loop one phase later, and the reason Onyx
+ * once removed 976 documents it believed were deleted at the source.
+ */
+export const STOPPED_REASON: Record<string, string> = {
+  depth: "We stopped going deeper — this folder nests further than a preview will follow.",
+  folders: "We stopped after 200 folders — this branch is larger than a preview will read.",
+  files: "We stopped after 2,000 files — this folder holds more than a preview will list.",
+  pages: "One folder had more pages of files than a preview will page through.",
+  unreadable: "A sub-folder could not be read, so part of this tree was not looked at.",
+}
+
 export const PREVIEW_TRUNCATED =
   "This listing did not finish, so this is part of the folder — not all of it."
 export const SCANNING = "Reading the folder…"

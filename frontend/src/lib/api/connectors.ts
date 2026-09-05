@@ -631,6 +631,12 @@ export interface SourcePreviewResponse {
   counts: Record<PreviewBucket, number>
   total: number
   truncated?: boolean
+  /** WHICH budget stopped the walk — depth / folders / files / pages / unreadable. */
+  stopped_by?: string | null
+  /** How many folders were read. 1 = the chosen folder had no sub-folders. */
+  folders_scanned?: number
+  /** Whether sub-folders were walked. ⛔ The screen must not imply a depth it did not go to. */
+  recursive?: boolean
   /** The zero-write receipt: `documents` · `chunks` · `jobs` · `folders`, all 0. */
   wrote: Record<string, number>
 }
@@ -658,6 +664,8 @@ export interface SourcePreviewRequest {
   folder_name?: string | null
   destination_folder_id?: string | null
   destination_folder_name?: string | null
+  /** Walk sub-folders. Defaults true on the server. */
+  recursive?: boolean
 }
 
 async function postPreview<T>(connectionId: string, path: string, body: SourcePreviewRequest, failMsg: string): Promise<T> {

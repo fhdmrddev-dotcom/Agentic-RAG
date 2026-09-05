@@ -25,6 +25,8 @@ import {
   OUTCOME_ORDER,
   reconciliationLine,
   confirmLabel,
+  scannedLine,
+  STOPPED_REASON,
 } from "./previewVocabulary"
 
 // The live source this suite is BOUND to — the repo's shipped `?raw` fence idiom.
@@ -120,5 +122,41 @@ describe("the sentences the surface composes", () => {
 
   it("…and names only one when nothing is uncertain", () => {
     expect(confirmLabel(12, 0)).toBe("Add 12")
+  })
+})
+
+describe("⛔ the screen may not imply a depth the walk did not go to", () => {
+  it("says so plainly when sub-folders were NOT read", () => {
+    expect(scannedLine(1, false)).toBe("This folder only — sub-folders were not read.")
+  })
+
+  it("distinguishes 'no sub-folders' from 'sub-folders not read'", () => {
+    // ⚠ These are DIFFERENT facts and the first shipped version could state neither: it read
+    //    one level deep and said nothing at all, so a person previewing a nested folder was
+    //    shown less than they had selected with no way to tell.
+    expect(scannedLine(1, true)).toBe("This folder — it has no sub-folders.")
+    expect(scannedLine(1, true)).not.toBe(scannedLine(1, false))
+  })
+
+  it("counts sub-folders, and gets the plural right at one", () => {
+    expect(scannedLine(2, true)).toBe("This folder and 1 sub-folder.")
+    expect(scannedLine(4, true)).toBe("This folder and 3 sub-folders.")
+  })
+})
+
+describe("⛔ a budget-stopped listing names WHICH budget stopped it", () => {
+  it("has a sentence for every stop reason the walker can emit", () => {
+    // The walker's `stopped_by` values, mirrored. A reason with no sentence renders the generic
+    // "did not finish" line — true, but it drops the one detail a person could act on.
+    for (const reason of ["depth", "folders", "files", "pages", "unreadable"]) {
+      expect(STOPPED_REASON[reason]).toBeTruthy()
+      expect(STOPPED_REASON[reason].length).toBeGreaterThan(25)
+    }
+  })
+
+  it("never says 'some files' — the sentence that lets a person assume the rest were fine", () => {
+    for (const sentence of Object.values(STOPPED_REASON)) {
+      expect(sentence.toLowerCase()).not.toContain("some files")
+    }
   })
 })

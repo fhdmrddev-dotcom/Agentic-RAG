@@ -16,7 +16,7 @@ the owed rows rather than closing without them.
 | # | Reported | Verdict |
 |---|---|---|
 | 1 | connected sources buried under a huge dropzone | ✅ true — **deferred, needs a sketch (G-2)** |
-| 2 | sub-folders not read | ✅ true — the adapter **ignores its own `recursive` flag**; deferred |
+| 2 | sub-folders not read | ✅ true — the adapter **ignored its own `recursive` flag**; **FIXED**, see BUG-07 |
 | 3 | confirm ingests with no signal | ✅ true, and **caused by (4)** — no job row meant nothing to show |
 | 4 | "why does everything queue now?" | ⚠ **not a regression** — Phase 230's design, `INGEST_MAX_CONCURRENT_JOBS = 3`. **But the connector path was not queuing at all**, which is the real defect |
 | 5 | files failing, even PDFs and DOCX | ✅ true — **three separate causes**, none of them "PDFs are broken" |
@@ -133,15 +133,75 @@ deliberately **not** in the unsafe set; it is the key's own separator.
 ## Verification
 
 - `test_260905_ingest_fixes.py` — **30 cases**, one class per defect.
-- Backend `pytest tests/unit`: **72 → 71 failed**, 3601 → **3632 passed**. ⭐ BUG-05 fixed one of the
-  *inherited* failures, so the tree now sits **exactly at the `CLAUDE.md` ceiling of 71** rather
-  than one over it.
+- Backend `pytest tests/unit`: **72 failed before, 72 failed after** — no regression, and **no
+  improvement either.**
+
+  ⚠ **CORRECTION, recorded rather than quietly fixed.** This line first read *"72 → 71 failed …
+  BUG-05 fixed one of the inherited failures"*, and the commit message `81bba8764` says the same.
+  **That was one reading, and it was an outlier.** Re-measured three times consecutively after the
+  recursion work: `72 / 72 / 72`, with the per-file failure distribution **identical to the
+  pre-fix baseline** (`diff` over `pytest -q | grep ^FAILED | uniq -c` returns empty). Driving it
+  directly settles it: `test_extraction_service.py` fails the same **two** cases with the fallback
+  stashed and with it applied, so **BUG-05 fixed neither.**
+
+  **The tree is therefore still ONE over the `CLAUDE.md` ceiling of 71, and was before this phase
+  started.** The correct claim is *"this work adds no failure"*, which the identical distribution
+  proves; the stronger claim was mine and it was wrong. ⭐ **The lesson is the one this repo keeps
+  re-learning: a single green-ward reading is not a measurement.** The `+40` passed cases between
+  the two runs are this work's own tests.
 - Frontend `count gate OK — 224/224, 0 failing, total 7498`.
 - Live: the previously-failing PDF now extracts **50,775 chars** with lineage
   `composable[pymupdf/camelot/pymupdf_full/none]`.
 
 ---
 
+## BUG-260905-07 — a flag that had never done anything
+
+`SourceAdapter.list_files` has taken `recursive: bool = False` since Phase 232 and
+**neither shipped adapter ever read it** — `grep -rn recursive` returned **three declarations and
+zero uses**. So the preview looked one level deep while its own signature advertised otherwise, and
+a person who pointed at a nested folder was shown less than they had selected **with nothing on
+screen saying so**. That last clause is what makes it a Phase 233 defect rather than a missing
+feature: the phase's whole claim is that the preview is honest about what it knows.
+
+### Where the walk lives, and why not in the adapter
+
+`walk_source_files()` sits in `preview_service`, on top of `browse()` + `list_files()`. That is the
+Phase 232 design claim honoured rather than quietly dropped — *adding a source family is data and
+registration, never an ingest path*. **Microsoft Graph (238) and MCP (239) inherit recursion by
+existing**, and there is exactly one budget to reason about instead of one per family. The adapter
+is still asked for **one level at a time**, and a test asserts that.
+
+### ⛔ The budget is a refusal to guess, not a performance tweak
+
+Someone will point this at *My Drive*. An unbounded walk is a request that never returns and a Drive
+quota that does — so it stops at `MAX_DEPTH 5 · MAX_FOLDERS 200 · MAX_FILES 2000 ·
+MAX_PAGES_PER_FOLDER 20`, and **`stopped_by` names which budget stopped it.** The screen prints that
+reason, because *"some files"* is the sentence that lets a person assume the rest were fine. This is
+the same fence `SRC-06` puts on the watch loop one phase later, and the reason Onyx once removed 976
+documents it believed were deleted at the source.
+
+### Two bugs the tests found before the operator could
+
+⭐ **A cycle re-listed the start folder.** `seen` was seeded from *children only*, so a sub-folder
+linking back to its parent re-read the parent and double-counted its files. `seen` is now seeded
+with the start folder — which is what makes it a *visited* set rather than a *queued* set.
+
+⭐ **A Drive file can have MORE THAN ONE PARENT**, so two folders legitimately return the same file
+in one walk. Unfixed, the preview counts it twice and the confirm then disagrees with it — **SC#4
+broken by arithmetic rather than by logic**, which is the hardest kind to notice. Files are now
+deduped by id during the walk.
+
+### What the screen now says
+
+`scannedLine()` distinguishes three different facts that the first version could state none of:
+*"This folder only — sub-folders were not read"* · *"This folder — it has no sub-folders"* ·
+*"This folder and 3 sub-folders."* ⚠ The middle one and the first one are **not** the same claim,
+and a test asserts they never render identically.
+
+**11 backend cases + 5 frontend cases**, including a positive control per budget.
+
+---
 ## D-233-07 REVERTED — the Library is full-width
 
 The width decision was **wrong and is reverted the same day**, on the operator's *"why is it not
@@ -167,6 +227,5 @@ already shed by `nth-child` under pressure — narrowing it spends the width tha
 | # | Item | Why not now |
 |---|---|---|
 | 1 | the dropzone / connected-source split | **live UI whose value is how it reads — G-2 says sketch it first** |
-| 2 | recursive sub-folder listing | the `recursive` flag exists in the contract and the Drive adapter ignores it; needs a bounded page/depth budget and a preview that says *"including sub-folders"* |
 | 7 | **the advertised format list is stale** | the dropzone prints 8 formats; the server accepts **17**. HTML, `.eml`, `.msg`, `.xls` and DXF all have working parsers and no door. The frontend list is deliberately a SUBSET — widening it is a product decision, not a constant edit |
 | 8 | **images (jpg/png) and OCR** | ⛔ **there is no OCR engine anywhere in the backend** — the *"needs OCR"* error message names a capability the product does not have. ⭐ **But the machinery already ships:** `multimodal_service` pulls images out of PDFs/DOCX and describes them with a **vision LLM**, storing the description as a searchable chunk (MODAL-02). Making an uploaded `.png` searchable is one MIME entry plus a small extractor that routes it into that path — and a scanned PDF could go the same way, giving an OCR *substitute* without adding tesseract |
