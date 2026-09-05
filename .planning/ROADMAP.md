@@ -81,6 +81,47 @@ stated here rather than smoothed over. Two supporting facts, also read at HEAD: 
 moves" half is already structurally true — and `accept_classification` (`documents.py:1894`) **is**
 the code that moves, which is where `VIS-06`'s narrower-of-two fence actually has to sit.
 
+> ### ⛔ CORRECTION 2026-09-06 — POINT 3'S CENTRAL CLAIM IS MEASURED **FALSE**. The original is kept above, never overwritten, because *how* a measured claim went wrong is the finding.
+>
+> **"The moment a watched sync mints a row through the splice, it hits the rules engine" does not
+> happen. Connector documents reach the classification rules engine at NO phase, including 234.**
+> Filed as **`BUG-260906-01`**, found in the operator's G-4 session at Phase 234's close and measured
+> on the live database: the first document ever delivered by a watch carries
+> `metadata._classification = None`.
+>
+> **Why the measurement was right and the conclusion still wrong.** Rule evaluation *is* inside
+> `ingest_document` — that part was read correctly at HEAD and is still true (now at
+> `documents.py:2385-2396`). But **a watched sync does not call `ingest_document`.**
+> `watch_service.sync_watch` calls `async_mint_document_row` and then `insert_ingestion_job`, handing
+> the file to **Phase 230's durable queue** — and `grep -n classification` across
+> `ingest_enrich.py` + `ingestion_queue_service.py` returns **one comment and nothing executable.**
+> The claim tracked the rules engine to the right function and never checked that the new path
+> reaches that function.
+>
+> ⚠ **The queue is what changed underneath it.** Point 3 was written when `/upload` → `ingest_document`
+> was the only ingest, so "mints through the splice" and "runs `ingest_document`" were the same
+> sentence. **Phase 230 (H-3, sequenced deliberately *before* 234) split them**, and this claim was
+> not re-derived afterwards. ⭐ **A cross-phase claim must be re-measured against the phase that
+> lands between it and its subject** — H-3 put a phase there on purpose.
+>
+> ⚠ **This is the FIFTH instance of the 2026-09-05 shape** — two paths serving one outcome, only one
+> doing the work — and the second time it is the *queue* that is the silent path.
+>
+> **What this does and does not change for `VIS-06`:**
+> - ⚠ **The assignment of `VIS-06` to 234 loses the reason given for it here.** H-4 says the fence
+>   must land in the same phase that first lets connector documents reach the rules engine; **no
+>   phase has done that yet**, so 234 was not it.
+> - ✅ **The fence itself is still correctly placed and must NOT be moved.** It sits at
+>   `accept_classification` (`documents.py:1892`) and at rule evaluation (`:2325`), which is where
+>   the *move* happens — and that reasoning (the last sentence of point 3) was independent of the
+>   false premise and survives it intact. **H-4 is honoured early rather than late**, which is the
+>   safe direction: the fence exists before the path that needs it does.
+> - ⛔ **Fix `BUG-260906-01` BEFORE Phase 235.** Its SC#1 is a per-source run history reporting what
+>   each sync did; a history built while filing silently never runs would be designed around the hole.
+>   The fix is the `ingest_enrich.py` extraction that closed `BUG-260905-06`, plus an **agreement**
+>   test in `test_ingest_enrich_shared.py` — never a second per-path test.
+> - See also **`SEED-252`** (the operator's ask: many rules contributing, and actually moving the file).
+
 **4. The four RLS sites are two policies and two `SECURITY DEFINER` bodies** — the `documents` and
 `document_chunks` policies, and the bodies of `match_document_chunks` and `keyword_search_chunks`.
 `match_document_chunks`'s body filters `AND d.is_latest = true`, which is why a row minted without
@@ -713,7 +754,7 @@ found at the v3.7 close.
 | 231. Connection-Scoped Visibility | — (built direct under the pairing, no GSD plan set) | ✅ Complete — Claude built, Gemini REVIEWED PASS by driving | 2026-09-05 |
 | 232. The Source Contract + Google Drive | 4/4 | ✅ Complete — Gemini built, Claude REVIEWED by driving. ⚠ `OD-232-01` live-Drive drive OWED | 2026-09-05 |
 | 233. The Preview — See It Before It Lands | 2/2 | ✅ Complete — Claude built AND verified (Gemini out, operator direction). ⚠ **G-4 lived-experience UAT is OWED** — 5 rows, run row 2 first | 2026-09-05 |
-| 234. The Watch Loop — The Library Reads By Itself | 5/5 | ✅ Complete — Gemini built, Claude reviewing. 38 backend unit green, 64 vitest green, 0 deploy drift | 2026-09-05 |
+| 234. The Watch Loop — The Library Reads By Itself | 5/5 | ✅ **CLOSED — Gemini built, Claude VERIFIED BY DRIVING.** ⭐ A file arrived by itself: `last_status=success`, items 0→6. SC#4 held across two ingest paths (0 dupes, 0 re-embeds). ⛔ It did NOT work at first — `watch_process_enabled` ships `False`, so the watch had **never run once**; fixed with `WATCH_PROCESS_ENABLED=true`. 4 findings filed, none folded in: `BUG-260906-01` (classification never runs on the queue path — **fix before 235**), `-02`, `-03`, `SEED-252`. ⛔ SC#2/SC#3/H-5 unexercised, not failed | 2026-09-06 |
 | 235. The Source Says What It Did | 0/? | Not started | — |
 | 236. The Corpus Under Attack | 0/? | Not started | — |
 | 237. One Rule Engine, Not Two | 0/? | Not started | — |

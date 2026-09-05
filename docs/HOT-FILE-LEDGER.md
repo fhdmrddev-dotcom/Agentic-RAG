@@ -7605,3 +7605,104 @@ as the authoritative reference for atomic leasing.
 
 Leaf data-access module. In Phase 234, `db/watches.py` replicates this pattern (`claim_due_watches`)
 for external folder watching rather than widening `workflow_schedules`.
+
+---
+
+## backend/app/services/watch_service.py
+
+**2 / 1 / 458** · young (Phase 234) · ⚠ **absent from this ledger and from CLAUDE.md's scan list
+until 2026-09-06** — through its own phase's build, review and close. It is the engine of the
+milestone's crux phase, and G-5 could not have fired on it at any count.
+
+The background poller: `claim_due_watches` → paginate a `SourceListing` → diff against
+`connector_watch_items` → mint + enqueue. **Invariants it carries:**
+
+- **H-5 / SRC-06 is structural, not a discipline.** `SourceListing.complete` defaults `False` and is
+  set `True` only when pagination exhausts with `next_page_token is None`. A non-complete listing
+  **may never** mark a file missing. Page-token cycle detection and a 200-page cap both set
+  `complete = False` rather than raising — a truncated read must degrade to "I don't know", never to
+  "they're gone".
+- **SEED-239 error isolation is per-watch AND per-item.** `tick()` wraps each `sync_watch`; one
+  malformed `config` row degrades **one** source while the others keep reading.
+- **Bytes are uploaded to storage BEFORE `insert_ingestion_job`.** Reversing this re-creates
+  `BUG-260905-08` (a document completing with no bytes) on the connector path.
+- **Tier-1 identity is an EQUALITY, never a hash** — `(system, external_id, source_version)` in
+  `metadata.source`. ⭐ Proven across *two different ingest paths* at the 2026-09-06 G-4 drive: five
+  files already imported by the Phase 233 preview path were **linked, not re-imported** — 0
+  duplicates, 0 re-embeddings.
+
+⛔ **It hands every file to Phase 230's durable queue, which evaluates NO classification rules**
+(`BUG-260906-01`). The ROADMAP's "Correction 3" claimed a watched sync "hits the rules engine"; that
+was measured against `ingest_document`, which this path never calls. **A watched file can never be
+filed.**
+
+⚠ **Its whole existence is gated on `settings.watch_process_enabled`, which ships `False`**
+(`config.py:1203`, `main.py:570`). At the 2026-09-06 G-4 session the operator's watch measured
+`last_run_at = None` and **0 items** — it had never run once, through a full phase that passed every
+gate it had. ⭐ **The rule earned: a phase adding a process-level enable flag must state in its
+verification which value the operator's environment actually holds.**
+
+**Named seam for the next landing:** the paged-listing loop (`sync_watch` steps 3-4) is a pure
+function of an adapter and a folder id, and is the half a second source family will duplicate first.
+Extract it before a third adapter, not after.
+
+---
+
+## backend/app/db/watches.py
+
+**1 / 1 / 439** · young (Phase 234) · the single data-access home for `connector_watches` +
+`connector_watch_items`.
+
+`claim_due_watches` **clones `db/schedules.py`'s `SKIP LOCKED` claim** rather than widening
+`workflow_schedules` — a watch lease is not a workflow schedule, and the two lifecycles diverge
+(`QUEUE-03` is a *watch* lease; there is nothing to overlap until a watch exists). The precedent
+was taken deliberately; keep them parallel rather than merged.
+
+⚠ `release_watch(status=…)` is the ONLY writer of `last_status` / `last_error`, and both columns are
+nullable — a watch that has never run reads `None`, which is a **different fact** from `failed` and
+must stay tellable apart. `WatchResponse` learned this the hard way (`d08a60709`, a
+`ResponseValidationError` → 500 → no CORS headers → the browser said `TypeError: Failed to fetch`).
+
+---
+
+## backend/app/api/sources.py
+
+**2 / 0 / 356** · young (Phase 234) · the watch CRUD + lifecycle router.
+
+⛔ **`POST /watches/{id}/sync` does not sync.** It sets `next_run_at = now()`, clears the lease, and
+returns `status="scheduled"`. That is the correct *mechanism* — an inline sync would hold a web
+worker for a whole Drive listing and re-open the concurrency problem `claim_due_watches` solves —
+but **the response describes the request, not the outcome**, and it says exactly the same thing when
+`watch_process_enabled` is `False` and nothing will ever consume the row (`BUG-260906-02`).
+**That reply is what hid the blocking finding at 234's G-4 for a day.** Fix by refusing when the
+loop is off and by reading back `last_run_at`/`last_status` — ⛔ never by syncing inline.
+
+---
+
+## frontend/src/components/sources/WatchedFoldersSection.tsx
+
+**2 / 0 / 393** · young (Phase 234) · the watched-folders surface.
+
+⭐ **G-1 was pre-empted by construction**: it is mounted in `library/IngestionTab.tsx` beside
+`ConnectedSourceSection`, leaving `ConnectionFormPanel.tsx` (**20/8/2376**) and `ConnectionsTab.tsx`
+(**24/8/1578**) **byte-untouched** — the two files a bolt-on would have grown.
+
+`SURF-01`'s cadence sentence is invariant copy: `checked every ${watch.interval_minutes} minutes`,
+read from the row, never from a constant.
+
+⛔ **It renders no `last_run_at`, `last_status` or `last_error`** — all three exist on the row and
+are correctly populated. A watch that has never run is visually identical to one that ran a minute
+ago, which is `BUG-260906-02`'s user-visible half and **Phase 235 SC#1/SC#2's subject**.
+
+---
+
+## frontend/src/components/sources/CreateWatchModal.tsx
+
+**2 / 0 / 276** · young (Phase 234) · the watch-creation door.
+
+⭐ **It DOES carry a destination-library-folder picker** (`library_folder_id`, defaulting to
+`"Root (No folder)"`). At the 2026-09-06 G-4 session the operator asked *"how do we specify which
+Library folder synced files land in?"* while their watch read `library_folder_id: None` — so the
+control exists and reads as belonging to *uploads* rather than to *this source*. **A
+discoverability finding for 235's sketch, not an absent capability** — recorded here so nobody
+builds a second picker.

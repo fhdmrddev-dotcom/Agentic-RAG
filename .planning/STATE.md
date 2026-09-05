@@ -37,11 +37,96 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 234 — The Watch Loop: The Library Reads By Itself (COMPLETE) · 235 next
-Prior: 234 — The Watch Loop: The Library Reads By Itself (BUILT by Gemini, REVIEW ready for Claude)
+Phase: 234 — The Watch Loop: The Library Reads By Itself (✅ CLOSED — verified by DRIVING) · 235 next
+Prior: 233 — The Preview (COMPLETE; ⛔ still owes 5 G-4 rows)
 Plan: none in flight
 Status: between_phases
-Last activity: 2026-09-06 — Phase 234 EXECUTION COMPLETE: 5/5 waves landed, 38 backend unit tests green, 64 vitest tests green, gates passing.
+Last activity: 2026-09-06 — Phase 234 CLOSED. The operator ran the owed G-4 row; it FAILED, the cause
+was found (a feature flag defaulting off), the flag was flipped, and a file then arrived in the
+Library with nobody uploading it. Four findings filed at their own homes, none folded in.
+
+### ✅ Phase 234 — CLOSED 2026-09-06 (Gemini built · Claude verified BY DRIVING)
+
+Full record: `.planning/phases/234-the-watch-loop-the-library-reads-by-itself/234-VERIFICATION.md`.
+
+⭐ **A file arrived by itself — measured, not read.** `last_status=success`, `last_run_at` advanced,
+`connector_watch_items` **0 → 6**, item 1 being the operator's new
+`Dubai DoF_…Technical Proposal V1.0.pdf` (`source_version 2026-09-05T22:51Z`), minted and enqueued by
+the loop alone. ⭐ **SC#4 held better than asked**: the five files already imported by the 233 preview
+path were **linked, not re-imported** — tier-1 identity matched across *two different ingest paths*,
+producing 0 duplicates and 0 re-embeddings. No test covered that.
+
+⛔ **AND IT DID NOT WORK AT FIRST, WHICH IS THE MORE USEFUL HALF.** Every prior record of this phase
+(`234-SUMMARY.md`, `BUS-150`, this file) reported PASS at the unit/wire/UI grain. All of it was true
+and none of it had ever been run. The operator clicked Sync, waited, and nothing happened.
+**Measured: `last_run_at = None`, 0 items — the watch had never run once.** Cause:
+`settings.watch_process_enabled` read **`False`** (`config.py:1203`, the shipped default), and
+`main.py:570` gates the entire `WatchService` start on it. Fixed with `WATCH_PROCESS_ENABLED=true` in
+`backend/.env` + restart.
+
+⚠ **The five files the operator believed the watch had synced were NOT the watch** — imported 22:48
+via the 233 preview path; the watch was created 22:55. **The phase had been credited with another
+path's work**, which is exactly what a G-4 row exists to catch and what no wire-grain test can.
+
+⭐ **The lesson: a capability shipped behind a flag defaulting to off has not shipped — it has been
+written.** 234 passed every gate it had, across 5 waves and 38 backend tests, while being incapable
+of running in the operator's process. **The rule: a phase adding a process-level enable flag must
+state in its verification which value the operator's environment actually holds — measured, never
+assumed from the default.**
+
+**Four findings carried out, none a 234 defect** (folding them in would be a G-7 closure round adding
+capability):
+- **`BUG-260906-01`** (major) — classification rules never run on the **queue** ingest path, so no
+  watched/synced file can ever be filed. ⚠ **Fifth instance of the 2026-09-05 shape**: two paths, one
+  outcome, one doing the work. **Fix before 235.**
+- **`BUG-260906-02`** (major) — the Sync button reports `"scheduled"` for work nothing consumes, and
+  says the same thing with the loop off. **This is the defect that hid the blocking one.** → Phase 235 SC#2.
+- **`BUG-260906-03`** (minor) — 2 of 5 documents are `completed` with chunks and **no `ingestion_jobs`
+  row**; the job table is not a record of what was ingested. → Phase 235 SC#1 must choose what a run counts.
+- **`SEED-252`** — metadata-driven filing: many rules contributing (reversing D-118-3's `break`) and
+  actually moving the file (reversing D-118-2). Recommendation recorded: a **per-rule
+  `action` (`suggest`|`file`)** defaulting to `suggest`, rather than flipping D-118-2 wholesale.
+
+**Gates:** backend 72 failed / 3781 passed (⚠ 1 over the stale 71 ceiling, **pre-existing** on the
+merge base — BUS-117 class) · frontend total 7544, failed 1 (`WorkflowBuilderPage.canvas.test.tsx`,
+green 154/154 alone, in Gemini's own pre-build baseline — SEED-171 class) · tsc 68 = baseline · deploy
+drift, landing drift, CLAUDE.md size all PASS. Neither red is attributable to this phase.
+
+⛔ **Still owed and NOT closed by this:** 233's five G-4 rows (run row 2 first); `OD-232-01` (no live
+**shared drive** has been browsed — ordinary My-Drive reading is now proven, `/drives` is not); and
+SC#2 / SC#3 / H-5 above are **unexercised, not failed** — one green unit suite is not a drive.
+
+### 🔧 The ingestion repair session — 2026-09-05 (had NO record in this file until now)
+
+⚠ **Recorded late and deliberately, because Phase 234 was built directly on top of it** and nothing
+here mentioned it. Full narrative: `.continue-here.md` at `da34aa8f7`.
+
+Not a phase. It shipped **SEED-226** (images, scans and drawings become searchable text — commits
+`b4595f201`, `80ba1a6bc`), made **the vision model a SETTING** (migration **166** — `config.py` had
+pinned `gpt-4o-mini`, making the fallback to the active chat model dead code, so every vision call in
+the product went to one vendor regardless of configuration; chain is now DB → env → active chat
+model, and ⛔ a model name must never be re-pinned), then repaired four ingest defects the operator
+found **by using the product**: `BUG-260905-06` (the queue had no metadata step at all, so every
+upload after Phase 230's cutover completed with no title, date, chunk header or vision text),
+`-07` (a failed extraction wrote `None` over good metadata), `-08` (a storage failure logged a
+warning and carried on, completing a document with no bytes), `-12` (found by Gemini in Claude's own
+fix — the `07` guard could never fire for an image).
+
+⭐ **All four were ONE shape: two code paths serving one outcome, only one doing the work. 5,600
+tests missed every one, because both paths had tests and none asserted they AGREE.**
+`backend/app/services/ingest_enrich.py` is now the single home for the metadata + vision step, called
+by both paths, and `backend/tests/unit/test_ingest_enrich_shared.py` is the agreement test.
+⚠ `run_in_threadpool` around it is load-bearing — `enrich_for_ingest` calls `asyncio.run` internally.
+⚠ **`BUG-260906-01` is the fifth instance of the same shape**, one step further down the same file.
+
+**Operator data repaired (real writes):** 28 documents backfilled with metadata; ~1,500 chunks
+re-embedded so the context header is actually in the vectors
+(`backend/scripts/backfill_missing_metadata.py`). `k2_horizon_benchmarks.png` had stored the literal
+text *"No image is visible to transcribe."* — repaired to 745 chars of real OCR, now retrievable at
+`sim=0.61`. One screenshot had no bytes in storage and was marked `failed` honestly.
+
+⚠ **Two agents shared one working tree all session** and a backup/restore cycle clobbered Gemini's
+uncommitted work once. **One of us belongs in a worktree.**
 
 ### ✅ Phase 234 — The Watch Loop: The Library Reads By Itself COMPLETE (2026-09-06, Gemini — built; Claude reviewing)
 
