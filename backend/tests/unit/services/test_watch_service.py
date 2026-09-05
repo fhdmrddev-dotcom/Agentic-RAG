@@ -283,3 +283,124 @@ async def test_watch_service_error_isolation_per_watch(mock_pool, mock_supabase,
 
         # w1 was released as failed with the error message
         mock_release.assert_awaited_once_with(mock_pool, w1_id, status="failed", error="Google Drive API 503 Backend Error")
+
+
+@pytest.mark.asyncio
+async def test_watch_service_per_item_error_isolation(mock_pool, mock_supabase, mock_adapter):
+    """Per-item error isolation: One failing file does not abort the watch or prevent subsequent items from syncing."""
+    watch_id = uuid4()
+    conn_id = uuid4()
+    user_id = uuid4()
+    org_id = uuid4()
+
+    watch_record = {
+        "id": watch_id,
+        "connection_id": conn_id,
+        "user_id": user_id,
+        "org_id": org_id,
+        "source_folder_id": "root-folder-123",
+    }
+
+    # Two files in listing: bad_file throws on read_file, good_file succeeds
+    bad_item = SourceFile(id="bad-1", name="corrupt.pdf", mime_type="application/pdf")
+    good_item = SourceFile(id="good-2", name="valid.pdf", mime_type="application/pdf")
+
+    mock_adapter.list_files.return_value = FilePage(files=[bad_item, good_item], next_page_token=None)
+
+    async def mock_read(conn, file_id):
+        if file_id == "bad-1":
+            raise IOError("Corrupt header in external file")
+        return ("valid.pdf", b"%PDF-1.4 good bytes", "application/pdf")
+
+    mock_adapter.read_file.side_effect = mock_read
+
+    good_doc_id = uuid4()
+    mint_res = MintResult(
+        document={"id": str(good_doc_id), "user_id": str(user_id)},
+        is_duplicate=False,
+        storage_path=f"{user_id}/{good_doc_id}/valid.pdf",
+        version_number=1,
+    )
+
+    with patch("app.services.watch_service.get_watch_items", new=AsyncMock(return_value=[])), \
+         patch("app.services.watch_service.upsert_watch_item", new=AsyncMock()) as mock_upsert, \
+         patch("app.services.watch_service.insert_ingestion_job", new=AsyncMock()) as mock_insert_job, \
+         patch("app.services.watch_service.release_watch", new=AsyncMock()) as mock_release, \
+         patch("app.services.watch_service.async_mint_document_row", new=AsyncMock(return_value=mint_res)), \
+         patch("app.services.sources.base.SourceRegistry.get_adapter", return_value=mock_adapter):
+
+        svc = WatchService(pool=mock_pool, supabase=mock_supabase)
+        res = await svc.sync_watch(watch_record)
+
+        assert res["status"] == "success"
+        assert res["counts"]["new"] == 1
+        assert res["counts"]["errors"] == 1
+
+        # Check mock_upsert called for both files
+        assert mock_upsert.await_count == 2
+        upsert_calls = mock_upsert.call_args_list
+
+        # First call: bad-1 recorded as failed with last_error
+        assert upsert_calls[0][1]["external_id"] == "bad-1"
+        assert upsert_calls[0][1]["state"] == "failed"
+        assert "Corrupt header" in upsert_calls[0][1]["last_error"]
+
+        # Second call: good-2 recorded as present
+        assert upsert_calls[1][1]["external_id"] == "good-2"
+        assert upsert_calls[1][1]["state"] == "present"
+
+        # Ingestion job enqueued for good-2 only
+        mock_insert_job.assert_awaited_once_with(mock_pool, document_id=good_doc_id, user_id=user_id, org_id=org_id)
+
+        # Watch was NOT aborted, released cleanly
+        mock_release.assert_awaited_once_with(mock_pool, watch_id, status="success")
+
+
+@pytest.mark.asyncio
+async def test_watch_service_pagination_token_cycle_detection(mock_pool, mock_supabase, mock_adapter):
+    """Pagination cycle detection: Cyclic page tokens break loop and leave listing.complete=False."""
+    watch_id = uuid4()
+    conn_id = uuid4()
+    user_id = uuid4()
+
+    watch_record = {
+        "id": watch_id,
+        "connection_id": conn_id,
+        "user_id": user_id,
+        "source_folder_id": "cycle-folder",
+    }
+
+    # Adapter returns cyclic token
+    file1 = SourceFile(id="f1", name="f1.pdf", mime_type="application/pdf")
+    file2 = SourceFile(id="f2", name="f2.pdf", mime_type="application/pdf")
+
+    calls = 0
+    async def mock_list(conn, **kwargs):
+        nonlocal calls
+        calls += 1
+        # Cycles token 'cycle-tok'
+        return FilePage(files=[file1 if calls == 1 else file2], next_page_token="cycle-tok")
+
+    mock_adapter.list_files.side_effect = mock_list
+    mock_adapter.read_file.return_value = ("f.pdf", b"bytes", "application/pdf")
+
+    mint_res = MintResult(
+        document={"id": str(uuid4()), "user_id": str(user_id)},
+        is_duplicate=True,
+        storage_path="path",
+        version_number=1,
+    )
+
+    with patch("app.services.watch_service.get_watch_items", new=AsyncMock(return_value=[])), \
+         patch("app.services.watch_service.upsert_watch_item", new=AsyncMock()), \
+         patch("app.services.watch_service.release_watch", new=AsyncMock()), \
+         patch("app.services.watch_service.async_mint_document_row", new=AsyncMock(return_value=mint_res)), \
+         patch("app.services.sources.base.SourceRegistry.get_adapter", return_value=mock_adapter):
+
+        svc = WatchService(pool=mock_pool, supabase=mock_supabase)
+        res = await svc.sync_watch(watch_record)
+
+        # Cycle broken after 2 calls (first introduces 'cycle-tok', second matches 'cycle-tok' in seen_tokens)
+        assert calls == 2
+        assert res["status"] == "success"
+

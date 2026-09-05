@@ -157,8 +157,24 @@ class WatchService:
         # 3. Paged listing loop producing a SourceListing
         listing = SourceListing(files=[], complete=False)
         page_token: str | None = None
+        seen_tokens: set[str] = set()
+        max_pages = 200
+        page_count = 0
         try:
             while True:
+                if page_token:
+                    if page_token in seen_tokens:
+                        logger.warning("Watch %s page token cycle detected: %s", watch_id, page_token)
+                        listing.complete = False
+                        break
+                    seen_tokens.add(page_token)
+
+                page_count += 1
+                if page_count > max_pages:
+                    logger.warning("Watch %s exceeded maximum pagination limit (%d pages)", watch_id, max_pages)
+                    listing.complete = False
+                    break
+
                 file_page = await adapter.list_files(
                     conn,
                     folder_id=source_folder_id,
@@ -184,119 +200,59 @@ class WatchService:
         existing_items = await get_watch_items(self.pool, watch_id)
         items_by_ext_id = {it["external_id"]: it for it in existing_items}
 
-        counts = {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0}
+        counts = {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0, "errors": 0}
         seen_ext_ids: set[str] = set()
 
         # 5. Process present items from source listing
         for item in listing.files:
             seen_ext_ids.add(item.id)
             existing = items_by_ext_id.get(item.id)
+            doc_id: UUID | None = None
 
-            if existing is None:
-                # ── NEW FILE ──────────────────────────────────────────────────────────
-                counts["new"] += 1
-                filename, file_bytes, mime_type = await adapter.read_file(conn, item.id)
-
-                metadata = {
-                    "source": {
-                        "system": (conn.get("service_id") or "connector").strip().lower(),
-                        "external_id": str(item.id),
-                        "version": str(item.modified_at or ""),
-                    }
-                }
-
-                mint_res: MintResult = await async_mint_document_row(
-                    raw=file_bytes,
-                    filename=filename or item.name,
-                    mime_type=mime_type or item.mime_type or "application/octet-stream",
-                    user_id=user_id,
-                    supabase=supabase,
-                    folder_id=library_folder_id,
-                    metadata=metadata,
-                    org_id=org_id,
-                    source_connection_id=conn_id,
-                    ingest_visibility=default_ingest_visibility,
-                    on_conflict="link",
-                )
-                doc_id = UUID(str(mint_res.document["id"]))
-
-                if mint_res.is_duplicate:
-                    # Duplicate in folder: link into watch items, but do NOT upload bytes and do NOT enqueue
-                    await upsert_watch_item(
-                        self.pool,
-                        watch_id=watch_id,
-                        external_id=item.id,
-                        name=item.name,
-                        user_id=UUID(user_id),
-                        org_id=UUID(org_id) if org_id else None,
-                        path_hint=getattr(item, "drive_id", "") or "",
-                        source_version=str(item.modified_at or ""),
-                        document_id=doc_id,
-                        state="present",
-                    )
-                else:
-                    # New content: Upload bytes to Supabase storage BEFORE enqueue
-                    await run_in_threadpool(
-                        lambda: supabase.storage.from_("documents").upload(
-                            path=mint_res.storage_path,
-                            file=file_bytes,
-                            file_options={"content-type": mime_type or item.mime_type or "application/octet-stream", "upsert": "true"},
-                        )
-                    )
-                    await upsert_watch_item(
-                        self.pool,
-                        watch_id=watch_id,
-                        external_id=item.id,
-                        name=item.name,
-                        user_id=UUID(user_id),
-                        org_id=UUID(org_id) if org_id else None,
-                        path_hint=getattr(item, "drive_id", "") or "",
-                        source_version=str(item.modified_at or ""),
-                        document_id=doc_id,
-                        state="present",
-                    )
-                    await insert_ingestion_job(
-                        self.pool,
-                        document_id=doc_id,
-                        user_id=UUID(user_id),
-                        org_id=UUID(org_id) if org_id else None,
-                    )
-
-            else:
-                # ── EXISTING FILE ─────────────────────────────────────────────────────
-                item_mod = str(item.modified_at or "")
-                existing_ver = str(existing.get("source_version") or "")
-
-                # Re-appearance check: if previously missing/unauthorized, restore to present
-                if existing.get("state") in ("missing", "unauthorized"):
-                    counts["restored"] += 1
-                    await update_item_state(self.pool, existing["id"], state="present")
-                    if existing.get("document_id"):
-                        await run_in_threadpool(
-                            lambda doc_id=existing["document_id"]: supabase.table("documents")
-                            .update({"source_state": None})
-                            .eq("id", str(doc_id))
-                            .execute()
-                        )
-
-                # Modification check: version/timestamp changed
-                if item_mod and existing_ver and item_mod != existing_ver:
-                    counts["modified"] += 1
+            try:
+                if existing is None:
+                    # ── NEW FILE ──────────────────────────────────────────────────────────
                     filename, file_bytes, mime_type = await adapter.read_file(conn, item.id)
-                    mint_res = await async_mint_document_row(
+
+                    metadata = {
+                        "source": {
+                            "system": (conn.get("service_id") or "connector").strip().lower(),
+                            "external_id": str(item.id),
+                            "version": str(item.modified_at or ""),
+                        }
+                    }
+
+                    mint_res: MintResult = await async_mint_document_row(
                         raw=file_bytes,
                         filename=filename or item.name,
                         mime_type=mime_type or item.mime_type or "application/octet-stream",
                         user_id=user_id,
                         supabase=supabase,
                         folder_id=library_folder_id,
+                        metadata=metadata,
                         org_id=org_id,
                         source_connection_id=conn_id,
                         ingest_visibility=default_ingest_visibility,
                         on_conflict="link",
                     )
                     doc_id = UUID(str(mint_res.document["id"]))
-                    if not mint_res.is_duplicate:
+
+                    if mint_res.is_duplicate:
+                        # Duplicate in folder: link into watch items, but do NOT upload bytes and do NOT enqueue
+                        await upsert_watch_item(
+                            self.pool,
+                            watch_id=watch_id,
+                            external_id=item.id,
+                            name=item.name,
+                            user_id=UUID(user_id),
+                            org_id=UUID(org_id) if org_id else None,
+                            path_hint=getattr(item, "drive_id", "") or "",
+                            source_version=str(item.modified_at or ""),
+                            document_id=doc_id,
+                            state="present",
+                        )
+                    else:
+                        # New content: Upload bytes to Supabase storage BEFORE enqueue
                         await run_in_threadpool(
                             lambda: supabase.storage.from_("documents").upload(
                                 path=mint_res.storage_path,
@@ -304,47 +260,148 @@ class WatchService:
                                 file_options={"content-type": mime_type or item.mime_type or "application/octet-stream", "upsert": "true"},
                             )
                         )
+                        await upsert_watch_item(
+                            self.pool,
+                            watch_id=watch_id,
+                            external_id=item.id,
+                            name=item.name,
+                            user_id=UUID(user_id),
+                            org_id=UUID(org_id) if org_id else None,
+                            path_hint=getattr(item, "drive_id", "") or "",
+                            source_version=str(item.modified_at or ""),
+                            document_id=doc_id,
+                            state="present",
+                        )
                         await insert_ingestion_job(
                             self.pool,
                             document_id=doc_id,
                             user_id=UUID(user_id),
                             org_id=UUID(org_id) if org_id else None,
                         )
-                    await upsert_watch_item(
-                        self.pool,
-                        watch_id=watch_id,
-                        external_id=item.id,
-                        name=item.name,
-                        user_id=UUID(user_id),
-                        org_id=UUID(org_id) if org_id else None,
-                        path_hint=getattr(item, "drive_id", "") or "",
-                        source_version=item_mod,
-                        document_id=doc_id,
-                        state="present",
-                    )
+                    counts["new"] += 1
 
-                # SC#4: Renamed or moved file at source (same external_id, name changed, content unchanged)
-                elif item.name != existing.get("name"):
-                    counts["renamed"] += 1
+                else:
+                    # ── EXISTING FILE ─────────────────────────────────────────────────────
+                    item_mod = str(item.modified_at or "")
+                    existing_ver = str(existing.get("source_version") or "")
+
+                    # Re-appearance check: if previously missing/unauthorized, restore to present
+                    if existing.get("state") in ("missing", "unauthorized"):
+                        counts["restored"] += 1
+                        await update_item_state(self.pool, existing["id"], state="present")
+                        if existing.get("document_id"):
+                            await run_in_threadpool(
+                                lambda doc_id=existing["document_id"]: supabase.table("documents")
+                                .update({"source_state": None})
+                                .eq("id", str(doc_id))
+                                .execute()
+                            )
+
+                    # Modification check: version/timestamp changed
+                    if item_mod and existing_ver and item_mod != existing_ver:
+                        filename, file_bytes, mime_type = await adapter.read_file(conn, item.id)
+                        mint_res = await async_mint_document_row(
+                            raw=file_bytes,
+                            filename=filename or item.name,
+                            mime_type=mime_type or item.mime_type or "application/octet-stream",
+                            user_id=user_id,
+                            supabase=supabase,
+                            folder_id=library_folder_id,
+                            org_id=org_id,
+                            source_connection_id=conn_id,
+                            ingest_visibility=default_ingest_visibility,
+                            on_conflict="link",
+                        )
+                        doc_id = UUID(str(mint_res.document["id"]))
+                        if not mint_res.is_duplicate:
+                            await run_in_threadpool(
+                                lambda: supabase.storage.from_("documents").upload(
+                                    path=mint_res.storage_path,
+                                    file=file_bytes,
+                                    file_options={"content-type": mime_type or item.mime_type or "application/octet-stream", "upsert": "true"},
+                                )
+                            )
+                            await insert_ingestion_job(
+                                self.pool,
+                                document_id=doc_id,
+                                user_id=UUID(user_id),
+                                org_id=UUID(org_id) if org_id else None,
+                            )
+                        await upsert_watch_item(
+                            self.pool,
+                            watch_id=watch_id,
+                            external_id=item.id,
+                            name=item.name,
+                            user_id=UUID(user_id),
+                            org_id=UUID(org_id) if org_id else None,
+                            path_hint=getattr(item, "drive_id", "") or "",
+                            source_version=item_mod,
+                            document_id=doc_id,
+                            state="present",
+                        )
+                        counts["modified"] += 1
+
+                    # SC#4: Renamed or moved file at source (same external_id, name changed, content unchanged)
+                    elif item.name != existing.get("name"):
+                        counts["renamed"] += 1
+                        await upsert_watch_item(
+                            self.pool,
+                            watch_id=watch_id,
+                            external_id=item.id,
+                            name=item.name,
+                            user_id=UUID(user_id),
+                            org_id=UUID(org_id) if org_id else None,
+                            path_hint=getattr(item, "drive_id", "") or "",
+                            source_version=existing_ver,
+                            document_id=existing.get("document_id"),
+                            state="present",
+                        )
+                        if existing.get("document_id"):
+                            await run_in_threadpool(
+                                lambda doc_id=existing["document_id"], new_name=item.name: supabase.table("documents")
+                                .update({"filename": new_name})
+                                .eq("id", str(doc_id))
+                                .execute()
+                            )
+
+            except Exception as item_err:
+                counts["errors"] += 1
+                logger.error(
+                    "Watch %s item %s (%s) sync failed: %s",
+                    watch_id, item.id, getattr(item, "name", ""), item_err, exc_info=True,
+                )
+                try:
+                    target_doc_id = doc_id or (UUID(str(existing["document_id"])) if (existing and existing.get("document_id")) else None)
                     await upsert_watch_item(
                         self.pool,
                         watch_id=watch_id,
                         external_id=item.id,
-                        name=item.name,
+                        name=getattr(item, "name", "") or "unknown",
                         user_id=UUID(user_id),
                         org_id=UUID(org_id) if org_id else None,
                         path_hint=getattr(item, "drive_id", "") or "",
-                        source_version=existing_ver,
-                        document_id=existing.get("document_id"),
-                        state="present",
+                        source_version=str(getattr(item, "modified_at", "") or ""),
+                        document_id=target_doc_id,
+                        state="failed",
+                        last_error=str(item_err),
                     )
-                    if existing.get("document_id"):
+                    if target_doc_id:
                         await run_in_threadpool(
-                            lambda doc_id=existing["document_id"], new_name=item.name: supabase.table("documents")
-                            .update({"filename": new_name})
-                            .eq("id", str(doc_id))
+                            lambda d_id=target_doc_id, err=item_err: supabase.table("documents")
+                            .update({
+                                "status": "failed",
+                                "ingestion_step": "failed",
+                                "error_message": f"Watch sync failed: {err}"[:500],
+                            })
+                            .eq("id", str(d_id))
                             .execute()
                         )
+                except Exception as record_err:
+                    logger.error(
+                        "Watch %s failed to record error state for item %s: %s",
+                        watch_id, item.id, record_err, exc_info=True,
+                    )
+                continue
 
         # 6. Deleted files (in DB, absent from source listing)
         deleted_candidates = [
@@ -376,8 +433,8 @@ class WatchService:
         # 7. Release watch upon successful sync
         await release_watch(self.pool, watch_id, status="success")
         logger.info(
-            "Watch %s sync complete: %d new, %d modified, %d renamed, %d missing, %d restored",
-            watch_id, counts["new"], counts["modified"], counts["renamed"], counts["missing"], counts["restored"],
+            "Watch %s sync complete: %d new, %d modified, %d renamed, %d missing, %d restored, %d errors",
+            watch_id, counts["new"], counts["modified"], counts["renamed"], counts["missing"], counts["restored"], counts["errors"],
         )
         return {"status": "success", "counts": counts}
 
