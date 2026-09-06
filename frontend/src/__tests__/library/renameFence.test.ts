@@ -170,8 +170,16 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     // The rename is only real if the branch that renders the surface moved with it. A stale
     // import would not typecheck; a stale BRANCH would render the positional fallback and
     // look like a missing page rather than a missing edit.
+    // ⚠ RELAXED AT 235-08, AND ONLY AT THE END. The pattern used to require the mount to be
+    // spelled `<LibraryPage onNavigate={onNavigate} />` — a CLOSED prop list — so adding
+    // `initialTab={libraryTab}` (SURF-03: the Health tab had no external door at all) turned
+    // this case red for a reason that has nothing to do with the Documents→Library rename
+    // this fence is about. What the fence actually guards is the KEY LINK: the branch on
+    // `activeView === "documents"` renders `LibraryPage`, adjacently. That is preserved
+    // verbatim, including the 120-character proximity window; only the trailing ` />` is
+    // dropped, so the mount may carry props without this fence claiming to own its signature.
     expect(
-      /activeView === "documents" \?[\s\S]{0,120}<LibraryPage onNavigate=\{onNavigate\} \/>/.test(
+      /activeView === "documents" \?[\s\S]{0,120}<LibraryPage onNavigate=\{onNavigate\}/.test(
         LAYOUT,
       ),
     ).toBe(true)

@@ -777,9 +777,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         </div>
       ) : (
         <main className="flex-1 overflow-hidden">
+          {/* ⚠ NOTHING GOES BETWEEN THE BRANCH BELOW AND ITS MOUNT. `renameFence.test.ts`
+              asserts that key link inside a 120-character window, so a comment in the gap
+              breaks a fence about the Documents→Library rename — which has nothing to do
+              with whatever the comment was saying. Phase 235-08: `libraryTab` is
+              `undefined` on every ordinary entry, so the Library keeps its own default; it
+              is set only by App's `handleOpenLibraryHealth`. */}
           {activeView === "documents" ? (
-            // Phase 235-08: `undefined` on every ordinary entry, so the Library keeps its
-            // own default; set only by App's `handleOpenLibraryHealth`.
             <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} />
           ) : activeView === "skills" ? (
             <SkillsPage
