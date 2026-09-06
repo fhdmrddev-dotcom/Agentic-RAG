@@ -22,7 +22,9 @@ from app.db.watches import (
     get_watch,
     get_watch_item_by_external_id,
     get_watch_items,
+    list_sync_runs,
     list_watches,
+    recent_runs_by_watch,
     record_skipped_still_running,
     release_watch,
     update_item_state,
@@ -184,8 +186,13 @@ async def test_release_and_skip_still_running():
 
     await release_watch(pool, watch_id, status="success")
     assert con.execute.called
-    assert "leased_until = NULL" in con.execute.call_args[0][0]
-    assert "last_status = $2" in con.execute.call_args[0][0]
+    # ⚠ Phase 235: release_watch now issues TWO statements — the lease UPDATE and the
+    # connector_sync_runs row beside it. `call_args` is the LAST call, so the UPDATE is
+    # pinned by POSITION here; asserting on `call_args` would silently start asserting
+    # against the run-row insert instead.
+    update_sql = con.execute.call_args_list[0][0][0]
+    assert "leased_until = NULL" in update_sql
+    assert "last_status = $2" in update_sql
 
     con.execute.reset_mock()
     await record_skipped_still_running(pool, watch_id)
@@ -239,3 +246,173 @@ async def test_watch_items_upsert_and_lifecycle():
 
     await bulk_update_item_states(pool, [item_id], state="missing")
     assert "WHERE id = ANY($1::uuid[])" in con.execute.call_args[0][0]
+
+
+# ── Phase 235 (SURF-02 / D-235-06 / D-235-07 / D-235-08) — connector_sync_runs ──
+#
+# The counts dict `watch_service.py:203` computes was logged and then discarded by
+# `tick():111`. These cases pin the home it now has: every release of a watch writes
+# exactly ONE bounded run row, and the two reads that serve it carry an owner predicate
+# in the SQL itself, because the asyncpg pool path is NOT RLS-gated.
+#
+# ⚠ THESE ARE SHAPE ASSERTIONS, AND THAT IS STATED RATHER THAN IMPLIED. The pool is a
+# MagicMock, so nothing here proves the prune actually deletes a row in Postgres — it
+# proves the statement carries the prune and binds `retain` as a PARAMETER rather than
+# interpolating it. The live behaviour is exercised by the operator's applied migration
+# and by the phase's G-4 rows.
+
+
+def _pool_and_con():
+    """The file's own double: a MagicMock pool whose acquire() yields an AsyncMock con."""
+    pool = MagicMock()
+    con = AsyncMock()
+    pool.acquire.return_value.__aenter__.return_value = con
+    return pool, con
+
+
+def _insert_call(con):
+    """The run-row statement is the SECOND execute — the first is the lease UPDATE."""
+    return con.execute.call_args_list[1][0]
+
+
+@pytest.mark.asyncio
+async def test_release_watch_success_writes_all_six_counts():
+    pool, con = _pool_and_con()
+    watch_id = uuid4()
+
+    await release_watch(
+        pool,
+        watch_id,
+        status="success",
+        counts={"new": 3, "modified": 2, "renamed": 1, "missing": 4, "restored": 5, "errors": 6},
+        listing_complete=True,
+    )
+
+    # The UPDATE it always did, unchanged and FIRST.
+    update_sql = con.execute.call_args_list[0][0][0]
+    assert "UPDATE connector_watches" in update_sql
+    assert "leased_until = NULL" in update_sql
+
+    # ...and one run row beside it.
+    assert con.execute.call_count == 2
+    args = _insert_call(con)
+    assert "INSERT INTO connector_sync_runs" in args[0]
+    assert args[1] == watch_id            # $1 watch_id
+    assert args[5] == "success"           # $5 status
+    assert args[8] is True                # $8 listing_complete
+    assert list(args[9:15]) == [3, 2, 1, 4, 5, 6]  # $9..$14, table order
+
+
+@pytest.mark.asyncio
+async def test_release_watch_failure_still_writes_a_row():
+    """A crash-shaped failure is history too — counts 0, listing incomplete, cause carried."""
+    pool, con = _pool_and_con()
+    watch_id = uuid4()
+
+    await release_watch(
+        pool,
+        watch_id,
+        status="failed",
+        error="Source access unauthorized: 403",
+        counts=None,
+        failure_cause="token_revoked",
+    )
+
+    assert con.execute.call_count == 2
+    args = _insert_call(con)
+    assert args[5] == "failed"
+    assert args[6] == "token_revoked"
+    assert args[7] == "Source access unauthorized: 403"
+    assert args[8] is False               # listing_complete defaults false
+    assert list(args[9:15]) == [0, 0, 0, 0, 0, 0]
+
+
+@pytest.mark.asyncio
+async def test_release_watch_prunes_in_the_same_statement():
+    pool, con = _pool_and_con()
+
+    await release_watch(pool, uuid4(), status="success", retain=3)
+
+    sql = _insert_call(con)[0]
+    # ONE statement: the insert is a CTE and the delete hangs off it.
+    assert "WITH ins AS (" in sql
+    assert "DELETE FROM connector_sync_runs" in sql
+    assert "ORDER BY started_at DESC" in sql
+    # ⛔ The bound MUST be a parameter. An f-string here would be T-235-04.
+    assert "LIMIT 3" not in sql
+    assert _insert_call(con)[15 + 1] == 3
+
+
+@pytest.mark.asyncio
+async def test_release_watch_retain_defaults_to_the_settings_knob():
+    from app.config import settings
+
+    assert settings.watch_run_history_retention == 200
+
+    pool, con = _pool_and_con()
+    await release_watch(pool, uuid4(), status="success")
+    assert _insert_call(con)[15 + 1] == settings.watch_run_history_retention
+
+
+@pytest.mark.asyncio
+async def test_release_watch_swallows_a_failed_history_insert():
+    """⭐ Losing a history row must NEVER turn a successful sync into a failed one."""
+    pool, con = _pool_and_con()
+    con.execute.side_effect = [None, RuntimeError("connector_sync_runs is not there")]
+
+    # No raise. The UPDATE that preceded it stands.
+    await release_watch(pool, uuid4(), status="success", counts={"new": 1})
+
+    assert con.execute.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_list_sync_runs_is_owner_predicated():
+    pool, con = _pool_and_con()
+    watch_id = uuid4()
+    user_id = uuid4()
+    con.fetch.return_value = [{"id": uuid4(), "watch_id": watch_id, "status": "success"}]
+
+    rows = await list_sync_runs(pool, watch_id, user_id=user_id, limit=50)
+
+    assert len(rows) == 1
+    sql = con.fetch.call_args[0][0]
+    assert "FROM connector_sync_runs" in sql
+    assert "watch_id = $1" in sql
+    # T-235-01: the pool path is NOT RLS-gated, so a watch_id guess must return nothing.
+    assert "user_id = $2" in sql
+    assert "ORDER BY started_at DESC" in sql
+    assert con.fetch.call_args[0][1] == watch_id
+    assert con.fetch.call_args[0][2] == user_id
+
+
+@pytest.mark.asyncio
+async def test_recent_runs_by_watch_is_one_windowed_query():
+    pool, con = _pool_and_con()
+    w1, w2 = uuid4(), uuid4()
+    user_id = uuid4()
+    con.fetch.return_value = [
+        {"id": uuid4(), "watch_id": w1, "status": "failed", "started_at": datetime.now(timezone.utc)},
+        {"id": uuid4(), "watch_id": w1, "status": "success", "started_at": datetime.now(timezone.utc)},
+        {"id": uuid4(), "watch_id": w2, "status": "success", "started_at": datetime.now(timezone.utc)},
+    ]
+
+    grouped = await recent_runs_by_watch(pool, [w1, w2], user_id=user_id, per_watch=5)
+
+    # ONE query, not one per watch — the verdict reads N watches at once.
+    assert con.fetch.call_count == 1
+    sql = con.fetch.call_args[0][0]
+    assert "ROW_NUMBER() OVER (PARTITION BY watch_id ORDER BY started_at DESC)" in sql
+    assert "watch_id = ANY(" in sql
+    assert "user_id = $2" in sql
+
+    assert set(grouped) == {str(w1), str(w2)}
+    assert len(grouped[str(w1)]) == 2
+    assert grouped[str(w1)][0]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_recent_runs_by_watch_empty_input_issues_no_query():
+    pool, con = _pool_and_con()
+    assert await recent_runs_by_watch(pool, [], user_id=uuid4()) == {}
+    assert con.fetch.call_count == 0
