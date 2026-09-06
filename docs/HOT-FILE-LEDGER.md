@@ -7610,9 +7610,17 @@ for external folder watching rather than widening `workflow_schedules`.
 
 ## backend/app/services/watch_service.py
 
-**2 / 1 / 458** · young (Phase 234) · ⚠ **absent from this ledger and from CLAUDE.md's scan list
+**4 / 2 / 608** · young (Phase 234) · ⚠ **absent from this ledger and from CLAUDE.md's scan list
 until 2026-09-06** — through its own phase's build, review and close. It is the engine of the
 milestone's crux phase, and G-5 could not have fired on it at any count.
+
+⭐ **235-13 (gap-closure round 1) — SEAM 2 IS THE ONE WRITER OF `connection_disabled`.** The
+connection-disabled arm changed `failure_cause=None` to the named cause and nothing else: same
+status, same zero counts, same `listing_complete=False`. It is the only code that KNOWS the
+connection is off, so the cause is written here and **inferred by nothing** — `failure_cause.py`
+deliberately carries no matcher and no status row for it. `test_watch_sync_runs.py` asserts the
+literal appears in this whole file **exactly once**, on a `failure_cause=` keyword, because a second
+writer would be a second place deciding a fact only one of them read.
 
 The background poller: `claim_due_watches` → paginate a `SourceListing` → diff against
 `connector_watch_items` → mint + enqueue. **Invariants it carries:**
@@ -7889,7 +7897,30 @@ that fix; it verified the discharge** (D-235-18), which is a different claim and
 
 ## backend/app/services/sources/failure_cause.py
 
-**1 / 1 / 169** · no (1 phase) · **THE ONE CLASSIFIER of why a source stopped.**
+**2 / 1 / 196** · no (1 phase) · **THE ONE CLASSIFIER of why a source stopped.**
+
+⭐ **235-13 (gap-closure round 1) added a FIFTH cause, and it is the one member of the union that
+is WRITTEN ONLY.** `connection_disabled` says the connection this source reads through was switched
+off. Two facts bind it, both asserted over this file's live source:
+
+- ⛔ **It is HARD.** A connection somebody switched off cannot come back on the next tick, so the
+  source stops on failure ONE. The soft threshold would keep it silently un-updated for three
+  cadences — 18 hours at the 6-hour cadence — for no gain. Recorded as a DECISION: if it proves
+  noisy, the change is removing one member from `HARD_CAUSES`, and **no branch moves.**
+- ⛔ **`classify_failure_cause` has NO matcher and NO status row for it.** It is written by exactly
+  one seam — the connection-disabled arm of `watch_service.sync_watch`, the only code that KNOWS the
+  connection is off because it just read `is_enabled`. A provider saying "disabled" about a file, an
+  API, a scope or an account is not evidence about this connection, and inferring it would offer
+  *turn it back on* for a connection that is already on. `test_failure_cause.py` drives **seven
+  tempting strings and ten status codes** against that rule and reads the live source to prove
+  neither `_STATUS_CAUSE` nor `_MATCHERS` names it (T-235c-01).
+
+⚠ **The defect it closes was an ABSENCE, not a wrong branch.** Seam 2 wrote `failure_cause=None`
+every paused tick; `health_verdict.py` counts every non-`success` status toward the streak
+(correctly), so after three ticks the source read `stopped` / `unknown` — *"It stopped, and no
+reason was recorded."* with a **Retry now** button that cannot change a deliberately-off connection.
+⛔ **`health_verdict.py` was NOT edited to fix it** (`git diff --numstat` empty): the streak logic
+was already right, and the fix was a table row on each side of the wire.
 
 ⭐ **The defect it closes, stated by the file itself:** `watch_service.py`'s only failure
 classification was a substring sniff (`"403" in err_str or "permission" in err_str …`) whose output

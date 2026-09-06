@@ -28,6 +28,31 @@ reachable as a matcher input below, so no failure classified today becomes uncla
    will need this same verdict when its trigger fires, and a branch inside `watch_service`
    could not be reused by it. So it is a table, and `is_hard` has no branch of its own.
 
+── ⛔ ONE CAUSE IS **WRITTEN ONLY**, NEVER INFERRED (Phase 235 plan 13, gap-closure round 1) ─
+
+`connection_disabled` — the connection this source reads through was switched off — obeys two
+binding facts that no other member of `Cause` carries:
+
+1. ⛔ **It is HARD.** A connection somebody switched off cannot come back on the next tick, so
+   the source stops on failure ONE. The soft threshold would keep it silently un-updated for
+   three cadences (18 hours at the 6-hour cadence) for no gain. ⚠ Stated as a DECISION: if this
+   proves noisy, the change is removing one member from `HARD_CAUSES` — no branch moves.
+2. ⛔ **`classify_failure_cause` has no matcher and no status row for it, deliberately.** It is
+   written by EXACTLY ONE seam — the connection-disabled arm of `watch_service.sync_watch` —
+   which is the only code that KNOWS the connection is off, because it just read `is_enabled`
+   off the connection row. A provider message containing the word "disabled" is not evidence of
+   that: a provider says "disabled" about files, APIs, scopes and accounts. Inferring it from
+   prose would offer *turn it back on* for a connection that is already on. Do NOT add a
+   matcher; `test_failure_cause.py` drives seven tempting strings and ten status codes against
+   this rule, and reads this module's live source to prove neither table names it.
+
+⭐ **THE DEFECT THAT PROMPTED IT.** Seam 2 wrote ``status="paused", failure_cause=None`` every
+tick while the connection was off. `health_verdict.py` counts every non-``success`` status
+toward the streak (correctly — a paused tick did not read), so after three ticks the source was
+promoted to `stopped` with cause ``unknown``: the surface said *"It stopped, and no reason was
+recorded."* and offered **Retry now**, on a state somebody chose deliberately, with a control
+that provably cannot change it. LIB-10's word is *fixes*.
+
 ── ⚠ THE FRONTEND BINDS TO THIS FILE'S LIVE SOURCE ────────────────────────────────────────
 
 `frontend/src/components/sources/sourceHealthVocabulary.test.ts` imports this module via
@@ -43,12 +68,14 @@ import re
 from typing import Literal
 
 # ⚠ ONE LINE, PLAIN TEXT, GREPPABLE. See the ``?raw`` note in the module docblock.
-Cause = Literal["token_revoked", "folder_gone", "unreachable", "unknown"]
+Cause = Literal["token_revoked", "folder_gone", "unreachable", "connection_disabled", "unknown"]
 
 #: ⭐ D-235-10 — **cause-dependent promotion to `stopped`.** A cause the next tick CANNOT
 #: recover from is stopped on the FIRST failure. Membership here is the whole rule; there is
 #: deliberately no second place that decides it.
-HARD_CAUSES: frozenset[Cause] = frozenset({"token_revoked", "folder_gone"})
+HARD_CAUSES: frozenset[Cause] = frozenset(
+    {"token_revoked", "folder_gone", "connection_disabled"}
+)
 
 #: ⭐ D-235-10 — a cause that MIGHT recover needs this many consecutive failures before the
 #: source is called stopped. A uniform N-failure rule for every cause was rejected: at a
