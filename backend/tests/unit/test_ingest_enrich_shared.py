@@ -666,7 +666,7 @@ def test_both_paths_produce_only_suggestions_never_auto_move(_stub_extraction):
         assert cls_meta.get("rule_id") == "rule-own-1"
 
 
-def test_watch_rules_match_arrival_facts_and_produce_suggestion_on_both_paths():
+def test_watch_rules_match_arrival_facts_and_produce_suggestion_on_both_paths(_stub_extraction):
     """RULES-01 / SC#1 / Operator Ruling 3: A watch rule must affect real documents at ingestion.
 
     A watch rule keying on arrival facts (name, mime/type, size, path, source facts) evaluates
