@@ -542,7 +542,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 
 ⚠ **THE TABLE MOVED BECAUSE THE OLD MECHANISM WAS MEASURED TO FAIL.** It sat in this file, complete, for every agent to read — and `App.tsx` still had **no row for 23 phases**, `NavPanel.tsx` for 11, `config.py` for the project's entire life. **A 214-row table nobody reads end-to-end is not a scan list; it is a hope.** The gate above cannot not-notice: it fails when a phase's `files_modified` names a non-test source file with no ledger row. That is strictly stronger than the completeness rule it replaces, and it is why moving the table does not weaken G-5.
 
-**G-5-FIRING files (110 of 214) — the rows a phase is most likely to collide with.** Verdicts abbreviated; the full cell, the narrative, the named seam and the binding invariants are in the detail file, which is where a phase must read before planning.
+**G-5-FIRING files (111 of 216) — the rows a phase is most likely to collide with.** Verdicts abbreviated; the full cell, the narrative, the named seam and the binding invariants are in the detail file, which is where a phase must read before planning.
 
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
@@ -552,6 +552,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/providers/StreamsProvider.tsx` | 85 / 34 / 4144 | honoured by construction (194.1 / **214**) |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
+| `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | honoured by construction (199 / 200 / **214**) |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 17 / 8 / 489 | honoured by construction (199) |
