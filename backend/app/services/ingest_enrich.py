@@ -75,7 +75,7 @@ def enrich_for_ingest(
     Every step is best-effort: any failure degrades to "no metadata" and never raises, so a
     document that would have ingested without enrichment still does.
     """
-    from app.api.documents import IMAGE_MIME_TYPES  # noqa: PLC0415
+    from app.api.documents import IMAGE_MIME_TYPES, _METADATA_BUILTINS  # noqa: PLC0415
     from app.services.embedding_service import (  # noqa: PLC0415
         extract_metadata,
         read_enabled_field_defs,
@@ -470,6 +470,80 @@ def enrich_for_ingest(
         header_parts.append(vision_provenance["truncated"]["note"])
 
     context_header = f"[{' | '.join(header_parts)}]\n" if header_parts else ""
+
+    # ── BUG-260906-01 — CLASSIFICATION LIVES HERE BECAUSE BOTH PATHS CALL HERE ───
+    #
+    # ⛔ THIS BLOCK USED TO LIVE INLINE IN `ingest_document`, AND THAT IS EXACTLY WHY NO
+    #   WATCHED OR SYNCED FILE WAS EVER CLASSIFIED. Phase 230's durable queue never calls
+    #   `ingest_document` at all, and the rule-eval pass sat ~330 lines BELOW the metadata
+    #   block, so BUG-260905-06's extraction of this module walked straight past it.
+    #
+    # ⚠ MEASURED ON THE OPERATOR'S LIVE DATABASE 2026-09-06, not inferred: the single
+    #   document ingested by a connector watch carried `_classification=None` while one
+    #   enabled rule existed. `grep -n classification` over the queue path returned exactly
+    #   ONE hit — a comment. Nothing executable. It is the FIFTH defect of one shape: two
+    #   code paths serving one user-visible outcome, and only one of them doing the work.
+    #
+    # ⚠ IT RUNS LAST, WHICH IS BYTE-FAITHFUL TO THE LEGACY ORDER. In `ingest_document` this
+    #   ran AFTER `enrich_for_ingest` returned — i.e. after every metadata merge (email, DXF,
+    #   vision, degrade-restore, the `_source` user-edit guard, the provenance carry) and
+    #   after the header build. The header only READS title/date/document_type and never
+    #   mutates the dict, so position relative to it is immaterial; the order is preserved
+    #   anyway rather than reasoned about.
+    #
+    # Phase 118 (CLASS-02 / D-118-2/3/4/8) — classification rule-eval pass.
+    # It writes ONE `_classification` SUGGESTION into metadata_dict and the CALLER's own
+    # metadata write carries it: `documents.py`'s single persist UPDATE on the legacy path,
+    # `ingest_splice.py`'s `update({"metadata": enriched.metadata})` on the queue path. It
+    # NEVER writes folder_id — the milestone anti-feature ("silent autonomous auto-filing")
+    # is structurally impossible here; the move happens ONLY on an explicit Accept
+    # (accept_classification). First-match-wins (D-118-3) is unchanged.
+    #
+    # This function is SYNC and runs inside a BackgroundTask or a `run_in_threadpool`
+    # worker (NO request JWT — auth.uid() is NULL and the service-role client BYPASSES
+    # RLS). The SOLE owner-scoping gate is the in-app
+    # `.or_(user_id.eq.{uploader},is_system_global.eq.true)` predicate (Pitfall 3, D-118-8): an
+    # unscoped select would return ALL users' rules. A global rule is evaluated against
+    # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
+    if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
+        try:
+            from app.services import classification_matcher  # noqa: PLC0415
+            from app.utils.db import coerce_uid  # noqa: PLC0415
+            rules = (
+                supabase.table("classification_rules").select("*")
+                # AR-118-01: coerce the interpolated uploader id (service-role read,
+                # RLS bypassed — this app-code predicate is the SOLE owner gate).
+                .or_(f"user_id.eq.{coerce_uid(user_id)},is_system_global.eq.true")  # D-118-8 own + global
+                .eq("enabled", True)
+                .order("is_system_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
+                .execute()
+            ).data or []
+            # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
+            # sibling service-role own+global reads carry (read_enabled_field_defs,
+            # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
+            # a malformed/over-broad result can NEVER evaluate another user's rule
+            # against this uploader's metadata (the phase's highest-stakes leak site).
+            rules = [r for r in rules if r.get("is_system_global") or str(r.get("user_id")) == str(user_id)]
+            whitelist = _METADATA_BUILTINS | {
+                d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
+            }
+            for rule in rules:  # first-match-wins (D-118-3): ONE object, never an array
+                if classification_matcher.match_metadata(rule["match_expr"], metadata_dict, whitelist):
+                    metadata_dict["_classification"] = classification_matcher.build_suggestion(
+                        rule, supabase, user_id,
+                    )
+                    break
+        except Exception:  # noqa: BLE001 — classification NEVER blocks ingestion (mirror the metadata degrade)
+            log.warning("classification rule-eval failed; skipping suggestion", exc_info=True)
+
+    # ⚠ ONE MEASURED ORDERING DELTA OF THE MOVE, AND IT IS BENIGN — RECORDED, NOT "FIXED".
+    #   On the legacy path `metadata_dict["attachments"] = attachment_manifest` is written
+    #   AFTER this function returns (the email-attachment loop in `ingest_document`) and
+    #   BEFORE the block used to run, so `attachments` was in the dict at match time and no
+    #   longer is. `attachments` is neither a `DocumentMetadata` field nor a custom field
+    #   def, so it is NOT in the whitelist and `match_metadata` already REFUSES any rule
+    #   naming it (`validate_fields` raises, and the soft `except` above degrades). No
+    #   reachable rule can change verdict. Do NOT reorder the write or widen the whitelist.
 
     return EnrichedIngest(
         text=text,
