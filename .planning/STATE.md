@@ -38,10 +38,71 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix)
+Phase: 236 — The Corpus Under Attack (⏭ **NEXT — not started**)
+Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: none in flight
-Status: complete
+Status: ready_for_236
+
+
+## ▶ NEXT SESSION — start here
+
+**`/gsd:discuss-phase 236`** — *The Corpus Under Attack* (TRUST-02, ⭐ **GA GATE**). Depends on 234:
+the payload must be planted in a **real synced document**, which 234 and 235 now make possible.
+
+⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
+operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries
+G-8; the reasoning and the measured cost table are in `docs/PLANNING-PROPORTION.md`. **Target 3-5
+plans.** Above 6, justify it in CONTEXT.md by naming what genuinely cannot share a worktree.
+
+⭐ **AND THE SECOND LEVER, WHICH IS BIGGER THAN THE AGENT ROSTER:** executors ran the FULL gates
+themselves — ~7 min per backend run, ~6 min per vitest gate, one plan ran the backend suite three
+times. That was **~3.5 h across 16 executors**. **Tell every executor: targeted suites per task,
+FULL gates once per WAVE (the orchestrator runs them).** CLAUDE.md's sampling rule already says so
+and it simply was not in the prompts.
+
+### ⛔ Owed from 235, carried forward — NOT closed
+
+1. **Five G-4 rows never driven. NO STOPPED SOURCE HAS EVER BEEN OBSERVED IN THIS PRODUCT.** Every
+   claim about a broken source is unit-level, including the control wired at the very end. **`M-1`
+   — revoke a real Drive grant — settles the whole path in one drive** and needs the operator,
+   because it disables a live integration.
+2. **`SEED-253`** — mobile has no drawer trigger outside the chat view (PRE-EXISTING; needs its own
+   sketch, so it was correctly refused inside a closure round).
+3. **`SEED-254`** — per-run per-file attribution; `connector_watch_items` holds one state per item.
+4. **`sourceComposition.test.tsx` closes at `16 failed | 33 passed` and is in NEITHER gate knob**, by
+   decision — pinning a red suite turns the shared gate red; pinning it with an allowance makes a
+   gate that cannot fail. All 16 are itemised with owners; **14 are provable against a pinned suite
+   and none is a missing surface.**
+5. **The backend ceiling.** Measured **71 twice and 72 twice on an UNCHANGED tree**. The finding is
+   not "make it 72" — **a zero-headroom gate on a non-deterministic measurement fails for reasons no
+   plan controls.** Recommendation on the table: pin by NAME-SET (`comm -13`), not by count.
+6. **No tests for the three new health aggregates** (`_fetch_readability`, `_fetch_embedding_coverage`,
+   `_fetch_outcomes_by_type`). Verified live in the browser, not pinned. ⚠ `_fetch_readability`
+   carries **two measured traps** in comments — `chunk_count` drifts, and PostgREST caps at 1000 —
+   so it is the one most worth a test.
+
+### ⭐ The lesson from 235 that should shape 236
+
+**Presence assertions cannot see content drift.** The composition fence asserted blocks were present
+by `data-testid` while they rendered the wrong content, so a green fence coexisted with ROADMAP
+failure mode #3. **236 is an ATTACK suite — SC#2 literally requires that removing a defence turns it
+RED.** That is the same property, stated as a requirement: a suite that cannot fail proves nothing.
+Drive every fence RED against a planted defect before trusting it.
+
+⚠ **A concurrent editor is active in this working tree** (auth-token-refresh work in
+`lib/api/_core.ts`, `index.css`, `CreateWatchModal.tsx`, plus screenshot deletions). **Not mine,
+untouched.** A second interactive session `agentic-rag-a0` was idle at close.
+
+### Health dashboard (quick task, 2026-09-06) — shipped after 235 closed
+
+`4bedda03c` + `69a185f49`. The Library Health tab measured DEMAND and called it health: the donut
+showed "found by a search" and retrieval coverage was **40% of `health_score`**. Now: readability
+takes that weight; two COMPOSITION donuts (freshness 83/28/8, 16 formats) + a chunk-volume bar;
+Coverage Trend full width; retrieval demoted to tiles under a USAGE heading.
+⚠ **The operator caught a defect in that fix**: it kept the top 8 formats and silently dropped DXF,
+PNG, WebP, HTML, TIFF, JPEG, Outlook and EPUB. Now all 21 types are mapped, the backend caps
+nothing, and the tail folds into a NAMED `Other (N)`.
 
 ## ✅ PHASE 235 CLOSED (2026-09-06)
 
