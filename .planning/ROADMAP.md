@@ -551,7 +551,11 @@ Plans:
   2. Removing **any one** named defence turns the suite **red**, and the output names which defence was removed — so a green run means the defences are load-bearing, not that the attack was weak (TRUST-02).
   3. A person reading the run can see which attacks were tried and which were refused — a pass is legible, not a bare exit code (TRUST-02).
 
-**Plans**: TBD
+**Plans**: 3 plans (all 3 executed)
+
+- [x] 236-01-PLAN.md — typed adversarial corpus, attack test suite & SC#3 attack report generator
+- [x] 236-02-PLAN.md — SC#2 GA Gate in-process mutation runner with pytest monkeypatch fixture & 8/8 mutations caught
+- [x] 236-03-PLAN.md — SC#10 dynamic native roster test suite, 236-ROSTER-REPORT.md & lived-experience sync UAT
 
 **UI hint**: no
 **Migrations**: none expected.

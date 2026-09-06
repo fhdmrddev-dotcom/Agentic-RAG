@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: in_progress
-last_updated: "2026-09-06T12:00:00.000Z"
+status: ready_for_review
+last_updated: "2026-09-06T12:55:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
-  completed_phases: 7
-  total_plans: 13
-  completed_plans: 13
+  completed_phases: 8
+  total_plans: 16
+  completed_plans: 16
   planned_plans_235: 12
-  percent: 43
+  percent: 57
 ---
 
 # Project State
@@ -38,17 +38,16 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 236 — The Corpus Under Attack (🚧 **IN PROGRESS — Waves 1 & 2 complete, ready for Wave 3 / Plan 236-03**)
+Phase: 236 — The Corpus Under Attack (✅ **COMPLETED 2026-09-06 — Waves 1, 2, & 3 complete, ready for Reviewer verification**)
 Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
-Plan: 236-01 & 236-02 complete (8/8 mutations caught loudly); 236-03 next
-Status: in_progress
+Plan: 236-01, 236-02, 236-03 complete (100%)
+Status: ready_for_review
 
 
 ## ▶ NEXT SESSION — start here
 
-**`/gsd:discuss-phase 236`** — *The Corpus Under Attack* (TRUST-02, ⭐ **GA GATE**). Depends on 234:
-the payload must be planted in a **real synced document**, which 234 and 235 now make possible.
+**Reviewer post-phase verification of Phase 236** (Claude Code), then **`/gsd:discuss-phase 237`** — *One Rule Engine, Not Two* (RULES-01, RULES-02, mig 173).
 
 ⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
 operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries
