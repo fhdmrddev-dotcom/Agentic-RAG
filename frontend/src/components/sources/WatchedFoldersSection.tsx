@@ -30,11 +30,13 @@
  *     was a full page reload onto a path that renders the chat home (T-235-36). It is deleted.
  *     When no navigator is supplied the Reconnect control is ABSENT rather than dead.
  *
- * ⚠ The three forbidden literals above are deliberately NOT spelled anywhere in this file,
- *   comment included — the fences that enforce them read this source as TEXT, and a literal
- *   inside a docblock is still a literal (Pitfall 8, and plan 04 lost time to it twice).
  *  5. The status pill was TWO parallel five-arm ternaries over the same conditions — a sixth
  *     state needed two edits and could disagree with itself. It is ONE lookup now.
+ *
+ * ⚠ The three forbidden literals behind (3) and (4) are deliberately NOT spelled anywhere in
+ *   this file, comment included — the fences that enforce them read this source as TEXT, and a
+ *   literal inside a docblock is still a literal (Pitfall 8, which plan 04 lost time to twice
+ *   and which was driven RED here, deliberately, before this paragraph was believed).
  *
  * ── ⛔ THE COLOUR RULE (BUILD-CONTRACT §4 / sketch 233 §9) ───────────────────────────
  *
