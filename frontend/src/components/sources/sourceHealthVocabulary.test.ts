@@ -28,11 +28,18 @@ import { describe, it, expect } from "vitest"
 import {
   classifySourceFailure,
   sourceFailureSentence,
+  CHECKED_PREFIX,
   CONTROL_FOR_CAUSE,
   COPY,
+  COUNT_ORDER,
+  FILE_FAILURE_HEADING,
+  FILE_FAILURE_SCOPE_NOTE,
+  instantPhrase,
   SENTENCE_FOR_CAUSE,
   SENTENCE_FOR_FILE_FAILURE,
   UNKNOWN_SOURCE_FAILURE_SENTENCE,
+  WORD_FOR_COUNT,
+  type CountKey,
   type SourceFailureCause,
   type SourceFileFailureKind,
 } from "./sourceHealthVocabulary"
@@ -101,11 +108,25 @@ const renderedCopy: string[] = [
 //   an operator the setting name IS the action (BUILD-CONTRACT §4). It is carved out BY NAME
 //   here and given its own assertions below, never by loosening rule 4 for everything else.
 
+// The words plan 13 added, rendered. ⭐ Folded into `allSentences` below so the five binding
+// rules loop over them too — a new export that skipped this list would be an unchecked string.
+const renderedCountWords: string[] = (Object.keys(WORD_FOR_COUNT) as CountKey[]).map(
+  (k) => WORD_FOR_COUNT[k],
+)
+
+const renderedNewCopy: string[] = [
+  CHECKED_PREFIX("4 minutes ago"),
+  FILE_FAILURE_HEADING,
+  FILE_FAILURE_SCOPE_NOTE,
+]
+
 const allSentences: string[] = [
   ...renderedCauseSentences,
   ...renderedControlLabels,
   ...renderedFileSentences,
   ...renderedCopy,
+  ...renderedCountWords,
+  ...renderedNewCopy,
 ]
 
 // ══════════════════════════════════════════════════════════════════════════════════════
@@ -113,21 +134,41 @@ const allSentences: string[] = [
 // ══════════════════════════════════════════════════════════════════════════════════════
 
 describe("sourceHealthVocabulary — non-vacuity", () => {
-  it("the cause table has exactly the four causes", () => {
+  it("the cause table has exactly the five causes", () => {
+    // ⚠ RE-BASELINED 4 → 5 (plan 13, gap-closure round 1), deliberately and in the SAME plan
+    //   that widened `failure_cause.py`. Widening one side alone leaves the tree red between
+    //   waves, which is the whole reason both halves of this wire live in one plan.
     const causes = Object.keys(SENTENCE_FOR_CAUSE)
-    expect(causes).toHaveLength(4)
+    expect(causes).toHaveLength(5)
     expect(causes).toContain("token_revoked")
     expect(causes).toContain("folder_gone")
     expect(causes).toContain("unreachable")
+    expect(causes).toContain("connection_disabled")
     expect(causes).toContain("unknown")
   })
 
-  it("the control table covers the same four causes", () => {
+  it("the control table covers the same five causes", () => {
     expect(Object.keys(CONTROL_FOR_CAUSE).sort()).toEqual(Object.keys(SENTENCE_FOR_CAUSE).sort())
   })
 
   it("the file-failure table has its three kinds", () => {
+    // ⚠ UNCHANGED at 3 by plan 13 — it adds no per-file kind, only the heading and the scope
+    //   note the wave-2 card needs to render the three that already exist.
     expect(Object.keys(SENTENCE_FOR_FILE_FAILURE)).toHaveLength(3)
+  })
+
+  it("the count-word table has exactly the six stored counts, and COUNT_ORDER lists each once", () => {
+    // ⚠ SIX, because `runHistoryFold.ts:63-81` stores six. The sketch's fixture exercised only
+    //   four of them, so two of these words are new — see the leaf's comment.
+    expect(Object.keys(WORD_FOR_COUNT)).toHaveLength(6)
+    expect(COUNT_ORDER).toHaveLength(6)
+    expect(new Set(COUNT_ORDER).size).toBe(6)
+    expect([...COUNT_ORDER].sort()).toEqual(Object.keys(WORD_FOR_COUNT).sort())
+  })
+
+  it("the two per-file headings are non-empty", () => {
+    expect(FILE_FAILURE_HEADING.trim().length).toBeGreaterThan(0)
+    expect(FILE_FAILURE_SCOPE_NOTE.trim().length).toBeGreaterThan(0)
   })
 
   it("COPY carries every key the sketch's own COPY object carries, less the two hoisted tables", () => {
@@ -250,6 +291,46 @@ describe("V-07 — each cause maps to exactly ONE named control", () => {
     expect(CONTROL_FOR_CAUSE.unknown.label("Legal Drive")).toBe("Retry now")
   })
 
+  it("⭐ G3 — a switched-off connection is NOT offered Retry now", () => {
+    // THE GAP THIS PLAN CLOSES. Before it, a disabled connection resolved to `unknown` after
+    // three paused ticks: "It stopped, and no reason was recorded." plus a Retry button that
+    // provably cannot change a state somebody chose deliberately. SC#2's word is *fixes*.
+    const label = CONTROL_FOR_CAUSE.connection_disabled.label("Marketing Drive")
+    expect(label).not.toBe("Retry now")
+    expect(label).not.toContain("Reconnect")
+    expect(label).toContain("Marketing Drive")
+    expect(label).toBe("Turn Marketing Drive back on")
+    expect(SENTENCE_FOR_CAUSE.connection_disabled("Marketing Drive")).not.toBe(
+      UNKNOWN_SOURCE_FAILURE_SENTENCE,
+    )
+  })
+
+  it("the connection_disabled sentence names the connection and says how reading resumes", () => {
+    const s = SENTENCE_FOR_CAUSE.connection_disabled("Marketing Drive")
+    expect(s).toContain("Marketing Drive")
+    expect(s).toContain("switched off")
+    expect(s).toContain("switched back on")
+  })
+
+  it("an empty connection name degrades on the new cause too, rather than printing a gap", () => {
+    expect(CONTROL_FOR_CAUSE.connection_disabled.label("")).toBe("Turn the connection back on")
+    expect(CONTROL_FOR_CAUSE.connection_disabled.label("   ")).toBe("Turn the connection back on")
+    expect(SENTENCE_FOR_CAUSE.connection_disabled("")).toContain("the connection")
+  })
+
+  it("⭐ the new cause REUSES the reconnect door — no fourth action was invented", () => {
+    // The Connections surface is where a connection is switched back on, and it is already the
+    // `reconnect` action's destination. Reusing it keeps the "three named actions" pin below
+    // green BY CONSTRUCTION rather than by loosening it.
+    expect(CONTROL_FOR_CAUSE.connection_disabled.action).toBe("reconnect")
+    const actions = new Set(
+      (Object.keys(CONTROL_FOR_CAUSE) as SourceFailureCause[]).map(
+        (c) => CONTROL_FOR_CAUSE[c].action,
+      ),
+    )
+    expect([...actions].sort()).toEqual(["reconnect", "repick_folder", "retry"])
+  })
+
   it("every cause carries exactly one action, drawn from the three named actions", () => {
     const actions = new Set(["reconnect", "repick_folder", "retry"])
     for (const cause of Object.keys(CONTROL_FOR_CAUSE) as SourceFailureCause[]) {
@@ -272,7 +353,17 @@ describe("V-07 — each cause maps to exactly ONE named control", () => {
     expect(vocabularySource.length).toBeGreaterThan(3000)
     expect(vocabularySource).not.toMatch(/switch\s*\(\s*cause/)
     expect(vocabularySource).not.toMatch(/cause\s*===\s*["']/)
-    expect(vocabularySource).not.toMatch(/case\s+["'](?:token_revoked|folder_gone|unreachable)["']/)
+    expect(vocabularySource).not.toMatch(
+      /case\s+["'](?:token_revoked|folder_gone|unreachable|connection_disabled)["']/,
+    )
+  })
+
+  it("⭐ D-235-11 PROVED ON THE FIFTH CAUSE — it appears in exactly three places, all of them tables", () => {
+    // A new cause must need a ROW, never a branch. Counted over the shipped source: the union,
+    // the sentence table, the control table. A fourth occurrence would mean somebody reached
+    // for special-casing, and this reds rather than waiting for a reviewer to notice.
+    const occurrences = vocabularySource.split("connection_disabled").length - 1
+    expect(occurrences).toBe(3)
   })
 
   it("⛔ ZERO IMPORTS — the leaf's own source has no import statement", () => {
@@ -300,10 +391,12 @@ describe("V-09 — bound to failure_cause.py's LIVE source", () => {
     expect(failureCausePySource).toContain("classify_failure_cause")
   })
 
-  it("⚠ NON-VACUITY — the extraction actually found the four cause literals", () => {
+  it("⚠ NON-VACUITY — the extraction actually found the five cause literals", () => {
     // A regex that matched nothing yields [], and [] would satisfy every "for each" below
     // vacuously while looking green. This is the assertion that reds on a rename.
-    expect(backendCauses()).toHaveLength(4)
+    // ⚠ RE-BASELINED 4 → 5 in the SAME plan that widened the backend union (plan 13).
+    expect(backendCauses()).toHaveLength(5)
+    expect(backendCauses()).toContain("connection_disabled")
   })
 
   it("⭐ every cause the backend can emit HAS a sentence and a control", () => {
@@ -359,6 +452,24 @@ describe("classifySourceFailure — the same four causes, recognised on the clie
     expect(classifySourceFailure(undefined)).toBe("unknown")
     expect(classifySourceFailure("   ")).toBe("unknown")
     expect(classifySourceFailure("something nobody has seen before")).toBe("unknown")
+  })
+
+  it("⛔ the fifth cause is WRITTEN, never inferred — the client half guesses it from nothing", () => {
+    // The MIRROR of `test_failure_cause.py::test_connection_disabled_is_never_inferred_from_a_message`.
+    // Only the seam that read `is_enabled` off the connection row knows this fact; a provider
+    // saying "disabled" about a file, an API, a scope or an account is not evidence about the
+    // connection. Inferring it would offer "turn it back on" for a connection already on.
+    for (const tempting of [
+      "connection is disabled",
+      "disabled",
+      "Connection is disabled",
+      "switched off",
+      "connection disabled",
+      "The connection has been disabled by an administrator.",
+      "this source is turned off",
+    ]) {
+      expect(classifySourceFailure(tempting)).not.toBe("connection_disabled")
+    }
   })
 })
 
@@ -472,5 +583,101 @@ describe("COPY — the sentences the BUILD-CONTRACT pins", () => {
       expect(s.toLowerCase()).not.toContain("instantly")
       expect(s.toLowerCase()).not.toContain("on change")
     }
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// PLAN 13 · THE WORDS WAVE 2 RENDERS — per-category counts, the per-file heading, the instant
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("WORD_FOR_COUNT — the six stored counts, in words", () => {
+  it("the four the sketch drew are byte-identical to the design", () => {
+    // `index.html:478-481` — `renderRun`'s own bits. These four are the contract; a reworded
+    // one is a drift from the approved sketch, not a copy improvement.
+    expect(WORD_FOR_COUNT.new).toBe("added")
+    expect(WORD_FOR_COUNT.modified).toBe("updated")
+    expect(WORD_FOR_COUNT.missing).toBe("missing at source")
+    expect(WORD_FOR_COUNT.errors).toBe("could not be read")
+  })
+
+  it("the two the sketch never drew are lowercase fragments in the same register", () => {
+    // ⚠ STATED, not slipped in: the store carries SIX counts (`runHistoryFold.ts:63-81`) and
+    //   the sketch's fixture exercised four. `renamed` and `restored` are ours.
+    expect(WORD_FOR_COUNT.renamed).toBe("renamed")
+    expect(WORD_FOR_COUNT.restored).toBe("restored")
+    for (const w of Object.values(WORD_FOR_COUNT)) {
+      expect(w).toBe(w.toLowerCase())
+      expect(w).not.toMatch(/[.?]$/)
+    }
+  })
+
+  it("COUNT_ORDER is the sketch's reading order", () => {
+    expect([...COUNT_ORDER]).toEqual([
+      "new",
+      "modified",
+      "renamed",
+      "restored",
+      "missing",
+      "errors",
+    ])
+  })
+
+  it("every COUNT_ORDER key has a word — the render cannot reach an undefined", () => {
+    for (const key of COUNT_ORDER) {
+      expect(typeof WORD_FOR_COUNT[key]).toBe("string")
+      expect(WORD_FOR_COUNT[key].length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe("CHECKED_PREFIX — the prefix COPY.checkedAgo bakes a summed count into", () => {
+  it("says what happened and when, and nothing about how many", () => {
+    expect(CHECKED_PREFIX("4 minutes ago")).toBe("Checked 4 minutes ago")
+    expect(CHECKED_PREFIX("3 days ago")).toBe("Checked 3 days ago")
+  })
+
+  it("⛔ COPY.checkedAgo is NOT deleted and NOT reworded — the source CARD still renders it", () => {
+    // The one-line summary is right for a card. The per-category breakdown is right for the
+    // run history. Both exist; neither replaces the other, and the 26-key pin is undisturbed.
+    expect(COPY.checkedAgo("4 minutes ago", 6)).toBe("Checked 4 minutes ago · 6 files")
+    expect(Object.keys(COPY)).toHaveLength(26)
+  })
+})
+
+describe("FILE_FAILURE_HEADING / FILE_FAILURE_SCOPE_NOTE — the list is a STATE, not a run", () => {
+  it("⭐ the scope note says the list is how the files stand NOW, not what one check did", () => {
+    // THE WHOLE REASON the wave-2 card may render per-file reasons at all. `connector_watch_items`
+    // carries the file's CURRENT state; it is not a per-run attribution, and claiming it were
+    // would be exactly the overclaim this phase exists to stop making.
+    expect(FILE_FAILURE_SCOPE_NOTE.toLowerCase()).toContain("now")
+    expect(FILE_FAILURE_SCOPE_NOTE.toLowerCase()).not.toContain("this check")
+    expect(FILE_FAILURE_HEADING.toLowerCase()).toContain("could not be read")
+  })
+})
+
+describe("instantPhrase — the BUILD-CONTRACT's absolute instant", () => {
+  it("renders the shape COPY.lastGood is pinned against", () => {
+    // ⚠ Constructed with local-time components so no assertion depends on the runner's zone.
+    const d = new Date(2026, 8, 2, 9, 14) // 2 September 2026, 09:14 local
+    expect(instantPhrase(d.toISOString())).toBe("2 September, 09:14")
+    expect(COPY.lastGood(instantPhrase(d.toISOString()) as string)).toBe(
+      "Last read successfully on 2 September, 09:14",
+    )
+  })
+
+  it("pads the hour and the minute, and never pads the day", () => {
+    const d = new Date(2026, 11, 25, 7, 5)
+    expect(instantPhrase(d.toISOString())).toBe("25 December, 07:05")
+    const early = new Date(2026, 0, 1, 0, 0)
+    expect(instantPhrase(early.toISOString())).toBe("1 January, 00:00")
+  })
+
+  it("silence beats an invented instant — null, undefined and unparseable all return null", () => {
+    // `relativeBand`'s own recorded rule. A date we cannot read is not a date we may guess.
+    expect(instantPhrase(null)).toBeNull()
+    expect(instantPhrase(undefined)).toBeNull()
+    expect(instantPhrase("")).toBeNull()
+    expect(instantPhrase("   ")).toBeNull()
+    expect(instantPhrase("not a date at all")).toBeNull()
   })
 })
