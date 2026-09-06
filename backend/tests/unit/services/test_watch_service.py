@@ -136,7 +136,17 @@ async def test_watch_service_tick_claims_and_syncs_new_file(mock_pool, mock_supa
         mock_insert_job.assert_awaited_once_with(mock_pool, document_id=new_doc_id, user_id=user_id, org_id=org_id)
 
         # Check watch released as success
-        mock_release.assert_awaited_once_with(mock_pool, watch_id, status="success")
+        # Phase 235 (SURF-02): the success release now carries what the tick DID, so an
+        # exact whole-call assertion can no longer be written by hand — `started_at` is a
+        # live clock reading. Repinned by KWARG; the subject is unchanged, only its addressing.
+        mock_release.assert_awaited_once()
+        assert mock_release.call_args[0] == (mock_pool, watch_id)
+        rel_kwargs = mock_release.call_args[1]
+        assert rel_kwargs["status"] == "success"
+        assert rel_kwargs["listing_complete"] is True
+        assert rel_kwargs["failure_cause"] is None
+        assert rel_kwargs["started_at"] is not None
+        assert set(rel_kwargs["counts"]) == {"new", "modified", "renamed", "missing", "restored", "errors"}
 
 
 @pytest.mark.asyncio
@@ -192,7 +202,17 @@ async def test_watch_service_duplicate_file_skips_upload_and_enqueue(mock_pool, 
         # Crucial: Storage upload NOT called and job NOT enqueued for duplicate
         mock_supabase.storage.from_("documents").upload.assert_not_called()
         mock_insert_job.assert_not_called()
-        mock_release.assert_awaited_once_with(mock_pool, watch_id, status="success")
+        # Phase 235 (SURF-02): the success release now carries what the tick DID, so an
+        # exact whole-call assertion can no longer be written by hand — `started_at` is a
+        # live clock reading. Repinned by KWARG; the subject is unchanged, only its addressing.
+        mock_release.assert_awaited_once()
+        assert mock_release.call_args[0] == (mock_pool, watch_id)
+        rel_kwargs = mock_release.call_args[1]
+        assert rel_kwargs["status"] == "success"
+        assert rel_kwargs["listing_complete"] is True
+        assert rel_kwargs["failure_cause"] is None
+        assert rel_kwargs["started_at"] is not None
+        assert set(rel_kwargs["counts"]) == {"new", "modified", "renamed", "missing", "restored", "errors"}
 
 
 @pytest.mark.asyncio
@@ -282,7 +302,16 @@ async def test_watch_service_error_isolation_per_watch(mock_pool, mock_supabase,
         assert svc.sync_watch.await_count == 2
 
         # w1 was released as failed with the error message
-        mock_release.assert_awaited_once_with(mock_pool, w1_id, status="failed", error="Google Drive API 503 Backend Error")
+        # Phase 235 (SURF-02 / V-01): the crash arm — OUTSIDE sync_watch — names a CAUSE and
+        # records that it read nothing: counts is None, and the listing never completed.
+        mock_release.assert_awaited_once()
+        assert mock_release.call_args[0] == (mock_pool, w1_id)
+        rel_kwargs = mock_release.call_args[1]
+        assert rel_kwargs["status"] == "failed"
+        assert rel_kwargs["error"] == "Google Drive API 503 Backend Error"
+        assert rel_kwargs["failure_cause"] == "unreachable"
+        assert rel_kwargs["counts"] is None
+        assert rel_kwargs["listing_complete"] is False
 
 
 @pytest.mark.asyncio
@@ -353,7 +382,17 @@ async def test_watch_service_per_item_error_isolation(mock_pool, mock_supabase, 
         mock_insert_job.assert_awaited_once_with(mock_pool, document_id=good_doc_id, user_id=user_id, org_id=org_id)
 
         # Watch was NOT aborted, released cleanly
-        mock_release.assert_awaited_once_with(mock_pool, watch_id, status="success")
+        # Phase 235 (SURF-02): the success release now carries what the tick DID, so an
+        # exact whole-call assertion can no longer be written by hand — `started_at` is a
+        # live clock reading. Repinned by KWARG; the subject is unchanged, only its addressing.
+        mock_release.assert_awaited_once()
+        assert mock_release.call_args[0] == (mock_pool, watch_id)
+        rel_kwargs = mock_release.call_args[1]
+        assert rel_kwargs["status"] == "success"
+        assert rel_kwargs["listing_complete"] is True
+        assert rel_kwargs["failure_cause"] is None
+        assert rel_kwargs["started_at"] is not None
+        assert set(rel_kwargs["counts"]) == {"new", "modified", "renamed", "missing", "restored", "errors"}
 
 
 @pytest.mark.asyncio
