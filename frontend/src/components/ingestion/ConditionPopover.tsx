@@ -122,9 +122,15 @@ export function ConditionPopover({
     const custom = customFields
       .filter((d) => d.enabled)
       .map((d) => ({ field_key: d.field_key, field_type: d.field_type, options: d.options }))
-    const combined = [...BUILTIN_FIELDS, ...WATCH_FIELDS]
-    const seen = new Set(combined.map((f) => f.field_key))
-    return [...combined, ...custom.filter((c) => !seen.has(c.field_key))]
+    const seen = new Set<string>()
+    const result: FilterField[] = []
+    for (const f of [...BUILTIN_FIELDS, ...WATCH_FIELDS, ...custom]) {
+      if (!seen.has(f.field_key)) {
+        seen.add(f.field_key)
+        result.push(f)
+      }
+    }
+    return result
   }, [customFields, ruleScope])
 
   const [field, setField] = useState<string>(() => {
