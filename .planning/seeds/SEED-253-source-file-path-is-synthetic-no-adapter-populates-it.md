@@ -12,8 +12,13 @@ relates_to:
   - Phase 238 (Microsoft Graph — OneDrive and SharePoint) — SharePoint's library paths are
     the natural forcing function; ⭐ this is the most likely place the gap becomes visible
 trigger_when: >
-  ANY of: (a) Phase 238 lands a Graph adapter, since SharePoint document-library paths are
-  folder-shaped by nature and a user WILL write a path rule against them; (b) a recursive /
+  ANY of: (a) Phase 238 lands a Graph adapter — WIDENED 2026-09-07 from "SharePoint" to ANY
+  Graph adapter, because the operator split Phase 238 and deferred SharePoint to SEED-256; left
+  as written this trigger would have waited on a phase that had already passed, which is the exact
+  dormant-seed failure this register exists to prevent. OneDrive alone fires it: driveItem carries
+  parentReference.path, so the real folder path IS available from Graph and the synthetic
+  '/<filename>' substitution becomes visibly wrong the moment a OneDrive folder is watched;
+  (b) a recursive /
   subfolder watch ships, making a file's folder location meaningful rather than constant;
   (c) any user-reported bug of the shape "my path rule does nothing"; (d) any phase that
   touches `SourceFile` or `preview_service._suggest_destination`.

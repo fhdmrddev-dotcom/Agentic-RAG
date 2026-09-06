@@ -600,14 +600,38 @@ Plans:
 
 ---
 
-#### Phase 238: Microsoft Graph — OneDrive and SharePoint
+#### Phase 238: Microsoft Graph — OneDrive (SharePoint deferred, `SEED-256`)
 
-**Goal**: A person watches a OneDrive or SharePoint folder exactly the way they watch a Drive folder — and how small this phase is, is the milestone's measurement of whether Phase 232's contract was real.
+> ### ⚠ SPLIT BY THE OPERATOR, 2026-09-07 — OneDrive ships and is DRIVEN; SharePoint is built-but-undriven and deferred with a trigger. The original scope is preserved below rather than rewritten.
+>
+> **The reason is an account boundary, not a scope cut.** SharePoint sites exist only inside a
+> Microsoft 365 **work/school tenant**; the operator has a **personal Microsoft account**, which has
+> no `/sites/` to read. No scope unlocks it — `Sites.Read.All` on a personal account has nothing to
+> address. So a SharePoint success criterion could only ever be *claimed*, never driven, and this
+> project's standing rule is that a row is recorded **⛔ blocked with its reason**, never silently
+> passed.
+>
+> ⭐ **Why splitting costs almost nothing, which is what makes it the right call rather than a
+> retreat:** SharePoint and OneDrive are the **same Graph API and the same adapter** — both are
+> drives, `/me/drive` vs `/sites/{id}/drive`, with identical listing, paging and the same 302
+> download dance. The adapter built for OneDrive **is** the one SharePoint needs, pointed at a
+> different drive id. The contract test (SC#4 — *"if this phase was not small…"*) is therefore
+> fully preserved: it is measured against OneDrive.
+>
+> ⚠ **The `Sites.Read.All` admin-consent risk in the Flags below is NOT resolved by this split — it
+> is DEFERRED WITH THE ROW.** It was the flag most likely to block the phase, and it is now the
+> first thing `SEED-256` must drive on a real tenant. Do not read the split as having answered it.
+>
+> **What ships here:** SC#1-#4 against **OneDrive**, driven live by the operator on a personal
+> account (`Files.Read.All` self-consents there). **What defers:** the SharePoint half of SC#1,
+> recorded ⛔ in the phase's UAT table with the reason *"no work/school tenant"*.
+
+**Goal**: A person watches a OneDrive folder exactly the way they watch a Drive folder — and how small this phase is, is the milestone's measurement of whether Phase 232's contract was real.
 **Depends on**: Phase 232 (the contract) and Phase 234 (the loop it plugs into).
 **Requirements**: SRC-03
 **Success Criteria** (what must be TRUE):
 
-  1. A person connects a Microsoft account, browses **OneDrive and a SharePoint document library**, picks a folder, and previews it with the same four buckets they saw for Drive (SRC-03).
+  1. A person connects a Microsoft account, browses **OneDrive**, picks a folder, and previews it with the same four buckets they saw for Drive (SRC-03). ⛔ **The SharePoint document-library half of this row is DEFERRED to `SEED-256`** — it is recorded in the UAT table as blocked with the reason *"no work/school tenant; a personal Microsoft account has no `/sites/` to address"*, never as passed and never omitted.
   2. Files from that folder are read and appear in the Library on the schedule — including files large enough to need the two-step download (SRC-03).
   3. Everything Phase 234 promised behaves **identically** for a Graph source: deletion does not delete, disconnect freezes, visibility is the connection's, an incomplete listing marks nothing missing. A person cannot tell from the behaviour which family they are watching (SRC-01's real test, observed through SRC-03).
   4. If this phase was **not small**, that is recorded as a finding against Phase 232's contract — naming the specific thing the contract could not express — rather than absorbed quietly into the adapter.
