@@ -202,8 +202,37 @@ async def test_paused_arm_records_a_run_row(mock_pool):
         # Zero counts, EXPLICITLY — nothing was read, and zero is the honest observation.
         assert kw["counts"] == {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0, "errors": 0}
         assert kw["listing_complete"] is False
-        assert kw["failure_cause"] is None
+        # ⚠ RE-BASELINED from `is None` (Phase 235 plan 13, gap-closure round 1). The pin is
+        #   REWRITTEN, not deleted: the assertion that this arm names its cause is exactly the
+        #   thing that used to be missing. A paused tick that recorded no cause was promoted to
+        #   `stopped` with `unknown` after three cadences, and the surface then offered
+        #   "Retry now" for a connection somebody switched off on purpose.
+        # ⛔ THIS IS THE ONLY PLACE THE CAUSE IS WRITTEN. It is never inferred — see
+        #   `test_failure_cause.py::test_connection_disabled_is_never_inferred_from_a_message`.
+        assert kw["failure_cause"] == "connection_disabled"
         assert isinstance(kw["started_at"], datetime)
+
+
+def test_connection_disabled_is_written_by_exactly_one_seam() -> None:
+    """⛔ ONE WRITER. The literal appears in `watch_service.py` exactly once, and it is the
+    `failure_cause=` keyword of the connection-disabled arm.
+
+    A second writer would mean a second place that decides a connection is off, and the two
+    could disagree about a fact only one of them read. Asserted over the live source because
+    the property is about the WHOLE FILE, which no call-level mock can observe.
+    """
+    from pathlib import Path
+
+    import app.services.watch_service as mod
+
+    source = Path(mod.__file__).read_text(encoding="utf-8")
+    # ⚠ NON-VACUITY — the file was actually read and does carry the seam.
+    assert "is_enabled" in source
+    occurrences = [
+        line.strip() for line in source.splitlines() if "connection_disabled" in line
+    ]
+    assert len(occurrences) == 1, f"expected ONE writer, found {occurrences}"
+    assert occurrences[0].startswith("failure_cause=")
 
 
 # ── 3. SEAM 3 of 4 — the happy path, and the counts that used to be discarded ─────────
