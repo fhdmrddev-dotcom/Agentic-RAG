@@ -121,7 +121,8 @@ Untrusted Ingested Text (Synced Drive files, uploaded PDFs, external connector d
     A code refactor accidentally deletes or weakens one of the 8 defense mechanisms, but existing tests
     fail to detect the regression.
   mitigation: >
-    SC#2 mutation harness: When any named defense is disabled (via AGENTIC_DISABLE_DEFENSE flag),
+    SC#2 mutation harness: When any named defense is removed (via out-of-process patch
+    application in scripts/mutants/*.patch and scripts/run-defense-mutations.sh),
     the adversarial test suite fails loudly and outputs the exact name of the missing defense.
   verification: >
     Reviewer-driven mutation run toggling each defense and asserting loud suite failure.

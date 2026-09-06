@@ -134,3 +134,60 @@ which is failure mode #2 on the ROADMAP list.
 3. Read the attack report the way a person would, for SC#3.
 4. Check the roster report lists **every** derived provider, each `pass` / `⛔ blocked with reason` /
    `[SKIP — missing credentials]` — never omitted.
+
+---
+
+# RE-CHECK @ `4c0c29aaa` — verdict: **PASS on design · 3 must-fix in `236-02`'s runner spec**
+
+Every finding from the first pass is addressed, and two of them better than I asked.
+
+| Finding | Status |
+|---|---|
+| ⛔ BLOCKING 1 — runtime kill-switch | ✅ **RESOLVED, and beyond the ask.** No production module appears in any `files_modified`. The mechanism is 8 patch files under `scripts/mutants/` + a runner that applies, asserts red, restores. |
+| ⛔ BLOCKING 2 — SC#3 has no owner | ✅ **RESOLVED.** `236-ATTACK-REPORT.md` rendered on every run, every attack row with tried / refused / verdict. |
+| M-1 misquoted `eval_runner` string | ✅ corrected to the verbatim clause |
+| M-2 `app/models/llm.py` ghost ref | ✅ now `app.config.MODEL_CAPABILITIES` throughout |
+| M-3 re-typed roster | ✅ derived; asserts every derived provider has a row; no count, no name list |
+| M-4 six files with no ledger row | ✅ **gate now reads `ledger gate OK · watched: 0`** — resolved by removal, exactly as predicted |
+| O-1 corpus derived from defences | ✅ **acted on though only an observation** — taxonomy is now attack-first (`LLM01-DELIMITER-01`, `LLM01-INDIRECT-01`, `LLM01-EXFIL-01`…) with modules as targets |
+
+⭐ **The corpus also moved from `backend/app/services/security/` to `backend/tests/unit/security/`.**
+I did not ask for that and it is the right call: the corpus is test data, not product. **This phase
+now modifies zero production source files** — correct for a phase whose job is to attack the
+defences, not to change them.
+
+## The three remaining defects are all in `236-02-02`'s runner spec
+
+**N-1 · `git restore backend/app` is far wider than the mutant.** It discards **every** uncommitted
+change under `backend/app`, not just the applied patch — so a reviewer or sibling agent with work in
+progress loses it silently, with no prompt and no backup. This repo already carries a scar for
+exactly this shape of over-broad cleanup (the `rm -rf` worktree rule). **Revert the patch, not the
+directory:** `git apply -R "$patch"`, which touches only the hunks it applied.
+
+**N-2 · The runner's own artifacts break its own clean-tree assertions. It cannot survive its second run.**
+`.planning/` is tracked, and:
+- step 1 requires a clean tree — but step 4 writes `236-MUTATION-REPORT.md` **into** the tree, so
+  **run #2 starts dirty and refuses**;
+- step 2 runs the corpus suite, which per `236-01` writes `236-ATTACK-REPORT.md` **on every run** via
+  pytest teardown — so the tree is dirty *before the first patch is applied*;
+- step 3's `git diff --exit-code` therefore reports non-zero every iteration, for a reason that has
+  nothing to do with the mutant.
+
+The danger is not the false red — it is the fix someone reaches for under time pressure: weakening
+the restore assertion. **That assertion is the one thing standing between this runner and a
+destructive script.** Keep it strict and narrow it instead: assert `git diff --exit-code -- backend/app`,
+and have both reports written to a gitignored output dir (or `git add`-ed deliberately at the end),
+never mid-loop.
+
+**N-3 · `236-THREAT-MODEL.md:124` still specifies the mechanism you removed** — it describes
+mitigation via *"AGENTIC_DISABLE_DEFENSE flag"*. The threat model is the artifact `secure-phase`
+reads, so leaving it describing a rejected design means the security check verifies the wrong thing.
+Update it to the patch-mutant mechanism. `236-DISCUSSION-LOG.md:29` records Option A as chosen —
+that one is **history and should stay**, annotated as *superseded at pre-flight*, not rewritten.
+
+## Disposition
+
+**`236-01` and `236-03` are cleared to execute now.** `236-02` is cleared once N-1/N-2/N-3 are in —
+all three are edits to a script spec, not a redesign. No re-review needed for N-3; I will verify
+N-1 and N-2 by running the finished runner myself, on a deliberately dirty tree, and confirming it
+refuses rather than restores over the top.

@@ -30,7 +30,7 @@
 | Option B | Source-level AST mutation or git patch drive applied by Claude during the review phase | |
 
 **User's choice:** Option A.
-**Notes:** User specifically asked what this means from a user perspective, and selected Option A to keep working tree and source files completely clean while enabling Claude to independently drive mutation testing.
+**Notes:** User specifically asked what this means from a user perspective, and selected Option A to keep working tree and source files clean. *(Superseded at pre-flight review: Option A's env-flag mechanism replaced with out-of-process git patch mutation in scripts/mutants/*.patch and scripts/run-defense-mutations.sh to eliminate runtime production kill-switches and test true deletion per SC#2)*.
 
 ---
 
