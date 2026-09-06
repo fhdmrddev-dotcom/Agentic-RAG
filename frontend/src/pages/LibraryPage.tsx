@@ -136,6 +136,21 @@ function pageReducer(state: LibState, action: PageAction): LibState {
   return libraryReducer<ViewFilter, SavedView>(state, action)
 }
 
+/** ⚠ A TEMPORARY SLOT, AND IT DOES NOTHING WITH THE HANDLER YET — say so rather than let it
+ *  read as a wired deep link.
+ *
+ *  Phase 235 plan 11 (Wave 4) declares `onGoToSource` on `HealthTab` itself and wires it to
+ *  the attention rows. This plan (wave 1) OWNS the handler but not that file, and
+ *  `tsconfig.app.json` sets `noUnusedLocals`, so the handler needs a real consumer to keep
+ *  `tsc --noEmit` at its measured baseline. This accepts the prop and drops it on the floor.
+ *
+ *  ⛔ PLAN 11 DELETES THIS and passes `onGoToSource` straight to `HealthTab`. Chosen over a
+ *  `HealthTab as ...` cast, which would CLAIM the prop was accepted while it is ignored — a
+ *  false type is worse than a stated no-op. */
+function HealthTabSlot(_props: { onGoToSource: (watchId: string) => void }) {
+  return <HealthTab />
+}
+
 // ⛔ FIVE TABS: Documents, Views, Ingestion, Indexing, Health. Built incrementally through
 // Phase 217.1 plans 03-12 — each tab body is a CHILD component with its own data fetching
 // and state, so no conditional branch enters this component.
@@ -166,7 +181,25 @@ function useIsWide(): boolean {
   return isWide
 }
 
-export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
+/** Phase 235-08 (SURF-03 / D-235-04) — the tab a CALLER outside the Library asked for.
+ *
+ *  ⛔ IT SEEDS THE INITIAL STATE AND NOTHING ELSE. The reducer stays the one source of
+ *  selection truth: after mount, every transition is a `SELECT_TAB` exactly as before, so a
+ *  caller cannot pin a tab the person is then stuck on (fenced by
+ *  `LibraryPage.initialTab.test.tsx`'s last case).
+ *
+ *  ⛔ AND IT IS COMPOSED HERE, NOT IN THE LEAF. `librarySelection.ts` gains NO seventh
+ *  action — its 25-case suite asserts the action set is exactly six, and `SET_FOLDER_SHEET`
+ *  (see `pageReducer`'s docblock above) is the shipped precedent for a page-level need met
+ *  at this boundary. `initialLibraryState` is typed `LibraryState<never, never>`, so a
+ *  spread that replaces `selection` stays assignable to `LibState` with no cast.
+ *
+ *  ⚠ There is no URL in any of this. This app has no router (`SEED-185`) — navigation is a
+ *  `useState<ActiveView>` switch in `App.tsx`, and this prop is the only door into a tab. */
+export function LibraryPage({
+  onNavigate,
+  initialTab,
+}: { onNavigate?: (view: ActiveView) => void; initialTab?: LibraryTab } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
@@ -174,8 +207,38 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   // ⭐ ONE reducer replaces `selectedFolderId`, `selectedViewId`, `editingView`, `filter` and
   // `folderSheetOpen` — five React state hooks and the five handlers that had to keep them
   // consistent by hand. The tab is PART of the selection, never a variable beside it.
-  const [lib, dispatch] = useReducer(pageReducer, initialLibraryState)
+  // ⭐ THE INITIAL TAB IS COMPOSED HERE, AND THROUGH THE LEAF'S OWN TRANSITION. The lazy
+  // initializer runs `SELECT_TAB` once against the shipped opening state, so the seeded
+  // state is one the reducer could genuinely have reached — no arm shape is re-derived at
+  // this boundary (the `LibrarySelection` arms are mutually exclusive by construction, and
+  // `selectionForTab` is module-private on purpose). ⛔ NO seventh action: the leaf is
+  // byte-unchanged, exactly as `SET_FOLDER_SHEET`'s docblock above requires.
+  const [lib, dispatch] = useReducer(pageReducer, initialLibraryState, (opening) =>
+    initialTab ? pageReducer(opening, { type: "SELECT_TAB", tab: initialTab }) : opening,
+  )
   const tab = lib.selection.tab
+
+  /** Phase 235-08 (D-235-17) — the Health tab's route BACK to the source card.
+   *
+   *  Health owns only what is WRONG; Ingestion owns everything a source did. So a Health row
+   *  does not restate the source — it hands the person to the card that already says it.
+   *
+   *  ⚠ SAME IDIOM AS `ReembedSearchPointer`'s `onViewProgress` below (dispatch, then scroll
+   *  on the next tick once the tab body has mounted) rather than a second scroll shape. The
+   *  100 ms is that handler's measured delay, not a new guess.
+   *
+   *  ⚠ THE ANCHOR IS OWED BY PLAN 10. `WatchedFoldersSection.tsx:219` emits
+   *  `data-testid={`watch-card-${watch.id}`}` but no matching `id` attribute, so this scroll
+   *  is a NO-OP until plan 10 adds it — the tab switch works today, the scroll does not.
+   *  Stated here rather than left to be discovered. */
+  const handleGoToSource = (watchId: string) => {
+    dispatch({ type: "SELECT_TAB", tab: "ingestion" })
+    setTimeout(() => {
+      document
+        .getElementById(`watch-card-${watchId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }, 100)
+  }
 
   /** Sketch 231-A — what the header pill and the `In progress` badge both read.
    *
@@ -845,7 +908,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
               value="health"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              <HealthTab />
+              <HealthTabSlot onGoToSource={handleGoToSource} />
             </TabsContent>
           </div>
         </Tabs>

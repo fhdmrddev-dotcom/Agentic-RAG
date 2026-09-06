@@ -69,7 +69,12 @@ const v2: SavedView = {
   is_system_global: true,
 }
 
-const TABS: readonly LibraryTab[] = ["documents", "views", "ingestion", "indexing"]
+// ⚠ Phase 235-08: `"health"` was MISSING here while `LibraryTab` has had five members since
+// 217.1-12 — so the fifth arm was never driven through the reducer at all. Widening the list
+// is free coverage, and it is the tab Phase 235 makes externally reachable, so an untested
+// arm was exactly the wrong one to leave untested. It adds one ACTION (13, not 12), not one
+// case: `TABS` is looped INSIDE cases, so the suite's case count is unchanged at 25.
+const TABS: readonly LibraryTab[] = ["documents", "views", "ingestion", "indexing", "health"]
 
 /** Every action the reducer accepts, at more than one payload each where payload matters. */
 const ACTIONS: readonly Action[] = [
@@ -231,7 +236,9 @@ describe("librarySelection — the named success criteria", () => {
 describe("librarySelection — every action against every arm", () => {
   it("is total: no action on any seed throws or yields an invalid arm", () => {
     expect(SEEDS.length).toBe(6)
-    expect(ACTIONS.length).toBe(12)
+    // 8 non-tab actions + one SELECT_TAB per tab. 13 since 235-08 widened `TABS` to the
+    // union's full five members; the ACTION TYPE count below is still SIX, and must stay so.
+    expect(ACTIONS.length).toBe(13)
 
     for (const s of SEEDS) {
       for (const a of ACTIONS) {
