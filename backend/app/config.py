@@ -1205,6 +1205,19 @@ class Settings(BaseSettings):
     watch_poll_interval_seconds: int = 60
     # Lease duration in seconds for in-flight watch passes (default 600s).
     watch_lease_seconds: int = 600
+    # Phase 235 (SURF-02 / D-235-08) — bound on per-watch run history, pruned on write.
+    # `connector_sync_runs` gains one row per release of a watch, so an hourly watch
+    # writes ~24 rows a day forever. The bound is applied in the SAME statement as the
+    # insert: there is no sweeper to forget to run and no unbounded-growth path.
+    #
+    # ⚠ It lives HERE rather than in `app_settings` deliberately, and the tension is
+    # named rather than hidden: CLAUDE.md says settings live in the DB and env vars are
+    # for secrets and infra. This is an operational bound on a background daemon — in
+    # the same block as that daemon's other two bounds — and putting it in `app_settings`
+    # would mean the watch loop reads a DB setting on every tick. When retention becomes
+    # a governed POLICY (a retention promise made to a customer) rather than a daemon
+    # bound, it moves to `app_settings` — recorded as SEED-250.
+    watch_run_history_retention: int = 200
 
 
     @model_validator(mode="after")

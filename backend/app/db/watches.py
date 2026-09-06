@@ -14,10 +14,13 @@ Key invariants:
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 import asyncpg
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,13 @@ _WATCH_COLUMNS = (
 _WATCH_CLAIM_COLUMNS = (
     "id, org_id, user_id, connection_id, source_folder_id, source_folder_name, "
     "source_drive_id, library_folder_id, interval_minutes, next_run_at, leased_until"
+)
+
+# Phase 235 (SURF-02) — `connector_sync_runs` in TABLE ORDER (migration 172).
+_SYNC_RUN_COLUMNS = (
+    "id, org_id, user_id, watch_id, started_at, finished_at, status, failure_cause, "
+    "last_error, listing_complete, count_new, count_modified, count_renamed, "
+    "count_missing, count_restored, count_errors, created_at"
 )
 
 _WATCH_ITEM_COLUMNS = (
@@ -252,8 +262,42 @@ async def release_watch(
     *,
     status: str,
     error: str | None = None,
+    counts: dict[str, int] | None = None,
+    listing_complete: bool = False,
+    failure_cause: str | None = None,
+    started_at: datetime | None = None,
+    user_id: UUID | None = None,
+    org_id: UUID | None = None,
+    retain: int | None = None,
 ) -> None:
-    """Clear lease and write terminal outcome hint."""
+    """Clear the lease, write the terminal outcome hint, and record ONE run row.
+
+    Phase 235 (SURF-02 / D-235-06 / D-235-07 / D-235-08).
+
+    ⭐ WHY THE RUN-ROW WRITE LIVES HERE AND NOT AT THE CALL SITES. `watch_service.py`
+    releases a watch from FOUR places — `tick()`'s per-watch `except` (`:115`, which is
+    outside `sync_watch` entirely), the connection-disabled arm (`:143`), the happy path
+    (`:434`) and the VIS-04 403 arm (`:458`). Writing the row at each of them means a
+    fifth arm added later silently stops recording history. Writing it HERE means all
+    four get a row by construction and a fifth cannot forget.
+
+    ⚠ THE RUN-ROW INSERT INHERITS THE SWALLOW, AND THAT IS THE POINT (T-235-05).
+    Losing a history row must never turn a successful sync into a failed one. The
+    visible consequence of a failed insert is a gap the history renders honestly, plus
+    a `logger.exception`; the alternative — a real sync marked failed because its
+    bookkeeping did not land — is strictly worse.
+
+    ⚠ ASYNCPG ONLY. This module touches no Supabase client, so the threadpool wrapper
+    D-v2.5-01 mandates for blocking supabase-py calls does not apply to any statement
+    here — both are plain awaits. (The token itself is kept out of this file on purpose:
+    its absence is a grep-able guard, and a mention in prose would read as a use.)
+
+    All arguments after `error` are optional and net-new: the four existing call sites
+    keep compiling unchanged, and a caller that supplies nothing still gets an honest
+    zero-count row rather than no row at all.
+    """
+    keep = settings.watch_run_history_retention if retain is None else retain
+    c = counts or {}
     try:
         async with pool.acquire() as con:
             await con.execute(
@@ -268,6 +312,68 @@ async def release_watch(
                 _as_uuid(watch_id),
                 status,
                 error,
+            )
+
+            # ── The run row + its bound, in ONE statement (D-235-08) ──────────────
+            #
+            # `retain` is BOUND as `$15`, never interpolated (T-235-04).
+            #
+            # ⚠ THE `- 1` IS DELIBERATE AND LOAD-BEARING. The DELETE and the CTE share
+            # one snapshot, so the row just inserted is invisible to the sub-SELECT and
+            # cannot itself be deleted. Keeping `retain - 1` of the pre-existing rows
+            # therefore leaves exactly `retain` rows including the new one; keeping
+            # `retain` would leave `retain + 1` and the bound would drift by one row on
+            # every single tick. `GREATEST(..., 0)` makes `retain = 1` mean "only the
+            # newest", not a negative LIMIT.
+            #
+            # `user_id` / `org_id` are read off the watch itself when the caller does
+            # not supply them, so ownership is resolved in the same statement rather
+            # than by a second round trip that could race a delete.
+            await con.execute(
+                """
+                WITH ins AS (
+                    INSERT INTO connector_sync_runs (
+                        watch_id, user_id, org_id, started_at, finished_at,
+                        status, failure_cause, last_error, listing_complete,
+                        count_new, count_modified, count_renamed,
+                        count_missing, count_restored, count_errors
+                    )
+                    SELECT w.id,
+                           COALESCE($2::uuid, w.user_id),
+                           COALESCE($3::uuid, w.org_id),
+                           COALESCE($4::timestamptz, now()),
+                           now(),
+                           $5, $6, $7, $8,
+                           $9, $10, $11, $12, $13, $14
+                    FROM connector_watches w
+                    WHERE w.id = $1
+                    RETURNING watch_id
+                )
+                DELETE FROM connector_sync_runs
+                WHERE watch_id = (SELECT watch_id FROM ins)
+                  AND id NOT IN (
+                      SELECT id
+                      FROM connector_sync_runs
+                      WHERE watch_id = (SELECT watch_id FROM ins)
+                      ORDER BY started_at DESC
+                      LIMIT GREATEST($15::int - 1, 0)
+                  )
+                """,
+                _as_uuid(watch_id),
+                _as_uuid(user_id) if user_id else None,
+                _as_uuid(org_id) if org_id else None,
+                started_at,
+                status,
+                failure_cause,
+                error,
+                bool(listing_complete),
+                int(c.get("new", 0)),
+                int(c.get("modified", 0)),
+                int(c.get("renamed", 0)),
+                int(c.get("missing", 0)),
+                int(c.get("restored", 0)),
+                int(c.get("errors", 0)),
+                int(keep),
             )
     except Exception:  # noqa: BLE001
         logger.exception("release_watch failed for %s", watch_id)
@@ -291,6 +397,95 @@ async def record_skipped_still_running(
             )
     except Exception:  # noqa: BLE001
         logger.exception("record_skipped_still_running failed for %s", watch_id)
+
+
+# ── Sync Run History (Phase 235 / SURF-02) ────────────────────────────────────
+#
+# ⛔ BOTH READS CARRY AN OWNER PREDICATE IN THE SQL ITSELF, AND THAT IS NOT OPTIONAL
+# (T-235-01). The asyncpg pool path is NOT RLS-gated — the policies migration 172 adds
+# protect PostgREST, not this connection. `get_watch_items` above deliberately has no
+# owner predicate because its route checks ownership first; these two are reached from
+# reads where a guessed `watch_id` must return zero rows rather than another tenant's
+# history. The shape to match is `get_watch:96-103` / `update_watch` / `delete_watch`.
+
+
+async def list_sync_runs(
+    pool: asyncpg.Pool,
+    watch_id: UUID,
+    *,
+    user_id: UUID,
+    limit: int = 200,
+) -> list[dict]:
+    """The per-watch history: what each recent tick actually did, newest first.
+
+    Served entirely by `idx_connector_sync_runs_watch_time` — the same index the
+    consecutive-failure derivation uses.
+    """
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            f"""
+            SELECT {_SYNC_RUN_COLUMNS}
+            FROM connector_sync_runs
+            WHERE watch_id = $1 AND user_id = $2
+            ORDER BY started_at DESC
+            LIMIT $3
+            """,
+            _as_uuid(watch_id),
+            _as_uuid(user_id),
+            max(1, limit),
+        )
+        return [dict(r) for r in rows]
+
+
+async def recent_runs_by_watch(
+    pool: asyncpg.Pool,
+    watch_ids: list[UUID],
+    *,
+    user_id: UUID,
+    per_watch: int = 5,
+) -> dict[str, list[dict]]:
+    """The last `per_watch` runs for MANY watches, in ONE query.
+
+    ⭐ The health verdict asks "how are all my sources doing?" — one query per watch
+    would be N round trips growing with the roster, which is the shape
+    `_enrich_watch_rows` already suffers from. `ROW_NUMBER()` windows the whole set in
+    a single pass.
+
+    ⚠ The consecutive-failure count the verdict needs is DERIVED from these rows — count
+    the leading entries whose `status <> 'success'`. There is deliberately no counter
+    column: four release arms would each have to increment and reset it, and a fifth
+    added later would drift undetectably from the history the user is looking at.
+    An EMPTY list for a watch is not "zero failures" — it is "has not read yet", which
+    is a different sentence.
+
+    Returns `{str(watch_id): [row, ...]}`, newest first within each watch.
+    """
+    if not watch_ids:
+        return {}
+
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            f"""
+            SELECT {_SYNC_RUN_COLUMNS}
+            FROM (
+                SELECT {_SYNC_RUN_COLUMNS},
+                       ROW_NUMBER() OVER (PARTITION BY watch_id ORDER BY started_at DESC) AS rn
+                FROM connector_sync_runs
+                WHERE watch_id = ANY($1::uuid[]) AND user_id = $2
+            ) ranked
+            WHERE rn <= $3
+            ORDER BY watch_id, started_at DESC
+            """,
+            [_as_uuid(w) for w in watch_ids],
+            _as_uuid(user_id),
+            max(1, per_watch),
+        )
+
+    grouped: dict[str, list[dict]] = {}
+    for r in rows:
+        record = dict(r)
+        grouped.setdefault(str(record["watch_id"]), []).append(record)
+    return grouped
 
 
 # ── Watch Items Mirror Table ──────────────────────────────────────────────────

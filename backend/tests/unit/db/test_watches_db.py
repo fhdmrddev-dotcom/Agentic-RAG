@@ -340,7 +340,8 @@ async def test_release_watch_prunes_in_the_same_statement():
     assert "ORDER BY started_at DESC" in sql
     # ⛔ The bound MUST be a parameter. An f-string here would be T-235-04.
     assert "LIMIT 3" not in sql
-    assert _insert_call(con)[15 + 1] == 3
+    # `args[0]` is the SQL, so `$n` is `args[n]`: retain is `$15`.
+    assert _insert_call(con)[15] == 3
 
 
 @pytest.mark.asyncio
@@ -351,7 +352,7 @@ async def test_release_watch_retain_defaults_to_the_settings_knob():
 
     pool, con = _pool_and_con()
     await release_watch(pool, uuid4(), status="success")
-    assert _insert_call(con)[15 + 1] == settings.watch_run_history_retention
+    assert _insert_call(con)[15] == settings.watch_run_history_retention
 
 
 @pytest.mark.asyncio
