@@ -236,15 +236,24 @@ def test_delete_folder_watch_and_purge(monkeypatch, client):
 
 
 def test_trigger_watch_sync(mock_asyncpg_pool, monkeypatch, client):
-    """POST /sources/watches/{id}/sync resets next_run_at to now() for immediate check."""
+    """POST /sources/watches/{id}/sync resets next_run_at to now() for immediate check.
+
+    ⚠ AMENDED at Phase 235 Plan 07 (`BUG-260906-02`). The poke this case was written to prove is
+    byte-unchanged and still asserted below; what changed is the WORD the reply uses for it. The
+    route used to answer with the same sentence whether or not a reader existed to consume the
+    poke, so the probe app now has to declare that a reader is live — which is itself the fix.
+    The reader-off arm lives in `test_sources_sync_honesty.py`.
+    """
     watch_row = _mock_watch_row()
     monkeypatch.setattr("app.api.sources.get_watch", AsyncMock(return_value=watch_row))
     real_app.dependency_overrides[deps.get_pg_pool] = lambda: mock_asyncpg_pool
+    client.app.state.watch_service = object()
 
     res = client.post(f"/sources/watches/{WATCH_ID}/sync", headers=_auth_headers())
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "scheduled"
+    assert data["status"] == "asked"
+    assert data["reader_running"] is True
     assert WATCH_ID in data["message"]
 
     sync_calls = [

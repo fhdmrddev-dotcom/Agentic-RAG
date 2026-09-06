@@ -1,7 +1,7 @@
 """Phase 234 (LIB-08 / SURF-01 / VIS-05) — Folder Watches & Source Sync API endpoints.
 
 Exposes CRUD and lifecycle operations on connector_watches:
-- POST /watches: Create a new scheduled watch
+- POST /watches: Create a new folder watch on a recurring cadence
 - GET /watches: List watches owned by caller/org
 - GET /watches/{watch_id}: Get watch details + tracked item mirror
 - PATCH /watches/{watch_id}: Update interval, pause/resume, destination folder
@@ -23,6 +23,7 @@ the domain owner — `GET /sources/health` belongs beside `GET /sources/watches`
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -71,39 +72,97 @@ def _as_uuid(val: Any) -> UUID:
     return val if isinstance(val, UUID) else UUID(str(val))
 
 
+#: The identity a degraded row falls back to when even the raw row cannot supply one. A row
+#: with no readable `id` is not droppable — dropping it is the omission this boundary exists to
+#: prevent — so it is returned under a sentinel that is obviously not a real watch.
+_UNIDENTIFIED_WATCH = UUID(int=0)
+
+
+def _degraded_watch_record(raw: Any, exc: Exception) -> dict:
+    """Project the least a caller needs to be TOLD a source could not be read.
+
+    ⛔ T-235-23 — `degraded_reason` reaches a screen, so it is a fixed token plus the exception's
+    CLASS NAME. Never `str(exc)`: a driver message routinely carries a table name, a connection
+    string or a provider URL, and none of those belong on a member's screen. The full exception
+    is logged by the caller with `logger.exception`, which is where detail belongs.
+    """
+    row = raw if isinstance(raw, dict) else {}
+
+    def _uuid_or(value: Any, fallback: UUID | None) -> UUID | None:
+        try:
+            return _as_uuid(value) if value is not None else fallback
+        except (ValueError, AttributeError, TypeError):
+            return fallback
+
+    return {
+        "id": _uuid_or(row.get("id"), _UNIDENTIFIED_WATCH),
+        "user_id": _uuid_or(row.get("user_id"), _UNIDENTIFIED_WATCH),
+        "connection_id": _uuid_or(row.get("connection_id"), _UNIDENTIFIED_WATCH),
+        "org_id": _uuid_or(row.get("org_id"), None),
+        # The NAME is what lets the surface say WHICH source could not be read, so it is read
+        # defensively rather than assumed present.
+        "source_folder_id": str(row.get("source_folder_id") or ""),
+        "source_folder_name": str(row.get("source_folder_name") or ""),
+        "degraded": True,
+        "degraded_reason": f"projection_failed:{type(exc).__name__}",
+    }
+
+
 async def _enrich_watch_rows(pool: Any, rows: list[dict]) -> list[dict]:
-    """Attach item_count, connection_name, and service_id to watch records."""
+    """Attach item_count, connection_name, and service_id to watch records.
+
+    ⛔ EVERY ROW IS PROJECTED INSIDE ITS OWN BOUNDARY (`SEED-239` / D-235-13). The callers below
+    declare `response_model=list[WatchResponse]` and FastAPI validates the WHOLE list, so a
+    single row that raises here — or that comes back in a shape the model rejects — used to be a
+    500 for every watch the caller owns. That is not hypothetical: `SEED-239` measured one
+    malformed `config` making all nine of a user's connections unreadable at once.
+
+    The failing row is returned as a NAMED degraded record, never dropped: a source that
+    vanishes from its own list is exactly the silence `LIB-10` forbids, and it is worse than an
+    error page because nothing on screen says anything is missing.
+
+    ⚠ This is the same boundary shape `connector_service.list_connections` needs when `SEED-239`
+    is fixed at its root. That fix stays with the seed; only the observable half lands here.
+    """
     if not rows or not pool:
         return rows
 
     enriched = []
     async with pool.acquire() as con:
         for r in rows:
-            record = dict(r)
-            wid = record.get("id")
-            conn_id = record.get("connection_id")
+            try:
+                record = dict(r)
+                wid = record.get("id")
+                conn_id = record.get("connection_id")
 
-            # 1. Count items
-            count = await con.fetchval(
-                "SELECT COUNT(*) FROM connector_watch_items WHERE watch_id = $1",
-                wid,
-            )
-            record["item_count"] = count or 0
-
-            # 2. Lookup connection details
-            if conn_id:
-                conn_row = await con.fetchrow(
-                    "SELECT name, service_id FROM connector_connections WHERE id = $1",
-                    conn_id,
+                # 1. Count items
+                count = await con.fetchval(
+                    "SELECT COUNT(*) FROM connector_watch_items WHERE watch_id = $1",
+                    wid,
                 )
-                if conn_row:
-                    record["connection_name"] = conn_row["name"]
-                    record["service_id"] = conn_row["service_id"]
+                record["item_count"] = count or 0
 
-            if not record.get("last_status"):
-                record["last_status"] = "pending"
+                # 2. Lookup connection details
+                if conn_id:
+                    conn_row = await con.fetchrow(
+                        "SELECT name, service_id FROM connector_connections WHERE id = $1",
+                        conn_id,
+                    )
+                    if conn_row:
+                        record["connection_name"] = conn_row["name"]
+                        record["service_id"] = conn_row["service_id"]
 
-            enriched.append(record)
+                if not record.get("last_status"):
+                    record["last_status"] = "pending"
+
+                enriched.append(record)
+            except Exception as exc:
+                # The detail goes to the LOG, the fact goes to the SCREEN.
+                logger.exception(
+                    "Could not project watch row %s; returning it degraded",
+                    r.get("id") if isinstance(r, dict) else r,
+                )
+                enriched.append(_degraded_watch_record(r, exc))
     return enriched
 
 
@@ -283,16 +342,53 @@ async def delete_folder_watch(
 )
 async def trigger_watch_sync(
     watch_id: UUID,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     pool=Depends(get_pg_pool),
 ):
-    """Trigger an immediate check for the watch by setting next_run_at = now()."""
+    """Ask the reader to check this watch on its next tick (BUG-260906-02 / D-235-14).
+
+    ⛔ D-235-15 — THIS ROUTE DOES NOT DO THE LISTING, AND MUST NOT. It sets `next_run_at = now()`
+    and returns; `WatchService._poll_loop` performs the read. The poke is deliberately safe
+    across multiple uvicorn workers (`claim_due_watches` holds the claim exclusivity), and an
+    inline listing here would hold a web worker for the length of a Drive listing and re-open
+    exactly the concurrency problem that claim was built to solve. The defect this route had was
+    that it OVERCLAIMED, never that it was asynchronous.
+
+    ⛔ AND IT NO LONGER PROMISES WORK NOTHING WILL DO. The reply used to describe the REQUEST —
+    the same sentence whether or not a reader existed to consume the poke. Measured on the
+    operator's machine: `next_run_at` carried a click from 27 minutes earlier, `last_run_at` was
+    `None`, and the watch had never run once. Because the button reported success, the operator
+    reasonably concluded the loop was working and the FILE was the problem.
+    """
     user_id = _as_uuid(current_user["id"])
     existing = await get_watch(pool, watch_id, user_id=user_id)
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Watch not found or unauthorized.",
+        )
+
+    # ⛔ THE LIVE READER, NOT THE INSTANCE'S CONFIGURATION (D-235-21). `main.py:587-589` swallows
+    # a failed start and leaves the flag reading true, so the flag is not the fact — only the
+    # object on `app.state` is. `getattr(..., None)` because a probe app (and any app whose
+    # lifespan never ran) has no such attribute at all, and a plain access would 500 the route.
+    #
+    # ⛔ T-235-26 — this runs AFTER the ownership check on purpose: a refusal that preceded the
+    # 404 would answer "does this watch id exist?" for a caller who does not own it.
+    reader_running = getattr(request.app.state, "watch_service", None) is not None
+    if not reader_running:
+        # ⛔ Nothing is written. Poking a column no process reads is the false promise itself.
+        # ⛔ T-235-22 — the subject of this sentence is this SERVER, never the caller's folder
+        # or their connection, and it never names an operator configuration key. The marked
+        # operator half of the instance statement lives in the frontend vocabulary leaf.
+        return WatchSyncResponse(
+            status="refused",
+            message=(
+                "Automatic reading is switched off on this server, so this check cannot be "
+                "asked for. The cause is this instance's configuration."
+            ),
+            reader_running=False,
         )
 
     async with pool.acquire() as con:
@@ -308,9 +404,20 @@ async def trigger_watch_sync(
             user_id,
         )
 
+    # ⚠ `asked_at` is resolved here rather than read back with a `RETURNING` clause, so the
+    # statement above stays byte-for-byte the one that shipped. It differs from the database's
+    # own `now()` by the round trip only, and the authoritative column is what `GET
+    # /sources/watches` returns — this value exists so the surface can render the pending state
+    # (D-235-16) without a second request.
+    asked_at = datetime.now(timezone.utc)
     return WatchSyncResponse(
-        status="scheduled",
-        message=f"Watch {watch_id} scheduled for immediate sync.",
+        status="asked",
+        message=(
+            f"Watch {watch_id} will be checked on the reader's next pass."
+        ),
+        next_run_at=asked_at,
+        next_check_within_seconds=settings.watch_poll_interval_seconds,
+        reader_running=True,
     )
 
 

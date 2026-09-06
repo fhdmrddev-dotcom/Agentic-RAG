@@ -63,14 +63,48 @@ class WatchResponse(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    # -- Phase 235 Plan 07 (SEED-239 / D-235-13 / D-235-16) ------------------------------------
+    # All THREE default, so `_mock_watch_row` and every other shipped fixture still validate.
+    #
+    #: This row could not be projected. It is still RETURNED — a source that vanishes from its
+    #: own list is the silence LIB-10 forbids — but only its identifying fields are trustworthy.
+    degraded: bool = False
+    #: A short machine-safe token, never a sentence and never the exception text. The SENTENCE
+    #: the person reads lives in the frontend vocabulary leaf; the full exception goes to the log.
+    degraded_reason: str | None = None
+    #: The reader's poll cadence, for the pending state between a Sync click and the next tick.
+    next_check_within_seconds: int | None = None
+
 
 class WatchDetailResponse(WatchResponse):
     items: list[WatchItemResponse] = []
 
 
 class WatchSyncResponse(BaseModel):
+    """The reply to `POST /sources/watches/{id}/sync` (Phase 235 · BUG-260906-02 · D-235-14).
+
+    ⚠ `status` stays a free string for wire compatibility, but its VALUES changed: it used to
+    describe the request and now describes the outcome of asking — `"asked"` when the reader is
+    live and the poke was written, `"refused"` when nothing is running to consume it.
+
+    ⚠ `"pending"` is deliberately NOT one of those values. `_enrich_watch_rows` already
+    SYNTHESISES `last_status = "pending"` at read time for a watch that has never ticked, and
+    two different meanings behind one token is how a surface starts lying quietly.
+
+    The three net-new fields default so every existing caller stays valid.
+    """
+
     status: str
     message: str
+    #: When the check was asked for — the moment the scheduler poke was written. `None` on a
+    #: refusal, because a refusal writes nothing.
+    next_run_at: datetime | None = None
+    #: The reader's poll cadence, so the surface can say "next check within N" (D-235-16)
+    #: instead of a bare spinner that reads as a hang for up to a minute.
+    next_check_within_seconds: int | None = None
+    #: Whether a reader process is genuinely live in THIS worker (D-235-21) — not what the
+    #: instance's configuration claims.
+    reader_running: bool = True
 
 
 class WatchPurgeResponse(BaseModel):
