@@ -429,12 +429,15 @@ export async function createRule(
   name: string,
   match_expr: ViewFilter,
   suggest_folder_id: string | null,
+  rule_scope?: "watch" | "classification",
 ): Promise<ClassificationRule> {
   const headers = await getAuthHeaders()
+  const payload: Record<string, unknown> = { name, match_expr, suggest_folder_id }
+  if (rule_scope) payload.rule_scope = rule_scope
   const res = await fetch(`${API_BASE}/classification-rules`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ name, match_expr, suggest_folder_id }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) throw new Error("Failed to create rule")
   return res.json() as Promise<ClassificationRule>
@@ -447,7 +450,13 @@ export async function createRule(
  *  the updated rule. 404 on a cross-user / absent id (never 403). */
 export async function updateRule(
   id: string,
-  body: { name?: string; match_expr?: ViewFilter; suggest_folder_id?: string | null; enabled?: boolean },
+  body: {
+    name?: string
+    match_expr?: ViewFilter
+    suggest_folder_id?: string | null
+    enabled?: boolean
+    rule_scope?: "watch" | "classification"
+  },
 ): Promise<ClassificationRule> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/classification-rules/${id}`, {

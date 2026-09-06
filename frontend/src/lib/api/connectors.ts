@@ -621,6 +621,7 @@ export interface SourcePreviewItem {
   destination?: string | null
   rule_suggested?: boolean
   web_view_url?: string | null
+  path?: string | null
 }
 
 export interface SourcePreviewResponse {

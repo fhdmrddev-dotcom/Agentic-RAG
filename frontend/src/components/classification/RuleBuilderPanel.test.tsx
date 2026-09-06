@@ -125,7 +125,7 @@ describe("RuleBuilderPanel", () => {
     ).toBeInTheDocument()
   })
 
-  it("Save calls createRule(name, match_expr, suggest_folder_id) and OMITS is_system_global", async () => {
+  it("Save calls createRule(name, match_expr, suggest_folder_id, rule_scope) and OMITS is_system_global", async () => {
     const onSaved = vi.fn()
     render(<RuleBuilderPanel folders={folders} onSaved={onSaved} onCancel={vi.fn()} />)
     addTitleIsInvoice()
@@ -135,23 +135,46 @@ describe("RuleBuilderPanel", () => {
     await waitFor(() => {
       expect(createRule).toHaveBeenCalledTimes(1)
     })
-    // Exactly (name, match_expr, suggest_folder_id) — the body never carries is_system_global.
+    // Exactly (name, match_expr, suggest_folder_id, rule_scope) — the body never carries is_system_global.
     expect(createRule).toHaveBeenCalledWith(
       "Acme Invoices",
       { op: "and", conditions: [{ field: "title", op: "eq", value: "invoice" }] },
       "folder-fin",
+      "classification",
     )
-    // No 4th argument (no is_system_global piggy-backed onto the call).
-    expect(createRule.mock.calls[0]).toHaveLength(3)
+    // No 5th argument (no is_system_global piggy-backed onto the call).
+    expect(createRule.mock.calls[0]).toHaveLength(4)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
 
-  it("editing an existing rule calls updateRule instead of createRule", async () => {
+  it("toggling scope to watch sets rule_scope: 'watch' in save payload", async () => {
+    const onSaved = vi.fn()
+    render(<RuleBuilderPanel folders={folders} onSaved={onSaved} onCancel={vi.fn()} />)
+    fireEvent.click(screen.getByRole("radio", { name: /when files arrive/i }))
+    fireEvent.change(screen.getByLabelText(/rule name/i), { target: { value: "Arrival Rule" } })
+    fireEvent.click(screen.getByText("condition"))
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "scan.pdf" } })
+    fireEvent.click(screen.getByText("Apply"))
+    fireEvent.change(screen.getByLabelText(/suggested folder/i), { target: { value: "folder-fin" } })
+    fireEvent.click(screen.getByRole("button", { name: /save rule/i }))
+    await waitFor(() => {
+      expect(createRule).toHaveBeenCalledTimes(1)
+    })
+    expect(createRule).toHaveBeenCalledWith(
+      "Arrival Rule",
+      expect.anything(),
+      "folder-fin",
+      "watch",
+    )
+  })
+
+  it("editing an existing rule calls updateRule instead of createRule and pre-fills scope", async () => {
     const existing: ClassificationRule = {
       id: "rule-1",
       user_id: "user-1",
       name: "Old Name",
-      match_expr: { op: "and", conditions: [{ field: "author", op: "contains", value: "Acme" }] },
+      rule_scope: "watch",
+      match_expr: { op: "and", conditions: [{ field: "path", op: "contains", value: "Acme" }] },
       suggest_folder_id: "folder-legal",
       is_system_global: false,
       enabled: true,
@@ -160,14 +183,18 @@ describe("RuleBuilderPanel", () => {
     render(
       <RuleBuilderPanel folders={folders} rule={existing} onSaved={onSaved} onCancel={vi.fn()} />,
     )
-    // Pre-filled with the existing rule's name + condition.
+    // Pre-filled with the existing rule's name + condition + scope.
     expect((screen.getByLabelText(/rule name/i) as HTMLInputElement).value).toBe("Old Name")
-    expect(screen.getByText(/author contains Acme/i)).toBeInTheDocument()
+    expect(screen.getByText(/path contains Acme/i)).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: /when files arrive/i })).toBeChecked()
     fireEvent.click(screen.getByRole("button", { name: /save rule/i }))
     await waitFor(() => {
       expect(updateRule).toHaveBeenCalledTimes(1)
     })
-    expect(updateRule).toHaveBeenCalledWith("rule-1", expect.objectContaining({ name: "Old Name" }))
+    expect(updateRule).toHaveBeenCalledWith(
+      "rule-1",
+      expect.objectContaining({ name: "Old Name", rule_scope: "watch" }),
+    )
     expect(createRule).not.toHaveBeenCalled()
   })
 })

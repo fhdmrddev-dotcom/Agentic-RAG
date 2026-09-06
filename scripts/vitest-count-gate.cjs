@@ -126,6 +126,10 @@ const BASELINE = {
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
+  // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
+  "ClassificationRulesPage.test.tsx": 8,
+  "ClassificationSection.test.tsx": 13,
+  "RuleBuilderPanel.test.tsx": 8,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -4558,6 +4562,10 @@ const TARGETS = [
   "src/components/layout/__tests__/ChatLayout.badge.test.tsx",
   "src/hooks/__tests__/useSourceAttention.test.tsx",
   "src/pages/__tests__/LibraryPage.initialTab.test.tsx",
+  // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
+  "src/components/classification/ClassificationRulesPage.test.tsx",
+  "src/components/classification/ClassificationSection.test.tsx",
+  "src/components/classification/RuleBuilderPanel.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

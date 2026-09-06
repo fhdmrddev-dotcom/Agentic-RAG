@@ -39,6 +39,17 @@ const BUILTIN_FIELDS: FilterField[] = [
   { field_key: "date", field_type: "date" },
 ]
 
+/** Phase 237 (RULES-01 / SC#1): Arrival facts available when rule_scope === "watch" */
+export const WATCH_FIELDS: FilterField[] = [
+  { field_key: "name", field_type: "string" },
+  { field_key: "path", field_type: "string" },
+  { field_key: "type", field_type: "string" },
+  { field_key: "size", field_type: "number" },
+  { field_key: "date", field_type: "date" },
+  { field_key: "source_system", field_type: "string" },
+  { field_key: "source_connection_id", field_type: "string" },
+]
+
 /** Type-aware operator vocabulary (114-RESEARCH mapping table + sketch 030).
  *  `enum` mirrors `string` minus free-text `contains`; `date` carries the
  *  direction-encoding relative operators.
@@ -87,6 +98,8 @@ function fieldType(fields: FilterField[], key: string): MetadataFieldDef["field_
 export interface ConditionPopoverProps {
   /** The enabled custom field defs to merge with the built-ins. */
   customFields?: MetadataFieldDef[]
+  /** Phase 237 (RULES-01): The authoring scope ('watch' restricts to arrival fields). */
+  ruleScope?: "watch" | "classification"
   /** The condition being edited, or `undefined` to compose a brand-new one. */
   initial?: ViewCondition
   onApply: (condition: ViewCondition) => void
@@ -95,20 +108,31 @@ export interface ConditionPopoverProps {
 
 export function ConditionPopover({
   customFields = [],
+  ruleScope,
   initial,
   onApply,
   onCancel,
 }: ConditionPopoverProps) {
-  // The full filterable-field set: built-ins ∪ enabled custom defs (deduped).
+  // The filterable-field set: when ruleScope === 'watch', strictly arrival fields (SC#3).
+  // Otherwise built-ins ∪ source facts ∪ enabled custom defs (deduped).
   const fields = useMemo<FilterField[]>(() => {
+    if (ruleScope === "watch") {
+      return WATCH_FIELDS
+    }
     const custom = customFields
       .filter((d) => d.enabled)
       .map((d) => ({ field_key: d.field_key, field_type: d.field_type, options: d.options }))
-    const seen = new Set(BUILTIN_FIELDS.map((f) => f.field_key))
-    return [...BUILTIN_FIELDS, ...custom.filter((c) => !seen.has(c.field_key))]
-  }, [customFields])
+    const combined = [...BUILTIN_FIELDS, ...WATCH_FIELDS]
+    const seen = new Set(combined.map((f) => f.field_key))
+    return [...combined, ...custom.filter((c) => !seen.has(c.field_key))]
+  }, [customFields, ruleScope])
 
-  const [field, setField] = useState<string>(initial?.field ?? fields[0]?.field_key ?? "title")
+  const [field, setField] = useState<string>(() => {
+    if (initial?.field && fields.some((f) => f.field_key === initial.field)) {
+      return initial.field
+    }
+    return fields[0]?.field_key ?? "title"
+  })
   const ftype = fieldType(fields, field)
   const ops = OPS_BY_TYPE[ftype]
 

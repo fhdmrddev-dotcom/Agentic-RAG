@@ -471,6 +471,8 @@ export interface ClassificationRule {
   id: string
   user_id?: string | null
   name: string
+  /** Phase 237 (RULES-01): rule_scope discriminator — 'watch' evaluates on arrival, 'classification' post-extraction. */
+  rule_scope?: "watch" | "classification"
   match_expr: ViewFilter
   suggest_folder_id: string | null
   /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
