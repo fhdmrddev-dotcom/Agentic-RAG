@@ -266,7 +266,18 @@ describe("LibraryPage — initialTab", () => {
     expect(selectedTabName()).toBe("Health")
     // …and the Health BODY is mounted, not merely the trigger painted. Radix unmounts an
     // inactive TabsContent, so an unseeded reducer would leave this absent.
-    expect(await screen.findByTestId("health-coverage-ring")).toBeInTheDocument()
+    /**
+     * ⚠ WAS `health-coverage-ring`, which no longer exists. The "found by a search" ring was
+     * REMOVED on 2026-09-06 (operator decision) because it drew DEMAND on a red-to-green health
+     * scale. `SourcesAttentionSection.test.tsx` re-anchored for the same reason; this suite was
+     * missed in that pass and sat RED from `4e0b0323b` — found at the Phase 236 reviewer baseline.
+     *
+     * The case's PROPERTY is unchanged and is the whole point — the Health tab BODY must be
+     * mounted, not merely its trigger painted. `health-freshness-donut` is HealthTab's own
+     * unconditional wrapper (`HealthTab.tsx:121`; only its INNER content is data-gated), so this
+     * still goes red if the tab stops rendering. Re-anchoring, not weakening.
+     */
+    expect(await screen.findByTestId("health-freshness-donut")).toBeInTheDocument()
   })
 
   it("lands on Ingestion too — the prop is GENERAL, not a health special case", async () => {
