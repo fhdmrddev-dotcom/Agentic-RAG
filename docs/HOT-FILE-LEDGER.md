@@ -7706,3 +7706,381 @@ Library folder synced files land in?"* while their watch read `library_folder_id
 control exists and reads as belonging to *uploads* rather than to *this source*. **A
 discoverability finding for 235's sketch, not an absent capability** — recorded here so nobody
 builds a second picker.
+
+
+---
+
+# Phase 235 — "The source says what it did" (2026-09-06)
+
+⚠ **EVERY TRIPLE BELOW WAS RE-DERIVED WITH CLAUDE.md's OWN RECIPE AT THIS PHASE'S FINAL COMMIT,
+never copied from `235-RESEARCH.md`.** Research measured them on 2026-09-06 *before the phase wrote a
+line*, and **every single one of the eight it published was already wrong by the close** — the
+ledger's own repeated finding, reproduced once more rather than trusted:
+
+| file | `235-RESEARCH.md` §14.4 said | re-derived at the final commit |
+|---|---|---|
+| `NavPanel.tsx` | 19 / 10 / 237 | **20 / 11 / 329** |
+| `nav-items.ts` | 8 / 6 / 95 | **8 / 6 / 95** (the one that held) |
+| `App.tsx` | 30 / 22 / 326 | **31 / 23 / 351** |
+| `HealthTab.tsx` | 8 / 1 / 184 | **9 / 2 / 199** |
+| `librarySelection.ts` | 2 / 2 / 312 | **2 / 2 / 312** (held — the phase did not modify it) |
+| `lib/api/sources.ts` | 2 / 0 / 163 | **4 / 1 / 296** |
+| `IngestionTab.tsx` (row read 13/4/456) | 16 / 5 / 487 | **17 / 6 / 512** |
+| `LibraryPage.tsx` (row read 40/12/825) | 42 / 13 / 866 | **44 / 14 / 922** |
+
+⚠ `LibraryPage.tsx` must be derived with `git log --follow` or it reads `1`. The recipe used here
+passes `--follow` for every file and prints the six-digit quick-task buckets it subtracted, so the
+arithmetic is auditable rather than asserted: `LibraryPage.tsx` excluded **2** dated quick-task
+buckets, `documents.py` **3**, `ingest_enrich.py` **1**, `vitest-count-gate.cjs` **3**.
+
+---
+
+## frontend/src/components/layout/NavPanel.tsx
+
+**20 / 11 / 329** · ⚠ **FIRES** · the desktop nav rail.
+
+⚠ **IT HAD NO ROW IN THIS LEDGER FOR ITS ENTIRE LIFE — ELEVEN PHASES.** G-5's threshold is three, so
+this file crossed it eight phases ago and **the guardrail could never have fired on it at any count**,
+because the guardrail's scan list is the CLAUDE.md table and this file was not in it. That is the
+identical failure `WorkflowsPage.tsx` suffered for ten phases, `db/workflows.py` for seventeen and
+`ChatArea.tsx` for twenty-eight. The row exists from Phase 235 onward.
+
+**Phase 235's change is honoured by construction, and the arithmetic says so rather than the prose:**
+two optional props (`attentionConditions`, `onOpenLibraryHealth`), one badge element, one popover
+mount. `git diff | grep '^+' | grep -cE "useState|useEffect"` reads **0** — no state, no effect, no
+branch on an existing path.
+
+⛔ **AN UNWIRED CALLER GETS SILENCE, NEVER A DEAD CONTROL.** Both new props are optional and a
+`NavPanel` mounted without them renders exactly what it rendered before. This is load-bearing beyond
+politeness: it is why five of the composition fence's sixteen remaining reds are a *harness* finding
+rather than a *surface* one — `mountScreen("rail")` passes neither prop, so the correct rail renders
+no badge and the fence reads that as absence (`235-BASELINE.md` §7.2).
+
+**Named seam if it is touched again:** the badge + popover pair is already a distinct concern from
+nav rendering; extract `NavAttentionBadge` before a second producer is ever registered.
+
+---
+
+## frontend/src/lib/nav-items.ts
+
+**8 / 6 / 95** · ⚠ **FIRES** · the shared `NAV_ITEMS` list and the `NavItem` / `ActiveView` types.
+
+⚠ **No row for its entire life at SIX phases**, and it is a **shared** leaf: the desktop rail, the
+mobile drawer and `App.tsx`'s view union all read it. A ninety-five-line file that three surfaces
+agree through is exactly the kind of thing a ledger exists to keep visible.
+
+⛔ **Phase 235 did NOT modify it, and that is the finding rather than an omission.** `App.tsx`'s new
+comment records the decision verbatim: *"NO TWELFTH `ActiveView` MEMBER. The Library already has one…
+What was missing was never a view."* The Library's Health **tab** had no external door; adding a
+twelfth nav member would have shipped a second entry point to a page that already had one. **The row
+is added because the file was considered and deliberately left alone** — a decision that is invisible
+unless it is written down.
+
+---
+
+## frontend/src/App.tsx
+
+**31 / 23 / 351** · ⚠ **FIRES** · the app root: auth gate, provider stack, and the view/tab state
+every top-level navigator sets.
+
+⚠ **IT HAD NO ROW FOR ITS ENTIRE LIFE — TWENTY-THREE PHASES.** G-5 could never have fired on the
+application's root component. Recorded plainly because the number is the point: this is the second
+file in this phase alone (with `NavPanel.tsx` at 11) that was invisible to its own guardrail, and the
+mechanism was not carelessness — **the audit compares against this table, so a file that has never
+been in it cannot be found by the audit.**
+
+**Phase 235's change is honoured by construction:** one `useState` holding `libraryTab`, one
+`handleOpenLibraryHealth` navigator, two props forwarded to `ChatLayout`. It is **the exact shape
+`handleOpenStudio` already had** twenty lines above — a new sibling of an existing pattern, not a new
+pattern.
+
+⛔ **`undefined` MEANS "THE PAGE DECIDES".** `libraryTab` is `LibraryTab | undefined`, so every other
+entry into the Library keeps the page's own default. A non-optional initial value here would have
+made one navigator's choice permanent for all of them.
+
+⛔ **NO URL IS ASSIGNED.** The app has no router (`SEED-185`); writing the browser location here
+would be a full page reload onto a path that renders the chat home. ⚠ **The comment in the file
+deliberately does not spell the location API**, because an acceptance criterion greps the file for it
+— the 187-24 lesson: *a grep proving something is absent must not be answerable by a comment.*
+
+**Named seam:** the view/tab state is now four `useState`s and four navigators. At the fifth, extract
+an `useAppNavigation()` hook rather than adding a fifth pair here.
+
+---
+
+## frontend/src/components/library/HealthTab.tsx
+
+**9 / 2 / 199** · no (2 phases) · the Library's Health tab body.
+
+⚠ **No row before Phase 235.** It is added at two phases — one below G-5's threshold — deliberately,
+so the third phase to touch it finds a row rather than starting the eleven-phase invisibility
+`NavPanel.tsx` above records.
+
+**Phase 235's change is one import, one optional prop, one mount, ZERO branches** —
+`git diff | grep '^+' | grep -cE "useState|useEffect"` reads **0**. The prop is *declared and
+forwarded*: the handler itself lives at the page boundary (`LibraryPage.handleGoToSource`), where
+every other cross-tab hop in this app already lives.
+
+⭐ **`health-body-health` is emitted by `SourcesAttentionSection`, NOT by this tab's root div** — and
+that is a design decision, not an implementation detail. This tab also carries a coverage ring, five
+stat tiles, seven signal chips, per-document bars and the checked-queries table, **none of which is
+in sketch 233's contract**; tagging the root would claim they were.
+
+---
+
+## frontend/src/pages/librarySelection.ts
+
+**2 / 2 / 312** · no (2 phases) · the Library's tab union, its persistence key and its selection
+reducer — the single source `App.tsx` now imports `LibraryTab` from.
+
+⚠ **No row for its entire life.** ⛔ **Phase 235 did not modify the module**; it modified its suite
+(`librarySelection.test.ts`, 9 insertions) and made `App.tsx` import its type. **The row is added
+because a type that the app root now depends on is a shared contract**, and the point of importing it
+rather than re-declaring a string literal beside it was to have exactly one source. A future edit
+here changes what `App.tsx` compiles against.
+
+---
+
+## frontend/src/lib/api/sources.ts
+
+**4 / 1 / 296** · no (1 phase) · the watch + sync-run + source-health wire client.
+
+⚠ **NOT covered by `frontend/src/lib/api.ts`'s row — that row is the BARREL.** This is the same
+correction Phase 214 had to make for `org.ts`, `knowledge.ts`, `threads.ts`, `connectors.ts` and
+`workflows.ts`: the 207 split created twelve domain modules and gave none of them a row, so the
+barrel's `187 / 110` reads like coverage it does not provide.
+
+**Phase 235 grew it by 133 lines** — `listSyncRuns` and `getSourceHealth`, the two readers every new
+surface in the phase goes through.
+
+⚠ **It is mocked SEPARATELY from `@/lib/api` in every suite that mounts a source surface**, because
+the barrel does not re-export it (measured, plan 03 P-10). **A function added here and forgotten in a
+mock factory throws at MOUNT with a message about a missing export rather than about the missing
+behaviour** — the Phase 196-08 failure mode across nine suites. Any addition to this file owes a
+sweep of the `vi.mock("@/lib/api/sources", …)` factories.
+
+---
+
+## backend/app/models/source.py
+
+**5 / 1 / 196** · no (1 phase) · the source/watch/sync-run wire models.
+
+⚠ No row before Phase 235, which added **117 lines** to it. ⛔ Its `cause` and `status` fields are
+`Literal`s, so an unknown value is a `ValidationError` at the boundary rather than a string that
+renders — the same shape `models/connector.py`'s row records for `bucket`/`outcome`. **A new failure
+cause must be added to `failure_cause.py` AND here, or it cannot cross the wire.**
+
+---
+
+## backend/app/services/ingest_enrich.py
+
+**3 / 0 / 553** · no (0 phases) · the shared post-ingest enrichment step.
+
+⚠ No row for its entire life. **Its phase count reads 0 because its three commits are all DATED
+QUICK TASKS** (one subtracted by the recipe), which is precisely why the six-digit-bucket rule
+matters: a file can be touched repeatedly and still show `0 phases`.
+
+⭐ **It is where `BUG-260906-01` was closed** by quick task `260906-5qd` — the rule-evaluation step
+that makes classification run on the queue ingest path as well as the upload path.
+`tests/unit/test_ingest_enrich_shared.py` pins that both paths agree. **Phase 235 did not implement
+that fix; it verified the discharge** (D-235-18), which is a different claim and is recorded as one.
+
+---
+
+## backend/app/services/sources/failure_cause.py
+
+**1 / 1 / 169** · no (1 phase) · **THE ONE CLASSIFIER of why a source stopped.**
+
+⭐ **The defect it closes, stated by the file itself:** `watch_service.py`'s only failure
+classification was a substring sniff (`"403" in err_str or "permission" in err_str …`) whose output
+was `str(exc)` written to a `text` column and rendered VERBATIM in the UI. **LIB-10's *"offers the
+one action that fixes it"* is impossible while the cause is prose — you cannot key a control off a
+sentence.** So the cause is a VALUE here, and both the sentence and the repair control key off it.
+
+⛔ **THREE BINDING PROPERTIES, each asserted by `test_failure_cause.py` over the live source:**
+1. **It WRITES NOTHING** — no row, no audit entry, no log line that reads like a decision.
+2. **It imports nothing from the DB or the service graph** — no `app.db`, no `supabase`, no
+   `asyncpg`. An import added here makes the classifier unusable from the one place it is most
+   needed: a producer that has not opened a pool yet.
+3. **Hard vs soft is DATA, never an inline branch** (D-235-10), because the deferred email producer
+   (`SEED-231`) will need the same verdict when its trigger fires.
+
+⚠ Every token the old sniff matched — `403` / `permission` / `unauthorized` — stays reachable as a
+matcher input, **so no failure classified before this phase became unclassified by it.**
+
+---
+
+## backend/app/services/sources/health_verdict.py
+
+**1 / 1 / 149** · no (1 phase) · **the ONE place that decides whether a source is STOPPED.**
+
+⭐ **DERIVED, NEVER COUNTED.** The consecutive-failure count is read off stored run history, not off
+a `consecutive_failures` column. A counter would have to be incremented and reset by all FOUR of the
+watch loop's release arms, and a fifth added later would drift from the history the user is looking
+at — **undetectably, because both would render.** Deriving is correct by construction: every tick
+writes a row (D-235-07), so the sequence IS the truth.
+
+⭐ **ZERO ROWS IS A DIFFERENT SENTENCE FROM ZERO FAILURES.** A watch created and never ticked is
+`never_read`, not healthy and not stopped. This is the same distinction SEED-248 names and the same
+one `useSourceAttention.verdictKnown` carries on the client.
+
+⛔ **There is deliberately NO second threshold literal in this file** — it imports
+`failure_cause.SOFT_FAILURE_THRESHOLD`. A number here would be the "two places, one rule" defect one
+level down from the one this module exists to fix.
+
+⛔ **D-235-05: the threshold is applied ONCE, on the server.** The rail badge, the Health row and the
+source card all render what this module decided. A client that re-derives "which sources are stopped"
+has created a second verdict that can disagree — and the person who finds the disagreement is a user.
+
+---
+
+## frontend/src/components/sources/sourceHealthVocabulary.ts
+
+**1 / 1 / 315** · no (1 phase) · every sentence and every repair-control label the source surfaces
+say. A strict leaf.
+
+⛔ **`Object.keys(COPY)` IS PINNED AT EXACTLY 26** by `sourceHealthVocabulary.test.ts:138`, and that
+pin is now blocking **four plans' worth of orphaned labels**: plan 04's `LISTING_INCOMPLETE_NOTE`,
+plan 10's four state labels + its history-loading sentence, and plan 11's `STILL_ASKING` /
+`COULD_NOT_ASK`. Each was hoisted to a named constant in its own component with the reason beside it,
+because no plan in a live wave can add a key without reddening a fence it does not own.
+**Whichever plan re-baselines the 26 should hoist all seven in ONE move**, not one at a time.
+
+⚠ `COPY.roster(total, need)` is authored, pinned, and **rendered by nothing** — it needs the TOTAL
+watch count, which the one-reader rule (D-235-05) forbids a second fetch for. It belongs in the
+INGESTION body, not Health. Logged in `deferred-items.md`.
+
+⭐ `SENTENCE_FOR_CAUSE.unknown` is the fallback for a cause the table does not know — **a surface
+renders it rather than guessing, and `last_error` is never rendered on any of these surfaces**
+(T-235-38).
+
+---
+
+## frontend/src/components/sources/runHistoryFold.ts
+
+**1 / 1 / 125** · no (1 phase) · the pure quiet-run fold: which ticks collapse and which stay visible.
+
+⭐ **A pure function with its own 17-case suite, deliberately separated from the list that renders
+it.** The design question — *"a quiet run is one that changed nothing"* — is answerable without
+mounting anything, and separating it is what let plan 11 prove the composition fence's collapsed-3 /
+expanded-17 red was a FIXTURE defect (`SAMPLE_RUNS` carries no `status`, no `listing_complete` and
+none of the six `count_*` fields, so `isQuiet` is false for all 17) rather than a missing surface.
+
+---
+
+## frontend/src/components/sources/RunHistoryList.tsx
+
+**1 / 1 / 160** · no (1 phase) · the per-source run history, mounted on first expansion.
+
+⚠ **IT MOUNTS BEHIND A CLICK, AND THAT IS WHY FIVE OF THE COMPOSITION FENCE'S REDS ARE A HARNESS
+FINDING.** `sourceComposition.test.tsx` §3/§4 assert `sources-history`, `sources-run`,
+`sources-quiet-fold`, `sources-fail-reason` and `sources-toggle-quiet` at MOUNT; §5 of the same file
+clicks `toggle-history` first and passes. **The blocks exist** — `RunHistoryList.test.tsx` (18 cases,
+pinned at this close) proves them live.
+
+⭐ It renders the FOLD, never a re-derivation: `runHistoryFold.ts` decides what collapses.
+
+---
+
+## frontend/src/components/layout/AttentionPopover.tsx
+
+**1 / 1 / 109** · no (1 phase) · the rail badge's popover — one condition per row, one door out.
+
+⛔ **It renders no verdict and derives no count.** It is handed `AttentionCondition[]` and renders
+them. The server decided; `attentionConditions.ts` shaped; this draws.
+
+---
+
+## frontend/src/components/layout/attentionConditions.ts
+
+**1 / 1 / 102** · no (1 phase) · **the app-shell attention registry: a GENERAL surface with EXACTLY
+ONE TENANT.**
+
+⛔ **D-235-03, and the constraint is ENFORCED rather than requested:**
+`NavPanel.badge.test.tsx` asserts `ATTENTION_PRODUCERS.length === 1` **literally**, so the next
+author adding a tenant has to come here and argue with a number. *"Registering a second producer here
+is scope creep and is forbidden."*
+
+⭐ **THE SEAM EXISTS FOR `SEED-231`** (*nobody is told an approval is waiting*) so approval
+notifications can plug in **without a second surface growing beside this one** — the
+two-paths-one-outcome shape this codebase has been bitten by five measured times. It does not exist
+so a later phase can quietly acquire a second feature.
+
+⛔ **THIS MODULE DERIVES NO VERDICT (D-235-05).** It shapes the server's `stopped[]` into conditions
+and filters, re-counts and second-guesses nothing. A source that failed once and recovered is not in
+that array, so it produces no condition and no badge — SC#4's *"a person who has ignored it once has
+not been trained to ignore it always"*, honoured by having no second decider rather than by a
+threshold copied onto the client.
+
+⚠ **ONE READER PER RENDER TREE, AND IT IS `ChatLayout`.** It calls the registry ONCE and hands the
+result to three renderers (desktop rail, mobile drawer nav row, drawer hamburger). A second
+`useSourceAttention()` in the same tree means two polls and eventually two disagreeing answers.
+`ChatLayout.badge.test.tsx` asserts the fetch fires `toHaveBeenCalledTimes(1)` — never
+`toHaveBeenCalled()`, which is true of both worlds.
+
+---
+
+## frontend/src/components/library/SourcesAttentionSection.tsx
+
+**2 / 1 / 197** · no (1 phase) · the Health tab's "only what is wrong" list.
+
+⭐ **THREE HONEST STATES, EACH SEPARATELY NAMED AND SEPARATELY TESTED** — `health-attention-loading`
+(we have not looked yet) / `health-attention-unknown` (we could not ask) / `health-attention-empty`
+(answered, and nothing is wrong). ⛔ Collapsing the middle one into the third prints an all-clear
+nobody was told, which is T-235-39 and SEED-248's exact prohibition.
+
+⛔ **A DOOR, NEVER A REPAIR.** Each row's one control calls `onGoToSource(watch_id)`; **no handler
+means no control**, because a dead click is worse than an honest gap. A negative case asserts zero
+`sources-history` / `sources-run` / `sources-toggle-history` / `sources-source-card` render here —
+**D-235-17 is asserted, not merely written down.**
+
+⛔ **The cause SENTENCE, never the raw column.** `last_error` is not read on this surface at all.
+
+---
+
+## frontend/src/hooks/useSourceAttention.ts
+
+**2 / 1 / 131** · no (1 phase) · **the ONE polled reader of the server's source verdict.**
+
+⭐ **`verdictKnown` IS THE WHOLE POINT, and it was a Rule-2 fix found by building the consumer.** The
+hook's contract is *"a rejected fetch keeps the previous verdict, settles `loading`, and never
+throws"* — correct, and it means that after a rejected FIRST probe the consumer sees `loading: false`
+and `stopped: []`, which is **byte-identical to the server saying nothing is wrong**. `verdictKnown`
+is derived from state the hook already held (`verdict !== null`): no new `useState`, no new effect,
+no second fetch.
+
+⛔ **A CONSUMER THAT READS ONLY `loading` + `stopped` WILL PRINT AN ALL-CLEAR IT NEVER RECEIVED.**
+That is the single most important sentence about this file.
+
+---
+
+## Rows corrected at Phase 235 — every one was STALE, and three of them by whole phases
+
+⚠ **These rows already existed and every one of them disagreed with git.** A row that is present and
+WRONG answers the auditor and stops the audit, which is worse than an absent row.
+
+| file | row read | re-derived 2026-09-06 | drift |
+|---|---|---|---|
+| `backend/app/api/sources.py` | 2 / 0 / 356 | **5 / 1 / 643** | +3 commits, +1 phase, **+287 L** |
+| `backend/app/db/watches.py` | 1 / 1 / 439 | **2 / 2 / 634** | +1 / +1 / +195 |
+| `backend/app/services/watch_service.py` | 2 / 1 / 458 | **3 / 2 / 599** | +1 / +1 / +141 |
+| `backend/app/config.py` | 78 / 37 / 1428 | **82 / 47 / 1489** | **+10 PHASES** unrecorded |
+| `backend/app/api/documents.py` | 75 / 32 / 2408 | **85 / 33 / 2437** | +10 / +1 / +29 |
+| `frontend/src/components/sources/WatchedFoldersSection.tsx` | 2 / 0 / 393 | **4 / 1 / 935** | **+542 L — it MORE THAN DOUBLED** |
+| `frontend/src/components/layout/ChatLayout.tsx` | 46 / 24 / 921 | **49 / 25 / 997** | +3 / +1 / +76 |
+| `frontend/src/components/chat/ChatArea.tsx` | 67 / 32 / 595 | **70 / 35 / 678** | +3 / **+3 phases** / +83 |
+| `frontend/src/components/library/IngestionTab.tsx` | 13 / 4 / 456 | **17 / 6 / 512** | +4 / +2 / +56 |
+| `frontend/src/pages/LibraryPage.tsx` | 40 / 12 / 825 | **44 / 14 / 922** | +4 / +2 / +97 |
+| `scripts/vitest-count-gate.cjs` | 159 / 36 / 4687 | **167 / 38 / 4786** | +8 / +2 / +99 |
+
+⭐ **`WatchedFoldersSection.tsx` is the one to read twice: 393 → 935 lines in a single phase**, and
+its row still read `young (234)` with `0 phases`. It is now the phase's largest surface and it is
+**at 1 phase**, so G-5 will not fire on it until two more phases have touched it — by which time it
+may be 1,500 lines. **Named seam, proposed now rather than at the threshold:** the per-source card
+(outcome line, stopped sentence, degraded/report row, history disclosure) is a distinct component
+from the roster that lists them; extract `WatchedSourceCard.tsx` before the next feature lands here.
+
+⚠ **`backend/app/config.py` drifted by TEN PHASES** while its cell read *"honoured by construction"*
+— the exact `satisfied`-stops-the-audit failure. Phase 235 added four watch/health knobs to it,
+beside the four Phase 230 added, at the same seam. **Its named seam — `MODEL_CAPABILITIES` out — is
+still OWED and is now ten phases older than the cell claimed.**
