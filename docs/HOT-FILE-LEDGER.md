@@ -7671,6 +7671,44 @@ nullable — a watch that has never run reads `None`, which is a **different fac
 must stay tellable apart. `WatchResponse` learned this the hard way (`d08a60709`, a
 `ResponseValidationError` → 500 → no CORS headers → the browser said `TypeError: Failed to fetch`).
 
+### ⚠ Re-derived 2026-09-06 (Phase 235 plan 14, gap-closure round 1) — **2 / 2 / 696**
+
+The header triple above (`1 / 1 / 439`) is **kept, not overwritten** — it was already superseded once
+at 235's close (`2 / 2 / 634`) and this plan moved it again in the same week. G-5 does not fire (2
+phases), and the module is still one data-access home.
+
+⭐ **`last_success_by_watch` is the THIRD read on `connector_sync_runs`, and the ONLY unbounded one.**
+`list_sync_runs` is per-watch + `LIMIT`; `recent_runs_by_watch` is `ROW_NUMBER()`-windowed to five per
+watch. Both are correct for what they feed — a history page and a leading-streak verdict. Neither can
+answer *"when did this source last read successfully?"* for a source that has failed more ticks than
+the window is deep, which is `235-VERIFICATION.md` gap **G2**: `last_good_at` came back `None` and
+every surface rendered **silence** (never a lie — `provenNeverRead` already gated the *"has not read
+successfully yet"* sentence on the unbounded run list, so nothing was ever libelled).
+
+⚠ **THE ALTERNATIVE FIX WAS WIDENING THE WINDOW, AND IT WAS REJECTED ON COST.**
+`recent_runs_by_watch` feeds `GET /sources/health`, which every signed-in page polls; raising
+`_HEALTH_RUN_WINDOW` multiplies rows read on **every** poll for **every healthy** source, to answer a
+question only STOPPED sources ask. The aggregate instead runs once, for the already-stopped watch ids
+only — **zero rows on a healthy instance, and no query at all when that list is empty** (asserted:
+`test_last_success_by_watch_empty_input_issues_no_query` fails if the pool is acquired).
+
+⛔ **The owner predicate is in the SQL — `user_id = $2` now appears in all THREE reads.** This pool
+path is not RLS-gated. Asserted over the executed statement text, not over the call site.
+
+⚠ **Absence, never `None` in a value slot.** A watch with no successful tick is simply missing from
+the mapping. The api-layer fill is `verdict_value or looked_up.get(id)`; a present-with-`None` would
+make that a silent no-op that reads exactly like a fix. The `status = 'success'` filter already makes
+a NULL aggregate unreachable — the defensive drop is what keeps *absence* the only spelling.
+
+⚠ **The status literal is pinned, not trusted.** `_SYNC_RUN_COLUMNS` is deliberately NOT reused (this
+selects an aggregate; seventeen columns to read one instant is the amplification the sibling docblock
+warns about), and the SQL's `'success'` is asserted equal to `health_verdict.SUCCESS_STATUS` — without
+importing a service into the DAL. If that constant ever moves, the aggregate would otherwise answer
+about a status nothing writes while every other assertion still passed.
+
+Index unchanged: `idx_connector_sync_runs_watch_time` `(watch_id, started_at DESC)` serves the
+`MAX(started_at)` per `watch_id` as a bounded index scan. **No migration is added by this plan.**
+
 ---
 
 ## backend/app/api/sources.py
@@ -7684,6 +7722,47 @@ but **the response describes the request, not the outcome**, and it says exactly
 `watch_process_enabled` is `False` and nothing will ever consume the row (`BUG-260906-02`).
 **That reply is what hid the blocking finding at 234's G-4 for a day.** Fix by refusing when the
 loop is off and by reading back `last_run_at`/`last_status` — ⛔ never by syncing inline.
+
+### ⚠ Re-derived 2026-09-06 (Phase 235 plan 14, gap-closure round 1) — **5 / 1 / 677**
+
+The header triple (`2 / 0 / 356`) is **kept, not overwritten**. G-5 does not fire (1 phase).
+
+⭐ **GAP G2 CLOSED, AND THE DEFECT WAS SILENCE — NOT A LIE.** `235-VERIFICATION.md` explicitly
+REFUTED the suspected overclaim: `WatchedFoldersSection.tsx` renders `COPY.neverRead` only when
+`provenNeverRead` is true, i.e. only after the UNBOUNDED run list has been fetched and holds no
+success, and `SourcesAttentionSection.tsx` renders nothing on a null. So a long-dead source was
+never libelled as *"never read"* — **that gating is untouched by this plan and must stay**. What
+was wrong is that `last_good_at` came back `None` from the five-row window, both surfaces render
+nothing on a null, and SC#2's sentence is *"says when it last succeeded"*.
+
+⚠ **THE FIX IS SERVER-SIDE BECAUSE D-235-05 SAYS SO, not for convenience.** Both surfaces read
+this one endpoint; filling the instant here fixes both at once with **no client derivation and no
+second verdict**. A card that re-derived the instant from a run list would be a second verdict
+that can disagree with the first, and the person who finds the disagreement is a user. The
+frontend is **byte-unchanged by this plan** — it already renders whenever the field is non-null.
+
+⚠ **`_HEALTH_RUN_WINDOW` IS BYTE-IDENTICAL, AND THAT IS PINNED BY A TEST**
+(`test_the_polled_window_is_unchanged_by_the_gap_fix`). Widening it was the alternative fix and
+was rejected on measured cost: this endpoint is polled from every page by every signed-in user, so
+`per_watch` multiplies rows read on **every** poll for **every healthy** source — to answer a
+question only stopped sources ask. And a wider window is still a window: it moves the edge, it
+does not remove it. Without that pin, a later *"just make it bigger"* would satisfy every other
+case in the section.
+
+⛔ **The enrichment is guarded on `s.last_good_at is None`, so three properties hold at once:**
+zero stopped sources ⇒ the lookup is never awaited (a healthy instance pays nothing); a success
+INSIDE the window still wins and is not re-asked (one fact, one source, so the two can never be
+seen to disagree); and a genuinely-never-succeeded source keeps `None`, because the DAL omits it
+from the mapping rather than returning a `None` value. All three are asserted with a spy.
+
+⚠ **It is wrapped exactly like the connection-name query beside it (T-235c-06).** A failed lookup
+costs the sentence a date; it must never cost the endpoint the whole app shell polls. Asserted by
+raising from the lookup and checking the route still answers 200 with cause and connection name.
+
+⭐ **The shipped caveat paragraph was REWRITTEN, not left standing.** It documented this exact gap
+(*"a source that has failed more times than the window is deep reports `None`"*) and would have
+become a false statement about live behaviour the moment the fix landed — the next reader believes
+a docblock over the code. A test greps the live module source to keep it gone.
 
 ---
 

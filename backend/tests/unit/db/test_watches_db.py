@@ -22,6 +22,7 @@ from app.db.watches import (
     get_watch,
     get_watch_item_by_external_id,
     get_watch_items,
+    last_success_by_watch,
     list_sync_runs,
     list_watches,
     recent_runs_by_watch,
@@ -417,3 +418,103 @@ async def test_recent_runs_by_watch_empty_input_issues_no_query():
     pool, con = _pool_and_con()
     assert await recent_runs_by_watch(pool, [], user_id=uuid4()) == {}
     assert con.fetch.call_count == 0
+
+
+# ══ Phase 235 plan 14 (gap G2) — the UNBOUNDED last-success lookup ════════════
+#
+# ⭐ WHY A SECOND READ AT ALL, beside `recent_runs_by_watch` which already returns rows.
+# That one is WINDOWED — five rows per watch — because it feeds a verdict that only needs the
+# leading failure streak, and it is polled from every page by every signed-in user. A source
+# that has failed more ticks than the window is deep therefore has NO success inside it, and
+# the verdict reports `last_good_at = None`. Every surface then renders nothing, while SC#2's
+# sentence is "says when it last succeeded". These cases pin the unbounded answer, and they
+# pin the two properties that make it safe to add: the owner predicate is in the SQL, and
+# there is no query at all when there is nothing to ask about.
+
+
+@pytest.mark.asyncio
+async def test_last_success_by_watch_is_one_unbounded_aggregate():
+    pool, con = _pool_and_con()
+    w1, w2 = uuid4(), uuid4()
+    user_id = uuid4()
+    older = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    newer = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    con.fetch.return_value = [
+        {"watch_id": w1, "last_success_at": older},
+        {"watch_id": w2, "last_success_at": newer},
+    ]
+
+    found = await last_success_by_watch(pool, [w1, w2], user_id=user_id)
+
+    # ONE query for the whole set, exactly like its windowed sibling.
+    assert con.fetch.call_count == 1
+    sql = con.fetch.call_args[0][0]
+    assert "MAX(started_at)" in sql
+    assert "GROUP BY watch_id" in sql
+    assert "watch_id = ANY(" in sql
+    # ⛔ T-235c-04 — the asyncpg pool path is NOT RLS-gated, so the owner predicate lives in
+    # the SQL itself, in this read exactly as in the two shipped ones.
+    assert "user_id = $2" in sql
+    # ⭐ THE property this function exists for: no window, no LIMIT, no ROW_NUMBER.
+    assert "ROW_NUMBER" not in sql
+    assert "LIMIT" not in sql
+
+    # Non-vacuity: the status literal in the SQL is the one the verdict calls a success. If
+    # `health_verdict.SUCCESS_STATUS` ever moved, this aggregate would silently answer about a
+    # status nothing writes, and every assertion above would still pass.
+    from app.services.sources.health_verdict import SUCCESS_STATUS
+
+    assert SUCCESS_STATUS == "success"
+    assert f"status = '{SUCCESS_STATUS}'" in sql
+
+    assert found == {str(w1): older, str(w2): newer}
+
+
+@pytest.mark.asyncio
+async def test_last_success_by_watch_omits_a_watch_that_never_succeeded():
+    """⛔ ABSENCE, never a `None` sitting in a value slot.
+
+    A caller must not be able to confuse "has never succeeded" with "was not asked about" —
+    and the api layer's fill is `verdict_value or looked_up.get(id)`, which a present-with-None
+    would turn into a silent no-op that reads exactly like a fix.
+    """
+    pool, con = _pool_and_con()
+    has_one, never = uuid4(), uuid4()
+    when = datetime(2026, 2, 3, tzinfo=timezone.utc)
+    # The GROUP BY over a status-filtered set returns no row at all for `never`; the second
+    # entry is the defensive arm — a NULL aggregate is dropped, never stored as None.
+    con.fetch.return_value = [
+        {"watch_id": has_one, "last_success_at": when},
+        {"watch_id": uuid4(), "last_success_at": None},
+    ]
+
+    found = await last_success_by_watch(pool, [has_one, never], user_id=uuid4())
+
+    assert found == {str(has_one): when}
+    assert str(never) not in found
+    assert None not in found.values()
+
+
+@pytest.mark.asyncio
+async def test_last_success_by_watch_empty_input_issues_no_query():
+    """A healthy instance has zero stopped sources, so this must cost zero round trips."""
+    pool, con = _pool_and_con()
+    assert await last_success_by_watch(pool, [], user_id=uuid4()) == {}
+    assert con.fetch.call_count == 0
+    assert pool.acquire.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_last_success_by_watch_coerces_str_ids():
+    """The caller holds ids read back out of a row; a `str` must not raise at the driver."""
+    pool, con = _pool_and_con()
+    w1 = uuid4()
+    user_id = uuid4()
+    con.fetch.return_value = []
+
+    await last_success_by_watch(pool, [str(w1)], user_id=str(user_id))
+
+    bound_ids, bound_user = con.fetch.call_args[0][1], con.fetch.call_args[0][2]
+    assert bound_ids == [w1]
+    assert all(isinstance(i, UUID) for i in bound_ids)
+    assert bound_user == user_id

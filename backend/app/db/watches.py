@@ -488,6 +488,68 @@ async def recent_runs_by_watch(
     return grouped
 
 
+async def last_success_by_watch(
+    pool: asyncpg.Pool,
+    watch_ids: list[UUID],
+    *,
+    user_id: UUID,
+) -> dict[str, datetime]:
+    """When each of these watches last read SUCCESSFULLY — UNBOUNDED, in ONE query.
+
+    ⭐ THE ONE PROPERTY THAT MAKES THIS WORTH EXISTING BESIDE `recent_runs_by_watch`: that read
+    is WINDOWED and this one is not, and the difference is exactly the gap it closes. The
+    verdict only needs the LEADING failure streak, so it reads five rows per watch; a source
+    that has failed more ticks than the window is deep therefore has no success inside it and
+    the verdict can only answer `last_good_at = None`. Every surface then renders NOTHING, which
+    is silence where the promised sentence is *"it last read successfully on X"*.
+
+    ⚠ WHY THE WINDOW WAS NOT SIMPLY WIDENED INSTEAD. `recent_runs_by_watch` feeds an endpoint
+    polled from every page by every signed-in user; widening it multiplies rows read on EVERY
+    poll for EVERY healthy source, to answer a question only STOPPED sources ask. This runs only
+    for watches the verdict has already called stopped — zero rows on a healthy instance, and no
+    query at all when that list is empty.
+
+    ⛔ `user_id = $2` is IN THE SQL, not merely at the call site. The asyncpg pool path is NOT
+    RLS-gated (migration 172's policies protect PostgREST, not this connection), so this read
+    carries the same owner predicate as `list_sync_runs` and `recent_runs_by_watch` above.
+
+    Served by `idx_connector_sync_runs_watch_time` — the same `(watch_id, started_at DESC)`
+    index the history page and the streak derivation already read; `MAX(started_at)` per
+    `watch_id` is a bounded scan of that index, not of the table. ⚠ It deliberately does NOT
+    reuse `_SYNC_RUN_COLUMNS`: this selects an AGGREGATE, and pulling seventeen columns to read
+    one instant would be exactly the amplification the sibling docblock warns about.
+
+    Returns `{str(watch_id): datetime}`. A watch with no successful tick is ABSENT — never
+    present with a `None` value, so a caller cannot confuse "has never succeeded" with "was not
+    asked about".
+    """
+    if not watch_ids:
+        return {}
+
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            """
+            SELECT watch_id, MAX(started_at) AS last_success_at
+            FROM connector_sync_runs
+            WHERE watch_id = ANY($1::uuid[])
+              AND user_id = $2
+              AND status = 'success'
+            GROUP BY watch_id
+            """,
+            [_as_uuid(w) for w in watch_ids],
+            _as_uuid(user_id),
+        )
+
+    found: dict[str, datetime] = {}
+    for r in rows:
+        when = r["last_success_at"]
+        # The status filter already makes a NULL aggregate unreachable; dropping it anyway is
+        # what keeps ABSENCE the only way this mapping says "never succeeded".
+        if when is not None:
+            found[str(r["watch_id"])] = when
+    return found
+
+
 # ── Watch Items Mirror Table ──────────────────────────────────────────────────
 
 

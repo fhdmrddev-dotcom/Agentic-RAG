@@ -37,6 +37,7 @@ from app.db.watches import (
     delete_watch,
     get_watch,
     get_watch_items,
+    last_success_by_watch,
     list_sync_runs,
     list_watches,
     recent_runs_by_watch,
@@ -489,10 +490,20 @@ async def purge_missing_watch_documents(
 #: silently truncate the streak and under-report stopped sources. The `+ 1` buys the row
 #: BELOW the streak, which is where `last_good_at` usually is.
 #:
-#: ⚠ HONEST CAVEAT: `last_good_at` is "the newest success WITHIN this window". A source that
-#: has failed more times than the window is deep reports `None`, which reads the same as
-#: "never succeeded". The per-watch history route below is the unbounded answer, and the card
-#: is what renders it.
+#: ⭐ THE WINDOW BOUNDS THE VERDICT, AND ONLY THE VERDICT. "Is this source stopped?" is decided
+#: from the LEADING failure streak, so five rows is all it ever needs. The last-good INSTANT is
+#: a different question with a different reach, and it is answered UNBOUNDED, at the single
+#: enrichment site in `get_source_health` below, for the stopped rows the window could not
+#: answer for. ⚠ The symbol is named THERE and nowhere else in this module, so a grep for the
+#: DAL function returns the import and exactly one call — which is how "one call site" stays
+#: checkable rather than asserted.
+#:
+#: ⚠ WHY THE WINDOW WAS NOT SIMPLY WIDENED to cover both (gap G2, Phase 235 plan 14). This
+#: endpoint is polled from every page by every signed-in user. Growing `per_watch` multiplies
+#: rows read on EVERY poll for EVERY healthy source, to answer a question only STOPPED sources
+#: ask — and it would still be a window, so it would still have an edge, just further out. The
+#: aggregate instead runs once, over the already-stopped ids only: zero extra rows on a healthy
+#: instance, and no query at all when nothing is stopped.
 _HEALTH_RUN_WINDOW = max(5, SOFT_FAILURE_THRESHOLD + 1)
 
 
@@ -631,6 +642,29 @@ async def get_source_health(
         except Exception:  # noqa: BLE001
             # A missing name costs a sentence a noun. It must never cost the verdict.
             logger.exception("Failed to resolve connection names for stopped sources")
+
+    # ⭐ SC#2 — "says WHEN it last succeeded". The verdict answers that from the window, and for
+    # a source that has been dead longer than the window is deep the window has no answer. This
+    # asks the unbounded question for exactly those rows, so the sentence is on the screen
+    # rather than one click away in the history. ⛔ A row the window ALREADY answered is not
+    # re-asked: one fact, one source, so the two can never be seen to disagree.
+    unanswered = [s.watch_id for s in stopped if s.last_good_at is None]
+    if unanswered:
+        try:
+            found = await last_success_by_watch(pool, unanswered, user_id=user_id)
+            stopped = [
+                s
+                if s.last_good_at is not None
+                # ⚠ `.get` on an ABSENT key, deliberately: a watch with no successful tick is
+                # missing from the mapping, so this stays `None` — which is what keeps the
+                # client's "has not read successfully yet" arm meaning what it says.
+                else s.model_copy(update={"last_good_at": found.get(str(s.watch_id))})
+                for s in stopped
+            ]
+        except Exception:  # noqa: BLE001
+            # Same posture as the name query above: a missing date costs a sentence a date. It
+            # must never cost the endpoint the whole app shell polls.
+            logger.exception("Failed to resolve the last successful tick for stopped sources")
 
     return SourceHealthResponse(
         stopped=stopped,
