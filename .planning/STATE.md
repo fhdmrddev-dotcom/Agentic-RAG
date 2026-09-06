@@ -38,11 +38,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 236 — The Corpus Under Attack (🚧 **IN PROGRESS — discuss complete, ready for planning**)
+Phase: 236 — The Corpus Under Attack (🚧 **IN PROGRESS — Wave 1 complete, ready for Wave 2 / Plan 236-02**)
 Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
-Plan: none in flight
-Status: ready_for_planning
+Plan: 236-01 complete (13/13 refusal matrix, 11/11 tests green); 236-02 next
+Status: in_progress
 
 
 ## ▶ NEXT SESSION — start here
