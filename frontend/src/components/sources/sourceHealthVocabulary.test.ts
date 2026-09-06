@@ -33,7 +33,9 @@ import {
   COPY,
   COUNT_ORDER,
   FILE_FAILURE_HEADING,
+  FILE_FAILURE_MORE,
   FILE_FAILURE_SCOPE_NOTE,
+  fileFailureKind,
   instantPhrase,
   SENTENCE_FOR_CAUSE,
   SENTENCE_FOR_FILE_FAILURE,
@@ -118,6 +120,10 @@ const renderedNewCopy: string[] = [
   CHECKED_PREFIX("4 minutes ago"),
   FILE_FAILURE_HEADING,
   FILE_FAILURE_SCOPE_NOTE,
+  // ⭐ Plan 17's one new string, folded in here rather than asserted alone, so the five
+  //   binding rules loop over it too. A new export that skipped this list would be a string
+  //   nobody checked — which is the failure mode this array exists to prevent.
+  FILE_FAILURE_MORE(3),
 ]
 
 const allSentences: string[] = [
@@ -679,5 +685,86 @@ describe("instantPhrase — the BUILD-CONTRACT's absolute instant", () => {
     expect(instantPhrase("")).toBeNull()
     expect(instantPhrase("   ")).toBeNull()
     expect(instantPhrase("not a date at all")).toBeNull()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ⭐ PLAN 17 (gap-closure round 1) · fileFailureKind — DENY BY DEFAULT
+//
+// `SENTENCE_FOR_FILE_FAILURE` had been written, pinned and consumed by NOTHING. Mounting it
+// needs one thing this leaf did not have: a rule for WHICH of its three kinds a stored item
+// state means. That rule is the risk — a broad matcher prints a confident sentence about a
+// file whose reason nobody knows, which is the politer version of printing the exception.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("fileFailureKind — the per-file classifier", () => {
+  it("a size skip is the too_big kind", () => {
+    expect(fileFailureKind("skipped_size")).toBe("too_big")
+    expect(fileFailureKind("skipped_size", "anything at all")).toBe("too_big")
+  })
+
+  it("a failed item whose message names a password is the password kind", () => {
+    expect(fileFailureKind("failed", "This PDF is password-protected.")).toBe("password")
+    expect(fileFailureKind("failed", "the document is protected with a password")).toBe("password")
+    expect(fileFailureKind("failed", "A password is required to open this file")).toBe("password")
+  })
+
+  it("⛔ DENY BY DEFAULT — an unrecognised message is `unknown`, never a guess", () => {
+    // The honest fallback. A cause we did not recognise must not be narrated as one we did.
+    expect(fileFailureKind("failed", "Errno 13 while opening the stream")).toBe("unknown")
+    expect(fileFailureKind("failed", "")).toBe("unknown")
+    expect(fileFailureKind("failed", null)).toBe("unknown")
+    expect(fileFailureKind("failed")).toBe("unknown")
+  })
+
+  it("⛔ a type skip is `unknown` — the table has no sentence that fits it", () => {
+    // `SENTENCE_FOR_FILE_FAILURE` carries password / too_big / unknown. There is deliberately
+    // no "wrong type" sentence, so a type skip resolves honestly rather than borrowing one.
+    expect(fileFailureKind("skipped_type")).toBe("unknown")
+    expect(fileFailureKind("skipped_type", "unsupported mime type")).toBe("unknown")
+  })
+
+  it("⛔ a state this build has never heard of resolves to `unknown` rather than throwing", () => {
+    expect(fileFailureKind("present")).toBe("unknown")
+    expect(fileFailureKind("missing")).toBe("unknown")
+    expect(fileFailureKind("unauthorized")).toBe("unknown")
+    expect(fileFailureKind("")).toBe("unknown")
+    expect(fileFailureKind("a state from a later migration")).toBe("unknown")
+  })
+
+  it("⛔ the password tell is NOT reachable from a state other than `failed`", () => {
+    // The password arm reads a message; every other arm must ignore one entirely, so a
+    // provider string can never steer a kind the state does not support.
+    expect(fileFailureKind("present", "this file is password-protected")).toBe("unknown")
+    expect(fileFailureKind("missing", "this file is password-protected")).toBe("unknown")
+    expect(fileFailureKind("skipped_size", "this file is password-protected")).toBe("too_big")
+  })
+
+  it("⛔ every kind it can return has a sentence — the output is a KEY, never text", () => {
+    const kinds: SourceFileFailureKind[] = ["password", "too_big", "unknown"]
+    for (const k of kinds) expect(SENTENCE_FOR_FILE_FAILURE[k].trim().length).toBeGreaterThan(0)
+    // ⛔ AND THE MESSAGE NEVER SURVIVES. A provider-shaped string in, a three-value key out.
+    const leaky = 'a driver failure at https://drive.example/f?token=ya29.abc {"code": 403}'
+    const kind = fileFailureKind("failed", leaky)
+    expect(kinds).toContain(kind)
+    expect(SENTENCE_FOR_FILE_FAILURE[kind]).not.toContain("https://")
+    expect(SENTENCE_FOR_FILE_FAILURE[kind]).not.toContain("ya29")
+  })
+})
+
+describe("FILE_FAILURE_MORE — the remainder, counted and nothing more", () => {
+  it("states the count", () => {
+    expect(FILE_FAILURE_MORE(3)).toBe("and 3 more")
+    expect(FILE_FAILURE_MORE(1)).toBe("and 1 more")
+  })
+
+  it("⛔ makes NO claim about why the remainder failed", () => {
+    // Naming a reason for files nobody looked at is the overclaim this vocabulary refuses.
+    const s = FILE_FAILURE_MORE(9)
+    for (const kind of ["password", "too_big", "unknown"] as SourceFileFailureKind[]) {
+      expect(s).not.toContain(SENTENCE_FOR_FILE_FAILURE[kind])
+    }
+    expect(s.toLowerCase()).not.toContain("password")
+    expect(s.toLowerCase()).not.toContain("larger")
   })
 })

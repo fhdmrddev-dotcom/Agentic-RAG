@@ -34,10 +34,19 @@ import userEvent from "@testing-library/user-event"
 
 import { WatchedFoldersSection } from "./WatchedFoldersSection"
 import * as sourcesApi from "@/lib/api/sources"
-import type { ConnectorWatch, StoppedSource } from "@/lib/api/sources"
+import type {
+  ConnectorWatch,
+  ConnectorWatchDetail,
+  ConnectorWatchItem,
+  StoppedSource,
+} from "@/lib/api/sources"
 import {
   CONTROL_FOR_CAUSE,
+  FILE_FAILURE_HEADING,
+  FILE_FAILURE_MORE,
+  FILE_FAILURE_SCOPE_NOTE,
   SENTENCE_FOR_CAUSE,
+  SENTENCE_FOR_FILE_FAILURE,
   type SourceFailureCause,
 } from "./sourceHealthVocabulary"
 
@@ -54,6 +63,8 @@ vi.mock("@/lib/api/sources", () => ({
   // ⭐ The two Phase-235 additions. Without them the mount throws about a missing export.
   listSyncRuns: vi.fn(),
   getSourceHealth: vi.fn(),
+  // ⭐ Plan 17's addition — the shipped per-item read the card finally calls.
+  getWatch: vi.fn(),
 }))
 
 vi.mock("@/lib/api", () => ({
@@ -75,6 +86,7 @@ const mockUpdateWatch = vi.mocked(sourcesApi.updateWatch)
 const mockDeleteWatch = vi.mocked(sourcesApi.deleteWatch)
 const mockPurgeWatchFiles = vi.mocked(sourcesApi.purgeWatchFiles)
 const mockListSyncRuns = vi.mocked(sourcesApi.listSyncRuns)
+const mockGetWatch = vi.mocked(sourcesApi.getWatch)
 
 /**
  * ⚠ `last_status` values come from the MEASURED production set only.
@@ -131,11 +143,31 @@ function only(over: Partial<ConnectorWatch>): ConnectorWatch[] {
   return [{ ...SAMPLE_WATCHES[0], ...over }]
 }
 
+/** One stored per-file row, in whatever state the case needs. */
+function item(over: Partial<ConnectorWatchItem> & { id: string }): ConnectorWatchItem {
+  return {
+    watch_id: "watch-1",
+    external_id: `ext-${over.id}`,
+    name: `${over.id}.pdf`,
+    path_hint: "/",
+    state: "present",
+    ...over,
+  }
+}
+
+/** The `GET /sources/watches/{id}` reply the card reads its per-file rows from. */
+function detail(items: ConnectorWatchItem[], base = SAMPLE_WATCHES[0]): ConnectorWatchDetail {
+  return { ...base, items }
+}
+
 describe("WatchedFoldersSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal("confirm", vi.fn(() => true))
     mockListSyncRuns.mockResolvedValue([])
+    // ⚠ The default is an ANSWERED fetch carrying no failing file, so every pre-existing case
+    //   renders exactly the surface it rendered before this plan.
+    mockGetWatch.mockResolvedValue(detail([]))
   })
 
   afterEach(() => {
@@ -383,16 +415,269 @@ describe("WatchedFoldersSection", () => {
     expect(screen.getAllByTestId("sources-state")[0]).toHaveTextContent(/waiting/i)
   })
 
+  // ══ ⭐ PLAN 17 — THE FILES IT COULD NOT READ, AS THEY STAND NOW ══════════════════
+  //
+  // `SENTENCE_FOR_FILE_FAILURE` was written in plan 02, pinned by its own suite, and consumed
+  // by NOTHING for the whole phase. `connector_watch_items` has carried each file's state and
+  // name since migration 169, and `getWatch` has returned them since Phase 234 — so the reason
+  // a file could not be read has been in the database all along and has never reached a person.
+  //
+  // ⛔ AND IT IS CURRENT STATE, NOT A RUN. An item carries ONE `state`, so a file that failed
+  //    in two checks can only ever be attributed to the later one. The block therefore renders
+  //    OUTSIDE the history, says so on the screen, and is asserted never to sit inside a run.
+  describe("the files it could not read are named, scoped to how they stand NOW", () => {
+    const PASSWORDED = item({
+      id: "i-1",
+      name: "Vendor NDA (signed).pdf",
+      state: "failed",
+      last_error: "The document is password-protected and could not be opened.",
+    })
+
+    /** Open the one healthy source's card. Variant B keeps it a line until asked. */
+    async function openCard() {
+      const user = userEvent.setup()
+      await waitFor(() => expect(screen.getByTestId("sources-source-line")).toBeInTheDocument())
+      await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+      return user
+    }
+
+    it("⭐ names the FILE and prints its own sentence — the orphan is mounted", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(detail([PASSWORDED]))
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(screen.getByTestId("sources-file-failures")).toBeInTheDocument())
+      const rows = screen.getAllByTestId("sources-file-failure")
+      expect(rows).toHaveLength(1)
+      // ⚠ CONTENT, not presence. The composition fence missed the original gap entirely
+      //   because the right testids were present while rendering the wrong thing.
+      expect(rows[0]).toHaveTextContent("Vendor NDA (signed).pdf")
+      expect(rows[0]).toHaveTextContent(SENTENCE_FOR_FILE_FAILURE.password)
+      expect(screen.getByText(FILE_FAILURE_HEADING)).toBeInTheDocument()
+    })
+
+    it("⭐ the scope note is ON THE SCREEN — its absence is what makes this surface honest", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(detail([PASSWORDED]))
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() =>
+        expect(screen.getByTestId("sources-file-failure-scope")).toBeInTheDocument(),
+      )
+      expect(screen.getByTestId("sources-file-failure-scope")).toHaveTextContent(
+        FILE_FAILURE_SCOPE_NOTE,
+      )
+    })
+
+    it("⛔ the block NEVER renders inside a run row, and never inside the history", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(detail([PASSWORDED]))
+      mockListSyncRuns.mockResolvedValue([
+        {
+          id: "run-1",
+          watch_id: "watch-1",
+          started_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+          finished_at: null,
+          status: "failed",
+          failure_cause: null,
+          last_error: null,
+          listing_complete: true,
+          count_new: 0,
+          count_modified: 0,
+          count_renamed: 0,
+          count_missing: 0,
+          count_restored: 0,
+          count_errors: 1,
+        },
+      ])
+      render(<WatchedFoldersSection />)
+      const user = await openCard()
+      await user.click(screen.getByTestId("sources-toggle-history"))
+
+      await waitFor(() => expect(screen.getByTestId("sources-file-failures")).toBeInTheDocument())
+      const block = screen.getByTestId("sources-file-failures")
+      // A run row is a per-CHECK claim; this list cannot make one. Structural, so a later
+      // refactor cannot slide it into a run and silently re-acquire the false attribution.
+      expect(block.closest('[data-testid="sources-run"]')).toBeNull()
+      const history = document.querySelector('[data-testid="sources-history"]')
+      expect(history).not.toBeNull()
+      expect(history!.contains(block)).toBe(false)
+    })
+
+    it("⛔ an `unauthorized`-only source renders NO per-file block", async () => {
+      // That writer marks EVERY item at once when the source loses access, so rendering it per
+      // file would print one SOURCE-level truth N times, beside a stopped sentence that has
+      // already said it once.
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(
+        detail([
+          item({ id: "u-1", state: "unauthorized" }),
+          item({ id: "u-2", state: "unauthorized" }),
+          item({ id: "u-3", state: "unauthorized" }),
+        ]),
+      )
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(mockGetWatch).toHaveBeenCalled())
+      expect(screen.queryByTestId("sources-file-failures")).not.toBeInTheDocument()
+    })
+
+    it("⛔ a provider-shaped item error never reaches the DOM (T-235c-11)", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(
+        detail([
+          item({
+            id: "leak-1",
+            name: "Quarterly board pack.pdf",
+            state: "failed",
+            last_error:
+              'a driver failure at https://drive.example/files/x?token=ya29.SECRET {"code": 403, "message": "insufficient scopes"}',
+          }),
+        ]),
+      )
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(screen.getByTestId("sources-file-failures")).toBeInTheDocument())
+      const text = document.body.textContent ?? ""
+      expect(text).toContain("Quarterly board pack.pdf")
+      expect(text).not.toContain("https://")
+      expect(text).not.toContain("ya29")
+      expect(text).not.toContain('"code": 403')
+      expect(text).not.toContain("insufficient scopes")
+      // Unrecognised ⇒ the honest fallback, never a guessed reason.
+      expect(screen.getByTestId("sources-file-failure")).toHaveTextContent(
+        SENTENCE_FOR_FILE_FAILURE.unknown,
+      )
+    })
+
+    it("⛔ `present` and `missing` are not failures — the block renders NOTHING", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(
+        detail([item({ id: "p-1" }), item({ id: "m-1", state: "missing" })]),
+      )
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(mockGetWatch).toHaveBeenCalled())
+      expect(screen.queryByTestId("sources-file-failures")).not.toBeInTheDocument()
+      // ⛔ No heading, no empty state. This is not the source's own attention state.
+      expect(screen.queryByText(FILE_FAILURE_HEADING)).not.toBeInTheDocument()
+    })
+
+    it("a size skip reads as the too_big sentence", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(
+        detail([item({ id: "big-1", name: "Site survey scans.pdf", state: "skipped_size" })]),
+      )
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(screen.getByTestId("sources-file-failure")).toBeInTheDocument())
+      expect(screen.getByTestId("sources-file-failure")).toHaveTextContent(
+        SENTENCE_FOR_FILE_FAILURE.too_big,
+      )
+    })
+
+    it("shows five and counts the remainder", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(
+        detail(
+          Array.from({ length: 8 }, (_, i) =>
+            item({ id: `f-${i}`, name: `report-${i}.pdf`, state: "failed" }),
+          ),
+        ),
+      )
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(screen.getByTestId("sources-file-failures")).toBeInTheDocument())
+      expect(screen.getAllByTestId("sources-file-failure")).toHaveLength(5)
+      expect(screen.getByTestId("sources-file-failure-more")).toHaveTextContent(
+        FILE_FAILURE_MORE(3),
+      )
+    })
+
+    it("asks ONCE per expanded card, and does not re-ask on collapse and re-open", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockResolvedValue(detail([PASSWORDED]))
+      render(<WatchedFoldersSection />)
+      const user = await openCard()
+
+      await waitFor(() => expect(mockGetWatch).toHaveBeenCalledWith("watch-1"))
+      expect(mockGetWatch).toHaveBeenCalledTimes(1)
+
+      await user.click(screen.getByTestId("sources-collapse"))
+      await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+      expect(mockGetWatch).toHaveBeenCalledTimes(1)
+    })
+
+    it("⛔ does NOT ask while the source is a closed line — a healthy list costs nothing", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      render(<WatchedFoldersSection />)
+
+      await waitFor(() => expect(screen.getByTestId("sources-source-line")).toBeInTheDocument())
+      expect(mockGetWatch).not.toHaveBeenCalled()
+    })
+
+    it("a stopped card asks WITHOUT being opened — a stopped card never collapses", async () => {
+      mockListWatches.mockResolvedValue([SAMPLE_WATCHES[1]])
+      mockGetWatch.mockResolvedValue(detail([PASSWORDED], SAMPLE_WATCHES[1]))
+      render(<WatchedFoldersSection stoppedSources={STOPPED_TOKEN_REVOKED} />)
+
+      await waitFor(() => expect(mockGetWatch).toHaveBeenCalledWith("watch-2"))
+    })
+
+    it("⛔ a rejected fetch renders nothing and leaves the rest of the card intact", async () => {
+      mockListWatches.mockResolvedValue(only({}))
+      mockGetWatch.mockRejectedValue(new Error("the mirror could not be read"))
+      render(<WatchedFoldersSection />)
+      await openCard()
+
+      await waitFor(() => expect(mockGetWatch).toHaveBeenCalled())
+      expect(screen.queryByTestId("sources-file-failures")).not.toBeInTheDocument()
+      // Fail-quiet: the card's own sentences are untouched.
+      expect(screen.getByTestId("sources-source-card")).toBeInTheDocument()
+      expect(screen.getByTestId("sources-outcome")).toBeInTheDocument()
+      expect(screen.queryByText(/mirror could not be read/i)).not.toBeInTheDocument()
+    })
+  })
+
   // ══ SOURCE FENCES — properties of the SHIPPED file, read as text ═════════════════
   describe("the invariants a later edit must not break", () => {
     it("⛔ the raw `last_error` is only ever handed to the vocabulary leaf", () => {
+      // ⚠ WIDENED BY PLAN 17, deliberately and with the reason recorded rather than by
+      //   loosening the regex to nothing. `fileFailureKind` is the SAME leaf, and its whole
+      //   return type is a three-value key — a message cannot survive it. The render-level
+      //   proof that nothing leaks is the planted-URL case above, not this grep.
       const codeHits = watchedFoldersSource
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("*") && line.includes("last_error"))
       expect(codeHits.length).toBeGreaterThan(0) // non-vacuity
       for (const line of codeHits) {
-        expect(line).toMatch(/(classifySourceFailure|sourceFailureSentence)\(\s*watch\.last_error/)
+        expect(line).toMatch(
+          /(classifySourceFailure|sourceFailureSentence)\(\s*watch\.last_error|fileFailureKind\(\s*item\.state,\s*item\.last_error/,
+        )
       }
+    })
+
+    it("⛔ the scope note ships WITH the block — a silent list would overclaim", () => {
+      // ⭐ The licence for this surface to exist. If a later edit removes the note but keeps
+      //   the list, THIS reds — the rendered case above proves it is drawn, and this proves
+      //   the two cannot be separated by an edit that only touches markup.
+      expect(watchedFoldersSource).toContain("sources-file-failures") // non-vacuity
+      expect(watchedFoldersSource).toMatch(
+        /sources-file-failures[\s\S]{0,800}?FILE_FAILURE_SCOPE_NOTE/,
+      )
+    })
+
+    it("⛔ no per-file row is built with raw HTML", () => {
+      // T-235c-12 — a hostile external FILE NAME is rendered as a text child and React escapes
+      // it. Nothing in this file may opt out of that.
+      expect(watchedFoldersSource).not.toContain("dangerouslySetInnerHTML")
     })
 
     it("⛔ no full page load survives — this app has no router (SEED-185)", () => {

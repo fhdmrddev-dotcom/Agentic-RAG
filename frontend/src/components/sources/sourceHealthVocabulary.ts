@@ -195,6 +195,52 @@ export const SENTENCE_FOR_FILE_FAILURE: Record<SourceFileFailureKind, string> = 
   unknown: UNKNOWN_SOURCE_FAILURE_SENTENCE,
 }
 
+/**
+ * ⭐ Plan 17 (gap-closure round 1) — THE TELLS OF A PASSWORD, AND NOTHING ELSE.
+ *
+ * Deliberately NARROW. The table above carries three kinds and only one of them can ever be
+ * recognised from a message, so the honest thing for this matcher to do most of the time is
+ * MISS. A broad pattern here would print a confident sentence about a file whose reason we
+ * do not actually know — the same overclaim `looksHumanWritten` refuses to make one screen up.
+ */
+const PASSWORD_TELLS =
+  /password[-\s]?protected|protected with a password|requires? (?:a )?password|password[-\s]?locked|password is required|encrypted with a password/i
+
+/**
+ * ⭐ Plan 17 — THE PER-FILE CLASSIFIER. A stored `connector_watch_items.state` (and, only for
+ * the `failed` arm, that item's own stored message) in; ONE of the three kinds out.
+ *
+ * ⛔ THE MESSAGE IS READ AND NEVER RETURNED. This function's whole output is a KEY into
+ * `SENTENCE_FOR_FILE_FAILURE`, so a provider string cannot reach a screen through it — which
+ * is the difference between this and `sourceFailureSentence`, whose pass-through arm exists
+ * for the backend's own authored prose and is gated on positive proof of plainness.
+ *
+ * ⚠ DENY BY DEFAULT. `skipped_type`, an unrecognised `failed` message, an empty string and a
+ * state this build has never heard of ALL resolve to `unknown`, whose sentence is the shipped
+ * honest fallback. Guessing a nameable reason from an unnameable message is the defect.
+ *
+ * ⚠ `skipped_size` and `skipped_type` have NO PRODUCER today (235-RESEARCH §3.5). The
+ * mapping is written because the state set is what it is; the row that would show it waits on
+ * a writer.
+ */
+export function fileFailureKind(
+  state: string,
+  lastError?: string | null,
+): SourceFileFailureKind {
+  if (state === "skipped_size") return "too_big"
+  if (state === "failed" && lastError && PASSWORD_TELLS.test(lastError)) return "password"
+  return "unknown"
+}
+
+/**
+ * *"and 3 more"* — the remainder, when a source has more failing files than the card shows.
+ *
+ * ⚠ It states a COUNT and makes no claim about what those files are. A sentence that implied
+ * the remainder shared the reasons above it would be inventing facts about files nobody looked
+ * at, which is exactly the shape of overclaim this vocabulary exists to refuse.
+ */
+export const FILE_FAILURE_MORE = (n: number): string => `and ${n} more`
+
 // ── RECOGNITION ───────────────────────────────────────────────────────────────────────
 
 /**

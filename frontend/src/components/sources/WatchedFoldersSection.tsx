@@ -65,7 +65,7 @@
  * than twelve (T-235-13). This component derives NO verdict of its own (D-235-05).
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   AlertCircle,
   AlertTriangle,
@@ -84,12 +84,14 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   deleteWatch,
+  getWatch,
   listSyncRuns,
   listWatches,
   purgeWatchFiles,
   triggerWatchSync,
   updateWatch,
   type ConnectorWatch,
+  type ConnectorWatchItem,
   type StoppedSource,
   type SyncRun,
 } from "@/lib/api/sources"
@@ -101,8 +103,13 @@ import { isQuiet } from "./runHistoryFold"
 import {
   CONTROL_FOR_CAUSE,
   COPY,
+  FILE_FAILURE_HEADING,
+  FILE_FAILURE_MORE,
+  FILE_FAILURE_SCOPE_NOTE,
   SENTENCE_FOR_CAUSE,
+  SENTENCE_FOR_FILE_FAILURE,
   classifySourceFailure,
+  fileFailureKind,
   sourceFailureSentence,
   type SourceFailureCause,
 } from "./sourceHealthVocabulary"
@@ -281,6 +288,21 @@ function outcomeSentence(
   }
   return watch.item_count > 0 ? COPY.checkedAgo(ago, watch.item_count) : COPY.checkedNoChange(ago)
 }
+
+/**
+ * ⭐ Plan 17 — THE ITEM STATES THAT MEAN *"this file could not be read"*, AND ONLY THOSE.
+ *
+ * ⛔ `unauthorized` IS DELIBERATELY ABSENT, and this is the load-bearing exclusion.
+ *   `watch_service.py:566-575` marks EVERY item at once when the source loses access, so
+ *   listing it per file would print ONE SOURCE-LEVEL TRUTH N TIMES — directly beneath a
+ *   stopped sentence that has already said it once, in a sentence written for it.
+ * ⛔ `present` and `missing` are not failures at all: a file that is gone at the source is a
+ *   count in the run history, not a file the reader tried and could not open.
+ */
+const FILE_FAILURE_STATES: readonly string[] = ["failed", "skipped_size", "skipped_type"]
+
+/** How many failing files a card names before it starts counting the rest instead. */
+const FILE_FAILURES_SHOWN = 5
 
 export interface WatchedFoldersSectionProps {
   onNavigateToConnections?: () => void
@@ -619,6 +641,17 @@ function WatchRow({
   const [runsLoading, setRunsLoading] = useState(false)
   const [runsError, setRunsError] = useState<string | null>(null)
   const [degradedReference, setDegradedReference] = useState(false)
+  /** The stored per-file rows. `null` until asked; `[]` is an answer, not a pending state. */
+  const [items, setItems] = useState<ConnectorWatchItem[] | null>(null)
+  /**
+   * ⚠ A REF, NOT STATE, AND THAT WAS DRIVEN RED BEFORE IT WAS BELIEVED. As `useState` it is an
+   * effect DEPENDENCY, so setting it immediately re-ran the effect, whose cleanup cancelled the
+   * in-flight fetch it had just started — every card asked, every answer was discarded, and the
+   * block rendered nothing while the call count looked perfect.
+   */
+  const itemsAsked = useRef(false)
+  /** Set only on real unmount, so a collapse can never discard an answer already in flight. */
+  const rowMounted = useRef(true)
 
   const collapsible = COLLAPSIBLE_STATES.includes(state)
   const asCard = !collapsible || open
@@ -651,6 +684,43 @@ function WatchRow({
   //   has been fetched and holds no success — otherwise this renders nothing at all.
   const lastGoodBand = relativeBand(stopped?.last_good_at, now)
   const provenNeverRead = runs !== null && !runs.some((r) => r.status === "success")
+
+  // ── ⭐ THE PER-FILE ROWS — asked ONCE, only for a card that is actually showing ─────
+  //
+  // ⚠ THE COST, STATED RATHER THAN GLOSSED. A stopped or unreadable card is a card the moment
+  //   it renders (those states never collapse), so it asks automatically; a healthy source is
+  //   a LINE and asks nothing until a person opens it. On a healthy instance there are zero
+  //   stopped cards, so the automatic arm costs exactly nothing — and on an unhealthy one the
+  //   ask is bounded by the number of sources that are actually broken.
+  //
+  // ⛔ FAIL-QUIET, and the `try` deliberately WRAPS THE CALL rather than only awaiting it: a
+  //   rejection, and a build where this export is unavailable, both land in the same arm and
+  //   both render nothing. A per-file list nobody could fetch is silence, never an error the
+  //   card did not otherwise have.
+  useEffect(() => {
+    rowMounted.current = true
+    return () => {
+      rowMounted.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!asCard || itemsAsked.current) return
+    itemsAsked.current = true
+    void (async () => {
+      try {
+        const detail = await getWatch(watch.id)
+        if (rowMounted.current) setItems(detail?.items ?? [])
+      } catch {
+        // Nothing is claimed. The rest of the card is untouched.
+      }
+    })()
+  }, [asCard, watch.id])
+
+  // ⛔ ONE `state` per item means CURRENT STATE, never per-run attribution (D-235-06). The
+  //   scope note beside the heading is what keeps this list from claiming otherwise, and it
+  //   renders unconditionally with the block rather than behind any branch.
+  const failingItems = (items ?? []).filter((i) => FILE_FAILURE_STATES.includes(i.state))
 
   async function openHistory() {
     setHistoryOpen(true)
@@ -889,6 +959,54 @@ function WatchRow({
                     {control.label(connectionName)}
                   </Button>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ── ⭐ THE FILES IT COULD NOT READ, AS THEY STAND NOW ──────────────────── */}
+          {/* ⛔ OUTSIDE the history, and never inside a run row. A run row is a claim about
+                ONE check; `connector_watch_items` carries one state per file and cannot
+                support that claim, so the block sits here and the note says which claim it
+                IS making. Per-run attribution needs a per-run writer — `SEED-254`.
+              ⛔ With no failing file this renders NOTHING — no heading and no empty state.
+                An empty per-file list is not one of this source's own attention states. */}
+          {failingItems.length > 0 && (
+            <div
+              data-testid="sources-file-failures"
+              className="space-y-1.5 border-t border-border/50 pt-2 text-xs"
+            >
+              <p className="font-medium text-foreground">{FILE_FAILURE_HEADING}</p>
+              <p
+                data-testid="sources-file-failure-scope"
+                className="text-[11px] text-muted-foreground"
+              >
+                {FILE_FAILURE_SCOPE_NOTE}
+              </p>
+              <ul className="space-y-1">
+                {failingItems.slice(0, FILE_FAILURES_SHOWN).map((item) => (
+                  <li
+                    key={item.id}
+                    data-testid="sources-file-failure"
+                    className="text-muted-foreground"
+                  >
+                    {/* The name is a TEXT CHILD — React escapes it, and this file introduces
+                        no raw-HTML escape hatch (T-235c-12). */}
+                    <span className="font-medium text-foreground">{item.name}</span>
+                    <span aria-hidden="true"> &mdash; </span>
+                    {/* ⛔ The item's own stored message reaches the vocabulary leaf and NOTHING
+                        ELSE. `fileFailureKind` returns one of three KEYS, so a provider string
+                        cannot ride through it onto the screen (T-235c-11). */}
+                    {SENTENCE_FOR_FILE_FAILURE[fileFailureKind(item.state, item.last_error)]}
+                  </li>
+                ))}
+              </ul>
+              {failingItems.length > FILE_FAILURES_SHOWN && (
+                <p
+                  data-testid="sources-file-failure-more"
+                  className="text-[11px] text-muted-foreground"
+                >
+                  {FILE_FAILURE_MORE(failingItems.length - FILE_FAILURES_SHOWN)}
+                </p>
               )}
             </div>
           )}
