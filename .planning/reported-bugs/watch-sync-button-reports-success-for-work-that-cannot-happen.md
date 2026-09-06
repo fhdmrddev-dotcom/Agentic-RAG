@@ -4,12 +4,33 @@ title: The watch Sync button reports "scheduled" for work nothing consumes, and 
 reported: 2026-09-06
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/connectors, frontend/library, connectors/watches]
 folded_into: 235
-verified_closed_by: null
+verified_closed_by: >
+  Phase 235, all THREE named parts, each verified in code at the phase's final commit rather than
+  assumed from a summary:
+  (1) REFUSE — `backend/app/api/sources.py:379-392` (plan 235-07). ⭐ It is BETTER than the fix
+      shape asked for: it tests the LIVE reader (`getattr(request.app.state, "watch_service", None)`)
+      rather than `settings.watch_process_enabled`, because `main.py` swallows a failed start and
+      leaves the flag reading true — the flag is not the fact. It returns `status="refused"` and
+      WRITES NOTHING; poking a column no process reads is the false promise itself.
+  (2) REPORT THE OUTCOME — `WatchedFoldersSection.tsx` renders `last_run_at` / `last_status`
+      (7 references measured) as an outcome line and a stopped sentence (plan 235-10), with the
+      cause as a NAMED value from `failure_cause.py`, never `last_error` prose.
+  (3) SAY IT WAS ASKED — the endpoint answers `status="asked"` with `next_check_within_seconds`,
+      and the card holds a `pendingAsks` state (plan 235-07 + 235-10). ⭐ D-235-16: the pending
+      state clears only when `last_run_at` has advanced PAST the click, never on a timer — a
+      self-expiring pending state would have been a second overclaim.
 related_seeds: [SEED-248]
-re_open_trigger: null
+re_open_trigger: >
+  ⚠ ONE THING THIS BUG'S CLOSURE DOES NOT COVER, named so the closure cannot be over-read:
+  `release_watch` SWALLOWS its `connector_sync_runs` INSERT, so no test yet proves a run row is
+  actually STORED after a real tick. The rendered outcome line is correct against the
+  `connector_watches` columns this bug named, and those were always populated — but the run
+  HISTORY behind it is unproven end-to-end. Re-open if a source shows an outcome line while its
+  history stays empty. The first honest check is a non-zero `count(*)` on `connector_sync_runs`
+  after a real tick, which is a G-4 row and not a unit test.
 reproduces_on:
   branch: develop
   commit: da34aa8f7
