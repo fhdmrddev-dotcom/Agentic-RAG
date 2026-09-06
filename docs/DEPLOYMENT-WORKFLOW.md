@@ -132,8 +132,19 @@ Before `master → production`:
       is regenerated.
 - [ ] Cross-provider: the change works across providers, not just the one you tested
       (provider-specific handling stays at the service boundary, never breaks the shared path).
+- [ ] **Landing-page CTAs point somewhere real — set `VITE_APP_URL` and `VITE_DEMO_URL` in
+      Vercel** (frontend project settings, **not** Coolify — `VITE_*` is a frontend build-time
+      var and the backend never reads it). Operator-deferred from `BUS-071` to deploy time.
+      ⚠ **Both have silent fallbacks**, so a wrong value never errors — it just quietly ships the
+      default: `VITE_APP_URL` → `/app`, `VITE_DEMO_URL` → the `#start` anchor. Read by
+      `landing/components/` `Navigation`, `HeroSection`, `CtaSection`, `LandingFooter`.
+      ⚠ **`VITE_*` is baked at BUILD time — changing it in Vercel needs a REDEPLOY**, it is not
+      picked up live. Set it in the same operation as the `app.<domain>` move (row above), since
+      that is where `VITE_APP_URL` gets its real value.
 - [ ] Watched the Coolify + Vercel deploy logs go ✅ after pushing.
 - [ ] Preview verification: verify root `/` serves landing, root `/app` 308-redirects to `https://app.<domain>/app`, and subdomain `/` mounts the SPA.
+- [ ] **Landing CTAs verified on the deployed page** — click "Open app" and the demo CTA and
+      confirm neither fell back to `/app` or `#start`. The fallbacks make this invisible otherwise.
 - [ ] Smoke-tested the live app (login, chat stream, a doc ingest) on the real domain.
 
 ---
