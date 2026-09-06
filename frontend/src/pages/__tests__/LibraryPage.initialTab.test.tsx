@@ -99,6 +99,11 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// ⚠ Phase 235 plan 10 — `listSyncRuns` and `getSourceHealth` are NOT optional here.
+//   `IngestionTab` now mounts `useSourceAttention`, which imports `getSourceHealth` from this
+//   module, and `WatchedFoldersSection` imports `listSyncRuns`. A factory that omits an export
+//   makes this suite throw AT MOUNT about a missing export rather than about the thing under
+//   test — Phase 196-08's nine-suite, 249-case failure mode, verbatim.
 vi.mock("@/lib/api/sources", () => ({
   listWatches: mockListWatches,
   getWatch: vi.fn().mockResolvedValue(null),
@@ -107,6 +112,10 @@ vi.mock("@/lib/api/sources", () => ({
   deleteWatch: vi.fn(),
   triggerWatchSync: vi.fn(),
   purgeWatchFiles: vi.fn(),
+  listSyncRuns: vi.fn().mockResolvedValue([]),
+  getSourceHealth: vi
+    .fn()
+    .mockResolvedValue({ stopped: [], reader_running: true, poll_interval_seconds: 60 }),
 }))
 
 vi.mock("@/hooks/useDocuments", () => ({ useDocuments: mockUseDocuments }))
