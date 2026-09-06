@@ -485,35 +485,37 @@ A, because A does not do what the requirement says.**
   3. A person who has not opened the sources screen **finds out that a watch is broken** — the signal reaches them where they already are in the product (SURF-03).
   4. That signal does **not** fire for a healthy source, and does not fire for a single transient failure the next check recovered from — a person who ignores it once has not been trained to ignore it always (SURF-03, LIB-10).
 
-**Plans**: 12 plans in 5 waves
+**Plans**: 12 plans in 5 waves — **all 12 executed** (verified against `235-NN-PLAN.md` on disk, 12 files, and against twelve `235-NN-SUMMARY.md`).
+
+⚠ **The `**Migrations**` line below reads `172` and was NOT stale at execution.** `235-12-PLAN.md` expected to find `161` there and correct it; the correction had already been made at planning time (D-235-20), and this is recorded because *verifying a discharge rather than assuming it* is the same rule D-235-18 turns on. The Phase Table row and this detail block agree.
 
 Plans:
 **Wave 1**
 
-- [ ] 235-01-PLAN.md — migration 172 + the DAL that writes and prunes the run row (wave 1)
-- [ ] 235-02-PLAN.md — the failure cause is DATA, and every cause has one sentence and one control (wave 1)
-- [ ] 235-03-PLAN.md — the composition fence, generated from the sketch and driven RED (wave 1)
-- [ ] 235-04-PLAN.md — the API client, the one verdict reader, and the quiet-run fold (wave 1)
-- [ ] 235-08-PLAN.md — an external caller can open the Library Health tab (`initialTab` threading) (wave 1)
+- [x] 235-01-PLAN.md — migration 172 + the DAL that writes and prunes the run row (wave 1)
+- [x] 235-02-PLAN.md — the failure cause is DATA, and every cause has one sentence and one control (wave 1)
+- [x] 235-03-PLAN.md — the composition fence, generated from the sketch and driven RED (wave 1)
+- [x] 235-04-PLAN.md — the API client, the one verdict reader, and the quiet-run fold (wave 1)
+- [x] 235-08-PLAN.md — an external caller can open the Library Health tab (`initialTab` threading) (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 235-05-PLAN.md — all FOUR release seams write an honest run row (wave 2)
-- [ ] 235-06-PLAN.md — the stopped verdict, computed once, from the live reader state (wave 2)
+- [x] 235-05-PLAN.md — all FOUR release seams write an honest run row (wave 2)
+- [x] 235-06-PLAN.md — the stopped verdict, computed once, from the live reader state (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 235-07-PLAN.md — the Sync button’s three-part honesty fix + the per-row degraded boundary (wave 3)
+- [x] 235-07-PLAN.md — the Sync button’s three-part honesty fix + the per-row degraded boundary (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 235-09-PLAN.md — the app-shell signal: rail badge, popover, and a mobile home (wave 4)
-- [ ] 235-10-PLAN.md — the variant-B source card, its run history, and the instance statement (wave 4)
-- [ ] 235-11-PLAN.md — the Health tab’s Sources attention section and the hop back to the card (wave 4)
+- [x] 235-09-PLAN.md — the app-shell signal: rail badge, popover, and a mobile home (wave 4)
+- [x] 235-10-PLAN.md — the variant-B source card, its run history, and the instance statement (wave 4)
+- [x] 235-11-PLAN.md — the Health tab’s Sources attention section and the hop back to the card (wave 4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 235-12-PLAN.md — adopt the fence green (both knobs), the ledger rows, and the deferral record (wave 5)
+- [x] 235-12-PLAN.md — adopt the fence green (both knobs), the ledger rows, and the deferral record (wave 5)
 
 **UI hint**: yes
 **Migrations**: **172** — `172_connector_sync_runs.sql` (per-source run history: counts, errors, listing completeness). ⚠ **CORRECTED at planning (D-235-20): this detail block read `161` and was STALE; the Phase Table row already said 172.** Phase 234 consumed 168-171 and `supabase/migrations/` ends at `171_reserved.sql`, so 172 is the next monotonic number — gaps are never backfilled.

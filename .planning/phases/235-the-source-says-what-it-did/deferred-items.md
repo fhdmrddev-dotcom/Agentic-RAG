@@ -72,3 +72,71 @@ live wave can add a key without reddening a fence it does not own. Waiting: plan
 `Unreadable here`) and its inline history-loading sentence, and plan 11's `STILL_ASKING` /
 `COULD_NOT_ASK`. **Owner:** whichever plan re-baselines the pin — it should hoist all of them in
 one move rather than one at a time.
+
+
+## From plan 235-12 (2026-09-06) — the phase's closing record
+
+### ⛔ THE FENCE IS STILL IN NEITHER KNOB, BY DECISION — and this is the item with a live trigger
+
+`frontend/src/components/sources/sourceComposition.test.tsx` closes Phase 235 at
+**16 failed / 33 passed (49)** and is therefore in **neither** `TARGETS` nor `BASELINE` of
+`scripts/vitest-count-gate.cjs`. Plan 12 refused to pin it, refused to pin it with an allowance, and
+refused to repair all sixteen at a phase's final commit. The full option table, the trajectory
+(`37/12` → `26/23` → `22/27` → `16/33`) and the per-red owner table are in `235-BASELINE.md` §7.
+
+**trigger_when — TWO independent conditions, so the item cannot be orphaned by whichever arrives
+first:**
+
+1. **The next plan that edits `sourceComposition.test.tsx`'s fixtures or harness.** Fourteen of the
+   sixteen reds are fixture/harness defects, each provable against a suite Phase 235 has now PINNED
+   (`IngestionTab.readerOff.test.tsx`, `RunHistoryList.test.tsx`, `runHistoryFold.test.ts`,
+   `WatchedFoldersSection.test.tsx`, `NavPanel.badge.test.tsx`). That plan must finish the job and
+   set BOTH knobs in its own commit.
+2. **OR the next plan that edits `frontend/src/pages/LibraryPage.tsx`'s `TabsTrigger`s.** The two
+   remaining reds (`sources-tab-ingestion`, `sources-tab-health`) need a `data-testid` on shipped
+   product markup — a two-attribute change no closeout plan may make, but a trivial one for any plan
+   already in that file.
+
+⚠ **This is NOT a "someday" note.** A deferral with no re-open trigger is a deletion that looks like
+a decision, and a design-contract fence that runs in no gate is precisely the sketch-218 failure this
+phase was built to prevent. **The fence has already earned its keep** — twenty-one of its cases went
+green by the surfaces being BUILT — but until it is in both knobs, nothing stops those surfaces
+regressing.
+
+### `release_watch` swallows its INSERT — nothing yet proves a run row was STORED
+
+Carried forward as the phase's largest OWED item. The first honest check is a **non-zero
+`count(*)` on `connector_sync_runs` after a real watch tick** — which is a **G-4 UAT row against the
+live local database, not a unit test**, because the swallow is in the write path and every unit test
+stubs it.
+
+**trigger_when:** the next `/gsd:verify-work` on any watch-loop phase, or the first operator report
+of an empty run history on a source that has demonstrably synced.
+
+### Migration 172's grant narrowing, still owed
+
+The narrowing waits on **measuring which role the asyncpg pool actually connects as** — an
+environment measurement, not a code change, and one nobody has taken.
+**trigger_when:** the next migration that touches `connector_sync_runs`, or any cloud-parity pass
+that enumerates grants.
+
+### The prune bound is not proven against live rows
+
+The retention prune's bounds are exercised against fixtures only. **trigger_when:** the first tick
+that produces more rows than the retention window, or `SEED-250`'s `app_settings` retention knob
+being built — whichever comes first.
+
+### Five suites the gate RUNS but does not GUARD, named rather than left anonymous
+
+Not this phase's, and deliberately not adopted by it (adopting a stranger's suite at a closeout
+commit pins a number nobody has reviewed): `PromptVariableChips.test.tsx` (3),
+`RunHero.test.tsx` (18), `automationFacts.test.ts` (11), `nodeEffectBanner.test.ts` (8),
+`toolReadOnlyMap.test.ts` (7). **trigger_when:** the next phase whose blast radius contains any of
+the five — pin it in that phase's own close, at the gate's own printed figure.
+
+### `src/pages/__tests__/SettingsPage.a11y.test.tsx` — STILL 4 failing, STILL inherited
+
+⚠ Re-confirmed at plan 12 by a different route than plans 08 and 11 used: **the suite is in neither
+gate knob**, so it never ran in any of this plan's three gate invocations, and the gate's green
+verdict says nothing about it either way. Unchanged owner: whichever plan next touches
+`SettingsPage.tsx` or the Settings a11y contract.

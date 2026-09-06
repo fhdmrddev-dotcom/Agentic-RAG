@@ -3194,7 +3194,37 @@ const BASELINE = {
   // two-column body that puts the folder tree inside the card it feeds.
   "SourcePreviewPanel.test.tsx": 30,
   // ── Phase 234 (234-05 / LIB-08 / SURF-01 / VIS-05) — Watched folders surface ──
-  "WatchedFoldersSection.test.tsx": 6,
+  // 6 → 27 at Phase 235: the card gained the outcome line, the stopped sentence, the
+  // degraded/report row and the history disclosure, each with its own case (235-10).
+  "WatchedFoldersSection.test.tsx": 27,
+  // ══ Phase 235 (235-12 / SURF-02 / SURF-03 / LIB-10) — "the source says what it did" ════
+  //
+  // ⚠ EVERY NUMBER BELOW IS THE GATE'S OWN PRINTED `— N new` FIGURE at this commit, read
+  // off the run made with the TARGETS lines added and these keys still absent. None is
+  // copied from a plan summary and none is guessed: the ten `— N new` figures sum to
+  // EXACTLY +150 and the grand total moved 7565 → 7715, which is the arithmetic that
+  // separates growth from drift (Phase 192.2's rule — an unexplained `+n` is the thing to
+  // worry about, never a bigger number).
+  //
+  // BOTH knobs are set in the SAME COMMIT as the TARGETS lines above. See that block for
+  // why (`exit 2`, not `fail`) and for the checked-not-assumed finding that none of
+  // `src/components/sources`, `src/components/library`, `src/components/layout` or
+  // `src/hooks` is a directory entry.
+  //
+  // ⛔ `sourceComposition.test.tsx` — the phase's design-contract fence — IS IN NEITHER
+  // KNOB, DELIBERATELY, BECAUSE IT IS RED (16 failed / 33 passed of 49). Full reasoning in
+  // the TARGETS block. This is stated in both places because a reader who greps one knob
+  // must not conclude the omission was an oversight.
+  "sourceHealthVocabulary.test.ts": 42,
+  "runHistoryFold.test.ts": 17,
+  "RunHistoryList.test.tsx": 18,
+  "WatchedFoldersSection.history.test.tsx": 17,
+  "IngestionTab.readerOff.test.tsx": 5,
+  "SourcesAttentionSection.test.tsx": 13,
+  "NavPanel.badge.test.tsx": 14,
+  "ChatLayout.badge.test.tsx": 5,
+  "useSourceAttention.test.tsx": 13,
+  "LibraryPage.initialTab.test.tsx": 6,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4490,6 +4520,39 @@ const TARGETS = [
   "src/components/sources/SourcePreviewPanel.test.tsx",
   // ── Phase 234 (234-05) — watched folders surface ──
   "src/components/sources/WatchedFoldersSection.test.tsx",
+  // ══ Phase 235 (235-12 / SURF-02 / SURF-03 / LIB-10) — "the source says what it did" ════
+  //
+  // NINE suites, and BOTH knobs are set in the SAME COMMIT that adopts them, for the reason
+  // Phase 233's BASELINE block records: a `BASELINE` key naming a path this array does not
+  // RUN makes the gate ERROR (exit 2) rather than fail.
+  //
+  // ⚠ EVERY ONE OF THESE NEEDS ITS OWN PATH LINE, AND THAT WAS CHECKED AGAINST THE ARRAY
+  // RATHER THAN ASSUMED. `src/components/sources`, `src/components/library`,
+  // `src/components/layout` and `src/hooks` are NONE of them directory entries — this whole
+  // array contains exactly TWO directory entries (`src/landing` and
+  // `src/components/workflows`), and a path entry recurses into nothing. Phase 214's
+  // `WorkflowScheduleModal.test.tsx` finding (it RAN for phases while guarding nothing) is
+  // the inverse of this one, and both come from not looking.
+  //
+  // ⛔ THE TENTH SUITE OF THIS PHASE IS DELIBERATELY ABSENT FROM BOTH KNOBS AND IT IS THE
+  // MOST IMPORTANT ONE: `src/components/sources/sourceComposition.test.tsx`, the phase's
+  // whole design-contract fence, is RED (16 failed / 33 passed of 49) at this commit. The
+  // gate's contract is *zero failing, forever*; pinning a red suite would redden the shared
+  // gate for the entire repository, and adopting it with an allowance would make it a gate
+  // that cannot fail — which is exactly what sketch 218 shipped and what this fence exists
+  // to stop. All 16 reds are itemised with owners in `235-11-SUMMARY.md` and carried forward
+  // in `235-12-SUMMARY.md` + `deferred-items.md`. **The fence RUNS in no gate today. That is
+  // recorded loudly rather than hidden behind a green verdict line.**
+  "src/components/sources/sourceHealthVocabulary.test.ts",
+  "src/components/sources/runHistoryFold.test.ts",
+  "src/components/sources/RunHistoryList.test.tsx",
+  "src/components/sources/WatchedFoldersSection.history.test.tsx",
+  "src/components/library/__tests__/IngestionTab.readerOff.test.tsx",
+  "src/components/library/__tests__/SourcesAttentionSection.test.tsx",
+  "src/components/layout/__tests__/NavPanel.badge.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.badge.test.tsx",
+  "src/hooks/__tests__/useSourceAttention.test.tsx",
+  "src/pages/__tests__/LibraryPage.initialTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
