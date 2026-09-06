@@ -7663,6 +7663,44 @@ nullable — a watch that has never run reads `None`, which is a **different fac
 must stay tellable apart. `WatchResponse` learned this the hard way (`d08a60709`, a
 `ResponseValidationError` → 500 → no CORS headers → the browser said `TypeError: Failed to fetch`).
 
+### ⚠ Re-derived 2026-09-06 (Phase 235 plan 14, gap-closure round 1) — **2 / 2 / 696**
+
+The header triple above (`1 / 1 / 439`) is **kept, not overwritten** — it was already superseded once
+at 235's close (`2 / 2 / 634`) and this plan moved it again in the same week. G-5 does not fire (2
+phases), and the module is still one data-access home.
+
+⭐ **`last_success_by_watch` is the THIRD read on `connector_sync_runs`, and the ONLY unbounded one.**
+`list_sync_runs` is per-watch + `LIMIT`; `recent_runs_by_watch` is `ROW_NUMBER()`-windowed to five per
+watch. Both are correct for what they feed — a history page and a leading-streak verdict. Neither can
+answer *"when did this source last read successfully?"* for a source that has failed more ticks than
+the window is deep, which is `235-VERIFICATION.md` gap **G2**: `last_good_at` came back `None` and
+every surface rendered **silence** (never a lie — `provenNeverRead` already gated the *"has not read
+successfully yet"* sentence on the unbounded run list, so nothing was ever libelled).
+
+⚠ **THE ALTERNATIVE FIX WAS WIDENING THE WINDOW, AND IT WAS REJECTED ON COST.**
+`recent_runs_by_watch` feeds `GET /sources/health`, which every signed-in page polls; raising
+`_HEALTH_RUN_WINDOW` multiplies rows read on **every** poll for **every healthy** source, to answer a
+question only STOPPED sources ask. The aggregate instead runs once, for the already-stopped watch ids
+only — **zero rows on a healthy instance, and no query at all when that list is empty** (asserted:
+`test_last_success_by_watch_empty_input_issues_no_query` fails if the pool is acquired).
+
+⛔ **The owner predicate is in the SQL — `user_id = $2` now appears in all THREE reads.** This pool
+path is not RLS-gated. Asserted over the executed statement text, not over the call site.
+
+⚠ **Absence, never `None` in a value slot.** A watch with no successful tick is simply missing from
+the mapping. The api-layer fill is `verdict_value or looked_up.get(id)`; a present-with-`None` would
+make that a silent no-op that reads exactly like a fix. The `status = 'success'` filter already makes
+a NULL aggregate unreachable — the defensive drop is what keeps *absence* the only spelling.
+
+⚠ **The status literal is pinned, not trusted.** `_SYNC_RUN_COLUMNS` is deliberately NOT reused (this
+selects an aggregate; seventeen columns to read one instant is the amplification the sibling docblock
+warns about), and the SQL's `'success'` is asserted equal to `health_verdict.SUCCESS_STATUS` — without
+importing a service into the DAL. If that constant ever moves, the aggregate would otherwise answer
+about a status nothing writes while every other assertion still passed.
+
+Index unchanged: `idx_connector_sync_runs_watch_time` `(watch_id, started_at DESC)` serves the
+`MAX(started_at)` per `watch_id` as a bounded index scan. **No migration is added by this plan.**
+
 ---
 
 ## backend/app/api/sources.py
