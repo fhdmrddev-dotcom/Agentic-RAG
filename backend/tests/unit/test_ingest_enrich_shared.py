@@ -28,6 +28,8 @@ from app.services.ingest_enrich import EnrichedIngest, enrich_for_ingest
 _BACKEND = Path(__file__).resolve().parents[2]
 _SPLICE = _BACKEND / "app" / "services" / "ingest_splice.py"
 _DOCUMENTS = _BACKEND / "app" / "api" / "documents.py"
+#: The ONE shared enrichment home both ingest paths call (BUG-260905-06 / BUG-260906-01).
+_ENRICH = _BACKEND / "app" / "services" / "ingest_enrich.py"
 
 
 def _source(p: Path) -> str:
@@ -382,3 +384,266 @@ def test_the_zero_chunk_guard_uses_the_authoritative_recount_not_the_local_list(
     assert "if not chunks:" not in code.split("4d. Finalize")[-1], (
         "the finalize guard must read the recount, never the local chunk list"
     )
+
+
+# ── BUG-260906-01 — classification is a step, so BOTH paths must run it ───────────────
+#
+# ⛔ THE FIFTH DEFECT OF ONE SHAPE, AND THE FIRST FOUR ARE ALREADY TESTED ABOVE. The
+# Phase 118 rule-eval pass lived inline in `ingest_document`, ~330 lines below the metadata
+# block that BUG-260905-06 extracted into `enrich_for_ingest`. The extraction walked past
+# it, so a file arriving through a connector watch was chunked, embedded and marked
+# `completed` carrying `metadata._classification = None` no matter which rule matched it.
+#
+# ⚠ MEASURED, not inferred (operator's live database, 2026-09-06): the one document ingested
+#   by a watch read `folder=None | _classification=None` beside `classification_rules rows: 1`.
+#   `grep -n classification` over the queue path returned exactly ONE hit — a comment.
+#
+# ⚠ THE TESTS BELOW ARE AGREEMENT TESTS, NEVER PER-PATH TESTS. A per-path classification
+#   test would reproduce this bug's own cause: five defects have now shipped past a suite in
+#   which both paths had tests and none asserted the two paths AGREE.
+
+
+class _StubMetadata:
+    """What a legacy-mode `extract_metadata` returns — only `model_dump` is consumed."""
+
+    def __init__(self, payload: dict):
+        self._payload = payload
+
+    def model_dump(self, **_kw) -> dict:
+        return dict(self._payload)
+
+
+class _Result:
+    def __init__(self, data):
+        self.data = data
+
+
+class _RoutingTable:
+    """⚠ TABLE-AWARE ON PURPOSE. `_FakeTable` above answers `data=None` to everything, which
+    can never serve a rule — so a classification test written against it would pass while
+    proving nothing. This one dispatches on the table NAME the caller asked for.
+
+    ⚠ `.or_()` IS A NO-OP HERE, DELIBERATELY. The real PostgREST `or` filter is applied by
+      the server; a fake that honoured it would hide the very thing AR-118-02 exists to
+      catch. Returning the rows UNFILTERED is what lets
+      `test_a_foreign_users_rule_is_never_evaluated` drive the fail-closed Python re-filter.
+    """
+
+    def __init__(self, name: str, rules: list[dict], raise_on_rules: bool):
+        self._name = name
+        self._rules = rules
+        self._raise = raise_on_rules
+
+    def select(self, *_a, **_k):
+        return self
+
+    def or_(self, *_a, **_k):
+        return self
+
+    def eq(self, *_a, **_k):
+        return self
+
+    def order(self, *_a, **_k):
+        return self
+
+    def limit(self, *_a, **_k):
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def single(self):
+        return self
+
+    def update(self, *_a, **_k):
+        return self
+
+    def execute(self):
+        if self._name == "classification_rules":
+            if self._raise:
+                raise RuntimeError("classification_rules read exploded")
+            return _Result(list(self._rules))
+        if self._name == "metadata_field_definitions":
+            return _Result([])          # whitelist = built-ins only
+        # `documents` -> the prior-metadata maybe_single read (no prior row).
+        # `folders`   -> build_suggestion's fresh name resolve, which degrades to None.
+        return _Result(None)
+
+
+class _RoutingSupabase:
+    def __init__(self, rules: list[dict], raise_on_rules: bool = False):
+        self._rules = rules
+        self._raise = raise_on_rules
+
+    def table(self, name):
+        return _RoutingTable(name, self._rules, self._raise)
+
+
+_OWNER = "11111111-1111-1111-1111-111111111111"
+_STRANGER = "22222222-2222-2222-2222-222222222222"
+
+#: A rule that matches the stub metadata below. `document_type` is a DocumentMetadata
+#: built-in, so it passes `validate_fields` against the built-ins-only whitelist.
+_MATCHING_EXPR = {
+    "op": "and",
+    "conditions": [{"field": "document_type", "op": "eq", "value": "invoice"}],
+}
+
+
+def _own_rule() -> dict:
+    return {
+        "id": "rule-own-1",
+        "name": "Invoices go to Finance",
+        "user_id": _OWNER,
+        "is_system_global": False,
+        "enabled": True,
+        "match_expr": _MATCHING_EXPR,
+        "suggest_folder_id": "f0000000-0000-0000-0000-000000000001",
+    }
+
+
+@pytest.fixture
+def _stub_extraction(monkeypatch):
+    """Deterministic non-empty metadata with no network call.
+
+    `enrich_for_ingest` imports `extract_metadata` FUNCTION-LOCALLY, so patching the module
+    attribute lands on the call. `_Settings.metadata_enrichment_mode` is `"legacy"`, which
+    is the arm that uses it.
+    """
+    import app.services.embedding_service as _es
+
+    monkeypatch.setattr(
+        _es,
+        "extract_metadata",
+        lambda _text: _StubMetadata({"document_type": "invoice", "title": "ACME"}),
+    )
+
+
+def _kwargs(supabase, user_id=_OWNER) -> dict:
+    return {
+        "document_id": "doc-classify-1",
+        "text": "Invoice 4417 from ACME Ltd.",
+        "raw": b"",
+        "mime_type": "text/plain",
+        "filename": "acme-invoice.txt",
+        "user_id": user_id,
+        "supabase": supabase,
+        "app_settings": _Settings(),
+    }
+
+
+def _via_legacy_path(supabase, user_id=_OWNER) -> EnrichedIngest:
+    """The shape `documents.py:2127` calls — a direct sync call from a BackgroundTask."""
+    return enrich_for_ingest(**_kwargs(supabase, user_id))
+
+
+def _via_queue_path(supabase, user_id=_OWNER) -> EnrichedIngest:
+    """The shape `ingest_splice.py:618-621` calls — off the event loop, in a worker thread.
+
+    ⚠ `run_in_threadpool` is not decoration here either. Driving the queue side through the
+      REAL transport is the only way this test can tell "both paths run the step" from
+      "the function contains the step".
+    """
+    import asyncio
+
+    from starlette.concurrency import run_in_threadpool
+
+    async def _drive():
+        return await run_in_threadpool(enrich_for_ingest, **_kwargs(supabase, user_id))
+
+    return asyncio.run(_drive())
+
+
+def test_both_paths_derive_the_same_classification(_stub_extraction):
+    """⭐ THE ONE TEST THAT WOULD HAVE CAUGHT THIS.
+
+    ⚠ IT ASSERTS AGREEMENT, NOT PRESENCE. Checking only that one side produces a suggestion
+      is exactly the test shape that let five of these ship: the legacy path was always
+      green, and its greenness said nothing whatsoever about the queue path.
+    """
+    legacy = _via_legacy_path(_RoutingSupabase([_own_rule()]))
+    queued = _via_queue_path(_RoutingSupabase([_own_rule()]))
+
+    legacy_cls = (legacy.metadata or {}).get("_classification")
+    queued_cls = (queued.metadata or {}).get("_classification")
+
+    assert legacy_cls is not None, "the legacy upload path derived no classification"
+    assert queued_cls is not None, (
+        "the QUEUE path derived no classification — this is BUG-260906-01: every watched "
+        "or synced file reaches `completed` with `_classification=None`"
+    )
+    assert legacy_cls["rule_id"] == "rule-own-1"
+    assert legacy_cls == queued_cls, (
+        "the two ingest paths disagree about the same document's classification"
+    )
+
+
+def test_a_foreign_users_rule_is_never_evaluated(_stub_extraction):
+    """⛔ THE HIGHEST-STAKES PROPERTY OF THE MOVE — AR-118-02, driven not assumed.
+
+    This read runs under the SERVICE-ROLE client with no request JWT: `auth.uid()` is NULL
+    and RLS is BYPASSED, so the in-app `.or_(...)` predicate is the SOLE owner gate and the
+    Python re-filter behind it is defence in depth. The fake deliberately returns an
+    OVER-BROAD result (it ignores `.or_()`, exactly as a malformed server-side filter would)
+    carrying a stranger's rule whose expression WOULD match this document.
+    """
+    foreign = _own_rule()
+    foreign["id"] = "rule-stranger-1"
+    foreign["user_id"] = _STRANGER
+    foreign["is_system_global"] = False
+
+    out = _via_legacy_path(_RoutingSupabase([foreign]))
+    queued = _via_queue_path(_RoutingSupabase([foreign]))
+
+    assert "_classification" not in (out.metadata or {}), (
+        "another user's rule was evaluated against this uploader's metadata"
+    )
+    assert "_classification" not in (queued.metadata or {}), (
+        "the queue path leaked another user's rule — the re-filter did not survive the move"
+    )
+
+
+def test_classification_never_blocks_ingestion(_stub_extraction):
+    """⛔ THE SOFT FAILURE IS DELIBERATE BEHAVIOUR, NOT AN OVERSIGHT.
+
+    A rules read that raises must degrade to "no suggestion" and let the document ingest.
+    The alternative — a classification-config problem failing an ingestion outright — is the
+    same class of defect D-111-8 forbids for metadata.
+    """
+    exploding = _RoutingSupabase([], raise_on_rules=True)
+
+    out = _via_legacy_path(exploding)
+
+    assert isinstance(out, EnrichedIngest)
+    assert out.metadata is not None, "a classification failure destroyed the derived metadata"
+    assert out.metadata.get("document_type") == "invoice"
+    assert "_classification" not in out.metadata
+
+
+def test_classification_lives_in_one_home_not_two():
+    """The single-home fence. Modelled on `test_both_ingest_paths_call_the_shared_enrichment`,
+    which learned two things the hard way and both apply here:
+
+    ⚠ STRIP COMMENT LINES. A fence a comment can satisfy is not a fence — and the moved
+      block carries an explanatory comment naming `classification_matcher` in the file it
+      LEFT would be enough to fool a bare substring search.
+    ⚠ DO NOT DEMAND A FOLLOWING `(`. The usage shapes differ (`classification_matcher` is
+      imported as a MODULE, then dotted), so a regex tuned to one call shape fails correct code.
+    """
+    def _code_lines(path: Path) -> list[str]:
+        return [
+            line for line in _source(path).split("\n")
+            if "classification_matcher" in line and not line.lstrip().startswith("#")
+        ]
+
+    for path in (_SPLICE, _DOCUMENTS):
+        assert _code_lines(path) == [], (
+            f"{path.name} evaluates classification rules itself — the step has two homes "
+            f"again, which is precisely how BUG-260906-01 happened: {_code_lines(path)}"
+        )
+
+    enrich_uses = _code_lines(_ENRICH)
+    assert enrich_uses, "ingest_enrich.py does not run the classification pass at all"
+    assert any(
+        not ln.lstrip().startswith(("from ", "import ")) for ln in enrich_uses
+    ), "ingest_enrich.py only IMPORTS the matcher — an import is not a use"
